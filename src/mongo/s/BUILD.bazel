@@ -381,6 +381,16 @@ idl_generator(
 )
 
 mongo_cc_library(
+    name = "add_shard_idl",
+    srcs = ["//src/mongo/s/request_types:add_shard_gen"],
+    hdrs = ["//src/mongo/db/auth:authorization_contract.h"],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/s:type_shard_identity_idl",
+    ],
+)
+
+mongo_cc_library(
     name = "common_s",
     srcs = [
         "//src/mongo/s/catalog:type_changelog.cpp",
@@ -402,7 +412,6 @@ mongo_cc_library(
         "//src/mongo/s/migration_blocking_operation:migration_blocking_operation_cluster_parameters_gen",
         "//src/mongo/s/migration_blocking_operation:migration_blocking_operation_feature_flags_gen",
         "//src/mongo/s/request_types:abort_reshard_collection_gen",
-        "//src/mongo/s/request_types:add_shard_request_type.cpp",
         "//src/mongo/s/request_types:add_shard_to_zone_gen",
         "//src/mongo/s/request_types:auto_split_vector_gen",
         "//src/mongo/s/request_types:balancer_collection_status_gen",
@@ -520,7 +529,6 @@ mongo_cc_library(
         "//src/mongo/s/catalog:type_shard.h",
         "//src/mongo/s/catalog:type_tags.h",
         "//src/mongo/s/request_types:merge_chunk_request_valid.h",
-        "//src/mongo/s/request_types:add_shard_request_type.h",
         "//src/mongo/s/request_types:migration_secondary_throttle_options.h",
         "//src/mongo/s/request_types:remove_shard_from_zone_request_type.h",
         "//src/mongo/s/request_types:update_zone_key_range_serialization.h",
@@ -553,6 +561,7 @@ mongo_cc_library(
         "//src/mongo/db:mongohasher",
         "//src/mongo/rpc:command_status",
         "//src/mongo/db:server_feature_flags",
+        ":add_shard_idl",
         ":analyze_shard_key_common",
         ":sharding_helpers",
         "//src/mongo/executor:scoped_task_executor",
@@ -1148,7 +1157,6 @@ mongo_cc_unit_test(
         "//src/mongo/s/client:config_shard_wrapper_test.cpp",
         "//src/mongo/s/client:shard_registry_test.cpp",
         "//src/mongo/s/client:shard_remote_test.cpp",
-        "//src/mongo/s/request_types:add_shard_request_test.cpp",
         "//src/mongo/s/request_types:add_shard_to_zone_request_test.cpp",
         "//src/mongo/s/request_types:merge_chunks_request_test.cpp",
         "//src/mongo/s/request_types:migration_secondary_throttle_options_test.cpp",

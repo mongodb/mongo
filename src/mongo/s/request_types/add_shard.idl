@@ -1,4 +1,4 @@
-# Copyright (C) 2018-present MongoDB, Inc.
+# Copyright (C) 2025-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
@@ -30,13 +30,57 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/db/basic_types.idl"
-    - "mongo/db/s/type_shard_identity.idl"
+  - "mongo/db/basic_types.idl"
+  - "mongo/db/s/type_shard_identity.idl"
+
+structs:
+    AddShardRequestBase:
+        description: "The addShard request fields shared by the add shard commands"
+        strict: false
+        fields:
+            name:
+                description: "A name for the shard."
+                type: string
+                optional: true
+
+    addShardResponse:
+        description: "The response for AddShard commands."
+        strict: false
+        fields:
+            shardAdded:
+                description: "A name for the shard."
+                type: string
+                optional: true
 
 commands:
+    addShard:
+        command_name: addShard
+        command_alias: addshard
+        cpp_name: AddShard
+        description: The public addShard command to add a shard."
+        strict: false
+        namespace: type
+        type: connection_string
+        api_version: ""
+        chained_structs:
+            AddShardRequestBase: AddShardRequestBase
+
+    _configsvrAddShard:
+        command_name: _configsvrAddShard
+        cpp_name: ConfigsvrAddShard
+        description: "The internal _configsvrAddShard command to add a shard."
+        strict: false
+        namespace: type
+        type: connection_string
+        api_version: ""
+        chained_structs:
+            AddShardRequestBase: AddShardRequestBase
+
     _addShard:
         command_name: _addShard
-        cpp_name: AddShard
+        # TODO (SERVER-99411): make this alias the command_name when 9.0 becomes last LTS
+        command_alias: _shardsvrAddShard
+        cpp_name: ShardsvrAddShard
         description: "_addShard Command"
         namespace: ignored
         api_version: ""

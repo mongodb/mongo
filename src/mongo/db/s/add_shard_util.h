@@ -37,7 +37,7 @@
 #include "mongo/db/write_concern_options.h"
 
 namespace mongo {
-class AddShard;
+class ShardsvrAddShard;
 class BSONObj;
 class OperationContext;
 
@@ -52,17 +52,17 @@ namespace add_shard_util {
 constexpr StringData kShardIdentityDocumentId = "shardIdentity"_sd;
 
 /**
- * Creates an AddShard command object that's sent from the config server to
+ * Creates an ShardsvrAddShard command object that's sent from the config server to
  * a mongod to instruct it to initialize itself as a shard in the cluster.
  */
-AddShard createAddShardCmd(OperationContext* opCtx, const ShardId& shardName);
+ShardsvrAddShard createAddShardCmd(OperationContext* opCtx, const ShardId& shardName);
 
 /**
  * Returns a BSON representation of an update request that can be used to insert a shardIdentity
  * doc into the shard with the given shardName (or update the shard's existing shardIdentity
  * doc's configsvrConnString if the _id, shardName, and clusterId do not conflict).
  */
-BSONObj createShardIdentityUpsertForAddShard(const AddShard& addShardCmd,
+BSONObj createShardIdentityUpsertForAddShard(const ShardsvrAddShard& addShardCmd,
                                              const WriteConcernOptions& wc);
 
 }  // namespace add_shard_util

@@ -81,7 +81,6 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
-#include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/s/add_shard_util.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -110,6 +109,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/database_version.h"
+#include "mongo/s/request_types/add_shard_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -541,8 +541,8 @@ protected:
 
             const auto addShardOpMsgRequest = static_cast<OpMsgRequest>(request);
 
-            auto addShardCmd =
-                AddShard::parse(IDLParserContext(AddShard::kCommandName), addShardOpMsgRequest);
+            auto addShardCmd = ShardsvrAddShard::parse(
+                IDLParserContext(ShardsvrAddShard::kCommandName), addShardOpMsgRequest);
 
             const auto& updateOpField = add_shard_util::createShardIdentityUpsertForAddShard(
                 addShardCmd, ShardingCatalogClient::kMajorityWriteConcern);

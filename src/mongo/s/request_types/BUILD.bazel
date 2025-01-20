@@ -361,3 +361,13 @@ idl_generator(
         "//src/mongo/idl:generic_argument_gen",
     ],
 )
+
+idl_generator(
+    name = "add_shard_gen",
+    src = "add_shard.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/s:type_shard_identity_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)

@@ -51,7 +51,7 @@ namespace mongo {
 
 /**
  * This command notifies an event on the shard server. The action taken is determined by the
- * event AddShard: Add an oplog entry for the new shard.
+ * event ShardsvrAddShard: Add an oplog entry for the new shard.
  */
 class ShardsvrNotifyShardingEventCommand : public TypedCommand<ShardsvrNotifyShardingEventCommand> {
 public:

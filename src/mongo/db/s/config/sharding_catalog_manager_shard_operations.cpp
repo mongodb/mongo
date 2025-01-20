@@ -100,7 +100,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/resource_yielder.h"
-#include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/s/add_shard_util.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
@@ -145,6 +144,7 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/remove_shard_gen.h"
+#include "mongo/s/request_types/add_shard_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/request_types/shardsvr_join_ddl_coordinators_request_gen.h"
 #include "mongo/s/request_types/shardsvr_join_migrations_request_gen.h"
@@ -1368,7 +1368,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     };
 
     if (!isConfigShard) {
-        AddShard addShardCmd = add_shard_util::createAddShardCmd(opCtx, shardType.getName());
+        ShardsvrAddShard addShardCmd =
+            add_shard_util::createAddShardCmd(opCtx, shardType.getName());
 
         // Use the _addShard command to add the shard, which in turn inserts a shardIdentity
         // document into the shard and triggers sharding state initialization.

@@ -200,16 +200,6 @@ mongo_cc_library(
 )
 
 idl_generator(
-    name = "add_shard_cmd_gen",
-    src = "add_shard_cmd.idl",
-    deps = [
-        ":type_shard_identity_gen",
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-idl_generator(
     name = "participant_block_gen",
     src = "participant_block.idl",
     deps = [
@@ -451,6 +441,15 @@ idl_generator(
 )
 
 mongo_cc_library(
+    name = "type_shard_identity_idl",
+    srcs = ["type_shard_identity_gen"],
+    deps = [
+        "//src/mongo/client:connection_string",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
     name = "resharding_server_parameters_idl",
     srcs = ["//src/mongo/db/s/resharding:resharding_server_parameters_gen"],
     deps = ["//src/mongo/db:server_base"],
@@ -608,12 +607,10 @@ mongo_cc_library(
         "sharding_util.cpp",
         "split_chunk_request_type.cpp",
         "type_shard_identity.cpp",
-        ":add_shard_cmd_gen",
         ":participant_block_gen",
         ":remove_tags_gen",
         ":sharded_index_catalog_commands_gen",
         ":sharding_config_server_parameters_gen",
-        ":type_shard_identity_gen",
         "//src/mongo/db/s/balancer:auto_merger_policy.cpp",
         "//src/mongo/db/s/balancer:balance_stats.cpp",
         "//src/mongo/db/s/balancer:balancer.cpp",
@@ -720,6 +717,7 @@ mongo_cc_library(
         "//src/mongo/executor:inline_executor",
         "//src/mongo/executor:network_interface",
         "//src/mongo/idl:cluster_server_parameter_common",
+        "//src/mongo/s:add_shard_idl",
         "//src/mongo/s:common_s",
         "//src/mongo/s/catalog:sharding_catalog_client_impl",
         "//src/mongo/s/client:sharding_client",
