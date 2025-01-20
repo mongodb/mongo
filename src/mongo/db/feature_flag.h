@@ -58,9 +58,10 @@ namespace mongo {
 class FeatureFlag {
     friend class FeatureFlagServerParameter;
 
-public:
+protected:
     FeatureFlag(bool enabled, StringData versionString, bool shouldBeFCVGated);
 
+public:
     /**
      * Returns true if the flag is set to true and enabled for this FCV version.
      * If the functionality of this function changes, make sure that the
@@ -131,6 +132,19 @@ private:
     bool _enabled;
     multiversion::FeatureCompatibilityVersion _version;
     bool _shouldBeFCVGated;
+};
+
+// TODO(SERVER-99351): Review the API exposed for FCV-gated feature flags
+class FeatureFlagFCVGated : public FeatureFlag {
+public:
+    FeatureFlagFCVGated(bool enabled, StringData versionString)
+        : FeatureFlag(enabled, versionString, true) {}
+};
+
+// TODO(SERVER-99302): Review the API exposed for binary-compatible feature flags
+class FeatureFlagBinaryCompatible : public FeatureFlag {
+public:
+    FeatureFlagBinaryCompatible(bool enabled) : FeatureFlag(enabled, "", false) {}
 };
 
 /**

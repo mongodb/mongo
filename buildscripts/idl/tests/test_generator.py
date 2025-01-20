@@ -1280,6 +1280,111 @@ class TestGenerator(testcase.IDLTestcase):
             ],
         )
 
+    def test_feature_flag_binary_compatible_disabled_by_default(self) -> None:
+        """Test generation of a disabled by default binary-compatible feature flag"""
+        header, source = self.assert_generate_with_basic_types(
+            dedent(
+                """
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: false
+                    shouldBeFCVGated: false
+            """
+            )
+        )
+        self.assertStringsInFile(
+            header,
+            ["mongo::FeatureFlagBinaryCompatible gToaster;"],
+        )
+        self.assertStringsInFile(
+            source,
+            [
+                "mongo::FeatureFlagBinaryCompatible gToaster{false};",
+                '<FeatureFlagServerParameter>("featureFlagToaster", gToaster);',
+            ],
+        )
+
+    def test_feature_flag_binary_compatible_enabled_by_default(self) -> None:
+        """Test generation of an enabled by default binary-compatible feature flag"""
+        header, source = self.assert_generate_with_basic_types(
+            dedent(
+                """
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: true
+                    shouldBeFCVGated: false
+            """
+            )
+        )
+        self.assertStringsInFile(
+            header,
+            ["mongo::FeatureFlagBinaryCompatible gToaster;"],
+        )
+        self.assertStringsInFile(
+            source,
+            [
+                "mongo::FeatureFlagBinaryCompatible gToaster{true};",
+                '<FeatureFlagServerParameter>("featureFlagToaster", gToaster);',
+            ],
+        )
+
+    def test_feature_flag_fcv_gated_disabled_on_all_versions_by_default(self) -> None:
+        """Test generation of an FCV-gated feature flag disabled by default for all versions"""
+        header, source = self.assert_generate_with_basic_types(
+            dedent(
+                """
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: false
+                    shouldBeFCVGated: true
+            """
+            )
+        )
+        self.assertStringsInFile(
+            header,
+            ["mongo::FeatureFlagFCVGated gToaster;"],
+        )
+        self.assertStringsInFile(
+            source,
+            [
+                'mongo::FeatureFlagFCVGated gToaster{false, ""_sd};',
+                '<FeatureFlagServerParameter>("featureFlagToaster", gToaster);',
+            ],
+        )
+
+    def test_feature_flag_fcv_gated_enabled_since_version(self) -> None:
+        """Test generation of an FCV-gated feature flag enabled since a specified version"""
+        header, source = self.assert_generate_with_basic_types(
+            dedent(
+                """
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: true
+                    version: 123
+                    shouldBeFCVGated: true
+            """
+            )
+        )
+        self.assertStringsInFile(
+            header,
+            ["mongo::FeatureFlagFCVGated gToaster;"],
+        )
+        self.assertStringsInFile(
+            source,
+            [
+                'mongo::FeatureFlagFCVGated gToaster{true, "123"_sd};',
+                '<FeatureFlagServerParameter>("featureFlagToaster", gToaster);',
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
