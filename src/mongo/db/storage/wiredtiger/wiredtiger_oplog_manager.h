@@ -101,11 +101,6 @@ public:
     std::uint64_t getOplogReadTimestamp() const;
     void setOplogReadTimestamp(Timestamp ts);
 
-    /**
-     * Returns an empty string if `initialize` hasn't been called.
-     */
-    StringData getIdent() const;
-
 private:
     void _setOplogReadTimestamp(WithLock, uint64_t newTimestamp);
 

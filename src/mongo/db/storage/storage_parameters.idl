@@ -214,7 +214,7 @@ server_parameters:
         redact: false
 
     enableAutoCompaction:
-        description: 'Enable auto compact at startup.'
+        description: 'Enable auto compact at startup. Used for testing purposes.'
         cpp_vartype: bool
         cpp_varname: gEnableAutoCompaction
         set_at: startup
