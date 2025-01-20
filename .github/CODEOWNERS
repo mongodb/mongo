@@ -2096,6 +2096,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/tla_plus/OWNERS.yml
 /src/mongo/tla_plus/**/TxnsMoveRange* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/tla_plus/**/TxnsCollectionIncarnation* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/tools/mongobridge_tool/OWNERS.yml
 /src/mongo/tools/mongobridge_tool/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot

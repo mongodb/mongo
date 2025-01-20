@@ -3,3 +3,6 @@ filters:
   - "TxnsMoveRange*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "TxnsCollectionIncarnation*":
+    approvers:
+      - 10gen/server-catalog-and-routing

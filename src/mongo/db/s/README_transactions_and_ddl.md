@@ -29,9 +29,9 @@ From an isolation perspective:
   distribution change occurring after the snapshot is established is invisible.
 - The placement versioning protocol, and more broadly, the routing protocol, operate with _read
   committed_ level: routing continuously observe data distribution changes. This routing protocol
-  behaviour is also true on the shard end: the shard validates that the incoming request originates from
-  a router that has the last data ownership information, regardless of whether this owernship
-  information is visibile in the existing data snapshot.
+  behavior is also true on the shard end: the shard validates that the incoming request originates from
+  a router that has the last data ownership information, regardless of whether this ownership
+  information is visible in the existing data snapshot.
 
 In practical terms, the routing protocol covers the case where the router is stale compared to the
 shard's view of the catalog, however it is not designed to address the case where the router uses
@@ -46,6 +46,11 @@ in itself cannot forbid the following anomalies:
   [collection generation](https://github.com/mongodb/mongo/blob/master/src/mongo/db/catalog/README_terminology.md)
   that is newer than the one in the shard's snapshot. This could occur, for instance, when the
   collection's namespace is recreated on the shard after the transaction has established a snapshot.
+- **Collection incarnation anomaly:** Similar to the collection generation anomaly, but concerning
+  the local catalog. The router forwards a request with ShardVersion::UNSHARDED, bypassing collection
+  generation checks. The request might be for a namespace that was sharded when the transaction
+  established the snapshot. Processing this request would incorrectly return partial data for the
+  collection as the router only targeted the primary shard.
 
 The sections below describe the protocols transactions use along with the placement versioning
 protocol to forbid the anomalies above.
@@ -63,17 +68,21 @@ The protocol is as follows:
 1. The targeted shard checks the attached placement version. All the following conditions must be
    met for the request to be considered valid:
    1. It must match the current (latest) placement version for this shard.
-   1. `atClusterTime` must not be earlier than the placement version's [timestamp field](https://github.com/mongodb/mongo/blob/8a79395deff895f18b8878ff4567c9fb309a7c64/src/mongo/db/s/README_versioning_protocols.md#shard-version).
+   1. The received `atClusterTime` must not be earlier than the placement version's [timestamp field](https://github.com/mongodb/mongo/blob/8a79395deff895f18b8878ff4567c9fb309a7c64/src/mongo/db/s/README_versioning_protocols.md#shard-version) known by the shard.
       This field represents the commit timestamp of the latest collection generation operation
       (e.g. shardCollection, renameCollection, etc) on this sharded collection.
+   1. If the placement version is UNSHARDED, the collection in the snapshot must be the same
+      incarnation (same UUID) as in the latest CollectionCatalog.
 
 Notes:
 
 - (3.i) ensures that the routing table used by the router (including its history) is not stale. This
   is part of the placement versioning protocol.
 - (3.ii) ensures that the collection did not undergo any collection generation change at a timestamp
-  later than atClusterTime, which would make the current routing/filtering metadata invalid to be used
+  later than `atClusterTime`, which would make the current routing/filtering metadata invalid to be used
   with the point-in-time storage snapshot. This proscribes the collection generation anomaly.
+- (3.iii) ensures that the collection incarnation anomaly is detected by the primary shard after a
+  sharded collection is reincarnated as unsharded (by definition, ShardVersion::UNSHARDED always conforms with 3.ii).
 
 ## Transactions with readConcern="local" or "majority"
 
@@ -99,9 +108,14 @@ The protocol is as follows:
       etc) on this collection.
    1. `placementConflictTime` must not be earlier than the latest _incoming_ migration commit timestamp on this
       shard for this collection.
+   1. If the placement version is UNSHARDED, the collection in the snapshot must be the same
+      incarnation (same UUID) as in the latest CollectionCatalog.
 
 A formal specification of the placement versioning protocol and the protocol avoiding the data
-placement anomaly is available [here](https://github.com/mongodb/mongo/tree/master/src/mongo/tla_plus/TxnsMoveRange).
+placement anomaly is available [here](/src/mongo/tla_plus/TxnsMoveRange).
+
+A formal specification of the protocol avoiding the collection generation and collection incarnation
+anomalies is available [here](/src/mongo/tla_plus/TxnsCollectionIncarnation).
 
 Notes:
 
@@ -112,6 +126,8 @@ Notes:
   invalid to be used with the open snapshot. This proscribes the collection generation anomaly.
 - (5.iii) ensures no migration committed since `placementConflictTime`. This proscribes the data
   placement anomaly.
+- (5.iv) ensures that the collection incarnation anomaly is detected by the primary shard after a
+  sharded collection is reincarnated unsharded.
 - The `afterClusterTime` selected at (3) imposes a lower bound for each shard's snapshot read
   timestamp. The (5.i) and (5.ii) assertions check that the metadata/placement has not changed since
   that lower bound, therefore guaranteeing that the assertions are valid for whatever timestamp could
