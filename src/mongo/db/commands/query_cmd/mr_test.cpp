@@ -587,13 +587,11 @@ TEST_F(MapReduceCommandTest, ReplacingExistingOutputCollectionPreservesIndexes) 
         writeConflictRetry(
             _opCtx.get(), "ReplacingExistingOutputCollectionPreservesIndexes", outputNss, [&] {
                 WriteUnitOfWork wuow(_opCtx.get());
-                CollectionWriter writer{_opCtx.get(), coll};
-
                 ASSERT_OK(
-                    writer.getWritableCollection(_opCtx.get())
+                    coll.getWritableCollection(_opCtx.get())
                         ->getIndexCatalog()
                         ->createIndexOnEmptyCollection(
-                            _opCtx.get(), writer.getWritableCollection(_opCtx.get()), indexSpec));
+                            _opCtx.get(), coll.getWritableCollection(_opCtx.get()), indexSpec));
                 wuow.commit();
             });
     }

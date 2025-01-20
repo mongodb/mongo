@@ -72,13 +72,6 @@ namespace mongo {
 extern const SharedCollectionDecorations::Decoration<AtomicWord<bool>>
     historicalIDTrackerAllowsMixedModeWrites;
 
-namespace catalog {
-// Forward declaration of a friend class for the CollectionCatalog since it resides in another
-// namespace. This is a special class that controls opening/closing the catalog and resides in
-// catalog_control.cpp
-class CatalogControlUtils;
-};  // namespace catalog
-
 class CollectionCatalog {
     friend class iterator;
     using OrderedCollectionMap =
@@ -325,8 +318,8 @@ public:
                                                      boost::optional<Timestamp> commitTime);
 
     /**
-     * Create a temporary record of an uncommitted view namespace to aid in detecting a
-     * simultaneous attempt to create a collection with the same namespace.
+     * Create a temporary record of an uncommitted view namespace to aid in detecting a simultaneous
+     * attempt to create a collection with the same namespace.
      */
     void registerUncommittedView(OperationContext* opCtx, const NamespaceString& nss);
 
@@ -386,6 +379,31 @@ public:
                                                   const NamespaceString& nss) const;
     const Collection* lookupCollectionByNamespaceOrUUID(
         OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID) const;
+
+    /**
+     * Returns a non-const Collection pointer that corresponds to the provided NamespaceString/UUID
+     * for a DDL operation.
+     *
+     * A MODE_X collection lock is required to call this function, unless the namespace/UUID
+     * corresponds to an uncommitted collection creation in which case a MODE_IX lock is sufficient.
+     *
+     * A WriteUnitOfWork must be active and the instance returned will be created using
+     * copy-on-write and will be different than prior calls to lookupCollection. However, subsequent
+     * calls to lookupCollection will return the same instance as this function as long as the
+     * WriteUnitOfWork remains active.
+     *
+     * When the WriteUnitOfWork commits future versions of the CollectionCatalog will return this
+     * instance. If the WriteUnitOfWork rolls back the instance will be discarded.
+     *
+     * It is safe to write to the returned instance in onCommit handlers but not in onRollback
+     * handlers.
+     *
+     * Returns nullptr if the 'uuid' is not known.
+     */
+    Collection* lookupCollectionByUUIDForMetadataWrite(OperationContext* opCtx,
+                                                       const UUID& uuid) const;
+    Collection* lookupCollectionByNamespaceForMetadataWrite(OperationContext* opCtx,
+                                                            const NamespaceString& nss) const;
 
     /**
      * This function gets the NamespaceString from the collection catalog entry that
@@ -669,41 +687,6 @@ public:
 
 private:
     friend class CollectionCatalog::iterator;
-
-    // We only allow the CollectionWriter class to interface with the catalog. This is to prevent
-    // misuse (i.e. bypassing existing infrastructure) and to only provide a single way to interact
-    // with the catalog for writers.
-    friend class CollectionWriter;
-
-    // We allow this class to access the internal methods as it deals with opening/closing the
-    // catalog and will perform live modifications to the catalog.
-    friend class catalog::CatalogControlUtils;
-
-    /**
-     * Returns a non-const Collection pointer that corresponds to the provided NamespaceString/UUID
-     * for a DDL operation.
-     *
-     * A MODE_X collection lock is required to call this function, unless the namespace/UUID
-     * corresponds to an uncommitted collection creation in which case a MODE_IX lock is sufficient.
-     *
-     * A WriteUnitOfWork must be active and the instance returned will be created using
-     * copy-on-write and will be different than prior calls to lookupCollection. However, subsequent
-     * calls to lookupCollection will return the same instance as this function as long as the
-     * WriteUnitOfWork remains active.
-     *
-     * When the WriteUnitOfWork commits future versions of the CollectionCatalog will return this
-     * instance. If the WriteUnitOfWork rolls back the instance will be discarded.
-     *
-     * It is safe to write to the returned instance in onCommit handlers but not in onRollback
-     * handlers.
-     *
-     * Returns nullptr if the 'uuid' is not known.
-     */
-    Collection* lookupCollectionByUUIDForMetadataWrite(OperationContext* opCtx,
-                                                       const UUID& uuid) const;
-    Collection* lookupCollectionByNamespaceForMetadataWrite(OperationContext* opCtx,
-                                                            const NamespaceString& nss) const;
-
     class PublishCatalogUpdates;
 
     /**

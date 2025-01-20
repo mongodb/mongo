@@ -287,24 +287,21 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
         // the front.
         if (options.capped) {
             WriteUnitOfWork wunit(opCtx.get());
-            CollectionWriter collWriter{opCtx.get(), coll};
             if (!idIndexSpec.isEmpty()) {
-                auto status = collWriter.getWritableCollection(opCtx.get())
-                                  ->getIndexCatalog()
-                                  ->createIndexOnEmptyCollection(
-                                      opCtx.get(),
-                                      collWriter.getWritableCollection(opCtx.get()),
-                                      idIndexSpec);
+                auto status =
+                    coll.getWritableCollection(opCtx.get())
+                        ->getIndexCatalog()
+                        ->createIndexOnEmptyCollection(
+                            opCtx.get(), coll.getWritableCollection(opCtx.get()), idIndexSpec);
                 if (!status.getStatus().isOK()) {
                     return status.getStatus();
                 }
             }
             for (auto&& spec : secondaryIndexSpecs) {
-                auto status =
-                    collWriter.getWritableCollection(opCtx.get())
-                        ->getIndexCatalog()
-                        ->createIndexOnEmptyCollection(
-                            opCtx.get(), collWriter.getWritableCollection(opCtx.get()), spec);
+                auto status = coll.getWritableCollection(opCtx.get())
+                                  ->getIndexCatalog()
+                                  ->createIndexOnEmptyCollection(
+                                      opCtx.get(), coll.getWritableCollection(opCtx.get()), spec);
                 if (!status.getStatus().isOK()) {
                     return status.getStatus();
                 }
@@ -583,8 +580,7 @@ Status StorageInterfaceImpl::truncateCollection(OperationContext* opCtx,
         }
 
         WriteUnitOfWork wunit(opCtx);
-        CollectionWriter collWriter{opCtx, autoColl};
-        auto status = collWriter.getWritableCollection(opCtx)->truncate(opCtx);
+        auto status = autoColl.getWritableCollection(opCtx)->truncate(opCtx);
         if (!status.isOK()) {
             return status;
         }

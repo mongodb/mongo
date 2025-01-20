@@ -456,6 +456,34 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     checkCollectionUUIDMismatch(opCtx, *catalog, _resolvedNss, _coll, options._expectedUUID);
 }
 
+Collection* AutoGetCollection::getWritableCollection(OperationContext* opCtx) {
+    invariant(_collLocks.size() == 1);
+
+    // Acquire writable instance if not already available
+    if (!_writableColl) {
+        auto catalog = CollectionCatalog::get(opCtx);
+        _writableColl = catalog->lookupCollectionByNamespaceForMetadataWrite(opCtx, _resolvedNss);
+        // Makes the internal CollectionPtr Yieldable and resets the writable Collection when
+        // the write unit of work finishes so we re-fetches and re-clones the Collection if a
+        // new write unit of work is opened.
+        shard_role_details::getRecoveryUnit(opCtx)->registerChange(
+            [this](OperationContext* opCtx, boost::optional<Timestamp> commitTime) {
+                _coll = CollectionPtr(_coll.get());
+                _coll.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _coll));
+                _writableColl = nullptr;
+            },
+            [this, originalCollection = _coll.get()](OperationContext* opCtx) {
+                _coll = CollectionPtr(originalCollection);
+                _coll.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _coll));
+                _writableColl = nullptr;
+            });
+
+        // Set to writable collection. We are no longer yieldable.
+        _coll = CollectionPtr(_writableColl);
+    }
+    return _writableColl;
+}
+
 struct CollectionWriter::SharedImpl {
     SharedImpl(CollectionWriter* parent) : _parent(parent) {}
 
@@ -518,35 +546,7 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, AutoGetCollection& a
       _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
     _sharedImpl->_writableCollectionInitializer = [&autoCollection, opCtx]() {
-        // TODO SERVER-99582: Using the CollectionWriter updates the AutoGetCollection object to
-        // point to the new writable instance. This is a legacy behaviour to maintain compatibility
-        // with existing code. We should ideally remove this if we can guarantee this is no longer
-        // the case.
-
-        auto catalog = CollectionCatalog::get(opCtx);
-        auto writableColl =
-            catalog->lookupCollectionByNamespaceForMetadataWrite(opCtx, autoCollection.getNss());
-
-        // Makes the internal CollectionPtr Yieldable and resets the writable Collection when
-        // the write unit of work finishes so we re-fetches and re-clones the Collection if a
-        // new write unit of work is opened.
-        shard_role_details::getRecoveryUnit(opCtx)->registerChange(
-            [&](OperationContext* opCtx, boost::optional<Timestamp> commitTime) {
-                autoCollection._coll = CollectionPtr(autoCollection._coll.get());
-                autoCollection._coll.makeYieldable(
-                    opCtx, LockedCollectionYieldRestore(opCtx, autoCollection._coll));
-            },
-            [&autoCollection,
-             originalCollection = autoCollection._coll.get()](OperationContext* opCtx) {
-                autoCollection._coll = CollectionPtr(originalCollection);
-                autoCollection._coll.makeYieldable(
-                    opCtx, LockedCollectionYieldRestore(opCtx, autoCollection._coll));
-            });
-
-        // Set to writable collection. We are no longer yieldable.
-        autoCollection._coll = CollectionPtr(writableColl);
-
-        return writableColl;
+        return autoCollection.getWritableCollection(opCtx);
     };
 }
 

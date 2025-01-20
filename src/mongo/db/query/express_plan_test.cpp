@@ -72,9 +72,7 @@ public:
 
         for (const auto& indexSpec : indexSpecList) {
             WriteUnitOfWork wuow(operationContext());
-            CollectionWriter writer{operationContext(), collection};
-
-            auto writeableCollection = writer.getWritableCollection(operationContext());
+            auto writeableCollection = collection.getWritableCollection(operationContext());
             auto* indexCatalog = writeableCollection->getIndexCatalog();
             ASSERT_OK(indexCatalog->createIndexOnEmptyCollection(
                 operationContext(), writeableCollection, indexSpec));

@@ -332,8 +332,9 @@ protected:
             OldClientContext ctx(&_opCtx, nss);
             WriteUnitOfWork wunit(&_opCtx);
             Database* db = ctx.db();
-            CollectionWriter writer{&_opCtx, nss};
-            Collection* coll = writer.getWritableCollection(&_opCtx);
+            Collection* coll =
+                CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespaceForMetadataWrite(
+                    &_opCtx, nss);
             if (!coll) {
                 coll = db->createCollection(&_opCtx, nss);
             }

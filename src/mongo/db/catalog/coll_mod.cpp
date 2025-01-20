@@ -807,7 +807,7 @@ StatusWith<const IndexDescriptor*> _setUpCollModIndexUnique(
 Status _collModInternal(OperationContext* opCtx,
                         const NamespaceStringOrUUID& nsOrUUID,
                         const CollMod& cmd,
-                        CollectionAcquisition* acquisition,
+                        const CollectionAcquisition* acquisition,
                         BSONObjBuilder* result,
                         boost::optional<repl::OplogApplication::Mode> mode) {
     // Get key pattern from the config server if we may need it for parsing checks if on the primary
@@ -959,14 +959,10 @@ Status _collModInternal(OperationContext* opCtx,
 
         const CollectionOptions& oldCollOptions = coll->getCollectionOptions();
 
-        auto collWriter = [&] {
-            if (acquisition) {
-                return CollectionWriter{opCtx, acquisition};
-            } else {
-                return CollectionWriter{opCtx, *autoget};
-            }
-        }();
-        Collection* writableColl = collWriter.getWritableCollection(opCtx);
+        Collection* writableColl = acquisition
+            ? CollectionCatalog::get(opCtx)->lookupCollectionByUUIDForMetadataWrite(opCtx,
+                                                                                    coll->uuid())
+            : autoget->getWritableCollection(opCtx);
 
         if (cmrNew.cappedSize || cmrNew.cappedMax) {
             // If the current capped collection size exceeds the newly set limits, future document
@@ -1067,7 +1063,7 @@ Status _collModInternal(OperationContext* opCtx,
         // system.views collection.
         auto* const opObserver = opCtx->getServiceContext()->getOpObserver();
         opObserver->onCollMod(
-            opCtx, nss, writableColl->uuid(), oplogEntryObj, oldCollOptions, indexCollModInfo);
+            opCtx, nss, coll->uuid(), oplogEntryObj, oldCollOptions, indexCollModInfo);
 
         wunit.commit();
         return Status::OK();
@@ -1112,7 +1108,7 @@ CollModRequest makeCollModDryRunRequest(const CollModRequest& request) {
 Status processCollModCommand(OperationContext* opCtx,
                              const NamespaceStringOrUUID& nsOrUUID,
                              const CollMod& cmd,
-                             CollectionAcquisition* acquisition,
+                             const CollectionAcquisition* acquisition,
                              BSONObjBuilder* result) {
     return _collModInternal(opCtx, nsOrUUID, cmd, acquisition, result, boost::none);
 }

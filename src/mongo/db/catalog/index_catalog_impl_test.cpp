@@ -53,15 +53,13 @@ TEST_F(IndexCatalogImplTest, IndexRebuildHandlesTransientEbusy) {
     {
         AutoGetCollection autoColl(operationContext(), nss, MODE_X);
         WriteUnitOfWork wuow(operationContext());
-        CollectionWriter writer{operationContext(), autoColl};
-
-        auto writableColl = writer.getWritableCollection(operationContext());
+        auto collWriter = autoColl.getWritableCollection(operationContext());
         IndexSpec spec;
         spec.version(1).name("x_1").addKeys(BSON("x" << 1));
         IndexDescriptor desc = IndexDescriptor(IndexNames::BTREE, spec.toBSON());
-        ASSERT_OK(writableColl->prepareForIndexBuild(operationContext(), &desc, boost::none));
-        writableColl->getIndexCatalog()->createIndexEntry(
-            operationContext(), writableColl, std::move(desc), CreateIndexEntryFlags::kNone);
+        ASSERT_OK(collWriter->prepareForIndexBuild(operationContext(), &desc, boost::none));
+        collWriter->getIndexCatalog()->createIndexEntry(
+            operationContext(), collWriter, std::move(desc), CreateIndexEntryFlags::kNone);
         wuow.commit();
     }
 
@@ -93,15 +91,13 @@ TEST_F(IndexCatalogImplTest, IndexRebuildHandlesTransientEbusy) {
     {
         AutoGetCollection autoColl(operationContext(), nss, MODE_X);
         WriteUnitOfWork wuow(operationContext());
-        CollectionWriter writer{operationContext(), autoColl};
-
-        auto writableColl = writer.getWritableCollection(operationContext());
-        IndexCatalogEntry* entry = writableColl->getIndexCatalog()->getWritableEntryByName(
+        auto collWriter = autoColl.getWritableCollection(operationContext());
+        IndexCatalogEntry* entry = collWriter->getIndexCatalog()->getWritableEntryByName(
             operationContext(), "x_1", IndexCatalog::InclusionPolicy::kUnfinished);
         ASSERT_FALSE(entry->isReady());
         initBarrier.countDownAndWait();
-        ASSERT_OK(writableColl->getIndexCatalog()->resetUnfinishedIndexForRecovery(
-            operationContext(), writableColl, entry));
+        ASSERT_OK(collWriter->getIndexCatalog()->resetUnfinishedIndexForRecovery(
+            operationContext(), collWriter, entry));
     }
 
     async_close_cursor.join();
@@ -125,14 +121,12 @@ TEST_F(IndexCatalogImplTest, WithInvalidIndexSpec) {
     {
         AutoGetCollection autoColl(operationContext(), nss, MODE_X);
         WriteUnitOfWork wuow(operationContext());
-        CollectionWriter writer{operationContext(), autoColl};
-
-        auto writableColl = writer.getWritableCollection(operationContext());
+        auto collWriter = autoColl.getWritableCollection(operationContext());
         IndexDescriptor desc{IndexNames::BTREE, bson};
-        ASSERT_OK(writableColl->prepareForIndexBuild(operationContext(), &desc, boost::none));
-        auto entry = writableColl->getIndexCatalog()->createIndexEntry(
-            operationContext(), writableColl, std::move(desc), CreateIndexEntryFlags::kNone);
-        writableColl->indexBuildSuccess(operationContext(), entry);
+        ASSERT_OK(collWriter->prepareForIndexBuild(operationContext(), &desc, boost::none));
+        auto entry = collWriter->getIndexCatalog()->createIndexEntry(
+            operationContext(), collWriter, std::move(desc), CreateIndexEntryFlags::kNone);
+        collWriter->indexBuildSuccess(operationContext(), entry);
         wuow.commit();
     }
 

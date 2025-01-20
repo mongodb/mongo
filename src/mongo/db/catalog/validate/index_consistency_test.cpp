@@ -69,7 +69,7 @@ void clearCollection(OperationContext* opCtx, AutoGetCollection& coll) {
 // Removes entries found in the given collection from this index, this creates missing index
 // entries.
 void clearIndexOfEntriesFoundInCollection(OperationContext* opCtx,
-                                          CollectionWriter& coll,
+                                          AutoGetCollection& coll,
                                           const IndexDescriptor* descriptor) {
     IndexCatalog* indexCatalog = coll.getWritableCollection(opCtx)->getIndexCatalog();
     auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
@@ -80,7 +80,7 @@ void clearIndexOfEntriesFoundInCollection(OperationContext* opCtx,
         int64_t numDeleted = 0;
         KeyStringSet keys;
         iam->getKeys(opCtx,
-                     coll.get(),
+                     *coll,
                      descriptor->getEntry(),
                      pooledBuilder,
                      record->data.toBson(),
@@ -145,7 +145,6 @@ TEST_F(IndexConsistencyTest, MissingIndexEntriesLimitedByMemoryBounds) {
             storageInterface()->createCollection(operationContext(), kNss, CollectionOptions()));
         AutoGetCollection coll(operationContext(), kNss, MODE_X);
         WriteUnitOfWork wuow(operationContext());
-        CollectionWriter writer{operationContext(), coll};
 
         for (int i = 0; i < 10; ++i) {
             BSONObj doc = BSON("_id" << i);
@@ -154,9 +153,9 @@ TEST_F(IndexConsistencyTest, MissingIndexEntriesLimitedByMemoryBounds) {
         }
 
         IndexCatalog* indexCatalog =
-            writer.getWritableCollection(operationContext())->getIndexCatalog();
+            coll.getWritableCollection(operationContext())->getIndexCatalog();
         clearIndexOfEntriesFoundInCollection(
-            operationContext(), writer, indexCatalog->findIdIndex(operationContext()));
+            operationContext(), coll, indexCatalog->findIdIndex(operationContext()));
         wuow.commit();
     }
 
@@ -186,10 +185,8 @@ TEST_F(IndexConsistencyTest, ExtraEntryPartialFindingsWithNonzeroMemoryLimit) {
             storageInterface()->createCollection(operationContext(), kNss, CollectionOptions()));
         AutoGetCollection coll(operationContext(), kNss, MODE_X);
         WriteUnitOfWork wuow(operationContext());
-        CollectionWriter writer{operationContext(), coll};
-
         IndexSpec spec;
-        auto collWriter = writer.getWritableCollection(operationContext());
+        auto collWriter = coll.getWritableCollection(operationContext());
         ASSERT_OK(collWriter->getIndexCatalog()->createIndexOnEmptyCollection(
             operationContext(),
             collWriter,
@@ -241,13 +238,11 @@ TEST_F(IndexConsistencyTest, MissingEntryPartialFindingsWithNonzeroMemoryLimit) 
             storageInterface()->createCollection(operationContext(), kNss, CollectionOptions()));
         AutoGetCollection coll(operationContext(), kNss, MODE_X);
         WriteUnitOfWork wuow(operationContext());
-        CollectionWriter writer{operationContext(), coll};
-
         IndexSpec spec;
-        auto writeColl = writer.getWritableCollection(operationContext());
-        ASSERT_OK(writeColl->getIndexCatalog()->createIndexOnEmptyCollection(
+        auto collWriter = coll.getWritableCollection(operationContext());
+        ASSERT_OK(collWriter->getIndexCatalog()->createIndexOnEmptyCollection(
             operationContext(),
-            writeColl,
+            collWriter,
             BSON("name"
                  << "a_1"
                  << "v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("a" << 1))));
@@ -258,9 +253,9 @@ TEST_F(IndexConsistencyTest, MissingEntryPartialFindingsWithNonzeroMemoryLimit) 
         }
 
         IndexCatalog* indexCatalog =
-            writer.getWritableCollection(operationContext())->getIndexCatalog();
+            coll.getWritableCollection(operationContext())->getIndexCatalog();
         clearIndexOfEntriesFoundInCollection(
-            operationContext(), writer, indexCatalog->findIndexByName(operationContext(), "a_1"));
+            operationContext(), coll, indexCatalog->findIndexByName(operationContext(), "a_1"));
         wuow.commit();
     }
 
@@ -300,7 +295,6 @@ TEST_F(IndexConsistencyTest, MemoryLimitSharedBetweenMissingAndExtra) {
             storageInterface()->createCollection(operationContext(), kNss, CollectionOptions()));
         AutoGetCollection coll(operationContext(), kNss, MODE_X);
         WriteUnitOfWork wuow(operationContext());
-        CollectionWriter writer{operationContext(), coll};
 
         // The first 10 entries appear in the index and not the collection.
         for (int i = 0; i < 10; ++i) {
@@ -317,11 +311,11 @@ TEST_F(IndexConsistencyTest, MemoryLimitSharedBetweenMissingAndExtra) {
                 operationContext(), *coll, InsertStatement(doc), nullptr));
         }
         IndexCatalog* indexCatalog =
-            writer.getWritableCollection(operationContext())->getIndexCatalog();
+            coll.getWritableCollection(operationContext())->getIndexCatalog();
         // Because we already cleared the collection of entries [0-10[, this call means the index
         // retains those.
         clearIndexOfEntriesFoundInCollection(
-            operationContext(), writer, indexCatalog->findIdIndex(operationContext()));
+            operationContext(), coll, indexCatalog->findIdIndex(operationContext()));
 
         wuow.commit();
     }

@@ -520,12 +520,10 @@ void _createIndexOnEmptyCollection(OperationContext* opCtx,
                                      << BSON("a" << 1) << "name" << indexName);
 
         WriteUnitOfWork wuow(opCtx);
-        CollectionWriter writer{opCtx, collection};
-
-        auto indexCatalog = writer.getWritableCollection(opCtx)->getIndexCatalog();
+        auto indexCatalog = collection.getWritableCollection(opCtx)->getIndexCatalog();
         ASSERT_OK(indexCatalog
                       ->createIndexOnEmptyCollection(
-                          opCtx, writer.getWritableCollection(opCtx), indexInfoObj)
+                          opCtx, collection.getWritableCollection(opCtx), indexInfoObj)
                       .getStatus());
         wuow.commit();
     });

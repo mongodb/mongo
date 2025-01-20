@@ -550,9 +550,7 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
             // Iterate through all the aborted indexes and drop any indexes that are ready in
             // the index catalog. This would indicate that while we yielded our locks during the
             // abort phase, a new identical index was created.
-            CollectionWriter collWriter{opCtx, *collection};
-            auto writableColl = collWriter.getWritableCollection(opCtx);
-            auto indexCatalog = writableColl->getIndexCatalog();
+            auto indexCatalog = collection->getWritableCollection(opCtx)->getIndexCatalog();
             for (const auto& indexName : indexNames) {
                 auto collDesc =
                     CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
@@ -577,8 +575,8 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
                     continue;
                 }
 
-                uassertStatusOK(
-                    dropIndexByDescriptor(opCtx, writableColl, indexCatalog, writableEntry));
+                uassertStatusOK(dropIndexByDescriptor(
+                    opCtx, collection->getWritableCollection(opCtx), indexCatalog, writableEntry));
             }
 
             wuow.commit();
@@ -601,8 +599,8 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
 
         // This is necessary to check shard version.
         OldClientContext ctx(opCtx, (*collection)->ns());
-        CollectionWriter writer{opCtx, *collection};
-        dropReadyIndexes(opCtx, writer.getWritableCollection(opCtx), indexNames, &reply, false);
+        dropReadyIndexes(
+            opCtx, collection->getWritableCollection(opCtx), indexNames, &reply, false);
         wunit.commit();
     });
 
@@ -647,11 +645,9 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
         // This is necessary to check shard version.
         OldClientContext ctx(opCtx, nss);
 
-        CollectionWriter writer{opCtx, collection};
-
         DropIndexesReply ignoredReply;
         dropReadyIndexes(opCtx,
-                         writer.getWritableCollection(opCtx),
+                         collection.getWritableCollection(opCtx),
                          swIndexNames.getValue(),
                          &ignoredReply,
                          true);

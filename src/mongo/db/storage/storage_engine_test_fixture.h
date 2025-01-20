@@ -180,8 +180,9 @@ public:
         }
         BSONObj spec = builder.append("name", key).done();
 
-        CollectionWriter writer{opCtx, collNs};
-        Collection* collection = writer.getWritableCollection(opCtx);
+        Collection* collection =
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(opCtx,
+                                                                                       collNs);
         auto descriptor = std::make_unique<IndexDescriptor>(IndexNames::findPluginName(spec), spec);
 
         auto ret = collection->prepareForIndexBuild(opCtx, descriptor.get(), buildUUID);
@@ -189,8 +190,9 @@ public:
     }
 
     void indexBuildSuccess(OperationContext* opCtx, NamespaceString collNs, std::string key) {
-        CollectionWriter writer{opCtx, collNs};
-        Collection* collection = writer.getWritableCollection(opCtx);
+        Collection* collection =
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(opCtx,
+                                                                                       collNs);
         auto writableEntry = collection->getIndexCatalog()->getWritableEntryByName(
             opCtx,
             key,

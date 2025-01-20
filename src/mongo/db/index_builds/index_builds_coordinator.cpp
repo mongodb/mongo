@@ -1075,8 +1075,7 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
             invariant(coll,
                       str::stream() << "Collection with UUID " << collUUID << " was dropped.");
 
-            CollectionWriter collWriter{opCtx, coll};
-            IndexCatalog* indexCatalog = collWriter.getWritableCollection(opCtx)->getIndexCatalog();
+            IndexCatalog* indexCatalog = coll.getWritableCollection(opCtx)->getIndexCatalog();
 
             for (const auto& spec : oplogEntry.indexSpecs) {
                 std::string name =
@@ -1088,7 +1087,7 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
                 if (auto writableEntry = indexCatalog->getWritableEntryByName(
                         opCtx, name, IndexCatalog::InclusionPolicy::kReady)) {
                     uassertStatusOK(indexCatalog->dropIndexEntry(
-                        opCtx, collWriter.getWritableCollection(opCtx), writableEntry));
+                        opCtx, coll.getWritableCollection(opCtx), writableEntry));
                 }
 
                 auto writableEntry = indexCatalog->getWritableEntryByKeyPatternAndOptions(
@@ -1098,7 +1097,7 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
                     IndexCatalog::InclusionPolicy::kReady);
                 if (writableEntry) {
                     uassertStatusOK(indexCatalog->dropIndexEntry(
-                        opCtx, collWriter.getWritableCollection(opCtx), writableEntry));
+                        opCtx, coll.getWritableCollection(opCtx), writableEntry));
                 }
             }
 
@@ -1281,9 +1280,7 @@ void IndexBuildsCoordinator::applyAbortIndexBuild(OperationContext* opCtx,
 
         WriteUnitOfWork wuow(opCtx);
 
-        CollectionWriter collWriter{opCtx, autoColl};
-
-        auto indexCatalog = collWriter.getWritableCollection(opCtx)->getIndexCatalog();
+        auto indexCatalog = autoColl.getWritableCollection(opCtx)->getIndexCatalog();
         for (const auto& indexSpec : oplogEntry.indexSpecs) {
             auto writableEntry = indexCatalog->getWritableEntryByName(
                 opCtx,
@@ -1297,7 +1294,7 @@ void IndexBuildsCoordinator::applyAbortIndexBuild(OperationContext* opCtx,
 
             invariant(writableEntry && writableEntry->isFrozen());
             invariant(indexCatalog->dropUnfinishedIndex(
-                opCtx, collWriter.getWritableCollection(opCtx), writableEntry));
+                opCtx, autoColl.getWritableCollection(opCtx), writableEntry));
         }
 
         wuow.commit();

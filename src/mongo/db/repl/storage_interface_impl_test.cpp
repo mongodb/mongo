@@ -163,14 +163,12 @@ int _createIndexOnEmptyCollection(OperationContext* opCtx, NamespaceString nss, 
     AutoGetCollection coll(opCtx, nss, MODE_X);
 
     WriteUnitOfWork wunit(opCtx);
-    CollectionWriter writer{opCtx, coll};
-
-    auto indexCatalog = writer.getWritableCollection(opCtx)->getIndexCatalog();
+    auto indexCatalog = coll.getWritableCollection(opCtx)->getIndexCatalog();
     ASSERT(indexCatalog);
 
     ASSERT_OK(
         indexCatalog
-            ->createIndexOnEmptyCollection(opCtx, writer.getWritableCollection(opCtx), indexSpec)
+            ->createIndexOnEmptyCollection(opCtx, coll.getWritableCollection(opCtx), indexSpec)
             .getStatus());
     wunit.commit();
 

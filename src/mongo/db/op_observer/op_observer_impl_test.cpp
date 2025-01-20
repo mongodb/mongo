@@ -283,8 +283,7 @@ protected:
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection collRaii(opCtx, nss, MODE_X);
             if (collRaii) {
-                CollectionWriter writer{opCtx, collRaii};
-                invariant(writer.getWritableCollection(opCtx)->truncate(opCtx));
+                invariant(collRaii.getWritableCollection(opCtx)->truncate(opCtx));
             } else {
                 auto db = collRaii.ensureDbExists(opCtx);
                 CollectionOptions opts;

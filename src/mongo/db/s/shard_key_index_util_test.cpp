@@ -64,11 +64,9 @@ public:
     void createIndex(const BSONObj& spec) {
         // Build the specified index on the collection.
         WriteUnitOfWork wuow(opCtx());
-        CollectionWriter writer{opCtx(), *_coll};
-
-        auto* indexCatalog = writer.getWritableCollection(opCtx())->getIndexCatalog();
+        auto* indexCatalog = _coll->getWritableCollection(opCtx())->getIndexCatalog();
         uassertStatusOK(indexCatalog->createIndexOnEmptyCollection(
-            opCtx(), writer.getWritableCollection(opCtx()), spec));
+            opCtx(), _coll->getWritableCollection(opCtx()), spec));
         wuow.commit();
     }
 
