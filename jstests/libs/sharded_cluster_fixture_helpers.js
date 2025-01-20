@@ -37,6 +37,13 @@ export function getRandomShardName(conn, exclude = []) {
     return _getRandomElem(filteredShards);
 }
 
+// Prepares a dbName for the correct execution of a test case.
+export function setupDbName(conn, suffix) {
+    const dbName = jsTestName() + '_' + suffix;
+    conn.getSiblingDB(dbName).dropDatabase();
+    return dbName;
+}
+
 // Drops and recreates dbName and assigns optPrimaryShard to it (if specified).
 export function setupTestDatabase(conn, dbName, optPrimaryShard = null) {
     const newDb = conn.getSiblingDB(dbName);
