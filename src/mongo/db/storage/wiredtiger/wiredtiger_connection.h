@@ -48,6 +48,7 @@
 
 namespace mongo {
 
+class StatsCollectionPermit;
 class WiredTigerKVEngine;
 
 /**
@@ -198,6 +199,23 @@ private:
     void _addSession(const SessionId& id, WiredTigerSession* session);
 
     bool _removeSession(const SessionId& id);
+
+    // Opens a session.
+    WT_SESSION* _openSession(WiredTigerSession* session,
+                             WT_EVENT_HANDLER* handler,
+                             const char* config);
+
+    // Similar to _openSession(), but uses the connection from the provided permit. This is
+    // necessary when using sessions that are concurrent with shutdown, such as for statistics.
+    WT_SESSION* _openSession(WiredTigerSession* session,
+                             StatsCollectionPermit& permit,
+                             const char* config);
+
+    // Similar to the above, but opens a session using the provided connection.
+    WT_SESSION* _openSessionInternal(WiredTigerSession* session,
+                                     WT_EVENT_HANDLER* handler,
+                                     const char* config,
+                                     WT_CONNECTION* conn);
 
     /**
      * Returns a session to the cache for later reuse. If closeAll was called between getting this

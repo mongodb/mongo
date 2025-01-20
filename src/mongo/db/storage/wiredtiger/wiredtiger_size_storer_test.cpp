@@ -30,28 +30,35 @@
 #include <wiredtiger.h>
 
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/temp_dir.h"
+#include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
 namespace {
 
+WT_CONNECTION* openConnection(const unittest::TempDir& tempDir) {
+    WT_CONNECTION* conn;
+    ASSERT_OK(
+        wtRCToStatus(wiredtiger_open(tempDir.path().c_str(), nullptr, "create", &conn), nullptr));
+    return conn;
+}
+
 class WiredTigerSizeStorerTest : public ServiceContextTest {
 protected:
-    WiredTigerSizeStorerTest() {
-        ASSERT_OK(wtRCToStatus(wiredtiger_open(_tempDir.path().c_str(), nullptr, "create", &_conn),
-                               nullptr));
-    }
+    WiredTigerSizeStorerTest() : _conn(openConnection(_tempDir), &_clockSource) {}
 
-    WiredTigerSizeStorer makeSizeStorer() const {
-        return {_conn, "table:sizeStorer"};
+    WiredTigerSizeStorer makeSizeStorer() {
+        return {&_conn, "table:sizeStorer"};
     }
 
 private:
     unittest::TempDir _tempDir{"WiredTigerSizeStorerTest"};
-    WT_CONNECTION* _conn;
+    ClockSourceMock _clockSource;
+    WiredTigerConnection _conn;
 };
 
 TEST_F(WiredTigerSizeStorerTest, Store) {

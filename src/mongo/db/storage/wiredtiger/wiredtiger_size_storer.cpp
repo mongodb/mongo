@@ -55,7 +55,8 @@
 
 namespace mongo {
 
-WiredTigerSizeStorer::WiredTigerSizeStorer(WT_CONNECTION* conn, const std::string& storageUri)
+WiredTigerSizeStorer::WiredTigerSizeStorer(WiredTigerConnection* conn,
+                                           const std::string& storageUri)
     : _conn(conn), _storageUri(storageUri), _tableId(WiredTigerUtil::genTableId()) {
     std::string config = WiredTigerCustomizationHooks::get(getGlobalServiceContext())
                              ->getTableCreateConfig(_storageUri);

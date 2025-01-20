@@ -770,8 +770,7 @@ int WiredTigerUtil::verifyTable(WiredTigerRecoveryUnit& ru,
         !connection->isEphemeral()) {
         sessionConfig = "prefetch=(enabled=true)";
     }
-    WT_CONNECTION* conn = ru.getConnection()->conn();
-    WiredTigerSession session(conn, &eventHandler, sessionConfig);
+    WiredTigerSession session(ru.getConnection(), &eventHandler, sessionConfig);
 
     const char* verifyConfig =
         configurationOverride.has_value() ? configurationOverride->c_str() : nullptr;
@@ -928,9 +927,9 @@ bool WiredTigerUtil::collectConnectionStatistics(WiredTigerKVEngine* engine, BSO
         return false;
     }
 
-    // Bypass the WiredTigerConnection to obtain a session that can be used after it shuts down,
+    // Obtain a session that can be used during shut down,
     // potentially before the storage engine itself shuts down.
-    WiredTigerSession session(permit->conn());
+    WiredTigerSession session(&engine->getConnection(), *permit);
 
     // Filter out irrelevant statistic fields.
     std::vector<std::string> fieldsToIgnore = {"LSM"};

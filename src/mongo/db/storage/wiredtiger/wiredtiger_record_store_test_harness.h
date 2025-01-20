@@ -80,8 +80,12 @@ public:
      */
     std::unique_ptr<RecordStore> newOplogRecordStoreNoInit();
 
-    WT_CONNECTION* conn() {
+    WiredTigerConnection& connection() {
         return _engine.getConnection();
+    }
+
+    WT_CONNECTION* conn() {
+        return _engine.getConn();
     }
 
 private:

@@ -48,6 +48,7 @@
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/temp_dir.h"
+#include "mongo/util/clock_source_mock.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWiredTiger
 
@@ -79,16 +80,20 @@ protected:
     }
 
     void openConnectionAndCreateSession() {
-        ASSERT_WT_OK(
-            wiredtiger_open(_path.path().c_str(), nullptr, "create,statistics=(fast),", &_conn));
-        _session = std::make_unique<WiredTigerSession>(_conn);
+        WT_CONNECTION* wtConnection;
+        ASSERT_WT_OK(wiredtiger_open(
+            _path.path().c_str(), nullptr, "create,statistics=(fast),", &wtConnection));
+        _conn = std::make_unique<WiredTigerConnection>(wtConnection, &_clockSource);
+        _session = std::make_unique<WiredTigerSession>(_conn.get());
         ASSERT_WT_OK(_session->create(_uri.c_str(),
                                       "type=file,key_format=q,value_format=u,log=(enabled=false)"));
     }
 
     void closeConnection() {
         _session.reset();
-        ASSERT_EQ(_conn->close(_conn, nullptr), 0);
+        WT_CONNECTION* wtConnection = _conn->conn();
+        _conn.reset();
+        ASSERT_EQ(wtConnection->close(wtConnection, nullptr), 0);
     }
 
     /**
@@ -162,7 +167,8 @@ protected:
 
     unittest::TempDir _path{"wiredtiger_operation_stats_test"};
     std::string _uri{"table:wiredtiger_operation_stats_test"};
-    WT_CONNECTION* _conn;
+    ClockSourceMock _clockSource;
+    std::unique_ptr<WiredTigerConnection> _conn;
     std::unique_ptr<WiredTigerSession> _session;
     /* Number of reads the fixture will prepare in setUp(), consequently max amount of times read()
      * can be called in a test.  */
@@ -178,7 +184,8 @@ TEST_F(WiredTigerStatsTest, EmptySession) {
     auto verbosityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kWiredTiger,
                                                                logv2::LogSeverity::Debug(5)};
     auto verboseConfig = WiredTigerUtil::generateWTVerboseConfiguration();
-    ASSERT_OK(wtRCToStatus(_conn->reconfigure(_conn, verboseConfig.c_str()), nullptr));
+    ASSERT_OK(
+        wtRCToStatus(_conn->conn()->reconfigure(_conn->conn(), verboseConfig.c_str()), nullptr));
 
     // Read and write statistics should be empty. Check "data" field does not exist. "wait" fields
     // such as the schemaLock might have some value.

@@ -399,7 +399,11 @@ public:
     // held by this class
     int reconfigure(const char* str);
 
-    WT_CONNECTION* getConnection() {
+    WiredTigerConnection& getConnection() {
+        return *_connection;
+    }
+
+    WT_CONNECTION* getConn() {
         return _conn;
     }
 

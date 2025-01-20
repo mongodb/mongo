@@ -59,7 +59,7 @@ const size_t numRegistryPartitions = 2 * ProcessInfo::getNumLogicalCores();
 }  // namespace
 
 WiredTigerConnection::WiredTigerConnection(WiredTigerKVEngine* engine)
-    : WiredTigerConnection(engine->getConnection(), engine->getClockSource(), engine) {}
+    : WiredTigerConnection(engine->getConn(), engine->getClockSource(), engine) {}
 
 WiredTigerConnection::WiredTigerConnection(WT_CONNECTION* conn,
                                            ClockSource* cs,
@@ -199,7 +199,7 @@ UniqueWiredTigerSession WiredTigerConnection::getSession() {
     }
 
     // Outside of the cache partition lock, but on release will be put back on the cache
-    return UniqueWiredTigerSession(new WiredTigerSession(_conn, this, _epoch.load()));
+    return UniqueWiredTigerSession(new WiredTigerSession(this, _epoch.load()));
 }
 
 void WiredTigerConnection::_releaseSession(WiredTigerSession* session) {
@@ -258,7 +258,7 @@ bool WiredTigerConnection::isEngineCachingCursors() {
 }
 
 void WiredTigerConnection::WiredTigerSessionDeleter::operator()(WiredTigerSession* session) const {
-    session->_conn->_releaseSession(session);
+    session->_connection->_releaseSession(session);
 }
 
 WiredTigerSession* WiredTigerConnection::getSessionById(const SessionId& id) {
@@ -277,6 +277,29 @@ bool WiredTigerConnection::_removeSession(const SessionId& id) {
     RegistryPartition& partition = _registry[id % numRegistryPartitions];
     stdx::lock_guard<stdx::mutex> lock(partition.mtx);
     return partition.map.erase(id);
+}
+
+WT_SESSION* WiredTigerConnection::_openSession(WiredTigerSession* session,
+                                               WT_EVENT_HANDLER* handler,
+                                               const char* config) {
+    return _openSessionInternal(session, handler, config, _conn);
+}
+
+WT_SESSION* WiredTigerConnection::_openSession(WiredTigerSession* session,
+                                               StatsCollectionPermit& permit,
+                                               const char* config) {
+    invariant(permit.conn());
+    return _openSessionInternal(session, nullptr, config, permit.conn());
+}
+
+WT_SESSION* WiredTigerConnection::_openSessionInternal(WiredTigerSession* session,
+                                                       WT_EVENT_HANDLER* handler,
+                                                       const char* config,
+                                                       WT_CONNECTION* conn) {
+    WT_SESSION* rawSession;
+    invariantWTOK(conn->open_session(conn, handler, config, &rawSession), nullptr);
+    // TODO(SERVER-99353): _addSession(id, session).
+    return rawSession;
 }
 
 }  // namespace mongo

@@ -839,7 +839,7 @@ TEST_F(WiredTigerKVEngineTest, TestRestartUsesNewConn) {
     {
         auto permit = engine->tryGetStatsCollectionPermit();
         ASSERT(permit);
-        ASSERT_EQ(engine->getConnection(), permit->conn());
+        ASSERT_EQ(engine->getConn(), permit->conn());
     }
 
     _helper.restartEngine();
@@ -847,7 +847,7 @@ TEST_F(WiredTigerKVEngineTest, TestRestartUsesNewConn) {
 
     auto permit = engine->tryGetStatsCollectionPermit();
     ASSERT(permit);
-    ASSERT_EQ(engine->getConnection(), permit->conn());
+    ASSERT_EQ(engine->getConn(), permit->conn());
 }
 
 DEATH_TEST_F(WiredTigerKVEngineTest, WaitUntilDurableMustBeOutOfUnitOfWork, "invariant") {

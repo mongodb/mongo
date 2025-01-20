@@ -252,7 +252,7 @@ Status WiredTigerIndex::create(WiredTigerRecoveryUnit& ru,
                                const std::string& uri,
                                const std::string& config) {
     // Don't use the session from the recovery unit: create should not be used in a transaction
-    WiredTigerSession session(ru.getConnection()->conn());
+    WiredTigerSession session(ru.getConnection());
     WT_SESSION* s = session.getSession();
     LOGV2_DEBUG(
         51780, 1, "create uri: {uri} config: {config}", "uri"_attr = uri, "config"_attr = config);
@@ -260,7 +260,7 @@ Status WiredTigerIndex::create(WiredTigerRecoveryUnit& ru,
 }
 
 Status WiredTigerIndex::Drop(WiredTigerRecoveryUnit& ru, const std::string& uri) {
-    WiredTigerSession session(ru.getConnection()->conn());
+    WiredTigerSession session(ru.getConnection());
     WT_SESSION* s = session.getSession();
 
     return wtRCToStatus(s->drop(s, uri.c_str(), nullptr), s);
@@ -415,9 +415,7 @@ void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
     // existing session has not written data to avoid potential deadlocks.
     invariant(!shard_role_details::getRecoveryUnit(opCtx)->inUnitOfWork());
     WiredTigerSession session(
-        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))
-            ->getConnection()
-            ->conn());
+        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))->getConnection());
 
     // Per the version cursor API:
     // - A version cursor can only be called with the read timestamp as the oldest timestamp.

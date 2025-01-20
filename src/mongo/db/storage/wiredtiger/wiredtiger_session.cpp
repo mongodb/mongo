@@ -39,34 +39,35 @@
 
 namespace mongo {
 
-WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn)
-    : WiredTigerSession(conn, nullptr, "isolation=snapshot") {}
+WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection)
+    : WiredTigerSession(connection, nullptr, "isolation=snapshot") {}
 
-WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn,
-                                     WiredTigerConnection* connection,
-                                     uint64_t epoch)
+WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection, uint64_t epoch)
     : _epoch(epoch),
-      _session(nullptr),
+      _session(connection->_openSession(this, nullptr, "isolation=snapshot")),
       _cursorGen(0),
       _cursorsOut(0),
-      _conn(connection),
-      _compiled(nullptr),
-      _idleExpireTime(Date_t::min()) {
-    invariantWTOK(conn->open_session(conn, nullptr, "isolation=snapshot", &_session), nullptr);
-    setCompiledConfigurationsPerConnection(connection->getCompiledConfigurations());
-}
+      _connection(connection),
+      _idleExpireTime(Date_t::min()) {}
 
-WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn,
+WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection,
                                      WT_EVENT_HANDLER* handler,
                                      const char* config)
     : _epoch(0),
-      _session(nullptr),
+      _session(connection->_openSession(this, handler, config)),
       _cursorGen(0),
       _cursorsOut(0),
-      _compiled(nullptr),
-      _idleExpireTime(Date_t::min()) {
-    invariantWTOK(conn->open_session(conn, handler, config, &_session), nullptr);
-}
+      _connection(connection),
+      _idleExpireTime(Date_t::min()) {}
+
+WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection,
+                                     StatsCollectionPermit& permit)
+    : _epoch(0),
+      _session(connection->_openSession(this, permit, "isolation=snapshot")),
+      _cursorGen(0),
+      _cursorsOut(0),
+      _connection(connection),
+      _idleExpireTime(Date_t::min()) {}
 
 WiredTigerSession::~WiredTigerSession() {
     if (_session) {
@@ -134,11 +135,11 @@ WT_CURSOR* WiredTigerSession::getNewCursor(const std::string& uri, const char* c
 void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor, std::string config) {
     // When releasing the cursor, we would want to check if the connection is already in shutdown
     // and prevent the race condition that the shutdown starts after the check.
-    WiredTigerConnection::BlockShutdown blockShutdown(_conn);
+    WiredTigerConnection::BlockShutdown blockShutdown(_connection);
 
     // Avoids the cursor already being destroyed during the shutdown. Also, avoids releasing a
     // cursor from an earlier epoch.
-    if (_conn->isShuttingDown() || _getEpoch() < _conn->_epoch.load()) {
+    if (_connection->isShuttingDown() || _getEpoch() < _connection->_epoch.load()) {
         return;
     }
 
@@ -181,6 +182,10 @@ void WiredTigerSession::closeAllCursors(const std::string& uri) {
         } else
             ++i;
     }
+}
+
+CompiledConfigurationsPerConnection* WiredTigerSession::getCompiledConfigurationsPerConnection() {
+    return _connection->getCompiledConfigurations();
 }
 
 void WiredTigerSession::modifyConfiguration(const std::string& newConfig, std::string undoConfig) {

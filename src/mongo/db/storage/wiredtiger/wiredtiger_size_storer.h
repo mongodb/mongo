@@ -41,6 +41,8 @@
 
 namespace mongo {
 
+class WiredTigerConnection;
+
 /**
  * The WiredTigerSizeStorer class serves as a write buffer to durably store size information for
  * MongoDB collections. The size storer uses a separate WiredTiger table as key-value store, where
@@ -76,7 +78,7 @@ public:
         AtomicWord<bool> _dirty;
     };
 
-    WiredTigerSizeStorer(WT_CONNECTION* conn, const std::string& storageUri);
+    WiredTigerSizeStorer(WiredTigerConnection* conn, const std::string& storageUri);
     ~WiredTigerSizeStorer() = default;
 
     /**
@@ -103,7 +105,7 @@ public:
     void flush(bool syncToDisk);
 
 private:
-    WT_CONNECTION* _conn;
+    WiredTigerConnection* _conn;
     const std::string _storageUri;
     const uint64_t _tableId;  // Not persisted
 

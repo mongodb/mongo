@@ -103,7 +103,7 @@ public:
     }
 
     WiredTigerSession openSession() {
-        return WiredTigerSession(getConnection()->conn());
+        return WiredTigerSession(getConnection());
     }
 
 private:

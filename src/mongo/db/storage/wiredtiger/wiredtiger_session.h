@@ -41,6 +41,7 @@
 
 namespace mongo {
 
+class StatsCollectionPermit;
 class WiredTigerConnection;
 
 /**
@@ -51,29 +52,40 @@ class WiredTigerConnection;
 class WiredTigerSession {
 public:
     /**
-     * Creates a new WT session on the specified connection.
+     * Creates a new WT session on the specified connection. This session will not be cached.
      *
-     * @param conn WT connection
+     * @param connection Wrapped WT connection
      */
-    WiredTigerSession(WT_CONNECTION* conn);
+    WiredTigerSession(WiredTigerConnection* connection);
 
     /**
-     * Creates a new WT session on the specified connection.
+     * Creates a new WT session on the specified connection. This is for sessions which will be
+     * cached by the WiredTigerConnection.
      *
-     * @param conn WT connection
-     * @param connection The WiredTigerConnection that owns this session.
+     * @param connection Wrapped WT connection
      * @param epoch In which session cache cleanup epoch was this session instantiated.
      */
-    WiredTigerSession(WT_CONNECTION* conn, WiredTigerConnection* connection, uint64_t epoch = 0);
+    WiredTigerSession(WiredTigerConnection* connection, uint64_t epoch);
 
     /**
-     * Creates a new WT session on the specified connection.
+     * Creates a new WT session on the specified connection. This session will not be cached.
      *
-     * @param conn WT connection
+     * @param connection WT connection
      * @param handler Callback handler that will be invoked by wiredtiger.
      * @param config configuration string used to open the session with.
      */
-    WiredTigerSession(WT_CONNECTION* conn, WT_EVENT_HANDLER* handler, const char* config);
+    WiredTigerSession(WiredTigerConnection* connection,
+                      WT_EVENT_HANDLER* handler,
+                      const char* config);
+
+    /**
+     * Creates a new WT session for collecting statistics possibly during shutdown (but before
+     * wiredtiger itself shuts down).
+     *
+     * @param connection WT connection
+     * @param permit Token showing that you asked the engine for permission to open this session.
+     */
+    WiredTigerSession(WiredTigerConnection* connection, StatsCollectionPermit& permit);
 
     ~WiredTigerSession();
 
@@ -178,13 +190,7 @@ public:
         return _idleExpireTime;
     }
 
-    void setCompiledConfigurationsPerConnection(CompiledConfigurationsPerConnection* compiled) {
-        _compiled = compiled;
-    }
-
-    CompiledConfigurationsPerConnection* getCompiledConfigurationsPerConnection() {
-        return _compiled;
-    }
+    CompiledConfigurationsPerConnection* getCompiledConfigurationsPerConnection();
 
     /**
      * Reconfigures the session. Stores the config string that undoes this change when
@@ -243,8 +249,7 @@ private:
     uint64_t _cursorGen;
     int _cursorsOut;
 
-    WiredTigerConnection* _conn;                     // not owned
-    CompiledConfigurationsPerConnection* _compiled;  // not owned
+    WiredTigerConnection* const _connection;  // not owned
 
     Date_t _idleExpireTime;
 

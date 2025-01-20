@@ -905,7 +905,7 @@ void WiredTigerRecordStore::printRecordMetadata(const RecordId& recordId,
                                                 std::set<Timestamp>* recordTimestamps) const {
     // Printing the record metadata requires a new session. We cannot open other cursors when there
     // are open history store cursors in the session.
-    WiredTigerSession session(_kvEngine->getConnection());
+    WiredTigerSession session(&_kvEngine->getConnection());
 
     // Per the version cursor API:
     // - A version cursor can only be called with the read timestamp as the oldest timestamp.
@@ -1237,7 +1237,7 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
 RecordId WiredTigerRecordStore::getLargestKey(OperationContext* opCtx) const {
     // Initialize the highest seen RecordId in a session without a read timestamp because that is
     // required by the largest_key API.
-    WiredTigerSession sessRaii(_kvEngine->getConnection());
+    WiredTigerSession sessRaii(&_kvEngine->getConnection());
 
     if (shard_role_details::getRecoveryUnit(opCtx)->inUnitOfWork()) {
         // We must limit the amount of time spent blocked on cache eviction to avoid a deadlock with
