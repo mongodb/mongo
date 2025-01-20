@@ -121,6 +121,9 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeLoggingCreateCollection);
 MONGO_FAIL_POINT_DEFINE(overrideRecordIdsReplicatedDefault);
 MONGO_FAIL_POINT_DEFINE(hangAndFailAfterCreateCollectionReservesOpTime);
 MONGO_FAIL_POINT_DEFINE(openCreateCollectionWindowFp);
+// Allows creating a buckets NS without timeseries options, as could ocurr on FCV 7.x and earlier,
+// for example due to SERVER-87678, or due to a drop concurrent to direct inserts on the buckets NS.
+MONGO_FAIL_POINT_DEFINE(skipCreateTimeseriesBucketsWithoutOptionsCheck);
 
 
 Status validateDBNameForWindows(StringData dbname) {
@@ -860,7 +863,8 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
     if (gFeatureFlagDisallowBucketCollectionWithoutTimeseriesOptions
             .isEnabledUseLastLTSFCVWhenUninitialized(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        nss.isTimeseriesBucketsCollection() && !collectionOptions.timeseries) {
+        nss.isTimeseriesBucketsCollection() && !collectionOptions.timeseries &&
+        !MONGO_unlikely(skipCreateTimeseriesBucketsWithoutOptionsCheck.shouldFail())) {
         return Status(ErrorCodes::IllegalOperation,
                       "Creation of a timeseries bucket collection without timeseries "
                       "options is not allowed");
