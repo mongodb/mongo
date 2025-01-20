@@ -1,3 +1,10 @@
+modules:
+  - name: dsi
+    owner: 10gen
+    repo: dsi
+    prefix: ${workdir}/src
+    branch: master
+
 include:
   ### lint_yaml trim start ###
   #
