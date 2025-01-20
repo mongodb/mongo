@@ -88,7 +88,6 @@ mongo_cc_library(
         "//src/mongo/db:basic_types.h",
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db:baton_hdrs",
-        "//src/mongo/db:cluster_role_hdrs",
         "//src/mongo/db:database_name_hdrs",
         "//src/mongo/db:database_name_reserved.def.h",
         "//src/mongo/db:jsobj.h",
@@ -172,6 +171,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/crypto:sha256_block",
+        "//src/mongo/db:cluster_role",
         "//src/mongo/db/stats:counter_ops",
         "//src/mongo/db/storage:damage_vector",
         "//src/mongo/db/storage:ident",

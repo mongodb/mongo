@@ -128,7 +128,6 @@ mongo_cc_library(
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db:baton.h",
         "//src/mongo/db:client.h",
-        "//src/mongo/db:cluster_role.h",
         "//src/mongo/db:database_name.h",
         "//src/mongo/db:database_name_reserved.def.h",
         "//src/mongo/db:feature_compatibility_version_parser.h",
@@ -256,6 +255,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db:cluster_role",
         "//src/mongo/db/stats:counter_ops",
         "//src/mongo/db/storage:damage_vector",
     ],

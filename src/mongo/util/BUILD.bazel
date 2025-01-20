@@ -836,7 +836,6 @@ mongo_cc_binary(
     name = "pretty_printer_test_program",
     srcs = [
         "pretty_printer_test_program.cpp",
-        "//src/mongo/db:cluster_role.h",
         "//src/mongo/db:database_name.h",
         "//src/mongo/db:database_name_reserved.def.h",
         "//src/mongo/db:namespace_string.h",
@@ -853,6 +852,7 @@ mongo_cc_binary(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db:cluster_role",
     ],
 )
 

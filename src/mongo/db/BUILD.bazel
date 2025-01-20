@@ -1804,7 +1804,6 @@ mongo_cc_library(
 mongo_cc_library(
     name = "server_base",
     srcs = [
-        "cluster_role.cpp",
         "dump_lock_manager.cpp",
         "feature_compatibility_version_parser.cpp",
         "feature_flag.cpp",
@@ -1888,6 +1887,7 @@ mongo_cc_library(
         "//src/mongo/executor:network_interface_thread_pool",
     ],
     deps = [
+        ":cluster_role",
         "//src/mongo:base",
         "//src/mongo/bson/util:bson_extract",
         "//src/mongo/db/repl:optime",
@@ -4266,16 +4266,17 @@ mongo_cc_benchmark(
     ],
 )
 
+mongo_cc_library(
+    name = "cluster_role",
+    srcs = ["cluster_role.cpp"],
+    hdrs = ["cluster_role.h"],
+    deps = ["//src/mongo:base"],
+)
+
 # TODO(SERVER-96853): Remove cycle created by moving //src/mongo/db:baton.h to //src/mongo/db:service_context
 filegroup(
     name = "baton_hdrs",
     srcs = [":baton.h"],
-)
-
-# TODO(SERVER-96855): Remove cycle created by moving //src/mongo/db:cluster_role.h to //src/mongo/db:server_base
-filegroup(
-    name = "cluster_role_hdrs",
-    srcs = [":cluster_role.h"],
 )
 
 # TODO(SERVER-96853): Remove cycle created by moving //src/mongo/db:database_name.h to //src/mongo/db:common
