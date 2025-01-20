@@ -637,15 +637,18 @@ void WiredTigerKVEngine::notifyReplStartupRecoveryComplete(RecoveryUnit& ru) {
     if (!gEnableAutoCompaction)
         return;
 
-    if (!TestingProctor::instance().isEnabled()) {
-        LOGV2_FATAL_NOTRACE(8730900, "enableAutoCompaction is a test-only parameter");
+    // Exclude the oplog table, if it exists.
+    invariant(_oplogManager);
+    std::vector<StringData> excludedIdents;
+    if (auto oplogIdent = _oplogManager->getIdent(); !oplogIdent.empty()) {
+        LOGV2_DEBUG(
+            9611300, 1, "Excluding oplog table for auto compact", "ident"_attr = oplogIdent);
+        excludedIdents.push_back(oplogIdent);
     }
-
-    // TODO SERVER-84357: exclude the oplog table.
     AutoCompactOptions options{/*enable=*/true,
                                /*runOnce=*/false,
                                /*freeSpaceTargetMB=*/boost::none,
-                               /*excludedIdents*/ std::vector<StringData>()};
+                               std::move(excludedIdents)};
 
     auto status = autoCompact(ru, options);
     if (status.isOK()) {
