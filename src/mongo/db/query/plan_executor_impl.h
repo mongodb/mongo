@@ -179,6 +179,9 @@ public:
     BatchedDeleteStats getBatchedDeleteStats() override;
     void markAsKilled(Status killStatus) final;
     void dispose(OperationContext* opCtx) final;
+    void forceSpill() final {
+        _root->forceSpill();
+    }
     void stashResult(const BSONObj& obj) final;
 
     MONGO_COMPILER_ALWAYS_INLINE bool isMarkedAsKilled() const final {

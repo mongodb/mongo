@@ -141,6 +141,10 @@ public:
         _pipeline->dispose(opCtx);
     }
 
+    void forceSpill() override {
+        _pipeline->forceSpill();
+    }
+
     void stashResult(const BSONObj& obj) override {
         _stash.push(obj.getOwned());
     }

@@ -471,6 +471,11 @@ public:
     virtual void dispose(OperationContext* opCtx) = 0;
 
     /**
+     * Forces all stages in the execution plan that are able to spill their data.
+     */
+    virtual void forceSpill() = 0;
+
+    /**
      * Stash the BSONObj so that it gets returned from the PlanExecutor a subsequent call to
      * getNext(). Implementations should NOT support returning stashed BSON objects using
      * 'getNextDocument()'. Only 'getNext()' should return the stashed BSON objects.

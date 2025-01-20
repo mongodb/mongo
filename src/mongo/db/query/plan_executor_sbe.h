@@ -145,6 +145,10 @@ public:
 
     void dispose(OperationContext* opCtx) override;
 
+    void forceSpill() override {
+        _root->forceSpill();
+    }
+
     void stashResult(const BSONObj& obj) override;
 
     bool isMarkedAsKilled() const override {

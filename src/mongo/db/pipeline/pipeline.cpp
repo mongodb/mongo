@@ -479,6 +479,12 @@ void Pipeline::dispose(OperationContext* opCtx) {
     }
 }
 
+void Pipeline::forceSpill() {
+    if (!_sources.empty()) {
+        _sources.back()->forceSpill();
+    }
+}
+
 bool Pipeline::usedDisk() {
     return std::any_of(
         _sources.begin(), _sources.end(), [](const auto& stage) { return stage->usedDisk(); });
