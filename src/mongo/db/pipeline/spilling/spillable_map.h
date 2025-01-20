@@ -90,7 +90,7 @@ public:
     }
 
     bool usedDisk() const {
-        return _stats.spills > 0;
+        return _stats.getSpills() > 0;
     }
 
     /**

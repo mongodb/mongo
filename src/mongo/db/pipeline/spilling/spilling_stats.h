@@ -29,19 +29,67 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 
 namespace mongo {
 
-struct SpillingStats {
+/**
+ * For collecting spilling stats.
+ */
+class SpillingStats {
+public:
+    void incrementSpills(uint64_t spills = 1);
+    void setSpills(uint64_t spills) {
+        _spills = spills;
+    }
+    uint64_t getSpills() const {
+        return _spills;
+    }
+
+    void incrementSpilledBytes(uint64_t spilledBytes);
+    void setSpilledBytes(uint64_t spilledBytes) {
+        _spilledBytes = spilledBytes;
+    }
+    uint64_t getSpilledBytes() const {
+        return _spilledBytes;
+    }
+
+    void incrementSpilledDataStorageSize(uint64_t spilledDataStorageSize);
+    void setSpilledDataStorageSize(uint64_t spilledDataStorageSize) {
+        _spilledDataStorageSize = spilledDataStorageSize;
+    }
+    uint64_t getSpilledDataStorageSize() const {
+        return _spilledDataStorageSize;
+    }
+
+    void incrementSpilledRecords(uint64_t spilledRecords);
+    void setSpilledRecords(uint64_t spilledRecords) {
+        _spilledRecords = spilledRecords;
+    }
+    uint64_t getSpilledRecords() const {
+        return _spilledRecords;
+    }
+
+    void updateSpillingStats(uint64_t additionalSpills,
+                             uint64_t additionalSpilledBytes,
+                             uint64_t additionalSpilledRecords,
+                             uint64_t currentSpilledDataStorageSize) {
+        incrementSpills(additionalSpills);
+        incrementSpilledBytes(additionalSpilledBytes);
+        incrementSpilledRecords(additionalSpilledRecords);
+        setSpilledDataStorageSize(std::max(_spilledDataStorageSize, currentSpilledDataStorageSize));
+    }
+
+private:
     // The number of times the tracked entity spilled.
-    uint64_t spills = 0;
+    uint64_t _spills = 0;
     // The size, in bytes, of the memory released with spilling.
-    uint64_t spilledBytes = 0;
+    uint64_t _spilledBytes = 0;
     // The size, in bytes, of disk space used for spilling.
-    uint64_t spilledDataStorageSize = 0;
+    uint64_t _spilledDataStorageSize = 0;
     // The number of records, written to record store.
-    uint64_t spilledRecords = 0;
+    uint64_t _spilledRecords = 0;
 };
 
 }  // namespace mongo

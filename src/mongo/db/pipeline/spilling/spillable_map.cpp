@@ -93,10 +93,12 @@ void SpillableDocumentMap::spillToDisk() {
     writer.flush();
     _diskMapSize += writer.writtenRecords();
 
-    _stats.spills++;
-    _stats.spilledBytes += writer.writtenBytes();
-    _stats.spilledRecords += writer.writtenRecords();
-    updateStorageSizeStat();
+    _stats.updateSpillingStats(
+        1,
+        writer.writtenBytes(),
+        writer.writtenRecords(),
+        static_cast<uint64_t>(_diskMap->rs()->storageSize(
+            *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext()))));
 }
 
 void SpillableDocumentMap::initDiskMap() {
@@ -118,10 +120,10 @@ RecordId SpillableDocumentMap::computeKey(const Value& id) const {
 }
 
 void SpillableDocumentMap::updateStorageSizeStat() {
-    _stats.spilledDataStorageSize =
-        std::max(_stats.spilledDataStorageSize,
+    _stats.setSpilledDataStorageSize(
+        std::max(_stats.getSpilledDataStorageSize(),
                  static_cast<uint64_t>(_diskMap->rs()->storageSize(
-                     *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext()))));
+                     *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext())))));
 }
 
 template <bool IsConst>

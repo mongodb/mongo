@@ -196,15 +196,15 @@ TEST_F(SpillableDocumentHashMapTest, ReportsMemoryUsageAndSpillingStats) {
         ASSERT_GTE(map.getApproximateSize(), totalAddedDocSize);
     }
 
-    ASSERT_EQ(map.getSpillingStats().spills, 0);
-    ASSERT_EQ(map.getSpillingStats().spilledBytes, 0);
-    ASSERT_EQ(map.getSpillingStats().spilledDataStorageSize, 0);
+    ASSERT_EQ(map.getSpillingStats().getSpills(), 0);
+    ASSERT_EQ(map.getSpillingStats().getSpilledBytes(), 0);
+    ASSERT_EQ(map.getSpillingStats().getSpilledDataStorageSize(), 0);
 
     map.spillToDisk();
     ASSERT_LT(map.getApproximateSize(), totalAddedDocSize);
 
-    ASSERT_EQ(map.getSpillingStats().spills, 1);
-    assertSpilledBytes(map.getSpillingStats().spilledBytes, totalAddedDocSize);
+    ASSERT_EQ(map.getSpillingStats().getSpills(), 1);
+    assertSpilledBytes(map.getSpillingStats().getSpilledBytes(), totalAddedDocSize);
 
     totalAddedDocSize = 0;
     for (const auto& doc : generateDocuments(10, 1024, 10)) {

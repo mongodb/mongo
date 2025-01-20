@@ -15,6 +15,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline/spilling:record_store_batch_writer.cpp",
         "//src/mongo/db/pipeline/spilling:spillable_deque.cpp",
         "//src/mongo/db/pipeline/spilling:spillable_map.cpp",
+        "//src/mongo/db/pipeline/spilling:spilling_stats.cpp",
     ],
     hdrs = [
         "//src/mongo/db/pipeline/spilling:record_store_batch_writer.h",
@@ -55,6 +56,7 @@ mongo_cc_unit_test(
         "record_store_batch_writer_test.cpp",
         "spillable_deque_test.cpp",
         "spillable_map_test.cpp",
+        "spilling_stats_test.cpp",
     ],
     tags = [
         "mongo_unittest_fourth_group",

@@ -1402,7 +1402,7 @@ struct DocumentSourceGraphLookupStats : public SpecificStats {
     uint64_t spilledBytes = 0;
     // The size, in bytes, of disk space used for spilling.
     uint64_t spilledDataStorageSize = 0;
-    // The total number of records spillied.
+    // The total number of records spilled.
     uint64_t spilledRecords = 0;
 
     // Tracks the summary stats in aggregate across all executions of the subpipeline.

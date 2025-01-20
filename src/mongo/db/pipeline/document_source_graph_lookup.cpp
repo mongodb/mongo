@@ -657,13 +657,13 @@ void DocumentSourceGraphLookUp::spill(int64_t maximumMemoryUsage) {
 
 void DocumentSourceGraphLookUp::updateSpillingStats() {
     _stats.maxMemoryUsageBytes = _memoryUsageTracker.maxMemoryBytes();
-    _stats.spills = _queue.getSpillingStats().spills + _visited.getSpillingStats().spills;
+    _stats.spills = _queue.getSpillingStats().getSpills() + _visited.getSpillingStats().getSpills();
     _stats.spilledBytes =
-        _queue.getSpillingStats().spilledBytes + _visited.getSpillingStats().spilledBytes;
-    _stats.spilledDataStorageSize = _queue.getSpillingStats().spilledDataStorageSize +
-        _visited.getSpillingStats().spilledDataStorageSize;
-    _stats.spilledRecords =
-        _queue.getSpillingStats().spilledRecords + _visited.getSpillingStats().spilledRecords;
+        _queue.getSpillingStats().getSpilledBytes() + _visited.getSpillingStats().getSpilledBytes();
+    _stats.spilledDataStorageSize = _queue.getSpillingStats().getSpilledDataStorageSize() +
+        _visited.getSpillingStats().getSpilledDataStorageSize();
+    _stats.spilledRecords = _queue.getSpillingStats().getSpilledRecords() +
+        _visited.getSpillingStats().getSpilledRecords();
 }
 
 void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
