@@ -191,4 +191,8 @@ void WiredTigerOplogManager::_setOplogReadTimestamp(WithLock, uint64_t newTimest
                 "newOplogReadTimestamp"_attr = Timestamp(newTimestamp));
 }
 
+StringData WiredTigerOplogManager::getIdent() const {
+    return _oplogRecordStore ? StringData(_oplogRecordStore->getIdent()) : StringData();
+}
+
 }  // namespace mongo
