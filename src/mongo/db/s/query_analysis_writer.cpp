@@ -79,6 +79,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/future_util.h"
+#include "mongo/util/scoped_unlock.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
@@ -287,6 +288,122 @@ bool shouldPersistSample(OperationContext* opCtx,
         QueryAnalysisSampleTracker::get(opCtx).isSamplingActive(nss, *collUuid);
 }
 
+/**
+ * Returns true if the writer should not retry inserting the document(s) that failed with the
+ * given error again.
+ */
+bool isNonRetryableInsertError(const ErrorCodes::Error& errorCode) {
+    return QueryAnalysisWriter::kNonRetryableInsertErrorCodes.find(errorCode) !=
+        QueryAnalysisWriter::kNonRetryableInsertErrorCodes.end();
+}
+
+/**
+ * Inserts the documents in buffer into the collection it is associated with in batches. Also remove
+ * succesful documents from the buffer and also keeps track of indexes to invalid entries.
+ */
+void flushBuffer(OperationContext* opCtx,
+                 QueryAnalysisWriter::Buffer* tmpBuffer,
+                 std::set<int>* invalidDocIndexes) {
+    const auto nss = tmpBuffer->getNss();
+
+    // Insert the documents in batches from the back of the buffer so that we don't need to move the
+    // documents forward after each batch.
+    size_t baseIndex = tmpBuffer->getCount() - 1;
+    size_t maxBatchSize = gQueryAnalysisWriterMaxBatchSize.load();
+
+    while (!tmpBuffer->isEmpty()) {
+        std::vector<BSONObj> docsToInsert;
+        long long objSize = 0;
+
+        size_t lastIndex = tmpBuffer->getCount();  // inclusive
+        while (lastIndex > 0 && docsToInsert.size() < maxBatchSize) {
+            // Check if the next document can fit in the batch.
+            auto doc = tmpBuffer->at(lastIndex - 1);
+            if (doc.objsize() + objSize >= kMaxBSONObjSizePerInsertBatch) {
+                break;
+            }
+            lastIndex--;
+            objSize += doc.objsize();
+            docsToInsert.push_back(std::move(doc));
+        }
+        // We don't add a document that is above the size limit to the buffer so we should have
+        // added at least one document to 'docsToInsert'.
+        invariant(!docsToInsert.empty());
+        LOGV2_DEBUG(
+            6876102, 2, "Persisting samples", logAttrs(nss), "numDocs"_attr = docsToInsert.size());
+
+        QueryAnalysisClient::get(opCtx).insert(
+            opCtx, nss, docsToInsert, [&](const BSONObj& resObj) {
+                BatchedCommandResponse res;
+                std::string errMsg;
+
+                if (!res.parseBSON(resObj, &errMsg)) {
+                    uasserted(ErrorCodes::FailedToParse, errMsg);
+                }
+
+                queryAnalysisWriterMockInsertCommandResponse.executeIf(
+                    [&](const BSONObj& data) {
+                        if (data.hasField("errorDetails")) {
+                            auto mockErrDetailsObj = data["errorDetails"].Obj();
+                            res.addToErrDetails(write_ops::WriteError::parse(mockErrDetailsObj));
+                        } else {
+                            uasserted(9881700,
+                                      str::stream() << "Expected the failpoint to specify "
+                                                       "'errorDetails'"
+                                                    << data);
+                        }
+                    },
+                    [&](const BSONObj& data) {
+                        for (const auto& doc : docsToInsert) {
+                            auto docId = doc["_id"].wrap();
+                            auto docIdToMatch = data["_id"].wrap();
+                            if (docId.woCompare(docIdToMatch) == 0) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    });
+
+                if (res.isErrDetailsSet() && res.sizeErrDetails() > 0) {
+                    boost::optional<write_ops::WriteError> firstWriteErr;
+
+                    for (const auto& err : res.getErrDetails()) {
+                        if (isNonRetryableInsertError(err.getStatus().code())) {
+                            int actualIndex = baseIndex - err.getIndex();
+                            LOGV2(7075402,
+                                  "Ignoring insert error",
+                                  "actualIndex"_attr = actualIndex,
+                                  "error"_attr = redact(err.getStatus()));
+                            dassert(actualIndex >= 0,
+                                    str::stream() << "Found an invalid index " << actualIndex);
+                            dassert(actualIndex < tmpBuffer->getCount(),
+                                    str::stream() << "Found an invalid index " << actualIndex);
+                            invalidDocIndexes->insert(actualIndex);
+                            continue;
+                        }
+                        if (!firstWriteErr) {
+                            // Save the error for later. Go through the rest of the errors to see if
+                            // there are any invalid documents so they can be discarded from the
+                            // buffer.
+                            firstWriteErr.emplace(err);
+                        }
+                    }
+                    if (firstWriteErr) {
+                        uassertStatusOK(firstWriteErr->getStatus());
+                    }
+                } else {
+                    if (isNonRetryableInsertError(res.toStatus().code())) {
+                        return;
+                    }
+                    uassertStatusOK(res.toStatus());
+                }
+            });
+
+        tmpBuffer->truncate(lastIndex, objSize);
+        baseIndex = tmpBuffer->getCount() - 1;
+    }
+}
+
 }  // namespace
 
 const std::string QueryAnalysisWriter::kSampledQueriesTTLIndexName = "SampledQueriesTTLIndex";
@@ -475,7 +592,8 @@ ExecutorFuture<void> QueryAnalysisWriter::createTTLIndexes(OperationContext* opC
 
 void QueryAnalysisWriter::_flushQueries(OperationContext* opCtx) {
     try {
-        _flush(opCtx, &_queries);
+        stdx::unique_lock lk(_mutex);
+        _flush(opCtx, lk, &_queries);
     } catch (DBException& ex) {
         LOGV2(7047300,
               "Failed to flush queries, will try again at the next interval",
@@ -485,7 +603,8 @@ void QueryAnalysisWriter::_flushQueries(OperationContext* opCtx) {
 
 void QueryAnalysisWriter::_flushDiffs(OperationContext* opCtx) {
     try {
-        _flush(opCtx, &_diffs);
+        stdx::unique_lock lk(_mutex);
+        _flush(opCtx, lk, &_diffs);
     } catch (DBException& ex) {
         LOGV2(7075400,
               "Failed to flush diffs, will try again at the next interval",
@@ -493,132 +612,40 @@ void QueryAnalysisWriter::_flushDiffs(OperationContext* opCtx) {
     }
 }
 
-void QueryAnalysisWriter::_flush(OperationContext* opCtx, Buffer* buffer) {
+void QueryAnalysisWriter::_flush(OperationContext* opCtx,
+                                 stdx::unique_lock<stdx::mutex>& lk,
+                                 Buffer* buffer) {
+    invariant(lk.owns_lock());
     const auto nss = buffer->getNss();
 
     Buffer tmpBuffer(nss);
     // The indices of invalid documents, e.g. documents that fail to insert with DuplicateKey errors
     // (i.e. duplicates) and BadValue errors. Such documents should not get added back to the buffer
     // when the inserts below fail.
-    std::set<int> invalid;
-    {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        if (buffer->isEmpty()) {
-            return;
-        }
-
-        LOGV2_DEBUG(7372300,
-                    1,
-                    "About to flush the sample buffer",
-                    logAttrs(nss),
-                    "numDocs"_attr = buffer->getCount());
-
-        std::swap(tmpBuffer, *buffer);
+    std::set<int> invalidDocIndexes;
+    if (buffer->isEmpty()) {
+        return;
     }
+
+    LOGV2_DEBUG(7372300,
+                1,
+                "About to flush the sample buffer",
+                logAttrs(nss),
+                "numDocs"_attr = buffer->getCount());
+
+    std::swap(tmpBuffer, *buffer);
+
     ScopeGuard backSwapper([&] {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
         for (int i = 0; i < tmpBuffer.getCount(); i++) {
-            if (invalid.find(i) == invalid.end()) {
+            if (invalidDocIndexes.find(i) == invalidDocIndexes.end()) {
                 buffer->add(tmpBuffer.at(i));
             }
         }
     });
 
-    // Insert the documents in batches from the back of the buffer so that we don't need to move the
-    // documents forward after each batch.
-    size_t baseIndex = tmpBuffer.getCount() - 1;
-    size_t maxBatchSize = gQueryAnalysisWriterMaxBatchSize.load();
-
-    while (!tmpBuffer.isEmpty()) {
-        std::vector<BSONObj> docsToInsert;
-        long long objSize = 0;
-
-        size_t lastIndex = tmpBuffer.getCount();  // inclusive
-        while (lastIndex > 0 && docsToInsert.size() < maxBatchSize) {
-            // Check if the next document can fit in the batch.
-            auto doc = tmpBuffer.at(lastIndex - 1);
-            if (doc.objsize() + objSize >= kMaxBSONObjSizePerInsertBatch) {
-                break;
-            }
-            lastIndex--;
-            objSize += doc.objsize();
-            docsToInsert.push_back(std::move(doc));
-        }
-        // We don't add a document that is above the size limit to the buffer so we should have
-        // added at least one document to 'docsToInsert'.
-        invariant(!docsToInsert.empty());
-        LOGV2_DEBUG(
-            6876102, 2, "Persisting samples", logAttrs(nss), "numDocs"_attr = docsToInsert.size());
-
-        QueryAnalysisClient::get(opCtx).insert(
-            opCtx, nss, docsToInsert, [&](const BSONObj& resObj) {
-                BatchedCommandResponse res;
-                std::string errMsg;
-
-                if (!res.parseBSON(resObj, &errMsg)) {
-                    uasserted(ErrorCodes::FailedToParse, errMsg);
-                }
-
-                queryAnalysisWriterMockInsertCommandResponse.executeIf(
-                    [&](const BSONObj& data) {
-                        if (data.hasField("errorDetails")) {
-                            auto mockErrDetailsObj = data["errorDetails"].Obj();
-                            res.addToErrDetails(write_ops::WriteError::parse(mockErrDetailsObj));
-                        } else {
-                            uasserted(9881700,
-                                      str::stream() << "Expected the failpoint to specify "
-                                                       "'errorDetails'"
-                                                    << data);
-                        }
-                    },
-                    [&](const BSONObj& data) {
-                        for (const auto& doc : docsToInsert) {
-                            auto docId = doc["_id"].wrap();
-                            auto docIdToMatch = data["_id"].wrap();
-                            if (docId.woCompare(docIdToMatch) == 0) {
-                                return true;
-                            }
-                        }
-                        return false;
-                    });
-
-                if (res.isErrDetailsSet() && res.sizeErrDetails() > 0) {
-                    boost::optional<write_ops::WriteError> firstWriteErr;
-
-                    for (const auto& err : res.getErrDetails()) {
-                        if (_isNonRetryableInsertError(err.getStatus().code())) {
-                            int actualIndex = baseIndex - err.getIndex();
-                            LOGV2(7075402,
-                                  "Ignoring insert error",
-                                  "actualIndex"_attr = actualIndex,
-                                  "error"_attr = redact(err.getStatus()));
-                            dassert(actualIndex >= 0,
-                                    str::stream() << "Found an invalid index " << actualIndex);
-                            dassert(actualIndex < tmpBuffer.getCount(),
-                                    str::stream() << "Found an invalid index " << actualIndex);
-                            invalid.insert(actualIndex);
-                            continue;
-                        }
-                        if (!firstWriteErr) {
-                            // Save the error for later. Go through the rest of the errors to see if
-                            // there are any invalid documents so they can be discarded from the
-                            // buffer.
-                            firstWriteErr.emplace(err);
-                        }
-                    }
-                    if (firstWriteErr) {
-                        uassertStatusOK(firstWriteErr->getStatus());
-                    }
-                } else {
-                    if (_isNonRetryableInsertError(res.toStatus().code())) {
-                        return;
-                    }
-                    uassertStatusOK(res.toStatus());
-                }
-            });
-
-        tmpBuffer.truncate(lastIndex, objSize);
-        baseIndex = tmpBuffer.getCount() - 1;
+    {
+        ScopedUnlock unlockBlock(lk);
+        flushBuffer(opCtx, &tmpBuffer, &invalidDocIndexes);
     }
 
     backSwapper.dismiss();
@@ -654,10 +681,6 @@ void QueryAnalysisWriter::Buffer::truncate(size_t index, long long numBytes) {
 bool QueryAnalysisWriter::_exceedsMaxSizeBytes() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _queries.getSize() + _diffs.getSize() >= gQueryAnalysisWriterMaxMemoryUsageBytes.load();
-}
-
-bool QueryAnalysisWriter::_isNonRetryableInsertError(const ErrorCodes::Error& errorCode) {
-    return kNonRetryableInsertErrorCodes.find(errorCode) != kNonRetryableInsertErrorCodes.end();
 }
 
 ExecutorFuture<void> QueryAnalysisWriter::addFindQuery(
