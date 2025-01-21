@@ -331,9 +331,6 @@ void NetworkInterfaceTL::shutdown() {
                 break;
             case kStopping:
             case kStopped:
-                LOGV2_INFO(6529201,
-                           "Network interface redundant shutdown",
-                           "state"_attr = toString(_state));
                 return;
         }
     }
