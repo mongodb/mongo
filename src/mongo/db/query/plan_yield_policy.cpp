@@ -138,10 +138,10 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
 
     _forceYield = false;
 
+    // Saving and restoring can modify '_yieldable', so we make a copy before we start. This copying
+    // cannot throw.
+    const std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable = _yieldable;
     for (int attempt = 1; true; attempt++) {
-        // Saving and restoring can modify '_yieldable', so we make a copy before we start.
-        // This copying cannot throw.
-        const std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable = _yieldable;
         try {
             // This sets _yieldable to a nullptr.
             saveState(opCtx);
@@ -181,14 +181,13 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
                 }
             }
 
-            // This copies 'yieldable' back to '_yieldable' where needed.
+            // This copies 'yieldable's contents back to '_yieldable' where needed.
             auto yieldablePtr = get_if<const Yieldable*>(&yieldable);
             restoreState(opCtx, yieldablePtr ? *yieldablePtr : nullptr, restoreType);
             return Status::OK();
         } catch (const StorageUnavailableException& e) {
-            // This copies 'yieldable' back to '_yieldable' where needed.
-            auto yieldablePtr = get_if<const Yieldable*>(&yieldable);
-            restoreState(opCtx, yieldablePtr ? *yieldablePtr : nullptr, restoreType);
+            // Restore '_yieldable' before the retry.
+            _yieldable = yieldable;
             if (_callbacks) {
                 _callbacks->handledWriteConflict(opCtx);
             }

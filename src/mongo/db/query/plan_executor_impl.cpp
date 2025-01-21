@@ -227,11 +227,7 @@ void PlanExecutorImpl::restoreState(const RestoreContext& context) {
 
 void PlanExecutorImpl::restoreStateWithoutRetrying(const RestoreContext& context,
                                                    const Yieldable* yieldable) {
-    // If a StorageUnavailableException has been caught, this call can be a retry. Depending on
-    // where the exception was thrown, the state may not have been saved, in which case NO-OP.
-    if (_currentState != kSaved) {
-        return;
-    }
+    invariant(_currentState == kSaved);
 
     if (!_yieldPolicy->usesCollectionAcquisitions()) {
         _yieldPolicy->setYieldable(yieldable);
