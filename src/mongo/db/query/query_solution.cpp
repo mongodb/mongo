@@ -254,7 +254,7 @@ std::string QuerySolution::summaryString() const {
                 seenLeaf = true;
             }
 
-            sb << stageTypeToString(node->getType());
+            sb << nodeStageTypeToString(node);
 
             switch (node->getType()) {
                 case STAGE_COUNT_SCAN: {

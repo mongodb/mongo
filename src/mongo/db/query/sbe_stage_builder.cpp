@@ -5782,7 +5782,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     if (reqResultInfo) {
         tassert(8146611,
-                str::stream() << "Expected build() for " << stageTypeToString(stageType)
+                str::stream() << "Expected build() for " << nodeStageTypeToString(root)
                               << " to produce a result object or ResultInfo",
                 outputs.hasResult());
     }
@@ -5805,7 +5805,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             for (auto&& f : missingFields) {
                 tassert(6023424,
                         str::stream()
-                            << "Expected build() for " << stageTypeToString(stageType)
+                            << "Expected build() for " << nodeStageTypeToString(root)
                             << " to either satisfy all kField reqs, provide a materialized "
                             << "result object, or provide a compatible result base object",
                         reqs.hasResultInfo() && reqs.getResultInfoAllowedSet().count(f) &&
