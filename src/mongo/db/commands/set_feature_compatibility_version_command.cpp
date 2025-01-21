@@ -708,40 +708,8 @@ private:
     // to happen during the upgrade. It is required that the code in this helper function is
     // idempotent and could be done after _runDowngrade even if it failed at any point in the middle
     // of _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
-    void _userCollectionsWorkForUpgrade(
-        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
-
-        std::vector<std::function<void(const Collection* collection)>> collValidationFunctions;
-
-        const auto originalVersion =
-            getTransitionFCVInfo(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion())
-                .from;
-
-        if (gFeatureFlagDisallowBucketCollectionWithoutTimeseriesOptions
-                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, originalVersion)) {
-            collValidationFunctions.emplace_back([](const Collection* collection) {
-                uassert(
-                    ErrorCodes::CannotUpgrade,
-                    fmt::format("Bucket collection '{}' metadata is missing timeseries options, "
-                                "which are required for bucket namespaces in the new FCV version. "
-                                "Please manually fix the collection metadata to match the data.",
-                                collection->ns().toStringForErrorMsg()),
-                    !collection->ns().isTimeseriesBucketsCollection() ||
-                        collection->getTimeseriesOptions());
-            });
-        }
-
-        for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-            Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
-            catalog::forEachCollectionFromDb(
-                opCtx, dbName, MODE_IS, [&](const Collection* collection) {
-                    for (const auto& collValidationFunc : collValidationFunctions) {
-                        collValidationFunc(collection);
-                    }
-                    return true;
-                });
-        }
+    void _userCollectionsWorkForUpgrade() {
+        return;
     }
 
     // This helper function is for updating server metadata to make sure the new features in the
@@ -917,7 +885,7 @@ private:
         // is idempotent and could be done after _runDowngrade even if it failed at any point in the
         // middle of _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
         if (!role || role->has(ClusterRole::None) || role->has(ClusterRole::ShardServer)) {
-            _userCollectionsWorkForUpgrade(opCtx, requestedVersion);
+            _userCollectionsWorkForUpgrade();
         }
 
         uassert(ErrorCodes::Error(549180),
