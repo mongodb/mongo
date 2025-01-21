@@ -90,6 +90,8 @@ private:
     CEResult estimate(const AndSortedNode* node);
     CEResult estimate(const OrNode* node);
     CEResult estimate(const MergeSortNode* node);
+    CEResult estimate(const LimitNode* node);
+    CEResult estimate(const SkipNode* node);
 
     // MatchExpressions
     CEResult estimate(const MatchExpression* node, bool isFilterRoot);

@@ -164,6 +164,16 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
             nodeCost = projectionStartup * oneCE + projectionIncrement * inCE + childCosts[0];
             break;
         }
+        case STAGE_LIMIT: {
+            const auto& inCE = childCEs[0];
+            nodeCost = limitStartup * oneCE + limitIncrement * inCE;
+            break;
+        }
+        case STAGE_SKIP: {
+            const auto& inCE = childCEs[0];
+            nodeCost = skipStartup * oneCE + skipIncrement * inCE;
+            break;
+        }
         default:
             MONGO_UNIMPLEMENTED_TASSERT(9695102);
     }
@@ -239,5 +249,11 @@ const CostCoefficient CostEstimator::projectionStartup =
     CostCoefficient{CostCoefficientType{1103.4_ms}};
 const CostCoefficient CostEstimator::projectionIncrement =
     CostCoefficient{CostCoefficientType{430.6_ms}};
+
+const CostCoefficient CostEstimator::limitStartup = CostCoefficient{CostCoefficientType{655.1_ms}};
+const CostCoefficient CostEstimator::limitIncrement = CostCoefficient{CostCoefficientType{62.4_ms}};
+
+const CostCoefficient CostEstimator::skipStartup = CostCoefficient{CostCoefficientType{655.1_ms}};
+const CostCoefficient CostEstimator::skipIncrement = CostCoefficient{CostCoefficientType{62.4_ms}};
 
 }  // namespace mongo::cost_based_ranker

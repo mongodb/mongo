@@ -110,9 +110,12 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
         case STAGE_EOF:
             _qsnEstimates[node] = QSNEstimate{.inCE = zeroCE, .outCE = zeroCE};
             return zeroCE;
-        // TODO SERVER-99072: Implement limit and skip
         case STAGE_LIMIT:
+            ceRes = estimate(static_cast<const LimitNode*>(node));
+            break;
         case STAGE_SKIP:
+            ceRes = estimate(static_cast<const SkipNode*>(node));
+            break;
         // TODO SERVER-99073: Implement shard filter
         case STAGE_SHARDING_FILTER:
         // TODO SERVER-99075: Implement distinct scan
@@ -517,6 +520,41 @@ CEResult CardinalityEstimator::tryHistogramAnd(const AndMatchExpression* node) {
     }
     // Combine CE's for the estimates of all paths under 'node'.
     return conjCard(selOffset, _inputCard);
+}
+
+CEResult CardinalityEstimator::estimate(const LimitNode* node) {
+    auto ceRes = estimate(node->children[0].get());
+    if (!ceRes.isOK()) {
+        return ceRes;
+    }
+    auto est = std::min(CardinalityEstimate{CardinalityType{static_cast<double>(node->limit)},
+                                            EstimationSource::Metadata},
+                        ceRes.getValue());
+    _qsnEstimates.emplace(node, QSNEstimate{.outCE = est});
+    trimSels(0);
+    _conjSels.push_back(est / _inputCard);
+    return est;
+}
+
+CEResult CardinalityEstimator::estimate(const SkipNode* node) {
+    auto ceRes = estimate(node->children[0].get());
+    if (!ceRes.isOK()) {
+        return ceRes;
+    }
+    auto childEst = ceRes.getValue();
+    auto skip =
+        CardinalityEstimate{CardinalityType{static_cast<double>(node->skip)}, childEst.source()};
+
+    // If the skip node skips more than the estimate of the child, then this node will return no
+    // results.
+    CardinalityEstimate card{CardinalityType{0}, childEst.source()};
+    if (skip <= childEst) {
+        card = childEst - skip;
+    }
+    _qsnEstimates.emplace(node, QSNEstimate{.outCE = card});
+    trimSels(0);
+    _conjSels.push_back(card / _inputCard);
+    return card;
 }
 
 /*
