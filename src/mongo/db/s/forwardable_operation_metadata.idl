@@ -31,6 +31,7 @@ global:
 
 imports:
      - "mongo/db/basic_types.idl"
+     - "mongo/rpc/metadata/audit_client_attrs.idl"
      - "mongo/rpc/metadata/impersonated_user_metadata.idl"
 
 structs:
@@ -54,11 +55,15 @@ structs:
         fields:
             comment:
                 type: object_owned
-                description: "The comment assiociated with the operation."
+                description: "The comment associated with the operation."
                 optional: true
             impersonatedUserMetadata:
                 type: AuthenticationMetadata
                 description: "The impersonated users associated with the operation."
+                optional: true
+            auditClientMetadata:
+                type: AuditClientAttrs
+                description: "The client information that should be audited on this operation"
                 optional: true
             mayBypassWriteBlocking:
                 type: optionalBool

@@ -175,6 +175,7 @@ idl_generator(
     src = "forwardable_operation_metadata.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/rpc/metadata:audit_client_attrs_gen",
         "//src/mongo/rpc/metadata:impersonated_user_metadata_gen",
     ],
 )

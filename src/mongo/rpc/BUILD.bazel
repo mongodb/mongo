@@ -142,6 +142,7 @@ mongo_cc_library(
     name = "metadata_impersonated_user",
     srcs = [
         "//src/mongo/rpc/metadata:audit_client_attrs.cpp",
+        "//src/mongo/rpc/metadata:audit_client_attrs_gen",
         "//src/mongo/rpc/metadata:impersonated_user_metadata.cpp",
     ],
     hdrs = [

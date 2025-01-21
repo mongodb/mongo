@@ -25,3 +25,11 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+idl_generator(
+    name = "audit_client_attrs_gen",
+    src = "audit_client_attrs.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
