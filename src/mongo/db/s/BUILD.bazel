@@ -833,6 +833,7 @@ mongo_cc_library(
         "//src/mongo/db/s/resharding:resharding_coordinator_observer.cpp",
         "//src/mongo/db/s/resharding:resharding_coordinator_service.cpp",
         "//src/mongo/db/s/resharding:resharding_coordinator_service_external_state.cpp",
+        "//src/mongo/db/s/resharding:resharding_coordinator_service_util.cpp",
         "//src/mongo/db/s/resharding:resharding_cumulative_metrics.cpp",
         "//src/mongo/db/s/resharding:resharding_cumulative_metrics_field_name_provider.cpp",
         "//src/mongo/db/s/resharding:resharding_data_copy_util.cpp",
@@ -950,6 +951,7 @@ mongo_cc_library(
         "//src/mongo/db/s/resharding:resharding_coordinator_observer.h",
         "//src/mongo/db/s/resharding:resharding_coordinator_service.h",
         "//src/mongo/db/s/resharding:resharding_coordinator_service_external_state.h",
+        "//src/mongo/db/s/resharding:resharding_coordinator_service_util.h",
         "//src/mongo/db/s/resharding:resharding_cumulative_metrics.h",
         "//src/mongo/db/s/resharding:resharding_cumulative_metrics_field_name_provider.h",
         "//src/mongo/db/s/resharding:resharding_data_copy_util.h",
@@ -977,7 +979,6 @@ mongo_cc_library(
     ],
     tags = [
         "compile_requires_large_memory_gcc",
-        "compile_requires_large_memory_sanitizer",
     ],
     deps = [
         ":analyze_shard_key_util",

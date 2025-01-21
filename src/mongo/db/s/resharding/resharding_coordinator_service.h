@@ -29,18 +29,8 @@
 
 #pragma once
 
-#include <memory>
-#include <utility>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/namespace_string.h"
@@ -59,64 +49,15 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/future.h"
-#include "mongo/util/future_impl.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo {
+
 namespace resharding {
 class CoordinatorCommitMonitor;
-
-CollectionType createTempReshardingCollectionType(
-    OperationContext* opCtx,
-    const ReshardingCoordinatorDocument& coordinatorDoc,
-    const ChunkVersion& chunkVersion,
-    const BSONObj& collation,
-    boost::optional<CollectionIndexes> indexVersion,
-    boost::optional<bool> isUnsplittable);
-
-void removeChunkDocs(OperationContext* opCtx, const UUID& collUUID);
-
-void writeDecisionPersistedState(OperationContext* opCtx,
-                                 ReshardingMetrics* metrics,
-                                 const ReshardingCoordinatorDocument& coordinatorDoc,
-                                 OID newCollectionEpoch,
-                                 Timestamp newCollectionTimestamp,
-                                 boost::optional<CollectionIndexes> indexVersion,
-                                 const std::vector<ShardId>& reshardedCollectionPlacement);
-
-void updateTagsDocsForTempNss(OperationContext* opCtx,
-                              const ReshardingCoordinatorDocument& coordinatorDoc,
-                              TxnNumber txnNumber);
-
-void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
-                                          ReshardingMetrics* metrics,
-                                          const ReshardingCoordinatorDocument& coordinatorDoc);
-
-void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
-                                           ReshardingMetrics* metrics,
-                                           const ReshardingCoordinatorDocument& coordinatorDoc,
-                                           std::vector<ChunkType> initialChunks,
-                                           std::vector<BSONObj> zones,
-                                           boost::optional<CollectionIndexes> indexVersion,
-                                           boost::optional<bool> isUnsplittable);
-
-void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
-    OperationContext* opCtx,
-    ReshardingMetrics* metrics,
-    const ReshardingCoordinatorDocument& coordinatorDoc);
-
-ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
-    OperationContext* opCtx,
-    ReshardingMetrics* metrics,
-    const ReshardingCoordinatorDocument& coordinatorDoc,
-    boost::optional<Status> abortReason = boost::none);
 }  // namespace resharding
 
 /**
@@ -208,6 +149,7 @@ private:
 };
 
 class ReshardingCoordinator;
+class CoordinatorCancellationTokenHolder;
 
 class ReshardingCoordinatorService : public repl::PrimaryOnlyService {
 public:
