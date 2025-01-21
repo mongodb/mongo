@@ -85,10 +85,6 @@ protected:
         return true;
     }
 
-    void setKey(WT_CURSOR* cursor, const WT_ITEM* item) {
-        cursor->set_key(cursor, item);
-    }
-
     void getKey(WT_CURSOR* cursor, WT_ITEM* key, ResourceConsumption::MetricsCollector* metrics) {
         invariantWTOK(cursor->get_key(cursor, key), cursor->session);
 

@@ -27,8 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/storage/key_string/key_string.h"
 
-#include "mongo/bson/bson_validate.h"
 #include <algorithm>
 #include <boost/optional.hpp>
 #include <cfloat>
@@ -39,15 +39,12 @@
 #include <memory>
 #include <type_traits>
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bson_depth.h"
+#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -2450,6 +2447,10 @@ std::string BuilderBase<BufferT>::toString() const {
 
 std::string Value::toString() const {
     return hexblob::encode(_buffer.get(), _ksSize);
+}
+
+std::string View::toString() const {
+    return hexblob::encode(_buffer, _ksSize);
 }
 
 TypeBits& TypeBits::operator=(const TypeBits& tb) {

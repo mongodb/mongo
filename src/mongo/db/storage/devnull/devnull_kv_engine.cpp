@@ -298,7 +298,7 @@ class DevNullSortedDataBuilderInterface : public SortedDataBuilderInterface {
 public:
     DevNullSortedDataBuilderInterface() {}
 
-    void addKey(const key_string::Value& keyString) override {}
+    void addKey(const key_string::View& keyString) override {}
 };
 
 class DevNullSortedDataInterface : public SortedDataInterface {
@@ -324,7 +324,7 @@ public:
     }
 
     void unindex(OperationContext* opCtx,
-                 const key_string::Value& keyString,
+                 const key_string::View& keyString,
                  bool dupsAllowed) override {}
 
     boost::optional<DuplicateKey> dupKeyCheck(OperationContext* opCtx,
