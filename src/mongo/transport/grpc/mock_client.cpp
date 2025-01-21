@@ -49,16 +49,16 @@ MockClient::MockClient(TransportLayer* tl,
         [](std::shared_ptr<MockChannel>& channel, Milliseconds) { return MockStub(channel); });
 }
 
-Future<Client::CtxAndStream> MockClient::_streamFactory(const HostAndPort& remote,
-                                                        const std::shared_ptr<GRPCReactor>& reactor,
-                                                        Milliseconds timeout,
-                                                        const ConnectOptions& options,
-                                                        const CancellationToken& token) {
+Future<Client::CallContext> MockClient::_streamFactory(const HostAndPort& remote,
+                                                       const std::shared_ptr<GRPCReactor>& reactor,
+                                                       Milliseconds timeout,
+                                                       const ConnectOptions& options,
+                                                       const CancellationToken& token) {
     if (MONGO_unlikely(grpcHangOnStreamEstablishment.shouldFail())) {
         // When this failpoint is set, take advantage of the cancellation token to block the future
         // until it has been cancelled, which ensures that we will hit the connect timeout codepath.
         return token.onCancel().unsafeToInlineFuture().onCompletion(
-            [](Status s) -> StatusWith<Client::CtxAndStream> {
+            [](Status s) -> StatusWith<Client::CallContext> {
                 return Status(ErrorCodes::CallbackCanceled,
                               "Cancelled stream establishment attempt due to failpoint");
             });
@@ -81,14 +81,14 @@ Future<Client::CtxAndStream> MockClient::_streamFactory(const HostAndPort& remot
         });
     });
 
-    CtxAndStream ctxAndStream;
+    std::shared_ptr<ClientStream> stream;
     if (options.authToken) {
-        ctxAndStream = CtxAndStream(ctx, stub->stub().authenticatedCommandStream(ctx.get()));
+        stream = stub->stub().authenticatedCommandStream(ctx.get());
     } else {
-        ctxAndStream = CtxAndStream(ctx, stub->stub().unauthenticatedCommandStream(ctx.get()));
+        stream = stub->stub().unauthenticatedCommandStream(ctx.get());
     }
 
-    return Future<CtxAndStream>::makeReady(ctxAndStream);
+    return Future<CallContext>::makeReady(CallContext{ctx, std::move(stream), {}});
 }
 
 

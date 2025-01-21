@@ -260,11 +260,7 @@ void DBClientConnection::handleNotPrimaryResponse(const BSONObj& replyBody,
 
 #ifdef MONGO_CONFIG_SSL
 const SSLConfiguration* DBClientConnection::getSSLConfiguration() {
-    auto& sslManager = _session->getSSLManager();
-    if (!sslManager) {
-        return nullptr;
-    }
-    return &sslManager->getSSLConfiguration();
+    return _session->getSSLConfiguration();
 }
 
 bool DBClientConnection::isUsingTransientSSLParams() const {

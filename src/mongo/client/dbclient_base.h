@@ -659,7 +659,7 @@ public:
 
 #ifdef MONGO_CONFIG_SSL
     /**
-     * Gets the SSL configuration of this client.
+     * Gets the SSL configuration of this client, if any.
      */
     virtual const SSLConfiguration* getSSLConfiguration() = 0;
 

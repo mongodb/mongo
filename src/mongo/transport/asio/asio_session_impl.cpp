@@ -360,6 +360,13 @@ const std::shared_ptr<SSLManagerInterface>& CommonAsioSession::getSSLManager() c
     return _sslContext->manager;
 }
 
+const SSLConfiguration* CommonAsioSession::getSSLConfiguration() const {
+    if (!_sslContext->manager) {
+        return nullptr;
+    }
+    return &_sslContext->manager->getSSLConfiguration();
+}
+
 Status CommonAsioSession::buildSSLSocket(const HostAndPort& target) {
     invariant(!_sslSocket, "SSL socket is already constructed");
     if (!_sslContext->egress) {

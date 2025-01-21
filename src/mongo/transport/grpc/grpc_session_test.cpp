@@ -77,6 +77,7 @@ public:
                                                _reactor,
                                                _streamFixtures->clientCtx,
                                                _streamFixtures->clientStream,
+                                               /* sslConfig */ boost::none,
                                                std::move(clientId),
                                                /* shared state */ nullptr);
     }

@@ -43,6 +43,7 @@
 #include "mongo/transport/grpc/test_fixtures.h"
 #include "mongo/transport/grpc/wire_version_provider.h"
 #include "mongo/transport/service_executor.h"
+#include "mongo/transport/session.h"
 #include "mongo/transport/session_workflow_test_util.h"
 #include "mongo/transport/test_fixtures.h"
 #include "mongo/transport/transport_layer.h"
@@ -54,6 +55,7 @@
 #include "mongo/util/errno_util.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/scopeguard.h"
@@ -888,7 +890,11 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest,
             ASSERT_EQ(
                 tl.rotateCertificates(SSLManagerCoordinator::get()->getSSLManager(), false).code(),
                 ErrorCodes::InvalidSSLConfiguration);
-            ASSERT_EQ(client->rotateCertificates(), ErrorCodes::InvalidSSLConfiguration);
+
+            SSLConfiguration newConfig{};
+            newConfig.serverCertificateExpirationDate =
+                Date_t::fromDurationSinceEpoch(Milliseconds(1234));
+            ASSERT_EQ(client->rotateCertificates(newConfig), ErrorCodes::InvalidSSLConfiguration);
 
             // Make sure we can still connect with the initial certs used before the bad
             // rotation.
@@ -900,7 +906,12 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest,
 
             // The already-existing client should also also still be using the old certs after a
             // failed rotation.
-            ASSERT_OK(client->connect(addr, reactor, Milliseconds(500), {}).getNoThrow());
+            auto swSession = client->connect(addr, reactor, Milliseconds(500), {}).getNoThrow();
+            ASSERT_OK(swSession);
+
+            // SSLConfiguration should remain unchanged.
+            ASSERT_NE(swSession.getValue()->getSSLConfiguration()->serverCertificateExpirationDate,
+                      newConfig.serverCertificateExpirationDate);
         },
         CommandServiceTestFixtures::makeTLOptions());
 }
@@ -950,11 +961,17 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest, ClientUsesOldCertsUntilRotate) 
 
             // After rotation, connection should now succeed.
             client->dropAllChannels_forTest();
-            ASSERT_OK(client->rotateCertificates());
-            ASSERT_OK(
+
+            SSLConfiguration newConfig{};
+            newConfig.serverCertificateExpirationDate = Date_t::fromMillisSinceEpoch(1234);
+            ASSERT_OK(client->rotateCertificates(newConfig));
+            auto swSession =
                 client
                     ->connect(addr, reactor, CommandServiceTestFixtures::kDefaultConnectTimeout, {})
-                    .getNoThrow());
+                    .getNoThrow();
+            ASSERT_OK(swSession);
+            ASSERT_EQ(swSession.getValue()->getSSLConfiguration()->serverCertificateExpirationDate,
+                      newConfig.serverCertificateExpirationDate);
         },
         CommandServiceTestFixtures::makeTLOptions());
 }

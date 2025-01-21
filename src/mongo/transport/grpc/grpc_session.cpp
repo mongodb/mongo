@@ -230,6 +230,7 @@ EgressSession::EgressSession(TransportLayer* tl,
                              const std::shared_ptr<GRPCReactor>& reactor,
                              std::shared_ptr<ClientContext> ctx,
                              std::shared_ptr<ClientStream> stream,
+                             boost::optional<SSLConfiguration> sslConfig,
                              UUID clientId,
                              std::shared_ptr<EgressSession::SharedState> sharedState)
     : GRPCSession(tl, ctx->getRemote()),
@@ -237,7 +238,8 @@ EgressSession::EgressSession(TransportLayer* tl,
       _ctx(std::move(ctx)),
       _stream(std::move(stream)),
       _clientId(clientId),
-      _sharedState(std::move(sharedState)) {
+      _sharedState(std::move(sharedState)),
+      _sslConfig(std::move(sslConfig)) {
     LOGV2_DEBUG(7401401, 2, "Constructed a new gRPC egress session", "session"_attr = toBSON());
 }
 
@@ -413,5 +415,11 @@ void EgressSession::_updateWireVersion() {
         _sharedState->clusterMaxWireVersion.store(wireVersion);
     }
 }
+
+#ifdef MONGO_CONFIG_SSL
+const SSLConfiguration* EgressSession::getSSLConfiguration() const {
+    return _sslConfig ? &*_sslConfig : nullptr;
+}
+#endif
 
 }  // namespace mongo::transport::grpc

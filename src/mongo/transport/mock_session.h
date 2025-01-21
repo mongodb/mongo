@@ -40,6 +40,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sockaddr.h"
+#include "mongo/util/net/ssl_types.h"
 
 namespace mongo {
 namespace transport {
@@ -98,11 +99,11 @@ public:
 
 #ifdef MONGO_CONFIG_SSL
     void setSSLManager(std::shared_ptr<SSLManagerInterface> interface) {
-        _sslManager = std::move(interface);
+        _sslConfig = interface->getSSLConfiguration();
     }
 
-    const std::shared_ptr<SSLManagerInterface>& getSSLManager() const override {
-        return _sslManager;
+    const SSLConfiguration* getSSLConfiguration() const override {
+        return _sslConfig ? &*_sslConfig : nullptr;
     }
 #endif
 
@@ -116,7 +117,7 @@ private:
     const SockAddr _localAddr;
     const HostAndPort _local;
     RestrictionEnvironment _restrictionEnvironment;
-    std::shared_ptr<SSLManagerInterface> _sslManager;
+    boost::optional<SSLConfiguration> _sslConfig;
 };
 
 class MockSession : public MockSessionBase {

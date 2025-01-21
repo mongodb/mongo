@@ -90,11 +90,11 @@ public:
     int getMaxWireVersion() override;
 
 #ifdef MONGO_CONFIG_SSL
-    /**
-     * Returns nullptr. SSL config is handled by gRPC.
-     */
     const SSLConfiguration* getSSLConfiguration() override {
-        return nullptr;
+        if (!_session) {
+            return nullptr;
+        }
+        return _session->getSSLConfiguration();
     }
 
     bool isTLS() override {

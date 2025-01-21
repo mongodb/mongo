@@ -47,6 +47,7 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_util.h"
+#include "mongo/util/net/ssl_types.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/uuid.h"
@@ -181,7 +182,7 @@ public:
     }
 
 #ifdef MONGO_CONFIG_SSL
-    const std::shared_ptr<SSLManagerInterface>& getSSLManager() const final {
+    const SSLConfiguration* getSSLConfiguration() const override {
         MONGO_UNIMPLEMENTED;
     }
 #endif
@@ -417,6 +418,7 @@ public:
                   const std::shared_ptr<GRPCReactor>& reactor,
                   std::shared_ptr<ClientContext> ctx,
                   std::shared_ptr<ClientStream> stream,
+                  boost::optional<SSLConfiguration> sslConfig,
                   UUID clientId,
                   std::shared_ptr<SharedState> sharedState);
 
@@ -479,6 +481,10 @@ public:
 
     void appendToBSON(BSONObjBuilder& bb) const override;
 
+#ifdef MONGO_CONFIG_SSL
+    const SSLConfiguration* getSSLConfiguration() const override;
+#endif
+
 private:
     void _tryCancel() override {
         _ctx->tryCancel();
@@ -515,6 +521,7 @@ private:
     std::shared_ptr<SharedState> _sharedState;
 
     boost::optional<std::function<void()>> _cleanupCallback;
+    boost::optional<SSLConfiguration> _sslConfig;
 };
 
 }  // namespace mongo::transport::grpc

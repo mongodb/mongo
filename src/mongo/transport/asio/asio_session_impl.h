@@ -138,11 +138,12 @@ public:
     }
 
 #ifdef MONGO_CONFIG_SSL
-    const std::shared_ptr<SSLManagerInterface>& getSSLManager() const override;
+    const SSLConfiguration* getSSLConfiguration() const override;
 #endif
 
 protected:
 #ifdef MONGO_CONFIG_SSL
+    const std::shared_ptr<SSLManagerInterface>& getSSLManager() const;
     /** Constructs a SSL socket required to initiate SSL handshake for egress connections. */
     Status buildSSLSocket(const HostAndPort& target) override;
     Future<void> handshakeSSLForEgress(const HostAndPort& target,

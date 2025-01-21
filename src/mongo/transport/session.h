@@ -237,9 +237,9 @@ public:
 
 #ifdef MONGO_CONFIG_SSL
     /**
-     * Get the SSL manager associated with this session.
+     * Get the SSL configuration associated with this session, if any.
      */
-    virtual const std::shared_ptr<SSLManagerInterface>& getSSLManager() const = 0;
+    virtual const SSLConfiguration* getSSLConfiguration() const = 0;
 #endif
 
     virtual const RestrictionEnvironment& getAuthEnvironment() const = 0;

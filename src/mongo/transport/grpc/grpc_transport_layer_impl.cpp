@@ -36,6 +36,7 @@
 #include "mongo/transport/grpc/client.h"
 #include "mongo/transport/grpc/grpc_session_manager.h"
 #include "mongo/transport/grpc/service.h"
+#include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/socket_utils.h"
@@ -375,7 +376,8 @@ Status GRPCTransportLayerImpl::rotateCertificates(std::shared_ptr<SSLManagerInte
     }
 
     if (_client) {
-        if (auto status = _client->rotateCertificates(); !status.isOK()) {
+        if (auto status = _client->rotateCertificates(manager->getSSLConfiguration());
+            !status.isOK()) {
             LOGV2_DEBUG(
                 9886803, 1, "Failed to rotate egress gRPC TLS certificates", "error"_attr = status);
             return status;

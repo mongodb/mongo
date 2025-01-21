@@ -37,6 +37,7 @@
 #include "mongo/transport/grpc/mock_stub.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/net/ssl_types.h"
 
 namespace mongo::transport::grpc {
 
@@ -59,16 +60,16 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
-    Status rotateCertificates() override {
+    Status rotateCertificates(const SSLConfiguration& sslConfig) override {
         MONGO_UNIMPLEMENTED;
     }
 
 private:
-    Future<CtxAndStream> _streamFactory(const HostAndPort& remote,
-                                        const std::shared_ptr<GRPCReactor>& reactor,
-                                        Milliseconds timeout,
-                                        const ConnectOptions& options,
-                                        const CancellationToken& token) override;
+    Future<CallContext> _streamFactory(const HostAndPort& remote,
+                                       const std::shared_ptr<GRPCReactor>& reactor,
+                                       Milliseconds timeout,
+                                       const ConnectOptions& options,
+                                       const CancellationToken& token) override;
 
     const HostAndPort _local;
     MockResolver _resolver;

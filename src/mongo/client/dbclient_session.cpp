@@ -570,11 +570,7 @@ Message DBClientSession::_call(Message& toSend, string* actualServer) {
 
 #ifdef MONGO_CONFIG_SSL
 const SSLConfiguration* DBClientSession::getSSLConfiguration() {
-    auto& sslManager = _session->getSSLManager();
-    if (!sslManager) {
-        return nullptr;
-    }
-    return &sslManager->getSSLConfiguration();
+    return _session->getSSLConfiguration();
 }
 
 bool DBClientSession::isUsingTransientSSLParams() const {
