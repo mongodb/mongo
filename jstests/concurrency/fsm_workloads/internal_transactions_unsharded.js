@@ -642,7 +642,7 @@ var $config = extendWorkload($config, function($config, $super) {
         for (const s of this.sessions) {
             if (s.getClusterTime() !== undefined)
                 session.advanceClusterTime(s.getClusterTime());
-            if (s.getClusterTime() !== undefined)
+            if (s.getOperationTime() !== undefined)
                 session.advanceOperationTime(s.getOperationTime());
         }
 
