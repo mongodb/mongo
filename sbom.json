@@ -383,7 +383,7 @@
         "name": ""
       },
       "name": "derickr/timelib",
-      "version": "2022.10",
+      "version": "2022.13",
       "licenses": [
         {
           "license": {
@@ -419,7 +419,7 @@
         ]
       },
       "scope": "required",
-      "purl": "pkg:github/derickr/timelib@2022.10"
+      "purl": "pkg:github/derickr/timelib@2022.13"
     },
     {
       "supplier": {
