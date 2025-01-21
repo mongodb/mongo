@@ -142,4 +142,14 @@ executor::RemoteCommandResponse runSearchCommandWithRetries(
  */
 void throwIfNotRunningWithMongotHostConfigured(
     const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+/**
+ * Helper function to determine whether or not pinned connection mode should be used.
+ *
+ * Mongod=>Mongot communication over the MongoDB gRPC protocol requires that all
+ * getMore/killCursor commands must be sent over the same stream as the command that
+ * initiated the cursor(s), which is currently implemented through the pinConnection functionality
+ * in TaskExecutorCursor.
+ */
+bool shouldPinConnection();
 }  // namespace mongo::mongot_cursor

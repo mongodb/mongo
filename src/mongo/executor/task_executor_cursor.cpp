@@ -343,12 +343,10 @@ void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
     // Ensure we update the RCR we give to each 'child cursor' with the current opCtx.
     auto freshRcr = _createRequest(opCtx, _rcr.cmdObj);
     auto copyOptions = [&] {
-        TaskExecutorCursorOptions options;
         // In the case that pinConnection is true, we need to ensure that additional cursors also
         // pin their connection to the same socket as the original cursor. We don't need to share
         // the yield policy or getMore strategy.
-        options.pinConnection = _options.pinConnection;
-        return options;
+        return TaskExecutorCursorOptions(_options.pinConnection);
     };
     for (unsigned int i = 1; i < cursorResponses.size(); ++i) {
         _additionalCursors.push_back(

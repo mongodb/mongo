@@ -113,7 +113,9 @@ public:
     std::unique_ptr<TaskExecutorCursor> makeTec(RemoteCommandRequest rcr,
                                                 boost::optional<int64_t> batchSize = boost::none,
                                                 bool preFetchNextBatch = true) {
-        TaskExecutorCursorOptions options(batchSize, preFetchNextBatch);
+        // pinConnection is a required argument to construct the options, but will be overriden in
+        // the base class to the correct value.
+        TaskExecutorCursorOptions options(/*pinConnection*/ false, batchSize, preFetchNextBatch);
         return Base::makeTec(rcr, std::move(options));
     }
 

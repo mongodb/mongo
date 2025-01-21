@@ -36,6 +36,7 @@
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/server_parameter_with_storage.h"
+#include "mongo/executor/task_executor_cursor_parameters_gen.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -183,11 +184,12 @@ std::unique_ptr<executor::TaskExecutorCursor> makeTaskExecutorCursorForExplain(
     // causes an error within makeTaskExecutorCursor() as it expects a cursor. We catch that error
     // here and then create a dummy TEC to continue execution.
     try {
-        return makeTaskExecutorCursor(expCtx->getOperationContext(),
-                                      taskExecutor,
-                                      command,
-                                      {std::move(getMoreStrategy), std::move(yieldPolicy)},
-                                      makeRetryOnNetworkErrorPolicy());
+        return makeTaskExecutorCursor(
+            expCtx->getOperationContext(),
+            taskExecutor,
+            command,
+            {shouldPinConnection(), std::move(getMoreStrategy), std::move(yieldPolicy)},
+            makeRetryOnNetworkErrorPolicy());
     } catch (ExceptionFor<ErrorCodes::IDLFailedToParse>&) {
         auto nss = expCtx->getNamespaceString();
         BSONObjBuilder createdResponse;
@@ -209,7 +211,11 @@ std::unique_ptr<executor::TaskExecutorCursor> makeTaskExecutorCursorForExplain(
         auto cursorResponse = CursorResponse::parseFromBSON(std::move(createdResponse.obj()));
 
         return std::make_unique<executor::TaskExecutorCursor>(
-            taskExecutor, nullptr, uassertStatusOK(std::move(cursorResponse)), command);
+            taskExecutor,
+            nullptr,
+            uassertStatusOK(std::move(cursorResponse)),
+            command,
+            executor::TaskExecutorCursorOptions(shouldPinConnection()));
     }
     MONGO_UNREACHABLE;
 }
@@ -230,11 +236,12 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursors(
             expCtx, command, taskExecutor, std::move(getMoreStrategy), std::move(yieldPolicy));
 
     } else {
-        initialCursor = makeTaskExecutorCursor(expCtx->getOperationContext(),
-                                               taskExecutor,
-                                               command,
-                                               {std::move(getMoreStrategy), std::move(yieldPolicy)},
-                                               makeRetryOnNetworkErrorPolicy());
+        initialCursor = makeTaskExecutorCursor(
+            expCtx->getOperationContext(),
+            taskExecutor,
+            command,
+            {shouldPinConnection(), std::move(getMoreStrategy), std::move(yieldPolicy)},
+            makeRetryOnNetworkErrorPolicy());
     }
 
     additionalCursors = initialCursor->releaseAdditionalCursors();
@@ -480,4 +487,9 @@ void throwIfNotRunningWithMongotHostConfigured(
         doThrowIfNotRunningWithMongotHostConfigured();
     }
 }
+
+bool shouldPinConnection() {
+    return globalMongotParams.useGRPC || gPinTaskExecCursorConns.load();
+}
+
 }  // namespace mongo::mongot_cursor

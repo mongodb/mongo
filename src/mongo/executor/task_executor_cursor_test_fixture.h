@@ -190,7 +190,7 @@ public:
     }
 
     std::unique_ptr<TaskExecutorCursor> makeTec(RemoteCommandRequest rcr,
-                                                TaskExecutorCursorOptions&& options = {}) {
+                                                TaskExecutorCursorOptions&& options) {
         options.pinConnection = false;
         return std::make_unique<TaskExecutorCursor>(getExecutorPtr(), rcr, std::move(options));
     }
@@ -256,7 +256,7 @@ public:
     }
 
     std::unique_ptr<TaskExecutorCursor> makeTec(RemoteCommandRequest rcr,
-                                                TaskExecutorCursorOptions&& options = {}) {
+                                                TaskExecutorCursorOptions&& options) {
         options.pinConnection = true;
         return std::make_unique<TaskExecutorCursor>(getExecutorPtr(), rcr, std::move(options));
     }

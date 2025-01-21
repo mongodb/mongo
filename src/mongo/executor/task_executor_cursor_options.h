@@ -104,22 +104,26 @@ struct TaskExecutorCursorOptions {
     /**
      * Construct the options from any pre-constructed GetMore strategy.
      */
-    TaskExecutorCursorOptions(std::shared_ptr<TaskExecutorCursorGetMoreStrategy> getMoreStrategy =
+    TaskExecutorCursorOptions(bool pinConnection,
+                              std::shared_ptr<TaskExecutorCursorGetMoreStrategy> getMoreStrategy =
                                   std::make_shared<DefaultTaskExecutorCursorGetMoreStrategy>(),
-                              std::shared_ptr<PlanYieldPolicy> yieldPolicy = nullptr,
-                              bool pinConnection = gPinTaskExecCursorConns.load());
+                              std::shared_ptr<PlanYieldPolicy> yieldPolicy = nullptr);
 
     /**
      * Construct the options with the default GetMore strategy from a given batchSize and
      * preFetchNextBatch flag.
      */
-    TaskExecutorCursorOptions(boost::optional<int64_t> batchSize,
+    TaskExecutorCursorOptions(bool pinConnection,
+                              boost::optional<int64_t> batchSize,
                               bool preFetchNextBatch = true,
-                              std::shared_ptr<PlanYieldPolicy> yieldPolicy = nullptr,
-                              bool pinConnection = gPinTaskExecCursorConns.load());
+                              std::shared_ptr<PlanYieldPolicy> yieldPolicy = nullptr);
 
     TaskExecutorCursorOptions(TaskExecutorCursorOptions& other) = default;
     TaskExecutorCursorOptions(TaskExecutorCursorOptions&& other) = default;
+
+    // Specifies whether the TEC should use a `PinnedConnectionTaskExecutor` to run all
+    // operations on the cursor over the same transport session.
+    bool pinConnection;
 
     // Specifies the strategy with which the cursor should configure GetMore requests.
     // Using shared_ptr to allow tries on network failure, don't share the pointer on other
@@ -131,8 +135,6 @@ struct TaskExecutorCursorOptions {
     // purpose. In practice, this will always be of type PlanYieldPolicyRemoteCursor, but
     // for dependency reasons, we must use the generic PlanYieldPolicy here.
     std::shared_ptr<PlanYieldPolicy> yieldPolicy;
-
-    bool pinConnection;
 };
 }  // namespace executor
 }  // namespace mongo
