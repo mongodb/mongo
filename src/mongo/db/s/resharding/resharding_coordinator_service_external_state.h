@@ -88,21 +88,27 @@ public:
      * - The number of documents to copy from each donor is equal to the total number of documents
      *   copied from that donor across all the recipients.
      */
-    void verifyClonedCollection(OperationContext* opCtx,
-                                const ReshardingCoordinatorDocument& coordinatorDoc);
+    virtual void verifyClonedCollection(OperationContext* opCtx,
+                                        const ReshardingCoordinatorDocument& coordinatorDoc) = 0;
 
     /**
      * To be called before transitioning to the "committing" state to verify the temporary
      * collection after reaching strict consistency by asserting on the number of the documents.
      */
-    void verifyFinalCollection(OperationContext* opCtx,
-                               const ReshardingCoordinatorDocument& coordinatorDoc);
+    virtual void verifyFinalCollection(OperationContext* opCtx,
+                                       const ReshardingCoordinatorDocument& coordinatorDoc) = 0;
 };
 
 class ReshardingCoordinatorExternalStateImpl final : public ReshardingCoordinatorExternalState {
 public:
     ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
         OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) override;
+
+    void verifyClonedCollection(OperationContext* opCtx,
+                                const ReshardingCoordinatorDocument& coordinatorDoc) override;
+
+    void verifyFinalCollection(OperationContext* opCtx,
+                               const ReshardingCoordinatorDocument& coordinatorDoc) override;
 };
 
 }  // namespace mongo

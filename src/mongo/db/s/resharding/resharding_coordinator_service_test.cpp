@@ -101,6 +101,15 @@ using PauseDuringStateTransitions =
     resharding_service_test_helpers::PauseDuringStateTransitions<CoordinatorStateEnum>;
 
 class ExternalStateForTest : public ReshardingCoordinatorExternalState {
+public:
+    struct Options {
+        boost::optional<ErrorCodes::Error> verifyClonedErrorCode;
+        boost::optional<ErrorCodes::Error> verifyFinalErrorCode;
+    };
+
+    ExternalStateForTest(Options options)
+        : ReshardingCoordinatorExternalState(), _options(options) {}
+
     ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
         OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) override {
         std::vector<ChunkType> initialChunks;
@@ -121,28 +130,49 @@ class ExternalStateForTest : public ReshardingCoordinatorExternalState {
         return ParticipantShardsAndChunks(
             {coordinatorDoc.getDonorShards(), coordinatorDoc.getRecipientShards(), initialChunks});
     }
+
+    void verifyClonedCollection(OperationContext* opCtx,
+                                const ReshardingCoordinatorDocument& coordinatorDoc) override {
+        if (_options.verifyClonedErrorCode) {
+            uasserted(*_options.verifyClonedErrorCode, "Failing cloned collection verification");
+        }
+    }
+
+    void verifyFinalCollection(OperationContext* opCtx,
+                               const ReshardingCoordinatorDocument& coordinatorDoc) override {
+        if (_options.verifyFinalErrorCode) {
+            uasserted(*_options.verifyFinalErrorCode, "Failing final collection verification");
+        }
+    }
+
+private:
+    const Options _options;
 };
 
 class ReshardingCoordinatorServiceForTest : public ReshardingCoordinatorService {
 public:
-    explicit ReshardingCoordinatorServiceForTest(ServiceContext* serviceContext)
-        : ReshardingCoordinatorService(serviceContext), _serviceContext(serviceContext) {}
+    explicit ReshardingCoordinatorServiceForTest(ServiceContext* serviceContext,
+                                                 ExternalStateForTest::Options externalStateOptions)
+        : ReshardingCoordinatorService(serviceContext),
+          _serviceContext(serviceContext),
+          _exteralStateOptions(externalStateOptions) {}
 
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override {
         return std::make_shared<ReshardingCoordinator>(
             this,
             ReshardingCoordinatorDocument::parse(IDLParserContext("ReshardingCoordinatorStateDoc"),
                                                  initialState),
-            std::make_shared<ExternalStateForTest>(),
+            std::make_shared<ExternalStateForTest>(_exteralStateOptions),
             _serviceContext);
     }
 
 private:
     ServiceContext* _serviceContext;
+    const ExternalStateForTest::Options _exteralStateOptions;
 };
 
-class ReshardingCoordinatorServiceTest : service_context_test::WithSetupTransportLayer,
-                                         public ConfigServerTestFixture {
+class ReshardingCoordinatorServiceTestBase : service_context_test::WithSetupTransportLayer,
+                                             public ConfigServerTestFixture {
 public:
     struct ReshardingOptions {
         const std::vector<ShardId> donorShardIds;
@@ -171,8 +201,12 @@ public:
         return {donorShardIds, recipientShardIds};
     }
 
-    std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) {
-        return std::make_unique<ReshardingCoordinatorServiceForTest>(serviceContext);
+    virtual ExternalStateForTest::Options getExternalStateOptions() const = 0;
+
+    std::unique_ptr<repl::PrimaryOnlyService> makeService(
+        ServiceContext* serviceContext, ExternalStateForTest::Options externalStateOptions) {
+        return std::make_unique<ReshardingCoordinatorServiceForTest>(serviceContext,
+                                                                     externalStateOptions);
     }
 
     void setUp() override {
@@ -216,7 +250,7 @@ public:
             NamespaceString::kConfigReshardingOperationsNamespace,
             [](const ReshardingCoordinatorDocument& stateDoc) { return stateDoc.getState(); }));
         _registry = repl::PrimaryOnlyServiceRegistry::get(getServiceContext());
-        auto service = makeService(getServiceContext());
+        auto service = makeService(getServiceContext(), getExternalStateOptions());
         auto serviceName = service->getServiceName();
         _registry->registerService(std::move(service));
         _service = _registry->lookupServiceByName(serviceName);
@@ -822,6 +856,8 @@ public:
 
     RAIIServerParameterControllerForTest serverParamController{
         "reshardingMinimumOperationDurationMillis", 0};
+    FailPointEnableBlock _performVerificationAfterCloning{
+        "reshardingPerformValidationAfterCloning"};
 
     long long _term = 0;
 
@@ -835,6 +871,13 @@ protected:
 
     const long totalApproxBytesToClone = 10000;
     const long totalApproxDocumentsToClone = 100;
+};
+
+class ReshardingCoordinatorServiceTest : public ReshardingCoordinatorServiceTestBase {
+public:
+    ExternalStateForTest::Options getExternalStateOptions() const override {
+        return {};
+    }
 };
 
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorSuccessfullyTransitionsTokDone) {
@@ -1401,6 +1444,72 @@ TEST_F(ReshardingCoordinatorServiceTest, CoordinatorHonorsCriticalSectionTimeout
     ASSERT_THROWS_CODE(coordinator->getCompletionFuture().get(opCtx),
                        DBException,
                        ErrorCodes::ReshardingCriticalSectionTimeout);
+}
+
+class ReshardingCoordinatorServiceFailCloningVerificationTest
+    : public ReshardingCoordinatorServiceTestBase {
+public:
+    ExternalStateForTest::Options getExternalStateOptions() const override {
+        return {.verifyClonedErrorCode = verifyClonedErrorCode};
+    }
+
+protected:
+    const ErrorCodes::Error verifyClonedErrorCode{9858201};
+};
+
+TEST_F(ReshardingCoordinatorServiceFailCloningVerificationTest, AbortIfPerformVerification) {
+    const std::vector<CoordinatorStateEnum> states = {CoordinatorStateEnum::kPreparingToDonate,
+                                                      CoordinatorStateEnum::kCloning,
+                                                      CoordinatorStateEnum::kAborting};
+
+    PauseDuringStateTransitions stateTransitionsGuard{controller(), states};
+
+    auto opCtx = operationContext();
+
+    auto reshardingOptions = makeDefaultReshardingOptions();
+    auto coordinator = initializeAndGetCoordinator(_reshardingUUID,
+                                                   _originalNss,
+                                                   _tempNss,
+                                                   _newShardKey,
+                                                   _originalUUID,
+                                                   _oldShardKey,
+                                                   reshardingOptions);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kPreparingToDonate);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kPreparingToDonate);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
+
+    makeDonorsReadyToDonateWithAssert(opCtx);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kCloning);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kCloning);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
+
+    makeRecipientsFinishedCloningWithAssert(opCtx);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kAborting);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kAborting);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kAborting);
+
+    makeRecipientsProceedToDone(opCtx);
+    makeDonorsProceedToDone(opCtx);
+
+    ASSERT_THROWS_CODE(
+        coordinator->getCompletionFuture().get(opCtx), DBException, verifyClonedErrorCode);
+}
+
+TEST_F(ReshardingCoordinatorServiceFailCloningVerificationTest, CommitIfNotPerformVerification) {
+    auto reshardingOptions = makeDefaultReshardingOptions();
+    reshardingOptions.performVerification = false;
+
+    runReshardingToCompletion(TransitionFunctionMap{},
+                              nullptr /* stateTransitionsGuard */,
+                              {CoordinatorStateEnum::kPreparingToDonate,
+                               CoordinatorStateEnum::kCloning,
+                               CoordinatorStateEnum::kApplying,
+                               CoordinatorStateEnum::kBlockingWrites,
+                               CoordinatorStateEnum::kCommitting},
+                              reshardingOptions);
 }
 
 }  // namespace

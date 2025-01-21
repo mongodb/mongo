@@ -340,7 +340,7 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
             initialChunks};
 }
 
-void ReshardingCoordinatorExternalState::verifyClonedCollection(
+void ReshardingCoordinatorExternalStateImpl::verifyClonedCollection(
     OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
     LOGV2(9929900,
           "Start verifying the temporary resharding collection after cloning",
@@ -382,7 +382,7 @@ void ReshardingCoordinatorExternalState::verifyClonedCollection(
           "reshardingUUID"_attr = coordinatorDoc.getReshardingUUID());
 }
 
-void ReshardingCoordinatorExternalState::verifyFinalCollection(
+void ReshardingCoordinatorExternalStateImpl::verifyFinalCollection(
     OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
     LOGV2(9929903,
           "Start verifying the temporary resharding collection after reaching strict consistency",
@@ -412,7 +412,7 @@ void ReshardingCoordinatorExternalState::verifyFinalCollection(
     uassert(
         9929906,
         str::stream() << "The number of documents in the original collection is " << numDocsOriginal
-                      << "but the number of documents in the resharding temporary collection is "
+                      << " but the number of documents in the resharding temporary collection is "
                       << numDocsTemporary,
         numDocsOriginal == numDocsTemporary);
 
