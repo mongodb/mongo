@@ -192,6 +192,12 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
         case MatchExpression::GT:
         case MatchExpression::GTE:
             ceRes = estimate(static_cast<const ComparisonMatchExpression*>(node));
+            if (!ceRes.isOK()) {
+                return ceRes;
+            }
+            if (isFilterRoot) {
+                addRootNodeSel(ceRes);
+            }
             break;
         case MatchExpression::NOT:
             ceRes = estimate(static_cast<const NotMatchExpression*>(node), isFilterRoot);
@@ -740,6 +746,10 @@ CEResult CardinalityEstimator::estimate(const IndexBounds* node) {
 }
 
 CEResult CardinalityEstimator::estimate(const OrderedIntervalList* node, bool forceHistogram) {
+    if (node->isMinToMax() || node->isMaxToMin()) {
+        return _inputCard;
+    }
+
     auto localRankerMode = _rankerMode;
     const bool strict = _rankerMode == QueryPlanRankerModeEnum::kHistogramCE || forceHistogram;
     const stats::CEHistogram* histogram = nullptr;
