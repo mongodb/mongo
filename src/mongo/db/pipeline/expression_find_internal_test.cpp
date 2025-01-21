@@ -111,6 +111,18 @@ protected:
     }
 };
 
+TEST_F(ExpressionInternalFindPositionalTest, AppliesProjectionToPostImage) {
+    defineAndSetProjectionPostImageVariable(getExpCtxRaw(),
+                                            Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
+
+    auto expr = createExpression(fromjson("{bar: 1, foo: {$gte: 5}}"), "foo");
+
+    ASSERT_DOCUMENT_EQ(
+        Document{fromjson("{bar:1, foo: [6]}")},
+        expr->evaluate(Document{fromjson("{bar: 1, foo: [1,2,6,10]}")}, &getExpCtx()->variables)
+            .getDocument());
+}
+
 TEST_F(ExpressionInternalFindPositionalTest, RecordsProjectionDependencies) {
     auto varId = defineAndSetProjectionPostImageVariable(
         getExpCtxRaw(), Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
@@ -157,6 +169,18 @@ TEST_F(ExpressionInternalFindPositionalTest,
     ASSERT_EQ(computedPaths.paths.count("foo"), 1UL);
 }
 
+TEST_F(ExpressionInternalFindSliceTest, AppliesProjectionToPostImage) {
+    defineAndSetProjectionPostImageVariable(getExpCtxRaw(),
+                                            Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
+
+    auto expr = createExpression("foo", 1, 2);
+
+    ASSERT_DOCUMENT_EQ(
+        Document{fromjson("{bar: 1, foo: [2,6]}")},
+        expr->evaluate(Document{fromjson("{bar: 1, foo: [1,2,6,10]}")}, &getExpCtx()->variables)
+            .getDocument());
+}
+
 TEST_F(ExpressionInternalFindSliceTest, RecordsProjectionDependencies) {
     auto varId = defineAndSetProjectionPostImageVariable(
         getExpCtxRaw(), Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
@@ -200,6 +224,15 @@ TEST_F(ExpressionInternalFindSliceTest, AddsTopLevelFieldOfArrayDottedPathToComp
     ASSERT_EQ(computedPaths.paths.size(), 1UL);
     ASSERT_EQ(computedPaths.renames.size(), 0UL);
     ASSERT_EQ(computedPaths.paths.count("foo"), 1UL);
+}
+
+TEST_F(ExpressionInternalFindElemMatchTest, AppliesProjectionToRootDocument) {
+    auto expr = createExpression(fromjson("{foo: {$elemMatch: {bar: {$gte: 5}}}}"), "foo");
+
+    ASSERT_VALUE_EQ(Document{fromjson("{foo: [{bar: 6, z: 6}]}")}["foo"],
+                    expr->evaluate(Document{fromjson("{foo: [{bar: 1, z: 1}, {bar: 2, z: 2}, "
+                                                     "{bar: 6, z: 6}, {bar: 10, z: 10}]}")},
+                                   &getExpCtx()->variables));
 }
 
 TEST_F(ExpressionInternalFindElemMatchTest, RecordsProjectionDependencies) {

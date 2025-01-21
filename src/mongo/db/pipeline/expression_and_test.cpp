@@ -72,16 +72,39 @@ static BSONObj constify(const BSONObj& obj, bool parentIsArray = false) {
     return bob.obj();
 }
 
+/** Convert Value to a wrapped BSONObj with an empty string field name. */
+static BSONObj toBson(const Value& value) {
+    BSONObjBuilder bob;
+    value.addToBsonObj(&bob, "");
+    return bob.obj();
+}
+
 /** Convert Expression to BSON. */
 static BSONObj expressionToBson(const boost::intrusive_ptr<Expression>& expression) {
     return BSON("" << expression->serialize()).firstElement().embeddedObject().getOwned();
 }
 
+/** Convert Document to BSON. */
+static BSONObj toBson(const Document& document) {
+    return document.toBson();
+}
+
+/** Create a Document from a BSONObj. */
+Document fromBson(BSONObj obj) {
+    return Document(obj);
+}
+
+/** Create a Value from a BSONObj. */
+Value valueFromBson(BSONObj obj) {
+    BSONElement element = obj.firstElement();
+    return Value(element);
+}
+
 namespace And {
 
-class ExpectedParsedBase {
+class ExpectedResultBase {
 public:
-    virtual ~ExpectedParsedBase() {}
+    virtual ~ExpectedResultBase() {}
     void run() {
         auto expCtx = ExpressionContextForTest{};
         BSONObj specObject = BSON("" << spec());
@@ -90,10 +113,17 @@ public:
         boost::intrusive_ptr<Expression> expression =
             Expression::parseOperand(&expCtx, specElement, vps);
         ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
+        ASSERT_BSONOBJ_EQ(
+            BSON("" << expectedResult()),
+            toBson(expression->evaluate(fromBson(BSON("a" << 1)), &expCtx.variables)));
+        boost::intrusive_ptr<Expression> optimized = expression->optimize();
+        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()),
+                          toBson(optimized->evaluate(fromBson(BSON("a" << 1)), &expCtx.variables)));
     }
 
 protected:
     virtual BSONObj spec() = 0;
+    virtual bool expectedResult() = 0;
 };
 
 class OptimizeBase {
@@ -123,86 +153,122 @@ class NoOptimizeBase : public OptimizeBase {
 };
 
 /** $and without operands. */
-class NoOperands : public ExpectedParsedBase {
+class NoOperands : public ExpectedResultBase {
     BSONObj spec() override {
         return BSON("$and" << BSONArray());
+    }
+    bool expectedResult() override {
+        return true;
     }
 };
 
 /** $and passed 'true'. */
-class True : public ExpectedParsedBase {
+class True : public ExpectedResultBase {
     BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(true));
+    }
+    bool expectedResult() override {
+        return true;
     }
 };
 
 /** $and passed 'false'. */
-class False : public ExpectedParsedBase {
+class False : public ExpectedResultBase {
     BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(false));
+    }
+    bool expectedResult() override {
+        return false;
     }
 };
 
 /** $and passed 'true', 'true'. */
-class TrueTrue : public ExpectedParsedBase {
+class TrueTrue : public ExpectedResultBase {
     BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(true << true));
+    }
+    bool expectedResult() override {
+        return true;
     }
 };
 
 /** $and passed 'true', 'false'. */
-class TrueFalse : public ExpectedParsedBase {
+class TrueFalse : public ExpectedResultBase {
     BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(true << false));
+    }
+    bool expectedResult() override {
+        return false;
     }
 };
 
 /** $and passed 'false', 'true'. */
-class FalseTrue : public ExpectedParsedBase {
+class FalseTrue : public ExpectedResultBase {
     BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(false << true));
+    }
+    bool expectedResult() override {
+        return false;
     }
 };
 
 /** $and passed 'false', 'false'. */
-class FalseFalse : public ExpectedParsedBase {
+class FalseFalse : public ExpectedResultBase {
     BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(false << false));
+    }
+    bool expectedResult() override {
+        return false;
     }
 };
 
 /** $and passed 'true', 'true', 'true'. */
-class TrueTrueTrue : public ExpectedParsedBase {
+class TrueTrueTrue : public ExpectedResultBase {
     BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(true << true << true));
+    }
+    bool expectedResult() override {
+        return true;
     }
 };
 
 /** $and passed 'true', 'true', 'false'. */
-class TrueTrueFalse : public ExpectedParsedBase {
+class TrueTrueFalse : public ExpectedResultBase {
     BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(true << true << false));
+    }
+    bool expectedResult() override {
+        return false;
     }
 };
 
 /** $and passed '0', '1'. */
-class ZeroOne : public ExpectedParsedBase {
+class ZeroOne : public ExpectedResultBase {
     BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(0 << 1));
+    }
+    bool expectedResult() override {
+        return false;
     }
 };
 
 /** $and passed '1', '2'. */
-class OneTwo : public ExpectedParsedBase {
+class OneTwo : public ExpectedResultBase {
     BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY(1 << 2));
+    }
+    bool expectedResult() override {
+        return true;
     }
 };
 
 /** $and passed a field path. */
-class FieldPath : public ExpectedParsedBase {
+class FieldPath : public ExpectedResultBase {
     BSONObj spec() override {
         return BSON("$and" << BSON_ARRAY("$a"));
+    }
+    bool expectedResult() override {
+        return true;
     }
 };
 

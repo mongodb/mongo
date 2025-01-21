@@ -113,9 +113,9 @@ TEST(FieldPath, RemoveOptimizesToMissingValue) {
 
     auto optimizedExpr = expression->optimize();
 
-    auto constantExpr = dynamic_cast<ExpressionConstant*>(optimizedExpr.get());
-    ASSERT_TRUE(constantExpr);
-    ASSERT_VALUE_EQ(Value(), constantExpr->getValue());
+    ASSERT_VALUE_EQ(
+        Value(),
+        optimizedExpr->evaluate(Document(BSON("x" << BSON("y" << 123))), &expCtx.variables));
 }
 
 TEST(FieldPath, NoOptimizationOnNormalPath) {
@@ -327,6 +327,205 @@ public:
     }
 };
 
+/** Field path target field is missing. */
+class Missing {
+public:
+    void run() {
+        auto expCtx = ExpressionContextForTest{};
+        intrusive_ptr<Expression> expression = ExpressionFieldPath::deprecatedCreate(&expCtx, "a");
+        ASSERT_BSONOBJ_BINARY_EQ(fromjson("{}"),
+                                 toBson(expression->evaluate({}, &expCtx.variables)));
+    }
+};
+
+/** Simple case where the target field is present. */
+class Present {
+public:
+    void run() {
+        auto expCtx = ExpressionContextForTest{};
+        intrusive_ptr<Expression> expression = ExpressionFieldPath::deprecatedCreate(&expCtx, "a");
+        ASSERT_BSONOBJ_BINARY_EQ(
+            fromjson("{'':123}"),
+            toBson(expression->evaluate(fromBson(BSON("a" << 123)), &expCtx.variables)));
+    }
+};
+
+/** Target field parent is null. */
+class NestedBelowNull {
+public:
+    void run() {
+        auto expCtx = ExpressionContextForTest{};
+        intrusive_ptr<Expression> expression =
+            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
+        ASSERT_BSONOBJ_BINARY_EQ(
+            fromjson("{}"),
+            toBson(expression->evaluate(fromBson(fromjson("{a:null}")), &expCtx.variables)));
+    }
+};
+
+/** Target field parent is undefined. */
+class NestedBelowUndefined {
+public:
+    void run() {
+        auto expCtx = ExpressionContextForTest{};
+        intrusive_ptr<Expression> expression =
+            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
+        ASSERT_BSONOBJ_BINARY_EQ(
+            fromjson("{}"),
+            toBson(expression->evaluate(fromBson(fromjson("{a:undefined}")), &expCtx.variables)));
+    }
+};
+
+/** Target field parent is missing. */
+class NestedBelowMissing {
+public:
+    void run() {
+        auto expCtx = ExpressionContextForTest{};
+        intrusive_ptr<Expression> expression =
+            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
+        ASSERT_BSONOBJ_BINARY_EQ(
+            fromjson("{}"),
+            toBson(expression->evaluate(fromBson(fromjson("{z:1}")), &expCtx.variables)));
+    }
+};
+
+/** Target field parent is an integer. */
+class NestedBelowInt {
+public:
+    void run() {
+        auto expCtx = ExpressionContextForTest{};
+        intrusive_ptr<Expression> expression =
+            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
+        ASSERT_BSONOBJ_BINARY_EQ(
+            fromjson("{}"),
+            toBson(expression->evaluate(fromBson(BSON("a" << 2)), &expCtx.variables)));
+    }
+};
+
+/** A value in a nested object. */
+class NestedValue {
+public:
+    void run() {
+        auto expCtx = ExpressionContextForTest{};
+        intrusive_ptr<Expression> expression =
+            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
+        ASSERT_BSONOBJ_BINARY_EQ(BSON("" << 55),
+                                 toBson(expression->evaluate(fromBson(BSON("a" << BSON("b" << 55))),
+                                                             &expCtx.variables)));
+    }
+};
+
+/** Target field within an empty object. */
+class NestedBelowEmptyObject {
+public:
+    void run() {
+        auto expCtx = ExpressionContextForTest{};
+        intrusive_ptr<Expression> expression =
+            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
+        ASSERT_BSONOBJ_BINARY_EQ(
+            fromjson("{}"),
+            toBson(expression->evaluate(fromBson(BSON("a" << BSONObj())), &expCtx.variables)));
+    }
+};
+
+/** Target field within an empty array. */
+class NestedBelowEmptyArray {
+public:
+    void run() {
+        auto expCtx = ExpressionContextForTest{};
+        intrusive_ptr<Expression> expression =
+            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
+        ASSERT_BSONOBJ_BINARY_EQ(
+            BSON("" << BSONArray()),
+            toBson(expression->evaluate(fromBson(BSON("a" << BSONArray())), &expCtx.variables)));
+    }
+};
+
+/** Target field within an array containing null. */
+class NestedBelowArrayWithNull {
+public:
+    void run() {
+        auto expCtx = ExpressionContextForTest{};
+        intrusive_ptr<Expression> expression =
+            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
+        ASSERT_BSONOBJ_BINARY_EQ(
+            fromjson("{'':[]}"),
+            toBson(expression->evaluate(fromBson(fromjson("{a:[null]}")), &expCtx.variables)));
+    }
+};
+
+/** Target field within an array containing undefined. */
+class NestedBelowArrayWithUndefined {
+public:
+    void run() {
+        auto expCtx = ExpressionContextForTest{};
+        intrusive_ptr<Expression> expression =
+            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
+        ASSERT_BSONOBJ_BINARY_EQ(
+            fromjson("{'':[]}"),
+            toBson(expression->evaluate(fromBson(fromjson("{a:[undefined]}")), &expCtx.variables)));
+    }
+};
+
+/** Target field within an array containing an integer. */
+class NestedBelowArrayWithInt {
+public:
+    void run() {
+        auto expCtx = ExpressionContextForTest{};
+        intrusive_ptr<Expression> expression =
+            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
+        ASSERT_BSONOBJ_BINARY_EQ(
+            fromjson("{'':[]}"),
+            toBson(expression->evaluate(fromBson(fromjson("{a:[1]}")), &expCtx.variables)));
+    }
+};
+
+/** Target field within an array. */
+class NestedWithinArray {
+public:
+    void run() {
+        auto expCtx = ExpressionContextForTest{};
+        intrusive_ptr<Expression> expression =
+            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
+        ASSERT_BSONOBJ_BINARY_EQ(
+            fromjson("{'':[9]}"),
+            toBson(expression->evaluate(fromBson(fromjson("{a:[{b:9}]}")), &expCtx.variables)));
+    }
+};
+
+/** Multiple value types within an array. */
+class MultipleArrayValues {
+public:
+    void run() {
+        auto expCtx = ExpressionContextForTest{};
+        intrusive_ptr<Expression> expression =
+            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
+        ASSERT_BSONOBJ_BINARY_EQ(
+            fromjson("{'':[9,20]}"),
+            toBson(expression->evaluate(
+                fromBson(fromjson("{a:[{b:9},null,undefined,{g:4},{b:20},{}]}")),
+                &expCtx.variables)));
+    }
+};
+
+/** Expanding values within nested arrays. */
+class ExpandNestedArrays {
+public:
+    void run() {
+        auto expCtx = ExpressionContextForTest{};
+        intrusive_ptr<Expression> expression =
+            ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b.c");
+        ASSERT_BSONOBJ_BINARY_EQ(
+            fromjson("{'':[[1,2],3,[4],[[5]],[6,7]]}"),
+            toBson(expression->evaluate(fromBson(fromjson("{a:[{b:[{c:1},{c:2}]},"
+                                                          "{b:{c:3}},"
+                                                          "{b:[{c:4}]},"
+                                                          "{b:[{c:[5]}]},"
+                                                          "{b:{c:[6,7]}}]}")),
+                                        &expCtx.variables)));
+    }
+};
+
 /** Add to a BSONObj. */
 class AddToBsonObj {
 public:
@@ -362,6 +561,22 @@ public:
     void setupTests() override {
         add<FieldPath::Invalid>();
         add<FieldPath::Dependencies>();
+        add<FieldPath::Missing>();
+        add<FieldPath::Present>();
+        add<FieldPath::NestedBelowNull>();
+        add<FieldPath::NestedBelowUndefined>();
+        add<FieldPath::NestedBelowMissing>();
+        add<FieldPath::NestedBelowInt>();
+        add<FieldPath::NestedValue>();
+        add<FieldPath::NestedBelowEmptyObject>();
+        add<FieldPath::NestedBelowEmptyArray>();
+        add<FieldPath::NestedBelowEmptyArray>();
+        add<FieldPath::NestedBelowArrayWithNull>();
+        add<FieldPath::NestedBelowArrayWithUndefined>();
+        add<FieldPath::NestedBelowArrayWithInt>();
+        add<FieldPath::NestedWithinArray>();
+        add<FieldPath::MultipleArrayValues>();
+        add<FieldPath::ExpandNestedArrays>();
         add<FieldPath::AddToBsonObj>();
         add<FieldPath::AddToBsonArray>();
     }
