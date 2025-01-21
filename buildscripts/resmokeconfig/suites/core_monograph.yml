@@ -17,11 +17,11 @@ selector:
   - jstests/core/apitest_db.js
   - jstests/core/apitest_db_profile_level.js
   # - jstests/core/apitest_dbcollection.js # 160: capped collection
-  # - jstests/core/apply_ops1.js # hang at unknown line
+  - jstests/core/apply_ops1.js
   - jstests/core/apply_ops2.js
-  # - jstests/core/apply_ops_dups.js # 38: unique index
+  - jstests/core/apply_ops_dups.js
   - jstests/core/apply_ops_index_collation.js
-  # - jstests/core/apply_ops_invalid_index_spec.js # 38: replTest
+  - jstests/core/apply_ops_invalid_index_spec.js
   - jstests/core/apply_ops_without_ns.js
   - jstests/core/array1.js
   - jstests/core/array3.js
@@ -43,11 +43,11 @@ selector:
   - jstests/core/arrayfindb.js
   - jstests/core/auth1.js
   - jstests/core/auth2.js
-  # - jstests/core/auth_copydb.js # 24: a.copyDatabase()
+  - jstests/core/auth_copydb.js
   - jstests/core/autocomplete.js
   - jstests/core/autoid.js
   - jstests/core/automation_setparameter.js
-  # - jstests/core/awaitdata_getmore_cmd.js # 55: metadata lock assert
+  # - jstests/core/awaitdata_getmore_cmd.js # 44: unsupported capped collection
   - jstests/core/background_index_multikey.js
   - jstests/core/bad_index_plugin.js
   - jstests/core/basic1.js
@@ -60,13 +60,13 @@ selector:
   - jstests/core/basica.js
   - jstests/core/batch_size.js
   - jstests/core/batch_write_collation_estsize.js
-  # - jstests/core/batch_write_command_delete.js # run too long time
-  # - jstests/core/batch_write_command_insert.js # run too long time
-  # - jstests/core/batch_write_command_update.js # run too long time
+  - jstests/core/batch_write_command_delete.js # It is normal for this test to run slowly.
+  - jstests/core/batch_write_command_insert.js # It is normal for this test to run slowly.
+  - jstests/core/batch_write_command_update.js # It is normal for this test to run slowly.
   - jstests/core/batch_write_command_wc.js
   # - jstests/core/bench_test1.js # 32: Error: 3362.0468597152712 is not less than or eq 2005.5
   - jstests/core/bench_test2.js
-  # - jstests/core/bench_test3.js # 33: table scan return wrong items
+  - jstests/core/bench_test3.js
   - jstests/core/binData.js
   - jstests/core/bindata_indexonly.js
   - jstests/core/bittest.js
@@ -94,9 +94,9 @@ selector:
   # - jstests/core/clone_as_capped_nonexistant.js
   # - jstests/core/collation.js # 673: crash at executing reIndex cmd
   # - jstests/core/collation_convert_to_capped.js
-  # - jstests/core/collation_plan_cache.js # 19: create index on exists document.
+  - jstests/core/collation_plan_cache.js
   - jstests/core/collation_update.js
-  # - jstests/core/collation_with_reverse_index.js # 7: create index on exists document.
+  - jstests/core/collation_with_reverse_index.js # 7: create index on exists document.
   # - jstests/core/collection_truncate.js # 10: CommandNotFound
   - jstests/core/collmod.js
   - jstests/core/collmod_bad_spec.js
@@ -109,11 +109,11 @@ selector:
   - jstests/core/connection_status.js
   - jstests/core/connection_string_validation.js
   # - jstests/core/constructors.js # failed in mapReduce context: Error: map reduce failed
-  # - jstests/core/convert_to_capped.js
-  # - jstests/core/convert_to_capped_nonexistant.js
-  # - jstests/core/copydb.js
+  - jstests/core/convert_to_capped.js
+  - jstests/core/convert_to_capped_nonexistant.js
+  - jstests/core/copydb.js
   - jstests/core/count.js
-  # - jstests/core/count10.js # Start a parallel shell which repeatedly checks for a count query using db.currentOp() 
+  # - jstests/core/count10.js # Invariant failure RESOURCE_DATABASE == resId.getType() || RESOURCE_COLLECTION == resId.getType() || (RESOURCE_GLOBAL == resId.getType() && isSharedLockMode(mode)) src/mongo/db/concurrency/monograph_locker_noop.h 264 
   - jstests/core/count11.js
   - jstests/core/count2.js
   - jstests/core/count3.js
@@ -144,7 +144,7 @@ selector:
   - jstests/core/create_collection.js
   - jstests/core/create_collection_fail_cleanup.js
   - jstests/core/create_indexes.js
-  # - jstests/core/crud_api.js # 201: server crash
+  - jstests/core/crud_api.js 
   # - jstests/core/currentop.js # 16: The current storage engine doesn't support backup mode
   - jstests/core/currentop_predicate.js
   - jstests/core/cursor1.js
@@ -154,7 +154,7 @@ selector:
   - jstests/core/cursor5.js
   - jstests/core/cursor6.js
   - jstests/core/cursor7.js
-    # - jstests/core/cursora.js # warning: cursora.js warning: shouldn't have counted all  n: 1500 num: 1500
+    # - jstests/core/cursora.js # Invariant failure RESOURCE_DATABASE == resId.getType() || RESOURCE_COLLECTION == resId.getType() || (RESOURCE_GLOBAL == resId.getType() && isSharedLockMode(mode)) src/mongo/db/concurrency/monograph_locker_noop.h 264
   - jstests/core/datasize2.js
   - jstests/core/date1.js
   - jstests/core/date2.js
@@ -188,7 +188,7 @@ selector:
   - jstests/core/drop.js
   - jstests/core/drop3.js
   - jstests/core/drop_index.js
-  # - jstests/core/dropdb.js # 29: dropDatabase()
+  - jstests/core/dropdb.js
   - jstests/core/dropdb_race.js
   - jstests/core/elemmatch_or_pushdown.js
   - jstests/core/elemMatchProjection.js 
@@ -198,18 +198,18 @@ selector:
   - jstests/core/eval0.js 
   - jstests/core/eval1.js
   - jstests/core/eval2.js
-  # - jstests/core/eval3.js 34: wrong distinct count.
-  # - jstests/core/eval4.js 31: wrong count after eval().
+  - jstests/core/eval3.js
+  - jstests/core/eval4.js
   - jstests/core/eval5.js
   - jstests/core/eval6.js
   - jstests/core/eval7.js
   - jstests/core/eval8.js
   - jstests/core/eval9.js
   # - jstests/core/eval_mr.js
-  # - jstests/core/eval_nolock.js 23: wrong count after eval().
+  - jstests/core/eval_nolock.js
   - jstests/core/eval_wait_for_read_write_concern.js
   - jstests/core/evala.js
-  # - jstests/core/evalb.js 53: MonographLockerNoop::getLockerInfo
+  # - jstests/core/evalb.js 53: Invariant failure Hit a MONGO_UNREACHABLE! src/mongo/db/concurrency/monograph_locker_noop.h 227
   # - jstests/core/evald.js eval JavaScript execution interrupted
   - jstests/core/evale.js
   - jstests/core/evalg.js
@@ -283,7 +283,7 @@ selector:
   - jstests/core/find_getmore_bsonsize.js
   - jstests/core/find_getmore_cmd.js
   - jstests/core/find_size.js
-  # - jstests/core/finda.js # 57: Error: assert failed : 150 :
+  - jstests/core/finda.js
   - jstests/core/fm1.js
   - jstests/core/fm2.js
   - jstests/core/fm3.js
@@ -482,11 +482,11 @@ selector:
   # - jstests/core/index9.js # 17: set autoIndexID:false
   - jstests/core/index_arr1.js
   - jstests/core/index_arr2.js
-  # - jstests/core/index_big1.js # 21: Error: did not throw exception
-  # - jstests/core/index_bigkeys.js # 42: Error: assert failed
-  # - jstests/core/index_bigkeys_nofail.js # 15: Error: no write error: { "nInserted" : 1 }
-  # - jstests/core/index_bigkeys_update.js # 15: Error: no write error: { "nMatched" : 1, "nUpserted" : 0, "nModified" : 1 }
-  # - jstests/core/index_bigkeys_validation.js # 39: Error: [false] != [true] are not equal
+  - jstests/core/index_big1.js 
+  # - jstests/core/index_bigkeys.js # Fails due to the unsupported feature failIndexKeyTooLong.
+  # - jstests/core/index_bigkeys_nofail.js # Fails due to the unsupported feature failIndexKeyTooLong.
+  - jstests/core/index_bigkeys_update.js 
+  # - jstests/core/index_bigkeys_validation.js # Fails due to the unsupported feature reIndex.
   - jstests/core/index_bounds_code.js
   - jstests/core/index_bounds_maxkey.js
   - jstests/core/index_bounds_minkey.js
@@ -507,7 +507,7 @@ selector:
   - jstests/core/index_elemmatch1.js
   # - jstests/core/index_elemmatch2.js # 29: sparse index
   - jstests/core/index_filter_commands.js
-  # - jstests/core/index_id_options.js # 29: create index on _id
+  # - jstests/core/index_id_options.js # Unsupported feature to set autoIndexId false.
   # - jstests/core/index_many.js # 44: renameCollection
   - jstests/core/index_many2.js
   - jstests/core/index_multikey.js
@@ -522,7 +522,7 @@ selector:
   # - jstests/core/index_sparse2.js
   - jstests/core/index_stats.js
   - jstests/core/index_type_change.js
-  # - jstests/core/indexa.js # 17: count() wrong number.
+  - jstests/core/indexa.js
   - jstests/core/indexapi.js
   - jstests/core/indexb.js
   # - jstests/core/indexc.js # 19: itcount() wrong number.
@@ -547,13 +547,13 @@ selector:
   - jstests/core/insert2.js
   - jstests/core/insert_id_undefined.js
   - jstests/core/insert_illegal_doc.js
-    # - jstests/core/insert_long_index_key.js # 12: Error: [1] != [2] are not equal
+  - jstests/core/insert_long_index_key.js # 12: Error: [1] != [2] are not equal
   - jstests/core/insert_one.js
   - jstests/core/invalid_db_name.js
   - jstests/core/ismaster.js
   - jstests/core/js1.js
   - jstests/core/js2.js
-  # - jstests/core/js3.js # 85: wrong count result.
+  # - jstests/core/js3.js # Invariant failure RESOURCE_DATABASE == resId.getType() || RESOURCE_COLLECTION == resId.getType() || (RESOURCE_GLOBAL == resId.getType() && isSharedLockMode(mode)) src/mongo/db/concurrency/monograph_locker_noop.h 264
   - jstests/core/js4.js
   - jstests/core/js5.js
   - jstests/core/js7.js
@@ -586,7 +586,7 @@ selector:
   - jstests/core/list_collections_no_views.js
   - jstests/core/list_commands.js
   - jstests/core/list_databases.js
-  # - jstests/core/list_indexes.js # 161: Monograph need to handle autoIndexId collection option.
+  # - jstests/core/list_indexes.js # Unsupported value for autoIndexId field: false.
   - jstests/core/list_indexes_invalid.js
   # - jstests/core/list_indexes_invalidation.js # 31: renameCollection()
   - jstests/core/list_indexes_non_existent_ns.js
@@ -729,7 +729,7 @@ selector:
   - jstests/core/query1.js
   # - jstests/core/queryoptimizer3.js # 25: assert(_collection->getCatalogEntry()->getTotalIndexCount(opCtx) == count);
   - jstests/core/queryoptimizer6.js
-  # - jstests/core/queryoptimizera.js # 83: create index on _id
+  # - jstests/core/queryoptimizera.js # Unsupported value for autoIndexId field: false.
   - jstests/core/read_after_optime.js
   - jstests/core/record_store_count.js
   # - jstests/core/recursion.js # 30: eval()
@@ -741,7 +741,7 @@ selector:
   - jstests/core/regex2.js
   - jstests/core/regex3.js
   - jstests/core/regex4.js
-  # - jstests/core/regex5.js # 22: index scan on array.
+  - jstests/core/regex5.js
   - jstests/core/regex6.js
   - jstests/core/regex7.js
   - jstests/core/regex8.js
@@ -762,7 +762,7 @@ selector:
   - jstests/core/remove4.js
   - jstests/core/remove6.js
   - jstests/core/remove7.js
-  # - jstests/core/remove8.js # 29: After eval(). count wrong number.
+  - jstests/core/remove8.js # 29: After eval(). count wrong number.
   # - jstests/core/remove9.js # 30: MonographRecordStoreCursor::seekExact null MonographRecord.
   - jstests/core/remove_justone.js
   - jstests/core/remove_undefined.js
@@ -779,9 +779,9 @@ selector:
   # - jstests/core/rename8.js
   - jstests/core/rename_change_target_type.js
   # - jstests/core/rename_stayTemp.js # renameCollection
-  # - jstests/core/repair_database.js # 27: repairDatabase(). metadata lock
-  # - jstests/core/repair_database_input_validation.js # 38: db already exists with different case already have
-  # - jstests/core/repair_server12955.js # 16: repairDatabase().
+  # - jstests/core/repair_database.js # Unsupported feature.The Monograph storage engine does not require manual database repair.
+  # - jstests/core/repair_database_input_validation.js # Unsupported feature.The Monograph storage engine does not require manual database repair.
+  # - jstests/core/repair_server12955.js # Unsupported feature.The Monograph storage engine does not require manual database repair.
   # - jstests/core/restart_catalog.js # 71: Storage engine does not support read concern
   - jstests/core/return_key.js
   - jstests/core/role_management_helpers.js
@@ -841,9 +841,9 @@ selector:
   - jstests/core/splitvector.js
   # - jstests/core/stages_and_hash.js # 53: [js] Error: [0] != [1] are not equal
   # - jstests/core/stages_and_sorted.js # 78: [js] Error: [0] != [1] are not equal
-  # - jstests/core/stages_collection_scan.js
-  # - jstests/core/stages_delete.js
-  # - jstests/core/stages_fetch.js
+  # - jstests/core/stages_collection_scan.js # 17: Error: [0] != [1] are not equal
+  # - jstests/core/stages_delete.js # 23: no such command: 'stageDebug'
+  # - jstests/core/stages_fetch.js # 51: no such command: 'stageDebug'
   # - jstests/core/stages_ixscan.js
   # - jstests/core/stages_limit_skip.js
   # - jstests/core/stages_mergesort.js
@@ -857,7 +857,7 @@ selector:
   # - jstests/core/system_profile.js # 22: Error: [false] != [undefined] are not equal
   - jstests/core/tailable_cursor_invalidation.js
   - jstests/core/tailable_getmore_batch_size.js
-  # - jstests/core/tailable_skip_limit.js # 44: Error: getMore command failed. BSONObjectTooLarge
+  - jstests/core/tailable_skip_limit.js # 44: Error: getMore command failed. BSONObjectTooLarge
   # - jstests/core/temp_cleanup.js # 10: Collection::insertDocument got document without _id for ns:local.tmp.mr.tempCleanup_1_temp_cleanup_test_inc
   - jstests/core/test_command_line_test_helpers.js
   - jstests/core/testminmax.js
@@ -935,9 +935,9 @@ selector:
   - jstests/core/validate_user_documents.js
   - jstests/core/verify_update_mods.js
   - jstests/core/views/duplicate_ns.js
-  # - jstests/core/views/invalid_system_views.js # 47: reIndex
-  # - jstests/core/views/views_aggregation.js # 91: mongo::IndexCatalogImpl::_setupInMemoryStructures(): invariant(save == _entries.find(descriptorPtr->indexName()))
-  # - jstests/core/views/views_all_commands.js # 634: metadata lock
+  # - jstests/core/views/invalid_system_views.js # Unsupported feature: reIndex.
+  # - jstests/core/views/views_aggregation.js # 91: Invariant failure uuidCatalog.lookupCollectionByUUID(_uuid.get()) != _this src/mongo/db/catalog/collection_impl.cpp 193
+  # - jstests/core/views/views_all_commands.js # 638: Error: [undefined] != [undefined] are equal : expected hash to change after creating new view
   - jstests/core/views/views_basic.js
   - jstests/core/views/views_change.js
   - jstests/core/views/views_coll_stats.js
@@ -956,7 +956,7 @@ selector:
   - jstests/core/where4.js
   - jstests/core/where5.js
   - jstests/core/write_commands_reject_unknown_fields.js
-  # - jstests/core/write_result.js # 109: Error: [1] != [0] are not equal
+  - jstests/core/write_result.js
   - jstests/core_standalone/read_concern.js
   - jstests/core_standalone/write_concern.js
   # - Tests that would be excluded from suite core_monograph

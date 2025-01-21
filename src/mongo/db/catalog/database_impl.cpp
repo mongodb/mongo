@@ -1610,6 +1610,17 @@ MONGO_REGISTER_SHIM(Database::userCreateNS)
         return {ErrorCodes::BadValue, "Unsupported value for autoIndexId field: false."};
     }
 
+    // See https://github.com/monographdb/monographdb_engine_for_mongodb/issues/73
+    // Capped collections are not supported in Monograph, with the exception of certain
+    // system collections in the "local" database, which are explicitly allowed.
+    if (collectionOptions.capped) {
+        NamespaceString nss{ns};
+        if (!nss.isLocal()) {
+            return {ErrorCodes::BadValue,
+                    "Unsupported feature. Do not set the value of capped field to true."};
+        }
+    }
+
     if (collectionOptions.isView()) {
         uassertStatusOK(db->createView(opCtx, ns, collectionOptions));
     } else {
