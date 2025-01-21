@@ -166,7 +166,7 @@ function runTest() {
         onEachShardPrimarysMongot(mongot => {
             repeat({
                 fn: () => expectPlanShardedSearch({mongotConn: mongot, coll: coll}),
-                nTimes: 1 /* parse time */ + baseCollDocs.length
+                nTimes: baseCollDocs.length
             });
         });
         repeat({fn: setQueryMockResponses, nTimes: baseCollDocs.length});
