@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (C) The c-ares project and its contributors
+# SPDX-License-Identifier: MIT
 set -e
 if [ "$BUILD_TYPE" = "coverage" ]; then
     echo "CI_NAME=${CI_NAME}"
