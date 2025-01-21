@@ -638,10 +638,5 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     return coordinatorDoc;
 }
 
-Date_t getCurrentTime() {
-    const auto svcCtx = cc().getServiceContext();
-    return svcCtx->getFastClockSource()->now();
-}
-
 }  // namespace resharding
 }  // namespace mongo

@@ -135,6 +135,11 @@ namespace {
 
 const WriteConcernOptions kNoWaitWriteConcern{1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
 
+Date_t getCurrentTime() {
+    const auto svcCtx = cc().getServiceContext();
+    return svcCtx->getFastClockSource()->now();
+}
+
 /**
  * Fulfills the promise if it is not already. Otherwise, does nothing.
  */
@@ -1486,7 +1491,7 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
     auto opCtx = factory.makeOperationContext(&cc());
     PersistentTaskStore<ReshardingRecipientDocument> store(
         NamespaceString::kRecipientReshardingOperationsNamespace);
-    Date_t timestamp = resharding::getCurrentTime();
+    Date_t timestamp = getCurrentTime();
 
     BSONObjBuilder updateBuilder;
     {

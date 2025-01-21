@@ -131,6 +131,11 @@ const WriteConcernOptions kNoWaitWriteConcern{1, WriteConcernOptions::SyncMode::
 const WriteConcernOptions kMajorityWriteConcern{
     WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
 
+Date_t getCurrentTime() {
+    const auto svcCtx = cc().getServiceContext();
+    return svcCtx->getFastClockSource()->now();
+}
+
 Timestamp generateMinFetchTimestamp(OperationContext* opCtx, const NamespaceString& sourceNss) {
     // Do a no-op write and use the OpTime as the minFetchTimestamp
     writeConflictRetry(
@@ -453,7 +458,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                            *onReleaseCriticalSectionAction);
 
                    _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
-                                       resharding::getCurrentTime());
+                                       getCurrentTime());
 
                    // We force a refresh to make sure that the placement information is updated in
                    // cache after abort decision before the donor state document is deleted.
@@ -791,8 +796,7 @@ void ReshardingDonorService::DonorStateMachine::
                 _critSecReason,
                 ShardingCatalogClient::kLocalWriteConcern);
 
-        _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCriticalSection,
-                              resharding::getCurrentTime());
+        _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCriticalSection, getCurrentTime());
     }
 
     {
