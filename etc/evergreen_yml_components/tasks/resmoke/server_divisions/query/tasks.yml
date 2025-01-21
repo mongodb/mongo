@@ -1818,8 +1818,8 @@ tasks:
           suite: benchmarks_query
           install_dir: build/install/bin
           resmoke_jobs_max: 1
-          exec_timeout_secs: 16200 # 4.5 hours
-          timeout_secs: 16200 # 4.5 hours
+          exec_timeout_secs: 19800 # 5.5 hours
+          timeout_secs: 19800 # 5.5 hours
       - command: s3.put
         params:
           aws_key: ${aws_key}
