@@ -121,3 +121,9 @@ filters:
   - "fle*":
     approvers:
       - 10gen/server-security
+  - "hashcmd*":
+    approvers:
+      - 10gen/server-security
+  - "filemd5*":
+    approvers:
+      - 10gen/query-execution

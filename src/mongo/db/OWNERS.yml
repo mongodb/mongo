@@ -42,14 +42,26 @@ filters:
   - "service_entry_point*":
     approvers:
       - 10gen/server-programmability
+  - "audit*":
+    approvers:
+      - 10gen/server-security
+  - "/cluster_auth_mode_option*":
+    approvers:
+      - 10gen/server-security
   - "fle*":
     approvers:
       - 10gen/server-security
       - 10gen/query-integration-fle
+  - "/keyfile_option*":
+    approvers:
+      - 10gen/server-security
   - "server_options*":
     approvers:
       - 10gen/server-security
   - "server_parameter*":
+    approvers:
+      - 10gen/server-security
+  - "system_index*":
     approvers:
       - 10gen/server-security
   - "*change_stream*":
