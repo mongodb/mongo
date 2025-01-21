@@ -858,6 +858,8 @@ public:
         "reshardingMinimumOperationDurationMillis", 0};
     FailPointEnableBlock _performVerificationAfterCloning{
         "reshardingPerformValidationAfterCloning"};
+    FailPointEnableBlock _performVerificationAfterApplying{
+        "reshardingPerformValidationAfterApplying"};
 
     long long _term = 0;
 
@@ -1499,6 +1501,85 @@ TEST_F(ReshardingCoordinatorServiceFailCloningVerificationTest, AbortIfPerformVe
 }
 
 TEST_F(ReshardingCoordinatorServiceFailCloningVerificationTest, CommitIfNotPerformVerification) {
+    auto reshardingOptions = makeDefaultReshardingOptions();
+    reshardingOptions.performVerification = false;
+
+    runReshardingToCompletion(TransitionFunctionMap{},
+                              nullptr /* stateTransitionsGuard */,
+                              {CoordinatorStateEnum::kPreparingToDonate,
+                               CoordinatorStateEnum::kCloning,
+                               CoordinatorStateEnum::kApplying,
+                               CoordinatorStateEnum::kBlockingWrites,
+                               CoordinatorStateEnum::kCommitting},
+                              reshardingOptions);
+}
+
+class ReshardingCoordinatorServiceFailFinalVerificationTest
+    : public ReshardingCoordinatorServiceTestBase {
+public:
+    ExternalStateForTest::Options getExternalStateOptions() const override {
+        return {.verifyFinalErrorCode = verifyFinalErrorCode};
+    }
+
+protected:
+    const ErrorCodes::Error verifyFinalErrorCode{9858601};
+};
+
+TEST_F(ReshardingCoordinatorServiceFailFinalVerificationTest, AbortIfPerformVerification) {
+    const std::vector<CoordinatorStateEnum> states = {CoordinatorStateEnum::kPreparingToDonate,
+                                                      CoordinatorStateEnum::kCloning,
+                                                      CoordinatorStateEnum::kBlockingWrites,
+                                                      CoordinatorStateEnum::kAborting};
+
+    PauseDuringStateTransitions stateTransitionsGuard{controller(), states};
+
+    auto opCtx = operationContext();
+
+    auto reshardingOptions = makeDefaultReshardingOptions();
+    auto coordinator = initializeAndGetCoordinator(_reshardingUUID,
+                                                   _originalNss,
+                                                   _tempNss,
+                                                   _newShardKey,
+                                                   _originalUUID,
+                                                   _oldShardKey,
+                                                   reshardingOptions);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kPreparingToDonate);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kPreparingToDonate);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
+
+    makeDonorsReadyToDonateWithAssert(opCtx);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kCloning);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kCloning);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
+
+    makeRecipientsFinishedCloningWithAssert(opCtx);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kApplying);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kApplying);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kApplying);
+
+    coordinator->onOkayToEnterCritical();
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kBlockingWrites);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kBlockingWrites);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kBlockingWrites);
+
+    makeRecipientsBeInStrictConsistencyWithAssert(opCtx);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kAborting);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kAborting);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kAborting);
+
+    makeRecipientsProceedToDone(opCtx);
+    makeDonorsProceedToDone(opCtx);
+
+    ASSERT_THROWS_CODE(
+        coordinator->getCompletionFuture().get(opCtx), DBException, verifyFinalErrorCode);
+}
+
+TEST_F(ReshardingCoordinatorServiceFailFinalVerificationTest, CommitIfNotPerformVerification) {
     auto reshardingOptions = makeDefaultReshardingOptions();
     reshardingOptions.performVerification = false;
 
