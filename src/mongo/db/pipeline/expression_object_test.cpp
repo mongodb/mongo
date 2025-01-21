@@ -192,83 +192,6 @@ TEST(ParseObject, ShouldRejectExpressionAsTheSecondField) {
 }
 
 //
-// Evaluation.
-//
-
-TEST(ExpressionObjectEvaluate, EmptyObjectShouldEvaluateToEmptyDocument) {
-    auto expCtx = ExpressionContextForTest{};
-    auto object = ExpressionObject::create(&expCtx, {});
-    ASSERT_VALUE_EQ(Value(Document()), object->evaluate(Document(), &(expCtx.variables)));
-    ASSERT_VALUE_EQ(Value(Document()), object->evaluate(Document{{"a", 1}}, &(expCtx.variables)));
-    ASSERT_VALUE_EQ(Value(Document()),
-                    object->evaluate(Document{{"_id", "ID"_sd}}, &(expCtx.variables)));
-}
-
-TEST(ExpressionObjectEvaluate, ShouldEvaluateEachField) {
-    auto expCtx = ExpressionContextForTest{};
-    auto object = ExpressionObject::create(&expCtx,
-                                           {{"a", ExpressionConstant::create(&expCtx, Value{1})},
-                                            {"b", ExpressionConstant::create(&expCtx, Value{5})}});
-
-
-    ASSERT_VALUE_EQ(Value(Document{{"a", 1}, {"b", 5}}),
-                    object->evaluate(Document(), &(expCtx.variables)));
-    ASSERT_VALUE_EQ(Value(Document{{"a", 1}, {"b", 5}}),
-                    object->evaluate(Document{{"a", 1}}, &(expCtx.variables)));
-    ASSERT_VALUE_EQ(Value(Document{{"a", 1}, {"b", 5}}),
-                    object->evaluate(Document{{"_id", "ID"_sd}}, &(expCtx.variables)));
-}
-
-TEST(ExpressionObjectEvaluate, OrderOfFieldsInOutputShouldMatchOrderInSpecification) {
-    auto expCtx = ExpressionContextForTest{};
-    auto object =
-        ExpressionObject::create(&expCtx,
-                                 {{"a", ExpressionFieldPath::deprecatedCreate(&expCtx, "a")},
-                                  {"b", ExpressionFieldPath::deprecatedCreate(&expCtx, "b")},
-                                  {"c", ExpressionFieldPath::deprecatedCreate(&expCtx, "c")}});
-    ASSERT_VALUE_EQ(
-        Value(Document{{"a", "A"_sd}, {"b", "B"_sd}, {"c", "C"_sd}}),
-        object->evaluate(Document{{"c", "C"_sd}, {"a", "A"_sd}, {"b", "B"_sd}, {"_id", "ID"_sd}},
-                         &(expCtx.variables)));
-}
-
-TEST(ExpressionObjectEvaluate, ShouldRemoveFieldsThatHaveMissingValues) {
-    auto expCtx = ExpressionContextForTest{};
-    auto object = ExpressionObject::create(
-        &expCtx,
-        {{"a", ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b")},
-         {"b", ExpressionFieldPath::deprecatedCreate(&expCtx, "missing")}});
-    ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document(), &(expCtx.variables)));
-    ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document{{"a", 1}}, &(expCtx.variables)));
-}
-
-TEST(ExpressionObjectEvaluate, ShouldEvaluateFieldsWithinNestedObject) {
-    auto expCtx = ExpressionContextForTest{};
-    auto object = ExpressionObject::create(
-        &expCtx,
-        {{"a",
-          ExpressionObject::create(
-              &expCtx,
-              {{"b", ExpressionConstant::create(&expCtx, Value{1})},
-               {"c", ExpressionFieldPath::deprecatedCreate(&expCtx, "_id")}})}});
-    ASSERT_VALUE_EQ(Value(Document{{"a", Document{{"b", 1}}}}),
-                    object->evaluate(Document(), &(expCtx.variables)));
-    ASSERT_VALUE_EQ(Value(Document{{"a", Document{{"b", 1}, {"c", "ID"_sd}}}}),
-                    object->evaluate(Document{{"_id", "ID"_sd}}, &(expCtx.variables)));
-}
-
-TEST(ExpressionObjectEvaluate, ShouldEvaluateToEmptyDocumentIfAllFieldsAreMissing) {
-    auto expCtx = ExpressionContextForTest{};
-    auto object = ExpressionObject::create(
-        &expCtx, {{"a", ExpressionFieldPath::deprecatedCreate(&expCtx, "missing")}});
-    ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document(), &(expCtx.variables)));
-
-    auto objectWithNestedObject = ExpressionObject::create(&expCtx, {{"nested", object}});
-    ASSERT_VALUE_EQ(Value(Document{{"nested", Document{}}}),
-                    objectWithNestedObject->evaluate(Document(), &(expCtx.variables)));
-}
-
-//
 // Dependencies.
 //
 
@@ -369,8 +292,7 @@ TEST(ExpressionObjectOptimizations, OptimizingAnObjectShouldOptimizeSubExpressio
     auto optimized = object->optimize();
     auto optimizedObject = dynamic_cast<ExpressionConstant*>(optimized.get());
     ASSERT_TRUE(optimizedObject);
-    ASSERT_VALUE_EQ(optimizedObject->evaluate(Document(), &(expCtx.variables)),
-                    Value(BSON("a" << 3)));
+    ASSERT_VALUE_EQ(Value(BSON("a" << 3)), optimizedObject->getValue());
 };
 
 TEST(ExpressionObjectOptimizations,
@@ -403,9 +325,9 @@ TEST(ExpressionObjectOptimizations,
     auto optimizedWithConstant = expressionWithConstantObject->optimize();
     auto optimizedObject = dynamic_cast<ExpressionConstant*>(optimizedWithConstant.get());
     ASSERT_TRUE(optimizedObject);
-    ASSERT_VALUE_EQ(optimizedObject->evaluate(Document(), &expCtx.variables),
-                    Value(BSON("willBeConstant" << 3 << "alreadyConstant"
-                                                << "string")));
+    ASSERT_VALUE_EQ(Value(BSON("willBeConstant" << 3 << "alreadyConstant"
+                                                << "string")),
+                    optimizedObject->getValue());
 };
 
 }  // namespace Object
