@@ -653,7 +653,7 @@ mongo_cc_benchmark(
         "//src/mongo/db:query_exec",
         "//src/mongo/db:service_context_non_d",
         "//src/mongo/db/auth:authmocks",
-        "//src/mongo/db/pipeline:expression_bm_fixture",
+        "//src/mongo/db/exec:expression_bm_fixture",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
     ],

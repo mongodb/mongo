@@ -27,3 +27,9 @@ env.Benchmark(
     source=[],
     LIBDEPS=[],
 )
+
+env.Benchmark(
+    target="expression_bm",
+    source=[],
+    LIBDEPS=[],
+)

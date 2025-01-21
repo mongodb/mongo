@@ -239,3 +239,34 @@ mongo_cc_benchmark(
         "//src/mongo/db:service_context_d_test_fixture",
     ],
 )
+
+mongo_cc_library(
+    name = "expression_bm_fixture",
+    srcs = [
+        "expression_bm_fixture.cpp",
+    ],
+    hdrs = [
+        "expression_bm_fixture.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/exec/document_value",
+        "//src/third_party/benchmark",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "expression_bm",
+    srcs = [
+        "//src/mongo/db/exec/expression:expression_bm.cpp",
+    ],
+    deps = [
+        ":expression_bm_fixture",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/pipeline:accumulator",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+    ],
+)

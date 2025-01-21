@@ -35,9 +35,9 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/expression_bm_fixture.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_bm_fixture.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/util/intrusive_counter.h"

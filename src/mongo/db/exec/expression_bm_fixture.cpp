@@ -43,7 +43,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/pipeline/expression_bm_fixture.h"
+#include "mongo/db/exec/expression_bm_fixture.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/time_support.h"
 
