@@ -516,6 +516,7 @@ env.CppUnitTest(
         'query_request_test.cpp',
         'query_settings/query_settings_hash_test.cpp',
         'query_settings/query_settings_manager_test.cpp',
+        'query_settings/query_settings_utils_test.cpp',
         'query_settings/query_settings_validation_test.cpp',
         'query_settings_test.cpp',
         'query_shape/agg_cmd_shape_test.cpp',

@@ -32,7 +32,9 @@
 #include <boost/optional/optional.hpp>
 #include <string_view>
 
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
@@ -159,6 +161,44 @@ void setQueryShapeHash(OperationContext* opCtx, const QueryShapeHash& hash) {
 bool requestComesFromMongosOrSentDirectlyToShard(const Client* client) {
     return client->isInternalClient() || client->isInDirectClient();
 }
+
+void validateIndexKeyPatternStructure(const IndexHint& hint) {
+    if (auto&& keyPattern = hint.getIndexKeyPattern()) {
+        uassert(9646000, "key pattern index can't be empty", keyPattern->nFields() > 0);
+        auto status = index_key_validate::validateKeyPattern(
+            *keyPattern, IndexDescriptor::getDefaultIndexVersion());
+        uassert(
+            9646001, status.withContext("invalid index key pattern hint").reason(), status.isOK());
+    }
+};
+
+void validateQuerySettingsKeyPatternIndexHints(const IndexHintSpec& hintSpec) {
+    const auto& allowedIndexes = hintSpec.getAllowedIndexes();
+    std::for_each(allowedIndexes.begin(), allowedIndexes.end(), validateIndexKeyPatternStructure);
+}
+
+void sanitizeKeyPatternIndexHints(QueryShapeConfiguration& queryShapeItem) {
+    const auto isInvalidIndexHint = [&](const IndexHint& hint) {
+        try {
+            validateIndexKeyPatternStructure(hint);
+            return false;
+        } catch (const DBException&) {
+            LOGV2_WARNING(9646002,
+                          "invalid key pattern index hint in "
+                          "query settings",
+                          "indexHint"_attr = hint.getIndexKeyPattern()->toString(),
+                          "queryShapeShash"_attr =
+                              queryShapeItem.getQueryShapeHash().toHexString());
+            return true;
+        }
+    };
+    if (auto&& hints = queryShapeItem.getSettings().getIndexHints()) {
+        for (auto&& spec : *hints) {
+            std::erase_if(spec.getAllowedIndexes(), isInvalidIndexHint);
+        }
+    }
+}
+
 }  // namespace
 
 /*
@@ -583,6 +623,7 @@ void validateQuerySettingsIndexHints(const auto& indexHints) {
         uassert(8727501,
                 "invalid index hint: 'ns.coll' field is missing",
                 hint.getNs().getColl().has_value());
+        validateQuerySettingsKeyPatternIndexHints(hint);
         auto nss = NamespaceStringUtil::deserialize(*hint.getNs().getDb(), *hint.getNs().getColl());
         auto [it, emplaced] = collectionsWithAppliedIndexHints.emplace(nss, hint);
         uassert(7746608,
@@ -677,5 +718,21 @@ void simplifyQuerySettings(QuerySettings& settings) {
     }
 }
 
+// TODO SERVER-97546 Remove PQS index hint sanitization.
+void sanitizeQuerySettingsHints(std::vector<QueryShapeConfiguration>& queryShapeConfigs) {
+    std::erase_if(queryShapeConfigs, [](QueryShapeConfiguration& queryShapeItem) {
+        auto& settings = queryShapeItem.getSettings();
+        sanitizeKeyPatternIndexHints(queryShapeItem);
+        simplifyQuerySettings(settings);
+        if (isDefault(settings)) {
+            LOGV2_WARNING(9646003,
+                          "query settings became default after index hint sanitization",
+                          "queryShapeShash"_attr = queryShapeItem.getQueryShapeHash().toHexString(),
+                          "queryInstance"_attr = queryShapeItem.getRepresentativeQuery());
+            return true;
+        }
+        return false;
+    });
+}
 }  // namespace utils
 }  // namespace mongo::query_settings

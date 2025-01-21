@@ -73,7 +73,7 @@ public:
         DBDirectClient db(&opCtx);
 
         db.dropDatabase(DatabaseName::createDatabaseName_forTest(boost::none, "test"));
-        query_settings::QuerySettingsManager::create(opCtx.getServiceContext(), {});
+        query_settings::QuerySettingsManager::create(opCtx.getServiceContext(), {}, {});
     }
 
     virtual ~Base() {

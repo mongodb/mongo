@@ -41,6 +41,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
@@ -96,6 +97,37 @@ void assertQueryShapeConfigurationsEquals(
         lhs.begin(), lhs.end(), rhs.begin(), SimpleBSONObjComparator::kInstance.makeEqualTo()));
 }
 
+BSONObj makeSettingsClusterParameter(const BSONArray& settings) {
+    LogicalTime clusterParameterTime(Timestamp(113, 59));
+    return BSON("_id" << QuerySettingsManager::kQuerySettingsClusterParameterName
+                      << QuerySettingsClusterParameterValue::kSettingsArrayFieldName << settings
+                      << QuerySettingsClusterParameterValue::kClusterParameterTimeFieldName
+                      << clusterParameterTime.asTimestamp());
+}
+
+QuerySettings makeQuerySettings(const IndexHintSpecs& indexHints, bool setFramework = true) {
+    QuerySettings settings;
+    if (!indexHints.empty()) {
+        settings.setIndexHints(indexHints);
+    }
+    if (setFramework) {
+        settings.setQueryFramework(mongo::QueryFrameworkControlEnum::kTrySbeEngine);
+    }
+    return settings;
+}
+
+auto makeDbName(StringData dbName) {
+    return DatabaseNameUtil::deserialize(
+        boost::none /*tenantId=*/, dbName, SerializationContext::stateDefault());
+}
+
+NamespaceSpec makeNsSpec(StringData collName) {
+    NamespaceSpec ns;
+    ns.setDb(makeDbName("testDbA"));
+    ns.setColl(collName);
+    return ns;
+}
+
 }  // namespace
 
 static auto const kSerializationContext =
@@ -114,9 +146,7 @@ public:
         ns.setDb(DatabaseNameUtil::deserialize(tenantId, kDbName, kSerializationContext));
         ns.setColl(kCollName);
 
-        QuerySettings settings;
-        settings.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
-        settings.setIndexHints({{IndexHintSpec(ns, {IndexHint("a_1")})}});
+        const QuerySettings settings = makeQuerySettings({IndexHintSpec(ns, {IndexHint("a_1")})});
         QueryInstance queryA =
             BSON("find" << kCollName << "$db" << kDbName << "filter" << BSON("a" << 2));
         QueryInstance queryB =
@@ -126,7 +156,8 @@ public:
     }
 
     void setUp() final {
-        QuerySettingsManager::create(getServiceContext(), {});
+        QuerySettingsManager::create(
+            getServiceContext(), {}, query_settings::utils::sanitizeQuerySettingsHints);
 
         _opCtx = cc().makeOperationContext();
         _expCtx = ExpressionContext::makeBlankExpressionContext(opCtx(), {NamespaceString()});
@@ -152,6 +183,58 @@ public:
 
         return NamespaceStringUtil::deserialize(
             tenantId, kDbName, kCollName, kSerializationContext);
+    }
+
+    void assertTransformInvalidQuerySettings(
+        const std::list<std::pair<const IndexHintSpecs, const IndexHintSpecs>>&
+            listOfIndexHintSpecs) {
+        auto sp = std::make_unique<QuerySettingsClusterParameter>(
+            "querySettings", ServerParameterType::kClusterWide);
+        BSONArrayBuilder bob;
+        std::vector<QueryShapeConfiguration> expectedQueryShapeConfigurations;
+        size_t collIndex = 0;
+        // Create the 'querySettingsClusterParamValue' as BSON.
+        for (const auto& [initialIndexHintSpecs, expectedIndexHintSpecs] : listOfIndexHintSpecs) {
+            QueryInstance representativeQuery = BSON("find"
+                                                     << "coll_" + std::to_string(collIndex) << "$db"
+                                                     << "foo");
+            bob.append(makeQueryShapeConfiguration(makeQuerySettings(initialIndexHintSpecs),
+                                                   representativeQuery,
+                                                   opCtx(),
+                                                   /* tenantId */ boost::none)
+                           .toBSON());
+            expectedQueryShapeConfigurations.emplace_back(
+                makeQueryShapeConfiguration(makeQuerySettings(expectedIndexHintSpecs),
+                                            representativeQuery,
+                                            opCtx(),
+                                            /* tenantId */ boost::none));
+            collIndex++;
+        }
+        // Set the cluster param value.
+        const auto clusterParamValues = BSON_ARRAY(makeSettingsClusterParameter(bob.arr()));
+        // Assert that parsing after transforming invalid settings (if any) works.
+        ASSERT_OK(sp->set(clusterParamValues.firstElement(), boost::none));
+        assertQueryShapeConfigurationsEquals(
+            expectedQueryShapeConfigurations,
+            manager()
+                .getAllQueryShapeConfigurations(opCtx(), /* tenantId */ boost::none)
+                .queryShapeConfigurations);
+    }
+
+    void assertSanitizeInvalidIndexHints(const IndexHintSpecs& initialSpec,
+                                         const IndexHintSpecs& expectedSpec) {
+        QueryInstance query = BSON("find"
+                                   << "exampleColl"
+                                   << "$db"
+                                   << "foo");
+        auto initSettings = makeQueryShapeConfiguration(makeQuerySettings(initialSpec),
+                                                        query,
+                                                        opCtx(),
+                                                        /* tenantId */ boost::none);
+        std::vector<QueryShapeConfiguration> queryShapeConfigs{initSettings};
+        const auto expectedSettings = makeQuerySettings(expectedSpec);
+        ASSERT_DOES_NOT_THROW(utils::sanitizeQuerySettingsHints(queryShapeConfigs));
+        ASSERT_BSONOBJ_EQ(queryShapeConfigs[0].getSettings().toBSON(), expectedSettings.toBSON());
     }
 
 private:
@@ -268,6 +351,177 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsLookup) {
     assertResultsEq(manager().getQuerySettingsForQueryShapeHash(
                         opCtx(), configs[1].getQueryShapeHash(), tenantId),
                     configs[1].getSettings());
+}
+
+/**
+ * Tests that valid index hint specs are the same before and after index hint sanitization.
+ */
+TEST_F(QuerySettingsManagerTest, ValidIndexHintsAreTheSameBeforeAndAfterSanitization) {
+    IndexHintSpecs indexHintSpec{IndexHintSpec(
+        makeNsSpec("testCollA"_sd), {IndexHint(BSON("a" << 1)), IndexHint(BSON("b" << -1.0))})};
+    assertSanitizeInvalidIndexHints(indexHintSpec, indexHintSpec);
+}
+
+/**
+ * Tests that invalid key-pattern are removed after sanitization.
+ */
+TEST_F(QuerySettingsManagerTest, InvalidKeyPatternIndexesAreRemovedAfterSanitization) {
+    IndexHintSpecs indexHintSpec{IndexHintSpec(makeNsSpec("testCollA"_sd),
+                                               {IndexHint(BSON("a" << 1 << "c"
+                                                                   << "invalid")),
+                                                IndexHint(BSON("b" << -1.0))})};
+    IndexHintSpecs expectedHintSpec{
+        IndexHintSpec(makeNsSpec("testCollA"_sd), {IndexHint(BSON("b" << -1.0))})};
+    assertSanitizeInvalidIndexHints(indexHintSpec, expectedHintSpec);
+}
+
+/**
+ * Same as the above test but with more complex examples.
+ */
+TEST_F(QuerySettingsManagerTest, InvalidKeyPatternIndexesAreRemovedAfterSanitizationComplex) {
+    IndexHintSpecs indexHintSpec{IndexHintSpec(makeNsSpec("testCollA"_sd),
+                                               {
+                                                   IndexHint(BSON("a" << 1 << "c"
+                                                                      << "invalid")),
+                                                   IndexHint(BSON("b" << -1.0)),
+                                                   IndexHint(BSON("c" << -2.0 << "b" << 4)),
+                                                   IndexHint("index_name"),
+                                                   IndexHint(BSON("$natural" << 1)),
+                                                   IndexHint(BSON("$natural" << -1 << "a" << 2)),
+                                                   IndexHint(BSON("a" << -1 << "$natural" << 1)),
+                                               })};
+    IndexHintSpecs expectedHintSpec{IndexHintSpec(makeNsSpec("testCollA"_sd),
+                                                  {IndexHint(BSON("b" << -1.0)),
+                                                   IndexHint(BSON("c" << -2.0 << "b" << 4)),
+                                                   IndexHint("index_name")})};
+    assertSanitizeInvalidIndexHints(indexHintSpec, expectedHintSpec);
+}
+
+
+/**
+ * Tests that invalid key-pattern are removed after sanitization and the resulted index hints are
+ * empty.
+ */
+TEST_F(QuerySettingsManagerTest, InvalidKeyPatternIndexesAreRemovedAfterSanitizationEmptyHints) {
+    IndexHintSpecs indexHintSpec{IndexHintSpec(makeNsSpec("testCollA"_sd),
+                                               {
+                                                   IndexHint(BSON("a" << 1 << "c"
+                                                                      << "invalid")),
+                                               })};
+    IndexHintSpecs expectedHintSpec;
+    assertSanitizeInvalidIndexHints(indexHintSpec, expectedHintSpec);
+}
+
+/**
+ * Sets the value of QuerySettingsClusterParameter and asserts the resulting index hint spec is
+ * sanitized.
+ */
+TEST_F(QuerySettingsManagerTest, SetValidClusterParameterAndAssertResultIsSanitized) {
+    IndexHintSpecs indexHintSpec{IndexHintSpec(
+        makeNsSpec("testCollA"), {IndexHint(BSON("a" << 1)), IndexHint(BSON("b" << -1.0))})};
+    assertTransformInvalidQuerySettings({{indexHintSpec, indexHintSpec}});
+}
+
+/**
+ * Same as above test, but assert that the validation would fail with invalid key-pattern indexes.
+ */
+TEST_F(QuerySettingsManagerTest, SetClusterParameterAndAssertResultIsSanitized) {
+    IndexHintSpecs initialIndexHintSpec{
+        IndexHintSpec(makeNsSpec("testCollA"_sd),
+                      {IndexHint(BSON("a" << 1.0)),
+                       IndexHint(BSON("b"
+                                      << "-1.0"))}),
+        IndexHintSpec(makeNsSpec("testCollB"_sd),
+                      {IndexHint(BSON("a" << 2)), IndexHint(BSONObj{})})};
+    IndexHintSpecs expectedIndexHintSpec{
+        IndexHintSpec(makeNsSpec("testCollA"_sd), {IndexHint(BSON("a" << 1))}),
+        IndexHintSpec(makeNsSpec("testCollB"_sd), {IndexHint(BSON("a" << 2))})};
+
+    ASSERT_THROWS_CODE(utils::validateQuerySettings(makeQuerySettings(initialIndexHintSpec)),
+                       DBException,
+                       9646001);
+
+    assertTransformInvalidQuerySettings({{initialIndexHintSpec, expectedIndexHintSpec}});
+}
+
+/**
+ * Same as above test, but with multiple QuerySettings set.
+ */
+TEST_F(QuerySettingsManagerTest, SetClusterParameterAndAssertResultIsSanitizedMultipleQS) {
+    // First pair of index hints.
+    IndexHintSpecs initialIndexHintSpec1{
+        IndexHintSpec(makeNsSpec("testCollA"_sd),
+                      {IndexHint(BSON("a" << 2)), IndexHint(BSONObj{})}),
+        IndexHintSpec(makeNsSpec("testCollB"_sd),
+                      {IndexHint(BSON("a" << 1.0)),
+                       IndexHint(BSON("b" << 3)),
+                       IndexHint("a_1"),
+                       IndexHint(NaturalOrderHint(NaturalOrderHint::Direction::kForward))})};
+    IndexHintSpecs expectedIndexHintSpec1{
+        IndexHintSpec(makeNsSpec("testCollA"_sd), {IndexHint(BSON("a" << 2.0))}),
+        IndexHintSpec(makeNsSpec("testCollB"_sd),
+                      {IndexHint(BSON("a" << 1.0)),
+                       IndexHint(BSON("b" << 3)),
+                       IndexHint("a_1"),
+                       IndexHint(NaturalOrderHint(NaturalOrderHint::Direction::kForward))})};
+    // Second pair of index hints.
+    IndexHintSpecs initialIndexHintSpec2{
+        IndexHintSpec(makeNsSpec("testCollC"_sd),
+                      {IndexHint(BSON("a" << 1 << "$natural" << 1)), IndexHint(BSONObj{})}),
+        IndexHintSpec(makeNsSpec("testCollD"_sd),
+                      {IndexHint(BSON("b"
+                                      << "some-string"
+                                      << "a" << 1)),
+                       IndexHint(BSONObj{})})};
+
+    ASSERT_THROWS_CODE(utils::validateQuerySettings(makeQuerySettings(initialIndexHintSpec1)),
+                       DBException,
+                       9646000);
+
+    ASSERT_THROWS_CODE(utils::validateQuerySettings(makeQuerySettings(initialIndexHintSpec2)),
+                       DBException,
+                       9646001);
+
+    assertTransformInvalidQuerySettings(
+        {{initialIndexHintSpec1, expectedIndexHintSpec1}, {initialIndexHintSpec2, {}}});
+}
+
+/**
+ * Tests that query settings with invalid key-pattern index hints leads to no query settings after
+ * sanitization.
+ */
+TEST_F(QuerySettingsManagerTest, SetClusterParameterInvalidQSSanitization) {
+    auto sp = std::make_unique<QuerySettingsClusterParameter>("querySettings",
+                                                              ServerParameterType::kClusterWide);
+    IndexHintSpecs initialIndexHintSpec{
+        IndexHintSpec(makeNsSpec("testCollC"_sd),
+                      {IndexHint(BSON("a" << 1 << "$natural" << 1)), IndexHint(BSONObj{})}),
+        IndexHintSpec(makeNsSpec("testCollD"_sd),
+                      {IndexHint(BSON("b"
+                                      << "some-string"
+                                      << "a" << 1))})};
+    const auto querySettings = makeQuerySettings(initialIndexHintSpec, false);
+    ASSERT_THROWS_CODE(utils::validateQuerySettings(querySettings), DBException, 9646001);
+
+    // Create the 'querySettingsClusterParamValue' as BSON.
+    const auto config = makeQueryShapeConfiguration(querySettings,
+                                                    BSON("find"
+                                                         << "bar"
+                                                         << "$db"
+                                                         << "foo"),
+                                                    opCtx(),
+                                                    /* tenantId */ boost::none);
+    // Assert that parsing after transforming invalid settings (if any) works.
+    const auto clusterParamValues =
+        BSON_ARRAY(makeSettingsClusterParameter(BSON_ARRAY(config.toBSON())));
+    ASSERT_OK(sp->set(clusterParamValues.firstElement(), boost::none));
+    auto res = manager().getQuerySettingsForQueryShapeHash(opCtx(),
+                                                           config.getQueryShapeHash(),
+                                                           /* tenantId */ boost::none);
+    ASSERT(!res.has_value());
+    ASSERT(manager()
+               .getAllQueryShapeConfigurations(opCtx(), /* tenantId */ boost::none)
+               .queryShapeConfigurations.empty());
 }
 
 }  // namespace mongo::query_settings

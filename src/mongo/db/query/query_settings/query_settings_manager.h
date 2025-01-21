@@ -117,17 +117,22 @@ struct QueryShapeConfigurationsWithTimestamp {
 class QuerySettingsManager {
 public:
     static constexpr auto kQuerySettingsClusterParameterName = "querySettings"_sd;
-    QuerySettingsManager(ServiceContext* service,
-                         std::function<void(OperationContext*)> clusterParameterRefreshFn)
-        : _clusterParameterRefreshFn(clusterParameterRefreshFn) {}
+    QuerySettingsManager(
+        ServiceContext* service,
+        std::function<void(OperationContext*)> clusterParameterRefreshFn,
+        std::function<void(std::vector<QueryShapeConfiguration>&)> sanitizeQuerySettingsHintsFn)
+        : _clusterParameterRefreshFn(clusterParameterRefreshFn),
+          _sanitizeQuerySettingsHintsFn(sanitizeQuerySettingsHintsFn) {}
 
     ~QuerySettingsManager() = default;
 
     QuerySettingsManager(const QuerySettingsManager&) = delete;
     QuerySettingsManager& operator=(const QuerySettingsManager&) = delete;
 
-    static void create(ServiceContext* service,
-                       std::function<void(OperationContext*)> clusterParameterRefreshFn);
+    static void create(
+        ServiceContext* service,
+        std::function<void(OperationContext*)> clusterParameterRefreshFn,
+        std::function<void(std::vector<QueryShapeConfiguration>&)> sanitizeQuerySettingsHintsFn);
 
     static QuerySettingsManager& get(ServiceContext* service);
     static QuerySettingsManager& get(OperationContext* opCtx);
@@ -184,6 +189,9 @@ public:
                                                   BSONObjBuilder* bob,
                                                   const boost::optional<TenantId>& tenantId);
 
+    // TODO SERVER-97546 Remove PQS index hint sanitization.
+    void sanitizeQuerySettingsHints(std::vector<QueryShapeConfiguration>& queryShapeConfigs);
+
 private:
     std::vector<QueryShapeConfiguration> getAllQueryShapeConfigurations_inlock(
         OperationContext* opCtx, const boost::optional<TenantId>& tenantId) const;
@@ -195,6 +203,8 @@ private:
     absl::flat_hash_map<boost::optional<TenantId>, VersionedQueryShapeConfigurations>
         _tenantIdToVersionedQueryShapeConfigurationsMap;
     std::function<void(OperationContext*)> _clusterParameterRefreshFn;
+    // TODO SERVER-97546 Remove PQS index hint sanitization.
+    std::function<void(std::vector<QueryShapeConfiguration>&)> _sanitizeQuerySettingsHintsFn;
 };
 };  // namespace query_settings
 }  // namespace mongo

@@ -47,6 +47,8 @@ env.Library(
         'query_settings_utils.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/index_key_validate',
+        '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/query/canonical_query',
         '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
         'manager',

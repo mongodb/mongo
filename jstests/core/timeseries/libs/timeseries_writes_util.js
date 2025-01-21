@@ -1078,6 +1078,9 @@ export function transformIndexHintsForTimeseriesCollection(indexHints) {
 }
 
 export function transformIndexHintsFromTimeseriesToView(indexHints) {
+    if (typeof indexHints !== "object") {
+        return indexHints;
+    }
     let transformedIndexes = {};
     // Transform index from control.min/max fields to normal keys.
     for (const [key, value] of Object.entries(indexHints)) {

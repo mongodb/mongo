@@ -202,5 +202,45 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithSomeEmptyA
     ASSERT_DOES_NOT_THROW(utils::validateQuerySettings(querySettings));
 }
 
+TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithEmptyKeyPattern) {
+    QuerySettings querySettings;
+    querySettings.setIndexHints({{
+        IndexHintSpec(makeNamespace("testDB", "testColl"), {IndexHint(BSONObj{})}),
+    }});
+    utils::simplifyQuerySettings(querySettings);
+    ASSERT_THROWS_CODE(utils::validateQuerySettings(querySettings), DBException, 9646000);
+}
+
+TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithInvalidKeyPattern) {
+    QuerySettings querySettings;
+    querySettings.setIndexHints({{
+        IndexHintSpec(makeNamespace("testDB", "testColl"),
+                      {IndexHint(BSON("a" << 1 << "b"
+                                          << "some-string"))}),
+    }});
+    utils::simplifyQuerySettings(querySettings);
+    ASSERT_THROWS_CODE(utils::validateQuerySettings(querySettings), DBException, 9646001);
+}
+
+TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithInvalidNaturalHint) {
+    QuerySettings querySettings;
+    querySettings.setIndexHints({{
+        IndexHintSpec(makeNamespace("testDB", "testColl"),
+                      {IndexHint(BSON("$natural" << 1 << "b" << 2))}),
+    }});
+    utils::simplifyQuerySettings(querySettings);
+    ASSERT_THROWS_CODE(utils::validateQuerySettings(querySettings), DBException, 9646001);
+}
+
+TEST_F(QuerySettingsValidationTestFixture, QuerySettingsIndexHintsWithInvalidNaturalHintInverse) {
+    QuerySettings querySettings;
+    querySettings.setIndexHints({{
+        IndexHintSpec(makeNamespace("testDB", "testColl"),
+                      {IndexHint(BSON("b" << 2 << "$natural" << 1))}),
+    }});
+    utils::simplifyQuerySettings(querySettings);
+    ASSERT_THROWS_CODE(utils::validateQuerySettings(querySettings), DBException, 9646001);
+}
+
 }  // namespace
 }  // namespace mongo::query_settings

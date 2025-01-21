@@ -363,7 +363,7 @@ class QuerySettingsNotMultitenantLookupBenchmark : public QuerySettingsLookupBen
 
             // On the first launch, initialize global service context and the QuerySettingsManager.
             setGlobalServiceContext(ServiceContext::make());
-            QuerySettingsManager::create(getGlobalServiceContext(), {});
+            QuerySettingsManager::create(getGlobalServiceContext(), {}, {});
 
             // Initialize the feature flag.
             _querySettingsFeatureFlag.emplace("featureFlagQuerySettings", true);
@@ -391,7 +391,7 @@ class QuerySettingsMultiTenantLookupBenchmark : public QuerySettingsLookupBenchm
             // On the first launched thread, initialize global service context and the
             // QuerySettingsManager.
             setGlobalServiceContext(ServiceContext::make());
-            QuerySettingsManager::create(getGlobalServiceContext(), {});
+            QuerySettingsManager::create(getGlobalServiceContext(), {}, {});
 
             // Initialize the feature flags.
             _querySettingsFeatureFlag.emplace("featureFlagQuerySettings", true);

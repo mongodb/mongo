@@ -206,7 +206,7 @@ public:
         // Start with a fresh oplog.
         deleteAll(cllNS());
 
-        query_settings::QuerySettingsManager::create(_opCtx.getServiceContext(), {});
+        query_settings::QuerySettingsManager::create(_opCtx.getServiceContext(), {}, {});
     }
 
     ~Base() {

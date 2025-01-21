@@ -236,10 +236,10 @@ std::vector<IndexHint> transformTimeseriesHints(std::vector<IndexHint> qsIndexHi
             auto timeSeriesKeyPattern = timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
                 timeseriesOptions, *indexKeyPattern);
             if (!timeSeriesKeyPattern.isOK()) {
-                dassert(false);
                 LOGV2_INFO(8699600,
                            "Couldn't convert index hint to time-series format.",
                            "hint"_attr = hint.getIndexKeyPattern()->toString());
+                dassert(false);
                 continue;
             }
             hint = IndexHint{timeSeriesKeyPattern.getValue()};

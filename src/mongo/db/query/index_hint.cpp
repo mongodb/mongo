@@ -76,6 +76,10 @@ IndexHint IndexHint::parse(const BSONElement& element) {
     } else if (element.type() == BSONType::Object) {
         auto obj = element.Obj();
         if (obj.firstElementFieldName() == kNaturalFieldName) {
+            uassert(ErrorCodes::FailedToParse,
+                    str::stream() << "$natural hint may only accept one field"
+                                  << element.toString(),
+                    obj.nFields() == 1);
             switch (obj.firstElement().numberInt()) {
                 case 1:
                     return IndexHint(NaturalOrderHint(NaturalOrderHint::Direction::kForward));

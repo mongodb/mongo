@@ -34,11 +34,14 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
@@ -63,7 +66,7 @@ public:
     static constexpr StringData kDbName = "foo"_sd;
 
     void setUp() final {
-        QuerySettingsManager::create(getServiceContext(), {});
+        QuerySettingsManager::create(getServiceContext(), {}, {});
 
         _opCtx = cc().makeOperationContext();
         _expCtx = ExpressionContext::makeBlankExpressionContext(opCtx(), {NamespaceString()});
@@ -111,7 +114,7 @@ TEST_F(QuerySettingsLoookupTest, QuerySettingsLookupForFind) {
     QueryShapeConfiguration conf(queryShapeHash, settings);
     conf.setRepresentativeQuery(findCmdBSON);
     manager().setQueryShapeConfigurations(
-        {conf}, LogicalTime(Timestamp(Date_t::now())), boost::none /* tenantId */);
+        opCtx(), {conf}, LogicalTime(Timestamp(Date_t::now())), boost::none /* tenantId */);
 
     // Ensure that settings are returned during the lookup, after query settings have been
     // populated.
@@ -156,7 +159,7 @@ TEST_F(QuerySettingsLoookupTest, QuerySettingsLookupForAgg) {
     QueryShapeConfiguration conf(queryShapeHash, settings);
     conf.setRepresentativeQuery(aggCmdBSON);
     manager().setQueryShapeConfigurations(
-        {conf}, LogicalTime(Timestamp(Date_t::now())), boost::none /* tenantId */);
+        opCtx(), {conf}, LogicalTime(Timestamp(Date_t::now())), boost::none /* tenantId */);
 
     // Ensure that settings are returned during the lookup, after query settings have been
     // populated.
@@ -185,6 +188,7 @@ TEST_F(QuerySettingsLoookupTest, QuerySettingsLookupForDistinct) {
     auto distinctCmdBSON = fromjson("{distinct: 'exampleColl', key: 'x', $db: 'foo'}");
     auto distinctCmd = std::make_unique<DistinctCommandRequest>(
         DistinctCommandRequest::parse(IDLParserContext("distinctCommandRequest",
+                                                       false /* apiStrict */,
                                                        auth::ValidatedTenancyScope::get(opCtx()),
                                                        boost::none,
                                                        SerializationContext::stateDefault()),
@@ -210,7 +214,7 @@ TEST_F(QuerySettingsLoookupTest, QuerySettingsLookupForDistinct) {
     QueryShapeConfiguration conf(queryShapeHash, settings);
     conf.setRepresentativeQuery(distinctCmdBSON);
     manager().setQueryShapeConfigurations(
-        {conf}, LogicalTime(Timestamp(Date_t::now())), boost::none /* tenantId */);
+        opCtx(), {conf}, LogicalTime(Timestamp(Date_t::now())), boost::none /* tenantId */);
 
     // Ensure that settings are returned during the lookup, after query settings have been
     // populated.
@@ -225,6 +229,7 @@ TEST_F(QuerySettingsLoookupTest,
     auto distinctCmdBSON = fromjson("{distinct: 'exampleColl', key: 'x', $db: 'foo'}");
     auto distinctCommand = std::make_unique<DistinctCommandRequest>(
         DistinctCommandRequest::parse(IDLParserContext("distinctCommandRequest",
+                                                       false /* apiStrict */,
                                                        auth::ValidatedTenancyScope::get(opCtx()),
                                                        boost::none,
                                                        SerializationContext::stateDefault()),
