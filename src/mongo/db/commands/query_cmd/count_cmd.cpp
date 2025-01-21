@@ -87,6 +87,7 @@
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
@@ -136,13 +137,18 @@ public:
         Invocation(OperationContext* opCtx,
                    const Command* command,
                    const OpMsgRequest& opMsgRequest)
-            : InvocationBaseGen(opCtx, command, opMsgRequest),
-              _ns(request().getNamespaceOrUUID().isNamespaceString()
+            : InvocationBaseGen(opCtx, command, opMsgRequest), _ns([&] {
+                  if (request().getRawData()) {
+                      return timeseries::isTimeseriesViewRequest(opCtx, request()).second;
+                  }
+
+                  return request().getNamespaceOrUUID().isNamespaceString()
                       ? request().getNamespaceOrUUID().nss()
                       : CollectionCatalog::get(opCtx)->resolveNamespaceStringFromDBNameAndUUID(
                             opCtx,
                             request().getNamespaceOrUUID().dbName(),
-                            request().getNamespaceOrUUID().uuid())) {
+                            request().getNamespaceOrUUID().uuid());
+              }()) {
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid namespace specified '" << _ns.toStringForErrorMsg()
                                   << "'",
@@ -361,6 +367,7 @@ public:
                 bob->append(CountCommandRequest::kEncryptionInformationFieldName,
                             req.getEncryptionInformation()->toBSON());
             }
+            req.getRawData().serializeToBSON(CountCommandRequest::kRawDataFieldName, bob);
         }
 
         bool canIgnorePrepareConflicts() const override {

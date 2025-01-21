@@ -2,9 +2,12 @@
  * Performs basic CRUD operations on a time-series buckets collection.
  * @tags: [
  *   does_not_support_transactions,
+ *   requires_fcv_81,
  *   requires_non_retryable_writes,
  * ]
  */
+
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Set up some testing buckets to work with
 const timeField = "t";
@@ -65,7 +68,11 @@ crudTest(() => {
 
 // count()
 crudTest(() => {
-    assert.eq(bucketsColl.count({"control.count": 2}), 1);
+    // TODO (SERVER-99409): Run this test case when the collection is sharded or unsplittable.
+    if (FixtureHelpers.isSharded(bucketsColl) || FixtureHelpers.isUnsplittable(bucketsColl)) {
+        return;
+    }
+    assert.eq(coll.count({"control.count": 2}, {rawData: true}), 1);
 });
 
 // remove()
