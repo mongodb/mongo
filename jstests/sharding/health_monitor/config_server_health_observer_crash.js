@@ -40,11 +40,11 @@ const mongosParams = {
     }
 };
 
-const faultState = function() {
+const assertFaultState = function(state) {
     let result =
         assert.commandWorked(st.s0.adminCommand({serverStatus: 1, health: {details: true}})).health;
-    print(`Server status: ${tojson(result)}`);
-    return result.state;
+    print(`Server health: ${tojson(result)}`);
+    assert(result.state == state);
 };
 
 var st = new ShardingTest({
@@ -60,6 +60,13 @@ assert.commandWorked(st.s0.adminCommand(
 const configPrimary = st.configRS.getPrimary();
 const admin = configPrimary.getDB("admin");
 
+// There should be no faults and we should be able to ping mongos.
+assertFaultState('Ok');
+assert.commandWorked(st.s0.adminCommand({"ping": 1}));
+
+let pidsBefore = _runningMongoChildProcessIds();
+let numPidsBefore = pidsBefore.length;
+
 // Set the priority and votes to 0 for secondary config servers so that in the case
 // of an election, they cannot step up. If a different node were to step up, the
 // config server would no longer be blackholed from mongos.
@@ -74,46 +81,28 @@ reconfig(st.configRS, conf);
 jsTest.log('Partitioning a config server replica from the mongos');
 st.config0.discardMessagesFrom(st.s, 1.0);
 st.s.discardMessagesFrom(st.config0, 1.0);
-sleep(1000);
-
-// Blocking only one config replica may sometimes transfer to the transient fault.
-assert.soon(() => {
-    return faultState() == 'Ok';
-}, 'Mongos not transitioned to fault state', 12000, 100);
 
 jsTest.log('Partitioning another config server replica from the mongos');
 st.config1.discardMessagesFrom(st.s, 1.0);
 st.s.discardMessagesFrom(st.config1, 1.0);
 
-const failedChecksCount = function() {
-    let result =
-        assert.commandWorked(st.s0.adminCommand({serverStatus: 1, health: {details: true}})).health;
-    print(`Server status: ${tojson(result)}`);
-    return result.configServer.totalChecksWithFailure;
-};
-
-// Wait for certain count of checks that detected a failure, or network error.
-assert.soon(() => {
-    try {
-        // Checks that the failure can be detected more than once.
-        return failedChecksCount() > 1;
-    } catch (e) {
-        jsTestLog(`Can't fetch server status: ${e}`);
-        return true;  // Server must be down already.
-    }
-}, 'Health observer did not detect several failures', 40000, 1000, {runHangAnalyzer: false});
-
-// Mongos should not crash yet.
-assert.commandWorked(st.s0.adminCommand({"ping": 1}));
-let pidsBefore = _runningMongoChildProcessIds();
-let numPidsBefore = pidsBefore.length;
-
 jsTest.log('Partitioning the final config server replica from the mongos');
 st.config2.discardMessagesFrom(st.s, 1.0);
 st.s.discardMessagesFrom(st.config2, 1.0);
 
-// Asserts that the Config server health observer will eventually trigger mongos crash.
+const failedChecksCount = function() {
+    let result =
+        assert.commandWorked(st.s0.adminCommand({serverStatus: 1, health: {details: true}})).health;
+    print(`Server status: ${tojson(result)}`);
+    return result.configServer.totalChecksWithFailure && result.state == 'TransientFault';
+};
 
+// Wait until a failure is detected.
+assert.soon(() => {
+    return failedChecksCount();
+}, 'Health observer did not detect a failure', 20000, 1000, {runHangAnalyzer: false});
+
+// Asserts that the Config server health observer will eventually trigger mongos crash.
 jsTestLog('Wait until the mongos crashes.');
 assert.soon(() => {
     try {
@@ -124,7 +113,7 @@ assert.soon(() => {
         jsTestLog(`Ping failed: ${tojson(e)}`);
         return true;
     }
-}, 'Mongos is not shutting down as expected', 40000, 400);
+}, 'Mongos is not shutting down as expected', 30000, 2500);
 
 try {
     // Refresh PIDs to force de-registration of the crashed mongos.
