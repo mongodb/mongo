@@ -18,6 +18,8 @@ selector:
     - does_not_support_concurrent_reads
     # Tests that run getLatestProfilerEntry(). The downstream syncing node affects the profiler.
     - run_getLatestProfilerEntry
+    # Tests that use fsyncLock which will fail if FCBIS has a backup cursor open.
+    - requires_fsync
 
 run_hook_interval: &run_hook_interval 20
 executor:
