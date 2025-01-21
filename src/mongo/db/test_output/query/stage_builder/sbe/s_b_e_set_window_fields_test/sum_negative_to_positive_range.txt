@@ -1,0 +1,21 @@
+# Golden test output of SBESetWindowFieldsTest/SumNegativeToPositiveRange
+[2] project [s13 = makeBsonObj(MakeObjSpec([sum = Set(0)], Open, NewObj, 0), s2, s12)] 
+[2] project [s12 = 
+    if exists(s7) 
+    then aggRemovableSumFinalize(s7) 
+    else 0 
+] 
+[2] window [s2, s4, s9, s8] [frameFirst[], frameLast[], lowBound{((s11 <=> (s8 + -2)) >= 0)}, highBound{((s11 <=> (s8 + 1)) <= 0)}] [s7 = {init{}, add{aggRemovableSumAdd(s4)}, remove{aggRemovableSumRemove(s4)}}] 
+[2] project [s8 = 
+    let [
+        l2.0 = (s9 ?: null) 
+    ] 
+    in 
+        if isNumber(l2.0) 
+        then move(l2.0) 
+        else fail(7993103, "Invalid range: Expected the sortBy field to be a number") 
+] 
+[2] project [s9 = s3] 
+[1] project [s3 = getField(s2, "a"), s4 = getField(s2, "b")] 
+[1] project [s2 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"a" : 1, "b" : 1}], [{"a" : 2, "b" : 3}], [{"a" : 3, "b" : 5}], [{"a" : 4, "b" : 7}]]} 

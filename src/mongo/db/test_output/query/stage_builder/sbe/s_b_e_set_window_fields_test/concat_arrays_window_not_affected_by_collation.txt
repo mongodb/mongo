@@ -1,0 +1,15 @@
+# Golden test output of SBESetWindowFieldsTest/ConcatArraysWindowNotAffectedByCollation
+[2] project [s10 = makeBsonObj(MakeObjSpec([result = Set(0)], Open, NewObj, 0), s3, s9)] 
+[2] project [s9 = 
+    if exists(s8) 
+    then getElement(s8, 0) 
+    else null 
+] 
+[2] window [s3, s5] [frameFirst[], frameLast[], lowBound{}, highBound{}] [s8 = {init{}, add{concatArraysCapped(
+    if isArray(s5) 
+    then s5 
+    else fail(14, "Expected new value for $concatArrays to be an array") 
+, 104857600)}, remove{}}] 
+[1] project [s4 = getField(s3, "a"), s5 = getField(s3, "b")] 
+[1] project [s3 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"a" : 1, "b" : ["a", "b"]}], [{"a" : 2, "b" : ["a", "c"]}], [{"a" : 3, "b" : ["c"]}]]} 

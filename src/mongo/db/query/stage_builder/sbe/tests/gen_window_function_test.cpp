@@ -45,7 +45,7 @@
 namespace mongo {
 
 
-class SBESetWindowFieldsTest : public SbeStageBuilderTestFixture {
+class SBESetWindowFieldsTest : public GoldenSbeStageBuilderTestFixture {
 public:
     boost::intrusive_ptr<DocumentSource> createSetWindowFieldsDocumentSource(
         boost::intrusive_ptr<ExpressionContext> expCtx, const BSONObj& windowSpec) {
@@ -96,6 +96,12 @@ public:
         auto [resultSlots, stage, data, _] = buildPlanStage(
             std::move(querySolution), false /*hasRecordId*/, nullptr, std::move(collator));
         ASSERT_EQ(resultSlots.size(), 1);
+
+        // Print the stage explain output and verify.
+        _gctx->printTestHeader(GoldenTestContext::HeaderFormat::Text);
+        _gctx->outStream() << sbe::DebugPrinter().print(*stage.get());
+        _gctx->outStream() << std::endl;
+        _gctx->verifyOutput();
 
         auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots[0]);
         return getAllResults(stage.get(), &resultAccessors[0]);
@@ -327,6 +333,105 @@ TEST_F(SBESetWindowFieldsTest, LastTestConstantValueNegativeWindow) {
                    << BSON("a" << 2 << "b" << 3 << "last" << 1000)
                    << BSON("a" << 3 << "b" << 5 << "last" << 1000)
                    << BSON("a" << 4 << "b" << 7 << "last" << 1000)));
+}
+
+TEST_F(SBESetWindowFieldsTest, PartitionedWithRangeAvg) {
+    auto ts = 1736467200000LL;
+    auto oneDay = 86400000LL;
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << Date_t::fromMillisSinceEpoch(ts) << "b" << 1 << "c" << 1)),
+        BSON_ARRAY(BSON("a" << Date_t::fromMillisSinceEpoch(ts + oneDay) << "b" << 3 << "c" << 1)),
+        BSON_ARRAY(BSON("a" << Date_t::fromMillisSinceEpoch(ts) << "b" << 5 << "c" << 2)),
+        BSON_ARRAY(
+            BSON("a" << Date_t::fromMillisSinceEpoch(ts + oneDay * 2) << "b" << 7 << "c" << 2))};
+
+    runSetWindowFieldsTest(
+        R"({partitionBy: '$c', sortBy: {a: 1}, output: {avg: {$avg: '$b', window: {range: [-1, 0], unit: 'day'} }}})",
+        docs,
+        BSON_ARRAY(
+            BSON("a" << Date_t::fromMillisSinceEpoch(ts) << "b" << 1 << "c" << 1 << "avg" << 1)
+            << BSON("a" << Date_t::fromMillisSinceEpoch(ts + oneDay) << "b" << 3 << "c" << 1
+                        << "avg" << 2)
+            << BSON("a" << Date_t::fromMillisSinceEpoch(ts) << "b" << 5 << "c" << 2 << "avg" << 5)
+            << BSON("a" << Date_t::fromMillisSinceEpoch(ts + oneDay * 2) << "b" << 7 << "c" << 2
+                        << "avg" << 7)));
+}
+
+TEST_F(SBESetWindowFieldsTest, SumNegativeToPositiveRange) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 3)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << 5)),
+                                       BSON_ARRAY(BSON("a" << 4 << "b" << 7))};
+    runSetWindowFieldsTest(
+        R"({sortBy: {a: 1}, output: {sum: {$sum: '$b', window: {range: [-2, 1]} }}})",
+        docs,
+        BSON_ARRAY(BSON("a" << 1 << "b" << 1 << "sum" << 4)
+                   << BSON("a" << 2 << "b" << 3 << "sum" << 9)
+                   << BSON("a" << 3 << "b" << 5 << "sum" << 16)
+                   << BSON("a" << 4 << "b" << 7 << "sum" << 15)));
+}
+
+TEST_F(SBESetWindowFieldsTest, TopNUnboundedToCurrent) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 7)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << 5)),
+                                       BSON_ARRAY(BSON("a" << 4 << "b" << 3))};
+    runSetWindowFieldsTest(
+        R"({sortBy: {a: 1}, output: {top2: {$topN: {output: '$a', n: 2, sortBy: {b: -1}}, window: {documents: ['unbounded', 'current']} }}})",
+        docs,
+        BSON_ARRAY(BSON("a" << 1 << "b" << 1 << "top2" << BSON_ARRAY(1))
+                   << BSON("a" << 2 << "b" << 7 << "top2" << BSON_ARRAY(2 << 1))
+                   << BSON("a" << 3 << "b" << 5 << "top2" << BSON_ARRAY(2 << 3))
+                   << BSON("a" << 4 << "b" << 3 << "top2" << BSON_ARRAY(2 << 3))));
+}
+
+TEST_F(SBESetWindowFieldsTest, RankUnboundedToUnbounded) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 7)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << 5)),
+                                       BSON_ARRAY(BSON("a" << 4 << "b" << 3))};
+    runSetWindowFieldsTest(R"({sortBy: {a: 1}, output: {rank: {$rank: {}}}})",
+                           docs,
+                           BSON_ARRAY(BSON("a" << 1 << "b" << 1 << "rank" << 1)
+                                      << BSON("a" << 2 << "b" << 7 << "rank" << 2)
+                                      << BSON("a" << 3 << "b" << 5 << "rank" << 3)
+                                      << BSON("a" << 4 << "b" << 3 << "rank" << 4)));
+}
+
+TEST_F(SBESetWindowFieldsTest, ShiftWithoutWindow) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 7)),
+                                       BSON_ARRAY(BSON("a" << 3 << "b" << 5)),
+                                       BSON_ARRAY(BSON("a" << 4 << "b" << 3))};
+    runSetWindowFieldsTest(
+        R"({sortBy: {a: 1}, output: {lastOne: {$shift: {output: '$b', by: -1, default: 0}}}})",
+        docs,
+        BSON_ARRAY(BSON("a" << 1 << "b" << 1 << "lastOne" << 0)
+                   << BSON("a" << 2 << "b" << 7 << "lastOne" << 1)
+                   << BSON("a" << 3 << "b" << 5 << "lastOne" << 7)
+                   << BSON("a" << 4 << "b" << 3 << "lastOne" << 5)));
+}
+
+TEST_F(SBESetWindowFieldsTest, DerivativeRangeNegativeToCurrent) {
+    auto ts = 1736467200000LL;
+    auto thirtySec = 30000LL;
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << Date_t::fromMillisSinceEpoch(ts) << "b" << 100)),
+        BSON_ARRAY(BSON("a" << Date_t::fromMillisSinceEpoch(ts + thirtySec) << "b" << 101)),
+        BSON_ARRAY(BSON("a" << Date_t::fromMillisSinceEpoch(ts + thirtySec * 2) << "b" << 102.5)),
+        BSON_ARRAY(BSON("a" << Date_t::fromMillisSinceEpoch(ts + thirtySec * 3) << "b" << 103))};
+
+    runSetWindowFieldsTest(
+        R"({sortBy: {a: 1}, output: {speed: {$derivative: {input: '$b', unit: 'hour'}, window: {range: [-30, 0], unit: 'second'} }}})",
+        docs,
+        BSON_ARRAY(
+            BSON("a" << Date_t::fromMillisSinceEpoch(ts) << "b" << 100 << "speed" << BSONNULL)
+            << BSON("a" << Date_t::fromMillisSinceEpoch(ts + thirtySec) << "b" << 101 << "speed"
+                        << 120)
+            << BSON("a" << Date_t::fromMillisSinceEpoch(ts + thirtySec * 2) << "b" << 102.5
+                        << "speed" << 180)
+            << BSON("a" << Date_t::fromMillisSinceEpoch(ts + thirtySec * 3) << "b" << 103 << "speed"
+                        << 60)));
 }
 
 TEST_F(SBESetWindowFieldsTest, SetUnionWindowNoRemoval) {

@@ -1,0 +1,21 @@
+# Golden test output of SBESetWindowFieldsTest/SetUnionWindowSubfiedMissingFieldWithRemoval
+[2] project [s12 = makeBsonObj(MakeObjSpec([result = Set(0)], Open, NewObj, 0), s2, s11)] 
+[2] project [s11 = 
+    if exists(s8) 
+    then aggRemovableSetCommonFinalize(s8) 
+    else null 
+] 
+[2] window [s2, s6, s9] [frameFirst[], frameLast[], lowBound{((s10 <=> (s9 + -1)) >= 0)}, highBound{((s10 <=> (s9 + 0)) <= 0)}] [s8 = {init{aggRemovableSetCommonInit()}, add{aggRemovableSetUnionAdd(
+    if isArray(s6) 
+    then s6 
+    else fail(14, "Expected new value for $setUnion to be an array") 
+, 104857600)}, remove{aggRemovableSetUnionRemove(
+    if isArray(s6) 
+    then s6 
+    else fail(14, "Expected value to remove for $setUnion to be an array") 
+)}}] 
+[2] project [s6 = traverseP(s4, lambda(l4.0) { getField(move(l4.0), "c") }, 1)] 
+[2] agg_project [s9 = sum(1)] 
+[1] project [s3 = getField(s2, "a"), s4 = getField(s2, "b")] 
+[1] project [s2 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"a" : 1, "b" : {"c" : [1, 2, 3]}}], [{"a" : 2}], [{"a" : 3, "b" : 1}], [{"a" : 4, "b" : {"c" : [4, 5, 6]}}], [{"a" : 5, "b" : {"c" : [7, 8, 9]}}]]} 
