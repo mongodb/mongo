@@ -197,6 +197,8 @@ __insert_queue_item(WT_SESSION_IMPL *session, char *uri, uint64_t *work_count)
     WTI_LIVE_RESTORE_SERVER *server = S2C(session)->live_restore_server;
     WTI_LIVE_RESTORE_WORK_ITEM *work_item = NULL;
 
+    __wt_spin_lock(session, &server->queue_lock);
+
     WT_ERR(__wt_calloc_one(session, &work_item));
     WT_ERR(__wt_strdup(session, uri, &work_item->uri));
     TAILQ_INSERT_HEAD(&server->work_queue, work_item, q);
@@ -208,6 +210,7 @@ err:
         __wt_free(session, work_item);
     }
 
+    __wt_spin_unlock(session, &server->queue_lock);
     return (ret);
 }
 

@@ -227,7 +227,12 @@ __wt_evict_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
 
     /* Retrieve the wait time and convert from milliseconds */
     WT_RET(__wt_config_gets(session, cfg, "cache_max_wait_ms", &cval));
-    evict->cache_max_wait_us = (uint64_t)(cval.val * WT_THOUSAND);
+    if (cval.val > 1)
+        evict->cache_max_wait_us = (uint64_t)(cval.val * WT_THOUSAND);
+    else if (cval.val == 1)
+        evict->cache_max_wait_us = 1;
+    else
+        evict->cache_max_wait_us = 0;
 
     /* Retrieve the timeout value and convert from seconds */
     WT_RET(__wt_config_gets(session, cfg, "cache_stuck_timeout_ms", &cval));

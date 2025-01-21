@@ -1329,13 +1329,11 @@ variables:
       # Must disable TCMALLOC as it may be picked up locally and its not on all hosts.
       ENABLE_TCMALLOC: 0
     tasks:
-      # FIXME-WT-13951 Re-enable MacOS testing on the Evergreen waterfall - switch back to the 'compile' task.
-      - name: compile-no-upload
+      - name: compile
       - name: make-check-test
       # Use a special version of unit-test for macOS that checks for Python version consistency.
       - name: unit-test-macos
-      # FIXME-WT-13951 Re-enable MacOS testing on the Evergreen waterfall - switch back to the 'fops' task.
-      - name: fops-macos
+      - name: fops
       - name: memory-model-test-mac
         batchtime: 40320 # 28 days
 
@@ -1430,13 +1428,6 @@ tasks:
       - func: "get project"
       - func: "compile wiredtiger"
       - func: "upload artifact"
-      - func: "cleanup"
-
-  # FIXME-WT-13951 Re-enable MacOS testing on the Evergreen waterfall - remove this task.
-  - name: compile-no-upload
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
       - func: "cleanup"
 
   # production build with --disable-shared
@@ -2076,12 +2067,10 @@ tasks:
 
   - name: unit-test-macos
     tags: ["python"]
-    # FIXME-WT-13951 - Put back the dependency on the compile task.
-    # depends_on:
-    #   - name: compile
+    depends_on:
+      - name: compile
     commands:
-    # FIXME-WT-13951 - Fetch the artifacts instead of getting the project and compiling again.
-      # - func: "fetch artifacts"
+      - func: "fetch artifacts"
       - func: "get project"
       - func: "compile wiredtiger"
       - func: "python config check"
@@ -2592,21 +2581,6 @@ tasks:
             else
               ./test_fops
             fi
-
-  # FIXME-WT-13951 Re-enable MacOS testing on the Evergreen waterfall - remove this task.
-  - name: fops-macos
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build/test/fops"
-          shell: bash
-          script: |
-            set -o errexit
-            set -o verbose
-            ${PREPARE_TEST_ENV}
-            ./test_fops
 
   - name: bench-tiered-push-pull-s3
     commands:
