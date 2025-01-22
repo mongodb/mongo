@@ -2188,11 +2188,12 @@ task_groups:
       - compile_all_but_not_unittests
 
   - <<: *compile_task_group_template
-    name: compile_test_parallel_core_stream_no_compile_all_TG
+    name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG
     tasks:
       - compile_dist_test
       - archive_dist_test
       - archive_dist_test_debug
+      - run_pretty_printer_tests
 
   - <<: *compile_task_group_template
     name: compile_all_but_not_unittests_TG
