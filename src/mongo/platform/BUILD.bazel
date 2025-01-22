@@ -7,6 +7,23 @@ exports_files(
 )
 
 mongo_cc_library(
+    name = "throw_hook",
+    srcs = ["throw_hook.cpp"],
+    hdrs = ["throw_hook.h"],
+    # Link all calls to __cxa_throw to __wrap___cxa_throw instead. Link
+    # calls to __real___cxa_throw to __cxa_throw. This needs to be included
+    # in every link operation where we want to install our hook, so it
+    # needs to be specified very early in our dependency tree. Fortunately,
+    # Bazel will propagate this option to all targets that depend on this
+    # target.
+    linkopts = ["-Wl,--wrap=__cxa_throw"],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+)
+
+mongo_cc_library(
     name = "visibility_test_libcommon",
     srcs = [
         "visibility_test_libcommon.cpp",
@@ -115,6 +132,22 @@ mongo_cc_unit_test(
     ],
     deps = [
         "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "throw_hook_test",
+    srcs = ["throw_hook_test.cpp"],
+    tags = [
+        "mongo_unittest_fourth_group",
+        "server-programmability",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":throw_hook",
     ],
 )
 

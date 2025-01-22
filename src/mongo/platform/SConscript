@@ -1,5 +1,7 @@
 # -*- mode: python -*-
 
+import platform
+
 Import(
     [
         "env",
@@ -48,3 +50,11 @@ env.Benchmark(
     source=[],
     LIBDEPS=[],
 )
+
+if platform.system() == "Linux":
+    env.CppUnitTest(
+        target="throw_hook_test",
+        source=[],
+        LIBDEPS=[],
+        PROVE_ALIASES=["server-programmability"],
+    )
