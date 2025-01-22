@@ -693,13 +693,6 @@ public:
             uassert(
                 ErrorCodes::BadValue, "Scale factor must be greater than zero", cmd.getScale() > 0);
 
-            // Scale factors in excess of 2^53 will lose precision during portions of the
-            // implementation where they are represented as double, since this overflows
-            // the mantissa.
-            uassert(ErrorCodes::BadValue,
-                    "Scale factor must not exceed 2^53",
-                    cmd.getScale() <= (1ll << 53));
-
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid db name: " << dbname.toStringForErrorMsg(),
                     DatabaseName::isValid(dbname, DatabaseName::DollarInDbNameBehavior::Allow));

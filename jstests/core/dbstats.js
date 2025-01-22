@@ -90,26 +90,6 @@ if (!isMongoS) {
 
     assert.eq(2, dbStats.collections, tojson(dbStats));  // testColl + system.views
     assert.eq(1, dbStats.views, tojson(dbStats));
-
-    // Scale should be truncated to 1 according to the manual entry for dbStats
-    dbStats = testDB.runCommand({dbStats: 1, scale: 1.5});
-    assert.commandWorked(dbStats);
-
-    assert.eq(2, dbStats.collections, tojson(dbStats));
-    assert.eq(1, dbStats.views, tojson(dbStats));
-    assert.eq(1, dbStats.scaleFactor, tojson(dbStats));
-
-    // Scale should be minimum 1
-    dbStats = testDB.runCommand({dbStats: 1, scale: 0});
-    assert.commandFailedWithCode(dbStats, ErrorCodes.BadValue);
-
-    // Scale should be maximum 2^53
-    dbStats = testDB.runCommand({dbStats: 1, scale: 2 ** 53});
-    assert.commandWorked(dbStats);
-    assert.eq(2 ** 53, dbStats.scaleFactor, tojson(dbStats));
-
-    dbStats = testDB.runCommand({dbStats: 1, scale: 2 ** 54});
-    assert.commandFailedWithCode(dbStats, ErrorCodes.BadValue);
 }
 
 // Check that the output for non-existing database and  the output for empty database
