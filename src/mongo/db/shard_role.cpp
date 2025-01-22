@@ -157,8 +157,10 @@ void validateResolvedCollectionByUUID(OperationContext* opCtx,
 }
 
 /**
- * Takes the input acquisitions, populates the NSS and returns a vector sorted by NSS, suitable for
- * locking them in NSS order.
+ * Takes the input acquisitions, populates the NSS and returns a vector sorted by the ResourceId of
+ * the target collection, suitable for locking them in order. This is necessary to prevent deadlocks
+ * due to ordering with strong locks. We do not care for the ordering of the databases as the
+ * canonical ordering is for target collections only.
  */
 ResolvedNamespaceOrViewAcquisitionRequests resolveNamespaceOrViewAcquisitionRequests(
     OperationContext* opCtx,
@@ -227,9 +229,11 @@ ResolvedNamespaceOrViewAcquisitionRequests resolveNamespaceOrViewAcquisitionRequ
         return resolvedAcquisitionRequests;
     }
 
+    // Sort them in ascending ResourceId order since that is the canonical lock ordering used across
+    // the server.
     std::sort(resolvedAcquisitionRequests.begin(),
               resolvedAcquisitionRequests.end(),
-              [](auto& lhs, auto& rhs) { return lhs.resourceId > rhs.resourceId; });
+              [](auto& lhs, auto& rhs) { return lhs.resourceId < rhs.resourceId; });
     return resolvedAcquisitionRequests;
 }
 
@@ -1078,9 +1082,11 @@ ResolvedNamespaceOrViewAcquisitionRequests generateSortedAcquisitionRequests(
         return resolvedAcquisitionRequests;
     }
 
+    // Sort them in ascending ResourceId order since that is the canonical lock ordering used across
+    // the server.
     std::sort(resolvedAcquisitionRequests.begin(),
               resolvedAcquisitionRequests.end(),
-              [](auto& lhs, auto& rhs) { return lhs.resourceId > rhs.resourceId; });
+              [](auto& lhs, auto& rhs) { return lhs.resourceId < rhs.resourceId; });
     return resolvedAcquisitionRequests;
 }
 
