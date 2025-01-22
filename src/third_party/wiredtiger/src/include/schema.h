@@ -111,6 +111,11 @@ struct __wt_import_list {
 /*
  * WT_WITH_LOCK_WAIT --
  *	Wait for a lock, perform an operation, drop the lock.
+ *  This macro lets us treat spinlocks as re-entrant. The session is only accessible by its owning
+ *  thread so the session's lock flags can be considered as thread-local tracking for whether we're
+ *  already inside the lock.
+ *  Coverity will complain that two threads might modify the lock flags concurrently, but this isn't
+ *  possible so those warnings can be ignored.
  */
 #define WT_WITH_LOCK_WAIT(session, lock, flag, op)    \
     do {                                              \
@@ -128,6 +133,11 @@ struct __wt_import_list {
 /*
  * WT_WITH_LOCK_NOWAIT --
  *	Acquire a lock if available, perform an operation, drop the lock.
+ *  This macro lets us treat spinlocks as re-entrant. The session is only accessible by its owning
+ *  thread so the session's lock flags can be considered as thread-local tracking for whether we're
+ *  already inside the lock.
+ *  Coverity will complain that two threads might modify the lock flags concurrently, but this isn't
+ *  possible so those warnings can be ignored.
  */
 #define WT_WITH_LOCK_NOWAIT(session, ret, lock, flag, op)                   \
     do {                                                                    \

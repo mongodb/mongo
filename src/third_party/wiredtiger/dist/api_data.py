@@ -104,7 +104,7 @@ source_meta = [
     Config('type', 'file', r'''
         set the type of data source used to store a column group, index or simple table.
         By default, a \c "file:" URI is derived from the object name. The \c type configuration
-        can be used to switch to a different data source or an extension configured by the
+        can be used to switch to a different data source or an extension configured by the 
         application'''),
 ]
 
@@ -447,7 +447,7 @@ connection_runtime_config = [
         min='1MB', max='10TB'),
     Config('cache_max_wait_ms', '0', r'''
         the maximum number of milliseconds an application thread will wait for space to be
-        available in cache before giving up. Default or 0 will wait forever. 1 will never wait''',
+        available in cache before giving up. Default will wait forever''',
         min=0),
     Config('cache_stuck_timeout_ms', '300000', r'''
         the number of milliseconds to wait before a stuck cache times out in diagnostic mode.
@@ -788,8 +788,9 @@ connection_runtime_config = [
         'failpoint_history_store_delete_key_from_ts', 'history_store_checkpoint_delay',
         'history_store_search', 'history_store_sweep_race', 'prefetch_1', 'prefetch_2',
         'prefetch_3', 'prefix_compare', 'prepare_checkpoint_delay', 'prepare_resolution_1',
-        'prepare_resolution_2', 'sleep_before_read_overflow_onpage','split_1', 'split_2',
-        'split_3', 'split_4', 'split_5', 'split_6', 'split_7', 'split_8','tiered_flush_finish']),
+        'prepare_resolution_2', 'session_alter_slow', 'sleep_before_read_overflow_onpage',
+        'split_1', 'split_2', 'split_3', 'split_4', 'split_5', 'split_6', 'split_7', 'split_8',
+        'tiered_flush_finish']),
     Config('verbose', '[]', r'''
         enable messages for various subsystems and operations. Options are given as a list,
         where each message type can optionally define an associated verbosity level, such as
@@ -1103,7 +1104,7 @@ session_config = [
     Config('cache_max_wait_ms', '0', r'''
         the maximum number of milliseconds an application thread will wait for space to be
         available in cache before giving up. Default value will be the global setting of the
-        connection config. 0 will wait forever. 1 will never wait''',
+        connection config''',
         min=0),
     Config('ignore_cache_size', 'false', r'''
         when set, operations performed by this session ignore the cache size and are not blocked
@@ -1262,9 +1263,9 @@ wiredtiger_open_common =\
         type='boolean'),
     Config('write_through', '', r'''
         Use \c FILE_FLAG_WRITE_THROUGH on Windows to write to files. Ignored on non-Windows
-        systems. Options are given as a list, such as <code>"write_through=[data]"</code>.
+        systems. Options are given as a list, such as <code>"write_through=[data]"</code>. 
         Configuring \c write_through requires care; see @ref write_through
-        Including \c "data" will cause WiredTiger data files to write through cache, including
+        Including \c "data" will cause WiredTiger data files to write through cache, including 
         \c "log" will cause WiredTiger log files to write through
         cache.''',
         type='list', choices=['data', 'log']),
@@ -1970,7 +1971,7 @@ methods = {
     Config('threads', '4', r'''
         maximum number of threads WiredTiger will start to help RTS. Each
         RTS worker thread uses a session from the configured WT_RTS_MAX_WORKERS''',
-        min=0,
+        min=0, 
         max=10),     # !!! Must match WT_RTS_MAX_WORKERS
 ]),
 

@@ -45,6 +45,7 @@ const WT_NAME_FLAG __wt_stress_types[] = {
   {"prepare_checkpoint_delay", WT_TIMING_STRESS_PREPARE_CHECKPOINT_DELAY},
   {"prepare_resolution_1", WT_TIMING_STRESS_PREPARE_RESOLUTION_1},
   {"prepare_resolution_2", WT_TIMING_STRESS_PREPARE_RESOLUTION_2},
+  {"session_alter_slow", WT_TIMING_STRESS_SESSION_ALTER_SLOW},
   {"sleep_before_read_overflow_onpage", WT_TIMING_STRESS_SLEEP_BEFORE_READ_OVERFLOW_ONPAGE},
   {"split_1", WT_TIMING_STRESS_SPLIT_1}, {"split_2", WT_TIMING_STRESS_SPLIT_2},
   {"split_3", WT_TIMING_STRESS_SPLIT_3}, {"split_4", WT_TIMING_STRESS_SPLIT_4},

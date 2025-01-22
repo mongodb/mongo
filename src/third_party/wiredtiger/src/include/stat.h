@@ -1044,12 +1044,8 @@ struct __wt_connection_stats {
     int64_t thread_read_active;
     int64_t thread_write_active;
     int64_t application_cache_ops;
-    int64_t application_cache_idle_ops;
-    int64_t application_cache_busy_ops;
     int64_t application_evict_snapshot_refreshed;
     int64_t application_cache_time;
-    int64_t application_cache_idle_time;
-    int64_t application_cache_busy_time;
     int64_t txn_release_blocked;
     int64_t dhandle_lock_blocked;
     int64_t page_index_slot_ref_blocked;
@@ -1428,8 +1424,6 @@ struct __wt_session_stats {
     int64_t write_time;
     int64_t lock_schema_wait;
     int64_t cache_time;
-    int64_t cache_time_idle;
-    int64_t cache_time_busy;
 };
 
 /* Statistics section: END */

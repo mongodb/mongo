@@ -776,10 +776,6 @@ conn_stats = [
     ##########################################
     # Yield statistics
     ##########################################
-    YieldStat('application_cache_busy_ops', 'application thread operations waiting for mandatory cache eviction'),
-    YieldStat('application_cache_busy_time', 'application thread time waiting for mandatory cache eviction (usecs)'),
-    YieldStat('application_cache_idle_ops', 'application thread operations waiting for cache eviction while idle'),
-    YieldStat('application_cache_idle_time', 'application thread time waiting for cache eviction while idle (usecs)'),
     YieldStat('application_cache_ops', 'application thread operations waiting for cache'),
     YieldStat('application_cache_time', 'application thread time waiting for cache (usecs)'),
     YieldStat('application_evict_snapshot_refreshed', 'application thread snapshot refreshed for eviction'),
@@ -1167,8 +1163,6 @@ session_stats = [
     SessionStat('bytes_read', 'bytes read into cache'),
     SessionStat('bytes_write', 'bytes written from cache'),
     SessionStat('cache_time', 'time waiting for cache (usecs)'),
-    SessionStat('cache_time_busy', 'time waiting for mandatory cache eviction (usecs)'),
-    SessionStat('cache_time_idle', 'time waiting for cache eviction while idle (usecs)'),
     SessionStat('lock_dhandle_wait', 'dhandle lock wait time (usecs)'),
     SessionStat('lock_schema_wait', 'schema lock wait time (usecs)'),
     SessionStat('read_time', 'page read from disk to cache time (usecs)'),

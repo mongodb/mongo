@@ -267,6 +267,7 @@ extern const char __WT_CONFIG_CHOICE_recovery_progress[];
 extern const char __WT_CONFIG_CHOICE_rts[];
 extern const char __WT_CONFIG_CHOICE_salvage[];
 extern const char __WT_CONFIG_CHOICE_sequential[];
+extern const char __WT_CONFIG_CHOICE_session_alter_slow[];
 extern const char __WT_CONFIG_CHOICE_set[];
 extern const char __WT_CONFIG_CHOICE_shared_cache[];
 extern const char __WT_CONFIG_CHOICE_size[];

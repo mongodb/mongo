@@ -66,8 +66,12 @@ struct __wt_prefetch {
 struct __wt_error_info {
     int err;
     int sub_level_err;
-    char *err_msg;
+    const char *err_msg;
+    WT_ITEM err_msg_buf;
 };
+
+#define WT_ERROR_INFO_EMPTY ""
+#define WT_ERROR_INFO_SUCCESS "last API call was successful"
 
 /* Get the connection implementation for a session */
 #define S2C(session) ((WT_CONNECTION_IMPL *)((WT_SESSION_IMPL *)(session))->iface.connection)
