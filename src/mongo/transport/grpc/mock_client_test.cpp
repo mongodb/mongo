@@ -287,7 +287,7 @@ TEST_F(MockClientTest, MockClientMetadata) {
 
 TEST_F(MockClientTest, WireVersionGossipping) {
     auto wvProvider = std::make_shared<MockWireVersionProvider>();
-    const auto kServerMaxWireVersion = 24;
+    const auto kServerMaxWireVersion = util::constants::kMinimumWireVersion + 1;
     wvProvider->setClusterMaxWireVersion(kServerMaxWireVersion);
 
     auto serverHandler = [&](HostAndPort local, std::shared_ptr<IngressSession> session) {
