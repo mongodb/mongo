@@ -5,8 +5,6 @@
 //   requires_fcv_53,
 //   # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
 //   embedded_router_incompatible,
-//   # TODO (SERVER-99100): Re-enable this test in aubsan once SERVER-92451 has upgraded Timelib.
-//   incompatible_aubsan,
 // ]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
