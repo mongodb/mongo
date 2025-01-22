@@ -211,6 +211,10 @@ auto& attemptsToBecomeSecondary = *MetricBuilder<Counter64>{"repl.apply.attempts
 auto& lastStateTransition =
     *MetricBuilder<synchronized_value<std::string>>{"repl.stateTransition.lastStateTransition"};
 
+auto& oldestTimestampMetric =
+    *MetricBuilder<synchronized_value<Timestamp>>{"repl.timestamps.oldestTimestamp"};
+
+
 // Tracks the number of operations killed on state transition.
 auto& totalOpsKilled = *MetricBuilder<Counter64>("repl.stateTransition.totalOperationsKilled");
 // Tracks the number of operations left running on state transition.
@@ -429,8 +433,7 @@ InitialSyncerInterface::Options createInitialSyncerOptions(
         // The oplog application phase of initial sync starts timestamping writes, causing
         // WiredTiger to pin this data in memory. Advancing the oldest timestamp in step with the
         // last applied optime here will permit WiredTiger to evict this data as it sees fit.
-        replCoord->getServiceContext()->getStorageEngine()->setOldestTimestamp(
-            opTimeAndWallTime.opTime.getTimestamp(), false /*force*/);
+        replCoord->setOldestTimestamp(opTimeAndWallTime.opTime.getTimestamp());
     };
     options.resetOptimes = [replCoord]() {
         replCoord->resetMyLastOpTimes();
@@ -5287,6 +5290,11 @@ void ReplicationCoordinatorImpl::prepareReplMetadata(const GenericArguments& gen
         invariantStatusOK(replSetMetadata->writeToMetadata(builder));
     if (oplogQueryMetadata)
         invariantStatusOK(oplogQueryMetadata->writeToMetadata(builder));
+}
+
+void ReplicationCoordinatorImpl::setOldestTimestamp(const Timestamp& timestamp) {
+    oldestTimestampMetric = timestamp;
+    return ReplicationCoordinator::setOldestTimestamp(timestamp);
 }
 
 bool ReplicationCoordinatorImpl::getWriteConcernMajorityShouldJournal() {

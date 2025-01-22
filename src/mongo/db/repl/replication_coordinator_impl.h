@@ -425,6 +425,9 @@ public:
                              const OpTime& lastOpTimeFromClient,
                              BSONObjBuilder* builder) const override;
 
+
+    void setOldestTimestamp(const Timestamp& timestamp) override;
+
     Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
                               ReplSetHeartbeatResponse* response) override;
 
