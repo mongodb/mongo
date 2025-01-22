@@ -570,6 +570,12 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("docsExamined", static_cast<long long>(spec->fetches));
+            bob->appendBool("usedDisk", (spec->spills > 0));
+            bob->appendNumber("spills", static_cast<long long>(spec->spills));
+            bob->appendNumber("spilledRecords", static_cast<long long>(spec->spilledRecords));
+            bob->appendNumber("spilledBytes", static_cast<long long>(spec->spilledBytes));
+            bob->appendNumber("spilledDataStorageSize",
+                              static_cast<long long>(spec->spilledDataStorageSize));
         }
     } else if (STAGE_TIMESERIES_MODIFY == stats.stageType) {
         TimeseriesModifyStats* spec = static_cast<TimeseriesModifyStats*>(stats.specific.get());

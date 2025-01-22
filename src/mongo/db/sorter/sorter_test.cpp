@@ -202,15 +202,16 @@ void _assertIteratorsEquivalent(It1&& it1, It2&& it2, int line) {
     int iteration;
     try {
         for (iteration = 0; true; iteration++) {
-            ASSERT_EQUALS(it1->more(), it2->more());
-            ASSERT_EQUALS(it1->more(), it2->more());  // make sure more() is safe to call twice
+            ASSERT_EQUALS(it1->more(), it2->more()) << "on iteration " << iteration;
+            // make sure more() is safe to call twice
+            ASSERT_EQUALS(it1->more(), it2->more()) << "on iteration " << iteration;
             if (!it1->more())
                 return;
 
             IWPair pair1 = it1->next();
             IWPair pair2 = it2->next();
-            ASSERT_EQUALS(pair1.first, pair2.first);
-            ASSERT_EQUALS(pair1.second, pair2.second);
+            ASSERT_EQUALS(pair1.first, pair2.first) << "on iteration " << iteration;
+            ASSERT_EQUALS(pair1.second, pair2.second) << "on iteration " << iteration;
         }
     } catch (...) {
         LOGV2(22047,
@@ -227,15 +228,16 @@ void _assertIteratorsEquivalentForNSteps(It1& it1, It2& it2, int maxSteps, int l
     int iteration;
     try {
         for (iteration = 0; iteration < maxSteps; iteration++) {
-            ASSERT_EQUALS(it1->more(), it2->more());
-            ASSERT_EQUALS(it1->more(), it2->more());  // make sure more() is safe to call twice
+            ASSERT_EQUALS(it1->more(), it2->more()) << "on iteration " << iteration;
+            // make sure more() is safe to call twice
+            ASSERT_EQUALS(it1->more(), it2->more()) << "on iteration " << iteration;
             if (!it1->more())
                 return;
 
             IWPair pair1 = it1->next();
             IWPair pair2 = it2->next();
-            ASSERT_EQUALS(pair1.first, pair2.first);
-            ASSERT_EQUALS(pair1.second, pair2.second);
+            ASSERT_EQUALS(pair1.first, pair2.first) << "on iteration " << iteration;
+            ASSERT_EQUALS(pair1.second, pair2.second) << "on iteration " << iteration;
         }
     } catch (...) {
         LOGV2(6409300,
@@ -910,7 +912,6 @@ public:
     PseudoRandom _random;
 };
 
-
 template <long long Limit, bool Random = true>
 class LotsOfDataWithLimit : public LotsOfDataLittleMemory<Random> {
     typedef LotsOfDataLittleMemory<Random> Parent;
@@ -1001,6 +1002,70 @@ class LotsOfSpillsLittleMemory : public LotsOfDataLittleMemory<Random> {
         DATA_MEM_LIMIT = MEM_LIMIT - static_cast<int>(MEM_LIMIT / 10),
     };
 };
+
+class ManualSpills : public Basic {
+public:
+    // Using constant seed for tests to be determenistic
+    ManualSpills() : _random(1) {
+        for (size_t i = 0; i < kElementCount; i++) {
+            _array[i] = i;
+        }
+        std::shuffle(_array.begin(), _array.end(), _random.urbg());
+    }
+
+    void addData(IWSorter* sorter) override {
+        for (size_t i = 0; i < kElementCount; ++i) {
+            sorter->add(_array[i], -_array[i]);
+            if (i % kSpillEveryN == kSpillEveryN - 1) {
+                sorter->spill();
+            }
+        }
+    }
+
+    size_t numAdded() const override {
+        return kElementCount;
+    }
+
+    std::shared_ptr<IWIterator> correct() override {
+        return std::make_shared<IntIterator>(0, kElementCount);
+    }
+    std::shared_ptr<IWIterator> correctReverse() override {
+        return std::make_shared<IntIterator>(kElementCount - 1, -1, -1);
+    }
+
+    size_t correctNumRanges() const override {
+        return kElementCount / kSpillEveryN;
+    }
+
+    size_t correctSpilledRanges() const override {
+        return correctNumRanges();
+    }
+
+protected:
+    static constexpr size_t kElementCount = 100;
+    static constexpr size_t kSpillEveryN = 10;
+
+    std::array<int, kElementCount> _array;
+    PseudoRandom _random;
+};
+
+class ManualSpillsWithLimit : public ManualSpills {
+    SortOptions adjustSortOptions(SortOptions opts) override {
+        return opts.Limit(kElementCount / 2);
+    }
+
+    std::shared_ptr<IWIterator> correct() override {
+        return std::make_shared<IntIterator>(0, kLimit);
+    }
+
+    std::shared_ptr<IWIterator> correctReverse() override {
+        return std::make_shared<IntIterator>(kElementCount - 1, kElementCount - kLimit - 1, -1);
+    }
+
+protected:
+    static constexpr size_t kLimit = kElementCount / 2;
+};
+
 }  // namespace SorterTests
 
 class SorterSuite : public unittest::OldStyleSuiteSpecification {
@@ -1046,6 +1111,8 @@ public:
         add<SorterTests::PauseAndResume>();
         add<SorterTests::PauseAndResumeLimit>();
         add<SorterTests::PauseAndResumeLimitOne>();
+        add<SorterTests::ManualSpills>();
+        add<SorterTests::ManualSpillsWithLimit>();
     }
 };
 

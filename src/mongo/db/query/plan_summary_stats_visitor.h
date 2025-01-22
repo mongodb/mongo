@@ -68,6 +68,9 @@ public:
     void visit(tree_walker::MaybeConstPtr<true, GroupStats> stats) final {
         _summary.usedDisk = _summary.usedDisk || stats->spills > 0;
     }
+    void visit(tree_walker::MaybeConstPtr<true, TextOrStats> stats) final {
+        _summary.usedDisk = _summary.usedDisk || stats->spills > 0;
+    }
     void visit(tree_walker::MaybeConstPtr<true, DocumentSourceCursorStats> stats) final {
         accumulate(stats->planSummaryStats);
     }

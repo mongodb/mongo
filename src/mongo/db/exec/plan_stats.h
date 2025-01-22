@@ -1042,6 +1042,18 @@ struct TextOrStats : public SpecificStats {
     }
 
     size_t fetches;
+
+    // The number of times the stage spilled.
+    uint64_t spills = 0;
+
+    // The size, in bytes, of the memory released with spilling.
+    uint64_t spilledBytes = 0;
+
+    // The size, in bytes, of disk space used for spilling.
+    uint64_t spilledDataStorageSize = 0;
+
+    // The total number of records spilled.
+    uint64_t spilledRecords = 0;
 };
 
 struct TrialStats : public SpecificStats {

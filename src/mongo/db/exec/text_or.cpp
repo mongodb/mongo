@@ -45,7 +45,10 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/plan_executor_impl.h"
+#include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/sorter/sorter_file_name.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -200,7 +203,14 @@ PlanStage::StageState TextOrStage::readFromChildren(WorkingSetID* out) {
         }
 
         // If we're here we are done reading results.  Move to the next state.
-        _scoreIterator = _scores.begin();
+        if (_sorter) {
+            if (!_scores.empty()) {
+                doForceSpill();
+            }
+            _sorterIterator = _sorter->done();
+        } else {
+            _scoreIterator = _scores.begin();
+        }
         _internalState = State::kReturningResults;
 
         return PlanStage::NEED_TIME;
@@ -212,6 +222,14 @@ PlanStage::StageState TextOrStage::readFromChildren(WorkingSetID* out) {
 }
 
 PlanStage::StageState TextOrStage::returnResults(WorkingSetID* out) {
+    if (_sorter) {
+        return returnResultsSpilled(out);
+    } else {
+        return returnResultsInMemory(out);
+    }
+}
+
+PlanStage::StageState TextOrStage::returnResultsInMemory(WorkingSetID* out) {
     if (_scoreIterator == _scores.end()) {
         _internalState = State::kDone;
         return PlanStage::IS_EOF;
@@ -222,7 +240,7 @@ PlanStage::StageState TextOrStage::returnResults(WorkingSetID* out) {
     ++_scoreIterator;
 
     // Ignore non-matched documents.
-    if (textRecordData.score < 0) {
+    if (textRecordData.score == kRejectedDocumentScore) {
         invariant(textRecordData.wsid == WorkingSet::INVALID_ID);
         return PlanStage::NEED_TIME;
     }
@@ -235,14 +253,46 @@ PlanStage::StageState TextOrStage::returnResults(WorkingSetID* out) {
     return PlanStage::ADVANCED;
 }
 
+PlanStage::StageState TextOrStage::returnResultsSpilled(WorkingSetID* out) {
+    if (!_sorterIterator->more()) {
+        _internalState = State::kDone;
+        return PlanStage::IS_EOF;
+    }
+
+    auto [recordId, textRecordData] = _sorterIterator->next();
+    double score = textRecordData.score;
+    bool skip = score == kRejectedDocumentScore;
+
+    while (_sorterIterator->more() && _sorterIterator->current() == recordId) {
+        double currentScore = _sorterIterator->next().second.score;
+        score += currentScore;
+        skip |= currentScore == kRejectedDocumentScore;
+    }
+
+    if (skip) {
+        return PlanStage::NEED_TIME;
+    }
+
+    WorkingSetMember wsm = textRecordData.document.extract();
+    wsm.metadata().setTextScore(score);
+    *out = _ws->emplace(std::move(wsm));
+    return PlanStage::ADVANCED;
+}
+
 PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out) {
     WorkingSetMember* wsm = _ws->get(wsid);
     invariant(wsm->getState() == WorkingSetMember::RID_AND_IDX);
     invariant(1 == wsm->keyData.size());
     const IndexKeyDatum newKeyData = wsm->keyData.back();  // copy to keep it around.
-    TextRecordData* textRecordData = &_scores[wsm->recordId];
 
-    if (textRecordData->score < 0) {
+    auto [it, inserted] = _scores.try_emplace(wsm->recordId, TextRecordData{});
+    if (inserted) {
+        _currentMemoryBytes += it->first.memUsage() + sizeof(TextRecordData);
+    }
+
+    TextRecordData* textRecordData = &it->second;
+
+    if (textRecordData->score == kRejectedDocumentScore) {
         // We have already rejected this document for not matching the filter.
         invariant(WorkingSet::INVALID_ID == textRecordData->wsid);
         _ws->free(wsid);
@@ -255,7 +305,7 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
 
         if (!Filter::passes(newKeyData.keyData, newKeyData.indexKeyPattern, _filter)) {
             _ws->free(wsid);
-            textRecordData->score = -1;
+            textRecordData->score = kRejectedDocumentScore;
             return NEED_TIME;
         }
 
@@ -272,7 +322,7 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
                                              collectionPtr(),
                                              collectionPtr()->ns())) {
                     _ws->free(wsid);
-                    textRecordData->score = -1;
+                    textRecordData->score = kRejectedDocumentScore;
                     return NEED_TIME;
                 }
                 ++_specificStats.fetches;
@@ -293,6 +343,7 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
 
         // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
         wsm->makeObjOwnedIfNeeded();
+        _currentMemoryBytes += wsm->getMemUsage();
     } else {
         // We already have a working set member for this RecordId. Free the new WSM and retrieve the
         // old one. Note that since we don't keep all index keys, we could get a score that doesn't
@@ -316,7 +367,70 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
 
     // Aggregate relevance score, term keys.
     textRecordData->score += documentTermScore;
+
+    if (_currentMemoryBytes > _maxMemoryBytes) {
+        doForceSpill();
+    }
+
     return NEED_TIME;
 }
 
+void TextOrStage::doForceSpill() {
+    if (!_sorter) {
+        initSorter();
+    }
+
+    uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
+        expCtx()->getTempDir(), internalQuerySpillingMinAvailableDiskSpaceBytes.loadRelaxed()));
+
+    size_t recordsToSpill = _scores.size();
+    for (auto it = _scores.begin(); it != _scores.end();) {
+        const auto& [recordId, textRecordData] = (*it);
+        SortableWorkingSetMember wsm = textRecordData.wsid != WorkingSet::INVALID_ID
+            ? _ws->extract(textRecordData.wsid)
+            : WorkingSetMember{};
+        TextRecordDataForSorter dataForSorter = {
+            std::move(wsm),
+            textRecordData.score,
+        };
+        _sorter->add(recordId, dataForSorter);
+        _scores.erase(it++);
+    }
+    _sorter->spill();
+
+    _specificStats.spills++;
+    _specificStats.spilledRecords += recordsToSpill;
+    _specificStats.spilledBytes += _currentMemoryBytes;
+    int64_t currentSpillDataStorageSize =
+        _sorterStats->bytesSpilled() - _specificStats.spilledDataStorageSize;
+    _specificStats.spilledDataStorageSize = _sorterStats->bytesSpilled();
+    textOrCounters.incrementPerSpilling(
+        1 /*spills*/, _currentMemoryBytes, recordsToSpill, currentSpillDataStorageSize);
+
+    _currentMemoryBytes = 0;
+}
+
+void TextOrStage::initSorter() {
+    uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
+            "Exceeded memory limit for TEXT_OR, but didn't allow external sort."
+            " Pass allowDiskUse:true to opt in.",
+            expCtx()->getAllowDiskUse());
+
+    // We disable automatic spilling inside Sorter because we manually spill after adding the whole
+    // batch to the _sorter.
+    static constexpr size_t kMaxMemoryUsageForSorter = std::numeric_limits<size_t>::max();
+
+    _sorterStats = std::make_unique<SorterFileStats>(nullptr /*sorterTracker*/);
+    _sorter = Sorter<RecordId, TextRecordDataForSorter>::make(
+        SortOptions{}
+            .FileStats(_sorterStats.get())
+            .MaxMemoryUsageBytes(kMaxMemoryUsageForSorter)
+            .TempDir(expCtx()->getTempDir())
+            .ExtSortAllowed(),
+        [](const RecordId& lhs, const RecordId& rhs) { return lhs.compare(rhs); });
+}
+
 }  // namespace mongo
+
+#include "mongo/db/sorter/sorter.cpp"
+// Explicit instantiation unneeded since we aren't exposing Sorter outside of this file.

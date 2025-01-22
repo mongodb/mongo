@@ -42,6 +42,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/sorter/sorter.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/stdx/unordered_map.h"
 
@@ -109,6 +110,7 @@ protected:
     void doRestoreStateRequiresCollection() final;
 
 private:
+    static constexpr double kRejectedDocumentScore = -1;
     /**
      * Worker for kInit. Initializes the _recordCursor member and handles the potential for
      * getCursor() to throw WriteConflictException.
@@ -131,6 +133,12 @@ private:
      * Worker for kReturningResults. Returns a wsm with RecordID and Score.
      */
     StageState returnResults(WorkingSetID* out);
+    StageState returnResultsInMemory(WorkingSetID* out);
+    StageState returnResultsSpilled(WorkingSetID* out);
+
+    void doForceSpill() override;
+
+    void initSorter();
 
     // The key prefix length within a possibly compound key: {prefix,term,score,suffix}.
     const size_t _keyPrefixSize;
@@ -155,9 +163,52 @@ private:
         double score;
     };
 
-    typedef stdx::unordered_map<RecordId, TextRecordData, RecordId::Hasher> ScoreMap;
+    typedef absl::flat_hash_map<RecordId, TextRecordData, RecordId::Hasher> ScoreMap;
     ScoreMap _scores;
+
+    // Max allowed consumption by _scores map in bytes.
+    const int64_t _maxMemoryBytes = internalTextOrStageMaxMemoryBytes.loadRelaxed();
+    // Current estimated memory consumption by _scores map in bytes.
+    int64_t _currentMemoryBytes = 0;
+
+    // Only used when the stage didn't spill.
     ScoreMap::const_iterator _scoreIterator;
+    struct TextRecordDataForSorter {
+        SortableWorkingSetMember document;
+        double score;
+
+        TextRecordDataForSorter getOwned() const {
+            return {document.getOwned(), score};
+        }
+
+        void makeOwned() {
+            document.makeOwned();
+        }
+
+        int memUsageForSorter() const {
+            return document.memUsageForSorter() + sizeof(double);
+        }
+
+        struct SorterDeserializeSettings {};
+
+        void serializeForSorter(BufBuilder& buf) const {
+            document.serializeForSorter(buf);
+            buf.appendNum(score);
+        }
+
+        static TextRecordDataForSorter deserializeForSorter(BufReader& buf,
+                                                            const SorterDeserializeSettings&) {
+            TextRecordDataForSorter result;
+            result.document = SortableWorkingSetMember::deserializeForSorter(buf, {});
+            buf.read(result.score);
+            return result;
+        }
+    };
+
+    // Only used when spilling.
+    std::unique_ptr<SorterFileStats> _sorterStats;
+    std::unique_ptr<Sorter<RecordId, TextRecordDataForSorter>> _sorter;
+    std::unique_ptr<Sorter<RecordId, TextRecordDataForSorter>::Iterator> _sorterIterator;
 
     TextOrStats _specificStats;
 

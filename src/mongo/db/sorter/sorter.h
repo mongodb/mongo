@@ -440,9 +440,9 @@ public:
         return _memPool.get();
     }
 
-protected:
     virtual void spill() = 0;
 
+protected:
     SortOptions _opts;
 
     std::shared_ptr<File> _file;

@@ -480,11 +480,9 @@ public:
         return memUsage();
     }
     RecordId getOwned() const {
-        MONGO_UNREACHABLE;
+        return *this;
     }
-    void makeOwned() {
-        MONGO_UNREACHABLE;
-    }
+    void makeOwned() {}
 
 private:
     /**

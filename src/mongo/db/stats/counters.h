@@ -585,6 +585,31 @@ public:
 };
 extern GraphLookupCounters graphLookupCounters;
 
+class TextOrCounters {
+public:
+    TextOrCounters() = default;
+    TextOrCounters(TextOrCounters&) = delete;
+    TextOrCounters& operator=(const TextOrCounters&) = delete;
+
+    void incrementPerSpilling(int64_t spills,
+                              int64_t spilledBytes,
+                              int64_t spilledRecords,
+                              int64_t spilledDataStorageSize) {
+        textOrSpills.incrementRelaxed(spills);
+        textOrSpilledBytes.incrementRelaxed(spilledBytes);
+        textOrSpilledRecords.incrementRelaxed(spilledRecords);
+        textOrSpilledDataStorageSize.incrementRelaxed(spilledDataStorageSize);
+    }
+
+    Counter64& textOrSpills = *MetricBuilder<Counter64>{"query.textOr.spills"};
+    // The spilled storage size after compression might be different from the bytes spilled.
+    Counter64& textOrSpilledBytes = *MetricBuilder<Counter64>{"query.textOr.spilledBytes"};
+    Counter64& textOrSpilledRecords = *MetricBuilder<Counter64>{"query.textOr.spilledRecords"};
+    Counter64& textOrSpilledDataStorageSize =
+        *MetricBuilder<Counter64>{"query.textOr.spilledDataStorageSize"};
+};
+extern TextOrCounters textOrCounters;
+
 /**
  * A common class which holds various counters related to Classic and SBE plan caches.
  */

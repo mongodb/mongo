@@ -1251,10 +1251,10 @@ private:
     }
 
     void spill() override {
-        invariant(!_done);
-
         if (_data.empty())
             return;
+
+        invariant(!_done);
 
         if (!this->_opts.extSortAllowed) {
             // This error message only applies to sorts from user queries made through the find or
