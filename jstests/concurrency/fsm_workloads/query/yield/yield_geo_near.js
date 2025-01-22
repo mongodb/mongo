@@ -1,6 +1,9 @@
 /*
  * Intersperses $geoNear aggregations with updates and deletes of documents they may match.
- * @tags: [requires_non_retryable_writes]
+ * @tags: [
+ *   requires_non_retryable_writes,
+ *   requires_getmore,
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/yield/yield.js";
