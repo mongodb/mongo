@@ -219,7 +219,7 @@ void doRollover(BucketCatalog& catalog,
         if (action == RolloverAction::kArchive) {
             archiveBucket(catalog, stripe, stripeLock, bucket, stats, closedBuckets);
         } else {
-            closeOpenBucket(catalog, stripe, stripeLock, bucket, stats, closedBuckets);
+            closeOpenBucket(catalog, stripe, stripeLock, bucket, stats);
         }
     } else {
         // We must keep the bucket around until all measurements are committed, just mark
@@ -622,8 +622,7 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(BucketCatalog& catalog,
                 if (state && !conflictsWithInsertions(state.value())) {
                     stats.incNumBucketsClosedDueToReopening();
                     if (allCommitted(*existingBucket)) {
-                        closeOpenBucket(
-                            catalog, stripe, stripeLock, *existingBucket, stats, closedBuckets);
+                        closeOpenBucket(catalog, stripe, stripeLock, *existingBucket, stats);
                     } else {
                         existingBucket->rolloverAction = RolloverAction::kSoftClose;
                     }
@@ -942,7 +941,7 @@ void archiveBucket(BucketCatalog& catalog,
         // We had a meta hash collision, and already have a bucket archived with the same meta hash
         // and timestamp as this bucket. Since it's somewhat arbitrary which bucket we keep, we'll
         // keep the one that's already archived and just plain close this one.
-        closeOpenBucket(catalog, stripe, stripeLock, bucket, stats, closedBuckets);
+        closeOpenBucket(catalog, stripe, stripeLock, bucket, stats);
     }
 }
 
@@ -1149,7 +1148,7 @@ void expireIdleBuckets(BucketCatalog& catalog,
             // Bucket was cleared and just needs to be removed from catalog.
             removeBucket(catalog, stripe, stripeLock, *bucket, stats, RemovalMode::kAbort);
         } else {
-            closeOpenBucket(catalog, stripe, stripeLock, *bucket, stats, closedBuckets);
+            closeOpenBucket(catalog, stripe, stripeLock, *bucket, stats);
             stats.incNumBucketsClosedDueToMemoryThreshold();
         }
 
@@ -1471,21 +1470,7 @@ void closeOpenBucket(BucketCatalog& catalog,
                      Stripe& stripe,
                      WithLock stripeLock,
                      Bucket& bucket,
-                     ExecutionStatsController& stats,
-                     ClosedBuckets& closedBuckets) {
-    // Remove the bucket from the bucket state registry.
-    stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
-
-    removeBucket(catalog, stripe, stripeLock, bucket, stats, RemovalMode::kClose);
-    return;
-}
-
-void closeOpenBucket(BucketCatalog& catalog,
-                     Stripe& stripe,
-                     WithLock stripeLock,
-                     Bucket& bucket,
-                     ExecutionStatsController& stats,
-                     boost::optional<ClosedBucket>& closedBucket) {
+                     ExecutionStatsController& stats) {
     // Remove the bucket from the bucket state registry.
     stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
 

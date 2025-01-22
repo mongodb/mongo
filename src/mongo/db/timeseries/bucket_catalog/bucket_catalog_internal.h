@@ -428,17 +428,8 @@ void closeOpenBucket(BucketCatalog& catalog,
                      Stripe& stripe,
                      WithLock stripeLock,
                      Bucket& bucket,
-                     ExecutionStatsController& stats,
-                     ClosedBuckets& closedBuckets);
-/**
- * Close an open bucket, setting the state appropriately and removing it from the catalog.
- */
-void closeOpenBucket(BucketCatalog& catalog,
-                     Stripe& stripe,
-                     WithLock stripeLock,
-                     Bucket& bucket,
-                     ExecutionStatsController& stats,
-                     boost::optional<ClosedBucket>& closedBucket);
+                     ExecutionStatsController& stats);
+
 /**
  * Close an archived bucket, setting the state appropriately and removing it from the catalog.
  */

@@ -626,8 +626,7 @@ boost::optional<ClosedBucket> finish(
         switch (bucket->rolloverAction) {
             case RolloverAction::kHardClose:
             case RolloverAction::kSoftClose: {
-                internal::closeOpenBucket(
-                    catalog, stripe, stripeLock, *bucket, stats, closedBucket);
+                internal::closeOpenBucket(catalog, stripe, stripeLock, *bucket, stats);
                 break;
             }
             case RolloverAction::kArchive: {
