@@ -60,13 +60,13 @@ constexpr auto kRangeDeletionThreadName = "range-deleter"_sd;
 
 /**
  * Delete the range in a sequence of batches until there are no more documents to delete or deletion
- * returns an error.
+ * returns an error. If successful, returns the number of deleted documents and bytes.
  */
-Status deleteRangeInBatches(OperationContext* opCtx,
-                            const DatabaseName& dbName,
-                            const UUID& collectionUuid,
-                            const BSONObj& keyPattern,
-                            const ChunkRange& range);
+StatusWith<std::pair<int, int>> deleteRangeInBatches(OperationContext* opCtx,
+                                                     const DatabaseName& dbName,
+                                                     const UUID& collectionUuid,
+                                                     const BSONObj& keyPattern,
+                                                     const ChunkRange& range);
 
 /**
  * - Retrieves source collection's persistent range deletion tasks from `config.rangeDeletions`

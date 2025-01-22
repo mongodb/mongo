@@ -64,6 +64,7 @@
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -224,19 +225,36 @@ void RangeDeleterService::ReadyRangeDeletionsProcessor::_runRangeDeletions() {
                 bool orphansRemovalCompleted = false;
                 while (!orphansRemovalCompleted) {
                     try {
-                        LOGV2_DEBUG(6872501,
-                                    2,
-                                    "Beginning deletion of documents in orphan range",
-                                    "dbName"_attr = dbName,
-                                    "collectionUUID"_attr = collectionUuid.toString(),
-                                    "range"_attr = redact(range.toString()));
+                        NamespaceString nss;
+                        {
+                            AutoGetCollection collection(
+                                opCtx, NamespaceStringOrUUID{dbName, collectionUuid}, MODE_IS);
+                            // It's possible for the namespace to become outdated if a concurrent
+                            // rename of collection occurs, because rangeDeletion is not
+                            // synchronized with DDL operations. We are using the nss variable
+                            // solely for logging purposes.
+                            nss = collection.getNss();
+                        }
+                        LOGV2_INFO(6872501,
+                                   "Beginning deletion of documents in orphan range",
+                                   "namespace"_attr = nss,
+                                   "collectionUUID"_attr = collectionUuid.toString(),
+                                   "range"_attr = redact(range.toString()));
 
                         auto shardKeyPattern =
                             (optKeyPattern ? (*optKeyPattern).toBSON()
                                            : getShardKeyPattern(opCtx, dbName, collectionUuid));
 
-                        uassertStatusOK(rangedeletionutil::deleteRangeInBatches(
-                            opCtx, dbName, collectionUuid, shardKeyPattern, range));
+                        auto numDocsAndBytesDeleted =
+                            uassertStatusOK(rangedeletionutil::deleteRangeInBatches(
+                                opCtx, dbName, collectionUuid, shardKeyPattern, range));
+                        LOGV2_INFO(9239400,
+                                   "Finished deletion of documents in orphan range",
+                                   "namespace"_attr = nss,
+                                   "collectionUUID"_attr = collectionUuid.toString(),
+                                   "range"_attr = redact(range.toString()),
+                                   "docsDeleted"_attr = numDocsAndBytesDeleted.first,
+                                   "bytesDeleted"_attr = numDocsAndBytesDeleted.second);
                         orphansRemovalCompleted = true;
                     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                         // No orphaned documents to remove from a dropped collection
