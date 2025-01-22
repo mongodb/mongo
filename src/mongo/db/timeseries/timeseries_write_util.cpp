@@ -604,8 +604,8 @@ void commitTimeseriesBucketsAtomically(
                    getPostCommitDebugChecks(opCtx, coll->ns()));
             batch.get().reset();
         }
-    } catch (const DBException& ex) {
-        abortStatus = ex.toStatus();
+    } catch (...) {
+        abortStatus = exceptionToStatus();
         throw;
     }
 

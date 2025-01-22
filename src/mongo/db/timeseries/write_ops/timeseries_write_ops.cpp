@@ -609,8 +609,8 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
             "bucketId"_attr = ex->bucketId());
         abortStatus = ex.toStatus();
         return false;
-    } catch (const DBException& ex) {
-        abortStatus = ex.toStatus();
+    } catch (...) {
+        abortStatus = exceptionToStatus();
         throw;
     }
 
