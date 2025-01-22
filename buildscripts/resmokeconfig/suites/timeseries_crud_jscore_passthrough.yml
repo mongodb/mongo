@@ -45,6 +45,7 @@ selector:
     # Hashed indexes.
     - jstests/core/query/hashed_partial_and_sparse_index.js
     - jstests/core/query/distinct/distinct_with_hashed_index.js
+    - jstests/core/query/distinct/distinct_for_passthrough.js
     - jstests/core/query/internal_hash_eq/**/*.js
     - jstests/core/query/project/projection_with_hashed_index.js
     - jstests/core/query/single_field_hashed_index.js
