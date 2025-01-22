@@ -176,19 +176,21 @@ DocumentSource::GetNextResult DocumentSourceVectorSearch::getNextAfterSetup() {
         return DocumentSource::GetNextResult::makeEOF();
     }
 
-    // Populate $sortKey metadata field so that mongos can properly merge sort the document stream.
-    if (pExpCtx->getNeedsMerge()) {
-        // Metadata can't be changed on a Document. Create a MutableDocument to set the sortKey.
-        MutableDocument output(Document::fromBsonWithMetaData(response.value()));
+    // Populate $sortKey metadata field so that downstream operators can correctly reason about the
+    // sort order. This can be important for mongos, so it can properly merge sort the document
+    // stream, or for $rankFusion to calculate the ranks of the results. This metadata can be safely
+    // ignored if nobody ends up needing it. It will be stripped out before a response is sent back
+    // to a client.
 
-        tassert(7828500,
-                "Expected vector search distance to be present",
-                output.metadata().hasVectorSearchScore());
-        output.metadata().setSortKey(Value{output.metadata().getVectorSearchScore()},
-                                     true /* isSingleElementKey */);
-        return output.freeze();
-    }
-    return Document::fromBsonWithMetaData(response.value());
+    // Metadata can't be changed on a Document. Create a MutableDocument to set the sortKey.
+    MutableDocument output(Document::fromBsonWithMetaData(response.value()));
+
+    tassert(7828500,
+            "Expected vector search distance to be present",
+            output.metadata().hasVectorSearchScore());
+    output.metadata().setSortKey(Value{output.metadata().getVectorSearchScore()},
+                                 true /* isSingleElementKey */);
+    return output.freeze();
 }
 
 DocumentSource::GetNextResult DocumentSourceVectorSearch::doGetNext() {

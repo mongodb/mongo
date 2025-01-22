@@ -48,12 +48,15 @@ const responseOk = 1;
     assert.eq(testDB.emptyCollection.aggregate(pipeline).toArray(), []);
 })();
 
+const someScore = {
+    $vectorSearchScore: 0.99
+};
 // $vectorSearch can query mongot and correctly pass along results.
 (function testVectorSearchQueriesMongotAndReturnsResults() {
     const filter = {x: {$gt: 0}};
     const pipeline = [{$vectorSearch: {queryVector, path, numCandidates, limit, index, filter}}];
 
-    const mongotResponseBatch = [{_id: 0}];
+    const mongotResponseBatch = [{_id: 0, ...someScore}];
     const expectedDocs = [{_id: 0}];
 
     const history = [{
@@ -78,7 +81,7 @@ const responseOk = 1;
 (function testVectorSearchRespectsLimit() {
     const pipeline = [{$vectorSearch: {queryVector, path, limit: 1}}];
 
-    const mongotResponseBatch = [{_id: 0}, {_id: 1}];
+    const mongotResponseBatch = [{_id: 0, ...someScore}, {_id: 1, ...someScore}];
     const expectedDocs = [{_id: 0}];
 
     const history = [{
@@ -96,7 +99,7 @@ const responseOk = 1;
     const filter = {"$or": [{"color": {"$gt": "C"}}, {"color": {"$lt": "C"}}]};
     const pipeline = [{$vectorSearch: {queryVector, path, limit: 1, filter: filter}}];
 
-    const mongotResponseBatch = [{_id: 0}, {_id: 1}];
+    const mongotResponseBatch = [{_id: 0, ...someScore}, {_id: 1, ...someScore}];
     const expectedDocs = [{_id: 0}];
 
     const history = [{
@@ -272,7 +275,8 @@ coll.insert({_id: 4, x: "cow", y: "lorem ipsum"});
         {$vectorSearch: {queryVector, path, numCandidates, limit}},
     ];
 
-    const mongotResponseBatch = [{_id: 2}, {_id: 3}, {_id: 4}];
+    const mongotResponseBatch =
+        [{_id: 2, ...someScore}, {_id: 3, ...someScore}, {_id: 4, ...someScore}];
 
     const expectedDocs = [
         {_id: 2, x: "now", y: "lorem"},
@@ -297,7 +301,13 @@ coll.insert({_id: 4, x: "cow", y: "lorem ipsum"});
         {$vectorSearch: {queryVector, path, numCandidates, limit: 5}},
     ];
 
-    const mongotResponseBatch = [{_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}, {_id: 7}];
+    const mongotResponseBatch = [
+        {_id: 3, ...someScore},
+        {_id: 4, ...someScore},
+        {_id: 5, ...someScore},
+        {_id: 6, ...someScore},
+        {_id: 7, ...someScore}
+    ];
 
     const expectedDocs = [{_id: 3, x: "brown", y: "ipsum"}, {_id: 4, x: "cow", y: "lorem ipsum"}];
 

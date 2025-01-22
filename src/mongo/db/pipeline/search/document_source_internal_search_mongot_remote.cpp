@@ -53,6 +53,29 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+namespace {
+auto withSortKeyMetadata(auto&& resultBson, const auto& stageSpec, const auto& sortKeyGen) {
+    // Metadata can't be changed on a Document. Create a MutableDocument to set the sortKey.
+    MutableDocument output(Document::fromBsonWithMetaData(std::move(resultBson)));
+
+    // If we have a sortSpec, then we use that to set sortKey. Otherwise, use the 'searchScore'
+    // if the document has one.
+    if (stageSpec.getSortSpec().has_value()) {
+        tassert(7320402,
+                "_sortKeyGen must be initialized if _sortSpec is present",
+                sortKeyGen.has_value());
+        auto sortKey = sortKeyGen->computeSortKeyFromDocument(output.peek());
+        output.metadata().setSortKey(sortKey, sortKeyGen->isSingleElementKey());
+    } else if (output.metadata().hasSearchScore()) {
+        // If this stage is getting metadata documents from mongot, those don't include
+        // searchScore.
+        output.metadata().setSortKey(Value{output.metadata().getSearchScore()},
+                                     true /* isSingleElementKey */);
+    }
+    return output.freeze();
+}
+
+}  // namespace
 MONGO_FAIL_POINT_DEFINE(failClassicSearch);
 
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalSearchMongotRemote,
@@ -289,28 +312,12 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchMongotRemote::getNextA
     }
 
     ++_docsReturned;
-    // Populate $sortKey metadata field so that mongos can properly merge sort the document stream.
-    if (pExpCtx->getNeedsMerge()) {
-        // Metadata can't be changed on a Document. Create a MutableDocument to set the sortKey.
-        MutableDocument output(Document::fromBsonWithMetaData(response.value()));
-
-        // If we have a sortSpec, then we use that to set sortKey. Otherwise, use the 'searchScore'
-        // if the document has one.
-        if (_spec.getSortSpec().has_value()) {
-            tassert(7320402,
-                    "_sortKeyGen must be initialized if _sortSpec is present",
-                    _sortKeyGen.has_value());
-            auto sortKey = _sortKeyGen->computeSortKeyFromDocument(Document(*response));
-            output.metadata().setSortKey(sortKey, _sortKeyGen->isSingleElementKey());
-        } else if (output.metadata().hasSearchScore()) {
-            // If this stage is getting metadata documents from mongot, those don't include
-            // searchScore.
-            output.metadata().setSortKey(Value{output.metadata().getSearchScore()},
-                                         true /* isSingleElementKey */);
-        }
-        return output.freeze();
-    }
-    return Document::fromBsonWithMetaData(response.value());
+    // Populate $sortKey metadata field so that downstream operators can correctly reason about the
+    // sort order. This can be important for mongos, so it can properly merge sort the document
+    // stream, or for $rankFusion to calculate the ranks of the results. This metadata can be safely
+    // ignored if nobody ends up needing it. It will be stripped out before a response is sent back
+    // to a client.
+    return withSortKeyMetadata(std::move(response.value()), _spec, _sortKeyGen);
 }
 
 std::unique_ptr<executor::TaskExecutorCursor>

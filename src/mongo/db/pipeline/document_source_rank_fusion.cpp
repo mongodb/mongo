@@ -27,39 +27,40 @@
  *    it in the license file.
  */
 
-#include "expression_context.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/json.h"
-#include "mongo/db/pipeline/document_source_limit.h"
-#include "mongo/db/pipeline/document_source_replace_root.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
-#include "mongo/db/pipeline/search/document_source_vector_search.h"
+#include "mongo/db/pipeline/document_source_rank_fusion.h"
+
 #include <algorithm>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_group.h"
+#include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_project.h"
-#include "mongo/db/pipeline/document_source_rank_fusion.h"
+#include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_set_metadata.h"
+#include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -178,6 +179,17 @@ StringMap<double> extractAndValidateWeights(
     return weights;
 }
 
+auto makeSureSortKeyIsOutput(const auto& stageList) {
+    DocumentSourceSort* rightMostSort = nullptr;
+    for (auto&& stage : stageList) {
+        if (auto sortStage = dynamic_cast<DocumentSourceSort*>(stage.get())) {
+            rightMostSort = sortStage;
+        }
+    }
+    if (rightMostSort)
+        rightMostSort->pleaseOutputSortKeyMetadata();
+}
+
 std::vector<BSONObj> getPipeline(BSONElement inputPipeElem) {
     return parsePipelineFromBSON(inputPipeElem);
 }
@@ -191,105 +203,115 @@ BSONObj group() {
     })");
 }
 
-BSONObj unwind(const std::string& prefix) {
-    std::string rank = prefix + "_rank";
-    return fromjson(R"({
-        $unwind: {
-            path: "$docs", includeArrayIndex: ")" +
-                    rank + R"("
-        }
-    })");
+auto stageToBson(const auto stagePtr) {
+    std::vector<Value> array;
+    stagePtr->serializeToArray(array);
+    return array[0].getDocument().toBson();
 }
 
-BSONObj addMetadataFields(const std::string& prefix, const std::string& metadataFieldName) {
-    std::string scoreDestinationField = metadataFieldName + "_score";
-    std::string detailsDestinationField = metadataFieldName + "_scoreDetails";
-    return BSON("$addFields" << BSON(scoreDestinationField << BSON("$meta"
-                                                                   << "score")
-                                                           << detailsDestinationField
-                                                           << BSON("$meta"
-                                                                   << "scoreDetails")));
+auto setWindowFields(const auto& expCtx, const std::string& rankFieldName) {
+    // TODO SERVER-98562 We shouldn't need to provide this sort, since it's not used other than to
+    // pass the parse-time validation checks.
+    const SortPattern dummySortPattern{fromjson("{order: 1}"), expCtx};
+    return make_intrusive<DocumentSourceInternalSetWindowFields>(
+        expCtx,
+        boost::none,  // partitionBy
+        dummySortPattern,
+        std::vector<WindowFunctionStatement>{
+            WindowFunctionStatement{rankFieldName,
+                                    window_function::Expression::parse(
+                                        fromjson("{$rank: {}}"), dummySortPattern, expCtx.get())}},
+        internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load(),
+        SbeCompatibility::notCompatible);
 }
 
-BSONObj removeMetadataFields(const std::string& prefix, const std::string& metadataFieldName) {
-    std::string scoreLocField = "docs." + metadataFieldName + "_score";
-    std::string detailsLocField = "docs." + metadataFieldName + "_scoreDetails";
-
-    return BSON("$project" << BSON(scoreLocField << 0 << detailsLocField << 0));
-}
-// RRF Score = weight * (1 / (rank + rank constant)).
-BSONObj addScoreField(const std::string& prefix,
-                      const int rankConstant,
-                      const double weight,
-                      const bool includeScoreDetails,
-                      const std::string& metadataFieldName) {
-    std::string score = prefix + "_score";
-    std::string scorePath = "$docs." + metadataFieldName + "_score";
-    std::string detailsPath = "$docs." + metadataFieldName + "_scoreDetails";
-    std::string rank = "$" + prefix + "_rank";
-    std::string scoreDetails = prefix + "_scoreDetails";
-
-    // We're building the following BSON:
-    /*
-    {$addFields:
-        {score:
-            {multiply:
-                [{$divide: [1, {$add: [rank, rankConstant]}]}]
-            },
-        scoreDetails:
-            [{$ifNull: [$scoreDetails: {value: score, details: "Not Calculated"}]}]
-        }
-    }
-    */
+/**
+ * Builds and returns an $addFields stage like this one:
+ * {$addFields: {
+ *      prefix_scoreDetails:
+ *          [{$ifNull: [{$meta: "scoreDetails"}, {value: score, details: "Not Calculated"}]}]
+ *      }
+ *  }
+ */
+auto addScoreDetails(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                     const std::string& prefix) {
+    const std::string scoreDetails = prefix + "_scoreDetails";
     BSONObjBuilder bob;
-    BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
-    BSONObjBuilder scoreField(addFieldsBob.subobjStart(score));
-    BSONArrayBuilder multiplyArray(scoreField.subarrayStart("$multiply"_sd));
-    multiplyArray.append(
-        BSON("$divide" << BSON_ARRAY(1 << BSON("$add" << BSON_ARRAY(rank << rankConstant)))));
-    multiplyArray.append(weight);
-    multiplyArray.done();
-    scoreField.done();
-    if (includeScoreDetails) {
-        addFieldsBob.append(
-            scoreDetails,
-            BSON("$ifNull" << BSON_ARRAY(detailsPath << BSON("value" << scorePath << "details"
-                                                                     << "Not Calculated"))));
-        addFieldsBob.append(prefix + "_rank", rank);
+    {
+        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
+        addFieldsBob.append(scoreDetails,
+                            fromjson(
+                                R"({$ifNull: [
+                                    {$meta: "scoreDetails"},
+                                    {value: {$meta: "score"}, details: "Not Calculated"}
+                                ]})"));
     }
-    addFieldsBob.done();
-
-    return bob.obj();
+    const auto spec = bob.obj();
+    return DocumentSourceAddFields::createFromBson(spec.firstElement(), expCtx);
 }
 
-std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
-    const std::string& prefixOne,
-    const int rankConstant,
-    const double weight,
-    const bool includeScoreDetails,
-    const std::string metadataFieldName,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+/**
+ * Builds and returns an $addFields stage, like the following:
+ * {$addFields:
+ *     {prefix_score:
+ *         {multiply:
+ *             [{$divide: [1, {$add: [rank, rankConstant]}]}]
+ *         },
+ *     }
+ * }
+ */
+auto addScoreField(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                   const std::string& prefix,
+                   const int rankConstant,
+                   const double weight) {
+    const std::string score = prefix + "_score";
+    const std::string rankPath = "$" + prefix + "_rank";
+    const std::string scorePath = "$" + score;
 
-    auto groupStage = DocumentSourceGroup::createFromBson(group().firstElement(), expCtx);
-
-    auto unwindStage =
-        DocumentSourceUnwind::createFromBson(unwind(prefixOne).firstElement(), expCtx);
-
-    auto addFields = DocumentSourceAddFields::createFromBson(
-        addScoreField(prefixOne, rankConstant, weight, includeScoreDetails, metadataFieldName)
-            .firstElement(),
-        expCtx);
-
-    if (includeScoreDetails) {
-        auto preserveMetadataStage = DocumentSourceAddFields::createFromBson(
-            addMetadataFields(prefixOne, metadataFieldName).firstElement(), expCtx);
-
-        auto removeMetadataStage = DocumentSourceProject::createFromBson(
-            removeMetadataFields(prefixOne, metadataFieldName).firstElement(), expCtx);
-        return {preserveMetadataStage, groupStage, unwindStage, addFields, removeMetadataStage};
+    BSONObjBuilder bob;
+    {
+        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
+        {
+            BSONObjBuilder scoreField(addFieldsBob.subobjStart(score));
+            {
+                BSONArrayBuilder multiplyArray(scoreField.subarrayStart("$multiply"_sd));
+                // RRF Score = weight * (1 / (rank + rank constant)).
+                multiplyArray.append(
+                    BSON("$divide"
+                         << BSON_ARRAY(1 << BSON("$add" << BSON_ARRAY(rankPath << rankConstant)))));
+                multiplyArray.append(weight);
+            }
+        }
     }
 
-    return {groupStage, unwindStage, addFields};
+    const auto spec = bob.obj();
+    return DocumentSourceAddFields::createFromBson(spec.firstElement(), expCtx);
+}
+
+/**
+ * Builds and returns a $replaceRoot stage: {$replaceWith: {docs: "$$ROOT"}}.
+ * This has the effect of storing the unmodified user's document in the path '$docs'.
+ */
+auto nestUserDocs(const auto& expCtx) {
+    static const BSONObj replaceRootObj = fromjson("{$replaceWith: {docs: \"$$ROOT\"}}");
+    return DocumentSourceReplaceRoot::createFromBson(replaceRootObj.firstElement(), expCtx);
+}
+
+auto buildFirstPipelineStages(const std::string& prefixOne,
+                              const int rankConstant,
+                              const double weight,
+                              const bool includeScoreDetails,
+                              const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+
+    std::list<boost::intrusive_ptr<DocumentSource>> outputStages = {
+        nestUserDocs(expCtx),
+        setWindowFields(expCtx, prefixOne + "_rank"),
+        addScoreField(expCtx, prefixOne, rankConstant, weight),
+    };
+    if (includeScoreDetails) {
+        outputStages.push_back(addScoreDetails(expCtx, prefixOne));
+    }
+    return outputStages;
 }
 
 BSONObj groupEachScore(
@@ -387,13 +409,16 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipeline(
     const double weight,
     std::unique_ptr<Pipeline, PipelineDeleter> oneInputPipeline,
     const bool includeScoreDetails,
-    const std::string& metadataFieldName,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+
+    makeSureSortKeyIsOutput(oneInputPipeline->getSources());
+    oneInputPipeline->pushBack(nestUserDocs(expCtx));
+    oneInputPipeline->pushBack(setWindowFields(expCtx, prefix + "_rank"));
+    oneInputPipeline->pushBack(addScoreField(expCtx, prefix, rankConstant, weight));
+    if (includeScoreDetails) {
+        oneInputPipeline->pushBack(addScoreDetails(expCtx, prefix));
+    }
     std::vector<BSONObj> bsonPipeline = oneInputPipeline->serializeToBson();
-    bsonPipeline.push_back(group());
-    bsonPipeline.push_back(unwind(prefix));
-    bsonPipeline.push_back(
-        addScoreField(prefix, rankConstant, weight, includeScoreDetails, metadataFieldName));
 
     auto collName = expCtx->getNamespaceString().coll();
 
@@ -418,10 +443,10 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
     })");
     auto sort = DocumentSourceSort::createFromBson(sortObj.firstElement(), expCtx);
 
-    BSONObj replaceRootObj = fromjson(R"({
+    static const BSONObj replaceRootObj = fromjson(R"({
         $replaceRoot: {newRoot: "$docs"}
     })");
-    auto replaceRoot =
+    auto restoreUserDocs =
         DocumentSourceReplaceRoot::createFromBson(replaceRootObj.firstElement(), expCtx);
 
     if (includeScoreDetails) {
@@ -436,9 +461,9 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
                                          << "$calculatedScoreDetails"),
                                     expCtx->variablesParseState),
             DocumentMetadataFields::kScoreDetails);
-        return {group, addFields, addFieldsDetails, setDetails, sort, replaceRoot};
+        return {group, addFields, addFieldsDetails, setDetails, sort, restoreUserDocs};
     }
-    return {group, addFields, sort, replaceRoot};
+    return {group, addFields, sort, restoreUserDocs};
 }
 
 }  // namespace
@@ -475,7 +500,6 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
     // It's important to use an ordered map here, so that we get stability in the desugaring =>
     // stability in the query shape.
     std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>> inputPipelines;
-    std::string metadataFieldName = UUID::gen().toString();
     // Ensure that all pipelines are valid ranked selection pipelines.
     for (const auto& elem : spec.getInput().getPipelines()) {
         auto pipeline = Pipeline::parse(getPipeline(elem), pExpCtx);
@@ -508,15 +532,12 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
 
         if (outputStages.empty()) {
             // First pipeline.
+            makeSureSortKeyIsOutput(pipeline->getSources());
             while (!pipeline->getSources().empty()) {
                 outputStages.push_back(pipeline->popFront());
             }
-            auto firstPipelineStages = buildFirstPipelineStages(name,
-                                                                rankConstant,
-                                                                pipelineWeight,
-                                                                includeScoreDetails,
-                                                                metadataFieldName,
-                                                                pExpCtx);
+            auto firstPipelineStages = buildFirstPipelineStages(
+                name, rankConstant, pipelineWeight, includeScoreDetails, pExpCtx);
             for (const auto& stage : firstPipelineStages) {
                 outputStages.push_back(std::move(stage));
             }
@@ -526,7 +547,6 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
                                                          pipelineWeight,
                                                          std::move(pipeline),
                                                          includeScoreDetails,
-                                                         metadataFieldName,
                                                          pExpCtx);
             outputStages.push_back(unionWithStage);
         }

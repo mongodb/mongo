@@ -2072,7 +2072,7 @@ void ExpressionMeta::_assertMetaFieldCompatibleWithHybridScoringFeatureFlag(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     uassert(ErrorCodes::FailedToParse,
             "'featureFlagRankFusionFull' must be enabled to use "
-            "this meta field",
+            "'score' or 'scoreDetails' meta field",
             !usesHybridScoringProtectedField || hybridScoringFeatureFlagEnabled);
 }
 

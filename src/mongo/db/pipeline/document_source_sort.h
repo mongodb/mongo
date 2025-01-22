@@ -171,6 +171,13 @@ public:
     }
 
     /**
+     * Requests that this stage should output the sort key metadata with each result.
+     */
+    void pleaseOutputSortKeyMetadata() {
+        _outputSortKeyMetadata = true;
+    }
+
+    /**
      * Returns true if the output documents of this $sort stage are supposed to have the sort key
      * metadata field populated.
      */

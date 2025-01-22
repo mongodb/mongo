@@ -31,11 +31,8 @@ function runStandaloneTest(stageRegex, pipeline, expectedCommand) {
 
     const collectionUUID = getUUIDFromListCollections(conn.getDB(dbName), collName);
     expectedCommand["collectionUUID"] = collectionUUID;
-    const expected = prepMongotResponse(expectedCommand,
-                                        coll,
-                                        mongotConn,
-                                        NumberLong(123) /* cursorId */,
-                                        false /* addVectorSearchScore */);
+    const expected =
+        prepMongotResponse(expectedCommand, coll, mongotConn, NumberLong(123) /* cursorId */);
 
     // Simulate a case where mongot closes the connection after getting a command.
     // Mongod should retry the command and succeed.

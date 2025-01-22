@@ -35,18 +35,26 @@ const cursorId = NumberLong(123);
 const collectionUUID = getUUIDFromListCollections(db, coll.getName());
 
 function runTest(pipeline, expectedCommand, shouldPrefetchGetMore) {
+    const someScore = {$vectorSearchScore: 0.97};
     const cursorHistory = [{
         expectedCommand,
         response: {
             ok: 1,
-            cursor: {firstBatch: [{_id: 1}, {_id: 2}], id: cursorId, ns: coll.getFullName()}
+            cursor: {
+                firstBatch: [{_id: 1, ...someScore}, {_id: 2, ...someScore}],
+                id: cursorId,
+                ns: coll.getFullName()
+            }
         }
     }];
     if (shouldPrefetchGetMore) {
         cursorHistory.push({
             expectedCommand: {getMore: cursorId, collection: coll.getName()},
-            response:
-                {cursor: {id: cursorId, ns: coll.getFullName(), nextBatch: [{_id: 14}]}, ok: 1},
+            response: {
+                cursor:
+                    {id: cursorId, ns: coll.getFullName(), nextBatch: [{_id: 14, ...someScore}]},
+                ok: 1
+            },
         });
     }
     cursorHistory.push({

@@ -64,19 +64,21 @@ let testQuery = [
 
 let results = coll.aggregate(testQuery).toArray();
 
-function assertFieldPresent(field, containingObj) {
-    assert(containingObj.hasOwnProperty(field),
-           "Looked for " + tojson(field) + " in " + tojson(containingObj));
+function fieldPresent(field, containingObj) {
+    return containingObj.hasOwnProperty(field);
 }
 
-let searchRankSet = [];
-let vectorRankSet = [];
 for (const foundDoc of results) {
-    assertFieldPresent("details", foundDoc);
+    assert(fieldPresent("details", foundDoc), foundDoc);
     const details = foundDoc["details"];
-    assertFieldPresent("value", details);
+    assert(fieldPresent("value", details), details);
     // We don't care about the actual score, just assert that its been calculated.
-    assert.gt(details["value"], 0);
+    assert.gt(details["value"], 0, details);
+
+    function assertFieldPresent(field, obj) {
+        assert(fieldPresent(field, obj),
+               `Looked for ${field} in ${tojson(obj)}. Full details: ${tojson(details)}`);
+    }
     // Description of rank fusion. Wrapper on both search / vector.
     assertFieldPresent("details", details);
     const subDetails = details["details"];
@@ -85,11 +87,7 @@ for (const foundDoc of results) {
     const searchDetails = subDetails["search"];
     assertFieldPresent("rank", searchDetails);
     // If there isn't a value, we didn't get this back from search at all.
-    // if ("value" in searchDetails) {
     if (searchDetails.hasOwnProperty("value")) {
-        // Make sure we didn't duplicate a rank in the search results.
-        assert(!(searchDetails["rank"] in searchRankSet));
-        searchRankSet.push(searchDetails["rank"]);
         assertFieldPresent("value", searchDetails);  // Output of rank calculation.
         assertFieldPresent("details",
                            searchDetails);  // Not checking description contents, just that its
@@ -102,9 +100,6 @@ for (const foundDoc of results) {
     assertFieldPresent("details", vectorDetails);
     assert.eq(vectorDetails["details"], "Not Calculated");
     assertFieldPresent("rank", vectorDetails);
-    // Make sure we haven't seen this rank before.
-    assert(!(vectorDetails["rank"] in vectorRankSet));
-    vectorRankSet.push(vectorDetails["rank"]);
 }
 
 // Test vectorSearch/vectorSearch where neither has score details.
@@ -119,14 +114,18 @@ testQuery = [
 ];
 results = coll.aggregate(testQuery).toArray();
 
-let secondVectorRankSet = [];
-vectorRankSet = [];
 for (const foundDoc of results) {
-    assertFieldPresent("details", foundDoc);
+    assert(fieldPresent("details", foundDoc), foundDoc);
     const details = foundDoc["details"];
-    assertFieldPresent("value", details);
+    assert(fieldPresent("value", details), details);
+    // The output of the rank calculation.
     // We don't care about the actual score, just assert that its been calculated.
     assert.gt(details["value"], 0);
+
+    function assertFieldPresent(field, obj) {
+        assert(fieldPresent(field, obj),
+               `Looked for ${field} in ${tojson(obj)}. Full details: ${tojson(details)}`);
+    }
     // Description of rank fusion. Wrapper on both secondVector / vector.
     assertFieldPresent("details", details);
     const subDetails = details["details"];
@@ -134,10 +133,7 @@ for (const foundDoc of results) {
     assertFieldPresent("vector", subDetails);
     const secondVectorDetails = subDetails["secondVector"];
     assertFieldPresent("rank", secondVectorDetails);
-    // Make sure we didn't duplicate a rank in the secondVector results.
-    assert(!(secondVectorDetails["rank"] in secondVectorRankSet));
-    secondVectorRankSet.push(secondVectorDetails["rank"]);
-    assertFieldPresent("value", secondVectorDetails);  // Output of rank calculation.
+    assertFieldPresent("value", secondVectorDetails);  // Original 'score' AKA vectorSearchScore.
     assertFieldPresent("details",
                        secondVectorDetails);  // Not checking description contents, just that its
                                               // present and not our placeholder value.
@@ -146,10 +142,8 @@ for (const foundDoc of results) {
     const vectorDetails = subDetails["vector"];
     assertFieldPresent("details", vectorDetails);
     assert.eq(vectorDetails["details"], "Not Calculated");
+    assertFieldPresent("value", vectorDetails);  // Original 'score' AKA vectorSearchScore.
     assertFieldPresent("rank", vectorDetails);
-    // Make sure we haven't seen this rank before.
-    assert(!(vectorDetails["rank"] in vectorRankSet));
-    vectorRankSet.push(vectorDetails["rank"]);
 }
 
 // Test search/vectorSearch where search scoreDetails is off.
@@ -177,14 +171,17 @@ testQuery = [
 ];
 
 results = coll.aggregate(testQuery).toArray();
-searchRankSet = [];
-vectorRankSet = [];
 for (const foundDoc of results) {
-    assertFieldPresent("details", foundDoc);
+    assert(fieldPresent("details", foundDoc), foundDoc);
     const details = foundDoc["details"];
-    assertFieldPresent("value", details);
+    assert(fieldPresent("value", details), details);
     // We don't care about the actual score, just assert that its been calculated.
     assert.gt(details["value"], 0);
+
+    function assertFieldPresent(field, obj) {
+        assert(fieldPresent(field, obj),
+               `Looked for ${field} in ${tojson(obj)}. Full details: ${tojson(details)}`);
+    }
     // Description of rank fusion. Wrapper on both search / vector.
     assertFieldPresent("details", details);
     const subDetails = details["details"];
@@ -195,9 +192,6 @@ for (const foundDoc of results) {
     // If there isn't a value, we didn't get this back from search at all.
     // if ("value" in searchDetails) {
     if (searchDetails.hasOwnProperty("value")) {
-        // Make sure we didn't duplicate a rank in the search results.
-        assert(!(searchDetails["rank"] in searchRankSet));
-        searchRankSet.push(searchDetails["rank"]);
         assertFieldPresent("value", searchDetails);  // Output of rank calculation.
         assertFieldPresent("details", searchDetails);
         assert.eq(searchDetails["details"], "Not Calculated");
@@ -208,9 +202,6 @@ for (const foundDoc of results) {
     assertFieldPresent("details", vectorDetails);
     assert.eq(vectorDetails["details"], "Not Calculated");
     assertFieldPresent("rank", vectorDetails);
-    // Make sure we haven't seen this rank before.
-    assert(!(vectorDetails["rank"] in vectorRankSet));
-    vectorRankSet.push(vectorDetails["rank"]);
 }
 
 // TODO SERVER-93218 Test scoreDetails with nested rankFusion.
