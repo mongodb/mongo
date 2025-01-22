@@ -1,6 +1,7 @@
 /**
  * This test checks that the operations that should modify the timestamp of a database or a
- * collection actually do it.
+ * collection actually do it - and that the internal "flush cache Updates" command return consistent
+ * responses).
  *
  * For databases, every time a DB is dropped and recreated its timestamp should also be updated
  *

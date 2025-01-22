@@ -219,9 +219,6 @@ selector:
     - jstests/sharding/**/*move*collection*.js
     - jstests/sharding/**/*unshard_collection*.js
 
-    # SERVER-51805 splitChunk op is not idempotent
-    - jstests/sharding/mongos_get_shard_version.js
-
     # Expects reshardCollection executes without config server stepdown
     - jstests/sharding/shard_encrypted_collection.js
 

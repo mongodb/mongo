@@ -1,9 +1,6 @@
 /**
- * Test that mongos getShardVersion returns the correct version and chunks.
- * @tags: [
- *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
- *    embedded_router_incompatible,
- * ]
+ * Test that getShardVersion with the optional fullMetadata option enabled returns the correct
+ * version and chunks when run against a mongos.
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
