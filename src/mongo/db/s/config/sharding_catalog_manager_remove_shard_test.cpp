@@ -84,6 +84,7 @@ namespace {
 using std::string;
 using std::vector;
 using unittest::assertGet;
+using namespace fmt::literals;
 
 const KeyPattern kKeyPattern(BSON("_id" << 1));
 
@@ -147,6 +148,14 @@ protected:
             return shardBSON["draining"].Bool();
         }
         return false;
+    }
+
+    void setupManyDatabases(int startIndex, int endIndex, const ShardId& primaryShard) {
+        for (int i = startIndex; i <= endIndex; i++) {
+            auto databaseName = "testDB_1234567890123456789012345678901234567890_{}"_format(i);
+            setupDatabase(DatabaseName::createDatabaseName_forTest(boost::none, databaseName),
+                          primaryShard);
+        }
     }
 
     const HostAndPort configHost{"TestHost1"};
@@ -388,6 +397,101 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
         BSONObj(),
         1));
     ASSERT_TRUE(response.docs.empty());
+}
+
+TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemainingMaxBSONSize) {
+
+    FailPointEnableBlock changeMaxUserSizeFP("changeBSONObjMaxUserSize",
+                                             BSON("maxUserSize" << 20480));
+
+    ShardType shard1;
+    shard1.setName("shard1");
+    shard1.setHost("host1:12345");
+    shard1.setState(ShardType::ShardState::kShardAware);
+
+    ShardType shard2;
+    shard2.setName("shard2");
+    shard2.setHost("host2:12345");
+    shard2.setState(ShardType::ShardState::kShardAware);
+
+    auto epoch = OID::gen();
+    const auto uuid = UUID::gen();
+    const auto timestamp = Timestamp(1);
+    ChunkType chunk1(uuid,
+                     ChunkRange(BSON("_id" << 0), BSON("_id" << 20)),
+                     ChunkVersion({epoch, timestamp}, {1, 1}),
+                     shard1.getName());
+    ChunkType chunk2(uuid,
+                     ChunkRange(BSON("_id" << 21), BSON("_id" << 50)),
+                     ChunkVersion({epoch, timestamp}, {1, 2}),
+                     shard1.getName());
+    ChunkType chunk3(uuid,
+                     ChunkRange(BSON("_id" << 51), BSON("_id" << 1000)),
+                     ChunkVersion({epoch, timestamp}, {1, 3}),
+                     shard1.getName());
+
+    chunk3.setJumbo(true);
+
+    setupShards(std::vector<ShardType>{shard1, shard2});
+
+    // Add so many databases, that the resulting BSON does not exceed the max size.
+    // dbsToMove array has to contain all databases and "truncated" field does not exist.
+    setupManyDatabases(1, 100, shard1.getName());
+
+    setupCollection(NamespaceString::createNamespaceString_forTest(
+                        "testDB_1234567890123456789012345678901234567890_1.testColl"),
+                    kKeyPattern,
+                    std::vector<ChunkType>{chunk1, chunk2, chunk3});
+
+    auto startedResult = ShardingCatalogManager::get(operationContext())
+                             ->removeShard(operationContext(), shard1.getName());
+    ASSERT_EQUALS(RemoveShardProgress::STARTED, startedResult.status);
+    ASSERT_EQUALS(false, startedResult.remainingCounts.has_value());
+    ASSERT_TRUE(isDraining(shard1.getName()));
+
+    auto ongoingResult = ShardingCatalogManager::get(operationContext())
+                             ->removeShard(operationContext(), shard1.getName());
+    ASSERT_EQUALS(RemoveShardProgress::ONGOING, ongoingResult.status);
+    ASSERT_EQUALS(true, ongoingResult.remainingCounts.has_value());
+    ASSERT_EQUALS(3, ongoingResult.remainingCounts->totalChunks);
+    ASSERT_EQUALS(0, ongoingResult.remainingCounts->totalCollections);
+    ASSERT_EQUALS(1, ongoingResult.remainingCounts->jumboChunks);
+    ASSERT_EQUALS(100, ongoingResult.remainingCounts->databases);
+    ASSERT_TRUE(isDraining(shard1.getName()));
+
+    BSONObjBuilder result;
+
+    ShardingCatalogManager::get(operationContext())
+        ->appendShardDrainingStatus(operationContext(), result, ongoingResult, shard1.getName());
+    auto resultObj = result.obj();
+    ASSERT_FALSE(resultObj.hasElement("truncated"));
+
+    ASSERT_EQUALS(100, resultObj["dbsToMove"].Array().size());
+
+    // Add more databases, that the resulting BSON exceeds the max size.
+    // dbsToMove array must contain only a subset of the databases and "truncated" field is enabled.
+    setupManyDatabases(101, 200, shard1.getName());
+
+    ongoingResult = ShardingCatalogManager::get(operationContext())
+                        ->removeShard(operationContext(), shard1.getName());
+    ASSERT_EQUALS(RemoveShardProgress::ONGOING, ongoingResult.status);
+    ASSERT_EQUALS(true, ongoingResult.remainingCounts.has_value());
+    ASSERT_EQUALS(3, ongoingResult.remainingCounts->totalChunks);
+    ASSERT_EQUALS(0, ongoingResult.remainingCounts->totalCollections);
+    ASSERT_EQUALS(1, ongoingResult.remainingCounts->jumboChunks);
+    ASSERT_EQUALS(200, ongoingResult.remainingCounts->databases);
+    ASSERT_TRUE(isDraining(shard1.getName()));
+
+    BSONObjBuilder resultTruncated;
+
+    ShardingCatalogManager::get(operationContext())
+        ->appendShardDrainingStatus(
+            operationContext(), resultTruncated, ongoingResult, shard1.getName());
+    resultObj = resultTruncated.obj();
+    ASSERT_TRUE(resultObj.hasElement("truncated"));
+    ASSERT_TRUE(resultObj["truncated"].booleanSafe());
+
+    ASSERT_EQUALS(167, resultObj["dbsToMove"].Array().size());
 }
 
 }  // namespace

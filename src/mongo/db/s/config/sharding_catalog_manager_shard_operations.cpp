@@ -183,6 +183,7 @@ MONGO_FAIL_POINT_DEFINE(hangRemoveShardBeforeUpdatingClusterCardinalityParameter
 MONGO_FAIL_POINT_DEFINE(skipUpdatingClusterCardinalityParameterAfterAddShard);
 MONGO_FAIL_POINT_DEFINE(skipUpdatingClusterCardinalityParameterAfterRemoveShard);
 MONGO_FAIL_POINT_DEFINE(skipBlockingDDLCoordinatorsDuringAddAndRemoveShard);
+MONGO_FAIL_POINT_DEFINE(changeBSONObjMaxUserSize);
 
 using CallbackHandle = executor::TaskExecutor::CallbackHandle;
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
@@ -535,11 +536,12 @@ long long getChunkForShardCount(OperationContext* opCtx, Shard* shard, const Sha
     return chunkCounter;
 }
 
-bool appendToArrayIfRoom(int& offset, BSONArrayBuilder& arrayBuilder, const std::string& toAppend) {
-    auto toAppendSize = toAppend.length() + 8;
-    if ((offset + toAppendSize) < BSONObjMaxUserSize) {
+bool appendToArrayIfRoom(int offset,
+                         BSONArrayBuilder& arrayBuilder,
+                         const std::string& toAppend,
+                         const int maxUserSize) {
+    if (static_cast<int>(offset + arrayBuilder.len() + toAppend.length()) < maxUserSize) {
         arrayBuilder.append(toAppend);
-        offset += toAppendSize;
         return true;
     }
     return false;
@@ -1899,25 +1901,36 @@ void ShardingCatalogManager::appendShardDrainingStatus(OperationContext* opCtx,
         // other attributes.
         int reservationOffsetBytes = 10 * 1024 + dbs.len();
 
+        const auto maxUserSize = std::invoke([&] {
+            if (auto failpoint = changeBSONObjMaxUserSize.scoped();
+                MONGO_unlikely(failpoint.isActive())) {
+                return failpoint.getData()["maxUserSize"].Int();
+            } else {
+                return BSONObjMaxUserSize;
+            }
+        });
+
         for (const auto& dbName : userDatabases) {
             canAppendToDoc = appendToArrayIfRoom(
                 reservationOffsetBytes,
                 dbs,
-                DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault()));
+                DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault()),
+                maxUserSize);
             if (!canAppendToDoc)
                 break;
         }
         dbs.doneFast();
+        reservationOffsetBytes += dbs.len();
 
         BSONArrayBuilder collectionsToMove(dbInfoBuilder.subarrayStart("collectionsToMove"));
-        reservationOffsetBytes += collectionsToMove.len();
         if (canAppendToDoc) {
             for (const auto& collectionName : collections) {
                 canAppendToDoc =
                     appendToArrayIfRoom(reservationOffsetBytes,
                                         collectionsToMove,
                                         NamespaceStringUtil::serialize(
-                                            collectionName, SerializationContext::stateDefault()));
+                                            collectionName, SerializationContext::stateDefault()),
+                                        maxUserSize);
                 if (!canAppendToDoc)
                     break;
             }
