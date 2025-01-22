@@ -31,7 +31,7 @@ fi
 if uname -a | grep -q 's390x\|ppc64le'; then
   # s390x and ppc64le both require these old versions for some reason
   # They are pinned deps as well
-  EXTRA_IBM_ARGS="cryptography==2.3 pyOpenSSL==19.0.0"
+  EXTRA_IBM_ARGS="pyOpenSSL==19.0.0"
 fi
 poetry_dir="${workdir}/poetry_dir"
 mkdir -p $poetry_dir
@@ -131,21 +131,6 @@ done
 if [ $RET -ne 0 ]; then
   echo "Poetry install error for full venv"
   exit $RET
-fi
-
-# poetry will install cryptography in an isolated build environment
-# to conform to pep517, however this doesn't work for the old cryptography
-# version on these platforms, and ends up not building required shared libraries.
-# Here we go behing poetry's back and install with pip
-if uname -a | grep -q 's390x\|ppc64le'; then
-  for i in {1..5}; do
-    python -m pip uninstall -y cryptography==2.3 || true
-    python -m pip install cryptography==2.3 && RET=0 && break || RET=$? && sleep 1
-  done
-  if [ $RET -ne 0 ]; then
-    echo "cryptography install error for full venv"
-    exit $RET
-  fi
 fi
 
 cd ..
