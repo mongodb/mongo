@@ -4812,40 +4812,28 @@ SlotBasedStageBuilder::buildSearchMetadataSlots() {
     std::vector<std::string> metadataNames;
     sbe::value::SlotVector metadataSlots;
 
-    const QueryMetadataBitSet& metadataBit = _cq.searchMetadata();
-    if (metadataBit.test(DocumentMetadataFields::MetaType::kSearchScore) || _state.needsMerge) {
-        metadataNames.push_back(Document::metaFieldSearchScore.toString());
-        metadataSlots.push_back(_slotIdGenerator.generate());
-        _data->metadataSlots.searchScoreSlot = metadataSlots.back();
-    }
+    // If Search in SBE is used, we should only build these metadata slots if the metadata type is
+    // requested by the pipeline. However, since Search in SBE is currently not in use, SERVER-99589
+    // changed it to always build these slots, for simplicity of a refactor.
+    metadataNames.push_back(Document::metaFieldSearchScore.toString());
+    metadataSlots.push_back(_slotIdGenerator.generate());
+    _data->metadataSlots.searchScoreSlot = metadataSlots.back();
 
-    if (metadataBit.test(DocumentMetadataFields::MetaType::kSearchHighlights) ||
-        _state.needsMerge) {
-        metadataNames.push_back(Document::metaFieldSearchHighlights.toString());
-        metadataSlots.push_back(_slotIdGenerator.generate());
-        _data->metadataSlots.searchHighlightsSlot = metadataSlots.back();
-    }
+    metadataNames.push_back(Document::metaFieldSearchHighlights.toString());
+    metadataSlots.push_back(_slotIdGenerator.generate());
+    _data->metadataSlots.searchHighlightsSlot = metadataSlots.back();
 
-    if (metadataBit.test(DocumentMetadataFields::MetaType::kSearchScoreDetails) ||
-        _state.needsMerge) {
-        metadataNames.push_back(Document::metaFieldSearchScoreDetails.toString());
-        metadataSlots.push_back(_slotIdGenerator.generate());
-        _data->metadataSlots.searchDetailsSlot = metadataSlots.back();
-    }
+    metadataNames.push_back(Document::metaFieldSearchScoreDetails.toString());
+    metadataSlots.push_back(_slotIdGenerator.generate());
+    _data->metadataSlots.searchDetailsSlot = metadataSlots.back();
 
-    if (metadataBit.test(DocumentMetadataFields::MetaType::kSearchSortValues) ||
-        _state.needsMerge) {
-        metadataNames.push_back(Document::metaFieldSearchSortValues.toString());
-        metadataSlots.push_back(_slotIdGenerator.generate());
-        _data->metadataSlots.searchSortValuesSlot = metadataSlots.back();
-    }
+    metadataNames.push_back(Document::metaFieldSearchSortValues.toString());
+    metadataSlots.push_back(_slotIdGenerator.generate());
+    _data->metadataSlots.searchSortValuesSlot = metadataSlots.back();
 
-    if (metadataBit.test(DocumentMetadataFields::MetaType::kSearchSequenceToken) ||
-        _state.needsMerge) {
-        metadataNames.push_back(Document::metaFieldSearchSequenceToken.toString());
-        metadataSlots.push_back(_slotIdGenerator.generate());
-        _data->metadataSlots.searchSequenceToken = metadataSlots.back();
-    }
+    metadataNames.push_back(Document::metaFieldSearchSequenceToken.toString());
+    metadataSlots.push_back(_slotIdGenerator.generate());
+    _data->metadataSlots.searchSequenceToken = metadataSlots.back();
 
     return {metadataNames, metadataSlots};
 }

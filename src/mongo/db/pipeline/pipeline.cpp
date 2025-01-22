@@ -754,7 +754,6 @@ DepsTracker Pipeline::getDependenciesForContainer(
             deps.requestMetadata(localDeps.metadataDeps());
             knowAllMeta = status & DepsTracker::State::EXHAUSTIVE_META;
         }
-        deps.requestMetadata(localDeps.searchMetadataDeps());
     }
 
     if (!knowAllFields)

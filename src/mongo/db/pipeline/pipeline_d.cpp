@@ -1066,7 +1066,6 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
     }
 
     swCq.getValue()->requestAdditionalMetadata(deps.metadataDeps());
-    swCq.getValue()->setSearchMetadata(deps.searchMetadataDeps());
 
     return swCq;
 }

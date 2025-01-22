@@ -344,15 +344,18 @@ DepsTracker::State DocumentSourceFacet::getDependencies(DepsTracker* deps) const
 
         deps->needWholeDocument = deps->needWholeDocument || subDepsTracker.needWholeDocument;
 
-        // If the subpipeline needs any search metadata, the top level pipeline must know to
-        // generate it.
-        deps->searchMetadataDeps() |= subDepsTracker.searchMetadataDeps();
-
-        // The text score is the only type of metadata that could be needed by $facet.
+        // The text score and search sequence token are the only type of metadata that could be
+        // needed by $facet.
+        // TODO SERVER-99596 Try to handle this generically rather than specifying individual fields
         deps->setNeedsMetadata(
             DocumentMetadataFields::kTextScore,
             deps->getNeedsMetadata(DocumentMetadataFields::kTextScore) ||
                 subDepsTracker.getNeedsMetadata(DocumentMetadataFields::kTextScore));
+
+        deps->setNeedsMetadata(
+            DocumentMetadataFields::kSearchSequenceToken,
+            deps->getNeedsMetadata(DocumentMetadataFields::kSearchSequenceToken) ||
+                subDepsTracker.getNeedsMetadata(DocumentMetadataFields::kSearchSequenceToken));
 
         if (deps->needWholeDocument && deps->getNeedsMetadata(DocumentMetadataFields::kTextScore)) {
             break;

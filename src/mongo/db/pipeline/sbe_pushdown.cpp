@@ -594,9 +594,6 @@ void finalizePipelineStages(Pipeline* pipeline,
     for (size_t i = 0; i < stagesToRemove; ++i) {
         sources.erase(sources.begin());
     }
-
-    canonicalQuery->setRemainingSearchMetadata(
-        pipeline->getDependencies(unavailableMetadata).searchMetadataDeps());
 }
 
 void attachPipelineStages(const MultipleCollectionAccessor& collections,

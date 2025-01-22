@@ -819,8 +819,59 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedDoc.freeze());
 }
 
+TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+       MetaDependenciesFalseWhenNotIncluded) {
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies(fromjson("{a: 1}"));
+
+    DepsTracker deps;
+    inclusion->addDependencies(&deps);
+
+    ASSERT_EQ(deps.fields.size(), 2UL);
+
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kTextScore]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kRandVal]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kGeoNearDist]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kGeoNearPoint]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kRecordId]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kIndexKey]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSortKey]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScore]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchHighlights]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScoreDetails]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kVectorSearchScore]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kScore]);
+}
+
+TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+       ShouldAddSingleMetaExpressionDependency) {
+    auto inclusion =
+        makeInclusionProjectionWithDefaultPolicies(fromjson("{a: 1, b: {$meta: 'geoNearPoint'}}"));
+
+    DepsTracker deps;
+    inclusion->addDependencies(&deps);
+
+    ASSERT_EQ(deps.fields.size(), 2UL);
+
+    // Only geo near point should be included as a dependency.
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kGeoNearPoint]);
+
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kTextScore]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kRandVal]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kGeoNearDist]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kRecordId]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kIndexKey]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSortKey]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScore]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchHighlights]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScoreDetails]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kVectorSearchScore]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kScore]);
+}
+
 TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldAddMetaExpressionsToDependencies) {
+    // Used to set 'score' metadata.
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
     auto inclusion =
         makeInclusionProjectionWithDefaultPolicies(fromjson("{a: 1, c: {$meta: 'textScore'}, "
                                                             "d: {$meta: 'randVal'}, "
@@ -831,7 +882,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
                                                             "i: {$meta: 'recordId'}, "
                                                             "j: {$meta: 'indexKey'}, "
                                                             "k: {$meta: 'sortKey'}, "
-                                                            "l: {$meta: 'searchScoreDetails'}}, "
+                                                            "l: {$meta: 'searchScoreDetails'}, "
                                                             "m: {$meta: 'vectorSearchScore'}, "
                                                             "n: {$meta: 'score'}}"));
 
@@ -840,14 +891,6 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
 
     ASSERT_EQ(deps.fields.size(), 2UL);
 
-    // We do not add the dependencies for searchScore, searchHighlights, searchScoreDetails, or
-    // distance because those values are not stored in the collection (or in mongod at all).
-    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScore]);
-    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchHighlights]);
-    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScoreDetails]);
-    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kVectorSearchScore]);
-    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kScore]);
-
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kTextScore]);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kRandVal]);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kGeoNearDist]);
@@ -855,6 +898,11 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kRecordId]);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kIndexKey]);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kSortKey]);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kSearchScore]);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kSearchHighlights]);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kSearchScoreDetails]);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kVectorSearchScore]);
+    ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kScore]);
 }
 
 TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldEvaluateMetaExpressions) {

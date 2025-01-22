@@ -109,25 +109,10 @@ void DepsTracker::setNeedsMetadata(DocumentMetadataFields::MetaType type, bool r
             str::stream() << "query requires " << type << " metadata, but it is not available",
             !required || !_unavailableMetadata[type]);
 
-    switch (type) {
-        case DocumentMetadataFields::MetaType::kSearchScore:
-        case DocumentMetadataFields::MetaType::kSearchHighlights:
-        case DocumentMetadataFields::MetaType::kSearchScoreDetails:
-        case DocumentMetadataFields::MetaType::kVectorSearchScore:
-        case DocumentMetadataFields::MetaType::kSearchSequenceToken:
-        case DocumentMetadataFields::MetaType::kScore:
-            // We track the dependencies for searchScore, searchHighlights,
-            // searchScoreDetails, vectorSearchScore, or score separately because those values are
-            // not stored in the collection (or in mongod at all).
-            invariant(required || !_searchMetadataDeps[type]);
-            _searchMetadataDeps[type] = required;
-            break;
-        default:
-            // If the metadata type is not required, then it should not be recorded as a metadata
-            // dependency.
-            invariant(required || !_metadataDeps[type]);
-            _metadataDeps[type] = required;
-    }
+    // If the metadata type is not required, then it should not be recorded as a metadata
+    // dependency.
+    invariant(required || !_metadataDeps[type]);
+    _metadataDeps[type] = required;
 }
 
 // Returns true if the lhs value should sort before the rhs, false otherwise.

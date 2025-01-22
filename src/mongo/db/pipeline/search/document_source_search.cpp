@@ -174,7 +174,7 @@ bool checkRequiresSearchSequenceToken(Pipeline::SourceContainer::iterator itr,
         nextStage->getDependencies(&deps);
         ++itr;
     }
-    return deps.searchMetadataDeps()[DocumentMetadataFields::kSearchSequenceToken];
+    return deps.getNeedsMetadata(DocumentMetadataFields::kSearchSequenceToken);
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceSearch::doOptimizeAt(
