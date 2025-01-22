@@ -70,10 +70,11 @@ const timeseriesParams = {
     granularity: 'seconds',
 };
 
-db.createCollection('test', {timeseries: timeseriesParams});
-db.test.insert(documentList);
+db.dropDatabase();
+assert.commandWorked(db.createCollection('test', {timeseries: timeseriesParams}));
+assert.commandWorked(db.test.insert(documentList));
 
 // Simply test that the query can be fully executed and does not trigger a tripwire assertion.
-let res = db.test.aggregate(pipeline).toArray();
-assert(res.length >= 30);
+const res = db.test.aggregate(pipeline).toArray();
+assert.gte(res.length, 30, tojson(res));
 })();
