@@ -190,6 +190,8 @@ buildvariants:
       # Explicitly include instead of using tags to avoid pulling in replica_sets_multiversion_gen. This
       # variant will be removed when config shards become the default, so this is only temporary.
       - name: sharding_multiversion_gen
+      - name: sharding_jscore_multiversion_gen
+      - name: sharding_jscore_kill_primary_multiversion_gen
       - name: .sharding .txns
       # Skip csrs stepdown suite because most tests can't handle the first shard stepping down.
       - name: .sharding .common !.csrs !.feature_flag_guarded

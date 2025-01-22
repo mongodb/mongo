@@ -65,6 +65,34 @@
         old_bin_version: last_continuous
         mixed_bin_versions: new_old_old_new
 
+- name: sharded_fixture_last_lts_3_nodes
+  value:
+    executor:
+      fixture:
+        num_shards: 2
+        num_rs_nodes_per_shard: 3
+        old_bin_version: last_lts
+        mixed_bin_versions: new_old_old_old_old_new
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              nonClusteredConfigTransactions: true
+
+- name: sharded_fixture_last_continuous_3_nodes
+  value:
+    executor:
+      fixture:
+        num_shards: 2
+        num_rs_nodes_per_shard: 3
+        old_bin_version: last_continuous
+        mixed_bin_versions: new_old_old_old_old_new
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              nonClusteredConfigTransactions: true
+
 ### Suite-specific overrides ###
 - name: multiversion_future_git_tag_exclude_files
   value:

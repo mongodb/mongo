@@ -2164,6 +2164,24 @@ tasks:
             --runNoFeatureFlagTests
 
   - <<: *gen_task_template
+    name: sharding_jscore_kill_primary_multiversion_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "experimental",
+        "multiversion_passthrough",
+        "multiversion",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          sharding_kill_primaries_jscore_passthrough_last_lts_new_old_old_new: last_lts
+          sharding_kill_primaries_jscore_passthrough_last_continuous_new_old_old_new: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          run_no_feature_flag_tests: "true"
+
+  - <<: *gen_task_template
     name: sharding_jscore_passthrough_gen
     tags:
       [

@@ -3,6 +3,8 @@
 //   assumes_unsharded_collection,
 //   # TODO SERVER-30466
 //   does_not_support_causal_consistency,
+//   # explain command is non-retryable
+//   requires_non_retryable_commands,
 // ]
 
 import {hasRejectedPlans} from "jstests/libs/query/analyze_plan.js";
