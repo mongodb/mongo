@@ -1,5 +1,11 @@
 version: 1.0.0
 filters:
+  - "basic_types.*":
+    approvers:
+      - 10gen/server-programmability
+  - "cancelable_operation_context*":
+    approvers:
+      - 10gen/server-programmability
   - "client.*":
     approvers:
       - 10gen/server-programmability
@@ -8,16 +14,94 @@ filters:
       - 10gen/server-programmability
   - "client_out_of_line_executor*":
     approvers:
-      - 10gen/server-programmability
+      - 10gen/server-networking-and-observability
   - "client_strand*":
     approvers:
       - 10gen/server-programmability
   - "cloner.*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "commands.*":
+    approvers:
+      - 10gen/server-programmability
+  - "commands_*":
+    approvers:
+      - 10gen/server-programmability
+  - "field_parser*":
+    approvers:
+      - 10gen/server-programmability
+  - "field_parser*":
+    approvers:
+      - 10gen/server-programmability
+  - "generic_argument_util.*":
+    approvers:
+      - 10gen/server-programmability
+  - "jsobj.*":
+    approvers:
+      - 10gen/server-programmability
+  - "json.*":
+    approvers:
+      - 10gen/server-programmability
   - "keys_collection*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "max_time.*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "mongod.cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "mongod_initializers.*":
+    approvers:
+      - 10gen/server-programmability
+  - "mongod_main.*":
+    approvers:
+      - 10gen/server-programmability
+  - "mongod_options*":
+    approvers:
+      - 10gen/server-programmability
+  - "nesting_depth_test.*":
+    approvers:
+      - 10gen/server-programmability
+  - "operation_context*":
+    approvers:
+      - 10gen/server-programmability
+  - "operation_cpu_timer*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "operation_id*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "operation_key_manager.*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "operation_killer.*":
+    approvers:
+      - 10gen/server-programmability
+  - "operation_time_tracker*":
+    approvers:
+      - 10gen/server-programmability
+  - "profiler_bm_fixture.*":
+    approvers:
+      - 10gen/server-programmability
+  - "README_default_max_time_ms.md":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "request_execution_context.*":
+    approvers:
+      - 10gen/server-programmability
+  - "service_context*":
+    approvers:
+      - 10gen/server-programmability
+  - "startup_warnings_common.*":
+    approvers:
+      - 10gen/server-programmability
+  - "startup_warnings_mongod.*":
+    approvers:
+      - 10gen/server-programmability
+  - "thread_client_test.*":
+    approvers:
+      - 10gen/server-programmability
   - "profile_*":
     approvers:
       - 10gen/query-integration-observability
@@ -154,9 +238,15 @@ filters:
   - "server_recovery*":
     approvers:
       - 10gen/server-storage-engine-integration
+  - "mongod_options_replication.*":
+    approvers:
+      - 10gen/server-replication
   - "mongod_options_storage.idl":
     approvers:
       - 10gen/server-storage-engine-integration
+  - "mongod_options_sharding.*":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "dbhelpers*":
     approvers:
       - 10gen/server-storage-engine-integration

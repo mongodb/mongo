@@ -1,20 +1,50 @@
 version: 1.0.0
 filters:
+  - "async_command_execution_test.*":
+    approvers:
+      - 10gen/server-programmability
   - "authentication_commands.*":
     approvers:
       - 10gen/server-security
+  - "buildinfo_common.*":
+    approvers:
+      - 10gen/server-programmability
   - "cluster_server_parameter_cmds.idl":
     approvers:
       - 10gen/server-security
   - "connection_status.*":
     approvers:
       - 10gen/server-security
+  - "cpuload.*":
+    approvers:
+      - 10gen/server-programmability
   - "create_indexes*":
     approvers:
       - 10gen/server-index-builds
+  - "db_command_test_fixture.*":
+    approvers:
+      - 10gen/server-programmability
+  - "fail_point_cmd.*":
+    approvers:
+      - 10gen/server-programmability
   - "fsync*":
     approvers:
       - 10gen/server-storage-engine-integration
+  - "kill_op*":
+    approvers:
+      - 10gen/server-programmability
+  - "killoperations*":
+    approvers:
+      - 10gen/server-programmability
+  - "shutdown*":
+    approvers:
+      - 10gen/server-programmability
+  - "sleep_command.*":
+    approvers:
+      - 10gen/server-programmability
+  - "test_commands_enabled.*":
+    approvers:
+      - 10gen/server-programmability
   - "user_management_commands*":
     approvers:
       - 10gen/server-security

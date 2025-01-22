@@ -75,3 +75,6 @@ filters:
   - "untrack_unsplittable_collection.idl":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "wait_for_fail_point.idl":
+    approvers:
+      - 10gen/server-programmability

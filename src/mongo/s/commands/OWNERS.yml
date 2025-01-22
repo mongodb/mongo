@@ -1,8 +1,26 @@
 version: 1.0.0
 filters:
+  - "cluster_build_info.cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "cluster_hello_cmd.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "cluster_kill_op.cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "cluster_killoperations_cmd.cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "cluster_shutdown_cmd.cpp":
+    approvers:
+      - 10gen/server-programmability
   - "cluster_user_management_commands.cpp":
     approvers:
       - 10gen/server-security
+  - "cluster_whats_my_uri_cmd.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
   - "cluster_fle2*":
     approvers:
       - 10gen/server-security
@@ -150,3 +168,6 @@ filters:
   - "*shard_collection*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "strategy.*":
+    approvers:
+      - 10gen/server-programmability

@@ -1,5 +1,8 @@
 version: 1.0.0
 filters:
+  - "*":
+    approvers:
+      - 10gen/server-programmability
   - "deferred_writer*":
     approvers:
       - 10gen/server-dbcheck
