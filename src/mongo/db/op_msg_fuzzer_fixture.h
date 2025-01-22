@@ -51,6 +51,8 @@ public:
 
     ~OpMsgFuzzerFixture();
 
+    ClientStrand* _getStrand(ClusterRole role);
+
     /**
      * Run a single operation as if it came from the network.
      */
@@ -66,8 +68,10 @@ private:
     const unittest::TempDir _dir;
 
     ServiceContext* _serviceContext;
-    ClientStrandPtr _clientStrand;
     transport::TransportLayerMock _transportLayer;
     std::shared_ptr<transport::Session> _session;
+
+    ClientStrandPtr _shardStrand;
+    ClientStrandPtr _routerStrand;
 };
 }  // namespace mongo

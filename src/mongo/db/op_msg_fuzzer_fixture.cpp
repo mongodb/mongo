@@ -115,8 +115,12 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
 
     _serviceContext->setPeriodicRunner(makePeriodicRunner(_serviceContext));
 
-    _clientStrand = ClientStrand::make(_serviceContext->getService()->makeClient("test", _session));
-    auto clientGuard = _clientStrand->bind();
+    _shardStrand = ClientStrand::make(
+        _serviceContext->getService(ClusterRole::ShardServer)->makeClient("shardTest", _session));
+    _routerStrand = ClientStrand::make(
+        _serviceContext->getService(ClusterRole::RouterServer)->makeClient("routerTest", _session));
+
+    auto clientGuard = _shardStrand->bind();
 
     storageGlobalParams.dbpath = _dir.path();
     storageGlobalParams.engine = "wiredTiger";
@@ -156,7 +160,7 @@ OpMsgFuzzerFixture::~OpMsgFuzzerFixture() {
     CollectionShardingStateFactory::clear(_serviceContext);
 
     {
-        auto clientGuard = _clientStrand->bind();
+        auto clientGuard = _shardStrand->bind();
         auto opCtx = _serviceContext->makeOperationContext(clientGuard.get());
         Lock::GlobalLock glk(opCtx.get(), MODE_X);
         auto databaseHolder = DatabaseHolder::get(opCtx.get());
@@ -166,13 +170,18 @@ OpMsgFuzzerFixture::~OpMsgFuzzerFixture() {
     shutdownGlobalStorageEngineCleanly(_serviceContext);
 }
 
+ClientStrand* OpMsgFuzzerFixture::_getStrand(ClusterRole role) {
+    return role.hasExclusively(ClusterRole::ShardServer) ? _shardStrand.get() : _routerStrand.get();
+}
+
 int OpMsgFuzzerFixture::testOneInput(const char* Data, size_t Size) {
     if (Size < sizeof(MSGHEADER::Value)) {
         return 0;
     }
 
     auto testHandleRequest = [&](const ClusterRole& role) {
-        auto clientGuard = _clientStrand->bind();
+        ClientStrand::Guard clientGuard = _getStrand(role)->bind();
+
         auto opCtx = _serviceContext->makeOperationContext(clientGuard.get());
         VectorClockMutable::get(_serviceContext)->tickClusterTimeTo(kInMemoryLogicalTime);
 
