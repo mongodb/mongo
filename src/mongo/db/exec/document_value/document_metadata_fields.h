@@ -211,7 +211,7 @@ public:
     }
 
     Value getSortKey() const {
-        invariant(hasSortKey());
+        tassert(9973200, "Attempt to get sort key which has not been populated", hasSortKey());
         return _holder->sortKey;
     }
 
