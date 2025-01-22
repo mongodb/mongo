@@ -153,4 +153,10 @@ std::strong_ordering ThreeWayPathComparator::operator()(StringData lhs, StringDa
     return lhs.size() <=> rhs.size();
 }
 
+bool DepsTracker::needsTextScoreMetadata(const QueryMetadataBitSet& metadataDeps) {
+    // Users may request the score with either $textScore or $score.
+    return metadataDeps[DocumentMetadataFields::kTextScore] ||
+        metadataDeps[DocumentMetadataFields::kScore];
+}
+
 }  // namespace mongo

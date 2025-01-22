@@ -150,6 +150,13 @@ struct DepsTracker {
                                                TruncateToRootLevel truncation);
 
     /**
+     * Helper function to determine whether the query has a dependency on the $text score metadata.
+     *
+     * TODO SERVER-99596 Consider finding a better home for this helper.
+     */
+    static bool needsTextScoreMetadata(const QueryMetadataBitSet& metadataDeps);
+
+    /**
      * Returns a projection object covering the non-metadata dependencies tracked by this class,
      * or empty BSONObj if the entire document is required. By default, the resulting project
      * will include the full, dotted field names of the dependencies. If 'truncationBehavior' is

@@ -136,7 +136,7 @@ bool requiresOriginalQuery(OperationContext* opCtx,
                                                     ProjectionPolicies::findProjectionPolicies(),
                                                     false /* shouldOptimize */);
         return proj.requiresMatchDetails() ||
-            proj.metadataDeps().test(DocumentMetadataFields::MetaType::kTextScore);
+            DepsTracker::needsTextScoreMetadata(proj.metadataDeps());
     }
     return false;
 }

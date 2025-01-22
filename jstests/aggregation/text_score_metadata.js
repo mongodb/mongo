@@ -1,6 +1,7 @@
 /**
  * Tests that the "text score" metadata (previously known as 'textScore') is accessible by the
- * 'score' metadata field.
+ * 'score' metadata field in aggregation pipelines.
+ *
  * @tags: [featureFlagRankFusionFull, requires_fcv_81]
  */
 
@@ -10,17 +11,27 @@ const kTextScoreMetadataArg = "textScore";
 const coll = db.foo;
 coll.drop();
 
-const bulk = coll.initializeUnorderedBulkOp();
-for (let i = 0; i < 10; ++i) {
-    bulk.insert({_id: i, x: "test"});
-}
-assert.commandWorked(bulk.execute());
+assert.commandWorked(coll.insertMany([
+    {_id: 0, x: "test"},
+    {_id: 1, x: "hello"},
+    {_id: 2, x: "test test"},
+]));
 
 assert.commandWorked(coll.createIndex({x: "text"}));
 
-function runTest({forceProjectionOnMerger}) {
+const textMatchStage = {
+    $match: {$text: {$search: "test"}}
+};
+
+/**
+ * Helper function to project $textScore in an aggregation, including the option to force the
+ * projection on the merging shard.
+ * @param {boolean} forceProjectionOnMerger force the metadata project to be run on the merging
+ *     shard, otherwise allow it to be pushed down.
+ */
+function runProjectionTest({forceProjectionOnMerger}) {
     function buildPipeline(projections) {
-        let pipeline = [{$match: {$text: {$search: "test"}}}];
+        let pipeline = [textMatchStage];
 
         if (forceProjectionOnMerger) {
             // Add a splitPipeline stage so that the $project will stay on the merging shard and
@@ -61,11 +72,31 @@ function runTest({forceProjectionOnMerger}) {
     results = coll.aggregate(pipelineWithScoreOnly).toArray();
     assert.neq(results.length, 0, "results array expected not to be empty");
 
-    // TODO SERVER-99335 Enable this validation once score is populated correctly for this case.
-    // for (let result of results) {
-    //     assert(result.hasOwnProperty(kScoreMetadataArg));
-    // }
+    for (let result of results) {
+        assert(result.hasOwnProperty(kScoreMetadataArg), result);
+    }
 }
 
-runTest({forceProjectionOnMerger: false});
-runTest({forceProjectionOnMerger: true});
+(function testProjectScore() {
+    runProjectionTest({forceProjectionOnMerger: false});
+})();
+
+(function testProjectScoreOnMergingShard() {
+    runProjectionTest({forceProjectionOnMerger: true});
+})();
+
+(function testSortOnScore() {
+    const results =
+        coll.aggregate([textMatchStage, {$sort: {[kScoreMetadataArg]: {$meta: kScoreMetadataArg}}}])
+            .toArray();
+    assert.eq(results, [{_id: 2, x: "test test"}, {_id: 0, x: "test"}]);
+})();
+
+(function testGroupOnScore() {
+    // We should have two distinct entries for two different returned scores.
+    const results =
+        coll.aggregate(
+                [textMatchStage, {$group: {_id: {$meta: kScoreMetadataArg}, count: {$sum: 1}}}])
+            .toArray();
+    assert.eq(results.length, 2, results);
+})();

@@ -1,6 +1,7 @@
 // Test that queries with a sort on text metadata return results in the correct order in a sharded
 // collection.
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var st = new ShardingTest({shards: 2});
@@ -68,6 +69,30 @@ assert.eq(results, [{_id: -2}, {_id: 2}, {_id: -1}, {_id: 1}]);
 
 results = coll.find({$text: {$search: "pizza"}}, {s: -1}).sort({s: {$meta: "textScore"}}).toArray();
 assert.eq(results, [{_id: -2}, {_id: 2}, {_id: -1}, {_id: 1}]);
+
+if (FeatureFlagUtil.isPresentAndEnabled(mongos, 'RankFusionFull')) {
+    //
+    // Use $score rather than $textScore when requesting the metadata for the sort (find).
+    //
+
+    results = coll.find({$text: {$search: "pizza"}}).sort({s: {$meta: "score"}}).toArray();
+    assert.eq(results, [
+        {_id: -2, a: "pizza pizza pizza pizza"},
+        {_id: 2, a: "pizza pizza pizza"},
+        {_id: -1, a: "pizza pizza"},
+        {_id: 1, a: "pizza"}
+    ]);
+
+    //
+    // Use $score rather than $textScore when requesting the metadata for the sort (aggregate).
+    //
+
+    const aggResults =
+        coll.aggregate(
+                [{$match: {$text: {$search: "pizza"}}}, {$sort: {s: {$meta: "score"}, b: 1}}])
+            .toArray();
+    assert.eq(results, aggResults);
+}
 
 //
 // Execute query with a compound sort that includes the text score along with a multikey field.
