@@ -29,9 +29,13 @@
 
 #pragma once
 
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/spilling/spilling_stats.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/util/hash_roaring_set.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/util/memory_usage_tracker.h"
 
 namespace mongo {
 
@@ -43,12 +47,16 @@ class RecordIdDeduplicator {
 public:
     /**
      * See HashRoaringSet constructor for definitions of the 'threshold', 'chunkSize', and
-     * 'universeSize' parameters.
+     * 'universeSize' parameters needed in the definition of HashRoaringSet.
      */
-    RecordIdDeduplicator(size_t threshold, size_t chunkSize, uint64_t universeSize);
+    RecordIdDeduplicator(ExpressionContext* expCtx,
+                         size_t threshold,
+                         size_t chunkSize,
+                         uint64_t universeSize);
 
-    RecordIdDeduplicator()
-        : RecordIdDeduplicator(static_cast<size_t>(internalRoaringBitmapsThreshold.load()),
+    RecordIdDeduplicator(ExpressionContext* expCtx)
+        : RecordIdDeduplicator(expCtx,
+                               static_cast<size_t>(internalRoaringBitmapsThreshold.load()),
                                static_cast<size_t>(internalRoaringBitmapsBatchSize.load()),
                                static_cast<uint64_t>(internalRoaringBitmapsThreshold.load() /
                                                      internalRoaringBitmapsMinimalDensity.load())) {
@@ -64,8 +72,32 @@ public:
      */
     bool insert(const RecordId& recordId);
 
+    bool hasSpilled() const {
+        return _stats.getSpills() > 0;
+    }
+
+    const SpillingStats& getSpillingStats() const {
+        return _stats;
+    }
+
+    void forceSpill() {
+        spill(0);
+    }
+
 private:
+    ExpressionContext* _expCtx;
+
     absl::flat_hash_set<RecordId, RecordId::Hasher> _hashset;
     HashRoaringSet _roaring;
+    // Keep the record with id null separately because storage does not
+    // consider records with id null to be the same.
+    bool hasNullRecordId{false};
+
+    std::unique_ptr<TemporaryRecordStore> _diskStorageString;
+    std::unique_ptr<TemporaryRecordStore> _diskStorageLong;
+    MemoryUsageTracker _memoryTracker;
+
+    void spill(uint64_t maximumMemoryUsageBytes);
+    SpillingStats _stats;
 };
 }  // namespace mongo

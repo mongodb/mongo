@@ -56,6 +56,7 @@ MergeSortStage::MergeSortStage(ExpressionContext* expCtx,
       _pattern(params.pattern),
       _collator(params.collator),
       _dedup(params.dedup),
+      _recordIdDeduplicator(expCtx),
       _merging(StageWithValueComparison(ws, params.pattern, params.collator)) {}
 
 void MergeSortStage::addChild(std::unique_ptr<PlanStage> child) {

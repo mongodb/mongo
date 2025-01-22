@@ -187,6 +187,14 @@ public:
             : false;
     }
 
+    void clear() {
+        _roarings.clear();
+    }
+
+    bool empty() const {
+        return _roarings.empty();
+    }
+
     /* Creates an iterator on the Roaring64BTree. The iterator iterates the elements in the
      * Roaring64BTree in ascending order.*/
     Iterator begin() const {

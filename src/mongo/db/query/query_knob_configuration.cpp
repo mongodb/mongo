@@ -60,6 +60,8 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
 
     _planEvaluationMaxResults = internalQueryPlanEvaluationMaxResults.loadRelaxed();
     _maxScansToExplodeValue = static_cast<size_t>(internalQueryMaxScansToExplode.loadRelaxed());
+    _internalQuerySpillingMinAvailableDiskSpaceBytes =
+        static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.loadRelaxed());
 }
 
 QueryFrameworkControlEnum QueryKnobConfiguration::getInternalQueryFrameworkControlForOp() const {
@@ -111,6 +113,10 @@ bool QueryKnobConfiguration::canPushDownFullyCompatibleStages() const {
             return true;
     }
     MONGO_UNREACHABLE;
+}
+
+int64_t QueryKnobConfiguration::getInternalQuerySpillingMinAvailableDiskSpaceBytes() const {
+    return _internalQuerySpillingMinAvailableDiskSpaceBytes;
 }
 
 }  // namespace mongo

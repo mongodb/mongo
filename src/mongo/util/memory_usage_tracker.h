@@ -54,8 +54,8 @@ namespace mongo {
  * It can be used directly by calling MemoryUsageTracker::add(int64_t diff), or by creating a
  * dependent tracker via MemoryUsageTracker::operator[].
  *
- * Dependent tracker will update both it's own memory and the total. It is used to tracker the
- * consumption of individual parts, such as different accumulators in $group, while simulaniously
+ * Dependent tracker will update both its own memory and the total. It is used to track the
+ * consumption of individual parts, such as different accumulators in $group, while simultaneously
  * keeping track of the total.
  *
  * Cannot be shallow copied because child memory trackers point to the address of the inline

@@ -61,7 +61,7 @@ public:
      * Returns true if this owns its own memory, and false otherwise
      */
     bool isOwned() const {
-        return _ownedData.get();
+        return _size == 0 || _ownedData.get();
     }
 
     SharedBuffer releaseBuffer() {

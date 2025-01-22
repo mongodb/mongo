@@ -223,6 +223,19 @@ public:
         return _state;
     }
 
+    void clear() {
+        _hashTable.clear();
+        _bitmap.clear();
+        _size = 0;
+        _minValue = std::numeric_limits<uint64_t>::max();
+        _maxValue = 0;
+        _state = kHashTable;
+    }
+
+    bool empty() const {
+        return _hashTable.empty() && _bitmap.empty();
+    }
+
     Iterator begin() const {
         return Iterator{this};
     }

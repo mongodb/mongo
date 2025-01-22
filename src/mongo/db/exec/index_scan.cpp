@@ -75,6 +75,7 @@ IndexScan::IndexScan(ExpressionContext* expCtx,
       _forward(params.direction == 1),
       _addKeyMetadata(params.addKeyMetadata),
       _dedup(params.shouldDedup),
+      _recordIdDeduplicator(expCtx),
       _startKeyInclusive(IndexBounds::isStartIncludedInBound(_bounds.boundInclusion)),
       _endKeyInclusive(IndexBounds::isEndIncludedInBound(_bounds.boundInclusion)) {
     _specificStats.indexName = params.name;
