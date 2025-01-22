@@ -188,7 +188,7 @@ public:
      * Prints any storage engine provided metadata for the index entry with key 'keyString'.
      */
     virtual void printIndexEntryMetadata(OperationContext* opCtx,
-                                         const key_string::Value& keyString) const = 0;
+                                         const key_string::View& keyString) const = 0;
 
     /**
      * Return the number of entries in 'this' index.

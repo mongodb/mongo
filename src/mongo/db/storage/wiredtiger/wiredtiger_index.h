@@ -184,7 +184,7 @@ public:
     Status initAsEmpty() override;
 
     void printIndexEntryMetadata(OperationContext* opCtx,
-                                 const key_string::Value& keyString) const override;
+                                 const key_string::View& keyString) const override;
 
     StatusWith<int64_t> compact(OperationContext* opCtx, const CompactOptions& options) override;
 

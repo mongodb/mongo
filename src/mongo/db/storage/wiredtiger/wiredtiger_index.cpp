@@ -413,7 +413,7 @@ bool WiredTigerIndex::isEmpty(OperationContext* opCtx) {
 }
 
 void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
-                                              const key_string::Value& keyString) const {
+                                              const key_string::View& keyString) const {
     // Printing the index entry metadata requires a new session. We cannot open other cursors when
     // there are open history store cursors in the session. We also need to make sure that the
     // existing session has not written data to avoid potential deadlocks.
@@ -433,7 +433,7 @@ void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
     // values for a given index entry.
     WT_CURSOR* cursor = session.getNewCursor(_uri, "debug=(dump_version=true)");
 
-    setKey(cursor, keyString.getView());
+    setKey(cursor, keyString.getKeyAndRecordIdView());
 
     int ret = cursor->search(cursor);
     while (ret != WT_NOTFOUND) {
@@ -458,12 +458,10 @@ void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
                                         &value),
                       cursor->session);
 
-        auto indexKey = key_string::toBson(keyString.getView(), _ordering, keyString.getTypeBits());
-
         LOGV2(6601200,
               "WiredTiger index entry metadata",
               "keyString"_attr = keyString,
-              "indexKey"_attr = indexKey,
+              "indexKey"_attr = key_string::toBson(keyString, _ordering),
               "startTxnId"_attr = startTxnId,
               "startTs"_attr = Timestamp(startTs),
               "startDurableTs"_attr = Timestamp(startDurableTs),

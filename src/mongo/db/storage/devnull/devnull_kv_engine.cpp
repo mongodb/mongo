@@ -366,7 +366,7 @@ public:
     }
 
     void printIndexEntryMetadata(OperationContext* opCtx,
-                                 const key_string::Value& keyString) const override {}
+                                 const key_string::View& keyString) const override {}
 
     std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
                                                            bool isForward) const override {
