@@ -366,6 +366,8 @@ last-continuous:
       ticket: SERVER-97044
     - test_file: jstests/sharding/analyze_shard_key/query_sampling_after_resharding.js
       ticket: SERVER-96783
+    - test_file: jstests/core/timeseries/query/timeseries_explicit_unpack_bucket.js
+      ticket: SERVER-95687
     - test_file: jstests/sharding/remove_shard_with_unsharded.js
       ticket: SERVER-89883
   suites: null
@@ -781,6 +783,8 @@ last-lts:
       ticket: SERVER-97044
     - test_file: jstests/sharding/analyze_shard_key/query_sampling_after_resharding.js
       ticket: SERVER-96783
+    - test_file: jstests/core/timeseries/query/timeseries_explicit_unpack_bucket.js
+      ticket: SERVER-95687
     - test_file: jstests/sharding/remove_shard_with_unsharded.js
       ticket: SERVER-89883
   suites: null

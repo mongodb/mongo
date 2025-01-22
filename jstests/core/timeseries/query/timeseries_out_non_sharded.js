@@ -275,6 +275,36 @@ function createTimeseriesOutCollection() {
     assert.throwsWithCode(() => observerInColl.aggregate(pipeline), 7268700);
 })();
 
+(function testTimeAndMetaFieldsCannotContainNullBytes() {
+    // Drop both collections.
+    dropOutCollections();
+
+    // Creates outColl as a TimeSeries collection with {timeField: "time", metaField: "tags"}.
+    createTimeseriesOutCollection();
+
+    const invalidTime = [{
+        $out: {
+            db: testDB.getName(),
+            coll: outColl.getName(),
+            timeseries: {timeField: "invalid_\x00_time", metaField: "tags"}
+        }
+    }];
+
+    assert.throwsWithCode(() => inColl.aggregate(invalidTime), ErrorCodes.BadValue);
+    assert.throwsWithCode(() => observerInColl.aggregate(invalidTime), ErrorCodes.BadValue);
+
+    const invalidMeta = [{
+        $out: {
+            db: testDB.getName(),
+            coll: observerOutColl.getName(),
+            timeseries: {timeField: "time", metaField: "invalid_\x00_meta"}
+        }
+    }];
+
+    assert.throwsWithCode(() => inColl.aggregate(invalidMeta), ErrorCodes.BadValue);
+    assert.throwsWithCode(() => observerInColl.aggregate(invalidMeta), ErrorCodes.BadValue);
+})();
+
 (function testCannotRunOutWithInvalidTimeseriesOptions() {
     // Drop both collections.
     dropOutCollections();
