@@ -155,7 +155,9 @@ public:
 
             ShardingStatistics::get(opCtx).report(&result);
             catalogCache->report(&result);
-            if (routingInfoCache) {
+            // (Ignore FCV check): this feature flag is not FCV-gated.
+            if (routingInfoCache &&
+                !feature_flags::gDualCatalogCache.isEnabledAndIgnoreFCVUnsafe()) {
                 routingInfoCache->report(&result);
             }
 
