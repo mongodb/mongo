@@ -592,6 +592,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/noPassthrough/cluster_parameters/OWNERS.yml
 /jstests/noPassthrough/cluster_parameters/**/* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/noPassthrough/cluster_scalability_misc/OWNERS.yml
+/jstests/noPassthrough/cluster_scalability_misc/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/noPassthrough/clustered_collections/OWNERS.yml
 /jstests/noPassthrough/clustered_collections/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
 
