@@ -2025,39 +2025,6 @@ mongo_cc_library(
     ],
 )
 
-idl_generator(
-    name = "throw_hook_options_gen",
-    src = "throw_hook_options.idl",
-)
-
-mongo_cc_library(
-    name = "throw_hook_impl",
-    srcs = [
-        "throw_hook_impl.cpp",
-        ":throw_hook_options_gen",
-    ],
-    deps = [
-        ":server_base",
-        "//src/mongo/platform:throw_hook",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "throw_hook_impl_test",
-    srcs = ["throw_hook_impl_test.cpp"],
-    tags = [
-        "mongo_unittest_second_group",
-        "server-programmability",
-    ],
-    target_compatible_with = select({
-        "@platforms//os:linux": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
-    deps = [
-        ":throw_hook_impl",
-    ],
-)
-
 # The db/'common' lib has the abstractions that are shared by components of the
 # server. Ideally, many of the object in 'coredb' should be moved here when their dependencies
 # get resolved.
@@ -2081,10 +2048,7 @@ mongo_cc_library(
         ":server_base",
         "//src/mongo/db/catalog:cannot_convert_index_to_unique_info",
         "//src/mongo/db/catalog:collection_uuid_mismatch_info",
-    ] + select({
-        "@platforms//os:linux": [":throw_hook_impl"],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 mongo_cc_library(
