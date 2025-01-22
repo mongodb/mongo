@@ -76,6 +76,10 @@ void logErrorBlock() {
  * process even if multiple threads attempt to abort the process concurrently.
  */
 MONGO_COMPILER_NORETURN void callAbort() {
+    thread_local int reentry = 0;
+    if (reentry++)
+        endProcessWithSignal(SIGABRT);
+
     [[maybe_unused]] static auto initOnce = (std::abort(), 0);
     MONGO_COMPILER_UNREACHABLE;
 }

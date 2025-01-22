@@ -62,6 +62,16 @@ struct PrinterMockUassert {
     }
 };
 
+void someRiskyBusiness() {
+    invariant(false, "ouch");
+}
+struct PrinterMockInvariant {
+    auto format(auto& fc) const {
+        someRiskyBusiness();
+        return fc.out();
+    }
+};
+
 struct MemberCallFormatter {
     constexpr auto parse(auto& ctx) {
         return ctx.begin();
@@ -78,6 +88,9 @@ struct formatter<mongo::PrinterMockTassert> : mongo::MemberCallFormatter {};
 
 template <>
 struct formatter<mongo::PrinterMockUassert> : mongo::MemberCallFormatter {};
+
+template <>
+struct formatter<mongo::PrinterMockInvariant> : mongo::MemberCallFormatter {};
 }  // namespace fmt
 
 namespace mongo {
@@ -563,10 +576,6 @@ TEST(ScopedDebugInfo, Stack) {
     ASSERT_THAT(infoStack.getAll(), Eq(expected));
 }
 
-void someRiskyBusiness() {
-    invariant(false, "ouch");
-}
-
 DEATH_TEST(ScopedDebugInfo, PrintedOnInvariant, "mission: ATestInjectedString") {
     ScopedDebugInfo g("mission", "ATestInjectedString");
     someRiskyBusiness();
@@ -642,6 +651,13 @@ DEATH_TEST_REGEX(ScopedDebugInfo,
                  "(?s)ouch.*abruptQuit"
                  ".*ScopedDebugInfo failed.*test.*9513402") {
     ScopedDebugInfo guardUasserts("test", PrinterMockUassert());
+    someRiskyBusiness();
+}
+
+DEATH_TEST_REGEX(ScopedDebugInfo,
+                 InvariantAndInvariantDuringLogging,
+                 "(?s)ouch.*abruptQuit.*ouch") {
+    ScopedDebugInfo guardInvariants("test", PrinterMockInvariant());
     someRiskyBusiness();
 }
 
