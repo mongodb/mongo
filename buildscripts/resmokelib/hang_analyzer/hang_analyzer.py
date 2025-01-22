@@ -249,7 +249,8 @@ class HangAnalyzer(Subcommand):
         if self.options.debugger_output is None:
             self.options.debugger_output = ["stdout"]
 
-        if self.options.process_ids is not None:
+        # add != "" check to avoid empty process_ids
+        if self.options.process_ids is not None and self.options.process_ids != "":
             # self.process_ids is an int list of PIDs
             self.process_ids = [int(pid) for pid in self.options.process_ids.split(",")]
 
