@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -50,7 +50,8 @@
 #include "mongo/unittest/framework.h"
 #include "mongo/util/string_map.h"
 
-namespace mongo::expression_internal_tests {
+namespace mongo::expression_evaluate_internal_tests {
+
 constexpr auto kProjectionPostImageVarName =
     projection_executor::ProjectionExecutor::kProjectionPostImageVarName;
 
@@ -80,6 +81,18 @@ protected:
     }
 };
 
+TEST_F(ExpressionInternalFindPositionalTest, AppliesProjectionToPostImage) {
+    defineAndSetProjectionPostImageVariable(getExpCtxRaw(),
+                                            Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
+
+    auto expr = createExpression(fromjson("{bar: 1, foo: {$gte: 5}}"), "foo");
+
+    ASSERT_DOCUMENT_EQ(
+        Document{fromjson("{bar:1, foo: [6]}")},
+        expr->evaluate(Document{fromjson("{bar: 1, foo: [1,2,6,10]}")}, &getExpCtx()->variables)
+            .getDocument());
+}
+
 class ExpressionInternalFindSliceTest : public AggregationContextFixture {
 protected:
     auto createExpression(const std::string& path, boost::optional<int> skip, int limit) {
@@ -94,6 +107,18 @@ protected:
         return expr;
     }
 };
+
+TEST_F(ExpressionInternalFindSliceTest, AppliesProjectionToPostImage) {
+    defineAndSetProjectionPostImageVariable(getExpCtxRaw(),
+                                            Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
+
+    auto expr = createExpression("foo", 1, 2);
+
+    ASSERT_DOCUMENT_EQ(
+        Document{fromjson("{bar: 1, foo: [2,6]}")},
+        expr->evaluate(Document{fromjson("{bar: 1, foo: [1,2,6,10]}")}, &getExpCtx()->variables)
+            .getDocument());
+}
 
 class ExpressionInternalFindElemMatchTest : public AggregationContextFixture {
 protected:
@@ -111,108 +136,14 @@ protected:
     }
 };
 
-TEST_F(ExpressionInternalFindPositionalTest, RecordsProjectionDependencies) {
-    auto varId = defineAndSetProjectionPostImageVariable(
-        getExpCtxRaw(), Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
-    auto expr = createExpression(fromjson("{bar: 1, foo: {$gte: 5}}"), "foo");
-
-    DepsTracker deps;
-    expression::addDependencies(expr.get(), &deps);
-
-    ASSERT_EQ(deps.fields.size(), 0UL);
-    ASSERT_TRUE(deps.needWholeDocument);
-
-    std::set<Variables::Id> refs;
-    expression::addVariableRefs(expr.get(), &refs);
-    ASSERT_EQ(refs.size(), 1UL);
-    ASSERT_EQ(refs.count(varId), 1UL);
-}
-
-TEST_F(ExpressionInternalFindPositionalTest, AddsArrayUndottedPathToComputedPaths) {
-    defineAndSetProjectionPostImageVariable(getExpCtxRaw(),
-                                            Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
-
-    auto expr = createExpression(fromjson("{bar: 1, foo: {$gte: 5}}"), "foo");
-
-    DepsTracker deps;
-    auto computedPaths = expr->getComputedPaths({});
-
-    ASSERT_EQ(computedPaths.paths.size(), 1UL);
-    ASSERT_EQ(computedPaths.renames.size(), 0UL);
-    ASSERT_EQ(computedPaths.paths.count("foo"), 1UL);
-}
-
-TEST_F(ExpressionInternalFindPositionalTest,
-       AddsOnlyTopLevelFieldOfArrayDottedPathToComputedPaths) {
-    defineAndSetProjectionPostImageVariable(getExpCtxRaw(),
-                                            Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
-
-    auto expr = createExpression(fromjson("{bar: 1, 'foo.bar': {$gte: 5}}"), "foo.bar");
-
-    DepsTracker deps;
-    auto computedPaths = expr->getComputedPaths({});
-
-    ASSERT_EQ(computedPaths.paths.size(), 1UL);
-    ASSERT_EQ(computedPaths.renames.size(), 0UL);
-    ASSERT_EQ(computedPaths.paths.count("foo"), 1UL);
-}
-
-TEST_F(ExpressionInternalFindSliceTest, RecordsProjectionDependencies) {
-    auto varId = defineAndSetProjectionPostImageVariable(
-        getExpCtxRaw(), Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
-    auto expr = createExpression("foo", 1, 2);
-
-    DepsTracker deps;
-    expression::addDependencies(expr.get(), &deps);
-
-    ASSERT_EQ(deps.fields.size(), 0UL);
-    ASSERT_TRUE(deps.needWholeDocument);
-
-    std::set<Variables::Id> refs;
-    expression::addVariableRefs(expr.get(), &refs);
-    ASSERT_EQ(refs.size(), 1UL);
-    ASSERT_EQ(refs.count(varId), 1UL);
-}
-
-TEST_F(ExpressionInternalFindSliceTest, AddsArrayUndottedPathToComputedPaths) {
-    defineAndSetProjectionPostImageVariable(getExpCtxRaw(),
-                                            Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
-
-    auto expr = createExpression("foo", 1, 2);
-
-    DepsTracker deps;
-    auto computedPaths = expr->getComputedPaths({});
-
-    ASSERT_EQ(computedPaths.paths.size(), 1UL);
-    ASSERT_EQ(computedPaths.renames.size(), 0UL);
-    ASSERT_EQ(computedPaths.paths.count("foo"), 1UL);
-}
-
-TEST_F(ExpressionInternalFindSliceTest, AddsTopLevelFieldOfArrayDottedPathToComputedPaths) {
-    defineAndSetProjectionPostImageVariable(getExpCtxRaw(),
-                                            Value{fromjson("{bar: 1, foo: [1,2,6,10]}")});
-
-    auto expr = createExpression("foo.bar", 1, 2);
-
-    DepsTracker deps;
-    auto computedPaths = expr->getComputedPaths({});
-
-    ASSERT_EQ(computedPaths.paths.size(), 1UL);
-    ASSERT_EQ(computedPaths.renames.size(), 0UL);
-    ASSERT_EQ(computedPaths.paths.count("foo"), 1UL);
-}
-
-TEST_F(ExpressionInternalFindElemMatchTest, RecordsProjectionDependencies) {
+TEST_F(ExpressionInternalFindElemMatchTest, AppliesProjectionToRootDocument) {
     auto expr = createExpression(fromjson("{foo: {$elemMatch: {bar: {$gte: 5}}}}"), "foo");
 
-    DepsTracker deps;
-    expression::addDependencies(expr.get(), &deps);
-
-    ASSERT_EQ(deps.fields.size(), 0UL);
-    ASSERT(deps.needWholeDocument);
-
-    std::set<Variables::Id> refs;
-    expression::addVariableRefs(expr.get(), &refs);
-    ASSERT_EQ(refs.size(), 0UL);
+    ASSERT_VALUE_EQ(Document{fromjson("{foo: [{bar: 6, z: 6}]}")}["foo"],
+                    expr->evaluate(Document{fromjson("{foo: [{bar: 1, z: 1}, {bar: 2, z: 2}, "
+                                                     "{bar: 6, z: 6}, {bar: 10, z: 10}]}")},
+                                   &getExpCtx()->variables));
 }
-}  // namespace mongo::expression_internal_tests
+
+
+}  // namespace mongo::expression_evaluate_internal_tests
