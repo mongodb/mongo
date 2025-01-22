@@ -96,6 +96,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/signal_handlers.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -2050,6 +2051,9 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
 }
 
 DEATH_TEST_REGEX_F(StepDownTest, StepDownHangsCantGetRSTL, "5675600.*lockRep") {
+    // TODO SERVER-99671 Get rid of this once the unittest framework handles it automatically.
+    startSignalProcessingThread();
+
     const auto repl = getReplCoord();
 
     OpTimeWithTermOne opTime1(100, 1);
@@ -2085,6 +2089,9 @@ DEATH_TEST_REGEX_F(StepDownTest, StepDownHangsCantGetRSTL, "5675600.*lockRep") {
 }
 
 DEATH_TEST_F(StepDownTest, StepDownHangsCantGetRSTLTooManyLocks, "\"id\":9222300") {
+    // TODO SERVER-99671 Get rid of this once the unittest framework handles it automatically.
+    startSignalProcessingThread();
+
     const auto repl = getReplCoord();
 
     OpTimeWithTermOne opTime1(100, 1);
