@@ -1567,6 +1567,10 @@ DBCollection.prototype.distinct = function(keyString, query, options) {
         cmd.hint = opts.hint;
     }
 
+    if (opts.rawData) {
+        cmd.rawData = opts.rawData;
+    }
+
     // Execute distinct command
     var res = this.runReadCommand(cmd);
     if (!res.ok) {

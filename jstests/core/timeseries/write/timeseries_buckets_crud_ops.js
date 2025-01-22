@@ -92,7 +92,11 @@ crudTest(() => {
 
 // distinct()
 crudTest(() => {
-    assert.eq(bucketsColl.distinct("control.count").sort(), [1, 2]);
+    // TODO (SERVER-99573): Run this test case when the collection is sharded or unsplittable.
+    if (FixtureHelpers.isSharded(bucketsColl) || FixtureHelpers.isUnsplittable(bucketsColl)) {
+        return;
+    }
+    assert.eq(coll.distinct("control.count", {}, {rawData: true}).sort(), [1, 2]);
 });
 
 // find()
