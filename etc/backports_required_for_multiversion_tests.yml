@@ -175,7 +175,7 @@ last-continuous:
       ticket: SERVER-90358
     - test_file: jstests/sharding/txn_participant_adds_additional_participants.js
       ticket: SERVER-89806
-    - test_file: jstests/aggregation/match_swapping_renamed_fields.js
+    - test_file: jstests/aggregation/optimization/match_swapping_renamed_fields.js
       ticket: SERVER-90869
     - test_file: jstests/core/timeseries/query/timeseries_ixscan_clusteredidxscan_union.js
       ticket: SERVER-90818
@@ -229,7 +229,7 @@ last-continuous:
       ticket: SERVER-91465
     - test_file: jstests/concurrency/fsm_workloads/random_update_delete_with_resharding.js
       ticket: SERVER-91465
-    - test_file: jstests/aggregation/bugs/add_fields_adds_to_missing_fields.js
+    - test_file: jstests/aggregation/sources/addFields/add_fields_adds_to_missing_fields.js
       ticket: SERVER-91784
     - test_file: jstests/aggregation/group_with_acc_n_to_distinct_scan.js
       ticket: SERVER-90017
@@ -527,7 +527,7 @@ last-lts:
       ticket: SERVER-90358
     - test_file: jstests/sharding/txn_participant_adds_additional_participants.js
       ticket: SERVER-89806
-    - test_file: jstests/aggregation/match_swapping_renamed_fields.js
+    - test_file: jstests/aggregation/optimization/match_swapping_renamed_fields.js
       ticket: SERVER-90869
     - test_file: jstests/core/timeseries/query/timeseries_ixscan_clusteredidxscan_union.js
       ticket: SERVER-90818
@@ -609,7 +609,7 @@ last-lts:
       ticket: SERVER-91465
     - test_file: jstests/concurrency/fsm_workloads/random_update_delete_with_resharding.js
       ticket: SERVER-91465
-    - test_file: jstests/aggregation/bugs/add_fields_adds_to_missing_fields.js
+    - test_file: jstests/aggregation/sources/addFields/add_fields_adds_to_missing_fields.js
       ticket: SERVER-91784
     - test_file: jstests/aggregation/group_with_acc_n_to_distinct_scan.js
       ticket: SERVER-90017

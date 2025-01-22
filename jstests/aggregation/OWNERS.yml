@@ -3,3 +3,35 @@ filters:
   - "*":
     approvers:
       - 10gen/query
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads
+      - 10gen/query-optimization-staff-leads
+      - 10gen/query-integration-staff-leads
+  - "agg_infinite_recursion.js":
+    approvers:
+      - 10gen/query-integration-javascript
+  - "aggregation_with_uuids.js":
+    approvers:
+      - 10gen/query-optimization-parsers
+  - "api_version_stage_allowance_checks.js":
+    approvers:
+      - 10gen/query-optimization-parsers
+  - "large_bson_mid_pipeline.js":
+    approvers:
+      - 10gen/query-execution-aggregation
+  - "no_output_to_system.js":
+    approvers:
+      - 10gen/query-optimization-parsers
+  - "spill_to_disk.js":
+    approvers:
+      - 10gen/query-execution-aggregation
+  - "testutils.js":
+    approvers:
+      - 10gen/query-optimization
+  - "text_in_agg.js":
+    approvers:
+      - 10gen/query-integration-staff-leads
+  - "view_resolution_namespace_collision.js":
+    approvers:
+      - 10gen/query-optimization-views

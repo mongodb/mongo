@@ -1,0 +1,27 @@
+version: 1.0.0
+filters:
+  # These tests cover parsing, optimization, and execution. As such, they are jointly owned by QE and QO.
+  - "*":
+    approvers:
+      - 10gen/query-execution-aggregation
+      - 10gen/query-optimization
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads
+      - 10gen/query-optimization-staff-leads
+      - 10gen/query-integration-staff-leads
+  - "collection_uuid_coll_stats_index_stats.js":
+    approvers:
+      - 10gen/query-optimization-parsers
+  - "multiple_unpack_bucket_error.js":
+    approvers:
+      - 10gen/query-integration-timeseries
+  - "search_stage_error.js":
+    approvers:
+      - 10gen/query-integration-search
+  - "single_stage_alias_error.js":
+    approvers:
+      - 10gen/query-optimization-parsers
+  - "sort_by_count_validation.js":
+    approvers:
+      - 10gen/query-optimization-parsers

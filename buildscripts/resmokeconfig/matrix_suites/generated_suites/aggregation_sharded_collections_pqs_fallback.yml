@@ -44,11 +44,11 @@ selector:
     - jstests/aggregation/extras/*.js
     - jstests/aggregation/data/*.js
     - jstests/aggregation/spill_to_disk.js
-    - jstests/aggregation/match_swapping_renamed_fields.js
-    - jstests/aggregation/use_query_project_and_sort.js
-    - jstests/aggregation/use_query_projection.js
-    - jstests/aggregation/use_query_sort.js
-    - jstests/aggregation/bugs/groupMissing.js
+    - jstests/aggregation/optimization/match_swapping_renamed_fields.js
+    - jstests/aggregation/optimization/use_query_project_and_sort.js
+    - jstests/aggregation/optimization/use_query_projection.js
+    - jstests/aggregation/optimization/use_query_sort.js
+    - jstests/aggregation/sources/group/groupMissing.js
     - jstests/aggregation/sources/graphLookup/variables.js
     - jstests/aggregation/accumulators/accumulator_js_size_limits.js
     - jstests/aggregation/query_limits_test.js

@@ -106,7 +106,7 @@ selector:
   exclude_files:
     - jstests/core/query/explain/explain_agg_write_concern.js
     - jstests/aggregation/sources/out/replace_collection.js
-    - jstests/aggregation/explain_writing_aggs.js
+    - jstests/aggregation/explain/explain_writing_aggs.js
     - jstests/core/administrative/builtin_roles_external.js
     - jstests/aggregation/sources/lookup/lookup_query_stats.js
     - jstests/aggregation/view_resolution_namespace_collision.js

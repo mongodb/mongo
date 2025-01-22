@@ -15,12 +15,12 @@ selector:
     # cluster.
     - jstests/aggregation/sources/unionWith/unionWith.js
     # TODO: Remove when SERVER-23229 is fixed.
-    - jstests/aggregation/bugs/groupMissing.js
+    - jstests/aggregation/sources/group/groupMissing.js
     # TODO SERVER-32311: These tests use getAggPlanStage(), which can't handle sharded explain output.
-    - jstests/aggregation/match_swapping_renamed_fields.js
-    - jstests/aggregation/use_query_project_and_sort.js
-    - jstests/aggregation/use_query_projection.js
-    - jstests/aggregation/use_query_sort.js
+    - jstests/aggregation/optimization/match_swapping_renamed_fields.js
+    - jstests/aggregation/optimization/use_query_project_and_sort.js
+    - jstests/aggregation/optimization/use_query_projection.js
+    - jstests/aggregation/optimization/use_query_sort.js
     - jstests/aggregation/sources/graphLookup/variables.js
   exclude_with_any_tags:
     # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js

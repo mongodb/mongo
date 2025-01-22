@@ -10,12 +10,12 @@ selector:
     # all the data is located on a single shard.
     - jstests/aggregation/spill_to_disk.js
     # TODO SERVER-32311: These tests use getAggPlanStage(), which can't handle sharded explain output.
-    - jstests/aggregation/match_swapping_renamed_fields.js
-    - jstests/aggregation/use_query_project_and_sort.js
-    - jstests/aggregation/use_query_projection.js
-    - jstests/aggregation/use_query_sort.js
+    - jstests/aggregation/optimization/match_swapping_renamed_fields.js
+    - jstests/aggregation/optimization/use_query_project_and_sort.js
+    - jstests/aggregation/optimization/use_query_projection.js
+    - jstests/aggregation/optimization/use_query_sort.js
     # TODO: Remove when SERVER-23229 is fixed.
-    - jstests/aggregation/bugs/groupMissing.js
+    - jstests/aggregation/sources/group/groupMissing.js
     - jstests/aggregation/sources/graphLookup/variables.js
   exclude_with_any_tags:
     # This passthrough implicitly shards the accessed collections. Do not run tests where collections

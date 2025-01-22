@@ -12,10 +12,10 @@ selector:
     - jstests/aggregation/extras/*.js
     - jstests/aggregation/data/*.js
     # TODO SERVER-32311: These tests use getAggPlanStage(), which can't handle sharded explain output.
-    - jstests/aggregation/match_swapping_renamed_fields.js
-    - jstests/aggregation/use_query_project_and_sort.js
-    - jstests/aggregation/use_query_projection.js
-    - jstests/aggregation/use_query_sort.js
+    - jstests/aggregation/optimization/match_swapping_renamed_fields.js
+    - jstests/aggregation/optimization/use_query_project_and_sort.js
+    - jstests/aggregation/optimization/use_query_projection.js
+    - jstests/aggregation/optimization/use_query_sort.js
 
     # These tests are written such that, after we check the engine being used and the colocation of
     # the involved collections, we drop and recreate our collections for each test case. Given that
@@ -32,47 +32,47 @@ selector:
     # Runs getMores which can be interrupted by a config transition.
     - jstests/aggregation/expressions/in.js
     - jstests/aggregation/sources/densify/densify_sort_opt_comparison.js
-    - jstests/aggregation/bugs/server21632.js
-    - jstests/aggregation/bugs/server6240.js
+    - jstests/aggregation/sources/sample/sample_optimization.js
+    - jstests/aggregation/expressions/extract_missing_date.js
     - jstests/aggregation/sources/merge/mode_replace_fail.js
     - jstests/aggregation/sources/collStats/query_exec_stats.js
     - jstests/aggregation/sources/out/replace_collection.js
     - jstests/aggregation/expressions/date_from_parts.js
     - jstests/aggregation/sources/merge/batch_writes.js
     - jstests/aggregation/expressions/expression_trigonometric.js
-    - jstests/aggregation/bugs/reverseArray.js
+    - jstests/aggregation/expressions/reverseArray.js
     - jstests/aggregation/expressions/set.js
     - jstests/aggregation/expressions/filter.js
     - jstests/aggregation/expressions/trim.js
     - jstests/aggregation/sources/merge/mode_merge_fail.js
     - jstests/aggregation/expressions/regex_limits.js
-    - jstests/aggregation/bugs/server3253.js
-    - jstests/aggregation/bugs/server20163.js
+    - jstests/aggregation/sources/out/unsharded_out.js
+    - jstests/aggregation/expressions/zip.js
     - jstests/aggregation/sources/merge/batch_writes.js
     - jstests/aggregation/expressions/arrayToObject.js
-    - jstests/aggregation/ifnull.js
+    - jstests/aggregation/expressions/ifnull.js
     - jstests/aggregation/sources/facet/facet_memory_consumption.js
-    - jstests/aggregation/bugs/server14670.js
-    - jstests/aggregation/bugs/server5932.js
+    - jstests/aggregation/expressions/strlen.js
+    - jstests/aggregation/agg_cursor.js
     - jstests/aggregation/expressions/binarySize.js
     - jstests/aggregation/expressions/divide.js
     - jstests/aggregation/sources/merge/mode_fail_insert.js
-    - jstests/aggregation/bugs/server7781.js
-    - jstests/aggregation/bugs/server10176.js
+    - jstests/aggregation/sources/geonear/geonear.js
+    - jstests/aggregation/expressions/abs.js
     - jstests/aggregation/expressions/unary_numeric.js
-    - jstests/aggregation/bugs/server11118.js
+    - jstests/aggregation/expressions/date_to_string2.js
     - jstests/aggregation/expressions/map.js
     - jstests/aggregation/expressions/date_to_parts.js
     - jstests/aggregation/sources/geonear/requires_geo_index.js
     - jstests/aggregation/expressions/expression_function.js
-    - jstests/aggregation/bugs/server6570.js
+    - jstests/aggregation/expressions/add_error_on_str.js
     - jstests/aggregation/expressions/merge_objects.js
-    - jstests/aggregation/bugs/server6239.js
+    - jstests/aggregation/expressions/add_subtract_dates.js
     - jstests/aggregation/expressions/multiply.js
     - jstests/aggregation/sources/merge/mode_replace_insert.js
     - jstests/aggregation/expressions/regex.js
     - jstests/aggregation/expressions/objectToArray.js
-    - jstests/aggregation/bugs/server14872.js
+    - jstests/aggregation/expressions/concat_arrays2.js
     - jstests/aggregation/aggregation_with_uuids.js
     - jstests/aggregation/sources/collStats/count.js
     - jstests/aggregation/expressions/size.js
@@ -84,12 +84,12 @@ selector:
     - jstests/aggregation/expressions/internal_js_emit.js
     - jstests/aggregation/sources/unionWith/unionWith.js
     - jstests/aggregation/sources/merge/on_fields_validation.js
-    - jstests/aggregation/bugs/server10530.js
-    - jstests/aggregation/range.js
+    - jstests/aggregation/agg_split_large_objs_across_batches.js
+    - jstests/aggregation/expressions/range.js
     - jstests/aggregation/sources/setWindowFields/concat_arrays.js
     - jstests/aggregation/accumulators/concat_arrays.js
-    - jstests/aggregation/bugs/substrCP.js
-    - jstests/aggregation/bugs/substr.js
+    - jstests/aggregation/expressions/substrCP.js
+    - jstests/aggregation/expressions/substrbytes.js
     - jstests/aggregation/sources/setWindowFields/set_union.js
     - jstests/aggregation/accumulators/set_union.js
     - jstests/aggregation/sources/graphLookup/spilling.js
@@ -101,10 +101,10 @@ selector:
 
     # This test sets an index filter on a particular shard which is only in memory and thus not copied over to a new shard
     # after a config transition moves the collection.
-    - jstests/aggregation/group_conversion_to_distinct_scan.js
+    - jstests/aggregation/optimization/group_conversion_to_distinct_scan.js
 
     # This test expects a stable collection UUID, which isn't true with background moveCollections.
-    - jstests/aggregation/collection_uuid_coll_stats_index_stats.js
+    - jstests/aggregation/sources/collection_uuid_coll_stats_index_stats.js
 
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos

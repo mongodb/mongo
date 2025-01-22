@@ -41,7 +41,7 @@ selector:
   exclude_files:
     - jstests/aggregation/extras/*.js
     - jstests/aggregation/data/*.js
-    - jstests/aggregation/bugs/groupMissing.js
+    - jstests/aggregation/sources/group/groupMissing.js
     - jstests/aggregation/accumulators/internal_js_reduce_with_scope.js
     - jstests/aggregation/expressions/internal_js_emit_with_scope.js
     - jstests/aggregation/sources/unionWith/unionWith_explain.js

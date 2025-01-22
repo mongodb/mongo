@@ -12,7 +12,7 @@ selector:
     # TODO(SERVER-77000): Remove the test exclusion when $out.db in response has expected prefix.
     - jstests/core/query/explain/explain_agg_write_concern.js
     - jstests/aggregation/sources/out/replace_collection.js
-    - jstests/aggregation/explain_writing_aggs.js
+    - jstests/aggregation/explain/explain_writing_aggs.js
     # `rolesInfo` is returning unprefixed database names
     - jstests/core/administrative/builtin_roles_external.js
     # QueryExecutorStats assertions are hardcoded for single-node results
