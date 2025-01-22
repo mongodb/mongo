@@ -44,6 +44,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
@@ -251,9 +252,10 @@ std::vector<BSONObj> TimeseriesModifyStage::_applyUpdate(
             matchDetails.requestElemMatchKey();
 
             // We have to re-apply the filter to get the matched element.
-            tassert(7662500,
-                    "measurement must pass filter",
-                    _originalPredicate->matchesBSON(measurement, &matchDetails));
+            tassert(
+                7662500,
+                "measurement must pass filter",
+                exec::matcher::matchesBSON(_originalPredicate.get(), measurement, &matchDetails));
 
             uassertStatusOK(_params.updateDriver->update(
                 opCtx(),
@@ -765,7 +767,8 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
         // We should stop matching measurements once we hit the limit of one in the non-multi case.
         bool shouldContinueMatching = _isMultiWrite() || matchedMeasurements.empty();
         if (shouldContinueMatching &&
-            (!_residualPredicate || _residualPredicate->matchesBSON(measurement))) {
+            (!_residualPredicate ||
+             exec::matcher::matchesBSON(_residualPredicate.get(), measurement))) {
             matchedMeasurements.push_back(measurement);
         } else {
             unchangedMeasurements.push_back(measurement);

@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/exec/mutable_bson/const_element.h"
 #include "mongo/db/matcher/copyable_match_expression.h"
 #include "mongo/db/matcher/expression.h"
@@ -66,7 +67,7 @@ public:
 
     bool match(const mutablebson::ConstElement& element) final {
         if (element.getType() == mongo::Object) {
-            return _matchExpr->matchesBSON(element.getValueObject());
+            return exec::matcher::matchesBSON(&*_matchExpr, element.getValueObject());
         } else {
             return false;
         }
@@ -106,7 +107,7 @@ public:
 
     bool match(const mutablebson::ConstElement& element) final {
         BSONObj candidate = element.getValue().wrap("");
-        return _matchExpr->matchesBSON(candidate);
+        return exec::matcher::matchesBSON(&*_matchExpr, candidate);
     }
 
     void setCollator(const CollatorInterface* collator) final {

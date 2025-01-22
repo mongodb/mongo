@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/path.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
 
@@ -58,7 +59,7 @@ bool InternalSchemaObjectMatchExpression::matchesSingleElement(const BSONElement
     if (elem.type() != BSONType::Object) {
         return false;
     }
-    return _sub->matchesBSON(elem.Obj());
+    return exec::matcher::matchesBSON(_sub.get(), elem.Obj());
 }
 
 void InternalSchemaObjectMatchExpression::debugString(StringBuilder& debug,

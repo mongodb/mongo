@@ -100,16 +100,6 @@ public:
         return MatchCategory::kLeaf;
     }
 
-    /**
-     * The input matches if the bucket document, 'doc', may contain any geo field that is within
-     * 'withinRegion'.
-     *  - If false, the bucket must not contain any point that is within 'withinRegion'.
-     *  - If true, the bucket may or may not contain points that are within the region. The bucket
-     * will go through the subsequent "unpack" stage so as to check each point in the bucket in an
-     * equivalent $geoWithin operator individually. Always returns true for any bucket containing
-     * objects not of type Point.
-     */
-    bool matches(const MatchableDocument* doc, MatchDetails* details) const final;
     bool matchesSingleElement(const BSONElement& element, MatchDetails* details) const final {
         return false;
     }
@@ -166,11 +156,6 @@ private:
             return expression;
         };
     }
-
-    /**
-     * Helper function for matches() and matchesSingleElement().
-     */
-    bool _matchesBSONObj(const BSONObj& obj) const;
 
     std::shared_ptr<GeometryContainer> _geoContainer;
     std::string _indexField;

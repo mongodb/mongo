@@ -144,8 +144,9 @@ PathMatchExpression* getEligiblePathMatchForNotSerialization(MatchExpression* ex
 }  // namespace
 
 void ListOfMatchExpression::_debugList(StringBuilder& debug, int indentationLevel) const {
-    for (unsigned i = 0; i < _expressions.size(); i++)
+    for (unsigned i = 0; i < _expressions.size(); i++) {
         _expressions[i]->debugString(debug, indentationLevel + 1);
+    }
 }
 
 void ListOfMatchExpression::_listToBSON(BSONArrayBuilder* out,
@@ -516,34 +517,24 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
 }
 
 bool ListOfMatchExpression::equivalent(const MatchExpression* other) const {
-    if (matchType() != other->matchType())
+    if (matchType() != other->matchType()) {
         return false;
-
+    }
     const ListOfMatchExpression* realOther = static_cast<const ListOfMatchExpression*>(other);
 
-    if (_expressions.size() != realOther->_expressions.size())
+    if (_expressions.size() != realOther->_expressions.size()) {
         return false;
-
+    }
     // TOOD: order doesn't matter
-    for (unsigned i = 0; i < _expressions.size(); i++)
-        if (!_expressions[i]->equivalent(realOther->_expressions[i].get()))
-            return false;
-
-    return true;
-}
-
-// -----
-
-bool AndMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
-    for (size_t i = 0; i < numChildren(); i++) {
-        if (!getChild(i)->matches(doc, details)) {
-            if (details)
-                details->resetOutput();
+    for (unsigned i = 0; i < _expressions.size(); i++) {
+        if (!_expressions[i]->equivalent(realOther->_expressions[i].get())) {
             return false;
         }
     }
     return true;
 }
+
+// -----
 
 bool AndMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
     for (size_t i = 0; i < numChildren(); i++) {
@@ -582,15 +573,6 @@ bool AndMatchExpression::isTriviallyTrue() const {
 
 // -----
 
-bool OrMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
-    for (size_t i = 0; i < numChildren(); i++) {
-        if (getChild(i)->matches(doc, nullptr)) {
-            return true;
-        }
-    }
-    return false;
-}
-
 bool OrMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
     MONGO_UNREACHABLE_TASSERT(5429901);
 }
@@ -622,15 +604,6 @@ bool OrMatchExpression::isTriviallyFalse() const {
 }
 
 // ----
-
-bool NorMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
-    for (size_t i = 0; i < numChildren(); i++) {
-        if (getChild(i)->matches(doc, nullptr)) {
-            return false;
-        }
-    }
-    return true;
-}
 
 bool NorMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
     for (size_t i = 0; i < numChildren(); i++) {

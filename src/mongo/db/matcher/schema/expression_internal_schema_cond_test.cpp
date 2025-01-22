@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
@@ -78,9 +79,10 @@ TEST(InternalSchemaCondMatchExpressionTest, AcceptsObjectsThatMatch) {
                           << "engineer");
     auto cond = createCondMatchExpression(conditionQuery, thenQuery, elseQuery);
 
-    ASSERT_TRUE(cond->matchesBSON(fromjson("{age: 15, job: 'student'}")));
-    ASSERT_TRUE(cond->matchesBSON(fromjson("{age: 18, job: 'engineer'}")));
-    ASSERT_TRUE(cond->matchesBSON(fromjson("{age: [10, 20, 30], job: 'student'}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(cond.get(), fromjson("{age: 15, job: 'student'}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(cond.get(), fromjson("{age: 18, job: 'engineer'}")));
+    ASSERT_TRUE(
+        exec::matcher::matchesBSON(cond.get(), fromjson("{age: [10, 20, 30], job: 'student'}")));
 }
 
 TEST(InternalSchemaCondMatchExpressionTest, RejectsObjectsThatDontMatch) {
@@ -91,10 +93,10 @@ TEST(InternalSchemaCondMatchExpressionTest, RejectsObjectsThatDontMatch) {
                           << "engineer");
     auto cond = createCondMatchExpression(conditionQuery, thenQuery, elseQuery);
 
-    ASSERT_FALSE(cond->matchesBSON(fromjson("{age: 21, job: 'student'}")));
-    ASSERT_FALSE(cond->matchesBSON(fromjson("{age: 5, job: 'engineer'}")));
-    ASSERT_FALSE(cond->matchesBSON(fromjson("{age: 19}")));
-    ASSERT_FALSE(cond->matchesBSON(fromjson("{age: 'blah'}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(cond.get(), fromjson("{age: 21, job: 'student'}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(cond.get(), fromjson("{age: 5, job: 'engineer'}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(cond.get(), fromjson("{age: 19}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(cond.get(), fromjson("{age: 'blah'}")));
 }
 
 TEST(InternalSchemaCondMatchExpressionTest, EmptyMatchAlwaysUsesThenBranch) {
@@ -103,8 +105,8 @@ TEST(InternalSchemaCondMatchExpressionTest, EmptyMatchAlwaysUsesThenBranch) {
     auto elseQuery = BSON("value" << BSON("$lt" << 0));
     auto cond = createCondMatchExpression(conditionQuery, thenQuery, elseQuery);
 
-    ASSERT_TRUE(cond->matchesBSON(BSON("value" << 0)));
-    ASSERT_TRUE(cond->matchesBSON(BSON("value" << 2)));
+    ASSERT_TRUE(exec::matcher::matchesBSON(cond.get(), BSON("value" << 0)));
+    ASSERT_TRUE(exec::matcher::matchesBSON(cond.get(), BSON("value" << 2)));
 
     BSONObj match = BSON("value" << 10);
     ASSERT_TRUE(cond->matchesSingleElement(match.firstElement()));
@@ -120,20 +122,22 @@ TEST(InternalSchemaCondMatchExpressionTest, AppliesToSubobjectsViaObjectMatch) {
     InternalSchemaObjectMatchExpression objMatch(
         "job"_sd, createCondMatchExpression(conditionQuery, thenQuery, elseQuery));
 
-    ASSERT_TRUE(objMatch.matchesBSON(
-        fromjson("{name: 'anne', job: {team: 'engineering', subteam: 'query'}}")));
-    ASSERT_TRUE(objMatch.matchesBSON(
-        fromjson("{name: 'natalia', job: {team: 'server', subteam: 'query'}}")));
-    ASSERT_TRUE(objMatch.matchesBSON(
+    ASSERT_TRUE(exec::matcher::matchesBSON(
+        &objMatch, fromjson("{name: 'anne', job: {team: 'engineering', subteam: 'query'}}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(
+        &objMatch, fromjson("{name: 'natalia', job: {team: 'server', subteam: 'query'}}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(
+        &objMatch,
         fromjson("{name: 'nicholas', job: {interests: ['query optimization', 'c++']}}")));
 
-    ASSERT_FALSE(
-        objMatch.matchesBSON(fromjson("{name: 'dave', team: 'server', subteam: 'query'}")));
-    ASSERT_FALSE(objMatch.matchesBSON(fromjson("{name: 'mateo', interests: ['perl', 'python']}}")));
-    ASSERT_FALSE(objMatch.matchesBSON(
-        fromjson("{name: 'lucas', job: {team: 'competitor', subteam: 'query'}}")));
-    ASSERT_FALSE(
-        objMatch.matchesBSON(fromjson("{name: 'marcos', job: {team: 'server', subteam: 'repl'}}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(
+        &objMatch, fromjson("{name: 'dave', team: 'server', subteam: 'query'}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(
+        &objMatch, fromjson("{name: 'mateo', interests: ['perl', 'python']}}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(
+        &objMatch, fromjson("{name: 'lucas', job: {team: 'competitor', subteam: 'query'}}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(
+        &objMatch, fromjson("{name: 'marcos', job: {team: 'server', subteam: 'repl'}}")));
 }
 
 TEST(InternalSchemaCondMatchExpressionTest, EquivalentReturnsCorrectResults) {

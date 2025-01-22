@@ -64,10 +64,6 @@ public:
      */
     virtual StringData name() const = 0;
 
-    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final {
-        return _value;
-    }
-
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final {
         return _value;
     }

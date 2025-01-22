@@ -42,6 +42,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -63,10 +64,11 @@ TEST(MatchExpressionParserArrayTest, Size1) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1))));
+    ASSERT(
+        !exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2 << 3))));
 }
 
 TEST(MatchExpressionParserArrayTest, SizeAsLong) {
@@ -75,10 +77,11 @@ TEST(MatchExpressionParserArrayTest, SizeAsLong) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1))));
+    ASSERT(
+        !exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2 << 3))));
 }
 
 TEST(MatchExpressionParserArrayTest, SizeAsNegativeLong) {
@@ -109,10 +112,11 @@ TEST(MatchExpressionParserArrayTest, SizeWithIntegralDouble) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1))));
+    ASSERT(
+        !exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2 << 3))));
 }
 
 TEST(MatchExpressionParserArrayTest, SizeWithNegativeIntegralDouble) {
@@ -158,10 +162,12 @@ TEST(MatchExpressionParserArrayTest, ElemMatchArr1) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("x" << 1)))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("x" << 1 << "y" << 2)))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x" << BSON_ARRAY(BSON("x" << 1)))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x" << BSON_ARRAY(BSON("x" << 1 << "y" << 2)))));
 }
 
 TEST(MatchExpressionParserArrayTest, ElemMatchAnd) {
@@ -171,10 +177,12 @@ TEST(MatchExpressionParserArrayTest, ElemMatchAnd) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("x" << 1)))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("x" << 1 << "y" << 2)))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x" << BSON_ARRAY(BSON("x" << 1)))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x" << BSON_ARRAY(BSON("x" << 1 << "y" << 2)))));
 }
 
 TEST(MatchExpressionParserArrayTest, ElemMatchNor) {
@@ -183,10 +191,12 @@ TEST(MatchExpressionParserArrayTest, ElemMatchNor) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("x" << 1)))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("x" << 2 << "y" << 2)))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x" << BSON_ARRAY(BSON("x" << 1)))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x" << BSON_ARRAY(BSON("x" << 2 << "y" << 2)))));
 }
 
 TEST(MatchExpressionParserArrayTest, ElemMatchOr) {
@@ -196,10 +206,12 @@ TEST(MatchExpressionParserArrayTest, ElemMatchOr) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("x" << 1)))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("x" << 1 << "y" << 2)))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x" << BSON_ARRAY(BSON("x" << 1)))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x" << BSON_ARRAY(BSON("x" << 1 << "y" << 2)))));
 }
 
 TEST(MatchExpressionParserArrayTest, ElemMatchVal1) {
@@ -208,9 +220,9 @@ TEST(MatchExpressionParserArrayTest, ElemMatchVal1) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(4))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(6))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(4))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(6))));
 }
 
 // with explicit $eq
@@ -231,9 +243,9 @@ TEST(MatchExpressionParserArrayTest, ElemMatchDBRef1) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << match)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(notMatch))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(match))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << match)));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(notMatch))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(match))));
 }
 
 TEST(MatchExpressionParserArrayTest, ElemMatchDBRef2) {
@@ -253,9 +265,9 @@ TEST(MatchExpressionParserArrayTest, ElemMatchDBRef2) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << match)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(notMatch))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(match))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << match)));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(notMatch))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(match))));
 }
 
 // Additional fields after $ref and $id.
@@ -274,12 +286,13 @@ TEST(MatchExpressionParserArrayTest, ElemMatchDBRef3) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << match)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(notMatch))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(match))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << match)));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(notMatch))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(match))));
 
     // Document contains fields not referred to in $elemMatch query.
-    ASSERT(result.getValue()->matchesBSON(
+    ASSERT(exec::matcher::matchesBSON(
+        result.getValue().get(),
         BSON("x" << BSON_ARRAY(BSON("$ref"
                                     << "coll"
                                     << "$id" << oid << "foo" << 12345 << "bar" << 678)))));
@@ -307,9 +320,9 @@ TEST(MatchExpressionParserArrayTest, ElemMatchDBRef4) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << match)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(notMatch))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(match))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << match)));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(notMatch))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(match))));
 }
 
 // Query with DBRef fields out of order.
@@ -331,12 +344,13 @@ TEST(MatchExpressionParserArrayTest, ElemMatchDBRef5) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << match)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(notMatch))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(match))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << match)));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(notMatch))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(match))));
 
     // Document contains fields not referred to in $elemMatch query.
-    ASSERT(result.getValue()->matchesBSON(
+    ASSERT(exec::matcher::matchesBSON(
+        result.getValue().get(),
         BSON("x" << BSON_ARRAY(BSON("$ref"
                                     << "coll"
                                     << "$id" << oid << "foo" << 12345 << "bar" << 678)))));
@@ -360,12 +374,13 @@ TEST(MatchExpressionParserArrayTest, ElemMatchDBRef6) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << match)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(notMatch))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(match))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << match)));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(notMatch))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(match))));
 
     // Document contains fields not referred to in $elemMatch query.
-    ASSERT(result.getValue()->matchesBSON(
+    ASSERT(exec::matcher::matchesBSON(
+        result.getValue().get(),
         BSON("x" << BSON_ARRAY(BSON("$ref"
                                     << "coll"
                                     << "$id" << oid << "foo" << 12345 << "bar" << 678)))));
@@ -388,12 +403,13 @@ TEST(MatchExpressionParserArrayTest, ElemMatchDBRef7) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << match)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(notMatch))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(match))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << match)));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(notMatch))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(match))));
 
     // Document contains fields not referred to in $elemMatch query.
-    ASSERT(result.getValue()->matchesBSON(
+    ASSERT(exec::matcher::matchesBSON(
+        result.getValue().get(),
         BSON("x" << BSON_ARRAY(BSON("$ref"
                                     << "coll"
                                     << "$id" << oid << "foo" << 12345 << "bar" << 678)))));
@@ -421,12 +437,13 @@ TEST(MatchExpressionParserArrayTest, ElemMatchDBRef8) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << match)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(notMatch))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(match))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << match)));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(notMatch))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(match))));
 
     // Document contains fields not referred to in $elemMatch query.
-    ASSERT(result.getValue()->matchesBSON(
+    ASSERT(exec::matcher::matchesBSON(
+        result.getValue().get(),
         BSON("x" << BSON_ARRAY(BSON("$ref"
                                     << "coll"
                                     << "$id" << oid << "$db"
@@ -443,12 +460,13 @@ TEST(MatchExpressionParserArrayTest, All1) {
     // Verify that the $all got parsed to AND.
     ASSERT_EQUALS(MatchExpression::AND, result.getValue()->matchType());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(2))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(2 << 3))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(2))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
+    ASSERT(
+        exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(2 << 3))));
 }
 
 TEST(MatchExpressionParserArrayTest, AllNull) {
@@ -460,10 +478,10 @@ TEST(MatchExpressionParserArrayTest, AllNull) {
     // Verify that the $all got parsed to AND.
     ASSERT_EQUALS(MatchExpression::AND, result.getValue()->matchType());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSONNULL)));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSONNULL))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSONNULL)));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(BSONNULL))));
 }
 
 TEST(MatchExpressionParserArrayTest, AllBadArg) {
@@ -548,10 +566,10 @@ TEST(MatchExpressionParserArrayTest, AllNonArray) {
     // Verify that the $all got parsed to AND.
     ASSERT_EQUALS(MatchExpression::AND, result.getValue()->matchType());
 
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << 5)));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(5))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 4)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(4))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 5)));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(5))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 4)));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(4))));
 }
 
 
@@ -568,10 +586,12 @@ TEST(MatchExpressionParserArrayTest, AllElemMatch1) {
     MatchExpression* child = result.getValue()->getChild(0);
     ASSERT_EQUALS(MatchExpression::ELEM_MATCH_OBJECT, child->matchType());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("x" << 1)))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("x" << 1 << "y" << 2)))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x" << BSON_ARRAY(BSON("x" << 1)))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x" << BSON_ARRAY(BSON("x" << 1 << "y" << 2)))));
 }
 
 // $all and $elemMatch on dotted field.
@@ -589,25 +609,30 @@ TEST(MatchExpressionParserArrayTest, AllElemMatch2) {
     MatchExpression* child = result.getValue()->getChild(0);
     ASSERT_EQUALS(MatchExpression::ELEM_MATCH_OBJECT, child->matchType());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("y" << 1))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("y" << BSON_ARRAY(1 << 2)))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("y" << BSON_ARRAY(BSON("x" << 1))))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON("y" << 1))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x" << BSON("y" << BSON_ARRAY(1 << 2)))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x" << BSON("y" << BSON_ARRAY(BSON("x" << 1))))));
     // x is a document. Internal document does not contain z.
-    ASSERT(!result.getValue()->matchesBSON(
-        BSON("x" << BSON("y" << BSON_ARRAY(BSON("x" << 1 << "y" << 1))))));
+    ASSERT(!exec::matcher::matchesBSON(
+        result.getValue().get(), BSON("x" << BSON("y" << BSON_ARRAY(BSON("x" << 1 << "y" << 1))))));
     // x is an array. Internal document does not contain z.
-    ASSERT(!result.getValue()->matchesBSON(
+    ASSERT(!exec::matcher::matchesBSON(
+        result.getValue().get(),
         BSON("x" << BSON_ARRAY(BSON("y" << BSON_ARRAY(BSON("x" << 1 << "y" << 1)))))));
     // x is a document but y is not an array.
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("y" << BSON("x" << 1 << "z" << 1)))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x" << BSON("y" << BSON("x" << 1 << "z" << 1)))));
     // x is an array but y is not an array.
-    ASSERT(!result.getValue()->matchesBSON(
-        BSON("x" << BSON_ARRAY(BSON("y" << BSON("x" << 1 << "z" << 1))))));
+    ASSERT(!exec::matcher::matchesBSON(
+        result.getValue().get(), BSON("x" << BSON_ARRAY(BSON("y" << BSON("x" << 1 << "z" << 1))))));
     // x is a document.
-    ASSERT(result.getValue()->matchesBSON(
-        BSON("x" << BSON("y" << BSON_ARRAY(BSON("x" << 1 << "z" << 1))))));
+    ASSERT(exec::matcher::matchesBSON(
+        result.getValue().get(), BSON("x" << BSON("y" << BSON_ARRAY(BSON("x" << 1 << "z" << 1))))));
     // x is an array.
-    ASSERT(result.getValue()->matchesBSON(
+    ASSERT(exec::matcher::matchesBSON(
+        result.getValue().get(),
         BSON("x" << BSON_ARRAY(BSON("y" << BSON_ARRAY(BSON("x" << 1 << "z" << 1)))))));
 }
 
@@ -691,15 +716,21 @@ TEST(MatchExpressionParserArrayTest, AllEmptyString) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x"
-                                                << "a")));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSONNULL << "a"))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSONObj() << "a"))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSONArray())));
-    ASSERT(result.getValue()->matchesBSON(BSON("x"
-                                               << "")));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSONNULL << ""))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSONObj() << ""))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x"
+                                            << "a")));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x" << BSON_ARRAY(BSONNULL << "a"))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x" << BSON_ARRAY(BSONObj() << "a"))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSONArray())));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x"
+                                           << "")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x" << BSON_ARRAY(BSONNULL << ""))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x" << BSON_ARRAY(BSONObj() << ""))));
 }
 
 // $all with ISO date.
@@ -716,13 +747,17 @@ TEST(MatchExpressionParserArrayTest, AllISODate) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << notMatch)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSONNULL << notMatch))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSONObj() << notMatch))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSONArray())));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << match)));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSONNULL << match))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSONObj() << match))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << notMatch)));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x" << BSON_ARRAY(BSONNULL << notMatch))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x" << BSON_ARRAY(BSONObj() << notMatch))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSONArray())));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << match)));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x" << BSON_ARRAY(BSONNULL << match))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x" << BSON_ARRAY(BSONObj() << match))));
 }
 
 // $all on array element with empty string.
@@ -732,17 +767,25 @@ TEST(MatchExpressionParserArrayTest, AllDottedEmptyString) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x"
-                                                << "a")));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSONNULL << "a"))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSONObj() << "a"))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY("" << BSONNULL))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY("" << BSONObj()))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSONArray())));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x"
-                                                << "")));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSONNULL << ""))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSONObj() << ""))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x"
+                                            << "a")));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x" << BSON_ARRAY(BSONNULL << "a"))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x" << BSON_ARRAY(BSONObj() << "a"))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x" << BSON_ARRAY("" << BSONNULL))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x" << BSON_ARRAY("" << BSONObj()))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSONArray())));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x"
+                                            << "")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x" << BSON_ARRAY(BSONNULL << ""))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x" << BSON_ARRAY(BSONObj() << ""))));
 }
 
 // $all on array element with ISO date.
@@ -759,15 +802,21 @@ TEST(MatchExpressionParserArrayTest, AllDottedISODate) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << notMatch)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSONNULL << notMatch))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSONObj() << notMatch))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(match << BSONNULL))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(match << BSONObj()))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSONArray())));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << match)));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSONNULL << match))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSONObj() << match))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << notMatch)));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x" << BSON_ARRAY(BSONNULL << notMatch))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x" << BSON_ARRAY(BSONObj() << notMatch))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x" << BSON_ARRAY(match << BSONNULL))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x" << BSON_ARRAY(match << BSONObj()))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSONArray())));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << match)));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x" << BSON_ARRAY(BSONNULL << match))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x" << BSON_ARRAY(BSONObj() << match))));
 }
 
 TEST(MatchExpressionParserArrayTest, AllStringNullCollation) {

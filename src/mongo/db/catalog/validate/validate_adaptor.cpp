@@ -60,6 +60,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression.h"
@@ -739,7 +740,8 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
         const IndexDescriptor* descriptor =
             coll->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
         if ((descriptor->isPartial() &&
-             !descriptor->getEntry()->getFilterExpression()->matchesBSON(recordBson)) ||
+             !exec::matcher::matchesBSON(descriptor->getEntry()->getFilterExpression(),
+                                         recordBson)) ||
             !results->getIndexValidateResult(descriptor->indexName()).continueValidation()) {
             continue;
         }

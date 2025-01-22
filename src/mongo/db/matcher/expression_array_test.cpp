@@ -34,6 +34,7 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
@@ -96,30 +97,34 @@ TEST(ElemMatchObjectMatchExpression, MatchesNonArray) {
     auto op = ElemMatchObjectMatchExpression{"a"_sd, std::move(eq)};
     // Directly nested objects are not matched with $elemMatch.  An intervening array is
     // required.
-    ASSERT(!op.matchesBSON(BSON("a" << BSON("b" << 5)), nullptr));
-    ASSERT(!op.matchesBSON(BSON("a" << BSON("0" << (BSON("b" << 5)))), nullptr));
-    ASSERT(!op.matchesBSON(BSON("a" << 4), nullptr));
+    ASSERT(!exec::matcher::matchesBSON(&op, BSON("a" << BSON("b" << 5)), nullptr));
+    ASSERT(!exec::matcher::matchesBSON(&op, BSON("a" << BSON("0" << (BSON("b" << 5)))), nullptr));
+    ASSERT(!exec::matcher::matchesBSON(&op, BSON("a" << 4), nullptr));
 }
 
 TEST(ElemMatchObjectMatchExpression, MatchesArrayObject) {
     auto baseOperand = BSON("b" << 5);
     auto eq = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand["b"]);
     auto op = ElemMatchObjectMatchExpression{"a"_sd, std::move(eq)};
-    ASSERT(op.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << 5))), nullptr));
-    ASSERT(op.matchesBSON(BSON("a" << BSON_ARRAY(4 << BSON("b" << 5))), nullptr));
-    ASSERT(op.matchesBSON(BSON("a" << BSON_ARRAY(BSONObj() << BSON("b" << 5))), nullptr));
-    ASSERT(op.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << 6) << BSON("b" << 5))), nullptr));
+    ASSERT(exec::matcher::matchesBSON(&op, BSON("a" << BSON_ARRAY(BSON("b" << 5))), nullptr));
+    ASSERT(exec::matcher::matchesBSON(&op, BSON("a" << BSON_ARRAY(4 << BSON("b" << 5))), nullptr));
+    ASSERT(exec::matcher::matchesBSON(
+        &op, BSON("a" << BSON_ARRAY(BSONObj() << BSON("b" << 5))), nullptr));
+    ASSERT(exec::matcher::matchesBSON(
+        &op, BSON("a" << BSON_ARRAY(BSON("b" << 6) << BSON("b" << 5))), nullptr));
 }
 
 TEST(ElemMatchObjectMatchExpression, MatchesMultipleNamedValues) {
     auto baseOperand = BSON("c" << 5);
     auto eq = std::make_unique<EqualityMatchExpression>("c"_sd, baseOperand["c"]);
     auto op = ElemMatchObjectMatchExpression{"a.b"_sd, std::move(eq)};
-    ASSERT(
-        op.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << BSON_ARRAY(BSON("c" << 5))))), nullptr));
-    ASSERT(op.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << BSON_ARRAY(BSON("c" << 1)))
-                                                 << BSON("b" << BSON_ARRAY(BSON("c" << 5))))),
-                          nullptr));
+    ASSERT(exec::matcher::matchesBSON(
+        &op, BSON("a" << BSON_ARRAY(BSON("b" << BSON_ARRAY(BSON("c" << 5))))), nullptr));
+    ASSERT(exec::matcher::matchesBSON(
+        &op,
+        BSON("a" << BSON_ARRAY(BSON("b" << BSON_ARRAY(BSON("c" << 1)))
+                               << BSON("b" << BSON_ARRAY(BSON("c" << 5))))),
+        nullptr));
 }
 
 TEST(ElemMatchObjectMatchExpression, ElemMatchKey) {
@@ -128,15 +133,18 @@ TEST(ElemMatchObjectMatchExpression, ElemMatchKey) {
     auto op = ElemMatchObjectMatchExpression{"a.b"_sd, std::move(eq)};
     auto details = MatchDetails{};
     details.requestElemMatchKey();
-    ASSERT(!op.matchesBSON(BSONObj(), &details));
+    ASSERT(!exec::matcher::matchesBSON(&op, BSONObj(), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(!op.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(BSON("c" << 7)))), &details));
+    ASSERT(!exec::matcher::matchesBSON(
+        &op, BSON("a" << BSON("b" << BSON_ARRAY(BSON("c" << 7)))), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(op.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(3 << BSON("c" << 6)))), &details));
+    ASSERT(exec::matcher::matchesBSON(
+        &op, BSON("a" << BSON("b" << BSON_ARRAY(3 << BSON("c" << 6)))), &details));
     ASSERT(details.hasElemMatchKey());
     // The entry within the $elemMatch array is reported.
     ASSERT_EQUALS("1", details.elemMatchKey());
-    ASSERT(op.matchesBSON(
+    ASSERT(exec::matcher::matchesBSON(
+        &op,
         BSON("a" << BSON_ARRAY(1 << 2 << BSON("b" << BSON_ARRAY(3 << 5 << BSON("c" << 6))))),
         &details));
     ASSERT(details.hasElemMatchKey());
@@ -220,8 +228,8 @@ TEST(ElemMatchValueMatchExpression, MatchesNonArray) {
     auto op = ElemMatchObjectMatchExpression("a"_sd, std::move(gt));
     // Directly nested objects are not matched with $elemMatch.  An intervening array is
     // required.
-    ASSERT(!op.matchesBSON(BSON("a" << 6), nullptr));
-    ASSERT(!op.matchesBSON(BSON("a" << BSON("0" << 6)), nullptr));
+    ASSERT(!exec::matcher::matchesBSON(&op, BSON("a" << 6), nullptr));
+    ASSERT(!exec::matcher::matchesBSON(&op, BSON("a" << BSON("0" << 6)), nullptr));
 }
 
 TEST(ElemMatchValueMatchExpression, MatchesArrayScalar) {
@@ -229,9 +237,9 @@ TEST(ElemMatchValueMatchExpression, MatchesArrayScalar) {
     auto gt = std::make_unique<GTMatchExpression>(""_sd, baseOperand["$gt"]);
     auto op =
         ElemMatchValueMatchExpression{"a"_sd, std::unique_ptr<MatchExpression>{std::move(gt)}};
-    ASSERT(op.matchesBSON(BSON("a" << BSON_ARRAY(6)), nullptr));
-    ASSERT(op.matchesBSON(BSON("a" << BSON_ARRAY(4 << 6)), nullptr));
-    ASSERT(op.matchesBSON(BSON("a" << BSON_ARRAY(BSONObj() << 7)), nullptr));
+    ASSERT(exec::matcher::matchesBSON(&op, BSON("a" << BSON_ARRAY(6)), nullptr));
+    ASSERT(exec::matcher::matchesBSON(&op, BSON("a" << BSON_ARRAY(4 << 6)), nullptr));
+    ASSERT(exec::matcher::matchesBSON(&op, BSON("a" << BSON_ARRAY(BSONObj() << 7)), nullptr));
 }
 
 TEST(ElemMatchValueMatchExpression, MatchesMultipleNamedValues) {
@@ -239,8 +247,10 @@ TEST(ElemMatchValueMatchExpression, MatchesMultipleNamedValues) {
     auto gt = std::make_unique<GTMatchExpression>(""_sd, baseOperand["$gt"]);
     auto op =
         ElemMatchValueMatchExpression{"a.b"_sd, std::unique_ptr<MatchExpression>{std::move(gt)}};
-    ASSERT(op.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << BSON_ARRAY(6)))), nullptr));
-    ASSERT(op.matchesBSON(
+    ASSERT(exec::matcher::matchesBSON(
+        &op, BSON("a" << BSON_ARRAY(BSON("b" << BSON_ARRAY(6)))), nullptr));
+    ASSERT(exec::matcher::matchesBSON(
+        &op,
         BSON("a" << BSON_ARRAY(BSON("b" << BSON_ARRAY(4)) << BSON("b" << BSON_ARRAY(4 << 6)))),
         nullptr));
 }
@@ -252,16 +262,16 @@ TEST(ElemMatchValueMatchExpression, ElemMatchKey) {
         ElemMatchValueMatchExpression{"a.b"_sd, std::unique_ptr<MatchExpression>{std::move(gt)}};
     auto details = MatchDetails{};
     details.requestElemMatchKey();
-    ASSERT(!op.matchesBSON(BSONObj(), &details));
+    ASSERT(!exec::matcher::matchesBSON(&op, BSONObj(), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(!op.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(2))), &details));
+    ASSERT(!exec::matcher::matchesBSON(&op, BSON("a" << BSON("b" << BSON_ARRAY(2))), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(op.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(3 << 7))), &details));
+    ASSERT(exec::matcher::matchesBSON(&op, BSON("a" << BSON("b" << BSON_ARRAY(3 << 7))), &details));
     ASSERT(details.hasElemMatchKey());
     // The entry within the $elemMatch array is reported.
     ASSERT_EQUALS("1", details.elemMatchKey());
-    ASSERT(op.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2 << BSON("b" << BSON_ARRAY(3 << 7)))),
-                          &details));
+    ASSERT(exec::matcher::matchesBSON(
+        &op, BSON("a" << BSON_ARRAY(1 << 2 << BSON("b" << BSON_ARRAY(3 << 7)))), &details));
     ASSERT(details.hasElemMatchKey());
     // The entry within a parent of the $elemMatch array is reported.
     ASSERT_EQUALS("2", details.elemMatchKey());
@@ -383,19 +393,19 @@ TEST(AndOfElemMatch, Matches) {
     andOfEM->add(std::move(elemMatch2));
 
     auto nonArray = BSON("x" << 4);
-    ASSERT(!andOfEM->matchesBSON(nonArray, nullptr));
+    ASSERT(!exec::matcher::matchesBSON(andOfEM.get(), nonArray, nullptr));
     auto emptyArray = BSON("x" << BSONArray());
-    ASSERT(!andOfEM->matchesBSON(emptyArray, nullptr));
+    ASSERT(!exec::matcher::matchesBSON(andOfEM.get(), emptyArray, nullptr));
     auto nonNumberArray = BSON("x" << BSON_ARRAY("q"));
-    ASSERT(!andOfEM->matchesBSON(nonNumberArray, nullptr));
+    ASSERT(!exec::matcher::matchesBSON(andOfEM.get(), nonNumberArray, nullptr));
     auto singleMatch = BSON("x" << BSON_ARRAY(5));
-    ASSERT(!andOfEM->matchesBSON(singleMatch, nullptr));
+    ASSERT(!exec::matcher::matchesBSON(andOfEM.get(), singleMatch, nullptr));
     auto otherMatch = BSON("x" << BSON_ARRAY(105));
-    ASSERT(!andOfEM->matchesBSON(otherMatch, nullptr));
+    ASSERT(!exec::matcher::matchesBSON(andOfEM.get(), otherMatch, nullptr));
     auto bothMatch = BSON("x" << BSON_ARRAY(5 << 105));
-    ASSERT(andOfEM->matchesBSON(bothMatch, nullptr));
+    ASSERT(exec::matcher::matchesBSON(andOfEM.get(), bothMatch, nullptr));
     auto neitherMatch = BSON("x" << BSON_ARRAY(0 << 200));
-    ASSERT(!andOfEM->matchesBSON(neitherMatch, nullptr));
+    ASSERT(!exec::matcher::matchesBSON(andOfEM.get(), neitherMatch, nullptr));
 }
 
 TEST(SizeMatchExpression, MatchesElement) {
@@ -420,27 +430,30 @@ TEST(SizeMatchExpression, MatchesNonArray) {
 
 TEST(SizeMatchExpression, MatchesArray) {
     auto size = SizeMatchExpression{"a"_sd, 2};
-    ASSERT(size.matchesBSON(BSON("a" << BSON_ARRAY(4 << 5.5)), nullptr));
+    ASSERT(exec::matcher::matchesBSON(&size, BSON("a" << BSON_ARRAY(4 << 5.5)), nullptr));
     // Arrays are not unwound to look for matching subarrays.
-    ASSERT(!size.matchesBSON(BSON("a" << BSON_ARRAY(4 << 5.5 << BSON_ARRAY(1 << 2))), nullptr));
+    ASSERT(!exec::matcher::matchesBSON(
+        &size, BSON("a" << BSON_ARRAY(4 << 5.5 << BSON_ARRAY(1 << 2))), nullptr));
 }
 
 TEST(SizeMatchExpression, MatchesNestedArray) {
     auto size = SizeMatchExpression{"a.2"_sd, 2};
     // A numerically referenced nested array is matched.
-    ASSERT(size.matchesBSON(BSON("a" << BSON_ARRAY(4 << 5.5 << BSON_ARRAY(1 << 2))), nullptr));
+    ASSERT(exec::matcher::matchesBSON(
+        &size, BSON("a" << BSON_ARRAY(4 << 5.5 << BSON_ARRAY(1 << 2))), nullptr));
 }
 
 TEST(SizeMatchExpression, ElemMatchKey) {
     auto size = SizeMatchExpression{"a.b"_sd, 3};
     auto details = MatchDetails{};
     details.requestElemMatchKey();
-    ASSERT(!size.matchesBSON(BSON("a" << 1), &details));
+    ASSERT(!exec::matcher::matchesBSON(&size, BSON("a" << 1), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(size.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(1 << 2 << 3))), &details));
+    ASSERT(exec::matcher::matchesBSON(
+        &size, BSON("a" << BSON("b" << BSON_ARRAY(1 << 2 << 3))), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(size.matchesBSON(BSON("a" << BSON_ARRAY(2 << BSON("b" << BSON_ARRAY(1 << 2 << 3)))),
-                            &details));
+    ASSERT(exec::matcher::matchesBSON(
+        &size, BSON("a" << BSON_ARRAY(2 << BSON("b" << BSON_ARRAY(1 << 2 << 3)))), &details));
     ASSERT(details.hasElemMatchKey());
     ASSERT_EQUALS("1", details.elemMatchKey());
 }

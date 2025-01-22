@@ -49,11 +49,6 @@ WhereMatchExpression::WhereMatchExpression(OperationContext* opCtx,
       _opCtx(opCtx),
       _jsFunction(std::make_unique<JsFunction>(_opCtx, getCode(), dbName)) {}
 
-bool WhereMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
-    validateState();
-    return _jsFunction->runAsPredicate(doc->toBSON());
-}
-
 unique_ptr<MatchExpression> WhereMatchExpression::clone() const {
     validateState();
 

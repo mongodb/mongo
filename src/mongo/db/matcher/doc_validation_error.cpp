@@ -49,6 +49,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/matcher/doc_validation_error.h"
 #include "mongo/db/matcher/doc_validation_util.h"
@@ -224,7 +225,7 @@ struct ValidationErrorContext {
             bool generateErrorValue;
             // If 'matchesBSON()' throws, generate an error which explains the exception.
             try {
-                generateErrorValue = expr.matchesBSON(frameParams.currentDoc)
+                generateErrorValue = exec::matcher::matchesBSON(&expr, frameParams.currentDoc)
                     ? inversion == InvertError::kInverted
                     : inversion == InvertError::kNormal;
             } catch (const DBException&) {
@@ -591,7 +592,7 @@ BSONElement findFirstFailingAdditionalProperty(const MatchExpression& filter,
                                                const BSONObj& doc) {
     for (auto&& property : additionalProperties) {
         auto&& elem = doc.getField(property.valueStringData());
-        if (!filter.matchesBSONElement(elem)) {
+        if (!exec::matcher::matchesBSONElement(&filter, elem)) {
             return elem;
         }
     }
@@ -614,7 +615,7 @@ BSONElement findFailingProperty(const InternalSchemaAllowedPropertiesMatchExpres
     for (auto&& elem : ctx->getCurrentDocument()) {
         auto field = elem.fieldNameStringData();
         auto&& re = pattern.regex;
-        if (re && *re && re->matchView(field) && !filter->matchesBSONElement(elem)) {
+        if (re && *re && re->matchView(field) && !exec::matcher::matchesBSONElement(filter, elem)) {
             return elem;
         }
     }
@@ -788,7 +789,7 @@ public:
             // Append the result of $expr's aggregation expression evaluation.
             BSONMatchableDocument document{_context->getCurrentDocument()};
             try {
-                auto expressionResult = expr->evaluateExpression(&document);
+                auto expressionResult = exec::matcher::evaluateExpression(expr, &document);
                 appendErrorReason(kNormalReason, kInvertedReason);
                 expressionResult.addToBsonObj(&bob, "expressionResult"_sd);
             } catch (const DBException& e) {
@@ -895,7 +896,8 @@ public:
             // Only generate an error in the boolean case if the 'additionalProperties' expression
             // evaluates to false.
             if (additionalPropertiesType == BSONType::Bool &&
-                !additionalPropertiesExpr->matchesBSON(_context->getCurrentDocument())) {
+                !exec::matcher::matchesBSON(additionalPropertiesExpr,
+                                            _context->getCurrentDocument())) {
                 generateAdditionalPropertiesFalseError(additionalProperties, _context);
             } else if (additionalPropertiesType == BSONType::Object) {
                 // In the case of an additionalProperties keyword which takes a schema argument,
@@ -971,7 +973,7 @@ public:
             // fail if its 'condition' expression evaluates to true and its then branch evaluates to
             // false. Therefore, if 'condition' evaluates to false, we conclude that this node will
             // not contribute to error generation.
-            if (!expr->condition()->matchesBSON(_context->getCurrentDocument())) {
+            if (!exec::matcher::matchesBSON(expr->condition(), _context->getCurrentDocument())) {
                 _context->setCurrentRuntimeState(RuntimeState::kNoError);
             }
         }
@@ -1108,7 +1110,7 @@ public:
             std::vector<int> matchingClauses;
             for (size_t childIndex = 0; childIndex < expr->numChildren(); ++childIndex) {
                 auto child = expr->getChild(childIndex);
-                if (child->matchesBSON(currentDoc)) {
+                if (exec::matcher::matchesBSON(child, currentDoc)) {
                     matchingClauses.push_back(childIndex);
                 }
             }

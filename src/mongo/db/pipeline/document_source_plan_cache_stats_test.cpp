@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -77,7 +78,9 @@ public:
         std::copy_if(_planCacheStats.begin(),
                      _planCacheStats.end(),
                      std::back_inserter(filteredStats),
-                     [&matchExpr](const BSONObj& obj) { return matchExpr->matchesBSON(obj); });
+                     [&matchExpr](const BSONObj& obj) {
+                         return exec::matcher::matchesBSON(matchExpr, obj);
+                     });
         return filteredStats;
     }
 

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,26 +27,20 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-#include <utility>
-
-#include "mongo/db/matcher/expression_where_noop.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/db/exec/matcher/matcher.h"
+#include "mongo/db/matcher/expression_where.h"
 
 namespace mongo {
 
-WhereNoOpMatchExpression::WhereNoOpMatchExpression(WhereParams params)
-    : WhereMatchExpressionBase(std::move(params)) {}
+namespace exec::matcher {
 
-std::unique_ptr<MatchExpression> WhereNoOpMatchExpression::clone() const {
-    WhereParams params;
-    params.code = getCode();
-    std::unique_ptr<WhereNoOpMatchExpression> e =
-        std::make_unique<WhereNoOpMatchExpression>(std::move(params));
-    if (getTag()) {
-        e->setTag(getTag()->clone());
-    }
-    return std::move(e);
+void MatchExpressionEvaluator::visit(const WhereMatchExpression* expr) {
+    expr->validateState();
+    _result = expr->getPredicate().runAsPredicate(_doc->toBSON());
 }
+
+void MatchExpressionEvaluator::visit(const WhereNoOpMatchExpression* expr) {
+    MONGO_UNREACHABLE;
+}
+}  // namespace exec::matcher
 }  // namespace mongo

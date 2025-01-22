@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -51,7 +52,7 @@ namespace {
 
 TEST(InternalSchemaXorOp, MatchesNothingWhenHasNoClauses) {
     InternalSchemaXorMatchExpression internalSchemaXorOp;
-    ASSERT_FALSE(internalSchemaXorOp.matchesBSON(BSONObj()));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&internalSchemaXorOp, BSONObj()));
 }
 
 TEST(InternalSchemaXorOp, MatchesSingleClause) {
@@ -60,10 +61,11 @@ TEST(InternalSchemaXorOp, MatchesSingleClause) {
     auto expr = MatchExpressionParser::parse(matchPredicate, expCtx);
 
     ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << 4)));
-    ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << BSON_ARRAY(4 << 6))));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(BSON("a" << 5)));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(BSON("a" << BSON_ARRAY(4 << 5))));
+    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << 4)));
+    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << BSON_ARRAY(4 << 6))));
+    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << 5)));
+    ASSERT_FALSE(
+        exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << BSON_ARRAY(4 << 5))));
 }
 
 TEST(InternalSchemaXorOp, MatchesThreeClauses) {
@@ -74,14 +76,14 @@ TEST(InternalSchemaXorOp, MatchesThreeClauses) {
     auto expr = MatchExpressionParser::parse(matchPredicate, expCtx);
 
     ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << -1)));
-    ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << 11)));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(BSON("a" << 5)));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(BSON("b" << 100)));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(BSON("b" << 101)));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(BSONObj()));
-    ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << 11 << "b" << 100)));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(BSON("a" << 11 << "b" << 0)));
+    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << -1)));
+    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << 11)));
+    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << 5)));
+    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("b" << 100)));
+    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("b" << 101)));
+    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), BSONObj()));
+    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << 11 << "b" << 100)));
+    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << 11 << "b" << 0)));
 }
 
 TEST(InternalSchemaXorOp, MatchesSingleElement) {
@@ -111,13 +113,13 @@ TEST(InternalSchemaXorOp, DoesNotUseElemMatchKey) {
     MatchDetails details;
     details.requestElemMatchKey();
     ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << 1), &details));
+    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << 1), &details));
     ASSERT_FALSE(details.hasElemMatchKey());
-    ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << BSON_ARRAY(1) << "b" << BSON_ARRAY(10)),
-                                             &details));
+    ASSERT_TRUE(exec::matcher::matchesBSON(
+        expr.getValue().get(), BSON("a" << BSON_ARRAY(1) << "b" << BSON_ARRAY(10)), &details));
     ASSERT_FALSE(details.hasElemMatchKey());
-    ASSERT_FALSE(
-        expr.getValue()->matchesBSON(BSON("a" << BSON_ARRAY(3) << "b" << BSON_ARRAY(4)), &details));
+    ASSERT_FALSE(exec::matcher::matchesBSON(
+        expr.getValue().get(), BSON("a" << BSON_ARRAY(3) << "b" << BSON_ARRAY(4)), &details));
     ASSERT_FALSE(details.hasElemMatchKey());
 }
 

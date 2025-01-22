@@ -48,6 +48,7 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/index/fts_access_method.h"
@@ -627,7 +628,7 @@ void SortedDataIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
                                                 UpdateTicket* ticket) const {
     SharedBufferFragmentBuilder pooledBuilder(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
     const MatchExpression* indexFilter = entry->getFilterExpression();
-    if (!indexFilter || indexFilter->matchesBSON(from)) {
+    if (!indexFilter || exec::matcher::matchesBSON(indexFilter, from)) {
         // Override key constraints when generating keys for removal. This only applies to keys
         // that do not apply to a partial filter expression.
         const auto getKeysMode = entry->isHybridBuilding()
@@ -650,7 +651,7 @@ void SortedDataIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
                 record);
     }
 
-    if (!indexFilter || indexFilter->matchesBSON(to)) {
+    if (!indexFilter || exec::matcher::matchesBSON(indexFilter, to)) {
         getKeys(opCtx,
                 collection,
                 entry,
@@ -1333,7 +1334,7 @@ void SortedDataIndexAccessMethod::getKeys(
         // indexed), do not suppress the error.
         const MatchExpression* filter = entry->getFilterExpression();
         if (mode == InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered &&
-            filter && filter->matchesBSON(obj)) {
+            filter && exec::matcher::matchesBSON(filter, obj)) {
             throw;
         }
 
@@ -1384,7 +1385,7 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
         // index.
         // See SERVER-28975 and SERVER-39705 for details.
         if (auto filter = entry->getFilterExpression()) {
-            if (!filter->matchesBSON(obj)) {
+            if (!exec::matcher::matchesBSON(filter, obj)) {
                 return Status::OK();
             }
         }
@@ -1436,7 +1437,7 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
         // index.
         // See SERVER-28975 and SERVER-39705 for details.
         if (auto filter = entry->getFilterExpression()) {
-            if (!filter->matchesBSON(obj)) {
+            if (!exec::matcher::matchesBSON(filter, obj)) {
                 return;
             }
         }

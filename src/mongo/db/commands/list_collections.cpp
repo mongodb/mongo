@@ -67,6 +67,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
@@ -170,7 +171,7 @@ void _addWorkingSetMember(OperationContext* opCtx,
                           const MatchExpression* matcher,
                           WorkingSet* ws,
                           std::vector<WorkingSetID>& results) {
-    if (matcher && !matcher->matchesBSON(maybe)) {
+    if (matcher && !exec::matcher::matchesBSON(matcher, maybe)) {
         return;
     }
 

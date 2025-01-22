@@ -31,6 +31,7 @@
 
 #include <cmath>
 
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
@@ -420,7 +421,7 @@ void SamplingEstimatorImpl::generateChunkSample() {
 CardinalityEstimate SamplingEstimatorImpl::estimateCardinality(const MatchExpression* expr) const {
     size_t cnt = 0;
     for (const auto& doc : _sample) {
-        if (expr->matchesBSON(doc, nullptr)) {
+        if (exec::matcher::matchesBSON(expr, doc, nullptr)) {
             cnt++;
         }
     }
@@ -468,7 +469,7 @@ CardinalityEstimate SamplingEstimatorImpl::estimateRIDs(const IndexBounds& bound
     for (auto&& doc : _sample) {
         if (doesDocumentMatchBounds(bounds, doc)) {
             // If 'expr' is null, we are simply estimating the cardinality by IndexBounds.
-            if (expr == nullptr || expr->matchesBSON(doc, nullptr)) {
+            if (expr == nullptr || exec::matcher::matchesBSON(expr, doc, nullptr)) {
                 count++;
             }
         }

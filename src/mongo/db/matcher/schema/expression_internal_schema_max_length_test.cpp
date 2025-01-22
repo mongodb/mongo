@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
 #include "mongo/unittest/assert.h"
@@ -48,42 +49,48 @@ namespace {
 TEST(InternalSchemaMaxLengthMatchExpression, RejectsNonStringElements) {
     InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 1);
 
-    ASSERT_FALSE(maxLength.matchesBSON(BSON("a" << BSONObj())));
-    ASSERT_FALSE(maxLength.matchesBSON(BSON("a" << 1)));
-    ASSERT_FALSE(maxLength.matchesBSON(BSON("a" << BSON_ARRAY(1))));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&maxLength, BSON("a" << BSONObj())));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&maxLength, BSON("a" << 1)));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&maxLength, BSON("a" << BSON_ARRAY(1))));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, RejectsStringsWithTooManyChars) {
     InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 2);
 
-    ASSERT_FALSE(maxLength.matchesBSON(BSON("a"
-                                            << "abc")));
-    ASSERT_FALSE(maxLength.matchesBSON(BSON("a"
-                                            << "abcd")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&maxLength,
+                                            BSON("a"
+                                                 << "abc")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&maxLength,
+                                            BSON("a"
+                                                 << "abcd")));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, AcceptsStringsWithLessThanOrEqualToMax) {
     InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 2);
 
-    ASSERT_TRUE(maxLength.matchesBSON(BSON("a"
-                                           << "ab")));
-    ASSERT_TRUE(maxLength.matchesBSON(BSON("a"
-                                           << "a")));
-    ASSERT_TRUE(maxLength.matchesBSON(BSON("a"
-                                           << "")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength,
+                                           BSON("a"
+                                                << "ab")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength,
+                                           BSON("a"
+                                                << "a")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength,
+                                           BSON("a"
+                                                << "")));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, MaxLengthZeroAllowsEmptyString) {
     InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 0);
 
-    ASSERT_TRUE(maxLength.matchesBSON(BSON("a"
-                                           << "")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength,
+                                           BSON("a"
+                                                << "")));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, RejectsNull) {
     InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 1);
 
-    ASSERT_FALSE(maxLength.matchesBSON(BSON("a" << BSONNULL)));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&maxLength, BSON("a" << BSONNULL)));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, TreatsMultiByteCodepointAsOneCharacter) {
@@ -92,8 +99,8 @@ TEST(InternalSchemaMaxLengthMatchExpression, TreatsMultiByteCodepointAsOneCharac
 
     // This string has one code point, so it should meet maximum length 1 but not maximum length 0.
     const auto testString = u8"\U0001f4a9"_as_char_ptr;
-    ASSERT_FALSE(nonMatchingMaxLength.matchesBSON(BSON("a" << testString)));
-    ASSERT_TRUE(matchingMaxLength.matchesBSON(BSON("a" << testString)));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&nonMatchingMaxLength, BSON("a" << testString)));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&matchingMaxLength, BSON("a" << testString)));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, CorectlyCountsUnicodeCodepoints) {
@@ -110,8 +117,8 @@ TEST(InternalSchemaMaxLengthMatchExpression, CorectlyCountsUnicodeCodepoints) {
 
     // This string has five code points, so it should meet maximum length 5 but not maximum
     // length 4.
-    ASSERT_FALSE(nonMatchingMaxLength.matchesBSON(BSON("a" << testString)));
-    ASSERT_TRUE(matchingMaxLength.matchesBSON(BSON("a" << testString)));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&nonMatchingMaxLength, BSON("a" << testString)));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&matchingMaxLength, BSON("a" << testString)));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, DealsWithInvalidUTF8) {
@@ -126,21 +133,26 @@ TEST(InternalSchemaMaxLengthMatchExpression, DealsWithInvalidUTF8) {
 
     // Because these inputs are invalid, we don't have any expectations about the answers we get.
     // Our only requirement is that the test does not crash.
-    std::ignore = maxLength.matchesBSON(BSON("a" << testStringUnexpectedContinuationByte));
-    std::ignore = maxLength.matchesBSON(BSON("a" << testStringOverlongEncoding));
-    std::ignore = maxLength.matchesBSON(BSON("a" << testStringInvalidCodePoint));
-    std::ignore = maxLength.matchesBSON(BSON("a" << testStringLeadingByteWithoutContinuationByte));
+    std::ignore =
+        exec::matcher::matchesBSON(&maxLength, BSON("a" << testStringUnexpectedContinuationByte));
+    std::ignore = exec::matcher::matchesBSON(&maxLength, BSON("a" << testStringOverlongEncoding));
+    std::ignore = exec::matcher::matchesBSON(&maxLength, BSON("a" << testStringInvalidCodePoint));
+    std::ignore = exec::matcher::matchesBSON(
+        &maxLength, BSON("a" << testStringLeadingByteWithoutContinuationByte));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, NestedArraysWorkWithDottedPaths) {
     InternalSchemaMaxLengthMatchExpression maxLength("a.b"_sd, 2);
 
-    ASSERT_TRUE(maxLength.matchesBSON(BSON("a" << BSON("b"
-                                                       << "a"))));
-    ASSERT_TRUE(maxLength.matchesBSON(BSON("a" << BSON("b"
-                                                       << "ab"))));
-    ASSERT_FALSE(maxLength.matchesBSON(BSON("a" << BSON("b"
-                                                        << "abc"))));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength,
+                                           BSON("a" << BSON("b"
+                                                            << "a"))));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&maxLength,
+                                           BSON("a" << BSON("b"
+                                                            << "ab"))));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&maxLength,
+                                            BSON("a" << BSON("b"
+                                                             << "abc"))));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, SameMaxLengthTreatedEquivalent) {
