@@ -8,6 +8,9 @@
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   references_foreign_collection,
+ *   # TODO SERVER-88275: background moveCollections can cause the aggregation below to fail with
+ *   # QueryPlanKilled.
+ *   assumes_balancer_off,
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
