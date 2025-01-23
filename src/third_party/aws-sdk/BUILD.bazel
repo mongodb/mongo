@@ -1,0 +1,1371 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+TARGET_COMPATIBILITY = select({
+    "//bazel/config:linux_aarch64": [],
+    "//bazel/config:linux_x86_64": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
+
+# The following copts should be included by mongo_cc_library already
+# [
+#     "-O2",
+#     "-g",
+#     "-DNDEBUG",
+#     "-fPIC",
+#     "-fvisibility=hidden",
+#     "-Wall",
+#     "-fno-omit-frame-pointer",
+# ]
+
+AWS_C_COMMON_INCLUDE = select({
+    # Platform specific source file include path
+    # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+    "@platforms//cpu:x86_64": ["-Isrc/third_party/aws-sdk/platform/linux_x86_64/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/generated/include"],
+    "@platforms//cpu:aarch64": ["-Isrc/third_party/aws-sdk/platform/linux_aarch64/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/generated/include"],
+    "//conditions:default": [],
+})
+
+AWS_CRT_CPP_INCLUDE = select({
+    # Platform specific source file include path
+    # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+    "@platforms//cpu:x86_64": ["-Isrc/third_party/aws-sdk/platform/linux_x86_64/aws-sdk/crt/aws-crt-cpp/generated/include"],
+    "@platforms//cpu:aarch64": ["-Isrc/third_party/aws-sdk/platform/linux_aarch64/aws-sdk/crt/aws-crt-cpp/generated/include"],
+    "//conditions:default": [],
+})
+
+mongo_cc_library(
+    name = "aws-cjson",
+    srcs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/external/cJSON.c",
+    ]),
+    hdrs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/external/cJSON.h",
+    ]),
+    includes = ["dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/external"],
+)
+
+mongo_cc_library(
+    name = "aws-c-common",
+    srcs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/posix/*.c",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/*.c",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/external/libcbor/*.c",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/external/libcbor/cbor/*.c",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/external/libcbor/cbor/internal/*.c",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/linux/*.c",
+    ]) + select({
+        # Platform specific source file include path
+        # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+        "@platforms//cpu:x86_64": [
+            "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/arch/intel/asm/cpuid.c",
+            "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/arch/intel/cpuid.c",
+            "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/arch/intel/encoding_avx2.c",
+        ],
+        "@platforms//cpu:aarch64": [
+            "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/arch/arm/auxv/cpuid.c",
+        ],
+        "//conditions:default": [
+            "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/arch/generic/cpuid.c",
+        ],
+    }),
+    hdrs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include/aws/common/posix/*",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include/aws/common/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include/aws/common/*.inl",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include/aws/common/external/ittnotify.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include/aws/common/private/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include/aws/common/private/*.inl",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/external/libcbor/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/external/libcbor/cbor/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/external/libcbor/cbor/internal/*.h",
+    ]) + select({
+        # Platform specific source file include path
+        # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+        "@platforms//cpu:x86_64": glob(["platform/linux_x86_64/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/generated/include/aws/common/*.h"]),
+        "@platforms//cpu:aarch64": glob(["platform/linux_aarch64/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/generated/include/aws/common/*.h"]),
+        "//conditions:default": [],
+    }),
+    copts = AWS_C_COMMON_INCLUDE + [
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/external",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/source/external/libcbor",
+        "-Wno-error",
+        "-Wno-sign-compare",
+        "-Wno-implicit-fallthrough",
+        "-Wstrict-prototypes",
+        "-pedantic",
+        "-Wno-long-long",
+        "-std=gnu99",
+    ] + select({
+        # Platform specific source file include path
+        # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+        "@platforms//cpu:x86_64": [
+            "-mavx",
+            "-mavx2",
+        ],
+        "@platforms//cpu:aarch64": [
+            "-moutline-atomics",
+        ],
+        "//conditions:default": [],
+    }),
+    linkopts = [
+        "-lpthread",
+        "-ldl",
+        "-lm",
+        "-lrt",
+    ],
+    local_defines = [
+        "AWS_AFFINITY_METHOD=AWS_AFFINITY_METHOD_PTHREAD_ATTR",
+        "AWS_COMMON_EXPORTS",
+        "AWS_COMMON_USE_IMPORT_EXPORT",
+        "AWS_PTHREAD_GETNAME_TAKES_3ARGS",
+        "AWS_PTHREAD_SETNAME_TAKES_2ARGS",
+        "CJSON_HIDE_SYMBOLS",
+        "ENABLED_REQUEST_COMPRESSION",
+        "ENABLED_ZLIB_REQUEST_COMPRESSION",
+        "ENABLE_CURL_CLIENT",
+        "ENFORCE_TLS_V1_2",
+        "HAVE_SYSCONF",
+        "INTEL_NO_ITTNOTIFY_API",
+        "PLATFORM_LINUX",
+        "_POSIX_C_SOURCE=200809L",
+        "_XOPEN_SOURCE=500",
+        "aws_c_common_EXPORTS",
+    ] + select({
+        # Platform specific source file include path
+        # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+        "@platforms//cpu:x86_64": [
+            "USE_SIMD_ENCODING",
+        ],
+        "//conditions:default": [],
+    }),
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        "aws-cjson",
+    ],
+)
+
+mongo_cc_library(
+    name = "aws-checksums",
+    srcs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-checksums/source/*.c",
+    ]) + select({
+        # Platform specific source file include path
+        # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+        "@platforms//cpu:x86_64": [
+            "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-checksums/source/intel/asm/crc32c_sse42_asm.c",
+            "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-checksums/source/intel/intrin/crc32c_sse42_avx512.c",
+            "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-checksums/source/intel/intrin/crc64nvme_avx512.c",
+            "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-checksums/source/intel/intrin/crc64nvme_clmul.c",
+        ],
+        "@platforms//cpu:aarch64": [
+            "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-checksums/source/arm/crc32c_arm.c",
+            "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-checksums/source/arm/crc64_arm.c",
+        ],
+        "//conditions:default": [],
+    }),
+    hdrs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-checksums/include/aws/checksums/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-checksums/include/aws/checksums/private/*.h",
+    ]),
+    copts = AWS_C_COMMON_INCLUDE + [
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-checksums/include",
+        "-Wno-error",
+        "-Wstrict-prototypes",
+        "-Wextra",
+        "-pedantic",
+        "-Wno-long-long",
+        "-std=gnu99",
+    ] + select({
+        # Platform specific source file include path
+        # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+        "@platforms//cpu:x86_64": [
+            "-msse4.2",
+            "-mavx512f",
+            "-mvpclmulqdq",
+            "-mavx512vl",
+            "-mavx",
+            "-mavx2",
+            "-mpclmul",
+        ],
+        "@platforms//cpu:aarch64": [
+            "-moutline-atomics",
+            "-march=armv8-a+crc+crypto",
+            "-mtune=neoverse-v1",
+        ],
+        "//conditions:default": [],
+    }),
+    local_defines = [
+        "AWS_CHECKSUMS_EXPORTS",
+        "AWS_CHECKSUMS_USE_IMPORT_EXPORT",
+        "AWS_COMMON_USE_IMPORT_EXPORT",
+        "ENABLED_REQUEST_COMPRESSION",
+        "ENABLED_ZLIB_REQUEST_COMPRESSION",
+        "ENABLE_CURL_CLIENT",
+        "ENFORCE_TLS_V1_2",
+        "HAVE_SYSCONF",
+        "INTEL_NO_ITTNOTIFY_API",
+        "PLATFORM_LINUX",
+        "aws_checksums_EXPORTS",
+    ],
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        "aws-c-common",
+    ],
+)
+
+mongo_cc_library(
+    name = "aws-s2n",
+    srcs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/crypto/*.c",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/error/*.c",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/stuffer/*.c",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/tls/*.c",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/tls/**/*.c",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/utils/*.c",
+    ]),
+    hdrs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/utils/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/api/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/api/unstable/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/crypto/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/error/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/stuffer/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/tls/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/tls/**/*.h",
+    ]),
+    copts = [
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/s2n",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/api",
+        "-Wno-error",
+        "-pedantic",
+        "-std=gnu99",
+        "-Wcast-align",
+        "-Wchar-subscripts",
+        "-Wcomment",
+        "-Wformat-security",
+        "-Wimplicit",
+        "-Wshadow",
+        "-Wsign-compare",
+        "-Wuninitialized",
+        "-Wunused",
+        "-Wwrite-strings",
+        "-Wa,--noexecstack",
+        "-Wno-deprecated-declarations",
+        "-Wno-missing-braces",
+        "-Wno-strict-prototypes",
+        "-Wno-unknown-pragmas",
+        "-DS2N_EXPORTS",
+        "-include utils/s2n_prelude.h",
+    ] + select({
+        # Platform specific source file include path
+        # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+        "@platforms//cpu:aarch64": [
+            "-moutline-atomics",
+        ],
+        "//conditions:default": [],
+    }),
+    # Libs I think it needs: dl Threads::Threads rt
+    linkopts = [
+        "-ldl",
+        "-lpthread",
+        # "-lThreads::Threads",
+        "-lcrypto",
+        "-lrt",
+    ],
+    local_defines = [
+        "ENABLED_REQUEST_COMPRESSION",
+        "ENABLED_ZLIB_REQUEST_COMPRESSION",
+        "ENABLE_CURL_CLIENT",
+        "ENFORCE_TLS_V1_2",
+        "PLATFORM_LINUX",
+        "S2N_ATOMIC_SUPPORTED",
+        "S2N_BUILD_RELEASE",
+        "S2N_CLOEXEC_SUPPORTED",
+        "S2N_CLOEXEC_XOPEN_SUPPORTED",
+        "S2N_CLONE_SUPPORTED",
+        "S2N_DIAGNOSTICS_POP_SUPPORTED",
+        "S2N_DIAGNOSTICS_PUSH_SUPPORTED",
+        "S2N_EXECINFO_AVAILABLE",
+        "S2N_FALL_THROUGH_SUPPORTED",
+        "S2N_FEATURES_AVAILABLE",
+        "S2N_LIBCRYPTO_SUPPORTS_EVP_RC4",
+        "S2N_LINUX_SENDFILE",
+        "S2N_MADVISE_SUPPORTED",
+        "S2N_STACKTRACE",
+        "s2n_EXPORTS",
+    ] + select({
+        # Platform specific source file include path
+        # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+        "@platforms//cpu:x86_64": [
+            "S2N_CPUID_AVAILABLE",
+            "S2N_KTLS_SUPPORTED",
+        ],
+        "//conditions:default": [],
+    }),
+    target_compatible_with = TARGET_COMPATIBILITY,
+)
+
+mongo_cc_library(
+    name = "aws-c-sdkutils",
+    srcs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-sdkutils/source/*.c",
+    ]),
+    hdrs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-sdkutils/include/aws/sdkutils/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-sdkutils/include/aws/sdkutils/private/*.h",
+    ]),
+    copts = AWS_C_COMMON_INCLUDE + AWS_CRT_CPP_INCLUDE + [
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-sdkutils/include",
+        "-Wno-error",
+        "-Wstrict-prototypes",
+        "-pedantic",
+        "-Wno-long-long",
+        "-std=gnu99",
+    ] + select({
+        # Platform specific source file include path
+        # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+        "@platforms//cpu:aarch64": [
+            "-moutline-atomics",
+        ],
+        "//conditions:default": [],
+    }),
+    local_defines = [
+        "AWS_COMMON_USE_IMPORT_EXPORT",
+        "AWS_SDKUTILS_EXPORTS",
+        "AWS_SDKUTILS_USE_IMPORT_EXPORT",
+        "ENABLED_REQUEST_COMPRESSION",
+        "ENABLED_ZLIB_REQUEST_COMPRESSION",
+        "ENABLE_CURL_CLIENT",
+        "ENFORCE_TLS_V1_2",
+        "HAVE_SYSCONF",
+        "INTEL_NO_ITTNOTIFY_API",
+        "PLATFORM_LINUX",
+        "aws_c_sdkutils_EXPORTS",
+    ],
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        "aws-c-common",
+    ],
+)
+
+mongo_cc_library(
+    name = "aws-c-cal",
+    srcs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-cal/source/*.c",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-cal/source/unix/*.c",
+    ]),
+    hdrs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-cal/include/aws/cal/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-cal/include/aws/cal/private/*.h",
+    ]),
+    copts = AWS_C_COMMON_INCLUDE + AWS_CRT_CPP_INCLUDE + [
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-cal/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include",
+        "-Wno-error",
+        "-Wno-implicit-fallthrough",
+        "-Wstrict-prototypes",
+        "-pedantic",
+        "-Wno-long-long",
+        "-std=gnu99",
+    ] + select({
+        # Platform specific source file include path
+        # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+        "@platforms//cpu:aarch64": [
+            "-moutline-atomics",
+        ],
+        "//conditions:default": [],
+    }),
+    # Libs I think it needs: OpenSSL::Crypto Threads::Threads
+    linkopts = [
+        "-lpthread",
+        "-lcrypto",
+    ],
+    local_defines = [
+        "AWS_CAL_EXPORTS",
+        "AWS_CAL_USE_IMPORT_EXPORT",
+        "AWS_COMMON_USE_IMPORT_EXPORT",
+        "ENABLED_REQUEST_COMPRESSION",
+        "ENABLED_ZLIB_REQUEST_COMPRESSION",
+        "ENABLE_CURL_CLIENT",
+        "ENFORCE_TLS_V1_2",
+        "HAVE_SYSCONF",
+        "INTEL_NO_ITTNOTIFY_API",
+        "PLATFORM_LINUX",
+        "aws_c_cal_EXPORTS",
+    ],
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        "aws-c-common",
+    ],
+)
+
+mongo_cc_library(
+    name = "aws-c-io",
+    srcs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include/aws/common/external/ittnotify.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/source/*.c",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/source/linux/*.c",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/source/posix/*.c",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/source/s2n/*.c",
+    ]),
+    hdrs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include/aws/common/external/ittnotify.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/include/aws/io/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/include/aws/io/private/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/include/aws/io/private/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/source/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/source/pkcs11/v2.40/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/api/unstable/*.h",
+    ]),
+    copts = AWS_C_COMMON_INCLUDE + AWS_CRT_CPP_INCLUDE + [
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-cal/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/s2n",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/api",
+        "-Wno-error",
+        "-Wstrict-prototypes",
+        "-Wextra",
+        "-pedantic",
+        "-Wno-long-long",
+        "-std=gnu99",
+    ] + select({
+        # Platform specific source file include path
+        # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+        "@platforms//cpu:aarch64": [
+            "-moutline-atomics",
+        ],
+        "//conditions:default": [],
+    }),
+    linkopts = [
+        "-lcrypto",
+    ],
+    local_defines = [
+        "AWS_CAL_USE_IMPORT_EXPORT",
+        "AWS_COMMON_USE_IMPORT_EXPORT",
+        "AWS_IO_EXPORTS",
+        "AWS_IO_USE_IMPORT_EXPORT",
+        "AWS_S2N_INSOURCE_PATH",
+        "AWS_USE_EPOLL",
+        "ENABLED_REQUEST_COMPRESSION",
+        "ENABLED_ZLIB_REQUEST_COMPRESSION",
+        "ENABLE_CURL_CLIENT",
+        "ENFORCE_TLS_V1_2",
+        "HAVE_SYSCONF",
+        "INTEL_NO_ITTNOTIFY_API",
+        "PLATFORM_LINUX",
+        "USE_S2N",
+        "aws_c_io_EXPORTS",
+    ],
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        "aws-c-cal",
+        "aws-c-common",
+        "aws-s2n",
+    ],
+)
+
+mongo_cc_library(
+    name = "aws-c-compression",
+    srcs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-compression/source/*.c",
+    ]),
+    hdrs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-compression/include/aws/compression/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-compression/include/aws/compression/private/*.h",
+    ]),
+    copts = AWS_C_COMMON_INCLUDE + [
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-cal/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-compression/include",
+        "-Wno-error",
+        "-Wstrict-prototypes",
+        "-Wextra",
+        "-pedantic",
+        "-Wno-long-long",
+        "-std=gnu99",
+    ] + select({
+        # Platform specific source file include path
+        # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+        "@platforms//cpu:aarch64": [
+            "-moutline-atomics",
+        ],
+        "//conditions:default": [],
+    }),
+    local_defines = [
+        "AWS_COMMON_USE_IMPORT_EXPORT",
+        "AWS_COMPRESSION_EXPORTS",
+        "AWS_COMPRESSION_USE_IMPORT_EXPORT",
+        "ENABLED_REQUEST_COMPRESSION",
+        "ENABLED_ZLIB_REQUEST_COMPRESSION",
+        "ENABLE_CURL_CLIENT",
+        "ENFORCE_TLS_V1_2",
+        "HAVE_SYSCONF",
+        "INTEL_NO_ITTNOTIFY_API",
+        "PLATFORM_LINUX",
+        "aws_c_compression_EXPORTS",
+    ],
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        "aws-c-common",
+    ],
+)
+
+mongo_cc_library(
+    name = "aws-c-http",
+    srcs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-http/source/*.c",
+    ]),
+    hdrs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-http/include/aws/http/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-http/include/aws/http/private/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-http/include/aws/http/private/*.def",
+    ]),
+    copts = AWS_C_COMMON_INCLUDE + AWS_CRT_CPP_INCLUDE + [
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-cal/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-compression/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-http/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/s2n",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/api",
+        "-Wno-error",
+        "-Wno-implicit-fallthrough",
+        "-Wstrict-prototypes",
+        "-Wextra",
+        "-pedantic",
+        "-Wno-long-long",
+        "-std=gnu99",
+    ] + select({
+        # Platform specific source file include path
+        # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+        "@platforms//cpu:aarch64": [
+            "-moutline-atomics",
+        ],
+        "//conditions:default": [],
+    }),
+    local_defines = [
+        "AWS_CAL_USE_IMPORT_EXPORT",
+        "AWS_COMMON_USE_IMPORT_EXPORT",
+        "AWS_COMPRESSION_USE_IMPORT_EXPORT",
+        "AWS_HTTP_EXPORTS",
+        "AWS_HTTP_USE_IMPORT_EXPORT",
+        "AWS_IO_USE_IMPORT_EXPORT",
+        "AWS_USE_EPOLL",
+        "ENABLED_REQUEST_COMPRESSION",
+        "ENABLED_ZLIB_REQUEST_COMPRESSION",
+        "ENABLE_CURL_CLIENT",
+        "ENFORCE_TLS_V1_2",
+        "HAVE_SYSCONF",
+        "INTEL_NO_ITTNOTIFY_API",
+        "PLATFORM_LINUX",
+        "aws_c_http_EXPORTS",
+    ],
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        "aws-c-compression",
+        "aws-c-io",
+    ],
+)
+
+mongo_cc_library(
+    name = "aws-c-auth",
+    srcs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-auth/source/*.c",
+    ]),
+    hdrs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-auth/include/aws/auth/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-auth/include/aws/auth/private/*.h",
+    ]),
+    copts = AWS_C_COMMON_INCLUDE + AWS_CRT_CPP_INCLUDE + [
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-auth/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-cal/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-compression/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-http/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-sdkutils/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-checksums/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/s2n",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/api",
+        "-Wno-error",
+        "-Wstrict-prototypes",
+        "-Wextra",
+        "-pedantic",
+        "-Wno-long-long",
+        "-std=gnu99",
+    ] + select({
+        # Platform specific source file include path
+        # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+        "@platforms//cpu:aarch64": [
+            "-moutline-atomics",
+        ],
+        "//conditions:default": [],
+    }),
+    local_defines = [
+        "AWS_AUTH_EXPORTS",
+        "AWS_AUTH_USE_IMPORT_EXPORT",
+        "AWS_CAL_USE_IMPORT_EXPORT",
+        "AWS_COMMON_USE_IMPORT_EXPORT",
+        "AWS_COMPRESSION_USE_IMPORT_EXPORT",
+        "AWS_HTTP_USE_IMPORT_EXPORT",
+        "AWS_IO_USE_IMPORT_EXPORT",
+        "AWS_SDKUTILS_USE_IMPORT_EXPORT",
+        "AWS_USE_EPOLL",
+        "CJSON_HIDE_SYMBOLS",
+        "ENABLED_REQUEST_COMPRESSION",
+        "ENABLED_ZLIB_REQUEST_COMPRESSION",
+        "ENABLE_CURL_CLIENT",
+        "ENFORCE_TLS_V1_2",
+        "HAVE_SYSCONF",
+        "INTEL_NO_ITTNOTIFY_API",
+        "PLATFORM_LINUX",
+        "aws_c_auth_EXPORTS",
+    ],
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        "aws-c-cal",
+        "aws-c-http",
+        "aws-c-sdkutils",
+    ],
+)
+
+mongo_cc_library(
+    name = "aws-c-s3",
+    srcs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-s3/source/*.c",
+    ]),
+    hdrs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-s3/include/aws/s3/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-s3/include/aws/s3/private/*.h",
+    ]),
+    copts = AWS_C_COMMON_INCLUDE + AWS_CRT_CPP_INCLUDE + [
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-auth/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-cal/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-compression/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-http/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-s3/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-sdkutils/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-checksums/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/s2n",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/api",
+        "-Wno-error",
+        "-Wno-implicit-fallthrough",
+        "-Wstrict-prototypes",
+        "-Wextra",
+        "-pedantic",
+        "-Wno-long-long",
+        "-std=gnu99",
+    ] + select({
+        # Platform specific source file include path
+        # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+        "@platforms//cpu:aarch64": [
+            "-moutline-atomics",
+        ],
+        "//conditions:default": [],
+    }),
+    local_defines = [
+        "AWS_AUTH_USE_IMPORT_EXPORT",
+        "AWS_CAL_USE_IMPORT_EXPORT",
+        "AWS_CHECKSUMS_USE_IMPORT_EXPORT",
+        "AWS_COMMON_USE_IMPORT_EXPORT",
+        "AWS_COMPRESSION_USE_IMPORT_EXPORT",
+        "AWS_HTTP_USE_IMPORT_EXPORT",
+        "AWS_IO_USE_IMPORT_EXPORT",
+        "AWS_S3_EXPORTS",
+        "AWS_S3_USE_IMPORT_EXPORT",
+        "AWS_SDKUTILS_USE_IMPORT_EXPORT",
+        "AWS_USE_EPOLL",
+        "CJSON_HIDE_SYMBOLS",
+        "ENABLED_REQUEST_COMPRESSION",
+        "ENABLED_ZLIB_REQUEST_COMPRESSION",
+        "ENABLE_CURL_CLIENT",
+        "ENFORCE_TLS_V1_2",
+        "HAVE_SYSCONF",
+        "INTEL_NO_ITTNOTIFY_API",
+        "PLATFORM_LINUX",
+        "aws_c_s3_EXPORTS",
+    ],
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        "aws-c-auth",
+        "aws-checksums",
+    ],
+)
+
+mongo_cc_library(
+    name = "aws-c-mqtt",
+    srcs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-mqtt/source/*.c",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-mqtt/source/v5/*.c",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-mqtt/source/request-response/*.c",
+    ]),
+    hdrs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-mqtt/include/aws/mqtt/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-mqtt/include/aws/mqtt/v5/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-mqtt/include/aws/mqtt/request-response/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-mqtt/include/aws/mqtt/private/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-mqtt/include/aws/mqtt/private/v5/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-mqtt/include/aws/mqtt/private/request-response/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/include/aws/crt/mqtt/private/*.h",
+    ]),
+    copts = AWS_C_COMMON_INCLUDE + AWS_CRT_CPP_INCLUDE + [
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-cal/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-compression/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-http/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-mqtt/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/s2n",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/api",
+        "-Wno-error",
+        "-Wno-implicit-fallthrough",
+        "-Wstrict-prototypes",
+        "-Wextra",
+        "-pedantic",
+        "-Wno-long-long",
+        "-std=gnu99",
+    ] + select({
+        # Platform specific source file include path
+        # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+        "@platforms//cpu:aarch64": [
+            "-moutline-atomics",
+        ],
+        "//conditions:default": [],
+    }),
+    local_defines = [
+        "AWS_CAL_USE_IMPORT_EXPORT",
+        "AWS_COMMON_USE_IMPORT_EXPORT",
+        "AWS_COMPRESSION_USE_IMPORT_EXPORT",
+        "AWS_HTTP_USE_IMPORT_EXPORT",
+        "AWS_IO_USE_IMPORT_EXPORT",
+        "AWS_MQTT_EXPORTS",
+        "AWS_MQTT_USE_IMPORT_EXPORT",
+        "AWS_USE_EPOLL",
+        "ENABLED_REQUEST_COMPRESSION",
+        "ENABLED_ZLIB_REQUEST_COMPRESSION",
+        "ENABLE_CURL_CLIENT",
+        "ENFORCE_TLS_V1_2",
+        "HAVE_SYSCONF",
+        "INTEL_NO_ITTNOTIFY_API",
+        "PLATFORM_LINUX",
+        "aws_c_mqtt_EXPORTS",
+    ],
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        "aws-c-http",
+    ],
+)
+
+mongo_cc_library(
+    name = "aws-c-event-stream",
+    srcs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-event-stream/source/*.c",
+    ]),
+    hdrs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-event-stream/include/aws/event-stream/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-event-stream/include/aws/event-stream/private/*.h",
+    ]),
+    copts = AWS_C_COMMON_INCLUDE + AWS_CRT_CPP_INCLUDE + [
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-cal/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-event-stream/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-checksums/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/s2n",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/api",
+        "-Wno-error",
+        "-Wno-implicit-fallthrough",
+        "-Wstrict-prototypes",
+        "-Wextra",
+        "-pedantic",
+        "-Wno-long-long",
+        "-std=gnu99",
+    ] + select({
+        # Platform specific source file include path
+        # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+        "@platforms//cpu:aarch64": [
+            "-moutline-atomics",
+        ],
+        "//conditions:default": [],
+    }),
+    local_defines = [
+        "AWS_CAL_USE_IMPORT_EXPORT",
+        "AWS_CHECKSUMS_USE_IMPORT_EXPORT",
+        "AWS_COMMON_USE_IMPORT_EXPORT",
+        "AWS_EVENT_STREAM_EXPORTS",
+        "AWS_EVENT_STREAM_USE_IMPORT_EXPORT",
+        "AWS_IO_USE_IMPORT_EXPORT",
+        "AWS_USE_EPOLL",
+        "ENABLED_REQUEST_COMPRESSION",
+        "ENABLED_ZLIB_REQUEST_COMPRESSION",
+        "ENABLE_CURL_CLIENT",
+        "ENFORCE_TLS_V1_2",
+        "HAVE_SYSCONF",
+        "INTEL_NO_ITTNOTIFY_API",
+        "PLATFORM_LINUX",
+        "aws_c_event_stream_EXPORTS",
+    ],
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        "aws-c-common",
+        "aws-c-io",
+        "aws-checksums",
+    ],
+)
+
+AWS_CRT_CPP_INCLUDES = AWS_C_COMMON_INCLUDE + AWS_CRT_CPP_INCLUDE + [
+    "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-auth/include",
+    "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-cal/include",
+    "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-common/include",
+    "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-compression/include",
+    "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-event-stream/include",
+    "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-http/include",
+    "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-io/include",
+    "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-mqtt/include",
+    "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-sdkutils/include",
+    "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-c-s3/include",
+    "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/aws-checksums/include",
+    "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/s2n",
+    "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/crt/s2n/api",
+    "-Isrc/third_party/aws-sdk/dist/aws-sdk/crt/aws-crt-cpp/include",
+]
+
+mongo_cc_library(
+    name = "aws-crt-cpp",
+    srcs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/source/*.cpp",
+        "dist/aws-sdk/crt/aws-crt-cpp/source/auth/*.cpp",
+        "dist/aws-sdk/crt/aws-crt-cpp/source/checksum/*.cpp",
+        "dist/aws-sdk/crt/aws-crt-cpp/source/crypto/*.cpp",
+        "dist/aws-sdk/crt/aws-crt-cpp/source/io/*.cpp",
+        "dist/aws-sdk/crt/aws-crt-cpp/source/iot/*.cpp",
+        "dist/aws-sdk/crt/aws-crt-cpp/source/mqtt/*.cpp",
+        "dist/aws-sdk/crt/aws-crt-cpp/source/http/*.cpp",
+        "dist/aws-sdk/crt/aws-crt-cpp/source/endpoints/*.cpp",
+        "dist/aws-sdk/crt/aws-crt-cpp/source/cbor/*.cpp",
+        "dist/aws-sdk/crt/aws-crt-cpp/source/mqtt/*.cpp",
+        "dist/aws-sdk/crt/aws-crt-cpp/source/mqtt/*.cpp",
+    ]),
+    hdrs = glob([
+        "dist/aws-sdk/crt/aws-crt-cpp/include/aws/crt/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/include/aws/crt/auth/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/include/aws/crt/checksum/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/include/aws/crt/crypto/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/include/aws/crt/io/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/include/aws/iot/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/include/aws/crt/mqtt/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/include/aws/crt/http/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/include/aws/crt/endpoints/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/include/aws/crt/cbor/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/include/aws/crt/mqtt/*.h",
+        "dist/aws-sdk/crt/aws-crt-cpp/include/aws/crt/mqtt/*.h",
+    ]) + select({
+        # Platform specific source file include path
+        # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+        "@platforms//cpu:x86_64": glob(["platform/linux_x86_64/aws-sdk/crt/aws-crt-cpp/generated/include/aws/crt/*.h"]),
+        "@platforms//cpu:aarch64": glob(["platform/linux_aarch64/aws-sdk/crt/aws-crt-cpp/generated/include/aws/crt/*.h"]),
+        "//conditions:default": [],
+    }),
+    copts = AWS_CRT_CPP_INCLUDES + [
+        "-Wno-error",
+        "-fvisibility-inlines-hidden",
+    ],
+    local_defines = [
+        "AWS_AUTH_USE_IMPORT_EXPORT",
+        "AWS_CAL_USE_IMPORT_EXPORT",
+        "AWS_CHECKSUMS_USE_IMPORT_EXPORT",
+        "AWS_COMMON_USE_IMPORT_EXPORT",
+        "AWS_COMPRESSION_USE_IMPORT_EXPORT",
+        "AWS_CRT_CPP_EXPORTS",
+        "AWS_CRT_CPP_USE_IMPORT_EXPORT",
+        "AWS_EVENT_STREAM_USE_IMPORT_EXPORT",
+        "AWS_HTTP_USE_IMPORT_EXPORT",
+        "AWS_IO_USE_IMPORT_EXPORT",
+        "AWS_MQTT_USE_IMPORT_EXPORT",
+        "AWS_S3_USE_IMPORT_EXPORT",
+        "AWS_SDKUTILS_USE_IMPORT_EXPORT",
+        "AWS_USE_EPOLL",
+        "CJSON_HIDE_SYMBOLS",
+        "ENABLED_REQUEST_COMPRESSION",
+        "ENABLED_ZLIB_REQUEST_COMPRESSION",
+        "ENABLE_CURL_CLIENT",
+        "ENFORCE_TLS_V1_2",
+        "PLATFORM_LINUX",
+        "aws_crt_cpp_EXPORTS",
+    ],
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        "aws-c-auth",
+        "aws-c-cal",
+        "aws-c-common",
+        "aws-c-event-stream",
+        "aws-c-http",
+        "aws-c-io",
+        "aws-c-mqtt",
+        "aws-c-s3",
+        "aws-checksums",
+    ],
+)
+
+AWS_CPP_COPTS = AWS_CRT_CPP_INCLUDES + [
+    "-Wno-error",
+    "-Wno-implicit-fallthrough",
+    "-fno-exceptions",
+    "-std=c++11",
+    "-pedantic",
+    "-Wextra",
+]
+
+mongo_cc_library(
+    name = "aws-cpp-sdk-core",
+    srcs = glob([
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/external/tinyxml2/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/external/cjson/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/auth/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/auth/signer/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/auth/signer-provider/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/auth/bearer-token-provider/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/client/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/internal/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/aws/model/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/http/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/http/curl/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/http/standard/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/config/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/config/defaults/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/endpoint/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/endpoint/internal/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/monitoring/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/net/linux-shared/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/utils/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/utils/event/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/utils/base64/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/utils/crypto/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/utils/crypto/crt/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/utils/json/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/utils/threading/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/utils/xml/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/utils/logging/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/utils/memory/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/utils/component-registry/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/utils/memory/stl/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/utils/stream/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/utils/crypto/factory/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/smithy/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/smithy/client/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/smithy/identity/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/smithy/tracing/*.cpp",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/source/platform/linux-shared/*.cpp",
+    ]),
+    hdrs = glob([
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/auth/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/auth/signer/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/auth/signer-provider/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/auth/bearer-token-provider/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/client/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/internal/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/net/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/http/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/http/curl/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/http/standard/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/config/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/config/defaults/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/endpoint/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/endpoint/internal/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/monitoring/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/platform/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/utils/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/utils/event/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/utils/base64/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/utils/crypto/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/utils/crypto/crt/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/utils/json/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/utils/threading/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/utils/xml/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/utils/memory/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/utils/component-registry/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/utils/memory/stl/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/utils/logging/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/utils/ratelimiter/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/utils/stream/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/external/cjson/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/external/tinyxml2/tinyxml2.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/client/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/client/impl/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/client/common/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/client/features/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/client/serializer/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/tracing/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/identity/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/identity/auth/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/identity/auth/impl/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/identity/auth/built-in/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/identity/identity/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/identity/resolver/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/identity/resolver/built-in/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/identity/identity/impl/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/identity/resolver/impl/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/identity/signer/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/identity/signer/built-in/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/interceptor/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/interceptor/impl/*.h",
+        "dist/aws-sdk/src/aws-cpp-sdk-core/include/smithy/interceptor/impl/*.h",
+    ]),
+    copts = AWS_CPP_COPTS + [
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/src/aws-cpp-sdk-core/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/src/aws-cpp-sdk-core/include/aws/core/platform/refs",
+    ],
+    linkopts = [
+        "-lcurl",
+    ],
+    local_defines = [
+        "AWS_AUTH_USE_IMPORT_EXPORT",
+        "AWS_CAL_USE_IMPORT_EXPORT",
+        "AWS_CHECKSUMS_USE_IMPORT_EXPORT",
+        "AWS_COMMON_USE_IMPORT_EXPORT",
+        "AWS_COMPRESSION_USE_IMPORT_EXPORT",
+        "AWS_CRT_CPP_USE_IMPORT_EXPORT",
+        "AWS_EVENT_STREAM_USE_IMPORT_EXPORT",
+        "AWS_HAS_ALIGNED_ALLOC",
+        "AWS_HTTP_USE_IMPORT_EXPORT",
+        "AWS_IO_USE_IMPORT_EXPORT",
+        "AWS_MQTT_USE_IMPORT_EXPORT",
+        "AWS_S3_USE_IMPORT_EXPORT",
+        "AWS_SDKUTILS_USE_IMPORT_EXPORT",
+        "AWS_SDK_VERSION_MAJOR=1",
+        "AWS_SDK_VERSION_MINOR=11",
+        "AWS_SDK_VERSION_PATCH=471",
+        "AWS_USE_EPOLL",
+        "CURL_HAS_H2",
+        "CURL_HAS_TLS_PROXY",
+        "ENABLED_REQUEST_COMPRESSION",
+        "ENABLED_ZLIB_REQUEST_COMPRESSION",
+        "ENABLE_CURL_CLIENT",
+        "ENABLE_CURL_LOGGING",
+        "ENFORCE_TLS_V1_2",
+        "HAS_PATHCONF",
+        "HAS_UMASK",
+        "PLATFORM_LINUX",
+        "SMITHY_EXPORTS=1",
+        "USE_IMPORT_EXPORT=1",
+        "aws_cpp_sdk_core_EXPORTS",
+    ],
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        "aws-crt-cpp",
+        "//src/third_party/zlib",
+    ],
+)
+
+mongo_cc_library(
+    name = "aws-cpp-sdk-s3",
+    srcs = glob([
+        "dist/aws-sdk/generated/src/aws-cpp-sdk-s3/source/*.cpp",
+        "dist/aws-sdk/generated/src/aws-cpp-sdk-s3/source/model/*.cpp",
+    ]),
+    hdrs = glob([
+        "dist/aws-sdk/generated/src/aws-cpp-sdk-s3/include/aws/s3/*.h",
+        "dist/aws-sdk/generated/src/aws-cpp-sdk-s3/include/aws/s3/model/*.h",
+    ]),
+    copts = AWS_CPP_COPTS + [
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/src/aws-cpp-sdk-core/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/generated/src/aws-cpp-sdk-s3/include",
+    ],
+    local_defines = [
+        "AWS_AUTH_USE_IMPORT_EXPORT",
+        "AWS_CAL_USE_IMPORT_EXPORT",
+        "AWS_CHECKSUMS_USE_IMPORT_EXPORT",
+        "AWS_COMMON_USE_IMPORT_EXPORT",
+        "AWS_COMPRESSION_USE_IMPORT_EXPORT",
+        "AWS_CRT_CPP_USE_IMPORT_EXPORT",
+        "AWS_EVENT_STREAM_USE_IMPORT_EXPORT",
+        "AWS_HTTP_USE_IMPORT_EXPORT",
+        "AWS_IO_USE_IMPORT_EXPORT",
+        "AWS_MQTT_USE_IMPORT_EXPORT",
+        "AWS_S3_USE_IMPORT_EXPORT",
+        "AWS_SDKUTILS_USE_IMPORT_EXPORT",
+        "AWS_SDK_VERSION_MAJOR=1",
+        "AWS_SDK_VERSION_MINOR=11",
+        "AWS_SDK_VERSION_PATCH=471",
+        "AWS_USE_EPOLL",
+        "ENABLED_REQUEST_COMPRESSION",
+        "ENABLED_ZLIB_REQUEST_COMPRESSION",
+        "ENABLE_CURL_CLIENT",
+        "ENFORCE_TLS_V1_2",
+        "HAS_PATHCONF",
+        "HAS_UMASK",
+        "PLATFORM_LINUX",
+        "USE_IMPORT_EXPORT=1",
+        "aws_cpp_sdk_s3_EXPORTS",
+    ],
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        "aws-cpp-sdk-core",
+    ],
+)
+
+mongo_cc_library(
+    name = "aws-cpp-sdk-lambda",
+    srcs = glob([
+        "dist/aws-sdk/generated/src/aws-cpp-sdk-lambda/source/*.cpp",
+        "dist/aws-sdk/generated/src/aws-cpp-sdk-lambda/source/model/*.cpp",
+    ]),
+    hdrs = glob([
+        "dist/aws-sdk/generated/src/aws-cpp-sdk-lambda/include/aws/lambda/*.h",
+        "dist/aws-sdk/generated/src/aws-cpp-sdk-lambda/include/aws/lambda/model/*.h",
+    ]),
+    copts = AWS_CPP_COPTS + [
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/src/aws-cpp-sdk-core/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/generated/src/aws-cpp-sdk-lambda/include",
+    ],
+    local_defines = [
+        "AWS_AUTH_USE_IMPORT_EXPORT",
+        "AWS_CAL_USE_IMPORT_EXPORT",
+        "AWS_CHECKSUMS_USE_IMPORT_EXPORT",
+        "AWS_COMMON_USE_IMPORT_EXPORT",
+        "AWS_COMPRESSION_USE_IMPORT_EXPORT",
+        "AWS_CRT_CPP_USE_IMPORT_EXPORT",
+        "AWS_EVENT_STREAM_USE_IMPORT_EXPORT",
+        "AWS_HTTP_USE_IMPORT_EXPORT",
+        "AWS_IO_USE_IMPORT_EXPORT",
+        "AWS_MQTT_USE_IMPORT_EXPORT",
+        "AWS_S3_USE_IMPORT_EXPORT",
+        "AWS_SDKUTILS_USE_IMPORT_EXPORT",
+        "AWS_SDK_VERSION_MAJOR=1",
+        "AWS_SDK_VERSION_MINOR=11",
+        "AWS_SDK_VERSION_PATCH=471",
+        "AWS_USE_EPOLL",
+        "ENABLED_REQUEST_COMPRESSION",
+        "ENABLED_ZLIB_REQUEST_COMPRESSION",
+        "ENABLE_CURL_CLIENT",
+        "ENFORCE_TLS_V1_2",
+        "HAS_PATHCONF",
+        "HAS_UMASK",
+        "PLATFORM_LINUX",
+        "USE_IMPORT_EXPORT=1",
+        "aws_cpp_sdk_lambda_EXPORTS",
+    ],
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        "aws-cpp-sdk-core",
+    ],
+)
+
+mongo_cc_library(
+    name = "aws-cpp-sdk-iam",
+    srcs = glob([
+        "dist/aws-sdk/generated/src/aws-cpp-sdk-iam/source/*.cpp",
+        "dist/aws-sdk/generated/src/aws-cpp-sdk-iam/source/model/*.cpp",
+    ]),
+    hdrs = glob([
+        "dist/aws-sdk/generated/src/aws-cpp-sdk-iam/include/aws/iam/*.h",
+        "dist/aws-sdk/generated/src/aws-cpp-sdk-iam/include/aws/iam/model/*.h",
+    ]),
+    copts = AWS_CPP_COPTS + [
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/src/aws-cpp-sdk-core/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/generated/src/aws-cpp-sdk-iam/include",
+    ],
+    local_defines = [
+        "AWS_AUTH_USE_IMPORT_EXPORT",
+        "AWS_CAL_USE_IMPORT_EXPORT",
+        "AWS_CHECKSUMS_USE_IMPORT_EXPORT",
+        "AWS_COMMON_USE_IMPORT_EXPORT",
+        "AWS_COMPRESSION_USE_IMPORT_EXPORT",
+        "AWS_CRT_CPP_USE_IMPORT_EXPORT",
+        "AWS_EVENT_STREAM_USE_IMPORT_EXPORT",
+        "AWS_HTTP_USE_IMPORT_EXPORT",
+        "AWS_IO_USE_IMPORT_EXPORT",
+        "AWS_MQTT_USE_IMPORT_EXPORT",
+        "AWS_S3_USE_IMPORT_EXPORT",
+        "AWS_SDKUTILS_USE_IMPORT_EXPORT",
+        "AWS_SDK_VERSION_MAJOR=1",
+        "AWS_SDK_VERSION_MINOR=11",
+        "AWS_SDK_VERSION_PATCH=471",
+        "AWS_USE_EPOLL",
+        "ENABLED_REQUEST_COMPRESSION",
+        "ENABLED_ZLIB_REQUEST_COMPRESSION",
+        "ENABLE_CURL_CLIENT",
+        "ENFORCE_TLS_V1_2",
+        "HAS_PATHCONF",
+        "HAS_UMASK",
+        "PLATFORM_LINUX",
+        "USE_IMPORT_EXPORT=1",
+        "aws_cpp_sdk_iam_EXPORTS",
+    ],
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        "aws-cpp-sdk-core",
+    ],
+)
+
+mongo_cc_library(
+    name = "aws-cpp-sdk-cognito-identity",
+    srcs = glob([
+        "dist/aws-sdk/generated/src/aws-cpp-sdk-cognito-identity/source/*.cpp",
+        "dist/aws-sdk/generated/src/aws-cpp-sdk-cognito-identity/source/model/*.cpp",
+    ]),
+    hdrs = glob([
+        "dist/aws-sdk/generated/src/aws-cpp-sdk-cognito-identity/include/aws/cognito-identity/*.h",
+        "dist/aws-sdk/generated/src/aws-cpp-sdk-cognito-identity/include/aws/cognito-identity/model/*.h",
+    ]),
+    copts = AWS_CPP_COPTS + [
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/src/aws-cpp-sdk-core/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/generated/src/aws-cpp-sdk-cognito-identity/include",
+    ],
+    local_defines = [
+        "AWS_AUTH_USE_IMPORT_EXPORT",
+        "AWS_CAL_USE_IMPORT_EXPORT",
+        "AWS_CHECKSUMS_USE_IMPORT_EXPORT",
+        "AWS_COMMON_USE_IMPORT_EXPORT",
+        "AWS_COMPRESSION_USE_IMPORT_EXPORT",
+        "AWS_CRT_CPP_USE_IMPORT_EXPORT",
+        "AWS_EVENT_STREAM_USE_IMPORT_EXPORT",
+        "AWS_HTTP_USE_IMPORT_EXPORT",
+        "AWS_IO_USE_IMPORT_EXPORT",
+        "AWS_MQTT_USE_IMPORT_EXPORT",
+        "AWS_S3_USE_IMPORT_EXPORT",
+        "AWS_SDKUTILS_USE_IMPORT_EXPORT",
+        "AWS_SDK_VERSION_MAJOR=1",
+        "AWS_SDK_VERSION_MINOR=11",
+        "AWS_SDK_VERSION_PATCH=471",
+        "AWS_USE_EPOLL",
+        "ENABLED_REQUEST_COMPRESSION",
+        "ENABLED_ZLIB_REQUEST_COMPRESSION",
+        "ENABLE_CURL_CLIENT",
+        "ENFORCE_TLS_V1_2",
+        "HAS_PATHCONF",
+        "HAS_UMASK",
+        "PLATFORM_LINUX",
+        "USE_IMPORT_EXPORT=1",
+        "aws_cpp_sdk_cognito_identity_EXPORTS",
+    ],
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        "aws-cpp-sdk-core",
+    ],
+)
+
+mongo_cc_library(
+    name = "aws-cpp-sdk-access-management",
+    srcs = glob([
+        "dist/aws-sdk/src/aws-cpp-sdk-access-management/source/*.cpp",
+    ]),
+    hdrs = glob([
+        "dist/aws-sdk/src/aws-cpp-sdk-access-management/include/aws/access-management/*.h",
+    ]),
+    copts = AWS_CPP_COPTS + [
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/src/aws-cpp-sdk-core/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/generated/src/aws-cpp-sdk-cognito-identity/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/generated/src/aws-cpp-sdk-iam/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/src/aws-cpp-sdk-access-management/include",
+    ],
+    local_defines = [
+        "AWS_AUTH_USE_IMPORT_EXPORT",
+        "AWS_CAL_USE_IMPORT_EXPORT",
+        "AWS_CHECKSUMS_USE_IMPORT_EXPORT",
+        "AWS_COMMON_USE_IMPORT_EXPORT",
+        "AWS_COMPRESSION_USE_IMPORT_EXPORT",
+        "AWS_CRT_CPP_USE_IMPORT_EXPORT",
+        "AWS_EVENT_STREAM_USE_IMPORT_EXPORT",
+        "AWS_HTTP_USE_IMPORT_EXPORT",
+        "AWS_IO_USE_IMPORT_EXPORT",
+        "AWS_MQTT_USE_IMPORT_EXPORT",
+        "AWS_S3_USE_IMPORT_EXPORT",
+        "AWS_SDKUTILS_USE_IMPORT_EXPORT",
+        "AWS_SDK_VERSION_MAJOR=1",
+        "AWS_SDK_VERSION_MINOR=11",
+        "AWS_SDK_VERSION_PATCH=471",
+        "AWS_USE_EPOLL",
+        "ENABLED_REQUEST_COMPRESSION",
+        "ENABLED_ZLIB_REQUEST_COMPRESSION",
+        "ENABLE_CURL_CLIENT",
+        "ENFORCE_TLS_V1_2",
+        "HAS_PATHCONF",
+        "HAS_UMASK",
+        "PLATFORM_LINUX",
+        "USE_IMPORT_EXPORT=1",
+        "aws_cpp_sdk_access_management_EXPORTS",
+    ],
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        "aws-cpp-sdk-cognito-identity",
+        "aws-cpp-sdk-core",
+        "aws-cpp-sdk-iam",
+    ],
+)
+
+mongo_cc_library(
+    name = "aws-cpp-sdk-kinesis",
+    srcs = glob([
+        "dist/aws-sdk/generated/src/aws-cpp-sdk-kinesis/source/*.cpp",
+        "dist/aws-sdk/generated/src/aws-cpp-sdk-kinesis/source/model/*.cpp",
+    ]),
+    hdrs = glob([
+        "dist/aws-sdk/generated/src/aws-cpp-sdk-kinesis/include/aws/kinesis/*.h",
+        "dist/aws-sdk/generated/src/aws-cpp-sdk-kinesis/include/aws/kinesis/model/*.h",
+    ]),
+    copts = AWS_CPP_COPTS + [
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/src/aws-cpp-sdk-core/include",
+        "-Isrc/third_party/aws-sdk/dist/aws-sdk/generated/src/aws-cpp-sdk-kinesis/include",
+    ],
+    local_defines = [
+        "AWS_AUTH_USE_IMPORT_EXPORT",
+        "AWS_CAL_USE_IMPORT_EXPORT",
+        "AWS_CHECKSUMS_USE_IMPORT_EXPORT",
+        "AWS_COMMON_USE_IMPORT_EXPORT",
+        "AWS_COMPRESSION_USE_IMPORT_EXPORT",
+        "AWS_CRT_CPP_USE_IMPORT_EXPORT",
+        "AWS_EVENT_STREAM_USE_IMPORT_EXPORT",
+        "AWS_HTTP_USE_IMPORT_EXPORT",
+        "AWS_IO_USE_IMPORT_EXPORT",
+        "AWS_MQTT_USE_IMPORT_EXPORT",
+        "AWS_S3_USE_IMPORT_EXPORT",
+        "AWS_SDKUTILS_USE_IMPORT_EXPORT",
+        "AWS_SDK_VERSION_MAJOR=1",
+        "AWS_SDK_VERSION_MINOR=11",
+        "AWS_SDK_VERSION_PATCH=471",
+        "AWS_USE_EPOLL",
+        "ENABLED_REQUEST_COMPRESSION",
+        "ENABLED_ZLIB_REQUEST_COMPRESSION",
+        "ENABLE_CURL_CLIENT",
+        "ENFORCE_TLS_V1_2",
+        "HAS_PATHCONF",
+        "HAS_UMASK",
+        "PLATFORM_LINUX",
+        "USE_IMPORT_EXPORT=1",
+        "aws_cpp_sdk_kinesis_EXPORTS",
+    ],
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        "aws-cpp-sdk-core",
+    ],
+)
+
+mongo_cc_library(
+    name = "aws-sdk",
+    hdrs = glob([
+        "dist/aws-sdk/include/**/*.h",
+        "dist/aws-sdk/include/**/*.inl",
+    ]),
+    includes = ["dist/aws-sdk/include"],
+    deps = [
+        "aws-cpp-sdk-access-management",
+        "aws-cpp-sdk-cognito-identity",
+        "aws-cpp-sdk-core",
+        "aws-cpp-sdk-iam",
+        "aws-cpp-sdk-kinesis",
+        "aws-cpp-sdk-lambda",
+        "aws-cpp-sdk-s3",
+    ],
+)

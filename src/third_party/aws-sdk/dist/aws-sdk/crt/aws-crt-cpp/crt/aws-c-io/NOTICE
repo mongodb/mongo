@@ -1,0 +1,5 @@
+AWS C Io
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+SPDX-License-Identifier: Apache-2.0.
+
+The source/pkcs11/v2.40/pkcs11.h header file is based on Public Domain content from https://github.com/latchset/pkcs11-headers

@@ -147,6 +147,49 @@
       "supplier": {
         "name": "Organization: github"
       },
+      "name": "aws-sdk - the AWS SDK client library",
+      "version": "1.11.471",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:github/aws/aws-sdk-cpp@1.11.471",
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Atlas Streams"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/aws/aws-sdk-cpp"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/aws-sdk/scripts/getsources.sh"
+        }
+      ],
+      "type": "library",
+      "bom-ref": "b6c87079-ee43-42ea-8e6c-eef197972f82",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/aws-sdk"
+          }
+        ]
+      },
+      "scope": "required"
+    },
+    {
+      "supplier": {
+        "name": "Organization: github"
+      },
       "name": "benchmark",
       "version": "v1.5.2",
       "licenses": [

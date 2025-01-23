@@ -36,7 +36,6 @@ package(default_visibility = ["//visibility:public"])
 mongo_cc_library(
     name = "rdkafka",
     srcs = [
-        "dist/src/cJSON.c",
         "dist/src/crc32c.c",
         "dist/src/lz4.c",
         "dist/src/lz4frame.c",
@@ -119,7 +118,10 @@ mongo_cc_library(
         ":dist_FAKE_config_h",
         ":dist_config_h",
     ],
-    hdrs = glob(["dist/src/**/*.h"]) + [
+    hdrs = glob(
+        ["dist/src/**/*.h"],
+        ["dist/src/cJSON.h"],
+    ) + [
         "dist/src/lz4.c",  # This file is textually included.
     ],
     copts = [
@@ -154,6 +156,7 @@ mongo_cc_library(
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [
+        "//src/third_party/aws-sdk:aws-cjson",
         "//src/third_party/zlib",
         "//src/third_party/zstandard:zstd",
     ],
