@@ -720,7 +720,7 @@ getPostCommitDebugChecks(OperationContext* opCtx, const NamespaceString& ns) {
     }
 
     return [opCtx, &ns](const timeseries::bucket_catalog::WriteBatch& batch, StringData timeField) {
-        // Check in-memory and disk state, caller still has commit rights.
+        // Check in-memory and disk state.
         DBDirectClient client{opCtx};
         BSONObj queriedBucket = client.findOne(ns, BSON("_id" << batch.bucketId.oid));
         if (!queriedBucket.isEmpty()) {

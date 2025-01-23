@@ -61,7 +61,7 @@ MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeReopeningBucket);
 /**
  * Prepares the batch for commit. Sets min/max appropriately, records the number of
  * documents that have previously been committed to the bucket, and renders the batch
- * inactive. Must have commit rights.
+ * inactive.
  */
 void prepareWriteBatchForCommit(TrackingContexts& trackingContexts,
                                 WriteBatch& batch,
@@ -108,7 +108,7 @@ void prepareWriteBatchForCommit(TrackingContexts& trackingContexts,
 
 /**
  * Reports the result and status of a commit, and notifies anyone waiting on getResult().
- * Must have commit rights. Inactive batches only.
+ * Inactive batches only.
  */
 void finishWriteBatch(WriteBatch& batch, const CommitInfo& info) {
     batch.promise.emplaceValue(info);

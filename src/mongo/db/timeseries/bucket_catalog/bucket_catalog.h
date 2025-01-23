@@ -277,19 +277,18 @@ StatusWith<InsertResult> insert(BucketCatalog& catalog,
 void waitToInsert(InsertWaiter* waiter);
 
 /**
- * Prepares a batch for commit, transitioning it to an inactive state. Caller must already have
- * commit rights on batch. Returns OK if the batch was successfully prepared, or a status indicating
- * why the batch was previously aborted by another operation. If another batch is already prepared
- * on the same bucket, or there is an outstanding 'ReopeningRequest' for the same series (metaField
- * value), this operation will block waiting for it to complete.
+ * Prepares a batch for commit, transitioning it to an inactive state. Returns OK if the batch was
+ * successfully prepared, or a status indicating why the batch was previously aborted by another
+ * operation. If another batch is already prepared on the same bucket, or there is an outstanding
+ * 'ReopeningRequest' for the same series (metaField value), this operation will block waiting for
+ * it to complete.
  */
 Status prepareCommit(BucketCatalog& catalog,
                      std::shared_ptr<WriteBatch> batch,
                      const StringDataComparator* comparator);
 
 /**
- * Records the result of a batch commit. Caller must already have commit rights on batch, and batch
- * must have been previously prepared.
+ * Records the result of a batch commit. Batch must have been previously prepared.
  *
  * Returns bucket information of a bucket if one was closed.
  *

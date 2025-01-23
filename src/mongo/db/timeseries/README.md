@@ -266,16 +266,11 @@ Index types that are not supported on time-series collections include
 ## BucketCatalog
 
 In order to facilitate efficient bucketing, we maintain the set of open buckets in the
-`BucketCatalog` found in [bucket_catalog.h](bucket_catalog.h). At a high level, we attempt to group
-writes from concurrent writers into batches which can be committed together to minimize the number
-of underlying document writes. A writer will attempt to insert each document in its input batch to
-the `BucketCatalog`, which will return either a handle to a `BucketCatalog::WriteBatch` or
-information that can be used to retrieve a bucket from disk to reopen. A second attempt to insert
-the document, potentially into the reopened bucket, should return a `BucketCatalog::WriteBatch`.
-Upon finishing all of its inserts, the writer will check each write batch. If no other writer has
-already claimed commit rights to a batch, it will claim the rights and commit the batch itself;
-otherwise, it will set the batch aside to wait on later. When it has checked all batches, the writer
-will wait on each remaining batch to be committed by another writer.
+`BucketCatalog` found in [bucket_catalog.h](bucket_catalog.h). A writer will attempt to insert each
+document in its input batch to the `BucketCatalog`, which will return either a handle to a
+`BucketCatalog::WriteBatch` or information that can be used to retrieve a bucket from disk to
+reopen. A second attempt to insert the document, potentially into the reopened bucket, should return
+a `BucketCatalog::WriteBatch`.
 
 Internally, the `BucketCatalog` maintains a list of updates to each bucket document. When a batch
 is committed, it will pivot the insertions into the column-format for the buckets as well as

@@ -168,8 +168,7 @@ void setUncompressedBucketDoc(WriteBatch& batch, BSONObj uncompressedBucketDoc);
 bool isWriteBatchFinished(const WriteBatch& batch);
 
 /**
- * Retrieves the result of the write batch commit. Should be called by any interested party
- * that does not have commit rights. Blocking.
+ * Retrieves the result of the write batch commit. Blocking.
  */
 StatusWith<CommitInfo> getWriteBatchResult(WriteBatch& batch);
 

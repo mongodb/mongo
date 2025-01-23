@@ -69,7 +69,7 @@ enum class AllowBucketCreation { kYes, kNo };
  * state change.
  */
 enum class RemovalMode {
-    kClose,    // Normal closure, pending compression
+    kClose,    // Normal closure
     kArchive,  // Archive bucket, no state change
     kAbort,    // Bucket is being cleared, possibly due to error, erase state
 };
@@ -288,8 +288,7 @@ void abort(BucketCatalog& catalog,
 
 /**
  * Aborts any unprepared batches for the given bucket, then removes the bucket if there is no
- * prepared batch. If 'batch' is non-null, it is assumed that the caller has commit rights for that
- * batch.
+ * prepared batch.
  */
 void abort(BucketCatalog& catalog,
            Stripe& stripe,
