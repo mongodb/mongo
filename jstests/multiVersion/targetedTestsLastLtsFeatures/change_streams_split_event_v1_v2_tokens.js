@@ -112,7 +112,7 @@ assert.commandWorked(st.s.adminCommand(
 expectedEvents.push({operationType: "reshardCollection"});
 
 assert.commandWorked(testColl.dropIndex({largeField: 1}));
-expectedEvents.push({operationType: "dropIndexes"}, {operationType: "dropIndexes"});
+expectedEvents.push({operationType: "dropIndexes"});
 
 const newTestCollectionName = "test_";
 assert.commandWorked(testColl.renameCollection(newTestCollectionName));
