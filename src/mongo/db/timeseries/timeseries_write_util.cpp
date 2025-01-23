@@ -92,8 +92,6 @@
 namespace mongo::timeseries {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(runPostCommitDebugChecks);
-
 // Performs the storage write of an update to a time-series bucket document.
 void updateTimeseriesDocument(OperationContext* opCtx,
                               const CollectionPtr& coll,
@@ -592,10 +590,7 @@ void commitTimeseriesBucketsAtomically(
         getOpTimeAndElectionId(opCtx, &opTime, &electionId);
 
         for (auto batch : batchesToCommit) {
-            finish(sideBucketCatalog,
-                   batch,
-                   bucket_catalog::CommitInfo{opTime, electionId},
-                   getPostCommitDebugChecks(opCtx, coll->ns()));
+            finish(sideBucketCatalog, batch, bucket_catalog::CommitInfo{opTime, electionId});
             batch.get().reset();
         }
     } catch (...) {
@@ -711,34 +706,6 @@ void updateRequestCheckFunction(UpdateRequest* request, const TimeseriesOptions&
             timeseries::translateUpdate(request->getUpdateModification(), *metaField));
         request->setUpdateModification(modification);
     }
-}
-
-std::function<void(const timeseries::bucket_catalog::WriteBatch&, StringData)>
-getPostCommitDebugChecks(OperationContext* opCtx, const NamespaceString& ns) {
-    if (MONGO_likely(!runPostCommitDebugChecks.shouldFail())) {
-        return nullptr;
-    }
-
-    return [opCtx, &ns](const timeseries::bucket_catalog::WriteBatch& batch, StringData timeField) {
-        // Check in-memory and disk state.
-        DBDirectClient client{opCtx};
-        BSONObj queriedBucket = client.findOne(ns, BSON("_id" << batch.bucketId.oid));
-        if (!queriedBucket.isEmpty()) {
-            uint32_t memCount =
-                batch.numPreviouslyCommittedMeasurements + batch.measurements.size();
-            uint32_t diskCount = isCompressedBucket(queriedBucket)
-                ? static_cast<uint32_t>(queriedBucket.getObjectField(kBucketControlFieldName)
-                                            .getIntField(kBucketControlCountFieldName))
-                : static_cast<uint32_t>(queriedBucket.getObjectField(kBucketDataFieldName)
-                                            .getObjectField(timeField)
-                                            .nFields());
-            invariant(memCount == diskCount,
-                      str::stream()
-                          << "Expected in-memory (" << memCount << ") and on-disk (" << diskCount
-                          << ") measurement counts to match. Bucket contents on disk: "
-                          << queriedBucket.toString());
-        }
-    };
 }
 
 TimeseriesBatches insertBatchOfMeasurements(OperationContext* opCtx,

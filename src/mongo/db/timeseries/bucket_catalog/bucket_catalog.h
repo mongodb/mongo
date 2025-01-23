@@ -291,16 +291,10 @@ Status prepareCommit(BucketCatalog& catalog,
  * Records the result of a batch commit. Batch must have been previously prepared.
  *
  * Returns bucket information of a bucket if one was closed.
- *
- * If a runPostCommitDebugChecks function is provided, it will attempt to verify the resulting
- * bucket contents on disk.
  */
-boost::optional<ClosedBucket> finish(
-    BucketCatalog& catalog,
-    std::shared_ptr<WriteBatch> batch,
-    const CommitInfo& info,
-    const std::function<void(const timeseries::bucket_catalog::WriteBatch&, StringData timeField)>&
-        runPostCommitDebugChecks = nullptr);
+boost::optional<ClosedBucket> finish(BucketCatalog& catalog,
+                                     std::shared_ptr<WriteBatch> batch,
+                                     const CommitInfo& info);
 
 /**
  * Aborts the given write batch and any other outstanding (unprepared) batches on the same bucket,

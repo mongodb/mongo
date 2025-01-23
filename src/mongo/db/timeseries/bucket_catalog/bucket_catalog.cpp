@@ -546,12 +546,9 @@ Status prepareCommit(BucketCatalog& catalog,
     return Status::OK();
 }
 
-boost::optional<ClosedBucket> finish(
-    BucketCatalog& catalog,
-    std::shared_ptr<WriteBatch> batch,
-    const CommitInfo& info,
-    const std::function<void(const timeseries::bucket_catalog::WriteBatch&, StringData)>&
-        runPostCommitDebugChecks) {
+boost::optional<ClosedBucket> finish(BucketCatalog& catalog,
+                                     std::shared_ptr<WriteBatch> batch,
+                                     const CommitInfo& info) {
     invariant(!isWriteBatchFinished(*batch));
 
     boost::optional<ClosedBucket> closedBucket;
@@ -560,17 +557,6 @@ boost::optional<ClosedBucket> finish(
 
     auto& stripe = *catalog.stripes[internal::getStripeNumber(catalog, batch->bucketId)];
     stdx::lock_guard stripeLock{stripe.mutex};
-
-    if (MONGO_unlikely(runPostCommitDebugChecks)) {
-        Bucket* bucket = internal::useBucket(catalog.bucketStateRegistry,
-                                             stripe,
-                                             stripeLock,
-                                             batch->bucketId,
-                                             internal::IgnoreBucketState::kYes);
-        if (bucket) {
-            runPostCommitDebugChecks(*batch, {bucket->timeField.data(), bucket->timeField.size()});
-        }
-    }
 
     Bucket* bucket =
         internal::useBucketAndChangePreparedState(catalog.bucketStateRegistry,
