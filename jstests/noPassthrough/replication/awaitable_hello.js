@@ -201,6 +201,8 @@ function runTest(db, cmd, logFailpoint, failpointName) {
 // Set command log verbosity to 0 to avoid logging *all* commands in the "slow query" log.
 const conn = MongoRunner.runMongod({setParameter: {logComponentVerbosity: tojson({command: 0})}});
 assert.neq(null, conn, "mongod was unable to start up");
+// Set slowMs threshold to 500ms.
+assert.commandWorked(conn.getDB("admin").setProfilingLevel(1, 500));
 runTest(conn.getDB("admin"), "hello", "waitForHelloCommandLogged", "shardWaitInHello");
 runTest(conn.getDB("admin"), "isMaster", "waitForIsMasterCommandLogged", "shardWaitInHello");
 runTest(conn.getDB("admin"), "ismaster", "waitForIsMasterCommandLogged", "shardWaitInHello");
@@ -210,6 +212,8 @@ const replTest = new ReplSetTest(
     {nodes: 1, nodeOptions: {setParameter: {logComponentVerbosity: tojson({command: 0})}}});
 replTest.startSet();
 replTest.initiate();
+// Set slowMs threshold to 500ms.
+assert.commandWorked(replTest.getPrimary().getDB("admin").setProfilingLevel(1, 500));
 runTest(
     replTest.getPrimary().getDB("admin"), "hello", "waitForHelloCommandLogged", "shardWaitInHello");
 runTest(replTest.getPrimary().getDB("admin"),
@@ -228,6 +232,8 @@ const st = new ShardingTest({
     config: 1,
     other: {mongosOptions: {setParameter: {logComponentVerbosity: tojson({command: 0})}}}
 });
+// Set slowMs threshold to 500ms.
+assert.commandWorked(st.s.getDB("admin").setProfilingLevel(0, 500));
 runTest(st.s.getDB("admin"), "hello", "waitForHelloCommandLogged", "routerWaitInHello");
 runTest(st.s.getDB("admin"), "isMaster", "waitForIsMasterCommandLogged", "routerWaitInHello");
 runTest(st.s.getDB("admin"), "ismaster", "waitForIsMasterCommandLogged", "routerWaitInHello");
