@@ -441,9 +441,11 @@ public:
     }
 
     void start() {
-#ifdef MONGO_CONFIG_SSL
-        _loadTlsCertificates(SSLManagerCoordinator::get()->getSSLManager()->getSSLConfiguration());
-#endif
+        std::shared_ptr<SSLManagerInterface> manager = nullptr;
+        if (SSLManagerCoordinator::get() &&
+            (manager = SSLManagerCoordinator::get()->getSSLManager())) {
+            _loadTlsCertificates(manager->getSSLConfiguration());
+        }
         _prunerService.start(_svcCtx, _pool);
     }
 
