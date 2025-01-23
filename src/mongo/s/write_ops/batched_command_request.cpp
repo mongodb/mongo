@@ -181,6 +181,14 @@ const boost::optional<BSONObj>& BatchedCommandRequest::getLet() const {
     return _visit(Visitor{});
 };
 
+void BatchedCommandRequest::setLet(boost::optional<mongo::BSONObj> value) {
+    _visit(OverloadedVisitor{[&](write_ops::InsertCommandRequest& op) {},
+                             [&](write_ops::UpdateCommandRequest& op) { op.setLet(value); },
+                             [&](write_ops::DeleteCommandRequest& op) {
+                                 op.setLet(value);
+                             }});
+}
+
 void BatchedCommandRequest::evaluateAndReplaceLetParams(OperationContext* opCtx) {
     switch (_batchType) {
         case BatchedCommandRequest::BatchType_Insert:
@@ -365,6 +373,49 @@ BatchedCommandRequest BatchedCommandRequest::buildPipelineUpdateOp(
         }()});
         return updateOp;
     }());
+}
+
+int BatchedCommandRequest::getBaseCommandSizeEstimate(OperationContext* opCtx) const {
+    // For simplicity, we build a dummy batched write command request that contains all the common
+    // fields and serialize it to get the base command size.
+    // We only bother to copy over variable-size and/or optional fields, since the value of fields
+    // that are fixed-size and always present (e.g. 'ordered') won't affect the size calculation.
+    auto nss = getNS();
+    auto request =
+        _visit(OverloadedVisitor{[&](const write_ops::InsertCommandRequest& op) {
+                                     return BatchedCommandRequest(write_ops::InsertCommandRequest{
+                                         nss, std::vector<BSONObj>{}});
+                                 },
+                                 [&](const write_ops::UpdateCommandRequest& op) {
+                                     return BatchedCommandRequest(write_ops::UpdateCommandRequest{
+                                         nss, std::vector<mongo::write_ops::UpdateOpEntry>{}});
+                                 },
+                                 [&](const write_ops::DeleteCommandRequest& op) {
+                                     return BatchedCommandRequest(write_ops::DeleteCommandRequest{
+                                         nss, std::vector<mongo::write_ops::DeleteOpEntry>{}});
+                                 }});
+
+    write_ops::WriteCommandRequestBase baseRequest;
+    if (opCtx->isRetryableWrite()) {
+        // We'll account for the size to store each individual stmtId as we add ops, so similar to
+        // above with ops, we just put an empty vector as a placeholder for now.
+        baseRequest.setStmtIds({});
+    }
+    baseRequest.setEncryptionInformation(
+        request.getWriteCommandRequestBase().getEncryptionInformation());
+    request.setWriteCommandRequestBase(std::move(baseRequest));
+
+    request.setLet(getLet());
+    if (hasLegacyRuntimeConstants()) {
+        request.setLegacyRuntimeConstants(*getLegacyRuntimeConstants());
+    }
+
+    BSONObjBuilder builder;
+    request.serialize(&builder);
+    // Add writeConcern and lsid/txnNumber to ensure we save space for them.
+    logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &builder);
+    builder.append(WriteConcernOptions::kWriteConcernField, opCtx->getWriteConcern().toBSON());
+    return builder.obj().objsize();
 }
 
 BatchItemRef::BatchItemRef(const BatchedCommandRequest* request, int index)

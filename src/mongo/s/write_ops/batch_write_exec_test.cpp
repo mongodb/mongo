@@ -647,8 +647,8 @@ TEST_F(BatchWriteExecTest, MultiOpLargeOrdered) {
         ASSERT_EQUALS(stats.numRounds, 2);
     });
 
-    expectInsertsReturnSuccess(docsToInsert.begin(), docsToInsert.begin() + 66576);
-    expectInsertsReturnSuccess(docsToInsert.begin() + 66576, docsToInsert.end());
+    expectInsertsReturnSuccess(docsToInsert.begin(), docsToInsert.begin() + 66575);
+    expectInsertsReturnSuccess(docsToInsert.begin() + 66575, docsToInsert.end());
 
     future.default_timed_get();
 }
@@ -718,9 +718,9 @@ TEST_F(BatchWriteExecTest, MultiOpLargeUnorderedWithStaleShardVersionError) {
         ASSERT_EQ(kNumDocsToInsert, response.getN());
     });
 
-    expectInsertsReturnStaleVersionErrors({docsToInsert.begin(), docsToInsert.begin() + 60133});
-    expectInsertsReturnSuccess({docsToInsert.begin(), docsToInsert.begin() + 60133});
-    expectInsertsReturnSuccess({docsToInsert.begin() + 60133, docsToInsert.end()});
+    expectInsertsReturnStaleVersionErrors({docsToInsert.begin(), docsToInsert.begin() + 60132});
+    expectInsertsReturnSuccess({docsToInsert.begin(), docsToInsert.begin() + 60132});
+    expectInsertsReturnSuccess({docsToInsert.begin() + 60132, docsToInsert.end()});
 
     future.default_timed_get();
 }
@@ -864,9 +864,9 @@ TEST_F(BatchWriteExecTest, MultiOpLargeUnorderedWithCannotRefreshError) {
         ASSERT_EQ(kNumDocsToInsert, response.getN());
     });
 
-    expectInsertsReturnCannotRefreshErrors({docsToInsert.begin(), docsToInsert.begin() + 60133});
-    expectInsertsReturnSuccess({docsToInsert.begin(), docsToInsert.begin() + 60133});
-    expectInsertsReturnSuccess({docsToInsert.begin() + 60133, docsToInsert.end()});
+    expectInsertsReturnCannotRefreshErrors({docsToInsert.begin(), docsToInsert.begin() + 60132});
+    expectInsertsReturnSuccess({docsToInsert.begin(), docsToInsert.begin() + 60132});
+    expectInsertsReturnSuccess({docsToInsert.begin() + 60132, docsToInsert.end()});
 
     future.default_timed_get();
 }
@@ -1697,8 +1697,8 @@ TEST_F(BatchWriteExecTest, RetryableWritesLargeBatch) {
         ASSERT_EQUALS(stats.numRounds, 2);
     });
 
-    expectInsertsReturnSuccess(docsToInsert.begin(), docsToInsert.begin() + 63791);
-    expectInsertsReturnSuccess(docsToInsert.begin() + 63791, docsToInsert.end());
+    expectInsertsReturnSuccess(docsToInsert.begin(), docsToInsert.begin() + 63790);
+    expectInsertsReturnSuccess(docsToInsert.begin() + 63790, docsToInsert.end());
 
     future.default_timed_get();
 }

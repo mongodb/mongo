@@ -600,8 +600,7 @@ StatusWith<WriteType> BatchWriteOp::targetBatch(const NSTargeter& targeter,
                 ordered ? 0 : write_ops::kWriteCommandBSONArrayPerElementOverheadBytes + 272;
             return std::max(writeSizeBytes, errorResponsePotentialSizeBytes);
         },
-        // TODO SERVER-77653: Account for the size of top-level command fields here.
-        0 /* baseCommandSizeBytes */,
+        _clientRequest.getBaseCommandSizeEstimate(_opCtx),
         *targetedBatches);
 
     if (!targetStatus.isOK()) {
