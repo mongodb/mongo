@@ -549,8 +549,14 @@ __session_config_int(WT_SESSION_IMPL *session, const char *config)
     }
     WT_RET_NOTFOUND_OK(ret);
 
-    if ((ret = __wt_config_getones(session, config, "cache_max_wait_ms", &cval)) == 0)
-        session->cache_max_wait_us = (uint64_t)(cval.val * WT_THOUSAND);
+    if ((ret = __wt_config_getones(session, config, "cache_max_wait_ms", &cval)) == 0) {
+        if (cval.val > 1)
+            session->cache_max_wait_us = (uint64_t)(cval.val * WT_THOUSAND);
+        else if (cval.val == 1)
+            session->cache_max_wait_us = 1;
+        else
+            session->cache_max_wait_us = 0;
+    }
     WT_RET_NOTFOUND_OK(ret);
 
     return (0);
