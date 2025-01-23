@@ -3,6 +3,8 @@
  *
  * @tags: [
  *   requires_fcv_71,
+ *   # TODO SERVER-99245: re-enable this test once the gRPC error code is correctly reported.
+ *   search_community_incompatible,
  * ]
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";

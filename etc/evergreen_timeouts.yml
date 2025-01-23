@@ -150,6 +150,10 @@ overrides:
     - task: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm
       exec_timeout: 180 # 3 hours
 
+  enterprise-rhel8-debug-aubsan-search-grpc:
+    - task: search_community
+      exec_timeout: 180 # 3 hours
+
   enterprise-suse15-64:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours

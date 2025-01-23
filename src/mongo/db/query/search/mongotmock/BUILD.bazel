@@ -34,7 +34,13 @@ mongo_cc_library(
         "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/query/search:search_index_common",
         "//src/mongo/util:version_impl",
-    ],
+        "//src/mongo/util/net:ssl_options_server",
+    ] + select({
+        "//bazel/config:build_grpc_enabled": [
+            "//src/mongo/transport/grpc:grpc_transport_server_options",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 mongo_cc_binary(

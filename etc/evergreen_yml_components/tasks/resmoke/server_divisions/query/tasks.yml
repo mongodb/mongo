@@ -1268,6 +1268,24 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *task_template
+    name: search_community
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "experimental",
+        "incompatible_mac",
+        "incompatible_windows",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "requires_large_host",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 10
+
+  - <<: *task_template
     name: search_auth
     tags:
       [

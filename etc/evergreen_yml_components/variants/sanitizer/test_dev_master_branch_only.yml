@@ -673,3 +673,31 @@ buildvariants:
       - name: sharded_jscore_txns
       - name: .aggregation !.auth !aggregation_read_concern_majority_passthrough !aggregation_secondary_reads_gen !aggregation_sharded_collections_causally_consistent_passthrough !aggregation_sharded_collections_passthrough
       - name: .grpc_misc_js
+
+  - name: &enterprise-rhel8-debug-aubsan-search-grpc enterprise-rhel8-debug-aubsan-search-grpc
+    display_name: "~ Linux x86 Shared Library {A,UB}SAN Enterprise Search in Community with GRPC (mongotmock only)"
+    tags: ["experimental"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel80-large
+    expansions:
+      <<: *generic_linux_compile_expansions
+      separate_debug: off
+      san_options: *grpc_aubsan_options
+      compile_flags: >-
+        --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
+        --dbg=on
+        --opt=on
+        --allocator=system
+        --sanitize=undefined,address
+        --ssl
+        --ocsp-stapling=off
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --link-model=dynamic
+        ENABLE_GRPC_BUILD=1
+      compile_variant: *enterprise-rhel8-debug-aubsan-search-grpc
+    tasks:
+      - name: compile_ninja_quick_TG
+      - name: compile_test_parallel_core_stream_TG
+      - name: generate_buildid_to_debug_symbols_mapping
+      - name: search_community
