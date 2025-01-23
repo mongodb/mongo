@@ -2102,6 +2102,81 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), DatabaseName::kAdmin));
 }
 
+DEATH_TEST_REGEX_F(StepDownTest, StepDownHangsCantGetRSTL, "5675600.*lockRep") {
+    const auto repl = getReplCoord();
+
+    OpTimeWithTermOne opTime1(100, 1);
+
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(opTime1, Date_t() + Seconds(100));
+
+    // Secondaries caught up.
+    ASSERT_OK(repl->setLastAppliedOptime_forTest(1, 1, opTime1));
+    ASSERT_OK(repl->setLastAppliedOptime_forTest(1, 2, opTime1));
+
+    simulateSuccessfulV1Election();
+    // Wait only one simulated second for RSTL.
+    fassertOnLockTimeoutForStepUpDown.store(1);
+
+    // Grab the RSTL
+    const auto opCtx = makeOperationContext();
+    ReplicationStateTransitionLockGuard transitionGuard(opCtx.get(), MODE_IX);
+
+    // Step down in another thread
+    stdx::thread stepDownThread([&] {
+        Client::setCurrent(getService()->makeClient("StepDownHangsCantGetRSTL"));
+        auto alternativeOpCtx = cc().makeOperationContext();
+        // This should crash.
+        getReplCoord()->updateTerm(alternativeOpCtx.get(), getReplCoord()->getTerm() + 1).ignore();
+    });
+
+    while (1) {
+        // Advance the simulated clock really fast.
+        checked_cast<ClockSourceMock*>(getServiceContext()->getPreciseClockSource())
+            ->advance(Milliseconds(100));
+        sleepFor(Milliseconds(1));
+    }
+}
+
+DEATH_TEST_F(StepDownTest, StepDownHangsCantGetRSTLTooManyLocks, "\"id\":9222300") {
+    const auto repl = getReplCoord();
+
+    OpTimeWithTermOne opTime1(100, 1);
+
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(opTime1, Date_t() + Seconds(100));
+
+    // Secondaries caught up.
+    ASSERT_OK(repl->setLastAppliedOptime_forTest(1, 1, opTime1));
+    ASSERT_OK(repl->setLastAppliedOptime_forTest(1, 2, opTime1));
+
+    simulateSuccessfulV1Election();
+    // Wait only one simulated second for RSTL.
+    fassertOnLockTimeoutForStepUpDown.store(1);
+
+    // Grab the RSTL
+    const auto opCtx = makeOperationContext();
+    ReplicationStateTransitionLockGuard transitionGuard(opCtx.get(), MODE_IX);
+
+    std::vector<Lock::CollectionLock> locks;
+    // Make lock manager dump fail by putting in an obnoxiously large debuginfo string.
+    shard_role_details::getLocker(opCtx.get())
+        ->setDebugInfo(std::string(BSONObjMaxInternalSize - 5, 'a'));
+
+    // Step down in another thread
+    stdx::thread stepDownThread([&] {
+        Client::setCurrent(getService()->makeClient("StepDownHangsCantGetRSTL"));
+        auto alternativeOpCtx = cc().makeOperationContext();
+        // This should crash.
+        getReplCoord()->updateTerm(alternativeOpCtx.get(), getReplCoord()->getTerm() + 1).ignore();
+    });
+
+    while (1) {
+        // Advance the simulated clock really fast.
+        checked_cast<ClockSourceMock*>(getServiceContext()->getPreciseClockSource())
+            ->advance(Milliseconds(100));
+        sleepFor(Milliseconds(1));
+    }
+}
+
 class StepDownTestWithUnelectableNode : public StepDownTest {
 protected:
     void initAndStart() override {

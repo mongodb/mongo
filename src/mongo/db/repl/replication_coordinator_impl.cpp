@@ -2970,7 +2970,12 @@ ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::AutoGetRstlForStepUpSt
         }
 
         // Dump all locks to identify which thread(s) are holding RSTL.
-        dumpLockManager();
+        try {
+            dumpLockManager();
+        } catch (const DBException& e) {
+            // If there are too many locks, dumpLockManager may fail.
+            LOGV2_FATAL_CONTINUE(9222300, "Dumping locks failed", "error"_attr = e);
+        }
 
         auto lockerInfo = shard_role_details::getLocker(opCtx)->getLockerInfo(
             CurOp::get(opCtx)->getLockStatsBase());
