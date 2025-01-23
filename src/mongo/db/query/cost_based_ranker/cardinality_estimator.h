@@ -95,15 +95,10 @@ private:
 
     // MatchExpressions
     CEResult estimate(const MatchExpression* node, bool isFilterRoot);
-    CEResult estimate(const ComparisonMatchExpression* node);
     CEResult estimate(const NotMatchExpression* node, bool isFilterRoot);
     CEResult estimate(const AndMatchExpression* node);
     CEResult estimate(const OrMatchExpression* node, bool isFilterRoot);
     CEResult estimate(const NorMatchExpression* node, bool isFilterRoot);
-
-    // Estimate all match expressions without children. Notice that there are other such nodes
-    // besides LeafMatchExpression subclasses.
-    CEResult estimateLeafExpression(const MatchExpression* node, bool isFilterRoot);
 
     // Intervals
     CEResult estimate(const IndexBounds* node);
@@ -141,6 +136,9 @@ private:
 
     CardinalityEstimate conjCard(size_t offset, CardinalityEstimate inputCard) {
         std::span selsToEstimate(std::span(_conjSels.begin() + offset, _conjSels.end()));
+        if (selsToEstimate.size() == 0) {
+            return inputCard;
+        }
         SelectivityEstimate conjSel = conjExponentialBackoff(selsToEstimate);
         CardinalityEstimate resultCard = conjSel * inputCard;
         return resultCard;
@@ -176,7 +174,7 @@ private:
     }
 
     // Pop all selectivities from '_conjSels' after the first 'count' elements.
-    void trimSels(size_t count) {
+    void popSelectivities(size_t count = 0) {
         tassert(9586700, "Cannot pop more elements than total size.", count <= _conjSels.size());
         size_t oldSize = _conjSels.size() - count;
         _conjSels.erase(_conjSels.end() - oldSize, _conjSels.end());

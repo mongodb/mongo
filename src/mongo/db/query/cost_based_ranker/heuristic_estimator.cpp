@@ -59,6 +59,28 @@ const SelectivityEstimate kMediumCardClosedRangeSel{SelectivityType{0.33},
 const SelectivityEstimate kLargeCardClosedRangeSel{SelectivityType{0.20},
                                                    EstimationSource::Heuristics};
 
+bool heuristicIsEstimable(const MatchExpression* expr) {
+    switch (expr->matchType()) {
+        // These are the complement set of match types to the switch statement in
+        // heuristicLeafMatchExpressionSel. The union of both sets are all MatchExpression types.
+        case MatchExpression::MatchType::AND:
+        case MatchExpression::MatchType::OR:
+        case MatchExpression::MatchType::ELEM_MATCH_OBJECT:
+        case MatchExpression::MatchType::ELEM_MATCH_VALUE:
+        case MatchExpression::MatchType::NOT:
+        case MatchExpression::MatchType::NOR:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_ALLOWED_PROPERTIES:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_COND:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_OBJECT_MATCH:
+        case MatchExpression::MatchType::INTERNAL_SCHEMA_XOR:
+            return false;
+        default:
+            return true;
+    }
+}
+
 SelectivityEstimate heuristicClosedRangeSel(CardinalityEstimate inputCard) {
     if (inputCard < kSmallLimit) {
         return kSmallCardClosedRangeSel;
@@ -91,10 +113,11 @@ SelectivityEstimate heuristicScaledPredSel(CardinalityEstimate inputCard, double
                                EstimationSource::Heuristics};
 }
 
-SelectivityEstimate estimateLeafMatchExpression(const MatchExpression* expr,
-                                                CardinalityEstimate inputCard) {
-    tassert(
-        9844001, "estimateLeafMatchExpression got non-leaf expression", expr->numChildren() == 0);
+SelectivityEstimate heuristicLeafMatchExpressionSel(const MatchExpression* expr,
+                                                    CardinalityEstimate inputCard) {
+    tassert(9844001,
+            "heuristicLeafMatchExpressionSel got non-leaf expression",
+            expr->numChildren() == 0);
 
     switch (expr->matchType()) {
         case MatchExpression::MatchType::ALWAYS_FALSE:
@@ -184,22 +207,9 @@ SelectivityEstimate estimateLeafMatchExpression(const MatchExpression* expr,
         case MatchExpression::MatchType::BITS_ANY_CLEAR: {
             return heuristicScaledPredSel(inputCard, kDefaultScalingFactor);
         }
-
-        // List all non-leaf expression types below for completeness. These should never appear in
-        // this function. The assert at the end checks that.
-        case MatchExpression::MatchType::AND:
-        case MatchExpression::MatchType::OR:
-        case MatchExpression::MatchType::ELEM_MATCH_OBJECT:
-        case MatchExpression::MatchType::ELEM_MATCH_VALUE:
-        case MatchExpression::MatchType::NOT:
-        case MatchExpression::MatchType::NOR:
-        case MatchExpression::MatchType::INTERNAL_SCHEMA_ALLOWED_PROPERTIES:
-        case MatchExpression::MatchType::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
-        case MatchExpression::MatchType::INTERNAL_SCHEMA_COND:
-        case MatchExpression::MatchType::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX:
-        case MatchExpression::MatchType::INTERNAL_SCHEMA_OBJECT_MATCH:
-        case MatchExpression::MatchType::INTERNAL_SCHEMA_XOR:
-            break;
+        default:
+            // Non-leaf expressions that should never appear in this function.
+            tassert(9902900, "Unknown inestimable expression.", !heuristicIsEstimable(expr));
     }
     MONGO_UNREACHABLE_TASSERT(9695000);
 }

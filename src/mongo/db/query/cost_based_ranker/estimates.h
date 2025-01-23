@@ -140,7 +140,7 @@ struct CostCoefficientTagParam {
     // TODO (SERVER-94981): based on Bonsai cost calibration it is 1 ns, assuming
     //  all cost calibration measurements are in 'ms'. Should be updated with a
     //  reference to the relevant cost coefficient in the new cost model.
-    static constexpr double kMin = 50.0_ms;
+    static constexpr double kMin = 10.0_ms;
     // The maximum value of a cost coefficient is the most expensive operation per
     // document according to the cost model.
     // TODO (SERVER-94981): Currently this is based on Bonsai calibration, and it
@@ -214,6 +214,7 @@ public:
         static StrongDouble<TypeTag> theValue(TypeTag::kMinValue);
         return theValue;
     }
+
     static StrongDouble<TypeTag> maxValue() {
         static StrongDouble<TypeTag> theValue(TypeTag::kMaxValue);
         return theValue;
@@ -247,6 +248,7 @@ public:
     template <typename T1, typename T2>
     friend class OptimizerEstimate;
     friend class SelectivityEstimate;
+
     friend SelectivityEstimate operator/(const CardinalityEstimate& smaller_ce,
                                          const CardinalityEstimate& bigger_ce);
 
@@ -270,6 +272,7 @@ using CostCoefficientType = StrongDouble<CostCoefficientTag>;
 class EstimateBase {
 public:
     EstimateBase() = delete;
+
     constexpr EstimateBase(EstimationSource s) : _source(s){};
 
     /**
@@ -393,6 +396,7 @@ public:
         assertValid();
         return *static_cast<EstimateType*>(this);
     }
+
     EstimateType operator+(const EstimateType& e) const {
         EstimateType result(*static_cast<const EstimateType*>(this));
         result += e;
@@ -442,15 +446,19 @@ public:
     // result would be documents^2. However, it is common to multiply CE by some unitless factor,
     // or multiply a cost coefficient with CE to get the cost of a node's output.
     friend CardinalityEstimate operator*(const CardinalityEstimate& ce, double factor);
+
     friend CardinalityEstimate operator*(double factor, const CardinalityEstimate& ce);
 
     friend CostEstimate operator*(const CardinalityEstimate& ce, const CostCoefficient& cc);
+
     friend CostEstimate operator*(const CostCoefficient& cc, const CardinalityEstimate& ce);
 
     friend SelectivityEstimate operator/(const CardinalityEstimate& smaller_ce,
                                          const CardinalityEstimate& bigger_ce);
+
     friend CardinalityEstimate operator*(const SelectivityEstimate& s,
                                          const CardinalityEstimate& ce);
+
     friend CardinalityEstimate operator*(const CardinalityEstimate& ce,
                                          const SelectivityEstimate& s);
 };
@@ -483,12 +491,16 @@ public:
 
     // Addition and subtraction do not make sense for cost coefficients
     CostCoefficient& operator+=(const CostCoefficient& e) = delete;
+
     CostCoefficient& operator+(const CostCoefficient& e) const = delete;
+
     CostCoefficient& operator-=(const CostCoefficient& e) = delete;
+
     CostCoefficient& operator-(const CostCoefficient& e) const = delete;
 
     // Cost coefficients can only be multiplied with CE to produce cost.
     friend CostEstimate operator*(const CardinalityEstimate& ce, const CostCoefficient& cc);
+
     friend CostEstimate operator*(const CostCoefficient& cc, const CardinalityEstimate& ce);
 };
 
@@ -529,17 +541,24 @@ public:
 
     friend CardinalityEstimate operator*(const SelectivityEstimate& s,
                                          const CardinalityEstimate& ce);
+
     friend CardinalityEstimate operator*(const CardinalityEstimate& ce,
                                          const SelectivityEstimate& s);
 };
 
 CardinalityEstimate operator*(const CardinalityEstimate& ce, double factor);
+
 CardinalityEstimate operator*(double factor, const CardinalityEstimate& ce);
+
 CostEstimate operator*(const CostCoefficient& cc, const CardinalityEstimate& ce);
+
 CostEstimate operator*(const CardinalityEstimate& ce, const CostCoefficient& cc);
+
 SelectivityEstimate operator/(const CardinalityEstimate& smaller_ce,
                               const CardinalityEstimate& bigger_ce);
+
 CardinalityEstimate operator*(const SelectivityEstimate& s, const CardinalityEstimate& ce);
+
 CardinalityEstimate operator*(const CardinalityEstimate& ce, const SelectivityEstimate& s);
 
 /**
@@ -563,6 +582,7 @@ struct QSNEstimate {
 
 // Predefined constants
 inline const CardinalityEstimate zeroCE{CardinalityType{0.0}, EstimationSource::Code};
+inline const CardinalityEstimate zeroMetadataCE{CardinalityType{0.0}, EstimationSource::Metadata};
 inline const CardinalityEstimate oneCE{CardinalityType{1}, EstimationSource::Code};
 inline const CardinalityEstimate minCE{CardinalityType::minValue(), EstimationSource::Code};
 inline const CardinalityEstimate maxCE{CardinalityType::maxValue(), EstimationSource::Code};

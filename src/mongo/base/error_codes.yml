@@ -930,3 +930,4 @@ error_codes:
       name: SamplingCEFailure,
       categories: [PlannerEstimationError],
     }
+  - {code: 9751903, name: CEFailure, categories: [PlannerEstimationError]}

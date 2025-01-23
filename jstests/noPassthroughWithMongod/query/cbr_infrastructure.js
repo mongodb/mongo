@@ -28,9 +28,12 @@ coll1.drop();
 // Insert such data that some queries will do well with an {a: 1} index while
 // others with a {b: 1} index.
 assert.commandWorked(coll.insertMany(Array.from({length: 3000}, (_, i) => {
-    const doc = {a: 1, b: i, c: i % 7, x: i % 5};
+    const doc = {a: 1, b: i, c: i % 7, x: i % 5, mixed: i};
     if (i % 9 === 0) {
         doc.missing_90_percent = i;
+    }
+    if (i % 9 !== 0) {
+        doc.missing_10_percent = i;
     }
     return doc;
 })));
@@ -39,17 +42,36 @@ assert.commandWorked(coll.insertMany(Array.from({length: 3000}, (_, i) => {
     if (i % 9 === 0) {
         doc.missing_90_percent = i % 3;
     }
+    if (i % 9 !== 0) {
+        doc.missing_10_percent = i;
+    }
+    if (i % 2 === 0) {
+        doc.mixed = 'xyz';
+    } else {
+        doc.mixed = 3.14;
+    }
     return doc;
 })));
 
-coll.createIndexes(
-    [{a: 1}, {b: 1}, {c: 1, b: 1, a: 1}, {a: 1, b: 1}, {c: 1, a: 1}, {missing_90_percent: 1}]);
+coll.createIndexes([
+    {a: 1},
+    {b: 1},
+    {c: 1, b: 1, a: 1},
+    {a: 1, b: 1},
+    {c: 1, a: 1},
+    {missing_10_percent: 1},
+    {missing_90_percent: 1},
+    {mixed: 1}
+]);
 
 assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
 assert.commandWorked(coll.runCommand({analyze: collName, key: "b", numberBuckets: 10}));
 assert.commandWorked(coll.runCommand({analyze: collName, key: "c", numberBuckets: 10}));
 assert.commandWorked(
     coll.runCommand({analyze: collName, key: "missing_90_percent", numberBuckets: 10}));
+assert.commandWorked(
+    coll.runCommand({analyze: collName, key: "missing_10_percent", numberBuckets: 10}));
+assert.commandWorked(coll.runCommand({analyze: collName, key: "mixed", numberBuckets: 10}));
 
 // Test queries
 const queries = [
@@ -92,6 +114,8 @@ const queries = [
         ],
     },
     {a: {$not: {$lt: 130}}},
+    {missing_10_percent: {$exists: false}},
+    {missing_10_percent: {$not: {$exists: false}}},
     {missing_90_percent: {$exists: false}},
     {missing_90_percent: {$not: {$exists: false}}},
     {a: {$not: {$lt: 130}}, b: 12, c: {$not: {$gt: 1200}}},
@@ -109,6 +133,41 @@ const queries = [
     {$nor: [{a: 1}, {b: {$gt: 1000}}]},
     {$and: [{$nor: [{a: 1}, {a: {$gt: 1000}}]}, {b: {$lt: 100}}]},
     {$and: [{$or: [{$nor: [{a: {$gt: 100}}, {b: {$gt: 50}}]}, {a: 1}]}, {b: {$lt: 100}}]},
+    // This query has an empty result, thus should estimate as 0
+    {$and: [{$or: [{a: 0}, {a: 1}]}, {$or: [{a: {$gt: 3}}, {a: {$lt: 0}}]}]},
+    // ({a: 0} and {a: { $gt: 3}}) or ({a: 0} and {a: {$lt: 0}}) or
+    // ({a: 1} and {a: { $gt: 3}}) or ({a: 1} and {a: {$lt: 0}})
+    //=>
+    // false OR false OR false OR false
+    /*
+      The below queries can be estimated well if the fields are indexed because then the planner
+      intersects most intervals, and the reduced interval(s) can be estimated precisely.
+      Without indexes the estimates can be very wrong - e.g. 2000 vs 0.
+    */
+    // This CNF query has an empty result, thus should estimate as 0
+    {$and: [{$or: [{a: 0}, {a: 1}]}, {$or: [{a: {$gt: 3}}, {a: {$lt: 0}}]}]},
+    // The same query in DNF
+    {
+        $or: [
+            {$and: [{a: 0}, {a: {$gt: 3}}]},
+            {$and: [{a: 0}, {a: {$lt: 0}}]},
+            {$and: [{a: 1}, {a: {$gt: 3}}]},
+            {$and: [{a: 1}, {a: {$lt: 0}}]}
+        ]
+    },
+    // Same query shape, different constants, non-empty result
+    {$and: [{$or: [{a: 1}, {a: 2}]}, {$or: [{a: {$gt: 3}}, {a: {$lt: 9}}]}]},
+
+    // Predicates that cannot be estimated via a histogram
+    {$and: [{a: 3}, {a: {$size: 9}}]},
+    {$and: [{a: 3}, {b: {$size: 9}}]},
+    // TODO SPM-3658: Sort cost vs ixscan + fetch cost not estimated propertly, so we choose the
+    // wrong plan {mixed: {$type: 'int'}}
+    {mixed: {$type: 'string'}},
+    {mixed: {$type: 'double'}},
+    // TODO SERVER-97790 Show estimates of SUBPLAN phases
+    // {$or: [{a: 3}, {a: {$size: 9}}]},
+    // {$or: [{a: 3}, {b: {$size: 9}}]},
 ];
 
 queries.push({$or: [queries[0], queries[1]]});
@@ -118,7 +177,9 @@ function assertCbrExplain(plan) {
     if (plan.stage === "EOF") {
         assert.eq(plan.cardinalityEstimate, 0, plan);
     } else {
-        assert.gt(plan.cardinalityEstimate, 0, plan);
+        // One of the test queries produces a 0 estimate because it finds that the interval
+        // intersection is empty, that's why we compare with '>='.
+        assert.gte(plan.cardinalityEstimate, 0, plan);
     }
     assert(plan.hasOwnProperty("costEstimate"), plan);
     assert.gt(plan.costEstimate, 0, plan);
@@ -153,6 +214,21 @@ function checkWinningPlan({query = {}, project = {}, order = {}}) {
         assert.eq(r0.length, r1.length);
     }
     r1.map((e) => assertCbrExplain(e));
+
+    // Uncomment to enable more detailed logging to determine which query caused a failure
+    // jsTestLog(`Query ${tojson(query)}, project ${tojson(project)}, order ${tojson(order)}`);
+    // if (e1.executionStats.totalKeysExamined > e0.executionStats.totalKeysExamined) {
+    //     jsTestLog(`e0 ${tojson(e0)})`);
+    //     jsTestLog(`e1 ${tojson(e1)})`);
+    // }
+    // if (e1.executionStats.totalDocsExamined > e0.executionStats.totalDocsExamined) {
+    //     jsTestLog(`e0 ${tojson(e0)})`);
+    //     jsTestLog(`e1 ${tojson(e1)})`);
+    // }
+    // if (e1.executionStats.executionStages.works > e0.executionStats.executionStages.works) {
+    //     jsTestLog(`e0 ${tojson(e0)})`);
+    //     jsTestLog(`e1 ${tojson(e1)})`);
+    // }
 
     // CBR's plan must be no worse than the Classic plan
     assert(e1.executionStats.totalKeysExamined <= e0.executionStats.totalKeysExamined);
@@ -240,10 +316,6 @@ try {
     // when one of the subqueries could not be planned. In this way the CE error is masked.
     const orExpl = coll1.find({$or: [{b: 1}, {a: 3}]}).explain();
     assert(isCollscan(db, getWinningPlanFromExplain(orExpl)));
-
-    // Histogram CE invokes conversion of expression to an inexact interval, which fails
-    assert.throwsWithCode(() => coll1.find({b: {$gt: []}}).explain(),
-                          ErrorCodes.HistogramCEFailure);
 
     // Histogram CE fails because of inestimable interval
     assert.throwsWithCode(() => coll1.find({b: {$gte: {foo: 1}}}).explain(),

@@ -118,24 +118,30 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
             break;
         }
         case STAGE_AND_SORTED: {
+            // Intersects streams of sorted RIDs
             nodeCost = sortedMergeStartup * oneCE;
             nodeCost +=
                 std::accumulate(childCosts.begin(), childCosts.end(), zeroCost, addEstimates);
-            // The cost of comparing the record IDs
+            // The cost of comparing the RIDs
             nodeCost += sortedMergeIncrement *
                 std::accumulate(childCEs.begin(), childCEs.end(), zeroCE, addEstimates);
             break;
         }
         case STAGE_OR: {
+            // Union of its children. Optionally deduplicates on RecordId.
             // TODO SERVER-97507: reflect the cost of deduplication
             nodeCost =
                 std::accumulate(childCosts.begin(), childCosts.end(), zeroCost, addEstimates);
             break;
         }
         case STAGE_SORT_MERGE: {
+            // Merges the outputs of N children, each of which is sorted in the order specified by
+            // some pattern.
             // TODO: Make the cost model more realistic
             nodeCost = sortedMergeStartup * oneCE;
-            nodeCost = sortedMergeIncrement *
+            nodeCost +=
+                std::accumulate(childCosts.begin(), childCosts.end(), zeroCost, addEstimates);
+            nodeCost += sortedMergeIncrement *
                 std::accumulate(childCEs.begin(), childCEs.end(), zeroCE, addEstimates);
             break;
         }
@@ -200,10 +206,8 @@ CostEstimate CostEstimator::filterCost(const MatchExpression* filter,
 const CostCoefficient CostEstimator::defaultIncrement =
     CostCoefficient{CostCoefficientType{1000.0_ms}};
 
-const CostCoefficient CostEstimator::filterStartup =
-    CostCoefficient{CostCoefficientType{1461.3_ms}};
-const CostCoefficient CostEstimator::filterIncrement =
-    CostCoefficient{CostCoefficientType{83.7_ms}};
+const CostCoefficient CostEstimator::filterStartup = minCC;
+const CostCoefficient CostEstimator::filterIncrement = minCC;
 
 const CostCoefficient CostEstimator::collScanStartup =
     CostCoefficient{CostCoefficientType{6175.5_ms}};
@@ -217,7 +221,7 @@ const CostCoefficient CostEstimator::indexScanIncrement =
 
 const CostCoefficient CostEstimator::fetchStartup = CostCoefficient{CostCoefficientType{7488.7_ms}};
 const CostCoefficient CostEstimator::fetchIncrement =
-    CostCoefficient{CostCoefficientType{1174.8_ms}};
+    CostCoefficient{CostCoefficientType{1500.0_ms}};
 
 const CostCoefficient CostEstimator::mergeJoinStartup =
     CostCoefficient{CostCoefficientType{1517.8_ms}};
@@ -230,20 +234,21 @@ const CostCoefficient CostEstimator::virtScanStartup =
 const CostCoefficient CostEstimator::virtScanIncrement =
     CostCoefficient{CostCoefficientType{100.3_ms}};
 
-const CostCoefficient CostEstimator::hashJoinStartup = minCC;
+const CostCoefficient CostEstimator::hashJoinStartup =
+    CostCoefficient{CostCoefficientType{100.0_ms}};
 const CostCoefficient CostEstimator::hashJoinBuild = CostCoefficient{CostCoefficientType{100.0_ms}};
 const CostCoefficient CostEstimator::hashJoinIncrement =
     CostCoefficient{CostCoefficientType{250.6_ms}};
 
-const CostCoefficient CostEstimator::sortStartup = minCC;
-const CostCoefficient CostEstimator::sortIncrement =
-    CostCoefficient{CostCoefficientType{2500.0_ms}};
+const CostCoefficient CostEstimator::sortStartup = CostCoefficient{CostCoefficientType{100.0_ms}};
+const CostCoefficient CostEstimator::sortIncrement = CostCoefficient{CostCoefficientType{250.0_ms}};
 const CostCoefficient CostEstimator::sortWithLimitIncrement =
-    CostCoefficient{CostCoefficientType{1000.0_ms}};  // TODO: not yet calibrated
-
-const CostCoefficient CostEstimator::sortedMergeStartup = minCC;
-const CostCoefficient CostEstimator::sortedMergeIncrement =
     CostCoefficient{CostCoefficientType{100.0_ms}};
+
+const CostCoefficient CostEstimator::sortedMergeStartup =
+    CostCoefficient{CostCoefficientType{100.0_ms}};
+const CostCoefficient CostEstimator::sortedMergeIncrement =
+    CostCoefficient{CostCoefficientType{200.0_ms}};
 
 const CostCoefficient CostEstimator::projectionStartup =
     CostCoefficient{CostCoefficientType{1103.4_ms}};

@@ -334,7 +334,7 @@ TEST(CardinalityEstimator, IndexUnionWithFetchFilter) {
     CardinalityEstimate e2 = getPlanHeuristicCE(*unionPlan2, 1000);
 
     ASSERT_EQ(e1, e2);
-    ASSERT_EQ(e1, makeCard(20.8395));
+    ASSERT_EQ(e1, makeCard(21.0504));
 }
 
 TEST(CardinalityEstimator, HistogramIndexedAndNonIndexedSolutionHaveSameCardinality) {

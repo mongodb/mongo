@@ -60,33 +60,33 @@ std::unique_ptr<MatchExpression> parse(const BSONObj& bson) {
 TEST(HeuristicEstimator, AlwaysFalse) {
     BSONObj query = fromjson("{$alwaysFalse: 1}");
     auto expr = parse(query);
-    ASSERT_EQ(estimateLeafMatchExpression(expr.get(), makeCard(100)), zeroSel);
+    ASSERT_EQ(heuristicLeafMatchExpressionSel(expr.get(), makeCard(100)), zeroSel);
 }
 
 TEST(HeuristicEstimator, AlwaysTrue) {
     BSONObj query = fromjson("{$alwaysTrue: 1}");
     auto expr = parse(query);
-    ASSERT_EQ(estimateLeafMatchExpression(expr.get(), makeCard(100)), oneSel);
+    ASSERT_EQ(heuristicLeafMatchExpressionSel(expr.get(), makeCard(100)), oneSel);
 }
 
 TEST(HeuristicEstimate, ModExpression) {
     BSONObj query = fromjson("{a: {$mod: [5, 2]}}");
     auto expr = parse(query);
     // Selectivty of mod 5 is 1/5
-    ASSERT_EQ(estimateLeafMatchExpression(expr.get(), makeCard(100)), makeSel(0.2));
+    ASSERT_EQ(heuristicLeafMatchExpressionSel(expr.get(), makeCard(100)), makeSel(0.2));
 }
 
 TEST(HeuristicEstimate, ExistsExpression) {
     // Note: {$exists: false} is parsed as {$not: {$exists: true}}
     BSONObj query = fromjson("{a: {$exists: true}}");
     auto expr = parse(query);
-    ASSERT_EQ(estimateLeafMatchExpression(expr.get(), makeCard(100)), kExistsSel);
+    ASSERT_EQ(heuristicLeafMatchExpressionSel(expr.get(), makeCard(100)), kExistsSel);
 }
 
 SelectivityEstimate estimateLeafQueryExpr(std::string queryStr, double card) {
     BSONObj query = fromjson(queryStr);
     auto expr = parse(query);
-    return estimateLeafMatchExpression(expr.get(), makeCard(card));
+    return heuristicLeafMatchExpressionSel(expr.get(), makeCard(card));
 }
 
 TEST(HeuristicEstimate, SelectivityRelationships) {

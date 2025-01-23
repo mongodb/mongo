@@ -43,12 +43,17 @@ const SelectivityEstimate oneSelHeuristic{SelectivityType{1}, EstimationSource::
 const SelectivityEstimate zeroSelHeuristic{SelectivityType{0}, EstimationSource::Heuristics};
 
 /**
+ * Return true if an expression can be estimated via heuristics.
+ */
+bool heuristicIsEstimable(const MatchExpression* expr);
+
+/**
  * Estimate the selectivity of the given 'MatchExpression'. The expression must be a leaf, that is
  * an atomic predicate. The caller is responsible for estimating selectivies of conjunctions,
  * disjuctions and negations.
  */
-SelectivityEstimate estimateLeafMatchExpression(const MatchExpression* expr,
-                                                CardinalityEstimate inputCard);
+SelectivityEstimate heuristicLeafMatchExpressionSel(const MatchExpression* expr,
+                                                    CardinalityEstimate inputCard);
 
 /**
  * Estimate a single interval heuristically, depending on the available bounds.
