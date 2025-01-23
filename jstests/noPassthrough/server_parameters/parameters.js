@@ -34,6 +34,7 @@ setAndCheckParameter(dbConn, "traceExceptions", "foo", true);
 setAndCheckParameter(dbConn, "traceExceptions", "", true);
 setAndCheckParameter(dbConn, "syncdelay", 0);
 setAndCheckParameter(dbConn, "syncdelay", 3000);
+setAndCheckParameter(dbConn, "wiredTigerCursorCacheSize", -50);
 
 function ensureSetParameterFailure(dbConn, parameterName, newValue, reason) {
     jsTest.log("Test setting parameter: " + parameterName + " to invalid value: " + newValue);
@@ -63,6 +64,7 @@ ensureSetParameterFailure(
 ensureSetParameterFailure(dbConn, "scramSHA256IterationCount", NaN, 'Unable to coerce NaN/Inf');
 ensureSetParameterFailure(
     dbConn, "scramSHA256IterationCount", Infinity, 'Unable to coerce NaN/Inf');
+ensureSetParameterFailure(dbConn, "wiredTigerCursorCacheSize", 5);
 
 MongoRunner.stopMongod(dbConn);
 

@@ -66,6 +66,9 @@ WiredTigerConnection::WiredTigerConnection(WT_CONNECTION* conn,
                                            WiredTigerKVEngine* engine)
     : _conn(conn), _clockSource(cs), _engine(engine), _registry(numRegistryPartitions) {
     uassertStatusOK(_compiledConfigurations.compileAll(_conn));
+    uassert(9728400,
+            "wiredTigerCursorCacheSize parameter value must be <= 0",
+            gWiredTigerCursorCacheSize.load() <= 0);
 }
 
 WiredTigerConnection::~WiredTigerConnection() {
@@ -251,10 +254,6 @@ void WiredTigerConnection::_releaseSession(WiredTigerSession* session) {
     if (_engine) {
         _engine->sizeStorerPeriodicFlush();
     }
-}
-
-bool WiredTigerConnection::isEngineCachingCursors() {
-    return gWiredTigerCursorCacheSize.load() <= 0;
 }
 
 void WiredTigerConnection::WiredTigerSessionDeleter::operator()(WiredTigerSession* session) const {

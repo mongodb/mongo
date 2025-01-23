@@ -82,13 +82,7 @@ server_parameters:
     # benefit from cursor caching above the storage engine.
     #
     # wiredTigerCursorCacheSize > 0
-    # WiredTiger-level caching of cursors is disabled but cursor caching does
-    # occur above the storage engine. The value of this setting represents the
-    # maximum number of cursors that are cached. Setting the value to 10000 will
-    # give the old (<= 3.6) behavior. Note that cursors remain cached, even when a
-    # session is released back to the cache. Thus, exclusive operations may be
-    # blocked temporarily, and in some cases, a long time. Drops that fail because
-    # of exclusivity silently succeed and are queued for retries.
+    # Not supported.
     #
     # wiredTigerCursorCacheSize < 0
     # This is a hybrid approach of the above two, and is the default. The the
@@ -103,6 +97,8 @@ server_parameters:
         cpp_vartype: 'AtomicWord<std::int32_t>'
         cpp_varname: gWiredTigerCursorCacheSize
         default: -100
+        validator:
+          lte: 0
         redact: false
 
     wiredTigerEvictionDirtyTargetGB:

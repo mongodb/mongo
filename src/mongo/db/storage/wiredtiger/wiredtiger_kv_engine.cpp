@@ -379,10 +379,6 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     ss << "config_base=false,";
     ss << "statistics=(fast),";
 
-    if (!WiredTigerConnection::isEngineCachingCursors()) {
-        ss << "cache_cursors=false,";
-    }
-
     if (_ephemeral) {
         // If we've requested an ephemeral instance we store everything into memory instead of
         // backing it onto disk. Logging is not supported in this instance, thus we also have to

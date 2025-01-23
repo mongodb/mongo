@@ -90,11 +90,6 @@ public:
     };
 
     /**
-     * Indicates that WiredTiger should be configured to cache cursors.
-     */
-    static bool isEngineCachingCursors();
-
-    /**
      * Returns a smart pointer to a previously released session for reuse, or creates a new session.
      * This method must only be called while holding the global lock to avoid races with
      * shuttingDown, but otherwise is thread safe.
