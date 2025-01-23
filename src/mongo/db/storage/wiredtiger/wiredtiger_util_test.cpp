@@ -865,5 +865,50 @@ DEATH_TEST_REGEX(WiredTigerConfigParserTest,
     parser.isTableLoggingSettingValid();
 }
 
+TEST_F(WiredTigerUtilTest, ReconfigureBackgroundCompaction) {
+    WiredTigerEventHandler eventHandler;
+
+    // Define a WiredTiger connection configuration that enables JSON encoding for all messages
+    // related to the WT_VERB_COMPACT category.
+    const std::string connection_cfg =
+        "json_output=[error,message],verbose=[compact],statistics=(all)";
+
+    // Initialize WiredTiger.
+    WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
+    WiredTigerSession* wtSession = ru->getSession();
+
+    // Turn on background compaction.
+    const std::string uri = "table:ev_compact";
+    startCapturingLogMessages();
+    ASSERT_OK(wtRCToStatus(wtSession->create(uri.c_str(), nullptr), *wtSession));
+    ASSERT_OK(wtRCToStatus(wtSession->compact(nullptr, "background=true,timeout=0"), *wtSession));
+
+    // Starting compaction requires setting up background threads, which may take some time. We
+    // query WiredTiger Statistics to ensure these threads have started before we continue.
+    StatusWith<int64_t> backgroundCompactionRunning = WiredTigerUtil::getStatisticsValue(
+        *wtSession, "statistics:", "statistics=(fast)", WT_STAT_CONN_BACKGROUND_COMPACT_RUNNING);
+    ASSERT_OK(backgroundCompactionRunning);
+
+    // A value of 0 here indicates that the background threads are not set up yet.
+    while (backgroundCompactionRunning.getValue() == 0) {
+        sleepmillis(100);
+        backgroundCompactionRunning =
+            WiredTigerUtil::getStatisticsValue(*wtSession,
+                                               "statistics:",
+                                               "statistics=(fast)",
+                                               WT_STAT_CONN_BACKGROUND_COMPACT_RUNNING);
+        ASSERT_OK(backgroundCompactionRunning);
+    }
+
+    // We should get an error when we try reconfigure background compaction
+    // while it is already running.
+    ASSERT_EQUALS(
+        ErrorCodes::AlreadyInitialized,
+        wtRCToStatus(wtSession->compact(nullptr, "background=true,timeout=0,run_once=true"),
+                     *wtSession));
+    stopCapturingLogMessages();
+}
+
 }  // namespace
 }  // namespace mongo
