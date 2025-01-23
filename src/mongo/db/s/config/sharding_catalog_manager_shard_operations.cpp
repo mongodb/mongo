@@ -569,83 +569,14 @@ void joinMigrations(OperationContext* opCtx) {
     uassert(8955101, "Failed to await ongoing migrations before removing catalog shard", result);
 }
 
-}  // namespace topology_change_helpers
-
-StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShard(
-    OperationContext* opCtx,
-    RemoteCommandTargeter* targeter,
-    const DatabaseName& dbName,
-    const BSONObj& cmdObj) {
-    auto swHost = targeter->findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
-    if (!swHost.isOK()) {
-        return swHost.getStatus();
-    }
-    auto host = std::move(swHost.getValue());
-
-    executor::RemoteCommandRequest request(
-        host, dbName, cmdObj, rpc::makeEmptyMetadata(), opCtx, kRemoteCommandTimeout);
-
-    executor::RemoteCommandResponse response(
-        host, Status(ErrorCodes::InternalError, "Internal error running command"));
-
-    auto swCallbackHandle = _executorForAddShard->scheduleRemoteCommand(
-        request, [&response](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
-            response = args.response;
-        });
-    if (!swCallbackHandle.isOK()) {
-        return swCallbackHandle.getStatus();
-    }
-
-    // Block until the command is carried out
-    _executorForAddShard->wait(swCallbackHandle.getValue());
-
-    if (response.status == ErrorCodes::ExceededTimeLimit) {
-        LOGV2(21941, "Operation timed out", "error"_attr = redact(response.status));
-    }
-
-    if (!response.isOK()) {
-        if (!Shard::shouldErrorBePropagated(response.status.code())) {
-            return {ErrorCodes::OperationFailed,
-                    str::stream() << "failed to run command " << cmdObj
-                                  << " when attempting to add shard "
-                                  << targeter->connectionString().toString()
-                                  << causedBy(response.status)};
-        }
-        return response.status;
-    }
-
-    BSONObj result = response.data.getOwned();
-
-    Status commandStatus = getStatusFromCommandResult(result);
-    if (!Shard::shouldErrorBePropagated(commandStatus.code())) {
-        commandStatus = {
-            ErrorCodes::OperationFailed,
-            str::stream() << "failed to run command " << cmdObj << " when attempting to add shard "
-                          << targeter->connectionString().toString() << causedBy(commandStatus)};
-    }
-
-    Status writeConcernStatus = getWriteConcernStatusFromCommandResult(result);
-    if (!Shard::shouldErrorBePropagated(writeConcernStatus.code())) {
-        writeConcernStatus = {ErrorCodes::OperationFailed,
-                              str::stream() << "failed to satisfy writeConcern for command "
-                                            << cmdObj << " when attempting to add shard "
-                                            << targeter->connectionString().toString()
-                                            << causedBy(writeConcernStatus)};
-    }
-
-    return Shard::CommandResponse(std::move(host),
-                                  std::move(result),
-                                  std::move(commandStatus),
-                                  std::move(writeConcernStatus));
-}
-
-StatusWith<boost::optional<ShardType>> ShardingCatalogManager::_checkIfShardExists(
+StatusWith<boost::optional<ShardType>> checkIfShardExists(
     OperationContext* opCtx,
     const ConnectionString& proposedShardConnectionString,
-    const std::string* proposedShardName) {
+    const boost::optional<StringData>& proposedShardName,
+    ShardingCatalogClient& localCatalogClient) {
     // Check whether any host in the connection is already part of the cluster.
     const auto existingShards =
-        _localCatalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+        localCatalogClient.getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
     if (!existingShards.isOK()) {
         return existingShards.getStatus().withContext(
             "Failed to load existing shards during addShard");
@@ -663,7 +594,7 @@ StatusWith<boost::optional<ShardType>> ShardingCatalogManager::_checkIfShardExis
         // Function for determining if the options for the shard that is being added match the
         // options of an existing shard that conflicts with it.
         auto shardsAreEquivalent = [&]() {
-            if (proposedShardName && *proposedShardName != existingShard.getName()) {
+            if (proposedShardName && proposedShardName.value() != existingShard.getName()) {
                 return false;
             }
             if (proposedShardConnectionString.type() != existingShardConnStr.type()) {
@@ -740,16 +671,87 @@ StatusWith<boost::optional<ShardType>> ShardingCatalogManager::_checkIfShardExis
             return hostsAreEquivalent;
         }
 
-        if (proposedShardName && *proposedShardName == existingShard.getName()) {
+        if (proposedShardName && proposedShardName.value() == existingShard.getName()) {
             // If we get here then we're trying to add a shard with the same name as an
             // existing shard, but there was no overlap in the hosts between the existing
             // shard and the proposed connection string for the new shard.
             return {ErrorCodes::IllegalOperation,
-                    str::stream() << "A shard named " << *proposedShardName << " already exists"};
+                    str::stream() << "A shard named " << proposedShardName.value()
+                                  << " already exists"};
         }
     }
 
     return {boost::none};
+}
+
+}  // namespace topology_change_helpers
+
+StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShard(
+    OperationContext* opCtx,
+    RemoteCommandTargeter* targeter,
+    const DatabaseName& dbName,
+    const BSONObj& cmdObj) {
+    auto swHost = targeter->findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
+    if (!swHost.isOK()) {
+        return swHost.getStatus();
+    }
+    auto host = std::move(swHost.getValue());
+
+    executor::RemoteCommandRequest request(
+        host, dbName, cmdObj, rpc::makeEmptyMetadata(), opCtx, kRemoteCommandTimeout);
+
+    executor::RemoteCommandResponse response(
+        host, Status(ErrorCodes::InternalError, "Internal error running command"));
+
+    auto swCallbackHandle = _executorForAddShard->scheduleRemoteCommand(
+        request, [&response](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
+            response = args.response;
+        });
+    if (!swCallbackHandle.isOK()) {
+        return swCallbackHandle.getStatus();
+    }
+
+    // Block until the command is carried out
+    _executorForAddShard->wait(swCallbackHandle.getValue());
+
+    if (response.status == ErrorCodes::ExceededTimeLimit) {
+        LOGV2(21941, "Operation timed out", "error"_attr = redact(response.status));
+    }
+
+    if (!response.isOK()) {
+        if (!Shard::shouldErrorBePropagated(response.status.code())) {
+            return {ErrorCodes::OperationFailed,
+                    str::stream() << "failed to run command " << cmdObj
+                                  << " when attempting to add shard "
+                                  << targeter->connectionString().toString()
+                                  << causedBy(response.status)};
+        }
+        return response.status;
+    }
+
+    BSONObj result = response.data.getOwned();
+
+    Status commandStatus = getStatusFromCommandResult(result);
+    if (!Shard::shouldErrorBePropagated(commandStatus.code())) {
+        commandStatus = {
+            ErrorCodes::OperationFailed,
+            str::stream() << "failed to run command " << cmdObj << " when attempting to add shard "
+                          << targeter->connectionString().toString() << causedBy(commandStatus)};
+    }
+
+    Status writeConcernStatus = getWriteConcernStatusFromCommandResult(result);
+    if (!Shard::shouldErrorBePropagated(writeConcernStatus.code())) {
+        writeConcernStatus = {ErrorCodes::OperationFailed,
+                              str::stream() << "failed to satisfy writeConcern for command "
+                                            << cmdObj << " when attempting to add shard "
+                                            << targeter->connectionString().toString()
+                                            << causedBy(writeConcernStatus)};
+    }
+
+    return Shard::CommandResponse(std::move(host),
+                                  std::move(result),
+                                  std::move(commandStatus),
+                                  std::move(writeConcernStatus));
 }
 
 StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
@@ -1254,7 +1256,11 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     // Check if this shard has already been added (can happen in the case of a retry after a network
     // error, for example) and thus this addShard request should be considered a no-op.
-    auto existingShard = _checkIfShardExists(opCtx, shardConnectionString, shardProposedName);
+    const auto existingShard = topology_change_helpers::checkIfShardExists(
+        opCtx,
+        shardConnectionString,
+        shardProposedName ? boost::optional<StringData>(*shardProposedName) : boost::none,
+        *_localCatalogClient);
     if (!existingShard.isOK()) {
         return existingShard.getStatus();
     }

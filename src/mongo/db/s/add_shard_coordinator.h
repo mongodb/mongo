@@ -48,7 +48,7 @@ public:
 
     void checkIfOptionsConflict(const BSONObj& stateDoc) const override {}
 
-    std::string getResult(OperationContext* opCtx);
+    const std::string& getResult(OperationContext* opCtx) const;
 
 private:
     StringData serializePhase(const Phase& phase) const override {
@@ -57,6 +57,8 @@ private:
 
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
+
+    void _verifyInput() const;
 
     // Set on successful completion of the coordinator.
     boost::optional<std::string> _result;

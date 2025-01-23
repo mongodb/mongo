@@ -35,6 +35,7 @@ const allCommands = {
     _clusterWriteWithoutShardKey: {skip: isAnInternalCommand},
     _configsvrAbortReshardCollection: {skip: isAnInternalCommand},
     _configsvrAddShard: {skip: isAnInternalCommand},
+    _configsvrAddShardCoordinator: {skip: isAnInternalCommand},
     _configsvrAddShardToZone: {skip: isAnInternalCommand},
     _configsvrBalancerCollectionStatus: {skip: isAnInternalCommand},
     _configsvrBalancerStart: {skip: isAnInternalCommand},

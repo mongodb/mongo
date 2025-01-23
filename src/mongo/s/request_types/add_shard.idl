@@ -88,3 +88,17 @@ commands:
             shardIdentity:
                 description: "Identity metadata for the new shard"
                 type: ShardIdentity
+
+    # TODO (SERVER-99284)
+    # This is a test command for internal testing of SPM-4017 - Resilient Topology Changes
+    # DO NOT USE THIS COMMAND!
+    _configsvrAddShardCoordinator:
+        command_name: _configsvrAddShardCoordinator
+        cpp_name: ConfigsvrAddShardCoordinator
+        description: "Test command to run the add shard coordinator"
+        strict: false
+        namespace: type
+        type: connection_string
+        api_version: ""
+        chained_structs:
+            AddShardRequestBase: AddShardRequestBase

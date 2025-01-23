@@ -1216,6 +1216,7 @@ mongo_cc_library(
         ":untrack_unsplittable_collection_coordinator_document_gen",
         "//src/mongo/db/s/config:configsvr_abort_reshard_collection_command.cpp",
         "//src/mongo/db/s/config:configsvr_add_shard_command.cpp",
+        "//src/mongo/db/s/config:configsvr_add_shard_coordinator_command.cpp",
         "//src/mongo/db/s/config:configsvr_add_shard_to_zone_command.cpp",
         "//src/mongo/db/s/config:configsvr_balancer_collection_status_command.cpp",
         "//src/mongo/db/s/config:configsvr_check_cluster_metadata_consistency_command.cpp",

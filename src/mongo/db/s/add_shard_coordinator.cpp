@@ -29,22 +29,77 @@
 
 #include "mongo/db/s/add_shard_coordinator.h"
 
+#include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 
 ExecutorFuture<void> AddShardCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then([] {
-            uasserted(ErrorCodes::NotImplemented, "The addShard coordinator is still incomplete.");
-        })
-        .onError([](const Status& status) { return status; });
+        .then(_buildPhaseHandler(
+            Phase::kCheckLocalPreconditions,
+            [this, _ = shared_from_this()]() {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+
+                _verifyInput();
+
+                const auto existingShard =
+                    uassertStatusOK(topology_change_helpers::checkIfShardExists(
+                        opCtx,
+                        _doc.getConnectionString(),
+                        _doc.getProposedName(),
+                        *ShardingCatalogManager::get(opCtx)->localCatalogClient()));
+                if (existingShard.has_value()) {
+                    _doc.setChosenName(existingShard.value().getName());
+                    _enterPhase(AddShardCoordinatorPhaseEnum::kFinal);
+                }
+            }))
+        .then(_buildPhaseHandler(Phase::kFinal,
+                                 [this, _ = shared_from_this()]() {
+                                     auto opCtxHolder = cc().makeOperationContext();
+                                     auto* opCtx = opCtxHolder.get();
+
+                                     // TODO this should not happen later on. if we reach the final
+                                     // phase that means we added something (or was already added).
+                                     // If we were not able to add anything then an assert should
+                                     // had been thrown earlier.
+                                     // invariant(_doc.getChosenName().has_value());
+                                     uassert(
+                                         ErrorCodes::NotImplemented,
+                                         "something is still missing here in the implementation...",
+                                         _doc.getChosenName().has_value());
+
+                                     repl::ReplClientInfo::forClient(opCtx->getClient())
+                                         .setLastOpToSystemLastOpTime(opCtx);
+
+                                     _result = _doc.getChosenName().value().toString();
+                                 }))
+        .onError([this, _ = shared_from_this()](const Status& status) { return status; });
 }
 
-std::string AddShardCoordinator::getResult(OperationContext* opCtx) {
-    getCompletionFuture().get(opCtx);
+const std::string& AddShardCoordinator::getResult(OperationContext* opCtx) const {
+    const_cast<AddShardCoordinator*>(this)->getCompletionFuture().get(opCtx);
     invariant(_result.is_initialized());
     return *_result;
+}
+
+// TODO (SPM-4017): these changes should be done on the cluster command level.
+void AddShardCoordinator::_verifyInput() const {
+    uassert(ErrorCodes::BadValue, "Invalid connection string", _doc.getConnectionString());
+
+    if (_doc.getConnectionString().type() != ConnectionString::ConnectionType::kStandalone &&
+        _doc.getConnectionString().type() != ConnectionString::ConnectionType::kReplicaSet) {
+        uasserted(ErrorCodes::FailedToParse,
+                  str::stream() << "Invalid connection string "
+                                << _doc.getConnectionString().toString());
+    }
+
+    uassert(ErrorCodes::BadValue,
+            "shard name cannot be empty",
+            !_doc.getProposedName() || !_doc.getProposedName()->empty());
 }
 
 }  // namespace mongo

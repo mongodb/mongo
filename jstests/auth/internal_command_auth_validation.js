@@ -78,6 +78,10 @@ const internalCommandsMap = {
         testname: "_configsvrAddShard",
         command: {_configsvrAddShard: "x"},
     },
+    _configsvrAddShardCoordinator: {
+        testname: "_configsvrAddShardCoordinator",
+        command: {_configsvrAddShardCoordinator: "x"},
+    },
     _configsvrAddShardToZone: {
         testname: "_configsvrAddShardToZone",
         command: {_configsvrAddShardToZone: shard0name, zone: 'z'},

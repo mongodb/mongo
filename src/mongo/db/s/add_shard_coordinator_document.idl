@@ -39,6 +39,8 @@ enums:
         type: string
         values:
             kUnset: "unset"
+            kCheckLocalPreconditions: "checkLocalPreconditions"
+            kFinal: "final"
 
 structs:
     AddShardCoordinatorDocument:
@@ -48,7 +50,18 @@ structs:
         chained_structs:
             ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
         fields:
+            connectionString:
+                type: connection_string
+                description: "Connection string for the new shard"
+            proposedName:
+                type: string
+                description: "A proposed name for the new shard"
+                optional: true
             phase:
                 type: AddShardCoordinatorPhase
                 description: "Coordinator phase."
                 default: kUnset
+            chosenName:
+                type: string
+                description: "The chosen name for the new shard"
+                optional: true
