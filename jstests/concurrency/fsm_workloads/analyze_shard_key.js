@@ -76,8 +76,13 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
      */
     $config.data.generateShardKeyOptions = function generateShardKeyOptions(cluster) {
         const isHashed = Math.random() < 0.5;
-        const isUnique = Math.random() < 0.5;
         const isMonotonic = Math.random() < 0.5;
+        // Please see the comment in 'generateDocumentOptions'. This test relies on the
+        // CountDownLatch to generate monotonic field values. However, the CountDownLatch does not
+        // support atomic decrement and fetch so it can end up generating duplicate field values.
+        // For this reason, we cannot test a monotonic shard key with a unique support index in this
+        // test.
+        const isUnique = isMonotonic ? false : Math.random() < 0.5;
 
         let shardKey, indexSpecs;
         if (cluster.isSharded() && isUnique) {
@@ -112,11 +117,21 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
      */
     $config.data.generateDocumentOptions = function generateDocumentOptions(cluster) {
         this.documentOptions = {};
+        this.latches = {};
         for (let fieldName in this.shardKeyOptions.shardKey) {
-            this.documentOptions[fieldName] = {
-                isMonotonic: this.shardKeyOptions.isMonotonic,
-                type: this.shardKeyOptions.isMonotonic ? "objectId" : "uuid"
-            };
+            if (this.shardKeyOptions.isMonotonic) {
+                this.documentOptions[fieldName] = {isMonotonic: true, type: "integer"};
+                // This CountDownLatch is shared between all the threads. The count is used as the
+                // value for this field to make it monotonic (decreasing). That is, every time a
+                // thread needs to insert a new document, it gets the latest count from the
+                // CountDownLatch and then decrements the count. Please note that the value will not
+                // be strictly decreasing (i.e. it will only be pseudo-monotonic) because the
+                // CountDownLatch does not support atomic decrement and fetch so multiple insert
+                // threads may call getCount() and countDown() at once.
+                this.latches[fieldName] = new CountDownLatch(1000000);
+            } else {
+                this.documentOptions[fieldName] = {isMonotonic: false, type: "uuid"};
+            }
         }
         this.documentOptions[this.nonCandidateShardKeyFieldName] = {
             isMonotonic: false,
@@ -136,8 +151,11 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
      */
     $config.data.generateRandomValue = function generateRandomValue(fieldName) {
         const fieldType = this.documentOptions[fieldName].type;
-        if (fieldType == "objectId") {
-            return new ObjectId();
+        if (fieldType == "integer") {
+            const fieldValue = this.latches[fieldName].getCount();
+            assert.gt(fieldValue, 0, "The count has reached zero");
+            this.latches[fieldName].countDown();
+            return fieldValue;
         } else if (fieldType == "uuid") {
             return new UUID();
         }
