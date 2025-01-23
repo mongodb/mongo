@@ -1673,8 +1673,6 @@ tasks:
 
   - <<: *task_template
     name: jsCore_wildcard_indexes
-    depends_on:
-      - name: jsCore
     tags:
       ["assigned_to_jira_team_server_query_optimization", "default", "jscore"]
     commands:
