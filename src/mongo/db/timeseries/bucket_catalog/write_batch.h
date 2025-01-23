@@ -131,9 +131,11 @@ struct WriteBatch {
 
     ExecutionStatsController stats;
 
-    // Marginal numbers for this batch only. Uncommitted is a rough estimate of data in this batch,
+    // Marginal numbers for this batch only.
+    // Sizes.uncommittedMeasurementEstimate is a rough estimate of data in this batch,
     // using 0 for anything under threshold, and uncompressed size for anything over threshold.
-    // Committed is 0 until it is populated by intermediate as the delta for committing this batch.
+    // Sizes.uncommittedVerifiedSize is 0 until it is populated by intermediate as the delta
+    // for committing this batch.
     Sizes sizes;
 
     StringMap<std::size_t> newFieldNamesToBeInserted;  // Value is hash of string key

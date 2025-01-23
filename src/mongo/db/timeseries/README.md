@@ -12,13 +12,14 @@ the `expireAfterSeconds` option.
 A time-series collection `mytscoll` in the `mydb` database is represented in the [catalog](../catalog/README.md) by a
 combination of a view and a system collection:
 
-- The view `mydb.mytscoll` is defined with the bucket collection as the source collection with
+- The non-materialized view `mydb.mytscoll` is defined with the bucket collection as the source collection with
   certain properties:
-  _ Writes (inserts only) are allowed on the view. Every document inserted must contain a time field.
-  _ Querying the view implicitly unwinds the data in the underlying bucket collection to return
-  documents in their original non-bucketed form. \* The aggregation stage [$\_internalUnpackBucket](../pipeline/document_source_internal_unpack_bucket.h) is used to
-  unwind the bucket data for the view. For more information about this stage and query rewrites for
-  time-series collections see [query/timeseries/README](../query/timeseries/README.md).
+  - Writes (inserts only) are allowed on the view. Every document inserted must contain a time field.
+  - Querying the view implicitly unwinds the data in the underlying bucket collection to return
+    documents in their original non-bucketed form.
+    - The aggregation stage [$\_internalUnpackBucket](../pipeline/document_source_internal_unpack_bucket.h) is used to
+      unwind the bucket data for the view. For more information about this stage and query rewrites for
+      time-series collections see [query/timeseries/README](../query/timeseries/README.md).
 - The system collection has the namespace `mydb.system.buckets.mytscoll` and is where the actual
   data is stored.
   - Each document in the bucket collection represents a set of time-series data within a period of time.
@@ -141,7 +142,7 @@ cannot rely on the fact that V3 buckets have their measurements in order by time
 
 New V1 buckets will no longer be created in 8.0+, but existing V1 buckets from upgrades will
 continue to be supported. Closed V1 buckets can be reopened, and will be compressed when more
-measurements are inserted into them. Specifically, the bucket will be compressed as v2 the
+measurements are inserted into them. Specifically, the bucket will be sorted and compressed as V2 the
 [moment it is reopened](https://github.com/mongodb/mongo/blob/4ccd7e74075ac8a9685981570b575acf74efe350/src/mongo/db/timeseries/timeseries_write_util.cpp#L721), and the insert [will then operate](https://github.com/mongodb/mongo/blob/4ccd7e74075ac8a9685981570b575acf74efe350/src/mongo/db/timeseries/timeseries_write_util.cpp#L1075-L1081) on a compressed bucket.
 
 ### BSONColumnBuilder
@@ -310,7 +311,7 @@ the index does not exist, then query-based reopening will not be used.
 When we reopen compressed buckets, in order to avoid fully decompressing and then fully re-compressing
 the bucket we instantiate the bucket's BSONColumnBuilders from the existing BSONColumn binaries. Currently
 this only supports scalar values; if the interleave mode (the mode where we are dealing with different types)
-is detected in the input BSONColumn binary, we will fully decompress and re-compressed the bucket we are
+is detected in the input BSONColumn binary, we will fully decompress and re-compress the bucket we are
 reopening.
 
 ### Bucket Closure and Archival
@@ -318,7 +319,7 @@ reopening.
 A bucket is permanently closed by setting the optional `control.closed` flag, which makes it
 ineligible for reopening. This can only be done manually for [Atlas Online Archive](https://www.mongodb.com/docs/atlas/online-archive/manage-online-archive/).
 
-If the `BucketCatalog` is using more memory than it's given threshold (controlled by the server
+If the `BucketCatalog` is using more memory than its given threshold (controlled by the server
 parameter `timeseriesIdleBucketExpiryMemoryUsageThreshold`), it will start to archive or close idle
 buckets. A bucket is considered idle if it is open and it does not have any uncommitted measurements
 pending. Archiving a bucket removes most of its in-memory state from the `BucketCatalog`, but
@@ -361,8 +362,10 @@ some reasonable presets of "seconds", "minutes" and "hours".
 | Granularity | `bucketRoundingSeconds` | `bucketMaxSpanSeconds` |
 | ----------- | ----------------------- | ---------------------- |
 | _Seconds_   | 60 (1 minute)           | 3,600 (1 hour)         |
-| _Hours_     | 3,600 (1 hour)          | 86,400 (1 day)         |
-| _Days_      | 86,400 (1 day)          | 25,592,000 (30 days)   |
+| _Minutes_   | 3,600 (1 hour)          | 86,400 (1 day)         |
+| _Hours_     | 86,400 (1 day)          | 2,559,200 (30 days)    |
+
+Chart sources: [bucketRoundingSeconds](https://github.com/10gen/mongo/blob/279417f986c9792b6477b060dc65b926f3608529/src/mongo/db/timeseries/timeseries_options.cpp#L368-L381) and [bucketMaxSpanSeconds](https://github.com/10gen/mongo/blob/279417f986c9792b6477b060dc65b926f3608529/src/mongo/db/timeseries/timeseries_options.cpp#L259-L273).
 
 If the user does not specify any bucketing parameters when creating a collection, the default value
 is `{granularity: "seconds"}`.
