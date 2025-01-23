@@ -235,7 +235,7 @@ auto setWindowFields(const auto& expCtx, const std::string& rankFieldName) {
  */
 auto addScoreDetails(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                      const std::string& prefix) {
-    const std::string scoreDetails = prefix + "_scoreDetails";
+    const std::string scoreDetails = fmt::format("{}_scoreDetails", prefix);
     BSONObjBuilder bob;
     {
         BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
@@ -264,9 +264,9 @@ auto addScoreField(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                    const std::string& prefix,
                    const int rankConstant,
                    const double weight) {
-    const std::string score = prefix + "_score";
-    const std::string rankPath = "$" + prefix + "_rank";
-    const std::string scorePath = "$" + score;
+    const std::string score = fmt::format("{}_score", prefix);
+    const std::string rankPath = fmt::format("${}_rank", prefix);
+    const std::string scorePath = fmt::format("${}", score);
 
     BSONObjBuilder bob;
     {
@@ -276,9 +276,9 @@ auto addScoreField(const boost::intrusive_ptr<ExpressionContext>& expCtx,
             {
                 BSONArrayBuilder multiplyArray(scoreField.subarrayStart("$multiply"_sd));
                 // RRF Score = weight * (1 / (rank + rank constant)).
-                multiplyArray.append(
-                    BSON("$divide"
-                         << BSON_ARRAY(1 << BSON("$add" << BSON_ARRAY(rankPath << rankConstant)))));
+
+                multiplyArray.append(fromjson(
+                    fmt::format("{{$divide: [1, {{$add: ['{}', {}]}}]}}", rankPath, rankConstant)));
                 multiplyArray.append(weight);
             }
         }
@@ -305,7 +305,7 @@ auto buildFirstPipelineStages(const std::string& prefixOne,
 
     std::list<boost::intrusive_ptr<DocumentSource>> outputStages = {
         nestUserDocs(expCtx),
-        setWindowFields(expCtx, prefixOne + "_rank"),
+        setWindowFields(expCtx, fmt::format("{}_rank", prefixOne)),
         addScoreField(expCtx, prefixOne, rankConstant, weight),
     };
     if (includeScoreDetails) {
@@ -324,28 +324,23 @@ BSONObj groupEachScore(
         StringBuilder sb;
         for (auto it = pipelines.begin(); it != pipelines.end(); it++) {
             sb << ", ";
-            const auto scoreName = it->first + "_score";
-            const auto rankName = it->first + "_rank";
-            const auto scoreDetailsName = it->first + "_scoreDetails";
-            sb << scoreName << R"(: {$max: {$ifNull: ["$)" + scoreName + R"(", NumberLong(0)]}})";
+            const auto& pipelineName = it->first;
+            sb << fmt::format("{0}_score: {{$max: {{$ifNull: [\"${0}_score\", NumberLong(0)]}}}}",
+                              pipelineName);
             // We only need to preserve the rank if we're calculating score details.
             if (includeScoreDetails) {
-                sb << ", " << rankName
-                   << R"(: {$max: {$ifNull: ["$)" + rankName + R"(", NumberLong(0)]}})";
-                sb << ", " << scoreDetailsName
-                   << R"(: {"$mergeObjects": "$)" + scoreDetailsName + R"("})";
+                sb << fmt::format(
+                    ", {0}_rank: {{$max: {{$ifNull: [\"${0}_rank\", NumberLong(0)]}}}}",
+                    pipelineName);
+                sb << fmt::format(", {0}_scoreDetails: {{$mergeObjects: \"${0}_scoreDetails\"}}",
+                                  pipelineName);
             }
         }
         return sb.str();
     };
 
-    return fromjson(R"({
-        $group: {
-                _id: "$docs._id",
-                docs: {$first: "$docs"}
-                )" + allScores() +
-                    R"(}
-    })");
+    return fromjson(
+        fmt::format("{{$group: {{_id: '$docs._id', docs: {{$first: '$docs'}}{0}}}}}", allScores()));
 }
 
 BSONObj calculateFinalScore(
@@ -365,15 +360,7 @@ BSONObj calculateFinalScore(
         sb << "]";
         return sb.str();
     };
-    BSONObj finalScore = fromjson(R"({
-        $addFields: {
-            score: {
-                $add: )" + allInputs() +
-                                  R"(
-            }
-        }
-    })");
-    return finalScore;
+    return fromjson(fmt::format(R"({{$addFields: {{score: {{$add: {0}}}}}}})", allInputs()));
 }
 
 BSONObj calculateFinalScoreDetails(
@@ -384,11 +371,9 @@ BSONObj calculateFinalScoreDetails(
     BSONObjBuilder bob;
     BSONArrayBuilder mergeNamedDetailsBob(bob.subarrayStart("$mergeObjects"_sd));
     for (auto it = inputs.begin(); it != inputs.end(); it++) {
-        mergeNamedDetailsBob.append(
-            BSON(it->first << BSON("$mergeObjects"
-                                   << BSON_ARRAY(BSON("rank"
-                                                      << "$" + it->first + "_rank")
-                                                 << "$" + it->first + "_scoreDetails"))));
+        mergeNamedDetailsBob.append(fromjson(
+            fmt::format("{{{0}: {{$mergeObjects: [{{rank: '${0}_rank'}}, '${0}_scoreDetails']}}}}",
+                        it->first)));
     }
     mergeNamedDetailsBob.done();
     // Create the following object:
@@ -399,8 +384,8 @@ BSONObj calculateFinalScoreDetails(
             }
         }
     */
-    BSONObj finalScoreDetails = BSON("$addFields" << BSON("calculatedScoreDetails" << bob.obj()));
-    return finalScoreDetails;
+    return fromjson(
+        fmt::format("{{$addFields: {{calculatedScoreDetails: {0}}}}}", bob.obj().toString()));
 }
 
 boost::intrusive_ptr<DocumentSource> buildUnionWithPipeline(
@@ -413,7 +398,7 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipeline(
 
     makeSureSortKeyIsOutput(oneInputPipeline->getSources());
     oneInputPipeline->pushBack(nestUserDocs(expCtx));
-    oneInputPipeline->pushBack(setWindowFields(expCtx, prefix + "_rank"));
+    oneInputPipeline->pushBack(setWindowFields(expCtx, fmt::format("{}_rank", prefix)));
     oneInputPipeline->pushBack(addScoreField(expCtx, prefix, rankConstant, weight));
     if (includeScoreDetails) {
         oneInputPipeline->pushBack(addScoreDetails(expCtx, prefix));
@@ -439,7 +424,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
     // Note that the scoreDetails fields go here in the pipeline. We create them below to be able
     // to return them immediately once all stages are generated.
     BSONObj sortObj = fromjson(R"({
-        $sort: { score: -1, _id: 1}
+        $sort: {score: -1, _id: 1}
     })");
     auto sort = DocumentSourceSort::createFromBson(sortObj.firstElement(), expCtx);
 
@@ -454,12 +439,10 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
             calculateFinalScoreDetails(inputPipelines).firstElement(), expCtx);
         auto setDetails = DocumentSourceSetMetadata::create(
             expCtx,
-            Expression::parseObject(expCtx.get(),
-                                    BSON("value"
-                                         << "$score"
-                                         << "details"
-                                         << "$calculatedScoreDetails"),
-                                    expCtx->variablesParseState),
+            Expression::parseObject(
+                expCtx.get(),
+                fromjson("{value: '$score', details: '$calculatedScoreDetails'}"),
+                expCtx->variablesParseState),
             DocumentMetadataFields::kScoreDetails);
         return {group, addFields, addFieldsDetails, setDetails, sort, restoreUserDocs};
     }
