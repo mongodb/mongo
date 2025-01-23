@@ -98,7 +98,7 @@ TEST_F(ExpressionEvaluateDateFromPartsTest, TestThatOutOfRangeValuesRollOver) {
 
 }  // namespace expression_evaluation_test
 
-namespace EvaluateDateExpressionsTest {
+namespace evaluate_date_expressions_test {
 
 std::vector<StringData> dateExpressions = {"$year"_sd,
                                            "$isoWeekYear"_sd,
@@ -272,9 +272,9 @@ TEST_F(EvaluateDateExpressionsTest, DoesResultInNullIfGivenNullishInput) {
     }
 }
 
-}  // namespace EvaluateDateExpressionsTest
+}  // namespace evaluate_date_expressions_test
 
-namespace ExpressionEvaluateDateToStringTest {
+namespace expression_evaluate_date_to_string_test {
 
 // This provides access to an ExpressionContext that has a valid ServiceContext with a
 // TimeZoneDatabase via getExpCtx(), but we'll use a different name for this test suite.
@@ -398,9 +398,9 @@ TEST_F(ExpressionEvaluateDateToStringTest, FailsForInvalidFormatRegardlessOfInpu
         18533);
 }
 
-}  // namespace ExpressionEvaluateDateToStringTest
+}  // namespace expression_evaluate_date_to_string_test
 
-namespace ExpressionEvaluateDateFromStringTest {
+namespace expression_evaluate_date_from_string_test {
 
 // This provides access to an ExpressionContext that has a valid ServiceContext with a
 // TimeZoneDatabase via getExpCtx(), but we'll use a different name for this test suite.
@@ -832,9 +832,9 @@ TEST_F(ExpressionEvaluateDateFromStringTest, OnErrorEvaluatedLazily) {
                        ErrorCodes::BadValue);
 }
 
-}  // namespace ExpressionEvaluateDateFromStringTest
+}  // namespace expression_evaluate_date_from_string_test
 
-namespace ExpressionEvaluateDateDiffTest {
+namespace expression_evaluate_date_diff_test {
 class ExpressionEvaluateDateDiffTest : public AggregationContextFixture {
 public:
     /**
@@ -1036,9 +1036,9 @@ TEST_F(ExpressionEvaluateDateDiffTest, EvaluatesExpression) {
     }
 }
 
-}  // namespace ExpressionEvaluateDateDiffTest
+}  // namespace expression_evaluate_date_diff_test
 
-namespace ExpressionEvaluateDateArithmeticsTest {
+namespace expression_evaluate_date_arithmetics_test {
 using ExpressionEvaluateDateArithmeticsTest = AggregationContextFixture;
 
 std::vector<StringData> dateArithmeticsExp = {"$dateAdd"_sd, "$dateSubtract"_sd};
@@ -1211,6 +1211,6 @@ TEST_F(ExpressionEvaluateDateArithmeticsTest, RegularEvaluationDateSubtract) {
     }
 }
 
-}  // namespace ExpressionEvaluateDateArithmeticsTest
+}  // namespace expression_evaluate_date_arithmetics_test
 
 }  // namespace mongo

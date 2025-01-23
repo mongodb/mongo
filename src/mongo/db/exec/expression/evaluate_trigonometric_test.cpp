@@ -40,9 +40,8 @@
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
-namespace expression_tests {
-
-using namespace mongo;
+namespace mongo {
+namespace expression_evaluation_test {
 
 // assertApproxEq is a helper function for asserting approximate results.
 static void assertApproxEq(const Value& evaluated, const Value& expected) {
@@ -1407,4 +1406,5 @@ TEST(ExpressionDegreesToRadiansTest, DecimalArg) {
 TEST(ExpressionDegreesToRadiansTest, NullArg) {
     assertEvaluates("$degreesToRadians", Value(BSONNULL), Value(BSONNULL));
 }
-}  // namespace expression_tests
+}  // namespace expression_evaluation_test
+}  // namespace mongo

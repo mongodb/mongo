@@ -3927,7 +3927,7 @@ TEST_F(EvaluateConvertTest, ConvertDoubleToBinDataQuietNan) {
 
 }  // namespace evaluate_convert_test
 
-namespace EvaluateConvertShortcutTest {
+namespace evaluate_convert_shortcut_test {
 
 using EvaluateConvertShortcutTest = AggregationContextFixture;
 
@@ -4127,5 +4127,5 @@ TEST_F(EvaluateConvertShortcutTest, ThrowsOnConversionFailure) {
                        ErrorCodes::ConversionFailure);
 }
 
-}  // namespace EvaluateConvertShortcutTest
+}  // namespace evaluate_convert_shortcut_test
 }  // namespace mongo

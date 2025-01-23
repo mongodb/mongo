@@ -1368,7 +1368,6 @@ mongo_cc_unit_test(
         "expression_replace_test.cpp",
         "expression_test.cpp",
         "expression_test_api_version_test.cpp",
-        "expression_trigonometric_test.cpp",
         "expression_trim_test.cpp",
         "expression_walker_test.cpp",
         "field_path_test.cpp",
