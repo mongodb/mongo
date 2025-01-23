@@ -132,50 +132,69 @@ static void rankFusionPipelineValidator(const Pipeline& pipeline) {
 }
 
 /**
- * Validates the weights inputs. If weights are specified by the user, there must be exactly one
- * weight per input pipeline.
+ * Parses and validates the weights for pipelines that have been explicitly specified in the
+ * RankFusionSpec. Returns a map from the pipeline name to the specified weight (as a double)
+ * for that pipeline. This function also validates that the weights specification is valid,
+ * and fails the query if for example, a non-existant pipeline is specified, or a pipeline
+ * is specified more than once.
+ * Note: not all pipelines must be in the returned map; it only holds the ones that were explicitly
+ * listed in the stage specifiation. This means any valid subset from none to all of the pipelines
+ * may be contained in the resulting map. Any pipelines not present in the resulting map have
+ * an implicit default weight of 1.
  */
-void rankFusionWeightsValidator(
-    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& pipelines,
-    const StringMap<double>& weights) {
-    // The size of weights and pipelines should actually be equal, but if we have more pipelines
-    // than weights, we'll throw a more specific error below that specifies which pipeline is
-    // missing a weight.
-    uassert(9460301,
-            "$rankFusion input has more weights than pipelines. If combination.weights is "
-            "specified, there must be only one weight per named input pipeline.",
-            weights.size() <= pipelines.size());
-
-    for (const auto& pipelineIt : pipelines) {
-        auto pipelineName = pipelineIt.first;
-        uassert(9460302,
-                str::stream()
-                    << "$rankFusion input pipeline \"" << pipelineName
-                    << "\" is missing a weight, even though combination.weights is specified.",
-                weights.contains(pipelineName));
-    }
-}
-
 StringMap<double> extractAndValidateWeights(
     const RankFusionSpec& spec,
     const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& pipelines) {
+    // Output map of pipeline name, to weight of pipeline.
     StringMap<double> weights;
 
+    // If no weights specified, no work to do; return empty map.
     const auto& combinationSpec = spec.getCombination();
     if (!combinationSpec.has_value()) {
         return weights;
     }
 
-    for (const auto& elem : combinationSpec->getWeights()) {
-        // elem.Number() throws a uassert if non-numeric.
-        double weight = elem.Number();
+    // Quick check; there should never be more weights specified than pipelines.
+    // There could be other issues as well, but this is a simple one the user can fix first
+    // before rerunning.
+    uassert(
+        9460301,
+        str::stream()
+            << "$rankFusion input has more weights (" << combinationSpec->getWeights().nFields()
+            << ") than pipelines (" << pipelines.size()
+            << "). If 'combination.weights' is specified, there must be a less or equal number of "
+               "weights as pipelines, each of which is unique and existing.",
+        combinationSpec->getWeights().nFields() <= int(pipelines.size()));
+
+    for (const auto& weightEntry : combinationSpec->getWeights()) {
+        // First validate that this pipeline exists.
+        uassert(9967400,
+                str::stream() << "A pipeline named '" << weightEntry.fieldName()
+                              << "' was provided in the $rankFusion 'combinations.weight' object, "
+                              << "but no such pipeline has been defined",
+                pipelines.contains(weightEntry.fieldName()));
+
+        // The pipeline exists, but must not already have been seen; else its a duplicate.
+        // Otherwise, add it to the output map.
+        // Practically, this should never arise because the BSON processing layer filters out
+        // redundant keys, but we leave it in as a defensive programming measure.
+        uassert(
+            9967401,
+            str::stream()
+                << "A pipeline named '" << weightEntry.fieldName()
+                << "' is specified more than once in the $rankFusion 'combinations.weight' object.",
+            !weights.contains(weightEntry.fieldName()));
+
+        // Unique, existing pipeline weight found.
+        // Validate the weight number and add to output map.
+        // weightEntry.Number() throws a uassert if non-numeric.
+        double weight = weightEntry.Number();
         uassert(9460300,
                 str::stream() << "Rank fusion pipeline weight must be non-negative, but given "
                               << weight,
                 weight >= 0);
-        weights[elem.fieldName()] = weight;
+        weights[weightEntry.fieldName()] = weight;
     }
-    rankFusionWeightsValidator(pipelines, weights);
     return weights;
 }
 
@@ -510,8 +529,9 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
         const auto& name = it->first;
         auto& pipeline = it->second;
 
-        // If weights weren't specified, the default weight is 1.
-        double pipelineWeight = weights.empty() ? 1 : weights.at(name);
+        // Check if an explicit weight for this pipeline has been specified.
+        // If not, the default is one.
+        double pipelineWeight = weights.contains(name) ? weights.at(name) : 1;
 
         if (outputStages.empty()) {
             // First pipeline.

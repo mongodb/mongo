@@ -1397,7 +1397,12 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfWeightsIsNotObject) {
                        ErrorCodes::TypeMismatch);
 }
 
-TEST_F(DocumentSourceRankFusionTest, ErrorsIfEmptyWeights) {
+TEST_F(DocumentSourceRankFusionTest, DoesNotErrorIfEmptyWeights) {
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(
+        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
+                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+
     auto spec = fromjson(R"({
         $rankFusion: {
             input: {
@@ -1425,12 +1430,16 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfEmptyWeights) {
         }
     })");
 
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9460302);
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()));
 }
 
-TEST_F(DocumentSourceRankFusionTest, ErrorsIfOnlySomeWeights) {
+TEST_F(DocumentSourceRankFusionTest, DoesNotErrorIfOnlySomeWeights) {
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(
+        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
+                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+
     auto spec = fromjson(R"({
         $rankFusion: {
             input: {
@@ -1460,9 +1469,8 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfOnlySomeWeights) {
         }
     })");
 
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9460302);
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()));
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfMisnamedWeight) {
@@ -1498,7 +1506,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfMisnamedWeight) {
 
     ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
-                       9460302);
+                       9967400);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfExtraWeight) {
