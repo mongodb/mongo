@@ -33,7 +33,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -162,8 +161,7 @@ bool ensureStillMatches(const CollectionPtr& collection,
 
         // Make sure the re-fetched doc still matches the predicate.
         if (cq &&
-            !exec::matcher::matchesBSON(
-                cq->getPrimaryMatchExpression(), member->doc.value().toBson(), nullptr)) {
+            !cq->getPrimaryMatchExpression()->matchesBSON(member->doc.value().toBson(), nullptr)) {
             // No longer matches.
             return false;
         }

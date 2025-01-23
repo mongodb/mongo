@@ -68,6 +68,8 @@ public:
         : ListOfMatchExpression(
               INTERNAL_SCHEMA_XOR, std::move(annotation), makeVector(std::move(expression))) {}
 
+    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
+
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     std::unique_ptr<MatchExpression> clone() const override {

@@ -33,7 +33,6 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -49,47 +48,45 @@ namespace {
 TEST(InternalSchemaRootDocEqMatchExpression, MatchesObject) {
     InternalSchemaRootDocEqMatchExpression rootDocEq(BSON("a" << 1 << "b"
                                                               << "string"));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&rootDocEq,
-                                           BSON("a" << 1 << "b"
-                                                    << "string")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&rootDocEq,
-                                            BSON("a" << 2 << "b"
-                                                     << "string")));
+    ASSERT_TRUE(rootDocEq.matchesBSON(BSON("a" << 1 << "b"
+                                               << "string")));
+    ASSERT_FALSE(rootDocEq.matchesBSON(BSON("a" << 2 << "b"
+                                                << "string")));
 }
 
 TEST(InternalSchemaRootDocEqMatchExpression, MatchesNestedObject) {
     InternalSchemaRootDocEqMatchExpression rootDocEq(BSON("a" << 1 << "b" << BSON("c" << 1)));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&rootDocEq, BSON("a" << 1 << "b" << BSON("c" << 1))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&rootDocEq, BSON("a" << 1 << "b" << BSON("c" << 2))));
+    ASSERT_TRUE(rootDocEq.matchesBSON(BSON("a" << 1 << "b" << BSON("c" << 1))));
+    ASSERT_FALSE(rootDocEq.matchesBSON(BSON("a" << 1 << "b" << BSON("c" << 2))));
 }
 
 TEST(InternalSchemaRootDocEqMatchExpression, MatchesObjectIgnoresElementOrder) {
     InternalSchemaRootDocEqMatchExpression rootDocEq(BSON("a" << 1 << "b" << BSON("c" << 1)));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&rootDocEq, BSON("b" << BSON("c" << 1) << "a" << 1)));
+    ASSERT_TRUE(rootDocEq.matchesBSON(BSON("b" << BSON("c" << 1) << "a" << 1)));
 }
 
 TEST(InternalSchemaRootDocEqMatchExpression, MatchesNestedObjectIgnoresElementOrder) {
     InternalSchemaRootDocEqMatchExpression rootDocEq(BSON("a" << BSON("b" << 1 << "c" << 1)));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&rootDocEq, BSON("a" << BSON("c" << 1 << "b" << 1))));
+    ASSERT_TRUE(rootDocEq.matchesBSON(BSON("a" << BSON("c" << 1 << "b" << 1))));
 }
 
 TEST(InternalSchemaRootDocEqMatchExpression, MatchesEmptyObject) {
     InternalSchemaRootDocEqMatchExpression rootDocEq{BSONObj()};
-    ASSERT_TRUE(exec::matcher::matchesBSON(&rootDocEq, BSONObj()));
+    ASSERT_TRUE(rootDocEq.matchesBSON(BSONObj()));
 }
 
 TEST(InternalSchemaRootDocEqMatchExpression, MatchesNestedArray) {
     InternalSchemaRootDocEqMatchExpression rootDocEq(BSON("a" << BSON_ARRAY(1 << 2 << 3)));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&rootDocEq, BSON("a" << BSON_ARRAY(1 << 2 << 3))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&rootDocEq, BSON("a" << BSON_ARRAY(1 << 3 << 2))));
+    ASSERT_TRUE(rootDocEq.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2 << 3))));
+    ASSERT_FALSE(rootDocEq.matchesBSON(BSON("a" << BSON_ARRAY(1 << 3 << 2))));
 }
 
 TEST(InternalSchemaRootDocEqMatchExpression, MatchesObjectWithNullElement) {
     InternalSchemaRootDocEqMatchExpression rootDocEq(fromjson("{a: null}"));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&rootDocEq, fromjson("{a: null}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&rootDocEq, fromjson("{a: 1}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&rootDocEq, fromjson("{}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&rootDocEq, fromjson("{a: undefined}")));
+    ASSERT_TRUE(rootDocEq.matchesBSON(fromjson("{a: null}")));
+    ASSERT_FALSE(rootDocEq.matchesBSON(fromjson("{a: 1}")));
+    ASSERT_FALSE(rootDocEq.matchesBSON(fromjson("{}")));
+    ASSERT_FALSE(rootDocEq.matchesBSON(fromjson("{a: undefined}")));
 }
 
 TEST(InternalSchemaRootDocEqMatchExpression, EquivalentReturnsCorrectResults) {

@@ -45,8 +45,11 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(ExprMatchExpressionMatchesReturnsFalseOnException);
 
 ExprMatchExpression::ExprMatchExpression(boost::intrusive_ptr<Expression> expr,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -61,6 +64,32 @@ ExprMatchExpression::ExprMatchExpression(BSONElement elem,
     : ExprMatchExpression(Expression::parseOperand(expCtx.get(), elem, expCtx->variablesParseState),
                           expCtx,
                           std::move(annotation)) {}
+
+bool ExprMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
+    if (_rewriteResult && _rewriteResult->matchExpression() &&
+        !_rewriteResult->matchExpression()->matches(doc, details)) {
+        return false;
+    }
+    try {
+        return evaluateExpression(doc).coerceToBool();
+    } catch (const DBException&) {
+        if (MONGO_unlikely(ExprMatchExpressionMatchesReturnsFalseOnException.shouldFail())) {
+            return false;
+        }
+
+        throw;
+    }
+}
+
+Value ExprMatchExpression::evaluateExpression(const MatchableDocument* doc) const {
+    Document document(doc->toBSON());
+
+    // 'Variables' is not thread safe, and ExprMatchExpression may be used in a validator which
+    // processes documents from multiple threads simultaneously. Hence we make a copy of the
+    // 'Variables' object per-caller.
+    Variables variables = _expCtx->variables;
+    return _expression->evaluate(document, &variables);
+}
 
 void ExprMatchExpression::serialize(BSONObjBuilder* out,
                                     const SerializationOptions& opts,

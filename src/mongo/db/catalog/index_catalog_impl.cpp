@@ -57,7 +57,6 @@
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/global_settings.h"
@@ -1750,7 +1749,7 @@ Status IndexCatalogImpl::_indexRecords(OperationContext* opCtx,
 
     std::vector<BsonRecord> filteredBsonRecords;
     for (const auto& bsonRecord : bsonRecords) {
-        if (exec::matcher::matchesBSON(filter, *(bsonRecord.docPtr)))
+        if (filter->matchesBSON(*(bsonRecord.docPtr)))
             filteredBsonRecords.push_back(bsonRecord);
     }
 

@@ -53,6 +53,22 @@ public:
                                   ElementPath(*path, leafArrBehavior, nonLeafArrayBehavior))
                             : boost::none) {}
 
+    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const override {
+        invariant(_elementPath);
+        MatchableDocument::IteratorHolder cursor(doc, &*_elementPath);
+        while (cursor->more()) {
+            ElementIterator::Context e = cursor->next();
+            if (!matchesSingleElement(e.element(), details)) {
+                continue;
+            }
+            if (details && details->needRecord() && !e.arrayOffset().eoo()) {
+                details->setElemMatchKey(e.arrayOffset().fieldName());
+            }
+            return true;
+        }
+        return false;
+    }
+
     /**
      * Gets the path that the expression applies to. Note that this returns an empty string for
      * empty path as well as no path cases. optPath() should be preferred in order to

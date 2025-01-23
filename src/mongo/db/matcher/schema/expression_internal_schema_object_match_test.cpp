@@ -37,7 +37,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
@@ -60,11 +59,10 @@ TEST(InternalSchemaObjectMatchExpression, RejectsNonObjectElements) {
 
     InternalSchemaObjectMatchExpression objMatch("a"_sd, std::move(subExpr.getValue()));
 
-    ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch, BSON("a" << 1)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch,
-                                            BSON("a"
-                                                 << "string")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch, BSON("a" << BSON_ARRAY(BSONNULL))));
+    ASSERT_FALSE(objMatch.matchesBSON(BSON("a" << 1)));
+    ASSERT_FALSE(objMatch.matchesBSON(BSON("a"
+                                           << "string")));
+    ASSERT_FALSE(objMatch.matchesBSON(BSON("a" << BSON_ARRAY(BSONNULL))));
 }
 
 TEST(InternalSchemaObjectMatchExpression, RejectsObjectsThatDontMatch) {
@@ -76,8 +74,8 @@ TEST(InternalSchemaObjectMatchExpression, RejectsObjectsThatDontMatch) {
 
     InternalSchemaObjectMatchExpression objMatch("a"_sd, std::move(subExpr.getValue()));
 
-    ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch, BSON("a" << BSON("b" << 1))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch, BSON("a" << BSON("b" << BSONObj()))));
+    ASSERT_FALSE(objMatch.matchesBSON(BSON("a" << BSON("b" << 1))));
+    ASSERT_FALSE(objMatch.matchesBSON(BSON("a" << BSON("b" << BSONObj()))));
 }
 
 TEST(InternalSchemaObjectMatchExpression, AcceptsObjectsThatMatch) {
@@ -89,19 +87,15 @@ TEST(InternalSchemaObjectMatchExpression, AcceptsObjectsThatMatch) {
 
     InternalSchemaObjectMatchExpression objMatch("a"_sd, std::move(subExpr.getValue()));
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(&objMatch,
-                                           BSON("a" << BSON("b"
-                                                            << "string"))));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&objMatch,
-                                           BSON("a" << BSON("b"
-                                                            << "string"
-                                                            << "c" << 1))));
+    ASSERT_TRUE(objMatch.matchesBSON(BSON("a" << BSON("b"
+                                                      << "string"))));
+    ASSERT_TRUE(objMatch.matchesBSON(BSON("a" << BSON("b"
+                                                      << "string"
+                                                      << "c" << 1))));
     ASSERT_FALSE(
-        exec::matcher::matchesBSON(&objMatch,
-                                   BSON("a" << BSON_ARRAY(BSON("b" << 1) << BSON("b"
-                                                                                 << "string")))));
-    ASSERT_TRUE(
-        exec::matcher::matchesBSON(&objMatch, BSON("a" << BSON("b" << BSON_ARRAY("string")))));
+        objMatch.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << 1) << BSON("b"
+                                                                           << "string")))));
+    ASSERT_TRUE(objMatch.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY("string")))));
 }
 
 TEST(InternalSchemaObjectMatchExpression, DottedPathAcceptsObjectsThatMatch) {
@@ -113,14 +107,11 @@ TEST(InternalSchemaObjectMatchExpression, DottedPathAcceptsObjectsThatMatch) {
 
     InternalSchemaObjectMatchExpression objMatch("a"_sd, std::move(subExpr.getValue()));
 
-    ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch,
-                                            BSON("a" << BSON("d"
-                                                             << "string"))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch,
-                                            BSON("a" << BSON("b" << BSON("c" << BSON("d" << 1))))));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&objMatch,
-                                           BSON("a" << BSON("b" << BSON("c" << BSON("d"
-                                                                                    << "foo"))))));
+    ASSERT_FALSE(objMatch.matchesBSON(BSON("a" << BSON("d"
+                                                       << "string"))));
+    ASSERT_FALSE(objMatch.matchesBSON(BSON("a" << BSON("b" << BSON("c" << BSON("d" << 1))))));
+    ASSERT_TRUE(objMatch.matchesBSON(BSON("a" << BSON("b" << BSON("c" << BSON("d"
+                                                                              << "foo"))))));
 }
 
 TEST(InternalSchemaObjectMatchExpression, EmptyMatchAcceptsAllObjects) {
@@ -130,15 +121,13 @@ TEST(InternalSchemaObjectMatchExpression, EmptyMatchAcceptsAllObjects) {
 
     InternalSchemaObjectMatchExpression objMatch("a"_sd, std::move(subExpr.getValue()));
 
-    ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch, BSON("a" << 1)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch,
-                                            BSON("a"
-                                                 << "string")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&objMatch, BSON("a" << BSONObj())));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&objMatch,
-                                           BSON("a" << BSON("b"
-                                                            << "string"))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&objMatch, BSON("a" << BSON_ARRAY(BSONObj()))));
+    ASSERT_FALSE(objMatch.matchesBSON(BSON("a" << 1)));
+    ASSERT_FALSE(objMatch.matchesBSON(BSON("a"
+                                           << "string")));
+    ASSERT_TRUE(objMatch.matchesBSON(BSON("a" << BSONObj())));
+    ASSERT_TRUE(objMatch.matchesBSON(BSON("a" << BSON("b"
+                                                      << "string"))));
+    ASSERT_FALSE(objMatch.matchesBSON(BSON("a" << BSON_ARRAY(BSONObj()))));
 }
 
 TEST(InternalSchemaObjectMatchExpression, NestedObjectMatchReturnsCorrectPath) {
@@ -167,12 +156,10 @@ TEST(InternalSchemaObjectMatchExpression, MatchesNestedObjectMatch) {
     auto objMatch = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(objMatch.getStatus());
 
-    ASSERT_FALSE(exec::matcher::matchesBSON(objMatch.getValue().get(), fromjson("{a: 1}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(objMatch.getValue().get(), fromjson("{a: {b: 1}}")));
-    ASSERT_FALSE(
-        exec::matcher::matchesBSON(objMatch.getValue().get(), fromjson("{a: {b: {c: 1}}}")));
-    ASSERT_TRUE(
-        exec::matcher::matchesBSON(objMatch.getValue().get(), fromjson("{a: {b: {c: 3}}}")));
+    ASSERT_FALSE(objMatch.getValue()->matchesBSON(fromjson("{a: 1}")));
+    ASSERT_FALSE(objMatch.getValue()->matchesBSON(fromjson("{a: {b: 1}}")));
+    ASSERT_FALSE(objMatch.getValue()->matchesBSON(fromjson("{a: {b: {c: 1}}}")));
+    ASSERT_TRUE(objMatch.getValue()->matchesBSON(fromjson("{a: {b: {c: 3}}}")));
 }
 
 TEST(InternalSchemaObjectMatchExpression, EquivalentReturnsCorrectResults) {
@@ -211,12 +198,9 @@ TEST(InternalSchemaObjectMatchExpression, SubExpressionRespectsCollator) {
     auto objectMatch = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(objectMatch.getStatus());
 
-    ASSERT_TRUE(
-        exec::matcher::matchesBSON(objectMatch.getValue().get(), fromjson("{a: {b: 'FOO'}}")));
-    ASSERT_TRUE(
-        exec::matcher::matchesBSON(objectMatch.getValue().get(), fromjson("{a: {b: 'foO'}}")));
-    ASSERT_TRUE(
-        exec::matcher::matchesBSON(objectMatch.getValue().get(), fromjson("{a: {b: 'foo'}}")));
+    ASSERT_TRUE(objectMatch.getValue()->matchesBSON(fromjson("{a: {b: 'FOO'}}")));
+    ASSERT_TRUE(objectMatch.getValue()->matchesBSON(fromjson("{a: {b: 'foO'}}")));
+    ASSERT_TRUE(objectMatch.getValue()->matchesBSON(fromjson("{a: {b: 'foo'}}")));
 }
 
 TEST(InternalSchemaObjectMatchExpression, RejectsArraysContainingMatchingSubObject) {
@@ -225,11 +209,10 @@ TEST(InternalSchemaObjectMatchExpression, RejectsArraysContainingMatchingSubObje
     auto objMatch = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(objMatch.getStatus());
 
-    ASSERT_FALSE(exec::matcher::matchesBSON(objMatch.getValue().get(), fromjson("{a: 1}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(objMatch.getValue().get(), fromjson("{a: {b: 1}}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(objMatch.getValue().get(), fromjson("{a: [{b: 1}]}")));
-    ASSERT_FALSE(
-        exec::matcher::matchesBSON(objMatch.getValue().get(), fromjson("{a: [{b: 1}, {b: 2}]}")));
+    ASSERT_FALSE(objMatch.getValue()->matchesBSON(fromjson("{a: 1}")));
+    ASSERT_TRUE(objMatch.getValue()->matchesBSON(fromjson("{a: {b: 1}}")));
+    ASSERT_FALSE(objMatch.getValue()->matchesBSON(fromjson("{a: [{b: 1}]}")));
+    ASSERT_FALSE(objMatch.getValue()->matchesBSON(fromjson("{a: [{b: 1}, {b: 2}]}")));
 }
 
 TEST(InternalSchemaObjectMatchExpression, HasSingleChild) {

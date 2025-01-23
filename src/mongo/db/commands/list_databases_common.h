@@ -36,7 +36,6 @@
 #include "mongo/db/commands/list_databases_gen.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -106,7 +105,7 @@ int64_t setReplyItems(OperationContext* opCtx,
         int64_t size = 0;
         if (!nameOnly) {
             // Filtering on name only should not require taking locks on filtered-out names.
-            if (filterNameOnly && !exec::matcher::matchesBSON(filter.get(), item.toBSON())) {
+            if (filterNameOnly && !filter->matchesBSON(item.toBSON())) {
                 continue;
             }
 
@@ -123,7 +122,7 @@ int64_t setReplyItems(OperationContext* opCtx,
             item.setEmpty(
                 CollectionCatalog::get(opCtx)->getAllCollectionUUIDsFromDb(dbName).empty());
         }
-        if (!filter || exec::matcher::matchesBSON(filter.get(), item.toBSON())) {
+        if (!filter || filter->matchesBSON(item.toBSON())) {
             totalSize += size;
             items.push_back(std::move(item));
         }

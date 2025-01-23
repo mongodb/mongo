@@ -47,7 +47,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/exec/collection_scan_common.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context.h"
@@ -712,8 +711,7 @@ Status DbCheckHasher::validateMissingKeys(OperationContext* opCtx,
                                           const CollectionPtr& collPtr) {
     for (auto entry : _indexes) {
         const auto descriptor = entry->descriptor();
-        if ((descriptor->isPartial() &&
-             !exec::matcher::matchesBSON(entry->getFilterExpression(), currentObj))) {
+        if ((descriptor->isPartial() && !entry->getFilterExpression()->matchesBSON(currentObj))) {
             // The index is partial and the document does not match the index filter expression, so
             // skip checking this index.
             continue;

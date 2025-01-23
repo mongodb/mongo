@@ -42,7 +42,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/doc_validation_error.h"
 #include "mongo/db/matcher/doc_validation_error_test.h"
 #include "mongo/db/matcher/doc_validation_util.h"
@@ -80,9 +79,9 @@ BSONObj generateValidationError(
     // Verify that the document fails to match against the query or whether it should throw based
     // on the value of 'shouldThrow'.
     if (shouldThrow) {
-        ASSERT_THROWS(exec::matcher::matchesBSON(expr, document), DBException);
+        ASSERT_THROWS(expr->matchesBSON(document), DBException);
     } else {
-        ASSERT_FALSE(exec::matcher::matchesBSON(expr, document));
+        ASSERT_FALSE(expr->matchesBSON(document));
     }
 
     return doc_validation_error::generateError(

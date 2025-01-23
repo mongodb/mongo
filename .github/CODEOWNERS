@@ -1387,12 +1387,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/exec/expression/**/evaluate_javascript* @10gen/query-integration-javascript @svc-auto-approve-bot
 /src/mongo/db/exec/expression/**/evaluate_fle* @10gen/query-integration-fle @svc-auto-approve-bot
 
-# The following patterns are parsed from ./src/mongo/db/exec/matcher/OWNERS.yml
-/src/mongo/db/exec/matcher/**/* @10gen/query-execution-classic-engine @svc-auto-approve-bot
-/src/mongo/db/exec/matcher/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-integration-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
-/src/mongo/db/exec/matcher/**/matcher_geo* @10gen/query-integration-geo @svc-auto-approve-bot
-/src/mongo/db/exec/matcher/**/matcher_where* @10gen/query-integration-staff-leads @svc-auto-approve-bot
-
 # The following patterns are parsed from ./src/mongo/db/exec/mutable_bson/OWNERS.yml
 /src/mongo/db/exec/mutable_bson/**/* @10gen/query-execution-write-exec @svc-auto-approve-bot
 /src/mongo/db/exec/mutable_bson/**/OWNERS.yml @10gen/query-execution-staff-leads @svc-auto-approve-bot

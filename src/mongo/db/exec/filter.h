@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/matchable.h"
@@ -157,7 +156,7 @@ public:
             return true;
         }
         WorkingSetMatchableDocument doc(wsm);
-        return exec::matcher::matches(filter, &doc, nullptr);
+        return filter->matches(&doc, nullptr);
     }
 
     static bool passes(const BSONObj& keyData,
@@ -167,7 +166,7 @@ public:
             return true;
         }
         IndexKeyMatchableDocument doc(keyData, keyPattern);
-        return exec::matcher::matches(filter, &doc, nullptr);
+        return filter->matches(&doc, nullptr);
     }
 };
 

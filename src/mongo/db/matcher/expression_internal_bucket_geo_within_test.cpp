@@ -32,7 +32,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -132,7 +131,7 @@ TEST_F(InternalBucketGeoWithinExpression, BoxPolygonOverlap) {
                                                   << "coordinates" << BSON_ARRAY(5 << 5)))
                                    .firstElement());
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
+    ASSERT_TRUE(expr->matchesBSON(obj));
 }
 
 TEST_F(InternalBucketGeoWithinExpression, ShouldFilterOutBucketDisjoint) {
@@ -147,7 +146,7 @@ TEST_F(InternalBucketGeoWithinExpression, ShouldFilterOutBucketDisjoint) {
                                                   << "coordinates" << BSON_ARRAY(20 << 20)))
                                    .firstElement());
 
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.get(), obj));
+    ASSERT_FALSE(expr->matchesBSON(obj));
 }
 
 TEST_F(InternalBucketGeoWithinExpression, ShouldFilterOutBucketDisjointLegacyPoints) {
@@ -156,7 +155,7 @@ TEST_F(InternalBucketGeoWithinExpression, ShouldFilterOutBucketDisjointLegacyPoi
     auto obj = createBucketObj(BSON("loc" << BSON_ARRAY(10 << 10)).firstElement(),
                                BSON("loc" << BSON_ARRAY(20 << 20)).firstElement());
 
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.get(), obj));
+    ASSERT_FALSE(expr->matchesBSON(obj));
 }
 
 TEST_F(InternalBucketGeoWithinExpression, ContainsAllPointsInTheBucket) {
@@ -171,7 +170,7 @@ TEST_F(InternalBucketGeoWithinExpression, ContainsAllPointsInTheBucket) {
                                                   << "coordinates" << BSON_ARRAY(3 << 3)))
                                    .firstElement());
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
+    ASSERT_TRUE(expr->matchesBSON(obj));
 }
 
 TEST_F(InternalBucketGeoWithinExpression, ContainsAllPointsInTheBucketLegacy) {
@@ -180,7 +179,7 @@ TEST_F(InternalBucketGeoWithinExpression, ContainsAllPointsInTheBucketLegacy) {
     auto obj = createBucketObj(BSON("loc" << BSON_ARRAY(1 << 1)).firstElement(),
                                BSON("loc" << BSON_ARRAY(3 << 3)).firstElement());
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
+    ASSERT_TRUE(expr->matchesBSON(obj));
 }
 
 TEST_F(InternalBucketGeoWithinExpression, BBoxContainsWithinRegion) {
@@ -195,7 +194,7 @@ TEST_F(InternalBucketGeoWithinExpression, BBoxContainsWithinRegion) {
                                                   << "coordinates" << BSON_ARRAY(10 << 10)))
                                    .firstElement());
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
+    ASSERT_TRUE(expr->matchesBSON(obj));
 }
 
 TEST_F(InternalBucketGeoWithinExpression, BBoxContainsWithinRegionLegacy) {
@@ -204,7 +203,7 @@ TEST_F(InternalBucketGeoWithinExpression, BBoxContainsWithinRegionLegacy) {
     auto obj = createBucketObj(BSON("loc" << BSON_ARRAY(-3 << -3)).firstElement(),
                                BSON("loc" << BSON_ARRAY(10 << 10)).firstElement());
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
+    ASSERT_TRUE(expr->matchesBSON(obj));
 }
 
 TEST_F(InternalBucketGeoWithinExpression, BBoxIntersectsWithinRegion) {
@@ -219,7 +218,7 @@ TEST_F(InternalBucketGeoWithinExpression, BBoxIntersectsWithinRegion) {
                                                   << "coordinates" << BSON_ARRAY(10 << 10)))
                                    .firstElement());
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
+    ASSERT_TRUE(expr->matchesBSON(obj));
 }
 
 TEST_F(InternalBucketGeoWithinExpression, BBoxIntersectsWithinRegionLegacy) {
@@ -228,7 +227,7 @@ TEST_F(InternalBucketGeoWithinExpression, BBoxIntersectsWithinRegionLegacy) {
     auto obj = createBucketObj(BSON("loc" << BSON_ARRAY(3 << 3)).firstElement(),
                                BSON("loc" << BSON_ARRAY(10 << 10)).firstElement());
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
+    ASSERT_TRUE(expr->matchesBSON(obj));
 }
 
 TEST_F(InternalBucketGeoWithinExpression, BigBBoxContainsWithinRegion) {
@@ -245,7 +244,7 @@ TEST_F(InternalBucketGeoWithinExpression, BigBBoxContainsWithinRegion) {
 
     // This big spherical bounding box should contain the prime meridian(0° longitude) instead of
     // the anti-meridian(180° longitude).
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
+    ASSERT_TRUE(expr->matchesBSON(obj));
 }
 
 TEST_F(InternalBucketGeoWithinExpression, BucketContainsNonPointType) {
@@ -262,7 +261,7 @@ TEST_F(InternalBucketGeoWithinExpression, BucketContainsNonPointType) {
                                            << BSON_ARRAY(BSON_ARRAY(2 << 2) << BSON_ARRAY(3 << 3))))
                             .firstElement());
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
+    ASSERT_TRUE(expr->matchesBSON(obj));
 }
 
 TEST_F(InternalBucketGeoWithinExpression, BucketContainsNonPointTypeLegacy) {
@@ -273,6 +272,6 @@ TEST_F(InternalBucketGeoWithinExpression, BucketContainsNonPointTypeLegacy) {
             .firstElement(),
         BSON("loc" << BSON_ARRAY(10 << 10)).firstElement());
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
+    ASSERT_TRUE(expr->matchesBSON(obj));
 }
 }  // namespace mongo

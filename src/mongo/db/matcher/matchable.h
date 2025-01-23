@@ -50,7 +50,7 @@ public:
     virtual BSONObj toBSON() const = 0;
 
     /**
-     * The newly returned ElementIterator is allowed to keep a pointer to path.
+     * The neewly returned ElementIterator is allowed to keep a pointer to path.
      * So the caller of this function should make sure path is in scope until
      * the ElementIterator is deallocated
      */

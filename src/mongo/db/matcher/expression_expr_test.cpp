@@ -40,7 +40,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -90,7 +89,7 @@ public:
 
     bool matches(const BSONObj& doc) {
         invariant(_matchExpression);
-        return exec::matcher::matchesBSON(_matchExpression.get(), doc);
+        return _matchExpression->matchesBSON(doc);
     }
 
     MatchExpression* getMatchExpression() {
@@ -798,7 +797,7 @@ TEST_F(ExprMatchTest, ExprWithFalsyConstantExpressionIsNotTriviallyTrue) {
 TEST_F(ExprMatchTest, ExpressionEvaluationReturnsResultsCorrectly) {
     createMatcher(fromjson("{$expr: {$ifNull: ['$NO_SUCH_FIELD', -2]}}"));
     BSONMatchableDocument document{BSONObj{}};
-    auto expressionResult = exec::matcher::evaluateExpression(getExprMatchExpression(), &document);
+    auto expressionResult = getExprMatchExpression()->evaluateExpression(&document);
     ASSERT_TRUE(expressionResult.integral());
     ASSERT_EQUALS(-2, expressionResult.coerceToInt());
 }

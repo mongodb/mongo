@@ -40,7 +40,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/platform/decimal128.h"
@@ -79,10 +78,9 @@ TEST(ComparisonMatchExpression, StringMatchingWithNullCollatorUsesBinaryComparis
     BSONObj operand = BSON("a"
                            << "string");
     EqualityMatchExpression eq("a"_sd, operand["a"]);
-    ASSERT(!exec::matcher::matchesBSON(&eq,
-                                       BSON("a"
-                                            << "string2"),
-                                       nullptr));
+    ASSERT(!eq.matchesBSON(BSON("a"
+                                << "string2"),
+                           nullptr));
 }
 
 TEST(ComparisonMatchExpression, StringMatchingRespectsCollation) {
@@ -91,10 +89,9 @@ TEST(ComparisonMatchExpression, StringMatchingRespectsCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     EqualityMatchExpression eq("a"_sd, operand["a"]);
     eq.setCollator(&collator);
-    ASSERT(exec::matcher::matchesBSON(&eq,
-                                      BSON("a"
-                                           << "string2"),
-                                      nullptr));
+    ASSERT(eq.matchesBSON(BSON("a"
+                               << "string2"),
+                          nullptr));
 }
 
 TEST(ComparisonMatchExpression, UnequalLengthString) {
@@ -188,42 +185,42 @@ DEATH_TEST_REGEX(EqOp, InvalidEooOperand, "failure.*eoo") {
 TEST(EqOp, MatchesScalar) {
     BSONObj operand = BSON("a" << 5);
     EqualityMatchExpression eq("a"_sd, operand["a"]);
-    ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << 5.0), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << 4), nullptr));
+    ASSERT(eq.matchesBSON(BSON("a" << 5.0), nullptr));
+    ASSERT(!eq.matchesBSON(BSON("a" << 4), nullptr));
 }
 
 TEST(EqOp, MatchesArrayValue) {
     BSONObj operand = BSON("a" << 5);
     EqualityMatchExpression eq("a"_sd, operand["a"]);
-    ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(5.0 << 6)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(6 << 7)), nullptr));
+    ASSERT(eq.matchesBSON(BSON("a" << BSON_ARRAY(5.0 << 6)), nullptr));
+    ASSERT(!eq.matchesBSON(BSON("a" << BSON_ARRAY(6 << 7)), nullptr));
 }
 
 TEST(EqOp, MatchesReferencedObjectValue) {
     BSONObj operand = BSON("a.b" << 5);
     EqualityMatchExpression eq("a.b"_sd, operand["a.b"]);
-    ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSON("b" << 5)), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSON("b" << BSON_ARRAY(5))), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(BSON("b" << 5))), nullptr));
+    ASSERT(eq.matchesBSON(BSON("a" << BSON("b" << 5)), nullptr));
+    ASSERT(eq.matchesBSON(BSON("a" << BSON("b" << BSON_ARRAY(5))), nullptr));
+    ASSERT(eq.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << 5))), nullptr));
 }
 
 TEST(EqOp, MatchesReferencedArrayValue) {
     BSONObj operand = BSON("a.0" << 5);
     EqualityMatchExpression eq("a.0"_sd, operand["a.0"]);
-    ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(5)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(BSON_ARRAY(5))), nullptr));
+    ASSERT(eq.matchesBSON(BSON("a" << BSON_ARRAY(5)), nullptr));
+    ASSERT(!eq.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(5))), nullptr));
 }
 
 TEST(EqOp, MatchesNull) {
     BSONObj operand = BSON("a" << BSONNULL);
     EqualityMatchExpression eq("a"_sd, operand["a"]);
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSONObj(), nullptr));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSONNULL), nullptr));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("a" << 4), nullptr));
+    ASSERT_TRUE(eq.matchesBSON(BSONObj(), nullptr));
+    ASSERT_TRUE(eq.matchesBSON(BSON("a" << BSONNULL), nullptr));
+    ASSERT_FALSE(eq.matchesBSON(BSON("a" << 4), nullptr));
 
     // {$eq:null} has special semantics which say that missing matched in addition to literal nulls.
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("b" << 4), nullptr));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("a" << BSONUndefined), nullptr));
+    ASSERT_TRUE(eq.matchesBSON(BSON("b" << 4), nullptr));
+    ASSERT_FALSE(eq.matchesBSON(BSON("a" << BSONUndefined), nullptr));
 }
 
 // This test documents how the matcher currently works,
@@ -232,19 +229,19 @@ TEST(EqOp, MatchesNestedNull) {
     BSONObj operand = BSON("a.b" << BSONNULL);
     EqualityMatchExpression eq("a.b"_sd, operand["a.b"]);
     // null matches any empty object that is on a subpath of a.b
-    ASSERT(exec::matcher::matchesBSON(&eq, BSONObj(), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSONObj()), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(BSONObj())), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSON("b" << BSONNULL)), nullptr));
+    ASSERT(eq.matchesBSON(BSONObj(), nullptr));
+    ASSERT(eq.matchesBSON(BSON("a" << BSONObj()), nullptr));
+    ASSERT(eq.matchesBSON(BSON("a" << BSON_ARRAY(BSONObj())), nullptr));
+    ASSERT(eq.matchesBSON(BSON("a" << BSON("b" << BSONNULL)), nullptr));
     // b does not exist as an element in array under a.
-    ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << BSONArray()), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(BSONNULL)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(1 << 2)), nullptr));
+    ASSERT(!eq.matchesBSON(BSON("a" << BSONArray()), nullptr));
+    ASSERT(!eq.matchesBSON(BSON("a" << BSON_ARRAY(BSONNULL)), nullptr));
+    ASSERT(!eq.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2)), nullptr));
     // a.b exists but is not null.
-    ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << BSON("b" << 4)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << BSON("b" << BSONObj())), nullptr));
+    ASSERT(!eq.matchesBSON(BSON("a" << BSON("b" << 4)), nullptr));
+    ASSERT(!eq.matchesBSON(BSON("a" << BSON("b" << BSONObj())), nullptr));
     // A non-existent field is treated same way as an empty bson object
-    ASSERT(exec::matcher::matchesBSON(&eq, BSON("b" << 4), nullptr));
+    ASSERT(eq.matchesBSON(BSON("b" << 4), nullptr));
 }
 
 TEST(EqOp, MatchesMinKey) {
@@ -254,9 +251,9 @@ TEST(EqOp, MatchesMinKey) {
     BSONObj maxKeyObj = BSON("a" << MaxKey);
     BSONObj numObj = BSON("a" << 4);
 
-    ASSERT(exec::matcher::matchesBSON(&eq, minKeyObj, nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&eq, maxKeyObj, nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&eq, numObj, nullptr));
+    ASSERT(eq.matchesBSON(minKeyObj, nullptr));
+    ASSERT(!eq.matchesBSON(maxKeyObj, nullptr));
+    ASSERT(!eq.matchesBSON(numObj, nullptr));
 
     ASSERT(eq.matchesSingleElement(minKeyObj.firstElement()));
     ASSERT(!eq.matchesSingleElement(maxKeyObj.firstElement()));
@@ -271,9 +268,9 @@ TEST(EqOp, MatchesMaxKey) {
     BSONObj maxKeyObj = BSON("a" << MaxKey);
     BSONObj numObj = BSON("a" << 4);
 
-    ASSERT(!exec::matcher::matchesBSON(&eq, minKeyObj, nullptr));
-    ASSERT(exec::matcher::matchesBSON(&eq, maxKeyObj, nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&eq, numObj, nullptr));
+    ASSERT(!eq.matchesBSON(minKeyObj, nullptr));
+    ASSERT(eq.matchesBSON(maxKeyObj, nullptr));
+    ASSERT(!eq.matchesBSON(numObj, nullptr));
 
     ASSERT(!eq.matchesSingleElement(minKeyObj.firstElement()));
     ASSERT(eq.matchesSingleElement(maxKeyObj.firstElement()));
@@ -283,17 +280,17 @@ TEST(EqOp, MatchesMaxKey) {
 TEST(EqOp, MatchesFullArray) {
     BSONObj operand = BSON("a" << BSON_ARRAY(1 << 2));
     EqualityMatchExpression eq("a"_sd, operand["a"]);
-    ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(1 << 2)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(1 << 2 << 3)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(1)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << 1), nullptr));
+    ASSERT(eq.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2)), nullptr));
+    ASSERT(!eq.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2 << 3)), nullptr));
+    ASSERT(!eq.matchesBSON(BSON("a" << BSON_ARRAY(1)), nullptr));
+    ASSERT(!eq.matchesBSON(BSON("a" << 1), nullptr));
 }
 
 TEST(EqOp, MatchesThroughNestedArray) {
     BSONObj operand = BSON("a.b.c.d" << 3);
     EqualityMatchExpression eq("a.b.c.d"_sd, operand["a.b.c.d"]);
     BSONObj obj = fromjson("{a:{b:[{c:[{d:1},{d:2}]},{c:[{d:3}]}]}}");
-    ASSERT(exec::matcher::matchesBSON(&eq, obj, nullptr));
+    ASSERT(eq.matchesBSON(obj, nullptr));
 }
 
 TEST(EqOp, ElemMatchKey) {
@@ -301,11 +298,11 @@ TEST(EqOp, ElemMatchKey) {
     EqualityMatchExpression eq("a"_sd, operand["a"]);
     MatchDetails details;
     details.requestElemMatchKey();
-    ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << 4), &details));
+    ASSERT(!eq.matchesBSON(BSON("a" << 4), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << 5), &details));
+    ASSERT(eq.matchesBSON(BSON("a" << 5), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(1 << 2 << 5)), &details));
+    ASSERT(eq.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2 << 5)), &details));
     ASSERT(details.hasElemMatchKey());
     ASSERT_EQUALS("2", details.elemMatchKey());
 }
@@ -320,7 +317,7 @@ TEST(EqOp, ElemMatchKeyWithImplicitAndExplicitTraversal) {
     MatchDetails details;
     details.requestElemMatchKey();
     BSONObj obj = fromjson("{a: [{b: [2, 3]}, {b: [4, 5]}]}");
-    ASSERT(exec::matcher::matchesBSON(&eq, obj, &details));
+    ASSERT(eq.matchesBSON(obj, &details));
     ASSERT(details.hasElemMatchKey());
     ASSERT_EQUALS("1", details.elemMatchKey());
 }
@@ -362,59 +359,57 @@ DEATH_TEST_REGEX(LtOp, InvalidEooOperand, "failure.*eoo") {
 TEST(LtOp, MatchesScalar) {
     BSONObj operand = BSON("$lt" << 5);
     LTMatchExpression lt("a"_sd, operand["$lt"]);
-    ASSERT(exec::matcher::matchesBSON(&lt, BSON("a" << 4.5), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << 6), nullptr));
+    ASSERT(lt.matchesBSON(BSON("a" << 4.5), nullptr));
+    ASSERT(!lt.matchesBSON(BSON("a" << 6), nullptr));
 }
 
 TEST(LtOp, MatchesScalarEmptyKey) {
     BSONObj operand = BSON("$lt" << 5);
     LTMatchExpression lt(""_sd, operand["$lt"]);
-    ASSERT(exec::matcher::matchesBSON(&lt, BSON("" << 4.5), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lt, BSON("" << 6), nullptr));
+    ASSERT(lt.matchesBSON(BSON("" << 4.5), nullptr));
+    ASSERT(!lt.matchesBSON(BSON("" << 6), nullptr));
 }
 
 TEST(LtOp, MatchesArrayValue) {
     BSONObj operand = BSON("$lt" << 5);
     LTMatchExpression lt("a"_sd, operand["$lt"]);
-    ASSERT(exec::matcher::matchesBSON(&lt, BSON("a" << BSON_ARRAY(6 << 4.5)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << BSON_ARRAY(6 << 7)), nullptr));
+    ASSERT(lt.matchesBSON(BSON("a" << BSON_ARRAY(6 << 4.5)), nullptr));
+    ASSERT(!lt.matchesBSON(BSON("a" << BSON_ARRAY(6 << 7)), nullptr));
 }
 
 TEST(LtOp, MatchesWholeArray) {
     BSONObj operand = BSON("$lt" << BSON_ARRAY(5));
     LTMatchExpression lt("a"_sd, operand["$lt"]);
-    ASSERT(exec::matcher::matchesBSON(&lt, BSON("a" << BSON_ARRAY(4)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << BSON_ARRAY(5)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << BSON_ARRAY(6)), nullptr));
+    ASSERT(lt.matchesBSON(BSON("a" << BSON_ARRAY(4)), nullptr));
+    ASSERT(!lt.matchesBSON(BSON("a" << BSON_ARRAY(5)), nullptr));
+    ASSERT(!lt.matchesBSON(BSON("a" << BSON_ARRAY(6)), nullptr));
     // Nested array.
-    ASSERT(exec::matcher::matchesBSON(&lt, BSON("a" << BSON_ARRAY(BSON_ARRAY(4))), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << BSON_ARRAY(BSON_ARRAY(5))), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << BSON_ARRAY(BSON_ARRAY(6))), nullptr));
+    ASSERT(lt.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(4))), nullptr));
+    ASSERT(!lt.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(5))), nullptr));
+    ASSERT(!lt.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(6))), nullptr));
 }
 
 TEST(LtOp, MatchesNull) {
     BSONObj operand = BSON("$lt" << BSONNULL);
     LTMatchExpression lt("a"_sd, operand["$lt"]);
-    ASSERT(!exec::matcher::matchesBSON(&lt, BSONObj(), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << BSONNULL), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << 4), nullptr));
+    ASSERT(!lt.matchesBSON(BSONObj(), nullptr));
+    ASSERT(!lt.matchesBSON(BSON("a" << BSONNULL), nullptr));
+    ASSERT(!lt.matchesBSON(BSON("a" << 4), nullptr));
     // A non-existent field is treated same way as an empty bson object
-    ASSERT(!exec::matcher::matchesBSON(&lt, BSON("b" << 4), nullptr));
+    ASSERT(!lt.matchesBSON(BSON("b" << 4), nullptr));
 }
 
 TEST(LtOp, MatchesDotNotationNull) {
     BSONObj operand = BSON("$lt" << BSONNULL);
     LTMatchExpression lt("a.b"_sd, operand["$lt"]);
-    ASSERT(!exec::matcher::matchesBSON(&lt, BSONObj(), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << BSONNULL), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << 4), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << BSONObj()), nullptr));
-    ASSERT(
-        !exec::matcher::matchesBSON(&lt, BSON("a" << BSON_ARRAY(BSON("b" << BSONNULL))), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(
-        &lt, BSON("a" << BSON_ARRAY(BSON("a" << 4) << BSON("b" << 4))), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << BSON_ARRAY(4)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << BSON_ARRAY(BSON("b" << 4))), nullptr));
+    ASSERT(!lt.matchesBSON(BSONObj(), nullptr));
+    ASSERT(!lt.matchesBSON(BSON("a" << BSONNULL), nullptr));
+    ASSERT(!lt.matchesBSON(BSON("a" << 4), nullptr));
+    ASSERT(!lt.matchesBSON(BSON("a" << BSONObj()), nullptr));
+    ASSERT(!lt.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << BSONNULL))), nullptr));
+    ASSERT(!lt.matchesBSON(BSON("a" << BSON_ARRAY(BSON("a" << 4) << BSON("b" << 4))), nullptr));
+    ASSERT(!lt.matchesBSON(BSON("a" << BSON_ARRAY(4)), nullptr));
+    ASSERT(!lt.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << 4))), nullptr));
 }
 
 TEST(LtOp, MatchesMinKey) {
@@ -424,9 +419,9 @@ TEST(LtOp, MatchesMinKey) {
     BSONObj maxKeyObj = BSON("a" << MaxKey);
     BSONObj numObj = BSON("a" << 4);
 
-    ASSERT(!exec::matcher::matchesBSON(&lt, minKeyObj, nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lt, maxKeyObj, nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lt, numObj, nullptr));
+    ASSERT(!lt.matchesBSON(minKeyObj, nullptr));
+    ASSERT(!lt.matchesBSON(maxKeyObj, nullptr));
+    ASSERT(!lt.matchesBSON(numObj, nullptr));
 
     ASSERT(!lt.matchesSingleElement(minKeyObj.firstElement()));
     ASSERT(!lt.matchesSingleElement(maxKeyObj.firstElement()));
@@ -440,9 +435,9 @@ TEST(LtOp, MatchesMaxKey) {
     BSONObj maxKeyObj = BSON("a" << MaxKey);
     BSONObj numObj = BSON("a" << 4);
 
-    ASSERT(exec::matcher::matchesBSON(&lt, minKeyObj, nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lt, maxKeyObj, nullptr));
-    ASSERT(exec::matcher::matchesBSON(&lt, numObj, nullptr));
+    ASSERT(lt.matchesBSON(minKeyObj, nullptr));
+    ASSERT(!lt.matchesBSON(maxKeyObj, nullptr));
+    ASSERT(lt.matchesBSON(numObj, nullptr));
 
     ASSERT(lt.matchesSingleElement(minKeyObj.firstElement()));
     ASSERT(!lt.matchesSingleElement(maxKeyObj.firstElement()));
@@ -454,11 +449,11 @@ TEST(LtOp, ElemMatchKey) {
     LTMatchExpression lt("a"_sd, operand["$lt"]);
     MatchDetails details;
     details.requestElemMatchKey();
-    ASSERT(!exec::matcher::matchesBSON(&lt, BSON("a" << 6), &details));
+    ASSERT(!lt.matchesBSON(BSON("a" << 6), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&lt, BSON("a" << 4), &details));
+    ASSERT(lt.matchesBSON(BSON("a" << 4), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&lt, BSON("a" << BSON_ARRAY(6 << 2 << 5)), &details));
+    ASSERT(lt.matchesBSON(BSON("a" << BSON_ARRAY(6 << 2 << 5)), &details));
     ASSERT(details.hasElemMatchKey());
     ASSERT_EQUALS("1", details.elemMatchKey());
 }
@@ -489,52 +484,50 @@ DEATH_TEST_REGEX(LteOp, InvalidEooOperand, "failure.*eoo") {
 TEST(LteOp, MatchesScalar) {
     BSONObj operand = BSON("$lte" << 5);
     LTEMatchExpression lte("a"_sd, operand["$lte"]);
-    ASSERT(exec::matcher::matchesBSON(&lte, BSON("a" << 4.5), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lte, BSON("a" << 6), nullptr));
+    ASSERT(lte.matchesBSON(BSON("a" << 4.5), nullptr));
+    ASSERT(!lte.matchesBSON(BSON("a" << 6), nullptr));
 }
 
 TEST(LteOp, MatchesArrayValue) {
     BSONObj operand = BSON("$lte" << 5);
     LTEMatchExpression lte("a"_sd, operand["$lte"]);
-    ASSERT(exec::matcher::matchesBSON(&lte, BSON("a" << BSON_ARRAY(6 << 4.5)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lte, BSON("a" << BSON_ARRAY(6 << 7)), nullptr));
+    ASSERT(lte.matchesBSON(BSON("a" << BSON_ARRAY(6 << 4.5)), nullptr));
+    ASSERT(!lte.matchesBSON(BSON("a" << BSON_ARRAY(6 << 7)), nullptr));
 }
 
 TEST(LteOp, MatchesWholeArray) {
     BSONObj operand = BSON("$lte" << BSON_ARRAY(5));
     LTEMatchExpression lte("a"_sd, operand["$lte"]);
-    ASSERT(exec::matcher::matchesBSON(&lte, BSON("a" << BSON_ARRAY(4)), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&lte, BSON("a" << BSON_ARRAY(5)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lte, BSON("a" << BSON_ARRAY(6)), nullptr));
+    ASSERT(lte.matchesBSON(BSON("a" << BSON_ARRAY(4)), nullptr));
+    ASSERT(lte.matchesBSON(BSON("a" << BSON_ARRAY(5)), nullptr));
+    ASSERT(!lte.matchesBSON(BSON("a" << BSON_ARRAY(6)), nullptr));
     // Nested array.
-    ASSERT(exec::matcher::matchesBSON(&lte, BSON("a" << BSON_ARRAY(BSON_ARRAY(4))), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&lte, BSON("a" << BSON_ARRAY(BSON_ARRAY(5))), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lte, BSON("a" << BSON_ARRAY(BSON_ARRAY(6))), nullptr));
+    ASSERT(lte.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(4))), nullptr));
+    ASSERT(lte.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(5))), nullptr));
+    ASSERT(!lte.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(6))), nullptr));
 }
 
 TEST(LteOp, MatchesNull) {
     BSONObj operand = BSON("$lte" << BSONNULL);
     LTEMatchExpression lte("a"_sd, operand["$lte"]);
-    ASSERT(exec::matcher::matchesBSON(&lte, BSONObj(), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&lte, BSON("a" << BSONNULL), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lte, BSON("a" << 4), nullptr));
+    ASSERT(lte.matchesBSON(BSONObj(), nullptr));
+    ASSERT(lte.matchesBSON(BSON("a" << BSONNULL), nullptr));
+    ASSERT(!lte.matchesBSON(BSON("a" << 4), nullptr));
     // A non-existent field is treated same way as an empty bson object
-    ASSERT(exec::matcher::matchesBSON(&lte, BSON("b" << 4), nullptr));
+    ASSERT(lte.matchesBSON(BSON("b" << 4), nullptr));
 }
 
 TEST(LteOp, MatchesDotNotationNull) {
     BSONObj operand = BSON("$lte" << BSONNULL);
     LTEMatchExpression lte("a.b"_sd, operand["$lte"]);
-    ASSERT(exec::matcher::matchesBSON(&lte, BSONObj(), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&lte, BSON("a" << BSONNULL), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&lte, BSON("a" << 4), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&lte, BSON("a" << BSONObj()), nullptr));
-    ASSERT(
-        exec::matcher::matchesBSON(&lte, BSON("a" << BSON_ARRAY(BSON("b" << BSONNULL))), nullptr));
-    ASSERT(exec::matcher::matchesBSON(
-        &lte, BSON("a" << BSON_ARRAY(BSON("a" << 4) << BSON("b" << 4))), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lte, BSON("a" << BSON_ARRAY(4)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lte, BSON("a" << BSON_ARRAY(BSON("b" << 4))), nullptr));
+    ASSERT(lte.matchesBSON(BSONObj(), nullptr));
+    ASSERT(lte.matchesBSON(BSON("a" << BSONNULL), nullptr));
+    ASSERT(lte.matchesBSON(BSON("a" << 4), nullptr));
+    ASSERT(lte.matchesBSON(BSON("a" << BSONObj()), nullptr));
+    ASSERT(lte.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << BSONNULL))), nullptr));
+    ASSERT(lte.matchesBSON(BSON("a" << BSON_ARRAY(BSON("a" << 4) << BSON("b" << 4))), nullptr));
+    ASSERT(!lte.matchesBSON(BSON("a" << BSON_ARRAY(4)), nullptr));
+    ASSERT(!lte.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << 4))), nullptr));
 }
 
 TEST(LteOp, MatchesMinKey) {
@@ -544,9 +537,9 @@ TEST(LteOp, MatchesMinKey) {
     BSONObj maxKeyObj = BSON("a" << MaxKey);
     BSONObj numObj = BSON("a" << 4);
 
-    ASSERT(exec::matcher::matchesBSON(&lte, minKeyObj, nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lte, maxKeyObj, nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&lte, numObj, nullptr));
+    ASSERT(lte.matchesBSON(minKeyObj, nullptr));
+    ASSERT(!lte.matchesBSON(maxKeyObj, nullptr));
+    ASSERT(!lte.matchesBSON(numObj, nullptr));
 
     ASSERT(lte.matchesSingleElement(minKeyObj.firstElement()));
     ASSERT(!lte.matchesSingleElement(maxKeyObj.firstElement()));
@@ -560,9 +553,9 @@ TEST(LteOp, MatchesMaxKey) {
     BSONObj maxKeyObj = BSON("a" << MaxKey);
     BSONObj numObj = BSON("a" << 4);
 
-    ASSERT(exec::matcher::matchesBSON(&lte, minKeyObj, nullptr));
-    ASSERT(exec::matcher::matchesBSON(&lte, maxKeyObj, nullptr));
-    ASSERT(exec::matcher::matchesBSON(&lte, numObj, nullptr));
+    ASSERT(lte.matchesBSON(minKeyObj, nullptr));
+    ASSERT(lte.matchesBSON(maxKeyObj, nullptr));
+    ASSERT(lte.matchesBSON(numObj, nullptr));
 
     ASSERT(lte.matchesSingleElement(minKeyObj.firstElement()));
     ASSERT(lte.matchesSingleElement(maxKeyObj.firstElement()));
@@ -575,11 +568,11 @@ TEST(LteOp, ElemMatchKey) {
     LTEMatchExpression lte("a"_sd, operand["$lte"]);
     MatchDetails details;
     details.requestElemMatchKey();
-    ASSERT(!exec::matcher::matchesBSON(&lte, BSON("a" << 6), &details));
+    ASSERT(!lte.matchesBSON(BSON("a" << 6), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&lte, BSON("a" << 4), &details));
+    ASSERT(lte.matchesBSON(BSON("a" << 4), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&lte, BSON("a" << BSON_ARRAY(6 << 2 << 5)), &details));
+    ASSERT(lte.matchesBSON(BSON("a" << BSON_ARRAY(6 << 2 << 5)), &details));
     ASSERT(details.hasElemMatchKey());
     ASSERT_EQUALS("1", details.elemMatchKey());
 }
@@ -596,54 +589,52 @@ DEATH_TEST_REGEX(GtOp, InvalidEooOperand, "failure.*eoo") {
 TEST(GtOp, MatchesScalar) {
     BSONObj operand = BSON("$gt" << 5);
     GTMatchExpression gt("a"_sd, operand["$gt"]);
-    ASSERT(exec::matcher::matchesBSON(&gt, BSON("a" << 5.5), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&gt, BSON("a" << 4), nullptr));
+    ASSERT(gt.matchesBSON(BSON("a" << 5.5), nullptr));
+    ASSERT(!gt.matchesBSON(BSON("a" << 4), nullptr));
 }
 
 TEST(GtOp, MatchesArrayValue) {
     BSONObj operand = BSON("$gt" << 5);
     GTMatchExpression gt("a"_sd, operand["$gt"]);
-    ASSERT(exec::matcher::matchesBSON(&gt, BSON("a" << BSON_ARRAY(3 << 5.5)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&gt, BSON("a" << BSON_ARRAY(2 << 4)), nullptr));
+    ASSERT(gt.matchesBSON(BSON("a" << BSON_ARRAY(3 << 5.5)), nullptr));
+    ASSERT(!gt.matchesBSON(BSON("a" << BSON_ARRAY(2 << 4)), nullptr));
 }
 
 TEST(GtOp, MatchesWholeArray) {
     BSONObj operand = BSON("$gt" << BSON_ARRAY(5));
     GTMatchExpression gt("a"_sd, operand["$gt"]);
-    ASSERT(!exec::matcher::matchesBSON(&gt, BSON("a" << BSON_ARRAY(4)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&gt, BSON("a" << BSON_ARRAY(5)), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&gt, BSON("a" << BSON_ARRAY(6)), nullptr));
+    ASSERT(!gt.matchesBSON(BSON("a" << BSON_ARRAY(4)), nullptr));
+    ASSERT(!gt.matchesBSON(BSON("a" << BSON_ARRAY(5)), nullptr));
+    ASSERT(gt.matchesBSON(BSON("a" << BSON_ARRAY(6)), nullptr));
     // Nested array.
     // XXX: The following assertion documents current behavior.
-    ASSERT(exec::matcher::matchesBSON(&gt, BSON("a" << BSON_ARRAY(BSON_ARRAY(4))), nullptr));
+    ASSERT(gt.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(4))), nullptr));
     // XXX: The following assertion documents current behavior.
-    ASSERT(exec::matcher::matchesBSON(&gt, BSON("a" << BSON_ARRAY(BSON_ARRAY(5))), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&gt, BSON("a" << BSON_ARRAY(BSON_ARRAY(6))), nullptr));
+    ASSERT(gt.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(5))), nullptr));
+    ASSERT(gt.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(6))), nullptr));
 }
 
 TEST(GtOp, MatchesNull) {
     BSONObj operand = BSON("$gt" << BSONNULL);
     GTMatchExpression gt("a"_sd, operand["$gt"]);
-    ASSERT(!exec::matcher::matchesBSON(&gt, BSONObj(), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&gt, BSON("a" << BSONNULL), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&gt, BSON("a" << 4), nullptr));
+    ASSERT(!gt.matchesBSON(BSONObj(), nullptr));
+    ASSERT(!gt.matchesBSON(BSON("a" << BSONNULL), nullptr));
+    ASSERT(!gt.matchesBSON(BSON("a" << 4), nullptr));
     // A non-existent field is treated same way as an empty bson object
-    ASSERT(!exec::matcher::matchesBSON(&gt, BSON("b" << 4), nullptr));
+    ASSERT(!gt.matchesBSON(BSON("b" << 4), nullptr));
 }
 
 TEST(GtOp, MatchesDotNotationNull) {
     BSONObj operand = BSON("$gt" << BSONNULL);
     GTMatchExpression gt("a.b"_sd, operand["$gt"]);
-    ASSERT(!exec::matcher::matchesBSON(&gt, BSONObj(), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&gt, BSON("a" << BSONNULL), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&gt, BSON("a" << 4), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&gt, BSON("a" << BSONObj()), nullptr));
-    ASSERT(
-        !exec::matcher::matchesBSON(&gt, BSON("a" << BSON_ARRAY(BSON("b" << BSONNULL))), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(
-        &gt, BSON("a" << BSON_ARRAY(BSON("a" << 4) << BSON("b" << 4))), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&gt, BSON("a" << BSON_ARRAY(4)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&gt, BSON("a" << BSON_ARRAY(BSON("b" << 4))), nullptr));
+    ASSERT(!gt.matchesBSON(BSONObj(), nullptr));
+    ASSERT(!gt.matchesBSON(BSON("a" << BSONNULL), nullptr));
+    ASSERT(!gt.matchesBSON(BSON("a" << 4), nullptr));
+    ASSERT(!gt.matchesBSON(BSON("a" << BSONObj()), nullptr));
+    ASSERT(!gt.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << BSONNULL))), nullptr));
+    ASSERT(!gt.matchesBSON(BSON("a" << BSON_ARRAY(BSON("a" << 4) << BSON("b" << 4))), nullptr));
+    ASSERT(!gt.matchesBSON(BSON("a" << BSON_ARRAY(4)), nullptr));
+    ASSERT(!gt.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << 4))), nullptr));
 }
 
 TEST(GtOp, MatchesMinKey) {
@@ -653,9 +644,9 @@ TEST(GtOp, MatchesMinKey) {
     BSONObj maxKeyObj = BSON("a" << MaxKey);
     BSONObj numObj = BSON("a" << 4);
 
-    ASSERT(!exec::matcher::matchesBSON(&gt, minKeyObj, nullptr));
-    ASSERT(exec::matcher::matchesBSON(&gt, maxKeyObj, nullptr));
-    ASSERT(exec::matcher::matchesBSON(&gt, numObj, nullptr));
+    ASSERT(!gt.matchesBSON(minKeyObj, nullptr));
+    ASSERT(gt.matchesBSON(maxKeyObj, nullptr));
+    ASSERT(gt.matchesBSON(numObj, nullptr));
 
     ASSERT(!gt.matchesSingleElement(minKeyObj.firstElement()));
     ASSERT(gt.matchesSingleElement(maxKeyObj.firstElement()));
@@ -669,9 +660,9 @@ TEST(GtOp, MatchesMaxKey) {
     BSONObj maxKeyObj = BSON("a" << MaxKey);
     BSONObj numObj = BSON("a" << 4);
 
-    ASSERT(!exec::matcher::matchesBSON(&gt, minKeyObj, nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&gt, maxKeyObj, nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&gt, numObj, nullptr));
+    ASSERT(!gt.matchesBSON(minKeyObj, nullptr));
+    ASSERT(!gt.matchesBSON(maxKeyObj, nullptr));
+    ASSERT(!gt.matchesBSON(numObj, nullptr));
 
     ASSERT(!gt.matchesSingleElement(minKeyObj.firstElement()));
     ASSERT(!gt.matchesSingleElement(maxKeyObj.firstElement()));
@@ -683,11 +674,11 @@ TEST(GtOp, ElemMatchKey) {
     GTMatchExpression gt("a"_sd, operand["$gt"]);
     MatchDetails details;
     details.requestElemMatchKey();
-    ASSERT(!exec::matcher::matchesBSON(&gt, BSON("a" << 4), &details));
+    ASSERT(!gt.matchesBSON(BSON("a" << 4), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&gt, BSON("a" << 6), &details));
+    ASSERT(gt.matchesBSON(BSON("a" << 6), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&gt, BSON("a" << BSON_ARRAY(2 << 6 << 5)), &details));
+    ASSERT(gt.matchesBSON(BSON("a" << BSON_ARRAY(2 << 6 << 5)), &details));
     ASSERT(details.hasElemMatchKey());
     ASSERT_EQUALS("1", details.elemMatchKey());
 }
@@ -718,53 +709,51 @@ DEATH_TEST_REGEX(GteOp, InvalidEooOperand, "failure.*eoo") {
 TEST(GteOp, MatchesScalar) {
     BSONObj operand = BSON("$gte" << 5);
     GTEMatchExpression gte("a"_sd, operand["$gte"]);
-    ASSERT(exec::matcher::matchesBSON(&gte, BSON("a" << 5.5), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&gte, BSON("a" << 4), nullptr));
+    ASSERT(gte.matchesBSON(BSON("a" << 5.5), nullptr));
+    ASSERT(!gte.matchesBSON(BSON("a" << 4), nullptr));
 }
 
 TEST(GteOp, MatchesArrayValue) {
     BSONObj operand = BSON("$gte" << 5);
     GTEMatchExpression gte("a"_sd, operand["$gte"]);
-    ASSERT(exec::matcher::matchesBSON(&gte, BSON("a" << BSON_ARRAY(4 << 5.5)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&gte, BSON("a" << BSON_ARRAY(1 << 2)), nullptr));
+    ASSERT(gte.matchesBSON(BSON("a" << BSON_ARRAY(4 << 5.5)), nullptr));
+    ASSERT(!gte.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2)), nullptr));
 }
 
 TEST(GteOp, MatchesWholeArray) {
     BSONObj operand = BSON("$gte" << BSON_ARRAY(5));
     GTEMatchExpression gte("a"_sd, operand["$gte"]);
-    ASSERT(!exec::matcher::matchesBSON(&gte, BSON("a" << BSON_ARRAY(4)), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&gte, BSON("a" << BSON_ARRAY(5)), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&gte, BSON("a" << BSON_ARRAY(6)), nullptr));
+    ASSERT(!gte.matchesBSON(BSON("a" << BSON_ARRAY(4)), nullptr));
+    ASSERT(gte.matchesBSON(BSON("a" << BSON_ARRAY(5)), nullptr));
+    ASSERT(gte.matchesBSON(BSON("a" << BSON_ARRAY(6)), nullptr));
     // Nested array.
     // XXX: The following assertion documents current behavior.
-    ASSERT(exec::matcher::matchesBSON(&gte, BSON("a" << BSON_ARRAY(BSON_ARRAY(4))), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&gte, BSON("a" << BSON_ARRAY(BSON_ARRAY(5))), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&gte, BSON("a" << BSON_ARRAY(BSON_ARRAY(6))), nullptr));
+    ASSERT(gte.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(4))), nullptr));
+    ASSERT(gte.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(5))), nullptr));
+    ASSERT(gte.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(6))), nullptr));
 }
 
 TEST(GteOp, MatchesNull) {
     BSONObj operand = BSON("$gte" << BSONNULL);
     GTEMatchExpression gte("a"_sd, operand["$gte"]);
-    ASSERT(exec::matcher::matchesBSON(&gte, BSONObj(), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&gte, BSON("a" << BSONNULL), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&gte, BSON("a" << 4), nullptr));
+    ASSERT(gte.matchesBSON(BSONObj(), nullptr));
+    ASSERT(gte.matchesBSON(BSON("a" << BSONNULL), nullptr));
+    ASSERT(!gte.matchesBSON(BSON("a" << 4), nullptr));
     // A non-existent field is treated same way as an empty bson object
-    ASSERT(exec::matcher::matchesBSON(&gte, BSON("b" << 4), nullptr));
+    ASSERT(gte.matchesBSON(BSON("b" << 4), nullptr));
 }
 
 TEST(GteOp, MatchesDotNotationNull) {
     BSONObj operand = BSON("$gte" << BSONNULL);
     GTEMatchExpression gte("a.b"_sd, operand["$gte"]);
-    ASSERT(exec::matcher::matchesBSON(&gte, BSONObj(), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&gte, BSON("a" << BSONNULL), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&gte, BSON("a" << 4), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&gte, BSON("a" << BSONObj()), nullptr));
-    ASSERT(
-        exec::matcher::matchesBSON(&gte, BSON("a" << BSON_ARRAY(BSON("b" << BSONNULL))), nullptr));
-    ASSERT(exec::matcher::matchesBSON(
-        &gte, BSON("a" << BSON_ARRAY(BSON("a" << 4) << BSON("b" << 4))), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&gte, BSON("a" << BSON_ARRAY(4)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&gte, BSON("a" << BSON_ARRAY(BSON("b" << 4))), nullptr));
+    ASSERT(gte.matchesBSON(BSONObj(), nullptr));
+    ASSERT(gte.matchesBSON(BSON("a" << BSONNULL), nullptr));
+    ASSERT(gte.matchesBSON(BSON("a" << 4), nullptr));
+    ASSERT(gte.matchesBSON(BSON("a" << BSONObj()), nullptr));
+    ASSERT(gte.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << BSONNULL))), nullptr));
+    ASSERT(gte.matchesBSON(BSON("a" << BSON_ARRAY(BSON("a" << 4) << BSON("b" << 4))), nullptr));
+    ASSERT(!gte.matchesBSON(BSON("a" << BSON_ARRAY(4)), nullptr));
+    ASSERT(!gte.matchesBSON(BSON("a" << BSON_ARRAY(BSON("b" << 4))), nullptr));
 }
 
 TEST(GteOp, MatchesMinKey) {
@@ -774,9 +763,9 @@ TEST(GteOp, MatchesMinKey) {
     BSONObj maxKeyObj = BSON("a" << MaxKey);
     BSONObj numObj = BSON("a" << 4);
 
-    ASSERT(exec::matcher::matchesBSON(&gte, minKeyObj, nullptr));
-    ASSERT(exec::matcher::matchesBSON(&gte, maxKeyObj, nullptr));
-    ASSERT(exec::matcher::matchesBSON(&gte, numObj, nullptr));
+    ASSERT(gte.matchesBSON(minKeyObj, nullptr));
+    ASSERT(gte.matchesBSON(maxKeyObj, nullptr));
+    ASSERT(gte.matchesBSON(numObj, nullptr));
 
     ASSERT(gte.matchesSingleElement(minKeyObj.firstElement()));
     ASSERT(gte.matchesSingleElement(maxKeyObj.firstElement()));
@@ -790,9 +779,9 @@ TEST(GteOp, MatchesMaxKey) {
     BSONObj maxKeyObj = BSON("a" << MaxKey);
     BSONObj numObj = BSON("a" << 4);
 
-    ASSERT(!exec::matcher::matchesBSON(&gte, minKeyObj, nullptr));
-    ASSERT(exec::matcher::matchesBSON(&gte, maxKeyObj, nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&gte, numObj, nullptr));
+    ASSERT(!gte.matchesBSON(minKeyObj, nullptr));
+    ASSERT(gte.matchesBSON(maxKeyObj, nullptr));
+    ASSERT(!gte.matchesBSON(numObj, nullptr));
 
     ASSERT(!gte.matchesSingleElement(minKeyObj.firstElement()));
     ASSERT(gte.matchesSingleElement(maxKeyObj.firstElement()));
@@ -804,11 +793,11 @@ TEST(GteOp, ElemMatchKey) {
     GTEMatchExpression gte("a"_sd, operand["$gte"]);
     MatchDetails details;
     details.requestElemMatchKey();
-    ASSERT(!exec::matcher::matchesBSON(&gte, BSON("a" << 4), &details));
+    ASSERT(!gte.matchesBSON(BSON("a" << 4), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&gte, BSON("a" << 6), &details));
+    ASSERT(gte.matchesBSON(BSON("a" << 6), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&gte, BSON("a" << BSON_ARRAY(2 << 6 << 5)), &details));
+    ASSERT(gte.matchesBSON(BSON("a" << BSON_ARRAY(2 << 6 << 5)), &details));
     ASSERT(details.hasElemMatchKey());
     ASSERT_EQUALS("1", details.elemMatchKey());
 }
@@ -970,52 +959,45 @@ TEST(RegexMatchExpression, MatchesElementUtf8) {
 
 TEST(RegexMatchExpression, MatchesScalar) {
     RegexMatchExpression regex("a"_sd, "b", "");
-    ASSERT(exec::matcher::matchesBSON(&regex,
-                                      BSON("a"
-                                           << "b"),
-                                      nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&regex,
-                                       BSON("a"
-                                            << "c"),
-                                       nullptr));
+    ASSERT(regex.matchesBSON(BSON("a"
+                                  << "b"),
+                             nullptr));
+    ASSERT(!regex.matchesBSON(BSON("a"
+                                   << "c"),
+                              nullptr));
 }
 
 TEST(RegexMatchExpression, MatchesArrayValue) {
     RegexMatchExpression regex("a"_sd, "b", "");
-    ASSERT(exec::matcher::matchesBSON(&regex,
-                                      BSON("a" << BSON_ARRAY("c"
-                                                             << "b")),
-                                      nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&regex,
-                                       BSON("a" << BSON_ARRAY("d"
-                                                              << "c")),
-                                       nullptr));
+    ASSERT(regex.matchesBSON(BSON("a" << BSON_ARRAY("c"
+                                                    << "b")),
+                             nullptr));
+    ASSERT(!regex.matchesBSON(BSON("a" << BSON_ARRAY("d"
+                                                     << "c")),
+                              nullptr));
 }
 
 TEST(RegexMatchExpression, MatchesNull) {
     RegexMatchExpression regex("a"_sd, "b", "");
-    ASSERT(!exec::matcher::matchesBSON(&regex, BSONObj(), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&regex, BSON("a" << BSONNULL), nullptr));
+    ASSERT(!regex.matchesBSON(BSONObj(), nullptr));
+    ASSERT(!regex.matchesBSON(BSON("a" << BSONNULL), nullptr));
 }
 
 TEST(RegexMatchExpression, ElemMatchKey) {
     RegexMatchExpression regex("a"_sd, "b", "");
     MatchDetails details;
     details.requestElemMatchKey();
-    ASSERT(!exec::matcher::matchesBSON(&regex,
-                                       BSON("a"
-                                            << "c"),
-                                       &details));
+    ASSERT(!regex.matchesBSON(BSON("a"
+                                   << "c"),
+                              &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&regex,
-                                      BSON("a"
-                                           << "b"),
-                                      &details));
+    ASSERT(regex.matchesBSON(BSON("a"
+                                  << "b"),
+                             &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&regex,
-                                      BSON("a" << BSON_ARRAY("c"
-                                                             << "b")),
-                                      &details));
+    ASSERT(regex.matchesBSON(BSON("a" << BSON_ARRAY("c"
+                                                    << "b")),
+                             &details));
     ASSERT(details.hasElemMatchKey());
     ASSERT_EQUALS("1", details.elemMatchKey());
 }
@@ -1104,35 +1086,28 @@ TEST(RegexMatchExpression, MalformedRegexWithStartOptionNotAccepted) {
 
 TEST(RegexMatchExpression, RegexAcceptsUCPStartOption) {
     RegexMatchExpression regex("a"_sd, "(*UCP)(\\w|\u304C)", "");
-    ASSERT(exec::matcher::matchesBSON(&regex,
-                                      BSON("a"
-                                           << "k")));
-    ASSERT(exec::matcher::matchesBSON(&regex,
-                                      BSON("a"
-                                           << "\u304B")));
-    ASSERT(exec::matcher::matchesBSON(&regex,
-                                      BSON("a"
-                                           << "\u304C")));
+    ASSERT(regex.matchesBSON(BSON("a"
+                                  << "k")));
+    ASSERT(regex.matchesBSON(BSON("a"
+                                  << "\u304B")));
+    ASSERT(regex.matchesBSON(BSON("a"
+                                  << "\u304C")));
 }
 
 TEST(RegexMatchExpression, RegexAcceptsLFOption) {
     // The LF option tells the regex to only treat \n as a newline. "." will not match newlines (by
     // default) so a\nb will not match, but a\rb will.
     RegexMatchExpression regexLF("a"_sd, "(*LF)a.b", "");
-    ASSERT(!exec::matcher::matchesBSON(&regexLF,
-                                       BSON("a"
-                                            << "a\nb")));
-    ASSERT(exec::matcher::matchesBSON(&regexLF,
-                                      BSON("a"
-                                           << "a\rb")));
+    ASSERT(!regexLF.matchesBSON(BSON("a"
+                                     << "a\nb")));
+    ASSERT(regexLF.matchesBSON(BSON("a"
+                                    << "a\rb")));
 
     RegexMatchExpression regexCR("a"_sd, "(*CR)a.b", "");
-    ASSERT(exec::matcher::matchesBSON(&regexCR,
-                                      BSON("a"
-                                           << "a\nb")));
-    ASSERT(!exec::matcher::matchesBSON(&regexCR,
-                                       BSON("a"
-                                            << "a\rb")));
+    ASSERT(regexCR.matchesBSON(BSON("a"
+                                    << "a\nb")));
+    ASSERT(!regexCR.matchesBSON(BSON("a"
+                                     << "a\rb")));
 }
 
 TEST(ModMatchExpression, MatchesElement) {
@@ -1155,31 +1130,31 @@ TEST(ModMatchExpression, ZeroDivisor) {
 
 TEST(ModMatchExpression, MatchesScalar) {
     ModMatchExpression mod("a"_sd, 5, 2);
-    ASSERT(exec::matcher::matchesBSON(&mod, BSON("a" << 7.0), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&mod, BSON("a" << 4), nullptr));
+    ASSERT(mod.matchesBSON(BSON("a" << 7.0), nullptr));
+    ASSERT(!mod.matchesBSON(BSON("a" << 4), nullptr));
 }
 
 TEST(ModMatchExpression, MatchesArrayValue) {
     ModMatchExpression mod("a"_sd, 5, 2);
-    ASSERT(exec::matcher::matchesBSON(&mod, BSON("a" << BSON_ARRAY(5 << 12LL)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&mod, BSON("a" << BSON_ARRAY(6 << 8)), nullptr));
+    ASSERT(mod.matchesBSON(BSON("a" << BSON_ARRAY(5 << 12LL)), nullptr));
+    ASSERT(!mod.matchesBSON(BSON("a" << BSON_ARRAY(6 << 8)), nullptr));
 }
 
 TEST(ModMatchExpression, MatchesNull) {
     ModMatchExpression mod("a"_sd, 5, 2);
-    ASSERT(!exec::matcher::matchesBSON(&mod, BSONObj(), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&mod, BSON("a" << BSONNULL), nullptr));
+    ASSERT(!mod.matchesBSON(BSONObj(), nullptr));
+    ASSERT(!mod.matchesBSON(BSON("a" << BSONNULL), nullptr));
 }
 
 TEST(ModMatchExpression, ElemMatchKey) {
     ModMatchExpression mod("a"_sd, 5, 2);
     MatchDetails details;
     details.requestElemMatchKey();
-    ASSERT(!exec::matcher::matchesBSON(&mod, BSON("a" << 4), &details));
+    ASSERT(!mod.matchesBSON(BSON("a" << 4), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&mod, BSON("a" << 2), &details));
+    ASSERT(mod.matchesBSON(BSON("a" << 2), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&mod, BSON("a" << BSON_ARRAY(1 << 2 << 5)), &details));
+    ASSERT(mod.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2 << 5)), &details));
     ASSERT(details.hasElemMatchKey());
     ASSERT_EQUALS("1", details.elemMatchKey());
 }
@@ -1216,26 +1191,25 @@ TEST(ExistsMatchExpression, MatchesElementExistsTrueValue) {
 
 TEST(ExistsMatchExpression, MatchesScalar) {
     ExistsMatchExpression exists("a"_sd);
-    ASSERT(exec::matcher::matchesBSON(&exists, BSON("a" << 1), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&exists, BSON("a" << BSONNULL), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&exists, BSON("b" << 1), nullptr));
+    ASSERT(exists.matchesBSON(BSON("a" << 1), nullptr));
+    ASSERT(exists.matchesBSON(BSON("a" << BSONNULL), nullptr));
+    ASSERT(!exists.matchesBSON(BSON("b" << 1), nullptr));
 }
 
 TEST(ExistsMatchExpression, MatchesArray) {
     ExistsMatchExpression exists("a"_sd);
-    ASSERT(exec::matcher::matchesBSON(&exists, BSON("a" << BSON_ARRAY(4 << 5.5)), nullptr));
+    ASSERT(exists.matchesBSON(BSON("a" << BSON_ARRAY(4 << 5.5)), nullptr));
 }
 
 TEST(ExistsMatchExpression, ElemMatchKey) {
     ExistsMatchExpression exists("a.b"_sd);
     MatchDetails details;
     details.requestElemMatchKey();
-    ASSERT(!exec::matcher::matchesBSON(&exists, BSON("a" << 1), &details));
+    ASSERT(!exists.matchesBSON(BSON("a" << 1), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&exists, BSON("a" << BSON("b" << 6)), &details));
+    ASSERT(exists.matchesBSON(BSON("a" << BSON("b" << 6)), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(
-        &exists, BSON("a" << BSON_ARRAY(2 << BSON("b" << 7))), &details));
+    ASSERT(exists.matchesBSON(BSON("a" << BSON_ARRAY(2 << BSON("b" << 7))), &details));
     ASSERT(details.hasElemMatchKey());
     ASSERT_EQUALS("1", details.elemMatchKey());
 }
@@ -1264,8 +1238,8 @@ TEST(InMatchExpression, MatchesEmpty) {
 
     BSONObj notMatch = BSON("a" << 2);
     ASSERT(!in.matchesSingleElement(notMatch["a"]));
-    ASSERT(!exec::matcher::matchesBSON(&in, BSON("a" << 1), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&in, BSONObj(), nullptr));
+    ASSERT(!in.matchesBSON(BSON("a" << 1), nullptr));
+    ASSERT(!in.matchesBSON(BSONObj(), nullptr));
 }
 
 TEST(InMatchExpression, MatchesElementMultiple) {
@@ -1292,8 +1266,8 @@ TEST(InMatchExpression, MatchesScalar) {
     std::vector<BSONElement> equalities{operand.firstElement()};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
 
-    ASSERT(exec::matcher::matchesBSON(&in, BSON("a" << 5.0), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&in, BSON("a" << 4), nullptr));
+    ASSERT(in.matchesBSON(BSON("a" << 5.0), nullptr));
+    ASSERT(!in.matchesBSON(BSON("a" << 4), nullptr));
 }
 
 TEST(InMatchExpression, MatchesArrayValue) {
@@ -1302,9 +1276,9 @@ TEST(InMatchExpression, MatchesArrayValue) {
     std::vector<BSONElement> equalities{operand.firstElement()};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
 
-    ASSERT(exec::matcher::matchesBSON(&in, BSON("a" << BSON_ARRAY(5.0 << 6)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&in, BSON("a" << BSON_ARRAY(6 << 7)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&in, BSON("a" << BSON_ARRAY(BSON_ARRAY(5))), nullptr));
+    ASSERT(in.matchesBSON(BSON("a" << BSON_ARRAY(5.0 << 6)), nullptr));
+    ASSERT(!in.matchesBSON(BSON("a" << BSON_ARRAY(6 << 7)), nullptr));
+    ASSERT(!in.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(5))), nullptr));
 }
 
 TEST(InMatchExpression, MatchesNull) {
@@ -1314,14 +1288,14 @@ TEST(InMatchExpression, MatchesNull) {
     std::vector<BSONElement> equalities{operand.firstElement()};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(&in, BSONObj(), nullptr));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&in, BSON("a" << BSONNULL), nullptr));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&in, BSON("a" << 4), nullptr));
+    ASSERT_TRUE(in.matchesBSON(BSONObj(), nullptr));
+    ASSERT_TRUE(in.matchesBSON(BSON("a" << BSONNULL), nullptr));
+    ASSERT_FALSE(in.matchesBSON(BSON("a" << 4), nullptr));
 
     // When null appears inside an $in, it has the same special semantics as an {$eq:null}
     // predicate. In particular, we expect it to match missing and not undefined.
-    ASSERT_TRUE(exec::matcher::matchesBSON(&in, BSON("b" << 4), nullptr));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&in, BSON("a" << BSONUndefined), nullptr));
+    ASSERT_TRUE(in.matchesBSON(BSON("b" << 4), nullptr));
+    ASSERT_FALSE(in.matchesBSON(BSON("a" << BSONUndefined), nullptr));
 }
 
 TEST(InMatchExpression, MatchesUndefined) {
@@ -1338,9 +1312,9 @@ TEST(InMatchExpression, MatchesMinKey) {
     std::vector<BSONElement> equalities{operand.firstElement()};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
 
-    ASSERT(exec::matcher::matchesBSON(&in, BSON("a" << MinKey), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&in, BSON("a" << MaxKey), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&in, BSON("a" << 4), nullptr));
+    ASSERT(in.matchesBSON(BSON("a" << MinKey), nullptr));
+    ASSERT(!in.matchesBSON(BSON("a" << MaxKey), nullptr));
+    ASSERT(!in.matchesBSON(BSON("a" << 4), nullptr));
 }
 
 TEST(InMatchExpression, MatchesMaxKey) {
@@ -1349,9 +1323,9 @@ TEST(InMatchExpression, MatchesMaxKey) {
     std::vector<BSONElement> equalities{operand.firstElement()};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
 
-    ASSERT(exec::matcher::matchesBSON(&in, BSON("a" << MaxKey), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&in, BSON("a" << MinKey), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&in, BSON("a" << 4), nullptr));
+    ASSERT(in.matchesBSON(BSON("a" << MaxKey), nullptr));
+    ASSERT(!in.matchesBSON(BSON("a" << MinKey), nullptr));
+    ASSERT(!in.matchesBSON(BSON("a" << 4), nullptr));
 }
 
 TEST(InMatchExpression, MatchesFullArray) {
@@ -1360,10 +1334,10 @@ TEST(InMatchExpression, MatchesFullArray) {
     std::vector<BSONElement> equalities{operand[0], operand[1], operand[2]};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
 
-    ASSERT(exec::matcher::matchesBSON(&in, BSON("a" << BSON_ARRAY(1 << 2)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&in, BSON("a" << BSON_ARRAY(1 << 2 << 3)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&in, BSON("a" << BSON_ARRAY(1)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&in, BSON("a" << 1), nullptr));
+    ASSERT(in.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2)), nullptr));
+    ASSERT(!in.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2 << 3)), nullptr));
+    ASSERT(!in.matchesBSON(BSON("a" << BSON_ARRAY(1)), nullptr));
+    ASSERT(!in.matchesBSON(BSON("a" << 1), nullptr));
 }
 
 TEST(InMatchExpression, ElemMatchKey) {
@@ -1374,11 +1348,11 @@ TEST(InMatchExpression, ElemMatchKey) {
 
     MatchDetails details;
     details.requestElemMatchKey();
-    ASSERT(!exec::matcher::matchesBSON(&in, BSON("a" << 4), &details));
+    ASSERT(!in.matchesBSON(BSON("a" << 4), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&in, BSON("a" << 5), &details));
+    ASSERT(in.matchesBSON(BSON("a" << 5), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&in, BSON("a" << BSON_ARRAY(1 << 2 << 5)), &details));
+    ASSERT(in.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2 << 5)), &details));
     ASSERT(details.hasElemMatchKey());
     ASSERT_EQUALS("1", details.elemMatchKey());
 }
@@ -2056,16 +2030,16 @@ TEST(LeafMatchExpressionTest, Equal1) {
     BSONObj temp = BSON("x" << 5);
     EqualityMatchExpression e("x"_sd, temp["x"]);
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(&e, fromjson("{ x : 5 }")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&e, fromjson("{ x : [5] }")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&e, fromjson("{ x : [1,5] }")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&e, fromjson("{ x : [1,5,2] }")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&e, fromjson("{ x : [5,2] }")));
+    ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 5 }")));
+    ASSERT_TRUE(e.matchesBSON(fromjson("{ x : [5] }")));
+    ASSERT_TRUE(e.matchesBSON(fromjson("{ x : [1,5] }")));
+    ASSERT_TRUE(e.matchesBSON(fromjson("{ x : [1,5,2] }")));
+    ASSERT_TRUE(e.matchesBSON(fromjson("{ x : [5,2] }")));
 
-    ASSERT_FALSE(exec::matcher::matchesBSON(&e, fromjson("{ x : null }")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&e, fromjson("{ x : 6 }")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&e, fromjson("{ x : [4,2] }")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&e, fromjson("{ x : [[5]] }")));
+    ASSERT_FALSE(e.matchesBSON(fromjson("{ x : null }")));
+    ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 6 }")));
+    ASSERT_FALSE(e.matchesBSON(fromjson("{ x : [4,2] }")));
+    ASSERT_FALSE(e.matchesBSON(fromjson("{ x : [[5]] }")));
 }
 
 TEST(LeafMatchExpressionTest, Comp1) {
@@ -2073,34 +2047,34 @@ TEST(LeafMatchExpressionTest, Comp1) {
 
     {
         LTEMatchExpression e("x"_sd, temp["x"]);
-        ASSERT_TRUE(exec::matcher::matchesBSON(&e, fromjson("{ x : 5 }")));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&e, fromjson("{ x : 4 }")));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&e, fromjson("{ x : 6 }")));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&e, fromjson("{ x : 'eliot' }")));
+        ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 5 }")));
+        ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 4 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 6 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 'eliot' }")));
     }
 
     {
         LTMatchExpression e("x"_sd, temp["x"]);
-        ASSERT_FALSE(exec::matcher::matchesBSON(&e, fromjson("{ x : 5 }")));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&e, fromjson("{ x : 4 }")));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&e, fromjson("{ x : 6 }")));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&e, fromjson("{ x : 'eliot' }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 5 }")));
+        ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 4 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 6 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 'eliot' }")));
     }
 
     {
         GTEMatchExpression e("x"_sd, temp["x"]);
-        ASSERT_TRUE(exec::matcher::matchesBSON(&e, fromjson("{ x : 5 }")));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&e, fromjson("{ x : 4 }")));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&e, fromjson("{ x : 6 }")));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&e, fromjson("{ x : 'eliot' }")));
+        ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 5 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 4 }")));
+        ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 6 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 'eliot' }")));
     }
 
     {
         GTMatchExpression e("x"_sd, temp["x"]);
-        ASSERT_FALSE(exec::matcher::matchesBSON(&e, fromjson("{ x : 5 }")));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&e, fromjson("{ x : 4 }")));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&e, fromjson("{ x : 6 }")));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&e, fromjson("{ x : 'eliot' }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 5 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 4 }")));
+        ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 6 }")));
+        ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 'eliot' }")));
     }
 }
 
@@ -2110,38 +2084,38 @@ TEST(MatchesBSONElement, ScalarEquality) {
 
     auto aFive = fromjson("{a: 5}");
     auto iFive = fromjson("{i: 5}");
-    ASSERT_TRUE(exec::matcher::matchesBSONElement(&filter, aFive["a"]));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&filter, iFive));
+    ASSERT_TRUE(filter.matchesBSONElement(aFive["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iFive));
 
     auto aSix = fromjson("{a: 6}");
     auto iSix = fromjson("{i: 6}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aSix["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iSix));
+    ASSERT_FALSE(filter.matchesBSONElement(aSix["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iSix));
 
     auto aArrMatch1 = fromjson("{a: [5, 6]}");
     auto iArrMatch1 = fromjson("{i: [5, 6]}");
-    ASSERT_TRUE(exec::matcher::matchesBSONElement(&filter, aArrMatch1["a"]));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&filter, iArrMatch1));
+    ASSERT_TRUE(filter.matchesBSONElement(aArrMatch1["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iArrMatch1));
 
     auto aArrMatch2 = fromjson("{a: [6, 5]}");
     auto iArrMatch2 = fromjson("{i: [6, 5]}");
-    ASSERT_TRUE(exec::matcher::matchesBSONElement(&filter, aArrMatch2["a"]));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&filter, iArrMatch2));
+    ASSERT_TRUE(filter.matchesBSONElement(aArrMatch2["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iArrMatch2));
 
     auto aArrNoMatch = fromjson("{a: [6, 6]}");
     auto iArrNoMatch = fromjson("{i: [6, 6]}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aArrNoMatch["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iArrNoMatch));
+    ASSERT_FALSE(filter.matchesBSONElement(aArrNoMatch["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iArrNoMatch));
 
     auto aObj = fromjson("{a: {i: 5}}");
     auto iObj = fromjson("{i: {i: 5}}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aObj["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iObj));
+    ASSERT_FALSE(filter.matchesBSONElement(aObj["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObj));
 
     auto aObjArr = fromjson("{a: [{i: 5}]}");
     auto iObjArr = fromjson("{i: [{i: 5}]}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aObjArr["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iObjArr));
+    ASSERT_FALSE(filter.matchesBSONElement(aObjArr["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjArr));
 }
 
 TEST(MatchesBSONElement, DottedPathEquality) {
@@ -2150,48 +2124,48 @@ TEST(MatchesBSONElement, DottedPathEquality) {
 
     auto aFive = fromjson("{a: 5}");
     auto iFive = fromjson("{i: 5}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aFive["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iFive));
+    ASSERT_FALSE(filter.matchesBSONElement(aFive["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iFive));
 
     auto aArr = fromjson("{a: [5]}");
     auto iArr = fromjson("{i: [5]}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aArr["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iArr));
+    ASSERT_FALSE(filter.matchesBSONElement(aArr["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iArr));
 
     auto aObjMatch = fromjson("{a: {a: 5, b: 6}}");
     auto iObjMatch = fromjson("{i: {a: 5, b: 6}}");
-    ASSERT_TRUE(exec::matcher::matchesBSONElement(&filter, aObjMatch["a"]));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&filter, iObjMatch));
+    ASSERT_TRUE(filter.matchesBSONElement(aObjMatch["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iObjMatch));
 
     auto aObjNoMatch1 = fromjson("{a: {a: 6}}");
     auto iObjNoMatch1 = fromjson("{i: {a: 6}}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aObjNoMatch1["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iObjNoMatch1));
+    ASSERT_FALSE(filter.matchesBSONElement(aObjNoMatch1["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjNoMatch1));
 
     auto aObjNoMatch2 = fromjson("{a: {b: 5}}");
     auto iObjNoMatch2 = fromjson("{i: {b: 5}}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aObjNoMatch2["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iObjNoMatch2));
+    ASSERT_FALSE(filter.matchesBSONElement(aObjNoMatch2["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjNoMatch2));
 
     auto aObjArrMatch1 = fromjson("{a: [{a: 5}, {a: 6}]}");
     auto iObjArrMatch1 = fromjson("{i: [{a: 5}, {a: 6}]}");
-    ASSERT_TRUE(exec::matcher::matchesBSONElement(&filter, aObjArrMatch1["a"]));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&filter, iObjArrMatch1));
+    ASSERT_TRUE(filter.matchesBSONElement(aObjArrMatch1["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iObjArrMatch1));
 
     auto aObjArrMatch2 = fromjson("{a: [{a: 6}, {a: 5}]}");
     auto iObjArrMatch2 = fromjson("{i: [{a: 6}, {a: 5}]}");
-    ASSERT_TRUE(exec::matcher::matchesBSONElement(&filter, aObjArrMatch2["a"]));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&filter, iObjArrMatch2));
+    ASSERT_TRUE(filter.matchesBSONElement(aObjArrMatch2["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iObjArrMatch2));
 
     auto aObjArrNoMatch1 = fromjson("{a: [{a: 6}, {a: 6}]}");
     auto iObjArrNoMatch1 = fromjson("{i: [{a: 6}, {a: 6}]}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aObjArrNoMatch1["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iObjArrNoMatch1));
+    ASSERT_FALSE(filter.matchesBSONElement(aObjArrNoMatch1["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjArrNoMatch1));
 
     auto aObjArrNoMatch2 = fromjson("{a: [{b: 5}, {b: 5}]}");
     auto iObjArrNoMatch2 = fromjson("{i: [{b: 5}, {b: 5}]}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aObjArrNoMatch2["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iObjArrNoMatch2));
+    ASSERT_FALSE(filter.matchesBSONElement(aObjArrNoMatch2["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjArrNoMatch2));
 }
 
 TEST(MatchesBSONElement, ArrayIndexEquality) {
@@ -2200,43 +2174,43 @@ TEST(MatchesBSONElement, ArrayIndexEquality) {
 
     auto aFive = fromjson("{a: 5}");
     auto iFive = fromjson("{i: 5}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aFive["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iFive));
+    ASSERT_FALSE(filter.matchesBSONElement(aFive["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iFive));
 
     auto aArrMatch = fromjson("{a: [6, 5]}");
     auto iArrMatch = fromjson("{i: [6, 5]}");
-    ASSERT_TRUE(exec::matcher::matchesBSONElement(&filter, aArrMatch["a"]));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&filter, iArrMatch));
+    ASSERT_TRUE(filter.matchesBSONElement(aArrMatch["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iArrMatch));
 
     auto aArrNoMatch = fromjson("{a: [5, 6]}");
     auto iArrNoMatch = fromjson("{i: [5, 6]}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aArrNoMatch["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iArrNoMatch));
+    ASSERT_FALSE(filter.matchesBSONElement(aArrNoMatch["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iArrNoMatch));
 
     auto aObjMatch = fromjson("{a: {'1': 5}}");
     auto iObjMatch = fromjson("{i: {'1': 5}}");
-    ASSERT_TRUE(exec::matcher::matchesBSONElement(&filter, aObjMatch["a"]));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&filter, iObjMatch));
+    ASSERT_TRUE(filter.matchesBSONElement(aObjMatch["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iObjMatch));
 
     auto aObjNoMatch = fromjson("{a: {i: 5}}");
     auto iObjNoMatch = fromjson("{i: {i: 5}}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aObjNoMatch["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iObjNoMatch));
+    ASSERT_FALSE(filter.matchesBSONElement(aObjNoMatch["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjNoMatch));
 
     auto aObjArrMatch = fromjson("{a: [{'1': 5}]}");
     auto iObjArrMatch = fromjson("{i: [{'1': 5}]}");
-    ASSERT_TRUE(exec::matcher::matchesBSONElement(&filter, aObjArrMatch["a"]));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&filter, iObjArrMatch));
+    ASSERT_TRUE(filter.matchesBSONElement(aObjArrMatch["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iObjArrMatch));
 
     auto aObjArrNoMatch = fromjson("{a: [{i: 6}, {i: 5}]}");
     auto iObjArrNoMatch = fromjson("{i: [{i: 6}, {i: 5}]}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aObjArrNoMatch["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iObjArrNoMatch));
+    ASSERT_FALSE(filter.matchesBSONElement(aObjArrNoMatch["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjArrNoMatch));
 
     auto aArrArr = fromjson("{a: [[6, 5], [6, 5]]}");
     auto iArrArr = fromjson("{i: [[6, 5], [6, 5]]}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aArrArr["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iArrArr));
+    ASSERT_FALSE(filter.matchesBSONElement(aArrArr["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iArrArr));
 }
 
 TEST(MatchesBSONElement, ObjectEquality) {
@@ -2245,48 +2219,48 @@ TEST(MatchesBSONElement, ObjectEquality) {
 
     auto aFive = fromjson("{a: 5}");
     auto iFive = fromjson("{i: 5}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aFive["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iFive));
+    ASSERT_FALSE(filter.matchesBSONElement(aFive["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iFive));
 
     auto aArr = fromjson("{a: [5]}");
     auto iArr = fromjson("{i: [5]}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aArr["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iArr));
+    ASSERT_FALSE(filter.matchesBSONElement(aArr["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iArr));
 
     auto aObjMatch = fromjson("{a: {a: 5}}");
     auto iObjMatch = fromjson("{i: {a: 5}}");
-    ASSERT_TRUE(exec::matcher::matchesBSONElement(&filter, aObjMatch["a"]));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&filter, iObjMatch));
+    ASSERT_TRUE(filter.matchesBSONElement(aObjMatch["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iObjMatch));
 
     auto aObjNoMatch1 = fromjson("{a: {a: 5, b: 6}}");
     auto iObjNoMatch1 = fromjson("{i: {a: 5, b: 6}}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aObjNoMatch1["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iObjNoMatch1));
+    ASSERT_FALSE(filter.matchesBSONElement(aObjNoMatch1["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjNoMatch1));
 
     auto aObjNoMatch2 = fromjson("{a: {a: 6}}");
     auto iObjNoMatch2 = fromjson("{i: {a: 6}}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aObjNoMatch2["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iObjNoMatch2));
+    ASSERT_FALSE(filter.matchesBSONElement(aObjNoMatch2["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjNoMatch2));
 
     auto aObjNoMatch3 = fromjson("{a: {b: 5}}");
     auto iObjNoMatch3 = fromjson("{i: {b: 5}}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aObjNoMatch3["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iObjNoMatch3));
+    ASSERT_FALSE(filter.matchesBSONElement(aObjNoMatch3["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjNoMatch3));
 
     auto aObjArrMatch1 = fromjson("{a: [{a: 5}, {a: 6}]}");
     auto iObjArrMatch1 = fromjson("{i: [{a: 5}, {a: 6}]}");
-    ASSERT_TRUE(exec::matcher::matchesBSONElement(&filter, aObjArrMatch1["a"]));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&filter, iObjArrMatch1));
+    ASSERT_TRUE(filter.matchesBSONElement(aObjArrMatch1["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iObjArrMatch1));
 
     auto aObjArrMatch2 = fromjson("{a: [{a: 6}, {a: 5}]}");
     auto iObjArrMatch2 = fromjson("{i: [{a: 6}, {a: 5}]}");
-    ASSERT_TRUE(exec::matcher::matchesBSONElement(&filter, aObjArrMatch2["a"]));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&filter, iObjArrMatch2));
+    ASSERT_TRUE(filter.matchesBSONElement(aObjArrMatch2["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iObjArrMatch2));
 
     auto aObjArrNoMatch = fromjson("{a: [{a: 6}, {a: 6}]}");
     auto iObjArrNoMatch = fromjson("{i: [{a: 6}, {a: 6}]}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aObjArrNoMatch["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iObjArrNoMatch));
+    ASSERT_FALSE(filter.matchesBSONElement(aObjArrNoMatch["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjArrNoMatch));
 }
 
 TEST(MatchesBSONElement, ArrayEquality) {
@@ -2295,28 +2269,28 @@ TEST(MatchesBSONElement, ArrayEquality) {
 
     auto aFive = fromjson("{a: 5}");
     auto iFive = fromjson("{i: 5}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aFive["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iFive));
+    ASSERT_FALSE(filter.matchesBSONElement(aFive["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iFive));
 
     auto aArrMatch = fromjson("{a: [5]}");
     auto iArrMatch = fromjson("{i: [5]}");
-    ASSERT_TRUE(exec::matcher::matchesBSONElement(&filter, aArrMatch["a"]));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&filter, iArrMatch));
+    ASSERT_TRUE(filter.matchesBSONElement(aArrMatch["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iArrMatch));
 
     auto aArrNoMatch = fromjson("{a: [5, 6]}");
     auto iArrNoMatch = fromjson("{i: [5, 6]}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aArrNoMatch["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iArrNoMatch));
+    ASSERT_FALSE(filter.matchesBSONElement(aArrNoMatch["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iArrNoMatch));
 
     auto aObj = fromjson("{a: {i: [5]}}");
     auto iObj = fromjson("{i: {i: [5]}}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aObj["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iObj));
+    ASSERT_FALSE(filter.matchesBSONElement(aObj["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObj));
 
     auto aObjArr = fromjson("{a: [{i: [5]}]}");
     auto iObjArr = fromjson("{i: [{i: [5]}]}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aObjArr["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iObjArr));
+    ASSERT_FALSE(filter.matchesBSONElement(aObjArr["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iObjArr));
 }
 
 DEATH_TEST_REGEX(RegexMatchExpression,

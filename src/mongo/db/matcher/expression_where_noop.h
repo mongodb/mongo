@@ -49,6 +49,8 @@ class WhereNoOpMatchExpression final : public WhereMatchExpressionBase {
 public:
     explicit WhereNoOpMatchExpression(WhereParams params);
 
+    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
+
     std::unique_ptr<MatchExpression> clone() const final;
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {

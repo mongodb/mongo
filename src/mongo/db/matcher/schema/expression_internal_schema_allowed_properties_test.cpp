@@ -31,7 +31,6 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -51,9 +50,9 @@ TEST(InternalSchemaAllowedPropertiesMatchExpression, MatchesObjectsWithListedPro
     auto expr = MatchExpressionParser::parse(filter, expCtx);
     ASSERT_OK(expr.getStatus());
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{a: 1, b: 1}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{a: 1}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{b: 1}")));
+    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{a: 1, b: 1}")));
+    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{a: 1}")));
+    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{b: 1}")));
 }
 
 TEST(InternalSchemaAllowedPropertiesMatchExpression, MatchesObjectsWithMatchingPatternProperties) {
@@ -71,10 +70,9 @@ TEST(InternalSchemaAllowedPropertiesMatchExpression, MatchesObjectsWithMatchingP
     auto expr = MatchExpressionParser::parse(filter, expCtx);
     ASSERT_OK(expr.getStatus());
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(),
-                                           fromjson("{puppies: 2, kittens: 3, phoneNum: 1234}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{puppies: 2}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{phoneNum: 1234}")));
+    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{puppies: 2, kittens: 3, phoneNum: 1234}")));
+    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{puppies: 2}")));
+    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{phoneNum: 1234}")));
 }
 
 TEST(InternalSchemaAllowedPropertiesMatchExpression,
@@ -86,9 +84,9 @@ TEST(InternalSchemaAllowedPropertiesMatchExpression,
     auto expr = MatchExpressionParser::parse(filter, expCtx);
     ASSERT_OK(expr.getStatus());
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{a: 6}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{a: 5}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{a: 4}")));
+    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{a: 6}")));
+    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{a: 5}")));
+    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{a: 4}")));
 }
 
 TEST(InternalSchemaAllowedPropertiesMatchExpression, OtherwiseEnforcedWhenAppropriate) {
@@ -106,8 +104,8 @@ TEST(InternalSchemaAllowedPropertiesMatchExpression, OtherwiseEnforcedWhenApprop
     auto expr = MatchExpressionParser::parse(filter, expCtx);
     ASSERT_OK(expr.getStatus());
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{foo: 'bar'}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{foo: 7}")));
+    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{foo: 'bar'}")));
+    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{foo: 7}")));
 }
 
 TEST(InternalSchemaAllowedPropertiesMatchExpression, EquivalentToClone) {

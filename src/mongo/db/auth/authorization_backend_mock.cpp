@@ -32,7 +32,6 @@
 #include <string>
 #include <utility>
 
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/matcher/expression.h"
@@ -205,7 +204,7 @@ Status AuthorizationBackendMock::_queryVector(OperationContext* opCtx,
 
     for (BSONObjCollection::iterator vecIt = mapIt->second.begin(); vecIt != mapIt->second.end();
          ++vecIt) {
-        if (exec::matcher::matchesBSON(matcher.get(), *vecIt)) {
+        if (matcher->matchesBSON(*vecIt)) {
             result->push_back(vecIt);
         }
     }

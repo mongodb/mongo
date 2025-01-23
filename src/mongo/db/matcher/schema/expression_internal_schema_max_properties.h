@@ -59,6 +59,11 @@ public:
                                                      "$_internalSchemaMaxProperties",
                                                      std::move(annotation)) {}
 
+    bool matches(const MatchableDocument* doc, MatchDetails* details) const final {
+        BSONObj obj = doc->toBSON();
+        return (obj.nFields() <= numProperties());
+    }
+
     bool matchesSingleElement(const BSONElement& elem,
                               MatchDetails* details = nullptr) const final {
         if (elem.type() != BSONType::Object) {

@@ -80,6 +80,14 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
+
+    /**
+     * Evaluates the aggregation expression of this match expression on document 'doc' and returns
+     * the result.
+     */
+    Value evaluateExpression(const MatchableDocument* doc) const;
+
     std::unique_ptr<MatchExpression> clone() const final;
 
     void debugString(StringBuilder& debug, int indentationLevel = 0) const final {
@@ -110,11 +118,7 @@ public:
 
     void resetChild(size_t, MatchExpression*) override {
         MONGO_UNREACHABLE;
-    }
-
-    const boost::optional<RewriteExpr::RewriteResult>& getRewriteResult() const {
-        return _rewriteResult;
-    }
+    };
 
     std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
         return nullptr;

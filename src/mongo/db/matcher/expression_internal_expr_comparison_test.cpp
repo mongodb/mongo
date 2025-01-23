@@ -38,7 +38,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/assert.h"
@@ -55,100 +54,88 @@ TEST(InternalExprComparisonMatchExpression, DoesNotPerformTypeBracketing) {
     {
         InternalExprGTMatchExpression gt(operand.firstElement().fieldNameStringData(),
                                          operand.firstElement());
-        ASSERT_FALSE(exec::matcher::matchesBSON(&gt, BSON("x" << MINKEY)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&gt, BSON("y" << 0)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&gt, BSON("x" << BSONNULL)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&gt, BSON("x" << BSONUndefined)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&gt, BSON("x" << 1)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&gt, BSON("x" << 2)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << 3.5)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gt,
-                                               BSON("x"
-                                                    << "string")));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << BSON("a" << 1))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << BSON_ARRAY(1 << 2 << 3))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << OID())));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << DATENOW)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << Timestamp(0, 3))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gt,
-                                               BSON("x"
-                                                    << "/^m/")));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << MAXKEY)));
+        ASSERT_FALSE(gt.matchesBSON(BSON("x" << MINKEY)));
+        ASSERT_FALSE(gt.matchesBSON(BSON("y" << 0)));
+        ASSERT_FALSE(gt.matchesBSON(BSON("x" << BSONNULL)));
+        ASSERT_FALSE(gt.matchesBSON(BSON("x" << BSONUndefined)));
+        ASSERT_FALSE(gt.matchesBSON(BSON("x" << 1)));
+        ASSERT_FALSE(gt.matchesBSON(BSON("x" << 2)));
+        ASSERT_TRUE(gt.matchesBSON(BSON("x" << 3.5)));
+        ASSERT_TRUE(gt.matchesBSON(BSON("x"
+                                        << "string")));
+        ASSERT_TRUE(gt.matchesBSON(BSON("x" << BSON("a" << 1))));
+        ASSERT_TRUE(gt.matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+        ASSERT_TRUE(gt.matchesBSON(BSON("x" << OID())));
+        ASSERT_TRUE(gt.matchesBSON(BSON("x" << DATENOW)));
+        ASSERT_TRUE(gt.matchesBSON(BSON("x" << Timestamp(0, 3))));
+        ASSERT_TRUE(gt.matchesBSON(BSON("x"
+                                        << "/^m/")));
+        ASSERT_TRUE(gt.matchesBSON(BSON("x" << MAXKEY)));
     }
     {
         InternalExprGTEMatchExpression gte(operand.firstElement().fieldNameStringData(),
                                            operand.firstElement());
-        ASSERT_FALSE(exec::matcher::matchesBSON(&gte, BSON("x" << MINKEY)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&gte, BSON("y" << 0)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&gte, BSON("x" << BSONNULL)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&gte, BSON("x" << BSONUndefined)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&gte, BSON("x" << 1)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << 2)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << 3.5)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte,
-                                               BSON("x"
-                                                    << "string")));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << BSON("a" << 1))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << BSON_ARRAY(1 << 2 << 3))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << OID())));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << DATENOW)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << Timestamp(0, 3))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte,
-                                               BSON("x"
-                                                    << "/^m/")));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << MAXKEY)));
+        ASSERT_FALSE(gte.matchesBSON(BSON("x" << MINKEY)));
+        ASSERT_FALSE(gte.matchesBSON(BSON("y" << 0)));
+        ASSERT_FALSE(gte.matchesBSON(BSON("x" << BSONNULL)));
+        ASSERT_FALSE(gte.matchesBSON(BSON("x" << BSONUndefined)));
+        ASSERT_FALSE(gte.matchesBSON(BSON("x" << 1)));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x" << 2)));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x" << 3.5)));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x"
+                                         << "string")));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x" << BSON("a" << 1))));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x" << OID())));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x" << DATENOW)));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x" << Timestamp(0, 3))));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x"
+                                         << "/^m/")));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x" << MAXKEY)));
     }
     {
         InternalExprLTMatchExpression lt(operand.firstElement().fieldNameStringData(),
                                          operand.firstElement());
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lt, BSON("x" << MINKEY)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lt, BSON("y" << 0)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lt, BSON("x" << BSONNULL)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lt, BSON("x" << BSONUndefined)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lt, BSON("x" << 1)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << 2)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << 3.5)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lt,
-                                                BSON("x"
-                                                     << "string")));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << BSON("a" << 1))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(
-            &lt,
-            BSON("x" << BSON_ARRAY(1 << 2
-                                     << 3))));  // Always returns true if path contains an array.
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << OID())));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << DATENOW)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << Timestamp(0, 3))));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lt,
-                                                BSON("x"
-                                                     << "/^m/")));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << MAXKEY)));
+        ASSERT_TRUE(lt.matchesBSON(BSON("x" << MINKEY)));
+        ASSERT_TRUE(lt.matchesBSON(BSON("y" << 0)));
+        ASSERT_TRUE(lt.matchesBSON(BSON("x" << BSONNULL)));
+        ASSERT_TRUE(lt.matchesBSON(BSON("x" << BSONUndefined)));
+        ASSERT_TRUE(lt.matchesBSON(BSON("x" << 1)));
+        ASSERT_FALSE(lt.matchesBSON(BSON("x" << 2)));
+        ASSERT_FALSE(lt.matchesBSON(BSON("x" << 3.5)));
+        ASSERT_FALSE(lt.matchesBSON(BSON("x"
+                                         << "string")));
+        ASSERT_FALSE(lt.matchesBSON(BSON("x" << BSON("a" << 1))));
+        ASSERT_TRUE(lt.matchesBSON(BSON(
+            "x" << BSON_ARRAY(1 << 2 << 3))));  // Always returns true if path contains an array.
+        ASSERT_FALSE(lt.matchesBSON(BSON("x" << OID())));
+        ASSERT_FALSE(lt.matchesBSON(BSON("x" << DATENOW)));
+        ASSERT_FALSE(lt.matchesBSON(BSON("x" << Timestamp(0, 3))));
+        ASSERT_FALSE(lt.matchesBSON(BSON("x"
+                                         << "/^m/")));
+        ASSERT_FALSE(lt.matchesBSON(BSON("x" << MAXKEY)));
     }
     {
         InternalExprLTEMatchExpression lte(operand.firstElement().fieldNameStringData(),
                                            operand.firstElement());
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lte, BSON("x" << MINKEY)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lte, BSON("y" << 0)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lte, BSON("x" << BSONNULL)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lte, BSON("x" << BSONUndefined)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lte, BSON("x" << 1)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lte, BSON("x" << 2)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lte, BSON("x" << 3.5)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lte,
-                                                BSON("x"
-                                                     << "string")));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lte, BSON("x" << BSON("a" << 1))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(
-            &lte,
-            BSON("x" << BSON_ARRAY(1 << 2
-                                     << 3))));  // Always returns true if path contains an array.
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lte, BSON("x" << OID())));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lte, BSON("x" << DATENOW)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lte, BSON("x" << Timestamp(0, 3))));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lte,
-                                                BSON("x"
-                                                     << "/^m/")));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lte, BSON("x" << MAXKEY)));
+        ASSERT_TRUE(lte.matchesBSON(BSON("x" << MINKEY)));
+        ASSERT_TRUE(lte.matchesBSON(BSON("y" << 0)));
+        ASSERT_TRUE(lte.matchesBSON(BSON("x" << BSONNULL)));
+        ASSERT_TRUE(lte.matchesBSON(BSON("x" << BSONUndefined)));
+        ASSERT_TRUE(lte.matchesBSON(BSON("x" << 1)));
+        ASSERT_TRUE(lte.matchesBSON(BSON("x" << 2)));
+        ASSERT_FALSE(lte.matchesBSON(BSON("x" << 3.5)));
+        ASSERT_FALSE(lte.matchesBSON(BSON("x"
+                                          << "string")));
+        ASSERT_FALSE(lte.matchesBSON(BSON("x" << BSON("a" << 1))));
+        ASSERT_TRUE(lte.matchesBSON(BSON(
+            "x" << BSON_ARRAY(1 << 2 << 3))));  // Always returns true if path contains an array.
+        ASSERT_FALSE(lte.matchesBSON(BSON("x" << OID())));
+        ASSERT_FALSE(lte.matchesBSON(BSON("x" << DATENOW)));
+        ASSERT_FALSE(lte.matchesBSON(BSON("x" << Timestamp(0, 3))));
+        ASSERT_FALSE(lte.matchesBSON(BSON("x"
+                                          << "/^m/")));
+        ASSERT_FALSE(lte.matchesBSON(BSON("x" << MAXKEY)));
     }
 }
 
@@ -159,46 +146,46 @@ TEST(InternalExprComparisonMatchExpression, CorrectlyComparesNaN) {
     {
         InternalExprGTMatchExpression gt(operand.firstElement().fieldNameStringData(),
                                          operand.firstElement());
-        ASSERT_FALSE(exec::matcher::matchesBSON(&gt, BSON("x" << MINKEY)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&gt, BSON("x" << BSONNULL)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&gt, BSON("x" << kNaN)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << Decimal128::kNegativeInfinity)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << 2)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << 3.5)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << MAXKEY)));
+        ASSERT_FALSE(gt.matchesBSON(BSON("x" << MINKEY)));
+        ASSERT_FALSE(gt.matchesBSON(BSON("x" << BSONNULL)));
+        ASSERT_FALSE(gt.matchesBSON(BSON("x" << kNaN)));
+        ASSERT_TRUE(gt.matchesBSON(BSON("x" << Decimal128::kNegativeInfinity)));
+        ASSERT_TRUE(gt.matchesBSON(BSON("x" << 2)));
+        ASSERT_TRUE(gt.matchesBSON(BSON("x" << 3.5)));
+        ASSERT_TRUE(gt.matchesBSON(BSON("x" << MAXKEY)));
     }
     {
         InternalExprGTEMatchExpression gte(operand.firstElement().fieldNameStringData(),
                                            operand.firstElement());
-        ASSERT_FALSE(exec::matcher::matchesBSON(&gte, BSON("x" << MINKEY)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&gte, BSON("x" << BSONNULL)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << kNaN)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << Decimal128::kNegativeInfinity)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << 2)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << 3.5)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << MAXKEY)));
+        ASSERT_FALSE(gte.matchesBSON(BSON("x" << MINKEY)));
+        ASSERT_FALSE(gte.matchesBSON(BSON("x" << BSONNULL)));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x" << kNaN)));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x" << Decimal128::kNegativeInfinity)));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x" << 2)));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x" << 3.5)));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x" << MAXKEY)));
     }
     {
         InternalExprLTMatchExpression lt(operand.firstElement().fieldNameStringData(),
                                          operand.firstElement());
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lt, BSON("x" << MINKEY)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lt, BSON("x" << BSONNULL)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << kNaN)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << Decimal128::kNegativeInfinity)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << 2)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << 3.5)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << MAXKEY)));
+        ASSERT_TRUE(lt.matchesBSON(BSON("x" << MINKEY)));
+        ASSERT_TRUE(lt.matchesBSON(BSON("x" << BSONNULL)));
+        ASSERT_FALSE(lt.matchesBSON(BSON("x" << kNaN)));
+        ASSERT_FALSE(lt.matchesBSON(BSON("x" << Decimal128::kNegativeInfinity)));
+        ASSERT_FALSE(lt.matchesBSON(BSON("x" << 2)));
+        ASSERT_FALSE(lt.matchesBSON(BSON("x" << 3.5)));
+        ASSERT_FALSE(lt.matchesBSON(BSON("x" << MAXKEY)));
     }
     {
         InternalExprLTEMatchExpression lte(operand.firstElement().fieldNameStringData(),
                                            operand.firstElement());
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lte, BSON("x" << MINKEY)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lte, BSON("x" << BSONNULL)));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lte, BSON("x" << kNaN)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lte, BSON("x" << Decimal128::kNegativeInfinity)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lte, BSON("x" << 2)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lte, BSON("x" << 3.5)));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lte, BSON("x" << MAXKEY)));
+        ASSERT_TRUE(lte.matchesBSON(BSON("x" << MINKEY)));
+        ASSERT_TRUE(lte.matchesBSON(BSON("x" << BSONNULL)));
+        ASSERT_TRUE(lte.matchesBSON(BSON("x" << kNaN)));
+        ASSERT_FALSE(lte.matchesBSON(BSON("x" << Decimal128::kNegativeInfinity)));
+        ASSERT_FALSE(lte.matchesBSON(BSON("x" << 2)));
+        ASSERT_FALSE(lte.matchesBSON(BSON("x" << 3.5)));
+        ASSERT_FALSE(lte.matchesBSON(BSON("x" << MAXKEY)));
     }
 }
 
@@ -209,34 +196,34 @@ TEST(InternalExprComparisonMatchExpression, AlwaysReturnsTrueWithLeafArrays) {
     {
         InternalExprGTMatchExpression gt(operand.firstElement().fieldNameStringData(),
                                          operand.firstElement());
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << BSON_ARRAY(BSONNULL))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << BSON_ARRAY(0))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << BSON_ARRAY(1 << 2 << 3))));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&gt, BSON("x" << 1)));
+        ASSERT_TRUE(gt.matchesBSON(BSON("x" << BSON_ARRAY(BSONNULL))));
+        ASSERT_TRUE(gt.matchesBSON(BSON("x" << BSON_ARRAY(0))));
+        ASSERT_TRUE(gt.matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+        ASSERT_FALSE(gt.matchesBSON(BSON("x" << 1)));
     }
     {
         InternalExprGTEMatchExpression gte(operand.firstElement().fieldNameStringData(),
                                            operand.firstElement());
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << BSON_ARRAY(BSONNULL))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << BSON_ARRAY(0))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << BSON_ARRAY(1 << 2 << 3))));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&gte, BSON("x" << 1)));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x" << BSON_ARRAY(BSONNULL))));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x" << BSON_ARRAY(0))));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+        ASSERT_FALSE(gte.matchesBSON(BSON("x" << 1)));
     }
     {
         InternalExprLTMatchExpression lt(operand.firstElement().fieldNameStringData(),
                                          operand.firstElement());
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lt, BSON("x" << BSON_ARRAY(BSONNULL))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lt, BSON("x" << BSON_ARRAY(0))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lt, BSON("x" << BSON_ARRAY(1 << 2 << 3))));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << 3)));
+        ASSERT_TRUE(lt.matchesBSON(BSON("x" << BSON_ARRAY(BSONNULL))));
+        ASSERT_TRUE(lt.matchesBSON(BSON("x" << BSON_ARRAY(0))));
+        ASSERT_TRUE(lt.matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+        ASSERT_FALSE(lt.matchesBSON(BSON("x" << 3)));
     }
     {
         InternalExprLTEMatchExpression lte(operand.firstElement().fieldNameStringData(),
                                            operand.firstElement());
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lte, BSON("x" << BSON_ARRAY(BSONNULL))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lte, BSON("x" << BSON_ARRAY(0))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lte, BSON("x" << BSON_ARRAY(1 << 2 << 3))));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lte, BSON("x" << 3)));
+        ASSERT_TRUE(lte.matchesBSON(BSON("x" << BSON_ARRAY(BSONNULL))));
+        ASSERT_TRUE(lte.matchesBSON(BSON("x" << BSON_ARRAY(0))));
+        ASSERT_TRUE(lte.matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+        ASSERT_FALSE(lte.matchesBSON(BSON("x" << 3)));
     }
 }
 
@@ -245,42 +232,38 @@ TEST(InternalExprComparisonMatchExpression, AlwaysReturnsTrueWithNonLeafArrays) 
     {
         InternalExprGTMatchExpression gt(operand.firstElement().fieldNameStringData(),
                                          operand.firstElement());
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << BSON_ARRAY(BSONNULL))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << BSON_ARRAY(1 << 2 << 3))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gt, BSON("x" << BSON_ARRAY(BSON("y" << 1)))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(
-            &gt, BSON("x" << BSON_ARRAY(BSON("y" << 2) << BSON("y" << 3)))));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&gt, BSON("x" << BSON("y" << 1))));
+        ASSERT_TRUE(gt.matchesBSON(BSON("x" << BSON_ARRAY(BSONNULL))));
+        ASSERT_TRUE(gt.matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+        ASSERT_TRUE(gt.matchesBSON(BSON("x" << BSON_ARRAY(BSON("y" << 1)))));
+        ASSERT_TRUE(gt.matchesBSON(BSON("x" << BSON_ARRAY(BSON("y" << 2) << BSON("y" << 3)))));
+        ASSERT_FALSE(gt.matchesBSON(BSON("x" << BSON("y" << 1))));
     }
     {
         InternalExprGTEMatchExpression gte(operand.firstElement().fieldNameStringData(),
                                            operand.firstElement());
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << BSON_ARRAY(BSONNULL))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << BSON_ARRAY(1 << 2 << 3))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&gte, BSON("x" << BSON_ARRAY(BSON("y" << 1)))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(
-            &gte, BSON("x" << BSON_ARRAY(BSON("y" << 2) << BSON("y" << 3)))));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&gte, BSON("x" << BSON("y" << 1))));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x" << BSON_ARRAY(BSONNULL))));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x" << BSON_ARRAY(BSON("y" << 1)))));
+        ASSERT_TRUE(gte.matchesBSON(BSON("x" << BSON_ARRAY(BSON("y" << 2) << BSON("y" << 3)))));
+        ASSERT_FALSE(gte.matchesBSON(BSON("x" << BSON("y" << 1))));
     }
     {
         InternalExprLTMatchExpression lt(operand.firstElement().fieldNameStringData(),
                                          operand.firstElement());
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lt, BSON("x" << BSON_ARRAY(BSONNULL))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lt, BSON("x" << BSON_ARRAY(1 << 2 << 3))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lt, BSON("x" << BSON_ARRAY(BSON("y" << 3)))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(
-            &lt, BSON("x" << BSON_ARRAY(BSON("y" << 1) << BSON("y" << 2)))));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lt, BSON("x" << BSON("y" << 3))));
+        ASSERT_TRUE(lt.matchesBSON(BSON("x" << BSON_ARRAY(BSONNULL))));
+        ASSERT_TRUE(lt.matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+        ASSERT_TRUE(lt.matchesBSON(BSON("x" << BSON_ARRAY(BSON("y" << 3)))));
+        ASSERT_TRUE(lt.matchesBSON(BSON("x" << BSON_ARRAY(BSON("y" << 1) << BSON("y" << 2)))));
+        ASSERT_FALSE(lt.matchesBSON(BSON("x" << BSON("y" << 3))));
     }
     {
         InternalExprLTEMatchExpression lte(operand.firstElement().fieldNameStringData(),
                                            operand.firstElement());
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lte, BSON("x" << BSON_ARRAY(BSONNULL))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lte, BSON("x" << BSON_ARRAY(1 << 2 << 3))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(&lte, BSON("x" << BSON_ARRAY(BSON("y" << 3)))));
-        ASSERT_TRUE(exec::matcher::matchesBSON(
-            &lte, BSON("x" << BSON_ARRAY(BSON("y" << 1) << BSON("y" << 2)))));
-        ASSERT_FALSE(exec::matcher::matchesBSON(&lte, BSON("x" << BSON("y" << 3))));
+        ASSERT_TRUE(lte.matchesBSON(BSON("x" << BSON_ARRAY(BSONNULL))));
+        ASSERT_TRUE(lte.matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+        ASSERT_TRUE(lte.matchesBSON(BSON("x" << BSON_ARRAY(BSON("y" << 3)))));
+        ASSERT_TRUE(lte.matchesBSON(BSON("x" << BSON_ARRAY(BSON("y" << 1) << BSON("y" << 2)))));
+        ASSERT_FALSE(lte.matchesBSON(BSON("x" << BSON("y" << 3))));
     }
 }
 

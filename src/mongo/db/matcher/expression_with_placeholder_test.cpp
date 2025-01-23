@@ -39,7 +39,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
@@ -64,8 +63,8 @@ TEST(ExpressionWithPlaceholderTest, ParseBasic) {
     auto filter = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     ASSERT(filter->getPlaceholder());
     ASSERT_EQ(*filter->getPlaceholder(), "i");
-    ASSERT_TRUE(exec::matcher::matchesBSON(filter->getFilter(), fromjson("{i: 0}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(filter->getFilter(), fromjson("{i: 1}")));
+    ASSERT_TRUE(filter->getFilter()->matchesBSON(fromjson("{i: 0}")));
+    ASSERT_FALSE(filter->getFilter()->matchesBSON(fromjson("{i: 1}")));
 }
 
 TEST(ExpressionWithPlaceholderTest, ParseDottedField) {
@@ -75,8 +74,8 @@ TEST(ExpressionWithPlaceholderTest, ParseDottedField) {
     auto filter = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     ASSERT(filter->getPlaceholder());
     ASSERT_EQ(*filter->getPlaceholder(), "i");
-    ASSERT_TRUE(exec::matcher::matchesBSON(filter->getFilter(), fromjson("{i: {a: 0, b: 1}}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(filter->getFilter(), fromjson("{i: {a: 0, b: 0}}")));
+    ASSERT_TRUE(filter->getFilter()->matchesBSON(fromjson("{i: {a: 0, b: 1}}")));
+    ASSERT_FALSE(filter->getFilter()->matchesBSON(fromjson("{i: {a: 0, b: 0}}")));
 }
 
 TEST(ExpressionWithPlaceholderTest, ParseLogicalQuery) {
@@ -86,8 +85,8 @@ TEST(ExpressionWithPlaceholderTest, ParseLogicalQuery) {
     auto filter = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     ASSERT(filter->getPlaceholder());
     ASSERT_EQ(*filter->getPlaceholder(), "i");
-    ASSERT_TRUE(exec::matcher::matchesBSON(filter->getFilter(), fromjson("{i: 0}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(filter->getFilter(), fromjson("{i: 1}")));
+    ASSERT_TRUE(filter->getFilter()->matchesBSON(fromjson("{i: 0}")));
+    ASSERT_FALSE(filter->getFilter()->matchesBSON(fromjson("{i: 1}")));
 }
 
 TEST(ExpressionWithPlaceholderTest, ParseElemMatch) {
@@ -97,8 +96,8 @@ TEST(ExpressionWithPlaceholderTest, ParseElemMatch) {
     auto filter = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     ASSERT(filter->getPlaceholder());
     ASSERT_EQ(*filter->getPlaceholder(), "i");
-    ASSERT_TRUE(exec::matcher::matchesBSON(filter->getFilter(), fromjson("{i: [{a: 0}]}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(filter->getFilter(), fromjson("{i: [{a: 1}]}")));
+    ASSERT_TRUE(filter->getFilter()->matchesBSON(fromjson("{i: [{a: 0}]}")));
+    ASSERT_FALSE(filter->getFilter()->matchesBSON(fromjson("{i: [{a: 1}]}")));
 }
 
 TEST(ExpressionWithPlaceholderTest, ParseCollation) {
@@ -111,8 +110,8 @@ TEST(ExpressionWithPlaceholderTest, ParseCollation) {
     auto filter = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     ASSERT(filter->getPlaceholder());
     ASSERT_EQ(*filter->getPlaceholder(), "i");
-    ASSERT_TRUE(exec::matcher::matchesBSON(filter->getFilter(), fromjson("{i: 'cba'}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(filter->getFilter(), fromjson("{i: 0}")));
+    ASSERT_TRUE(filter->getFilter()->matchesBSON(fromjson("{i: 'cba'}")));
+    ASSERT_FALSE(filter->getFilter()->matchesBSON(fromjson("{i: 0}")));
 }
 
 TEST(ExpressionWithPlaceholderTest, ParseIdContainsNumbersAndCapitals) {
@@ -122,8 +121,8 @@ TEST(ExpressionWithPlaceholderTest, ParseIdContainsNumbersAndCapitals) {
     auto filter = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     ASSERT(filter->getPlaceholder());
     ASSERT_EQ(*filter->getPlaceholder(), "iA3");
-    ASSERT_TRUE(exec::matcher::matchesBSON(filter->getFilter(), fromjson("{'iA3': 0}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(filter->getFilter(), fromjson("{'iA3': 1}")));
+    ASSERT_TRUE(filter->getFilter()->matchesBSON(fromjson("{'iA3': 0}")));
+    ASSERT_FALSE(filter->getFilter()->matchesBSON(fromjson("{'iA3': 1}")));
 }
 
 TEST(ExpressionWithPlaceholderTest, EmptyMatchExpressionParsesSuccessfully) {

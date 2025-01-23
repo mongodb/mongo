@@ -66,7 +66,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -742,7 +741,7 @@ std::vector<BSONObj> CommonMongodProcessInterface::getMatchingPlanCacheEntryStat
         if (obj.hasField("securityLevel")) {
             return false;
         }
-        return !matchExp ? true : exec::matcher::matchesBSON(matchExp, obj);
+        return !matchExp ? true : matchExp->matchesBSON(obj);
     };
 
     AutoGetCollection collection(opCtx, nss, MODE_IS);

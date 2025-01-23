@@ -32,6 +32,12 @@
 namespace mongo {
 constexpr StringData InternalSchemaCondMatchExpression::kName;
 
+bool InternalSchemaCondMatchExpression::matches(const MatchableDocument* doc,
+                                                MatchDetails* details) const {
+    return condition()->matches(doc, details) ? thenBranch()->matches(doc, details)
+                                              : elseBranch()->matches(doc, details);
+}
+
 bool InternalSchemaCondMatchExpression::matchesSingleElement(const BSONElement& elem,
                                                              MatchDetails* details) const {
     return condition()->matchesSingleElement(elem, details)

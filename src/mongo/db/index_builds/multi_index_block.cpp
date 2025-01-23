@@ -54,7 +54,6 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
@@ -825,8 +824,7 @@ Status MultiIndexBlock::_insert(
     }
 
     for (size_t i = 0; i < _indexes.size(); i++) {
-        if (_indexes[i].filterExpression &&
-            !exec::matcher::matchesBSON(_indexes[i].filterExpression, doc)) {
+        if (_indexes[i].filterExpression && !_indexes[i].filterExpression->matchesBSON(doc)) {
             continue;
         }
 

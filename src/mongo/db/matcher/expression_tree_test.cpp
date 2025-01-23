@@ -37,7 +37,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
@@ -52,18 +51,18 @@ TEST(NotMatchExpression, MatchesScalar) {
     auto baseOperand = BSON("$lt" << 5);
     auto lt = std::make_unique<LTMatchExpression>("a"_sd, baseOperand["$lt"]);
     auto notOp = NotMatchExpression{lt.release()};
-    ASSERT(exec::matcher::matchesBSON(&notOp, BSON("a" << 6), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&notOp, BSON("a" << 4), nullptr));
+    ASSERT(notOp.matchesBSON(BSON("a" << 6), nullptr));
+    ASSERT(!notOp.matchesBSON(BSON("a" << 4), nullptr));
 }
 
 TEST(NotMatchExpression, MatchesArray) {
     auto baseOperand = BSON("$lt" << 5);
     auto lt = std::make_unique<LTMatchExpression>("a"_sd, baseOperand["$lt"]);
     auto notOp = NotMatchExpression{lt.release()};
-    ASSERT(exec::matcher::matchesBSON(&notOp, BSON("a" << BSON_ARRAY(6)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&notOp, BSON("a" << BSON_ARRAY(4)), nullptr));
+    ASSERT(notOp.matchesBSON(BSON("a" << BSON_ARRAY(6)), nullptr));
+    ASSERT(!notOp.matchesBSON(BSON("a" << BSON_ARRAY(4)), nullptr));
     // All array elements must match.
-    ASSERT(!exec::matcher::matchesBSON(&notOp, BSON("a" << BSON_ARRAY(4 << 5 << 6)), nullptr));
+    ASSERT(!notOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 5 << 6)), nullptr));
 }
 
 TEST(NotMatchExpression, ElemMatchKey) {
@@ -72,11 +71,11 @@ TEST(NotMatchExpression, ElemMatchKey) {
     auto notOp = NotMatchExpression{lt.release()};
     auto details = MatchDetails{};
     details.requestElemMatchKey();
-    ASSERT(!exec::matcher::matchesBSON(&notOp, BSON("a" << BSON_ARRAY(1)), &details));
+    ASSERT(!notOp.matchesBSON(BSON("a" << BSON_ARRAY(1)), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&notOp, BSON("a" << 6), &details));
+    ASSERT(notOp.matchesBSON(BSON("a" << 6), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(&notOp, BSON("a" << BSON_ARRAY(6)), &details));
+    ASSERT(notOp.matchesBSON(BSON("a" << BSON_ARRAY(6)), &details));
     // elemMatchKey is not implemented for negative match operators.
     ASSERT(!details.hasElemMatchKey());
 }
@@ -88,10 +87,9 @@ TEST(NotMatchExpression, SetCollatorPropagatesToChild) {
     auto notOp = NotMatchExpression{eq.release()};
     auto collator = CollatorInterfaceMock{CollatorInterfaceMock::MockType::kAlwaysEqual};
     notOp.setCollator(&collator);
-    ASSERT(!exec::matcher::matchesBSON(&notOp,
-                                       BSON("a"
-                                            << "string2"),
-                                       nullptr));
+    ASSERT(!notOp.matchesBSON(BSON("a"
+                                   << "string2"),
+                              nullptr));
 }
 
 DEATH_TEST_REGEX(NotMatchExpression,
@@ -107,7 +105,7 @@ DEATH_TEST_REGEX(NotMatchExpression,
 
 TEST(AndOp, NoClauses) {
     auto andMatchExpression = AndMatchExpression{};
-    ASSERT(exec::matcher::matchesBSON(&andMatchExpression, BSONObj{}, nullptr));
+    ASSERT(andMatchExpression.matchesBSON(BSONObj{}, nullptr));
 }
 
 TEST(AndOp, MatchesElementThreeClauses) {
@@ -133,10 +131,10 @@ TEST(AndOp, MatchesElementThreeClauses) {
     andOp.add(std::move(sub2));
     andOp.add(std::move(sub3));
 
-    ASSERT(exec::matcher::matchesBSON(&andOp, match));
-    ASSERT(!exec::matcher::matchesBSON(&andOp, notMatch1));
-    ASSERT(!exec::matcher::matchesBSON(&andOp, notMatch2));
-    ASSERT(!exec::matcher::matchesBSON(&andOp, notMatch3));
+    ASSERT(andOp.matchesBSON(match));
+    ASSERT(!andOp.matchesBSON(notMatch1));
+    ASSERT(!andOp.matchesBSON(notMatch2));
+    ASSERT(!andOp.matchesBSON(notMatch3));
 }
 
 TEST(AndOp, MatchesSingleClause) {
@@ -147,10 +145,10 @@ TEST(AndOp, MatchesSingleClause) {
     auto andOp = AndMatchExpression{};
     andOp.add(std::move(ne));
 
-    ASSERT(exec::matcher::matchesBSON(&andOp, BSON("a" << 4), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&andOp, BSON("a" << BSON_ARRAY(4 << 6)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&andOp, BSON("a" << 5), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&andOp, BSON("a" << BSON_ARRAY(4 << 5)), nullptr));
+    ASSERT(andOp.matchesBSON(BSON("a" << 4), nullptr));
+    ASSERT(andOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 6)), nullptr));
+    ASSERT(!andOp.matchesBSON(BSON("a" << 5), nullptr));
+    ASSERT(!andOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 5)), nullptr));
 }
 
 TEST(AndOp, MatchesThreeClauses) {
@@ -167,11 +165,11 @@ TEST(AndOp, MatchesThreeClauses) {
     andOp.add(std::move(sub2));
     andOp.add(std::move(sub3));
 
-    ASSERT(exec::matcher::matchesBSON(&andOp, BSON("a" << 5 << "b" << 6), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&andOp, BSON("a" << 5), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&andOp, BSON("b" << 6), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&andOp, BSON("a" << 1 << "b" << 6), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&andOp, BSON("a" << 10 << "b" << 6), nullptr));
+    ASSERT(andOp.matchesBSON(BSON("a" << 5 << "b" << 6), nullptr));
+    ASSERT(!andOp.matchesBSON(BSON("a" << 5), nullptr));
+    ASSERT(!andOp.matchesBSON(BSON("b" << 6), nullptr));
+    ASSERT(!andOp.matchesBSON(BSON("a" << 1 << "b" << 6), nullptr));
+    ASSERT(!andOp.matchesBSON(BSON("a" << 10 << "b" << 6), nullptr));
 }
 
 TEST(AndOp, ElemMatchKey) {
@@ -187,12 +185,11 @@ TEST(AndOp, ElemMatchKey) {
 
     auto details = MatchDetails{};
     details.requestElemMatchKey();
-    ASSERT(!exec::matcher::matchesBSON(&andOp, BSON("a" << BSON_ARRAY(1)), &details));
+    ASSERT(!andOp.matchesBSON(BSON("a" << BSON_ARRAY(1)), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(!exec::matcher::matchesBSON(&andOp, BSON("b" << BSON_ARRAY(2)), &details));
+    ASSERT(!andOp.matchesBSON(BSON("b" << BSON_ARRAY(2)), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(
-        &andOp, BSON("a" << BSON_ARRAY(1) << "b" << BSON_ARRAY(1 << 2)), &details));
+    ASSERT(andOp.matchesBSON(BSON("a" << BSON_ARRAY(1) << "b" << BSON_ARRAY(1 << 2)), &details));
     ASSERT(details.hasElemMatchKey());
     // The elem match key for the second $and clause is recorded.
     ASSERT_EQUALS("1", details.elemMatchKey());
@@ -219,7 +216,7 @@ DEATH_TEST_REGEX(AndOp, GetChildFailsOnIndexLargerThanChildren, "Tripwire assert
 
 TEST(OrOp, NoClauses) {
     auto orOp = OrMatchExpression{};
-    ASSERT(!exec::matcher::matchesBSON(&orOp, BSONObj{}, nullptr));
+    ASSERT(!orOp.matchesBSON(BSONObj{}, nullptr));
 }
 
 TEST(OrOp, MatchesSingleClause) {
@@ -230,10 +227,10 @@ TEST(OrOp, MatchesSingleClause) {
     auto orOp = OrMatchExpression{};
     orOp.add(std::move(ne));
 
-    ASSERT(exec::matcher::matchesBSON(&orOp, BSON("a" << 4), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&orOp, BSON("a" << BSON_ARRAY(4 << 6)), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&orOp, BSON("a" << 5), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&orOp, BSON("a" << BSON_ARRAY(4 << 5)), nullptr));
+    ASSERT(orOp.matchesBSON(BSON("a" << 4), nullptr));
+    ASSERT(orOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 6)), nullptr));
+    ASSERT(!orOp.matchesBSON(BSON("a" << 5), nullptr));
+    ASSERT(!orOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 5)), nullptr));
 }
 
 TEST(OrOp, MatchesTwoClauses) {
@@ -248,23 +245,23 @@ TEST(OrOp, MatchesTwoClauses) {
 
     auto aClause1 = fromjson("{a: 5}");
     auto iClause1 = fromjson("{i: 5}");
-    ASSERT_TRUE(exec::matcher::matchesBSONElement(&filter, aClause1["a"]));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&filter, iClause1));
+    ASSERT_TRUE(filter.matchesBSONElement(aClause1["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iClause1));
 
     auto aClause2 = fromjson("{a: {a: 6}}");
     auto iClause2 = fromjson("{i: {a: 6}}");
-    ASSERT_TRUE(exec::matcher::matchesBSONElement(&filter, aClause2["a"]));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&filter, iClause2));
+    ASSERT_TRUE(filter.matchesBSONElement(aClause2["a"]));
+    ASSERT_TRUE(filter.matchesBSON(iClause2));
 
     auto aNoMatch1 = fromjson("{a: 6}");
     auto iNoMatch1 = fromjson("{i: 6}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aNoMatch1["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iNoMatch1));
+    ASSERT_FALSE(filter.matchesBSONElement(aNoMatch1["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iNoMatch1));
 
     auto aNoMatch2 = fromjson("{a: {a: 5}}");
     auto iNoMatch2 = fromjson("{i: {a: 5}}");
-    ASSERT_FALSE(exec::matcher::matchesBSONElement(&filter, aNoMatch2["a"]));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&filter, iNoMatch2));
+    ASSERT_FALSE(filter.matchesBSONElement(aNoMatch2["a"]));
+    ASSERT_FALSE(filter.matchesBSON(iNoMatch2));
 }
 
 TEST(OrOp, MatchesThreeClauses) {
@@ -280,13 +277,13 @@ TEST(OrOp, MatchesThreeClauses) {
     orOp.add(std::move(sub2));
     orOp.add(std::move(sub3));
 
-    ASSERT(exec::matcher::matchesBSON(&orOp, BSON("a" << -1), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&orOp, BSON("a" << 11), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&orOp, BSON("a" << 5), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&orOp, BSON("b" << 100), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&orOp, BSON("b" << 101), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&orOp, BSONObj(), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&orOp, BSON("a" << 11 << "b" << 100), nullptr));
+    ASSERT(orOp.matchesBSON(BSON("a" << -1), nullptr));
+    ASSERT(orOp.matchesBSON(BSON("a" << 11), nullptr));
+    ASSERT(!orOp.matchesBSON(BSON("a" << 5), nullptr));
+    ASSERT(orOp.matchesBSON(BSON("b" << 100), nullptr));
+    ASSERT(!orOp.matchesBSON(BSON("b" << 101), nullptr));
+    ASSERT(!orOp.matchesBSON(BSONObj(), nullptr));
+    ASSERT(orOp.matchesBSON(BSON("a" << 11 << "b" << 100), nullptr));
 }
 
 TEST(OrOp, ElemMatchKey) {
@@ -301,13 +298,11 @@ TEST(OrOp, ElemMatchKey) {
 
     auto details = MatchDetails{};
     details.requestElemMatchKey();
-    ASSERT(!exec::matcher::matchesBSON(&orOp, BSONObj{}, &details));
+    ASSERT(!orOp.matchesBSON(BSONObj{}, &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(!exec::matcher::matchesBSON(
-        &orOp, BSON("a" << BSON_ARRAY(10) << "b" << BSON_ARRAY(10)), &details));
+    ASSERT(!orOp.matchesBSON(BSON("a" << BSON_ARRAY(10) << "b" << BSON_ARRAY(10)), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(
-        &orOp, BSON("a" << BSON_ARRAY(1) << "b" << BSON_ARRAY(1 << 2)), &details));
+    ASSERT(orOp.matchesBSON(BSON("a" << BSON_ARRAY(1) << "b" << BSON_ARRAY(1 << 2)), &details));
     // The elem match key feature is not implemented for $or.
     ASSERT(!details.hasElemMatchKey());
 }
@@ -332,7 +327,7 @@ DEATH_TEST_REGEX(OrOp, GetChildFailsOnIndexLargerThanChildren, "Tripwire asserti
 
 TEST(NorOp, NoClauses) {
     auto norOp = NorMatchExpression{};
-    ASSERT(exec::matcher::matchesBSON(&norOp, BSONObj{}, nullptr));
+    ASSERT(norOp.matchesBSON(BSONObj{}, nullptr));
 }
 
 TEST(NorOp, MatchesSingleClause) {
@@ -343,10 +338,10 @@ TEST(NorOp, MatchesSingleClause) {
     auto norOp = NorMatchExpression{};
     norOp.add(std::move(ne));
 
-    ASSERT(!exec::matcher::matchesBSON(&norOp, BSON("a" << 4), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&norOp, BSON("a" << BSON_ARRAY(4 << 6)), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&norOp, BSON("a" << 5), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&norOp, BSON("a" << BSON_ARRAY(4 << 5)), nullptr));
+    ASSERT(!norOp.matchesBSON(BSON("a" << 4), nullptr));
+    ASSERT(!norOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 6)), nullptr));
+    ASSERT(norOp.matchesBSON(BSON("a" << 5), nullptr));
+    ASSERT(norOp.matchesBSON(BSON("a" << BSON_ARRAY(4 << 5)), nullptr));
 }
 
 TEST(NorOp, MatchesThreeClauses) {
@@ -363,13 +358,13 @@ TEST(NorOp, MatchesThreeClauses) {
     norOp.add(std::move(sub2));
     norOp.add(std::move(sub3));
 
-    ASSERT(!exec::matcher::matchesBSON(&norOp, BSON("a" << -1), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&norOp, BSON("a" << 11), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&norOp, BSON("a" << 5), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&norOp, BSON("b" << 100), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&norOp, BSON("b" << 101), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&norOp, BSONObj{}, nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&norOp, BSON("a" << 11 << "b" << 100), nullptr));
+    ASSERT(!norOp.matchesBSON(BSON("a" << -1), nullptr));
+    ASSERT(!norOp.matchesBSON(BSON("a" << 11), nullptr));
+    ASSERT(norOp.matchesBSON(BSON("a" << 5), nullptr));
+    ASSERT(!norOp.matchesBSON(BSON("b" << 100), nullptr));
+    ASSERT(norOp.matchesBSON(BSON("b" << 101), nullptr));
+    ASSERT(norOp.matchesBSON(BSONObj{}, nullptr));
+    ASSERT(!norOp.matchesBSON(BSON("a" << 11 << "b" << 100), nullptr));
 }
 
 TEST(NorOp, ElemMatchKey) {
@@ -384,13 +379,11 @@ TEST(NorOp, ElemMatchKey) {
 
     MatchDetails details;
     details.requestElemMatchKey();
-    ASSERT(!exec::matcher::matchesBSON(&norOp, BSON("a" << 1), &details));
+    ASSERT(!norOp.matchesBSON(BSON("a" << 1), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(!exec::matcher::matchesBSON(
-        &norOp, BSON("a" << BSON_ARRAY(1) << "b" << BSON_ARRAY(10)), &details));
+    ASSERT(!norOp.matchesBSON(BSON("a" << BSON_ARRAY(1) << "b" << BSON_ARRAY(10)), &details));
     ASSERT(!details.hasElemMatchKey());
-    ASSERT(exec::matcher::matchesBSON(
-        &norOp, BSON("a" << BSON_ARRAY(3) << "b" << BSON_ARRAY(4)), &details));
+    ASSERT(norOp.matchesBSON(BSON("a" << BSON_ARRAY(3) << "b" << BSON_ARRAY(4)), &details));
     // The elem match key feature is not implemented for $nor.
     ASSERT(!details.hasElemMatchKey());
 }

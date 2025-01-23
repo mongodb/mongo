@@ -147,6 +147,7 @@ public:
      *  - any field not contained in '_properties' nor matching a pattern in '_patternProperties'
      *    matches the '_otherwise' match expression.
      */
+    bool matches(const MatchableDocument* doc, MatchDetails* details) const final;
     bool matchesSingleElement(const BSONElement& element, MatchDetails* details) const final;
 
     void serialize(BSONObjBuilder* builder,

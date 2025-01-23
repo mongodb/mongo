@@ -71,6 +71,8 @@ public:
         : MatchExpression(MatchExpression::INTERNAL_SCHEMA_ROOT_DOC_EQ, std::move(annotation)),
           _rhsObj(std::move(rhs)) {}
 
+    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
+
     /**
      * This expression should only be used to match full documents, not objects within an array
      * in the case of $elemMatch.
@@ -120,10 +122,6 @@ public:
 
     BSONObj getRhsObj() const {
         return _rhsObj;
-    }
-
-    const BSONObj::ComparatorInterface* getObjCmp() const {
-        return &_objCmp;
     }
 
 private:

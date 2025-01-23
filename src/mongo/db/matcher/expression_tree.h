@@ -77,13 +77,6 @@ public:
         return _expressions.size();
     }
 
-    /**
-     * Returns the unmodifiable vector of the children of the current node.
-     */
-    const std::vector<std::unique_ptr<MatchExpression>>& getChildren() const {
-        return _expressions;
-    }
-
     MatchExpression* getChild(size_t i) const final {
         tassert(6400201, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
         return _expressions[i].get();
@@ -150,6 +143,8 @@ public:
                        clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ListOfMatchExpression(AND, std::move(annotation), makeVector(std::move(expression))) {}
 
+    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
+
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     std::unique_ptr<MatchExpression> clone() const override {
@@ -195,6 +190,8 @@ public:
                       clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ListOfMatchExpression(OR, std::move(annotation), makeVector(std::move(expression))) {}
 
+    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
+
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     std::unique_ptr<MatchExpression> clone() const override {
@@ -239,6 +236,8 @@ public:
     NorMatchExpression(std::unique_ptr<MatchExpression> expression,
                        clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ListOfMatchExpression(NOR, std::move(annotation), makeVector(std::move(expression))) {}
+
+    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
@@ -288,6 +287,10 @@ public:
             self->setTag(getTag()->clone());
         }
         return self;
+    }
+
+    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final {
+        return !_exp->matches(doc, nullptr);
     }
 
     bool matchesSingleElement(const BSONElement& elt, MatchDetails* details = nullptr) const final {

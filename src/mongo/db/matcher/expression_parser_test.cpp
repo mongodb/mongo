@@ -47,7 +47,6 @@
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/json.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -68,8 +67,8 @@ TEST(MatchExpressionParserTest, SimpleEQ1) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 2)));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 3)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 3)));
 }
 
 TEST(MatchExpressionParserTest, Multiple1) {
@@ -78,11 +77,11 @@ TEST(MatchExpressionParserTest, Multiple1) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 5 << "y" << 7)));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 5 << "y" << 6)));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 6 << "y" << 7)));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 5 << "y" << 9)));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 5 << "y" << 4)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 5 << "y" << 7)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 5 << "y" << 6)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 6 << "y" << 7)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5 << "y" << 9)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5 << "y" << 4)));
 }
 
 TEST(MatchExpressionParserTest, MinDistanceWithoutNearFailsToParse) {
@@ -152,9 +151,9 @@ TEST(MatchExpressionParserTest, AlwaysFalseParsesIntegerArgument) {
     auto expr = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(expr.getStatus());
 
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: 1}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: 'blah'}")));
+    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{}")));
+    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{x: 1}")));
+    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{x: 'blah'}")));
 }
 
 TEST(MatchExpressionParserTest, AlwaysTrueFailsToParseNonOneArguments) {
@@ -182,9 +181,9 @@ TEST(MatchExpressionParserTest, AlwaysTrueParsesIntegerArgument) {
     auto expr = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(expr.getStatus());
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: 1}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: 'blah'}")));
+    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{}")));
+    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{x: 1}")));
+    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{x: 'blah'}")));
 }
 
 TEST(MatchExpressionParserTest, TextFailsToParseWhenDisallowed) {
@@ -478,18 +477,18 @@ TEST(MatchExpressionParserTest, InternalExprEqParsesCorrectly) {
     auto query = fromjson("{a: {$_internalExprEq: 'foo'}}");
     auto statusWith = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(statusWith.getStatus());
-    ASSERT_TRUE(exec::matcher::matchesBSON(statusWith.getValue().get(), fromjson("{a: 'foo'}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(statusWith.getValue().get(), fromjson("{a: ['foo']}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(statusWith.getValue().get(), fromjson("{a: ['bar']}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(statusWith.getValue().get(), fromjson("{a: 'bar'}")));
+    ASSERT_TRUE(statusWith.getValue()->matchesBSON(fromjson("{a: 'foo'}")));
+    ASSERT_TRUE(statusWith.getValue()->matchesBSON(fromjson("{a: ['foo']}")));
+    ASSERT_TRUE(statusWith.getValue()->matchesBSON(fromjson("{a: ['bar']}")));
+    ASSERT_FALSE(statusWith.getValue()->matchesBSON(fromjson("{a: 'bar'}")));
 
     query = fromjson("{'a.b': {$_internalExprEq: 5}}");
     statusWith = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(statusWith.getStatus());
-    ASSERT_TRUE(exec::matcher::matchesBSON(statusWith.getValue().get(), fromjson("{a: {b: 5}}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(statusWith.getValue().get(), fromjson("{a: {b: [5]}}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(statusWith.getValue().get(), fromjson("{a: {b: [6]}}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(statusWith.getValue().get(), fromjson("{a: {b: 6}}")));
+    ASSERT_TRUE(statusWith.getValue()->matchesBSON(fromjson("{a: {b: 5}}")));
+    ASSERT_TRUE(statusWith.getValue()->matchesBSON(fromjson("{a: {b: [5]}}")));
+    ASSERT_TRUE(statusWith.getValue()->matchesBSON(fromjson("{a: {b: [6]}}")));
+    ASSERT_FALSE(statusWith.getValue()->matchesBSON(fromjson("{a: {b: 6}}")));
 }
 
 TEST(MatchExpressionParserTest, InternalExprEqComparisonToArrayDoesNotParse) {
@@ -533,7 +532,7 @@ TEST(MatchExpressionParserTest, SampleRateMatchingBehaviorStats) {
     int sum = 0;
     for (int i = 0; i < k; i++) {
         for (int j = 0; j < N; j++) {
-            if (exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << 1))) {
+            if (expr.getValue()->matchesBSON(BSON("a" << 1))) {
                 sum++;
             }
         }
@@ -547,12 +546,12 @@ TEST(MatchExpressionParserTest, SampleRateMatchingBehaviorStats) {
     // Test that $sampleRate args 0.0 and 1.0 return 0 and all hits, respectively.
     expr = MatchExpressionParser::parse(BSON("$sampleRate" << 0.0), expCtx);
     for (int j = 0; j < N; j++) {
-        ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << 1)));
+        ASSERT_FALSE(expr.getValue()->matchesBSON(BSON("a" << 1)));
     }
 
     expr = MatchExpressionParser::parse(BSON("$sampleRate" << 1.0), expCtx);
     for (int j = 0; j < N; j++) {
-        ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << 1)));
+        ASSERT_TRUE(expr.getValue()->matchesBSON(BSON("a" << 1)));
     }
 }
 
@@ -652,8 +651,8 @@ TEST(InternalBinDataSubTypeMatchExpressionTest, SubTypeParsesCorrectly) {
     BSONObj match = BSON("a" << BSONBinData(bytes, 5, BinDataType::bdtCustom));
     BSONObj notMatch = BSON("a" << BSONBinData(bytes, 5, BinDataType::Function));
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(statusWith.getValue().get(), match));
-    ASSERT_FALSE(exec::matcher::matchesBSON(statusWith.getValue().get(), notMatch));
+    ASSERT_TRUE(statusWith.getValue()->matchesBSON(match));
+    ASSERT_FALSE(statusWith.getValue()->matchesBSON(notMatch));
 }
 
 TEST(InternalBinDataSubTypeMatchExpressionTest, SubTypeWithFloatParsesCorrectly) {
@@ -666,8 +665,8 @@ TEST(InternalBinDataSubTypeMatchExpressionTest, SubTypeWithFloatParsesCorrectly)
     BSONObj match = BSON("a" << BSONBinData(bytes, 5, BinDataType::MD5Type));
     BSONObj notMatch = BSON("a" << BSONBinData(bytes, 5, BinDataType::bdtCustom));
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(statusWith.getValue().get(), match));
-    ASSERT_FALSE(exec::matcher::matchesBSON(statusWith.getValue().get(), notMatch));
+    ASSERT_TRUE(statusWith.getValue()->matchesBSON(match));
+    ASSERT_FALSE(statusWith.getValue()->matchesBSON(notMatch));
 }
 
 TEST(InternalBinDataSubTypeMatchExpressionTest, InvalidSubTypeDoesNotParse) {
@@ -706,7 +705,7 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeMatchesSingleType
     BSONObj matchingDoc = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
                                                   sizeof(FleBlobHeader),
                                                   BinDataType::Encrypt));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), matchingDoc));
+    ASSERT_TRUE(expr->matchesBSON(matchingDoc));
 }
 
 TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeMatchesSingleType) {
@@ -722,7 +721,7 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeMatchesSingleType
     BSONObj matchingDoc = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
                                                   sizeof(FleBlobHeader),
                                                   BinDataType::Encrypt));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), matchingDoc));
+    ASSERT_TRUE(expr->matchesBSON(matchingDoc));
 }
 
 TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeMatchesOneOfTypesInArray) {
@@ -739,7 +738,7 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeMatchesOneOfTypes
     BSONObj matchingDoc = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
                                                   sizeof(FleBlobHeader),
                                                   BinDataType::Encrypt));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), matchingDoc));
+    ASSERT_TRUE(expr->matchesBSON(matchingDoc));
 }
 
 TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeDoesNotMatchSingleType) {
@@ -755,7 +754,7 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeDoesNotMatchSingl
     BSONObj notMatchingDoc = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
                                                      sizeof(FleBlobHeader),
                                                      BinDataType::Encrypt));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.get(), notMatchingDoc));
+    ASSERT_FALSE(expr->matchesBSON(notMatchingDoc));
 }
 
 TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeDoesNotMatchTypeArray) {
@@ -772,7 +771,7 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeDoesNotMatchTypeA
     BSONObj notMatchingDoc = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
                                                      sizeof(FleBlobHeader),
                                                      BinDataType::Encrypt));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.get(), notMatchingDoc));
+    ASSERT_FALSE(expr->matchesBSON(notMatchingDoc));
 }
 
 TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, InvalidArgumentDoesNotParse) {
@@ -826,7 +825,7 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, IntentToEncryptFleBlobDoe
                                                sizeof(FleBlobHeader),
                                                BinDataType::Encrypt));
 
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.get(), notMatch));
+    ASSERT_FALSE(expr->matchesBSON(notMatch));
 }
 
 TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, UnknownFleBlobTypeDoesNotMatch) {
@@ -842,7 +841,7 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, UnknownFleBlobTypeDoesNot
                                                sizeof(FleBlobHeader),
                                                BinDataType::Encrypt));
     try {
-        exec::matcher::matchesBSON(expr.get(), notMatch);
+        expr->matchesBSON(notMatch);
     } catch (...) {
         ASSERT_EQ(exceptionToStatus().code(), 33118);
     }
@@ -854,7 +853,7 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, EmptyFleBlobDoesNotMatch)
     auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
 
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Encrypt));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.get(), notMatch));
+    ASSERT_FALSE(expr->matchesBSON(notMatch));
 }
 
 TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, NonEncryptBinDataSubTypeDoesNotMatch) {
@@ -863,7 +862,7 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, NonEncryptBinDataSubTypeD
     auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
 
     BSONObj notMatch = BSON("a" << BSONBinData("\x69\xb7", 2, BinDataGeneral));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.get(), notMatch));
+    ASSERT_FALSE(expr->matchesBSON(notMatch));
 }
 
 TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, NonBinDataValueDoesNotMatch) {
@@ -872,6 +871,6 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, NonBinDataValueDoesNotMat
     auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
 
     BSONObj notMatch = BSON("a" << BSONArray());
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.get(), notMatch));
+    ASSERT_FALSE(expr->matchesBSON(notMatch));
 }
 }  // namespace mongo

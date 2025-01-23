@@ -31,7 +31,6 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
@@ -50,7 +49,7 @@ bool MatchProcessor::process(const Document& input) const {
         ? input.toBson<BSONObj::LargeSizeTrait>()
         : document_path_support::documentToBsonWithPaths<BSONObj::LargeSizeTrait>(
               input, _dependencies.fields);
-    return exec::matcher::matchesBSON(_expression.get(), toMatch);
+    return _expression->matchesBSON(toMatch);
 }
 
 }  // namespace mongo

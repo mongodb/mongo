@@ -30,7 +30,6 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
@@ -43,12 +42,11 @@ namespace {
 TEST(AlwaysFalseMatchExpression, RejectsAllObjects) {
     AlwaysFalseMatchExpression falseExpr;
 
-    ASSERT_FALSE(exec::matcher::matchesBSON(&falseExpr, BSON("a" << BSONObj())));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&falseExpr, BSON("a" << 1)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&falseExpr,
-                                            BSON("a"
-                                                 << "string")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&falseExpr, BSONObj()));
+    ASSERT_FALSE(falseExpr.matchesBSON(BSON("a" << BSONObj())));
+    ASSERT_FALSE(falseExpr.matchesBSON(BSON("a" << 1)));
+    ASSERT_FALSE(falseExpr.matchesBSON(BSON("a"
+                                            << "string")));
+    ASSERT_FALSE(falseExpr.matchesBSON(BSONObj()));
 }
 
 TEST(AlwaysFalseMatchExpression, EquivalentReturnsCorrectResults) {
@@ -63,12 +61,11 @@ TEST(AlwaysFalseMatchExpression, EquivalentReturnsCorrectResults) {
 TEST(AlwaysTrueMatchExpression, AcceptsAllObjects) {
     AlwaysTrueMatchExpression trueExpr;
 
-    ASSERT_TRUE(exec::matcher::matchesBSON(&trueExpr, BSON("a" << BSONObj())));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&trueExpr, BSON("a" << 1)));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&trueExpr,
-                                           BSON("a"
-                                                << "string")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&trueExpr, BSONObj()));
+    ASSERT_TRUE(trueExpr.matchesBSON(BSON("a" << BSONObj())));
+    ASSERT_TRUE(trueExpr.matchesBSON(BSON("a" << 1)));
+    ASSERT_TRUE(trueExpr.matchesBSON(BSON("a"
+                                          << "string")));
+    ASSERT_TRUE(trueExpr.matchesBSON(BSONObj()));
 }
 
 TEST(AlwaysTrueMatchExpression, EquivalentReturnsCorrectResults) {

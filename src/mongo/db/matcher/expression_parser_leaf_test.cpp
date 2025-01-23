@@ -49,7 +49,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -99,9 +98,9 @@ TEST(MatchExpressionParserLeafTest, SimpleEQ2) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 2)));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 3)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 3)));
 }
 
 TEST(MatchExpressionParserLeafTest, SimpleEQUndefined) {
@@ -143,8 +142,8 @@ TEST(MatchExpressionParserLeafTest, SimpleGT1) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 2)));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 3)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 2)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 3)));
 }
 
 TEST(MatchExpressionParserLeafTest, GTNullCollation) {
@@ -179,9 +178,9 @@ TEST(MatchExpressionParserLeafTest, SimpleLT1) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 2)));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 3)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 2)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 3)));
 }
 
 TEST(MatchExpressionParserLeafTest, LTNullCollation) {
@@ -216,9 +215,9 @@ TEST(MatchExpressionParserLeafTest, SimpleGTE1) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 2)));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 3)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 3)));
 }
 
 TEST(MatchExpressionParserLeafTest, GTENullCollation) {
@@ -253,9 +252,9 @@ TEST(MatchExpressionParserLeafTest, SimpleLTE1) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 2)));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 3)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 3)));
 }
 
 TEST(MatchExpressionParserLeafTest, LTENullCollation) {
@@ -290,9 +289,9 @@ TEST(MatchExpressionParserLeafTest, SimpleNE1) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 2)));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 3)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 2)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 3)));
 }
 
 TEST(MatchExpressionParserLeafTest, NENullCollation) {
@@ -366,9 +365,9 @@ TEST(MatchExpressionParserLeafTest, SimpleMod1) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 5)));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 4)));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 8)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 5)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 4)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 8)));
 }
 
 TEST(MatchExpressionParserLeafTest, ModFloatTruncate) {
@@ -489,9 +488,9 @@ TEST(MatchExpressionParserLeafTest, SimpleIN1) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 2)));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 3)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 3)));
 }
 
 TEST(MatchExpressionParserLeafTest, INNullCollation) {
@@ -528,61 +527,51 @@ TEST(MatchExpressionParserLeafTest, INSingleDBRef) {
     ASSERT_OK(result.getStatus());
 
     OID oidx = OID::gen();
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x" << BSON("$ref"
-                                                        << "collx"
-                                                        << "$id" << oidx << "$db"
-                                                        << "db"))));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x" << BSON("$ref"
-                                                        << "coll"
-                                                        << "$id" << oidx << "$db"
-                                                        << "db"))));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x" << BSON("$id" << oid << "$ref"
-                                                              << "coll"
-                                                              << "$db"
-                                                              << "db"))));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x" << BSON("$id" << oid << "$ref"
-                                                              << "coll"
-                                                              << "$db"
-                                                              << "db"))));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x" << BSON_ARRAY(BSON("$id" << oid << "$ref"
-                                                                         << "coll"
-                                                                         << "$db"
-                                                                         << "db")))));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x" << BSON("$ref"
-                                                        << "coll"
-                                                        << "$id" << oid << "$db"
-                                                        << "dbx"))));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x" << BSON("$db"
-                                                        << "db"
-                                                        << "$ref"
-                                                        << "coll"
-                                                        << "$id" << oid))));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x" << BSON("$ref"
-                                                       << "coll"
-                                                       << "$id" << oid << "$db"
-                                                       << "db"))));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x" << BSON_ARRAY(BSON("$ref"
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
+                                                            << "collx"
+                                                            << "$id" << oidx << "$db"
+                                                            << "db"))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
+                                                            << "coll"
+                                                            << "$id" << oidx << "$db"
+                                                            << "db"))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$id" << oid << "$ref"
                                                                   << "coll"
-                                                                  << "$id" << oid << "$db"
-                                                                  << "db")))));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x" << BSON_ARRAY(BSON("$ref"
-                                                                  << "collx"
-                                                                  << "$id" << oidx << "$db"
-                                                                  << "db")
-                                                             << BSON("$ref"
-                                                                     << "coll"
-                                                                     << "$id" << oid << "$db"
-                                                                     << "db")))));
+                                                                  << "$db"
+                                                                  << "db"))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$id" << oid << "$ref"
+                                                                  << "coll"
+                                                                  << "$db"
+                                                                  << "db"))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$id" << oid << "$ref"
+                                                                             << "coll"
+                                                                             << "$db"
+                                                                             << "db")))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
+                                                            << "coll"
+                                                            << "$id" << oid << "$db"
+                                                            << "dbx"))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$db"
+                                                            << "db"
+                                                            << "$ref"
+                                                            << "coll"
+                                                            << "$id" << oid))));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
+                                                           << "coll"
+                                                           << "$id" << oid << "$db"
+                                                           << "db"))));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                      << "coll"
+                                                                      << "$id" << oid << "$db"
+                                                                      << "db")))));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                      << "collx"
+                                                                      << "$id" << oidx << "$db"
+                                                                      << "db")
+                                                                 << BSON("$ref"
+                                                                         << "coll"
+                                                                         << "$id" << oid << "$db"
+                                                                         << "db")))));
 }
 
 TEST(MatchExpressionParserLeafTest, INMultipleDBRef) {
@@ -601,111 +590,94 @@ TEST(MatchExpressionParserLeafTest, INMultipleDBRef) {
     ASSERT_OK(result.getStatus());
 
     OID oidx = OID::gen();
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x" << BSON("$ref"
-                                                        << "collx"
-                                                        << "$id" << oidx << "$db"
-                                                        << "db"))));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x" << BSON("$ref"
-                                                        << "coll"
-                                                        << "$id" << oidx << "$db"
-                                                        << "db"))));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x" << BSON("$id" << oid << "$ref"
-                                                              << "coll"
-                                                              << "$db"
-                                                              << "db"))));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x" << BSON_ARRAY(BSON("$ref"
-                                                                   << "coll"
-                                                                   << "$id" << oidy << "$db"
-                                                                   << "db")))));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x" << BSON_ARRAY(BSON("$ref"
-                                                                   << "colly"
-                                                                   << "$id" << oid << "$db"
-                                                                   << "db")))));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x" << BSON_ARRAY(BSON("$id" << oid << "$ref"
-                                                                         << "coll"
-                                                                         << "$db"
-                                                                         << "db")))));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x" << BSON_ARRAY(BSON("$ref"
-                                                                   << "coll"
-                                                                   << "$id" << oid << "$db"
-                                                                   << "dbx")))));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x" << BSON_ARRAY(BSON("$id" << oidy << "$ref"
-                                                                         << "colly"
-                                                                         << "$db"
-                                                                         << "db")))));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x" << BSON_ARRAY(BSON("$ref"
-                                                                   << "collx"
-                                                                   << "$id" << oidx << "$db"
-                                                                   << "db")
-                                                              << BSON("$ref"
-                                                                      << "coll"
-                                                                      << "$id" << oidx << "$db"
-                                                                      << "db")))));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x" << BSON_ARRAY(BSON("$ref"
-                                                                   << "collx"
-                                                                   << "$id" << oidx << "$db"
-                                                                   << "db")
-                                                              << BSON("$ref"
-                                                                      << "colly"
-                                                                      << "$id" << oidx << "$db"
-                                                                      << "db")))));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x" << BSON_ARRAY(BSON("$ref"
-                                                                   << "collx"
-                                                                   << "$id" << oidx << "$db"
-                                                                   << "db")
-                                                              << BSON("$ref"
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
+                                                            << "collx"
+                                                            << "$id" << oidx << "$db"
+                                                            << "db"))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
+                                                            << "coll"
+                                                            << "$id" << oidx << "$db"
+                                                            << "db"))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$id" << oid << "$ref"
+                                                                  << "coll"
+                                                                  << "$db"
+                                                                  << "db"))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                       << "coll"
+                                                                       << "$id" << oidy << "$db"
+                                                                       << "db")))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                       << "colly"
+                                                                       << "$id" << oid << "$db"
+                                                                       << "db")))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$id" << oid << "$ref"
+                                                                             << "coll"
+                                                                             << "$db"
+                                                                             << "db")))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                       << "coll"
+                                                                       << "$id" << oid << "$db"
+                                                                       << "dbx")))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$id" << oidy << "$ref"
+                                                                             << "colly"
+                                                                             << "$db"
+                                                                             << "db")))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                       << "collx"
+                                                                       << "$id" << oidx << "$db"
+                                                                       << "db")
+                                                                  << BSON("$ref"
+                                                                          << "coll"
+                                                                          << "$id" << oidx << "$db"
+                                                                          << "db")))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                       << "collx"
+                                                                       << "$id" << oidx << "$db"
+                                                                       << "db")
+                                                                  << BSON("$ref"
+                                                                          << "colly"
+                                                                          << "$id" << oidx << "$db"
+                                                                          << "db")))));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                       << "collx"
+                                                                       << "$id" << oidx << "$db"
+                                                                       << "db")
+                                                                  << BSON("$ref"
+                                                                          << "coll"
+                                                                          << "$id" << oid << "$db"
+                                                                          << "dbx")))));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
+                                                           << "coll"
+                                                           << "$id" << oid << "$db"
+                                                           << "db"))));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
+                                                           << "colly"
+                                                           << "$id" << oidy << "$db"
+                                                           << "db"))));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
                                                                       << "coll"
                                                                       << "$id" << oid << "$db"
-                                                                      << "dbx")))));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x" << BSON("$ref"
-                                                       << "coll"
-                                                       << "$id" << oid << "$db"
-                                                       << "db"))));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x" << BSON("$ref"
-                                                       << "colly"
-                                                       << "$id" << oidy << "$db"
-                                                       << "db"))));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x" << BSON_ARRAY(BSON("$ref"
-                                                                  << "coll"
-                                                                  << "$id" << oid << "$db"
-                                                                  << "db")))));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x" << BSON_ARRAY(BSON("$ref"
-                                                                  << "colly"
-                                                                  << "$id" << oidy << "$db"
-                                                                  << "db")))));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x" << BSON_ARRAY(BSON("$ref"
-                                                                  << "collx"
-                                                                  << "$id" << oidx << "$db"
-                                                                  << "db")
-                                                             << BSON("$ref"
-                                                                     << "coll"
-                                                                     << "$id" << oid << "$db"
-                                                                     << "db")))));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x" << BSON_ARRAY(BSON("$ref"
-                                                                  << "collx"
-                                                                  << "$id" << oidx << "$db"
-                                                                  << "db")
-                                                             << BSON("$ref"
-                                                                     << "colly"
-                                                                     << "$id" << oidy << "$db"
-                                                                     << "db")))));
+                                                                      << "db")))));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                      << "colly"
+                                                                      << "$id" << oidy << "$db"
+                                                                      << "db")))));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                      << "collx"
+                                                                      << "$id" << oidx << "$db"
+                                                                      << "db")
+                                                                 << BSON("$ref"
+                                                                         << "coll"
+                                                                         << "$id" << oid << "$db"
+                                                                         << "db")))));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(BSON("$ref"
+                                                                      << "collx"
+                                                                      << "$id" << oidx << "$db"
+                                                                      << "db")
+                                                                 << BSON("$ref"
+                                                                         << "colly"
+                                                                         << "$id" << oidy << "$db"
+                                                                         << "db")))));
 }
 
 TEST(MatchExpressionParserLeafTest, INDBRefWithOptionalField1) {
@@ -718,18 +690,15 @@ TEST(MatchExpressionParserLeafTest, INDBRefWithOptionalField1) {
     ASSERT_OK(result.getStatus());
 
     OID oidx = OID::gen();
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x" << BSON("$ref"
-                                                        << "coll"
-                                                        << "$id" << oidx << "$db"
-                                                        << "db"))));
-    ASSERT(exec::matcher::matchesBSON(
-        result.getValue().get(),
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
+                                                            << "coll"
+                                                            << "$id" << oidx << "$db"
+                                                            << "db"))));
+    ASSERT(result.getValue()->matchesBSON(
         BSON("x" << BSON_ARRAY(BSON("$ref"
                                     << "coll"
                                     << "$id" << oid << "foo" << 12345)))));
-    ASSERT(exec::matcher::matchesBSON(
-        result.getValue().get(),
+    ASSERT(result.getValue()->matchesBSON(
         BSON("x" << BSON_ARRAY(BSON("$ref"
                                     << "collx"
                                     << "$id" << oidx << "foo" << 12345)
@@ -840,13 +809,13 @@ TEST(MatchExpressionParserLeafTest, INRegexStuff) {
                             << "l");
     BSONObj notMatchRegex = BSONObjBuilder().appendRegex("a", "B", "").obj();
 
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), matchFirst));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), matchFirstRegex));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), matchSecond));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), matchSecondRegex));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), matchThird));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), notMatch));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), notMatchRegex));
+    ASSERT(result.getValue()->matchesBSON(matchFirst));
+    ASSERT(result.getValue()->matchesBSON(matchFirstRegex));
+    ASSERT(result.getValue()->matchesBSON(matchSecond));
+    ASSERT(result.getValue()->matchesBSON(matchSecondRegex));
+    ASSERT(result.getValue()->matchesBSON(matchThird));
+    ASSERT(!result.getValue()->matchesBSON(notMatch));
+    ASSERT(!result.getValue()->matchesBSON(notMatchRegex));
 }
 
 TEST(MatchExpressionParserLeafTest, SimpleNIN1) {
@@ -855,9 +824,9 @@ TEST(MatchExpressionParserLeafTest, SimpleNIN1) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 2)));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 3)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 2)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 3)));
 }
 
 TEST(MatchExpressionParserLeafTest, NINNotArray) {
@@ -902,15 +871,12 @@ TEST(MatchExpressionParserLeafTest, Regex1) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "abc")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "ABC")));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x"
-                                            << "AC")));
+    ASSERT(result.getValue()->matchesBSON(BSON("x"
+                                               << "abc")));
+    ASSERT(result.getValue()->matchesBSON(BSON("x"
+                                               << "ABC")));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x"
+                                                << "AC")));
 }
 
 TEST(MatchExpressionParserLeafTest, Regex2) {
@@ -922,15 +888,12 @@ TEST(MatchExpressionParserLeafTest, Regex2) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "abc")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "ABC")));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x"
-                                            << "AC")));
+    ASSERT(result.getValue()->matchesBSON(BSON("x"
+                                               << "abc")));
+    ASSERT(result.getValue()->matchesBSON(BSON("x"
+                                               << "ABC")));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x"
+                                                << "AC")));
 }
 
 TEST(MatchExpressionParserLeafTest, Regex3) {
@@ -942,15 +905,12 @@ TEST(MatchExpressionParserLeafTest, Regex3) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "abc")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "ABC")));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x"
-                                            << "AC")));
+    ASSERT(result.getValue()->matchesBSON(BSON("x"
+                                               << "abc")));
+    ASSERT(result.getValue()->matchesBSON(BSON("x"
+                                               << "ABC")));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x"
+                                                << "AC")));
 }
 
 
@@ -991,10 +951,9 @@ TEST(MatchExpressionParserLeafTest, RegexEmbeddedNULByte) {
     ASSERT_OK(result.getStatus());
 
     const auto value = "a\0b"_sd;
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << value)));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x"
-                                            << "a")));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << value)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x"
+                                                << "a")));
 }
 
 TEST(MatchExpressionParserLeafTest, ExistsYes1) {
@@ -1005,12 +964,10 @@ TEST(MatchExpressionParserLeafTest, ExistsYes1) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "abc")));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("y"
-                                            << "AC")));
+    ASSERT(result.getValue()->matchesBSON(BSON("x"
+                                               << "abc")));
+    ASSERT(!result.getValue()->matchesBSON(BSON("y"
+                                                << "AC")));
 }
 
 TEST(MatchExpressionParserLeafTest, ExistsNO1) {
@@ -1021,12 +978,10 @@ TEST(MatchExpressionParserLeafTest, ExistsNO1) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x"
-                                            << "abc")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("y"
-                                           << "AC")));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x"
+                                                << "abc")));
+    ASSERT(result.getValue()->matchesBSON(BSON("y"
+                                               << "AC")));
 }
 
 TEST(MatchExpressionParserLeafTest, Type1) {
@@ -1035,10 +990,9 @@ TEST(MatchExpressionParserLeafTest, Type1) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "abc")));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 5)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x"
+                                               << "abc")));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5)));
 }
 
 TEST(MatchExpressionParserLeafTest, Type2) {
@@ -1047,8 +1001,8 @@ TEST(MatchExpressionParserLeafTest, Type2) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 5.3)));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 5)));
+    ASSERT(result.getValue()->matchesBSON(BSON("x" << 5.3)));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5)));
 }
 
 TEST(MatchExpressionParserLeafTest, TypeDoubleOperatorFailsToParse) {
@@ -1065,9 +1019,8 @@ TEST(MatchExpressionParserLeafTest, TypeDecimalOperator) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT_FALSE(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 5.3)));
-    ASSERT_TRUE(
-        exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << mongo::Decimal128("1"))));
+    ASSERT_FALSE(result.getValue()->matchesBSON(BSON("x" << 5.3)));
+    ASSERT_TRUE(result.getValue()->matchesBSON(BSON("x" << mongo::Decimal128("1"))));
 }
 
 TEST(MatchExpressionParserLeafTest, TypeNull) {
@@ -1076,11 +1029,11 @@ TEST(MatchExpressionParserLeafTest, TypeNull) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSONObj()));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 5)));
+    ASSERT(!result.getValue()->matchesBSON(BSONObj()));
+    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5)));
     BSONObjBuilder b;
     b.appendNull("x");
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), b.obj()));
+    ASSERT(result.getValue()->matchesBSON(b.obj()));
 }
 
 TEST(MatchExpressionParserLeafTest, TypeBadType) {
@@ -1120,8 +1073,8 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameDouble) {
     ASSERT_FALSE(tmeNumberDouble->typeSet().allNumbers);
     ASSERT_EQ(tmeNumberDouble->typeSet().bsonTypes.size(), 1u);
     ASSERT_TRUE(tmeNumberDouble->typeSet().hasType(BSONType::NumberDouble));
-    ASSERT_TRUE(exec::matcher::matchesBSON(tmeNumberDouble, fromjson("{a: 5.4}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(tmeNumberDouble, fromjson("{a: NumberInt(5)}")));
+    ASSERT_TRUE(tmeNumberDouble->matchesBSON(fromjson("{a: 5.4}")));
+    ASSERT_FALSE(tmeNumberDouble->matchesBSON(fromjson("{a: NumberInt(5)}")));
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringNameNumberDecimal) {
@@ -1134,8 +1087,8 @@ TEST(MatchExpressionParserLeafTest, TypeStringNameNumberDecimal) {
     ASSERT_FALSE(tmeNumberDecimal->typeSet().allNumbers);
     ASSERT_EQ(tmeNumberDecimal->typeSet().bsonTypes.size(), 1u);
     ASSERT_TRUE(tmeNumberDecimal->typeSet().hasType(BSONType::NumberDecimal));
-    ASSERT_TRUE(exec::matcher::matchesBSON(tmeNumberDecimal, BSON("a" << mongo::Decimal128("1"))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(tmeNumberDecimal, fromjson("{a: true}")));
+    ASSERT_TRUE(tmeNumberDecimal->matchesBSON(BSON("a" << mongo::Decimal128("1"))));
+    ASSERT_FALSE(tmeNumberDecimal->matchesBSON(fromjson("{a: true}")));
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameNumberInt) {
@@ -1148,8 +1101,8 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameNumberInt) {
     ASSERT_FALSE(tmeNumberInt->typeSet().allNumbers);
     ASSERT_EQ(tmeNumberInt->typeSet().bsonTypes.size(), 1u);
     ASSERT_TRUE(tmeNumberInt->typeSet().hasType(BSONType::NumberInt));
-    ASSERT_TRUE(exec::matcher::matchesBSON(tmeNumberInt, fromjson("{a: NumberInt(5)}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(tmeNumberInt, fromjson("{a: 5.4}")));
+    ASSERT_TRUE(tmeNumberInt->matchesBSON(fromjson("{a: NumberInt(5)}")));
+    ASSERT_FALSE(tmeNumberInt->matchesBSON(fromjson("{a: 5.4}")));
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameNumberLong) {
@@ -1162,8 +1115,8 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameNumberLong) {
     ASSERT_FALSE(tmeNumberLong->typeSet().allNumbers);
     ASSERT_EQ(tmeNumberLong->typeSet().bsonTypes.size(), 1u);
     ASSERT_TRUE(tmeNumberLong->typeSet().hasType(BSONType::NumberLong));
-    ASSERT_TRUE(exec::matcher::matchesBSON(tmeNumberLong, BSON("a" << -1LL)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(tmeNumberLong, fromjson("{a: true}")));
+    ASSERT_TRUE(tmeNumberLong->matchesBSON(BSON("a" << -1LL)));
+    ASSERT_FALSE(tmeNumberLong->matchesBSON(fromjson("{a: true}")));
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameString) {
@@ -1175,8 +1128,8 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameString) {
     ASSERT_FALSE(tmeString->typeSet().allNumbers);
     ASSERT_EQ(tmeString->typeSet().bsonTypes.size(), 1u);
     ASSERT_TRUE(tmeString->typeSet().hasType(BSONType::String));
-    ASSERT_TRUE(exec::matcher::matchesBSON(tmeString, fromjson("{a: 'hello world'}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(tmeString, fromjson("{a: 5.4}")));
+    ASSERT_TRUE(tmeString->matchesBSON(fromjson("{a: 'hello world'}")));
+    ASSERT_FALSE(tmeString->matchesBSON(fromjson("{a: 5.4}")));
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnamejstOID) {
@@ -1188,9 +1141,8 @@ TEST(MatchExpressionParserLeafTest, TypeStringnamejstOID) {
     ASSERT_FALSE(tmejstOID->typeSet().allNumbers);
     ASSERT_EQ(tmejstOID->typeSet().bsonTypes.size(), 1u);
     ASSERT_TRUE(tmejstOID->typeSet().hasType(BSONType::jstOID));
-    ASSERT_TRUE(exec::matcher::matchesBSON(tmejstOID,
-                                           fromjson("{a: ObjectId('000000000000000000000000')}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(tmejstOID, fromjson("{a: 'hello world'}")));
+    ASSERT_TRUE(tmejstOID->matchesBSON(fromjson("{a: ObjectId('000000000000000000000000')}")));
+    ASSERT_FALSE(tmejstOID->matchesBSON(fromjson("{a: 'hello world'}")));
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnamejstNULL) {
@@ -1203,8 +1155,8 @@ TEST(MatchExpressionParserLeafTest, TypeStringnamejstNULL) {
     ASSERT_FALSE(tmejstNULL->typeSet().allNumbers);
     ASSERT_EQ(tmejstNULL->typeSet().bsonTypes.size(), 1u);
     ASSERT_TRUE(tmejstNULL->typeSet().hasType(BSONType::jstNULL));
-    ASSERT_TRUE(exec::matcher::matchesBSON(tmejstNULL, fromjson("{a: null}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(tmejstNULL, fromjson("{a: true}")));
+    ASSERT_TRUE(tmejstNULL->matchesBSON(fromjson("{a: null}")));
+    ASSERT_FALSE(tmejstNULL->matchesBSON(fromjson("{a: true}")));
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameBool) {
@@ -1216,8 +1168,8 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameBool) {
     ASSERT_FALSE(tmeBool->typeSet().allNumbers);
     ASSERT_EQ(tmeBool->typeSet().bsonTypes.size(), 1u);
     ASSERT_TRUE(tmeBool->typeSet().hasType(BSONType::Bool));
-    ASSERT_TRUE(exec::matcher::matchesBSON(tmeBool, fromjson("{a: true}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(tmeBool, fromjson("{a: null}")));
+    ASSERT_TRUE(tmeBool->matchesBSON(fromjson("{a: true}")));
+    ASSERT_FALSE(tmeBool->matchesBSON(fromjson("{a: null}")));
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameObject) {
@@ -1229,8 +1181,8 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameObject) {
     ASSERT_FALSE(tmeObject->typeSet().allNumbers);
     ASSERT_EQ(tmeObject->typeSet().bsonTypes.size(), 1u);
     ASSERT_TRUE(tmeObject->typeSet().hasType(BSONType::Object));
-    ASSERT_TRUE(exec::matcher::matchesBSON(tmeObject, fromjson("{a: {}}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(tmeObject, fromjson("{a: []}")));
+    ASSERT_TRUE(tmeObject->matchesBSON(fromjson("{a: {}}")));
+    ASSERT_FALSE(tmeObject->matchesBSON(fromjson("{a: []}")));
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameArray) {
@@ -1242,8 +1194,8 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameArray) {
     ASSERT_FALSE(tmeArray->typeSet().allNumbers);
     ASSERT_EQ(tmeArray->typeSet().bsonTypes.size(), 1u);
     ASSERT_TRUE(tmeArray->typeSet().hasType(BSONType::Array));
-    ASSERT_TRUE(exec::matcher::matchesBSON(tmeArray, fromjson("{a: [[]]}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(tmeArray, fromjson("{a: {}}")));
+    ASSERT_TRUE(tmeArray->matchesBSON(fromjson("{a: [[]]}")));
+    ASSERT_FALSE(tmeArray->matchesBSON(fromjson("{a: {}}")));
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameNumber) {
@@ -1254,10 +1206,10 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameNumber) {
     TypeMatchExpression* tmeNumber = static_cast<TypeMatchExpression*>(typeNumber.getValue().get());
     ASSERT_TRUE(tmeNumber->typeSet().allNumbers);
     ASSERT_EQ(tmeNumber->typeSet().bsonTypes.size(), 0u);
-    ASSERT_TRUE(exec::matcher::matchesBSON(tmeNumber, fromjson("{a: 5.4}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(tmeNumber, fromjson("{a: NumberInt(5)}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(tmeNumber, BSON("a" << -1LL)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(tmeNumber, fromjson("{a: ''}")));
+    ASSERT_TRUE(tmeNumber->matchesBSON(fromjson("{a: 5.4}")));
+    ASSERT_TRUE(tmeNumber->matchesBSON(fromjson("{a: NumberInt(5)}")));
+    ASSERT_TRUE(tmeNumber->matchesBSON(BSON("a" << -1LL)));
+    ASSERT_FALSE(tmeNumber->matchesBSON(fromjson("{a: ''}")));
 }
 
 TEST(MatchExpressionParserLeafTest, CanParseArrayOfTypes) {

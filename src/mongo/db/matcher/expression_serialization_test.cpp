@@ -53,7 +53,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_leaf.h"
@@ -1245,7 +1244,7 @@ TEST(SerializeBasic, ExpressionNotWithDirectPathExpSerializesCorrectly) {
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), originalBSON);
 
     auto obj = fromjson("{a: 2}");
-    ASSERT_EQ(exec::matcher::matchesBSON(notExpression.get(), obj), reserialized.matches(obj));
+    ASSERT_EQ(notExpression->matchesBSON(obj), reserialized.matches(obj));
 }
 
 TEST(SerializeBasic, ExpressionNotNotDirectlySerializesCorrectly) {
@@ -1267,7 +1266,7 @@ TEST(SerializeBasic, ExpressionNotNotDirectlySerializesCorrectly) {
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$nor: [{a: {$not: {$eq: 2}}}]}"));
 
     auto obj = fromjson("{a: 2}");
-    ASSERT_EQ(exec::matcher::matchesBSON(topNot.get(), obj), reserialized.matches(obj));
+    ASSERT_EQ(topNot->matchesBSON(obj), reserialized.matches(obj));
 }
 
 TEST(SerializeBasic, ExpressionNotWithoutPathChildrenSerializesCorrectly) {
@@ -1322,10 +1321,10 @@ TEST(SerializeBasic, ExpressionNotWithoutPathChildrenSerializesCorrectly) {
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{foo: 'abc'}");
-    ASSERT_EQ(exec::matcher::matchesBSON(expression.get(), obj), reserialized.matches(obj));
+    ASSERT_EQ(expression->matchesBSON(obj), reserialized.matches(obj));
 
     obj = fromjson("{foo: 'acbdf'}");
-    ASSERT_EQ(exec::matcher::matchesBSON(expression.get(), obj), reserialized.matches(obj));
+    ASSERT_EQ(expression->matchesBSON(obj), reserialized.matches(obj));
 }
 
 TEST(SerializeBasic, ExpressionJsonSchemaWithDollarFieldSerializesCorrectly) {
@@ -1354,10 +1353,10 @@ TEST(SerializeBasic, ExpressionJsonSchemaWithDollarFieldSerializesCorrectly) {
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{$stdDevPop: [1, 2, 3]}");
-    ASSERT_EQ(exec::matcher::matchesBSON(expression.get(), obj), reserialized.matches(obj));
+    ASSERT_EQ(expression->matchesBSON(obj), reserialized.matches(obj));
 
     obj = fromjson("{$stdDevPop: []}");
-    ASSERT_EQ(exec::matcher::matchesBSON(expression.get(), obj), reserialized.matches(obj));
+    ASSERT_EQ(expression->matchesBSON(obj), reserialized.matches(obj));
 }
 
 TEST(SerializeBasic, ExpressionJsonSchemaWithKeywordDollarFieldSerializesCorrectly) {
@@ -1384,10 +1383,10 @@ TEST(SerializeBasic, ExpressionJsonSchemaWithKeywordDollarFieldSerializesCorrect
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{$or: 'abcd'}");
-    ASSERT_EQ(exec::matcher::matchesBSON(expression.get(), obj), reserialized.matches(obj));
+    ASSERT_EQ(expression->matchesBSON(obj), reserialized.matches(obj));
 
     obj = fromjson("{$or: ''}");
-    ASSERT_EQ(exec::matcher::matchesBSON(expression.get(), obj), reserialized.matches(obj));
+    ASSERT_EQ(expression->matchesBSON(obj), reserialized.matches(obj));
 }
 
 TEST(SerializeBasic, ExpressionNorSerializesCorrectly) {

@@ -57,7 +57,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/exec/mock_stage.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
@@ -177,8 +176,7 @@ public:
 
             if (state == PlanStage::ADVANCED) {
                 auto member = ws.get(id);
-                ASSERT(exec::matcher::matchesBSON(cq->getPrimaryMatchExpression(),
-                                                  member->doc.value().toBson()));
+                ASSERT(cq->getPrimaryMatchExpression()->matchesBSON(member->doc.value().toBson()));
                 numResults++;
             }
         }

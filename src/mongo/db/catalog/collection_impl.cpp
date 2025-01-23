@@ -63,7 +63,6 @@
 #include "mongo/db/collection_crud/capped_visibility.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -647,7 +646,7 @@ std::pair<Collection::SchemaValidationResult, Status> CollectionImpl::checkValid
     }
 
     try {
-        if (exec::matcher::matchesBSON(validatorMatchExpr, document))
+        if (validatorMatchExpr->matchesBSON(document))
             return {SchemaValidationResult::kPass, Status::OK()};
     } catch (DBException&) {
     };

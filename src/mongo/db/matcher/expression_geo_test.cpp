@@ -35,7 +35,6 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -51,11 +50,11 @@ TEST(ExpressionGeoTest, Geo1) {
 
     GeoMatchExpression ge("a"_sd, gq.release(), query);
 
-    ASSERT(!exec::matcher::matchesBSON(&ge, fromjson("{a: [3,4]}")));
-    ASSERT(exec::matcher::matchesBSON(&ge, fromjson("{a: [4,4]}")));
-    ASSERT(exec::matcher::matchesBSON(&ge, fromjson("{a: [5,5]}")));
-    ASSERT(exec::matcher::matchesBSON(&ge, fromjson("{a: [5,5.1]}")));
-    ASSERT(exec::matcher::matchesBSON(&ge, fromjson("{a: {x: 5, y:5.1}}")));
+    ASSERT(!ge.matchesBSON(fromjson("{a: [3,4]}")));
+    ASSERT(ge.matchesBSON(fromjson("{a: [4,4]}")));
+    ASSERT(ge.matchesBSON(fromjson("{a: [5,5]}")));
+    ASSERT(ge.matchesBSON(fromjson("{a: [5,5.1]}")));
+    ASSERT(ge.matchesBSON(fromjson("{a: {x: 5, y:5.1}}")));
 }
 
 TEST(ExpressionGeoTest, GeoNear1) {
