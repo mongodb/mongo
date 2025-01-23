@@ -865,5 +865,101 @@ DEATH_TEST_REGEX(WiredTigerConfigParserTest,
     parser.isTableLoggingSettingValid();
 }
 
+TEST_F(WiredTigerUtilTest, GetLastErrorFromSuccessfulCall) {
+    WiredTigerEventHandler eventHandler;
+    const std::string connection_cfg = "json_output=[error,message],verbose=[compact]";
+
+    WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
+    WiredTigerSession* wtSession = ru->getSession();
+
+    const std::string uri = "table:get_last_err_on_success";
+
+    ASSERT_OK(wtRCToStatus(wtSession->create(uri.c_str(), nullptr), *wtSession));
+
+    WT_CURSOR* cursor;
+    ASSERT_EQUALS(0, wtSession->open_cursor(uri.c_str(), nullptr, nullptr, &cursor));
+
+    // The previous session api call to open the cursor was successful, so we should expect no
+    // error code and a WT_NONE sub-level error code
+    int err, sub_level_err;
+    const char* err_msg;
+    wtSession->get_last_error(&err, &sub_level_err, &err_msg);
+
+    ASSERT_EQUALS(0, err);
+    ASSERT_EQUALS(WT_NONE, sub_level_err);
+    ASSERT_EQUALS("last API call was successful"_sd, StringData(err_msg));
+}
+
+TEST_F(WiredTigerUtilTest, GetLastErrorFromFailedCall) {
+    WiredTigerEventHandler eventHandler;
+    const std::string connection_cfg = "json_output=[error,message],verbose=[compact]";
+
+    WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
+    WiredTigerSession* wtSession = ru->getSession();
+
+    const std::string uri = "table:get_last_err_from_failed_call";
+
+    ASSERT_OK(wtRCToStatus(wtSession->create(uri.c_str(), nullptr), *wtSession));
+
+    WT_CURSOR* cursor;
+    ASSERT_NOT_EQUALS(0, wtSession->open_cursor(nullptr, nullptr, nullptr, &cursor));
+
+    int err, sub_level_err;
+    const char* err_msg;
+    wtSession->get_last_error(&err, &sub_level_err, &err_msg);
+
+    // The last session api call to open the cursor failed, but no sub-level error code is defined
+    // for this case. Thus we should get EINVAL and WT_NONE as the error code, and sub-level error
+    // code respectively.
+    ASSERT_EQUALS(EINVAL, err);
+    ASSERT_EQUALS(WT_NONE, sub_level_err);
+    ASSERT_EQUALS("should be passed either a URI or a cursor to duplicate, but not both"_sd,
+                  StringData(err_msg));
+}
+
+TEST_F(WiredTigerUtilTest, GetLastErrorFromLatestAPICall) {
+    WiredTigerEventHandler eventHandler;
+    const std::string connection_cfg = "json_output=[error,message],verbose=[compact]";
+
+    WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
+    WiredTigerSession* wtSession = ru->getSession();
+
+    const std::string uri = "table:get_last_err_from_last_call";
+
+    ASSERT_OK(wtRCToStatus(wtSession->create(uri.c_str(), nullptr), *wtSession));
+
+    // The last session API call to create the table was successful, so we should expect no
+    // error code and a WT_NONE sub-level error code.
+    int err, sub_level_err;
+    const char* err_msg;
+    wtSession->get_last_error(&err, &sub_level_err, &err_msg);
+
+    ASSERT_EQUALS(0, err);
+    ASSERT_EQUALS(WT_NONE, sub_level_err);
+    ASSERT_EQUALS("last API call was successful"_sd, StringData(err_msg));
+
+    WT_CURSOR* cursor;
+    ASSERT_NOT_EQUALS(0, wtSession->open_cursor(nullptr, nullptr, nullptr, &cursor));
+
+    // Now the last API call has failed, so we should make sure we get the right errors.
+    wtSession->get_last_error(&err, &sub_level_err, &err_msg);
+    ASSERT_EQUALS(EINVAL, err);
+    ASSERT_EQUALS(WT_NONE, sub_level_err);
+    ASSERT_EQUALS("should be passed either a URI or a cursor to duplicate, but not both"_sd,
+                  StringData(err_msg));
+
+    ASSERT_EQUALS(0, wtSession->open_cursor(uri.c_str(), nullptr, nullptr, &cursor));
+
+    // Now the last API call has succeeded, so we should make sure we get no error code and a
+    // WT_NONE sub-level error code.
+    wtSession->get_last_error(&err, &sub_level_err, &err_msg);
+    ASSERT_EQUALS(0, err);
+    ASSERT_EQUALS(WT_NONE, sub_level_err);
+    ASSERT_EQUALS("last API call was successful"_sd, StringData(err_msg));
+}
+
 }  // namespace
 }  // namespace mongo
