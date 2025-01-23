@@ -534,7 +534,42 @@ jsTestOptions = function() {
     return _jsTestOptions;
 };
 
-jsTestLog = function(msg) {
+/**
+ * Formats a log and prints it to the console. Depending on the format, it can either be in plain
+ * text, or as a stringified JSON.
+ *
+ * @param {string} msg - The message to be printed.
+ * @param {object} args
+ * @param {object} args.attr - An object used to declare extra logging params.
+ * @param {number} args.id - An unique identified to help with filtering logs.
+ * @param {("i"|"d"|"w"|"e")} severity - An unique identified to help with filtering logs.
+ */
+jsTestLog = function(
+    msg,
+    args = {},
+    severity = "i",
+) {
+    if (TestData?.logFormat === "json") {
+        // New logging format, enabled through the --logFormat resmoke flag.
+        const {attr, id} = args;
+        let new_msg = {
+            t: new Date().toISOString(),
+            "s": severity,
+            "c": "js_test",
+            "ctx": TestData?.testName || "-",  // context (e.g., TestData.testName)
+            "msg": msg,                        // message body
+        };
+        if (attr && typeof attr === "object" && Object.keys(attr).length > 0) {
+            new_msg["attr"] = attr;
+        }
+        if (id && typeof id === "number") {
+            new_msg["id"] = id;
+        }
+        print(JSON.stringify(new_msg));
+        return;
+    }
+
+    // Legacy logging format.
     if (typeof msg === "object") {
         msg = tojson(msg);
     }

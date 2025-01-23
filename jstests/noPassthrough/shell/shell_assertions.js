@@ -1,7 +1,6 @@
 /**
  * Tests for the assertion functions in mongo/shell/assert.js.
  */
-
 const tests = [];
 
 const kDefaultTimeoutMS = 10 * 1000;
@@ -762,6 +761,52 @@ tests.push(function assertCallsHangAnalyzer() {
                       () => false, 'assert message', kDefaultRetryAttempts, kSmallRetryIntervalMS));
     runAssertTest(() => assert.time(
                       () => sleep(5), 'assert message', 1 /* we certainly take less than this */));
+});
+
+tests.push(function assertJsTestLogJsonFormat() {
+    const oldTestData = TestData;
+    const printOriginal = print;
+    // In case an exception is thrown, revert the original print and TestData states.
+    try {
+        // Override the TestData object.
+        TestData = {logFormat: "json", testName: "shell_assertions"};
+        // Override the print function.
+        print = msg => {
+            print.console.push(msg);
+        };
+        print.console = [];
+        // Assert the new format prints valid JSON.
+        jsTestLog("test message", {attr: {key1: "val1", key2: "val2"}, id: 87});
+        const expectedResult = {
+            "s": "i",
+            "c": "js_test",
+            "ctx": "shell_assertions",
+            "msg": "test message",
+            "attr": {key1: "val1", key2: "val2"},
+            "id": 87,
+        };
+        // Assert we only print once.
+        assert.eq(1, print.console.length);
+        let actualResult = JSON.parse(print.console[0]);
+        // Delete the timestamp field.
+        delete actualResult["t"];
+        assert.docEq(expectedResult, actualResult, "expected a different log format");
+
+        print.console = [];
+        // Assert the legacy format works as before.
+        TestData.logFormat = "legacy";
+        jsTestLog("test message legacy", {attr: {key1: "val1", key2: "val2"}, id: 87});
+        assert.eq(1, print.console.length);
+        const expectedLegacyResult =
+            ["----", "test message legacy", "----"].map(s => `[jsTest] ${s}`);
+        assert.eq(`\n\n${expectedLegacyResult.join("\n")}\n\n`,
+                  print.console,
+                  "expected a different log format when legacy mode is on");
+    } finally {
+        // Reset state.
+        print = printOriginal;
+        TestData = oldTestData;
+    }
 });
 
 /* main */
