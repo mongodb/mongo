@@ -92,7 +92,7 @@ public:
                                                      Status status,
                                                      const BSONObj& obj,
                                                      const boost::optional<RecordId>& loc)>;
-    using KeyHandlerFn = unique_function<Status(const key_string::Value&)>;
+    using KeyHandlerFn = unique_function<Status(const key_string::View&)>;
     using RecordIdHandlerFn = unique_function<Status(const RecordId&)>;
 
     IndexAccessMethod() = default;

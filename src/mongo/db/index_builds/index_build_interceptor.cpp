@@ -132,7 +132,7 @@ void IndexBuildInterceptor::keepTemporaryTables() {
 
 Status IndexBuildInterceptor::recordDuplicateKey(OperationContext* opCtx,
                                                  const IndexCatalogEntry* indexCatalogEntry,
-                                                 const key_string::Value& key) const {
+                                                 const key_string::View& key) const {
     invariant(indexCatalogEntry->descriptor()->unique());
     return _duplicateKeyTracker->recordKey(opCtx, indexCatalogEntry, key);
 }
@@ -360,12 +360,11 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
     // Sorted index types may choose to disallow duplicates (enforcing an unique index). Columnar
     // indexes are not sorted and therefore cannot enforce uniqueness constraints. Only sorted
     // indexes will use this lambda passed through the IndexAccessMethod interface.
-    IndexAccessMethod::KeyHandlerFn onDuplicateKeyFn =
-        [=, this](const key_string::Value& duplicateKey) {
-            return trackDups == TrackDuplicates::kTrack
-                ? recordDuplicateKey(opCtx, indexCatalogEntry, duplicateKey)
-                : Status::OK();
-        };
+    auto onDuplicateKeyFn = [=, this](const key_string::View& duplicateKey) {
+        return trackDups == TrackDuplicates::kTrack
+            ? recordDuplicateKey(opCtx, indexCatalogEntry, duplicateKey)
+            : Status::OK();
+    };
 
     return indexCatalogEntry->accessMethod()->applyIndexBuildSideWrite(opCtx,
                                                                        coll,

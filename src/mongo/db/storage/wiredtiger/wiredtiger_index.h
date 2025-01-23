@@ -171,7 +171,7 @@ public:
                            BSONObjBuilder* output,
                            double scale) const override;
     boost::optional<DuplicateKey> dupKeyCheck(OperationContext* opCtx,
-                                              const SortedDataKeyValueView& keyString) override;
+                                              const key_string::View& keyString) override;
 
     bool isEmpty(OperationContext* opCtx) override;
 
@@ -213,7 +213,7 @@ public:
     virtual bool isDup(OperationContext* opCtx,
                        WT_CURSOR* c,
                        WiredTigerSession* session,
-                       const SortedDataKeyValueView& keyString) = 0;
+                       const key_string::View& keyString) = 0;
     virtual bool unique() const = 0;
     virtual bool isTimestampSafeUniqueIdx() const = 0;
 
@@ -250,7 +250,7 @@ protected:
     boost::optional<RecordId> _keyExists(OperationContext* opCtx,
                                          WT_CURSOR* c,
                                          WiredTigerSession* session,
-                                         const SortedDataKeyValueView& keyString);
+                                         const key_string::View& keyString);
 
     /**
      * Sets the upper bound on the passed in cursor to be the maximum value of the KeyString prefix.
@@ -258,7 +258,7 @@ protected:
      */
     void _setUpperBoundForKeyExists(WT_CURSOR* c,
                                     WiredTigerSession* session,
-                                    const SortedDataKeyValueView& keyString);
+                                    const key_string::View& keyString);
 
     /**
      * Returns a DuplicateKey error if the prefix key exists in the index with a different RecordId.
@@ -269,7 +269,7 @@ protected:
         OperationContext* opCtx,
         WT_CURSOR* c,
         WiredTigerSession* session,
-        const key_string::Value& keyString,
+        const key_string::View& keyString,
         IncludeDuplicateRecordId includeDuplicateRecordId = IncludeDuplicateRecordId::kOff);
 
     /*
@@ -327,7 +327,7 @@ public:
     bool isDup(OperationContext* opCtx,
                WT_CURSOR* c,
                WiredTigerSession* session,
-               const SortedDataKeyValueView& keyString) override;
+               const key_string::View& keyString) override;
 
 
 protected:
@@ -390,7 +390,7 @@ public:
     bool isDup(OperationContext* opCtx,
                WT_CURSOR* c,
                WiredTigerSession* session,
-               const SortedDataKeyValueView& keyString) override {
+               const key_string::View& keyString) override {
         // Unimplemented by _id indexes for lack of need
         MONGO_UNREACHABLE;
     }
@@ -445,7 +445,7 @@ public:
     bool isDup(OperationContext* opCtx,
                WT_CURSOR* c,
                WiredTigerSession* session,
-               const SortedDataKeyValueView& keyString) override {
+               const key_string::View& keyString) override {
         // Unimplemented by non-unique indexes
         MONGO_UNREACHABLE;
     }

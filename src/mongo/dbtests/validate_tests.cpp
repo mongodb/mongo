@@ -2137,7 +2137,7 @@ public:
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &entry, &interceptor](const key_string::Value& duplicateKey) {
+                        [this, &entry, &interceptor](const key_string::View& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
@@ -2387,7 +2387,7 @@ public:
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &entry, &interceptor](const key_string::Value& duplicateKey) {
+                        [this, &entry, &interceptor](const key_string::View& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
@@ -2692,7 +2692,7 @@ public:
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &entry, &interceptor](const key_string::Value& duplicateKey) {
+                        [this, &entry, &interceptor](const key_string::View& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
@@ -2739,7 +2739,7 @@ public:
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &entry, &interceptor](const key_string::Value& duplicateKey) {
+                        [this, &entry, &interceptor](const key_string::View& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
@@ -3305,7 +3305,7 @@ public:
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &entry, &interceptor](const key_string::Value& duplicateKey) {
+                        [this, &entry, &interceptor](const key_string::View& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
@@ -3352,7 +3352,7 @@ public:
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &entry, &interceptor](const key_string::Value& duplicateKey) {
+                        [this, &entry, &interceptor](const key_string::View& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
@@ -4528,7 +4528,7 @@ public:
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &entry, &interceptor](const key_string::Value& duplicateKey) {
+                        [this, &entry, &interceptor](const key_string::View& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);

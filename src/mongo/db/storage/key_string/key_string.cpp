@@ -3042,26 +3042,6 @@ void appendToBSONArray(const char* buf, int len, BSONArrayBuilder* builder, Vers
     toBsonValue(ctype, &reader, &typeBitsReader, inverted, version, builder, depth);
 }
 
-void Value::serializeWithoutRecordIdLong(BufBuilder& buf) const {
-    dassert(decodeRecordIdLongAtEnd(getView()).isValid());
-    serializeWithoutRecordId(buf);
-}
-
-void Value::serializeWithoutRecordIdStr(BufBuilder& buf) const {
-    dassert(decodeRecordIdStrAtEnd(getView()).isValid());
-    serializeWithoutRecordId(buf);
-}
-
-void Value::serializeWithoutRecordId(BufBuilder& buf) const {
-    const int32_t sizeWithoutRecordId = getSizeWithoutRecordId();
-    buf.appendNum(sizeWithoutRecordId);                 // Serialize size of KeyString
-    buf.appendBuf(_buffer.get(), sizeWithoutRecordId);  // Serialize KeyString
-    buf.appendBuf(_buffer.get() + _ksSize, _buffer.size() - _ksSize);  // Serialize TypeBits
-    if (_buffer.size() == static_cast<size_t>(_ksSize)) {  // Serialize AllZeroes Typebits
-        buf.appendChar(0);
-    }
-}
-
 Value Value::deserialize(BufReader& buf,
                          key_string::Version version,
                          boost::optional<KeyFormat> ridFormat) {
@@ -3085,6 +3065,26 @@ Value Value::deserialize(BufReader& buf,
             sizeOfKeystring,
             static_cast<int32_t>(sizeOfKeystring - withoutRid.size()),
             SharedBufferFragment(newBuf.release(), newBufLen)};
+}
+
+View View::deserialize(BufReader& reader,
+                       key_string::Version version,
+                       boost::optional<KeyFormat> ridFormat) {
+    auto ksSize = reader.read<LittleEndian<int32_t>>();
+    auto ksData = static_cast<const char*>(reader.skip(ksSize));
+
+    uint32_t ridSize = 0;
+    if (ridFormat) {
+        ridSize = ksSize - withoutRecordIdAtEnd(std::span(ksData, ksSize), *ridFormat).size();
+    }
+
+    uint32_t tbSize = 0;
+    auto tbStart = reader.remaining();
+    if (!TypeBits::fromBuffer(version, &reader).isAllZeros()) {
+        tbSize = tbStart - reader.remaining();
+    }
+
+    return View(version, std::span(ksData, ksSize + tbSize), ridSize, tbSize);
 }
 
 size_t Value::getApproximateSize() const {

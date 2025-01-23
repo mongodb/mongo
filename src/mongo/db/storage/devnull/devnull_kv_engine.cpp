@@ -328,7 +328,7 @@ public:
                  bool dupsAllowed) override {}
 
     boost::optional<DuplicateKey> dupKeyCheck(OperationContext* opCtx,
-                                              const SortedDataKeyValueView& keyString) override {
+                                              const key_string::View& keyString) override {
         return boost::none;
     }
 

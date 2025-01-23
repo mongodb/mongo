@@ -603,15 +603,6 @@ public:
         }
     }
 
-    /**
-     * Serializes this Value, excluding the RecordId, into a storable format with TypeBits
-     * information. The serialized format takes the following form:
-     *   [keystring size][keystring encoding][typebits encoding]
-     */
-    void serializeWithoutRecordIdLong(BufBuilder& buf) const;
-    void serializeWithoutRecordIdStr(BufBuilder& buf) const;
-    void serializeWithoutRecordId(BufBuilder& buf) const;
-
     // Deserialize the Value from a serialized format.
     // The caller must pass an ridFormat the indicates the RecordId encoding format, or boost::none
     // if not present.
@@ -753,6 +744,35 @@ public:
      * Returns a hex encoding of this key.
      */
     std::string toString() const;
+
+    /**
+     * Serializes this keystring, excluding the RecordId, into a storable format with TypeBits
+     * information. The serialized format takes the following form:
+     *     [keystring size][keystring encoding][typebits encoding]
+     */
+    template <typename Builder>
+    void serializeWithoutRecordId(Builder& buf) const {
+        auto keyView = getKeyView();
+        auto tbView = getTypeBitsView();
+        buf.appendNum(static_cast<int32_t>(keyView.size()));
+        buf.appendBuf(keyView.data(), keyView.size());
+        buf.appendBuf(tbView.data(), tbView.size());
+        if (tbView.empty()) {
+            buf.appendChar(0);
+        }
+    }
+
+    /**
+     * Deserialize a keystring from the serialized format produced by
+     * serialize() or serializeWithoutRecordId(). The given ridFormat must match
+     * the one used when serializing, or boost::none if
+     * serializeWithoutRecordId() was used.
+     *
+     * The returned View points into the buffer backing the given BufReader.
+     */
+    static View deserialize(BufReader& buf,
+                            key_string::Version version,
+                            boost::optional<KeyFormat> ridFormat);
 
 private:
     const char* _buffer = nullptr;

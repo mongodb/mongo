@@ -389,7 +389,7 @@ bool WiredTigerIndex::appendCustomStats(OperationContext* opCtx,
 }
 
 boost::optional<SortedDataInterface::DuplicateKey> WiredTigerIndex::dupKeyCheck(
-    OperationContext* opCtx, const SortedDataKeyValueView& key) {
+    OperationContext* opCtx, const key_string::View& key) {
     invariant(unique());
 
     // Allow overwrite because it's faster and this is a read-only cursor.
@@ -402,8 +402,7 @@ boost::optional<SortedDataInterface::DuplicateKey> WiredTigerIndex::dupKeyCheck(
     WT_CURSOR* c = curwrap.get();
 
     if (isDup(opCtx, c, curwrap.getSession(), key)) {
-        return DuplicateKey{key_string::toBson(
-            key.getKeyStringOriginalView(), _ordering, key.getTypeBitsView(), key.getVersion())};
+        return DuplicateKey{key_string::toBson(key, _ordering)};
     }
     return boost::none;
 }
@@ -511,7 +510,7 @@ StatusWith<int64_t> WiredTigerIndex::compact(OperationContext* opCtx,
 boost::optional<RecordId> WiredTigerIndex::_keyExists(OperationContext* opCtx,
                                                       WT_CURSOR* c,
                                                       WiredTigerSession* session,
-                                                      const SortedDataKeyValueView& keyString) {
+                                                      const key_string::View& keyString) {
     // Given a KeyString KS with RecordId RID appended to the end, set the:
     // 1. Lower bound (inclusive) to be KS without RID
     // 2. Upper bound (inclusive) to be
@@ -520,8 +519,7 @@ boost::optional<RecordId> WiredTigerIndex::_keyExists(OperationContext* opCtx,
     //
     // For example, KS = "key" and RID = "ABC123". The lower bound is "key" and the upper bound is
     // "keyFF00".
-    auto keyStringPrefix = keyString.getKeyStringWithoutRecordIdView();
-    setKey(c, keyStringPrefix);
+    setKey(c, keyString.getKeyView());
     invariantWTOK(c->bound(c, lowerInclusiveBoundConfig.getConfig(session)), c->session);
     _setUpperBoundForKeyExists(c, session, keyString);
     ON_BLOCK_EXIT([c, session] {
@@ -541,7 +539,7 @@ boost::optional<RecordId> WiredTigerIndex::_keyExists(OperationContext* opCtx,
 
     WiredTigerItem key;
     getKey(c, key.get(), &metricsCollector);
-    if (key.size() == keyString.getKeyStringWithoutRecordIdView().size()) {
+    if (key.size() == keyString.getKeyView().size()) {
         invariant(_rsKeyFormat == KeyFormat::Long);
 
         // The prefix key is in the index without a RecordId appended to the key, which means that
@@ -557,9 +555,9 @@ boost::optional<RecordId> WiredTigerIndex::_keyExists(OperationContext* opCtx,
 
 void WiredTigerIndex::_setUpperBoundForKeyExists(WT_CURSOR* c,
                                                  WiredTigerSession* session,
-                                                 const SortedDataKeyValueView& keyString) {
+                                                 const key_string::View& keyString) {
     key_string::Builder builder(keyString.getVersion(), _ordering);
-    builder.resetFromBuffer(keyString.getKeyStringWithoutRecordIdView());
+    builder.resetFromBuffer(keyString.getKeyView());
     builder.appendRecordId(record_id_helpers::maxRecordId(_rsKeyFormat));
 
     setKey(c, builder.getView());
@@ -570,14 +568,12 @@ std::variant<bool, SortedDataInterface::DuplicateKey> WiredTigerIndex::_checkDup
     OperationContext* opCtx,
     WT_CURSOR* c,
     WiredTigerSession* session,
-    const key_string::Value& keyString,
+    const key_string::View& keyString,
     IncludeDuplicateRecordId includeDuplicateRecordId) {
     int ret;
-    auto keyStringView = SortedDataKeyValueView::fromValue(keyString);
     // A prefix key is KeyString of index key. It is the component of the index entry that
     // should be unique.
-    auto prefix = keyStringView.getKeyStringWithoutRecordIdView();
-
+    auto prefix = keyString.getKeyView();
     // First phase inserts the prefix key to prohibit concurrent insertions of same key
     setKey(c, prefix);
     setValue(c, {});
@@ -587,13 +583,14 @@ std::variant<bool, SortedDataInterface::DuplicateKey> WiredTigerIndex::_checkDup
     // An entry with prefix key already exists. This can happen only during rolling upgrade when
     // both timestamp unsafe and timestamp safe index format keys could be present.
     if (ret == WT_DUPLICATE_KEY) {
-        return DuplicateKey{key_string::toBson(prefix, _ordering, keyString.getTypeBits())};
+        return DuplicateKey{key_string::toBson(
+            prefix, _ordering, keyString.getTypeBitsView(), keyString.getVersion())};
     }
     invariantWTOK(ret,
                   c->session,
                   fmt::format("WiredTigerIndex::_insert: insert: {}; uri: {}", _indexName, _uri));
 
-    // Remove the prefix key, our entry will continue to conflict with any concurrent
+    // Remove the prefix key. Our entry will continue to conflict with any concurrent
     // transactions, but will not conflict with any transaction that begins after this
     // operation commits.
     setKey(c, prefix);
@@ -606,10 +603,10 @@ std::variant<bool, SortedDataInterface::DuplicateKey> WiredTigerIndex::_checkDup
     // The second phase looks for the key to avoid insertion of a duplicate key. The range bounded
     // cursor API restricts the key range we search within. This makes the search significantly
     // faster.
-    auto rid = _keyExists(opCtx, c, session, keyStringView);
+    auto rid = _keyExists(opCtx, c, session, keyString);
     if (!rid) {
         return false;
-    } else if (*rid == key_string::decodeRecordIdAtEnd(keyString.getView(), _rsKeyFormat)) {
+    } else if (*rid == key_string::decodeRecordIdAtEnd(keyString.getRecordIdView(), _rsKeyFormat)) {
         return true;
     }
 
@@ -618,8 +615,9 @@ std::variant<bool, SortedDataInterface::DuplicateKey> WiredTigerIndex::_checkDup
         foundRecordId = *rid;
     }
 
-    return DuplicateKey{key_string::toBson(prefix, _ordering, keyString.getTypeBits()),
-                        std::move(foundRecordId)};
+    return DuplicateKey{
+        key_string::toBson(prefix, _ordering, keyString.getTypeBitsView(), keyString.getVersion()),
+        std::move(foundRecordId)};
 }
 
 void WiredTigerIndex::_repairDataFormatVersion(OperationContext* opCtx,
@@ -1399,8 +1397,8 @@ bool WiredTigerIndexUnique::isTimestampSafeUniqueIdx() const {
 bool WiredTigerIndexUnique::isDup(OperationContext* opCtx,
                                   WT_CURSOR* c,
                                   WiredTigerSession* session,
-                                  const SortedDataKeyValueView& prefixKey) {
-    std::span prefix = prefixKey.getKeyStringWithoutRecordIdView();
+                                  const key_string::View& prefixKey) {
+    std::span prefix = prefixKey.getKeyView();
 
     // This procedure to determine duplicates is exclusive for timestamp safe unique indexes.
     // Check if a prefix key already exists in the index. When keyExists() returns true, the cursor

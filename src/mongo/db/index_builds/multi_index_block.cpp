@@ -906,22 +906,22 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                 entry,
                 dupsAllowed,
                 kYieldIterations,
-                [&](const key_string::Value& duplicateKey) {
+                [&](const key_string::View& duplicateKey) {
                     // Do not record duplicates when explicitly ignored. This may be the case on
                     // secondaries.
+                    if (!dupsAllowed || onDuplicateRecord || _ignoreUnique ||
+                        !entry->indexBuildInterceptor()) {
+                        return Status::OK();
+                    }
                     return writeConflictRetry(
                         opCtx, "recordingDuplicateKey", entry->getNSSFromCatalog(opCtx), [&] {
-                            if (dupsAllowed && !onDuplicateRecord && !_ignoreUnique &&
-                                entry->indexBuildInterceptor()) {
-                                WriteUnitOfWork wuow(opCtx);
-                                Status status = entry->indexBuildInterceptor()->recordDuplicateKey(
-                                    opCtx, entry, duplicateKey);
-                                if (!status.isOK()) {
-                                    return status;
-                                }
+                            WriteUnitOfWork wuow(opCtx);
+                            Status status = entry->indexBuildInterceptor()->recordDuplicateKey(
+                                opCtx, entry, duplicateKey);
+                            if (status.isOK()) {
                                 wuow.commit();
                             }
-                            return Status::OK();
+                            return status;
                         });
                 },
                 onDuplicateRecord);

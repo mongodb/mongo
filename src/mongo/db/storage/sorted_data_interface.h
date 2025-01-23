@@ -137,7 +137,7 @@ public:
      * @param opCtx the transaction under which this operation takes place
      */
     virtual boost::optional<DuplicateKey> dupKeyCheck(OperationContext* opCtx,
-                                                      const SortedDataKeyValueView& keyString) = 0;
+                                                      const key_string::View& keyString) = 0;
 
     /**
      * Attempt to reduce the storage space used by this index via compaction. Only called if the
@@ -490,19 +490,6 @@ public:
         invariant(rid.size() < std::numeric_limits<int32_t>::max());
         invariant(typeBits.size() < std::numeric_limits<int32_t>::max());
         _ksOriginalSize = isRecordIdAtEndOfKeyString ? (key.size() + rid.size()) : key.size();
-    }
-
-    /**
-     * Construct a SortedDataKeyValueView which points into the given RecordData, which must outlive
-     * this view.
-     */
-    SortedDataKeyValueView(const RecordData& record, key_string::Version keyStringVersion)
-        : _version(keyStringVersion) {
-        BufReader reader(record.data(), record.size());
-        _ksOriginalSize = _ksSize = reader.read<LittleEndian<int32_t>>();
-        _ksData = static_cast<const char*>(reader.skip(_ksSize));
-        _tbSize = reader.remaining();
-        _tbData = static_cast<const char*>(reader.skip(_tbSize));
     }
 
     SortedDataKeyValueView() = default;

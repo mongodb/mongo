@@ -91,7 +91,7 @@ void DuplicateKeyTracker::keepTemporaryTable() {
 
 Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
                                       const IndexCatalogEntry* indexCatalogEntry,
-                                      const key_string::Value& key) {
+                                      const key_string::View& key) {
     invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     LOGV2_DEBUG(20676,
@@ -102,16 +102,8 @@ Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
     // The key_string::Value will be serialized in the format [KeyString][TypeBits]. We need to
     // store the TypeBits for error reporting later on. The RecordId does not need to be stored, so
     // we exclude it from the serialization.
-    BufBuilder builder;
-    if (KeyFormat::Long ==
-        indexCatalogEntry->accessMethod()
-            ->asSortedData()
-            ->getSortedDataInterface()
-            ->rsKeyFormat()) {
-        key.serializeWithoutRecordIdLong(builder);
-    } else {
-        key.serializeWithoutRecordIdStr(builder);
-    }
+    StackBufBuilder builder;
+    key.serializeWithoutRecordId(builder);
 
     auto status =
         _keyConstraintsTable->rs()->insertRecord(opCtx, builder.buf(), builder.len(), Timestamp());
@@ -154,7 +146,8 @@ boost::optional<SortedDataInterface::DuplicateKey> DuplicateKeyTracker::checkCon
     while (record) {
         resolved++;
 
-        SortedDataKeyValueView key(record->data, index->getKeyStringVersion());
+        BufReader reader(record->data.data(), record->data.size());
+        auto key = key_string::View::deserialize(reader, index->getKeyStringVersion(), boost::none);
         if (auto duplicateKey = index->dupKeyCheck(opCtx, key)) {
             return duplicateKey;
         }
