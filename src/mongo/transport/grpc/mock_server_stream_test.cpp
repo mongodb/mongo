@@ -65,9 +65,11 @@ public:
         Base::setUp();
 
         MockStubTestFixtures fixtures;
-        _fixtures = fixtures.makeStreamTestFixtures(
-            Base::getServiceContext()->getFastClockSource()->now() + getTimeout(), _clientMetadata);
         _reactor = std::make_shared<GRPCReactor>();
+        _fixtures = fixtures.makeStreamTestFixtures(
+            Base::getServiceContext()->getFastClockSource()->now() + getTimeout(),
+            _clientMetadata,
+            _reactor);
     }
 
     virtual Milliseconds getTimeout() const {

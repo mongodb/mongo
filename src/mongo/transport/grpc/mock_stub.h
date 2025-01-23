@@ -187,17 +187,20 @@ public:
 
     ~MockStub() {}
 
-    std::shared_ptr<MockClientStream> unauthenticatedCommandStream(MockClientContext* ctx) {
-        return _makeStream(MockRPC::MethodName::UnauthenticatedCommandStream, ctx);
+    std::shared_ptr<MockClientStream> unauthenticatedCommandStream(
+        MockClientContext* ctx, const std::shared_ptr<GRPCReactor>& reactor) {
+        return _makeStream(MockRPC::MethodName::UnauthenticatedCommandStream, ctx, reactor);
     }
 
-    std::shared_ptr<MockClientStream> authenticatedCommandStream(MockClientContext* ctx) {
-        return _makeStream(MockRPC::MethodName::AuthenticatedCommandStream, ctx);
+    std::shared_ptr<MockClientStream> authenticatedCommandStream(
+        MockClientContext* ctx, const std::shared_ptr<GRPCReactor>& reactor) {
+        return _makeStream(MockRPC::MethodName::AuthenticatedCommandStream, ctx, reactor);
     }
 
 private:
     std::shared_ptr<MockClientStream> _makeStream(MockRPC::MethodName methodName,
-                                                  MockClientContext* ctx) {
+                                                  MockClientContext* ctx,
+                                                  const std::shared_ptr<GRPCReactor>& reactor) {
         MetadataView clientMetadata;
         for (auto& kvp : ctx->_metadata) {
             clientMetadata.insert(kvp);
@@ -223,7 +226,8 @@ private:
                                                std::move(metadataPF.future),
                                                std::move(terminationStatusPF.future),
                                                cancellationState,
-                                               std::move(*pipe.right));
+                                               std::move(*pipe.right),
+                                               reactor);
 
         ctx->_stream = clientStream;
         _channel->sendRPC(std::move(rpc));

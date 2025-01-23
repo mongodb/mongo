@@ -112,7 +112,7 @@ public:
         auto th = stdx::thread([&, promise = std::move(clientStreamPf.promise)]() mutable {
             promise.setWith([&] {
                 auto stub = makeStub();
-                return stub.unauthenticatedCommandStream(&ctx);
+                return stub.unauthenticatedCommandStream(&ctx, getReactor());
             });
         });
         ON_BLOCK_EXIT([&th] { th.join(); });
@@ -128,20 +128,22 @@ private:
 
 TEST_F(MockStubTest, ConcurrentStreamsAuth) {
     auto stub = makeStub();
-    runEchoTest([&](auto& ctx) { return stub.authenticatedCommandStream(&ctx); });
+    runEchoTest([&](auto& ctx) { return stub.authenticatedCommandStream(&ctx, getReactor()); });
 }
 
 TEST_F(MockStubTest, ConcurrentStreamsNoAuth) {
     auto stub = makeStub();
-    runEchoTest([&](auto& ctx) { return stub.unauthenticatedCommandStream(&ctx); });
+    runEchoTest([&](auto& ctx) { return stub.unauthenticatedCommandStream(&ctx, getReactor()); });
 }
 
 TEST_F(MockStubTest, ConcurrentStubsAuth) {
-    runEchoTest([&](auto& ctx) { return makeStub().authenticatedCommandStream(&ctx); });
+    runEchoTest(
+        [&](auto& ctx) { return makeStub().authenticatedCommandStream(&ctx, getReactor()); });
 }
 
 TEST_F(MockStubTest, ConcurrentStubsNoAuth) {
-    runEchoTest([&](auto& ctx) { return makeStub().unauthenticatedCommandStream(&ctx); });
+    runEchoTest(
+        [&](auto& ctx) { return makeStub().unauthenticatedCommandStream(&ctx, getReactor()); });
 }
 
 TEST_F(MockStubTest, RPCReturn) {

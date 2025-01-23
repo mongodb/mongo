@@ -110,23 +110,11 @@ public:
 
     public:
         friend class GRPCReactor;
-        friend class MockClientStream;
 
         CompletionQueueEntry() = delete;
         CompletionQueueEntry(Passkey, Promise<void> promise) : _promise(std::move(promise)) {}
 
     private:
-        /**
-         * This function will fulfill the Promise associated with a tag, but does not remove it from
-         * the _cqTaskStash. This is a workaround to introducing a mock grpc::CompletionQueue that
-         * the MockClientStream interacts with, because at the MockClientStream layer we have no
-         * access to which reactor this tag is associated with and just care about filling the
-         * promise.
-         */
-        void _setPromise_forTest(Status s) {
-            _promise.setFrom(s);
-        }
-
         Promise<void> _promise;
         std::list<std::unique_ptr<CompletionQueueEntry>>::iterator _iter;
     };

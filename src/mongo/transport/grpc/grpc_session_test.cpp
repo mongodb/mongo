@@ -54,8 +54,8 @@ public:
 
     void setUp() override {
         ServiceContextWithClockSourceMockTest::setUp();
-        _streamFixtures = _makeStreamFixtures();
         _reactor = std::make_shared<GRPCReactor>();
+        _streamFixtures = _makeStreamFixtures();
     }
 
     void tearDown() override {
@@ -149,8 +149,10 @@ private:
         // server, so it's okay to let stubFixture go out of scope.
         MockStubTestFixtures stubFixture;
         MetadataView metadata = {{"foo", "bar"}};
-        return stubFixture.makeStreamTestFixtures(
-            getServiceContext()->getFastClockSource()->now() + kStreamTimeout, std::move(metadata));
+        return stubFixture.makeStreamTestFixtures(getServiceContext()->getFastClockSource()->now() +
+                                                      kStreamTimeout,
+                                                  std::move(metadata),
+                                                  _reactor);
     }
 
     template <class SessionType>

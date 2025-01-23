@@ -54,7 +54,8 @@ public:
                      Future<MetadataContainer>&& serverInitialMetadata,
                      Future<::grpc::Status>&& rpcReturnStatus,
                      std::shared_ptr<MockCancellationState> rpcCancellationState,
-                     BidirectionalPipe::End&& pipe);
+                     BidirectionalPipe::End&& pipe,
+                     const std::shared_ptr<GRPCReactor>& reactor);
 
     void read(SharedBuffer* msg, GRPCReactor::CompletionQueueEntry* tag) override;
 
@@ -93,5 +94,7 @@ private:
     std::shared_ptr<MockCancellationState> _rpcCancellationState;
 
     BidirectionalPipe::End _pipe;
+
+    const std::shared_ptr<GRPCReactor>& _reactor;
 };
 }  // namespace mongo::transport::grpc

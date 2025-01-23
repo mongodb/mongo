@@ -102,10 +102,7 @@ void GRPCReactor::drain() {
         _processCompletionQueueNotification(tag, ok);
     }
 
-    // TODO SERVER-98524: Make this an invariant failure.
-    if (_cqTaskStash.size() != 0) {
-        LOGV2_WARNING(9715301, "GRPCReactor did not properly drain all tasks");
-    }
+    invariant(_cqTaskStash.size() == 0, "GRPCReactor did not properly drain all tasks");
 }
 
 void GRPCReactor::schedule(Task task) {

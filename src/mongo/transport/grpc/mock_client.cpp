@@ -83,9 +83,9 @@ Future<Client::CallContext> MockClient::_streamFactory(const HostAndPort& remote
 
     std::shared_ptr<ClientStream> stream;
     if (options.authToken) {
-        stream = stub->stub().authenticatedCommandStream(ctx.get());
+        stream = stub->stub().authenticatedCommandStream(ctx.get(), reactor);
     } else {
-        stream = stub->stub().unauthenticatedCommandStream(ctx.get());
+        stream = stub->stub().unauthenticatedCommandStream(ctx.get(), reactor);
     }
 
     return Future<CallContext>::makeReady(CallContext{ctx, std::move(stream), {}});

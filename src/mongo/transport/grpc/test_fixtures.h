@@ -124,7 +124,9 @@ public:
     }
 
     std::unique_ptr<MockStreamTestFixtures> makeStreamTestFixtures(
-        Date_t deadline, const MetadataView& clientMetadata) {
+        Date_t deadline,
+        const MetadataView& clientMetadata,
+        const std::shared_ptr<GRPCReactor>& reactor) {
         MockStreamTestFixtures fixtures{nullptr, std::make_shared<MockClientContext>(), nullptr};
 
         auto clientThread = stdx::thread([&] {
@@ -133,7 +135,7 @@ public:
                 fixtures.clientCtx->addMetadataEntry(kvp.first.toString(), kvp.second.toString());
             }
             fixtures.clientStream =
-                makeStub().unauthenticatedCommandStream(fixtures.clientCtx.get());
+                makeStub().unauthenticatedCommandStream(fixtures.clientCtx.get(), reactor);
         });
 
         auto rpc = getServer().acceptRPC();

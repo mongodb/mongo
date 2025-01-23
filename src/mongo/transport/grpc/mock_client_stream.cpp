@@ -38,12 +38,14 @@ MockClientStream::MockClientStream(HostAndPort remote,
                                    Future<MetadataContainer>&& initialMetadataFuture,
                                    Future<::grpc::Status>&& rpcReturnStatus,
                                    std::shared_ptr<MockCancellationState> rpcCancellationState,
-                                   BidirectionalPipe::End&& pipe)
+                                   BidirectionalPipe::End&& pipe,
+                                   const std::shared_ptr<GRPCReactor>& reactor)
     : _remote{std::move(remote)},
       _serverInitialMetadata{std::move(initialMetadataFuture)},
       _rpcReturnStatus{std::move(rpcReturnStatus)},
       _rpcCancellationState(std::move(rpcCancellationState)),
-      _pipe{std::move(pipe)} {}
+      _pipe{std::move(pipe)},
+      _reactor(reactor) {}
 
 void MockClientStream::read(SharedBuffer* msg, GRPCReactor::CompletionQueueEntry* tag) {
     // Even if the server side handler of this stream has set a final status for the RPC (i.e.
@@ -51,8 +53,7 @@ void MockClientStream::read(SharedBuffer* msg, GRPCReactor::CompletionQueueEntry
     // sent before setting that status, so only return early here if the RPC was cancelled.
     // Otherwise, try to read whatever messages are in the queue.
     if (_rpcCancellationState->isCancelled()) {
-        tag->_setPromise_forTest(
-            {ErrorCodes::CallbackCanceled, "Completion queue task did not execute"});
+        _reactor->_processCompletionQueueNotification(tag, false /* ok */);
         return;
     }
 
@@ -61,25 +62,24 @@ void MockClientStream::read(SharedBuffer* msg, GRPCReactor::CompletionQueueEntry
 
     if (res.has_value()) {
         *msg = res.get();
-        tag->_setPromise_forTest(Status::OK());
+        _reactor->_processCompletionQueueNotification(tag, true /* ok */);
     } else {
-        tag->_setPromise_forTest({ErrorCodes::CallbackCanceled, "Read did not go to the wire"});
+        _reactor->_processCompletionQueueNotification(tag, false /* ok */);
     }
 }
 
 void MockClientStream::write(ConstSharedBuffer msg, GRPCReactor::CompletionQueueEntry* tag) {
     if (_rpcCancellationState->isCancelled() || _rpcReturnStatus.isReady()) {
-        tag->_setPromise_forTest(
-            {ErrorCodes::CallbackCanceled, "Completion queue task did not execute"});
+        _reactor->_processCompletionQueueNotification(tag, false /* ok */);
         return;
     }
 
     auto res = runWithDeadline<bool>(_rpcCancellationState->getDeadline(),
                                      [&](Interruptible* i) { return _pipe.write(msg, i); });
     if (res) {
-        tag->_setPromise_forTest(Status::OK());
+        _reactor->_processCompletionQueueNotification(tag, true /* ok */);
     } else {
-        tag->_setPromise_forTest({ErrorCodes::CallbackCanceled, "Write did not go to the wire"});
+        _reactor->_processCompletionQueueNotification(tag, false /* ok */);
     }
 }
 
@@ -97,16 +97,16 @@ void MockClientStream::finish(::grpc::Status* status, GRPCReactor::CompletionQue
     if (auto cancellationStatus = _rpcCancellationState->getCancellationStatus();
         cancellationStatus.has_value()) {
         *status = *cancellationStatus;
-        tag->_setPromise_forTest(Status::OK());
+        _reactor->_processCompletionQueueNotification(tag, true /* ok */);
         return;
     }
 
     *status = _rpcReturnStatus.get();
-    tag->_setPromise_forTest(Status::OK());
+    _reactor->_processCompletionQueueNotification(tag, true /* ok */);
 }
 
 void MockClientStream::writesDone(GRPCReactor::CompletionQueueEntry* tag) {
-    tag->_setPromise_forTest(Status::OK());
+    _reactor->_processCompletionQueueNotification(tag, true /* ok */);
 }
 
 boost::optional<SharedBuffer> MockClientStream::syncRead(
