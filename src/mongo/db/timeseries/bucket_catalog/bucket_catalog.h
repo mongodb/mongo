@@ -348,23 +348,16 @@ void clear(BucketCatalog& catalog, const UUID& collectionUUID);
  * Freezes the given bucket in the registry so that this bucket will never be used in the future.
  */
 void freeze(BucketCatalog&, const BucketId& bucketId);
-void freeze(BucketCatalog&,
-            const TimeseriesOptions& options,
-            const StringDataComparator* comparator,
-            const UUID& collectionUUID,
-            const BSONObj& bucket);
 
 /**
  * Extracts the BucketId from a bucket document.
  */
 BucketId extractBucketId(BucketCatalog&,
                          const TimeseriesOptions& options,
-                         const StringDataComparator* comparator,
                          const UUID& collectionUUID,
                          const BSONObj& bucket);
 
 BucketKey::Signature getKeySignature(const TimeseriesOptions& options,
-                                     const StringDataComparator* comparator,
                                      const UUID& collectionUUID,
                                      const BSONObj& metadata);
 
@@ -388,7 +381,6 @@ void appendExecutionStats(const BucketCatalog& catalog,
  */
 StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catalog,
                                                             const UUID& collectionUUID,
-                                                            const StringDataComparator* comparator,
                                                             const TimeseriesOptions& options,
                                                             const BSONObj& measurementDoc);
 

@@ -291,11 +291,8 @@ void BucketCatalogTest::_insertOneAndCommit(const NamespaceString& ns,
                                             const UUID& uuid,
                                             uint16_t numPreviouslyCommittedMeasurements) {
     auto time = Date_t::now();
-    auto insertContextAndTime = uassertStatusOK(prepareInsert(*_bucketCatalog,
-                                                              uuid,
-                                                              _getCollator(ns),
-                                                              _getTimeseriesOptions(ns),
-                                                              BSON(_timeField << time)));
+    auto insertContextAndTime = uassertStatusOK(
+        prepareInsert(*_bucketCatalog, uuid, _getTimeseriesOptions(ns), BSON(_timeField << time)));
 
     auto result = insert(*_bucketCatalog,
                          _getCollator(ns),
@@ -315,8 +312,8 @@ StatusWith<mongo::timeseries::bucket_catalog::InsertResult> BucketCatalogTest::_
     const UUID& uuid,
     const mongo::BSONObj& doc) {
 
-    auto insertContextAndTime = uassertStatusOK(
-        prepareInsert(catalog, uuid, _getCollator(nss), _getTimeseriesOptions(nss), doc));
+    auto insertContextAndTime =
+        uassertStatusOK(prepareInsert(catalog, uuid, _getTimeseriesOptions(nss), doc));
 
     return insert(catalog,
                   _getCollator(nss),
@@ -334,8 +331,8 @@ StatusWith<mongo::timeseries::bucket_catalog::InsertResult> BucketCatalogTest::_
     const UUID& uuid,
     const mongo::BSONObj& doc) {
 
-    auto insertContextAndTime = uassertStatusOK(
-        prepareInsert(catalog, uuid, _getCollator(nss), _getTimeseriesOptions(nss), doc));
+    auto insertContextAndTime =
+        uassertStatusOK(prepareInsert(catalog, uuid, _getTimeseriesOptions(nss), doc));
 
     return tryInsert(catalog,
                      _getCollator(nss),
@@ -355,8 +352,8 @@ BucketCatalogTest::_insertOneWithReopeningContextHelper(
     const mongo::BSONObj& doc,
     ReopeningContext& reopeningContext) {
 
-    auto insertContextAndTime = uassertStatusOK(
-        prepareInsert(catalog, uuid, _getCollator(nss), _getTimeseriesOptions(nss), doc));
+    auto insertContextAndTime =
+        uassertStatusOK(prepareInsert(catalog, uuid, _getTimeseriesOptions(nss), doc));
 
     return insertWithReopeningContext(catalog,
                                       _getCollator(nss),
@@ -483,7 +480,7 @@ void BucketCatalogTest::_testUseBucketSkipsConflictingBucket(
     std::function<void(BucketCatalog&, Bucket&)> makeBucketConflict) {
     BSONObj measurement = BSON(_timeField << Date_t::now() << _metaField << 1);
     auto swResult =
-        prepareInsert(*_bucketCatalog, _uuid1, nullptr, _getTimeseriesOptions(_ns1), measurement);
+        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), measurement);
     ASSERT_OK(swResult);
     auto& [insertCtx, time] = swResult.getValue();
 
@@ -516,7 +513,7 @@ void BucketCatalogTest::_testUseAlternateBucketSkipsConflictingBucket(
     std::function<void(BucketCatalog&, Bucket&)> makeBucketConflict) {
     BSONObj measurement = BSON(_timeField << Date_t::now() << _metaField << 1);
     auto swResult =
-        prepareInsert(*_bucketCatalog, _uuid1, nullptr, _getTimeseriesOptions(_ns1), measurement);
+        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), measurement);
     ASSERT_OK(swResult);
     auto& [insertCtx, time] = swResult.getValue();
 
@@ -667,14 +664,12 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketArray) {
     auto insertContextAndTime1 = uassertStatusOK(prepareInsert(
         *_bucketCatalog,
         _uuid1,
-        _getCollator(_ns1),
         _getTimeseriesOptions(_ns1),
         BSON(_timeField << Date_t::now() << _metaField << BSON_ARRAY(BSON("a" << 0 << "b" << 1)))));
 
     auto insertContextAndTime2 = uassertStatusOK(prepareInsert(
         *_bucketCatalog,
         _uuid1,
-        _getCollator(_ns1),
         _getTimeseriesOptions(_ns1),
         BSON(_timeField << Date_t::now() << _metaField << BSON_ARRAY(BSON("b" << 1 << "a" << 0)))));
 
@@ -687,7 +682,6 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketObjArray) {
     auto insertContextAndTime1 = uassertStatusOK(prepareInsert(
         *_bucketCatalog,
         _uuid1,
-        _getCollator(_ns1),
         _getTimeseriesOptions(_ns1),
         BSON(_timeField << Date_t::now() << _metaField
                         << BSONObj(BSON("c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1)
@@ -696,7 +690,6 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketObjArray) {
     auto insertContextAndTime2 = uassertStatusOK(prepareInsert(
         *_bucketCatalog,
         _uuid1,
-        _getCollator(_ns1),
         _getTimeseriesOptions(_ns1),
         BSON(_timeField << Date_t::now() << _metaField
                         << BSONObj(BSON("c" << BSON_ARRAY(BSON("b" << 1 << "a" << 0)
@@ -712,7 +705,6 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketNestedArray) {
     auto insertContextAndTime1 = uassertStatusOK(prepareInsert(
         *_bucketCatalog,
         _uuid1,
-        _getCollator(_ns1),
         _getTimeseriesOptions(_ns1),
         BSON(_timeField << Date_t::now() << _metaField
                         << BSONObj(BSON("c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1)
@@ -722,7 +714,6 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketNestedArray) {
     auto insertContextAndTime2 = uassertStatusOK(prepareInsert(
         *_bucketCatalog,
         _uuid1,
-        _getCollator(_ns1),
         _getTimeseriesOptions(_ns1),
         BSON(_timeField << Date_t::now() << _metaField
                         << BSONObj(BSON("c" << BSON_ARRAY(BSON("b" << 1 << "a" << 0)
@@ -739,15 +730,11 @@ TEST_F(BucketCatalogTest, InsertNullAndMissingMetaFieldIntoDifferentBuckets) {
     auto insertContextAndTime1 =
         uassertStatusOK(prepareInsert(*_bucketCatalog,
                                       _uuid1,
-                                      _getCollator(_ns1),
                                       _getTimeseriesOptions(_ns1),
                                       BSON(_timeField << Date_t::now() << _metaField << BSONNULL)));
 
-    auto insertContextAndTime2 = uassertStatusOK(prepareInsert(*_bucketCatalog,
-                                                               _uuid1,
-                                                               _getCollator(_ns1),
-                                                               _getTimeseriesOptions(_ns1),
-                                                               BSON(_timeField << Date_t::now())));
+    auto insertContextAndTime2 = uassertStatusOK(prepareInsert(
+        *_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), BSON(_timeField << Date_t::now())));
 
 
     // Inserts should all be into two distinct buckets.
@@ -2074,8 +2061,8 @@ TEST_F(BucketCatalogTest, OIDCollisionIsHandledForFrozenBucket) {
     auto doc = BSON(_timeField << time << _metaField << "B");
     // Get the insertContext so that we can get the key signature for the BucketID — again, to
     // trigger a collision of our frozen bucketID with the bucketID of the bucket we will allocate.
-    auto insertContext = std::get<bucket_catalog::InsertContext>(uassertStatusOK(prepareInsert(
-        *_bucketCatalog, _uuid1, _getCollator(_ns1), _getTimeseriesOptions(_ns1), doc)));
+    auto insertContext = std::get<bucket_catalog::InsertContext>(
+        uassertStatusOK(prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), doc)));
 
     // Get the next sequential OID so that we can trigger an ID collision down the line.
     auto OIDAndRoundedTime =
@@ -2205,7 +2192,7 @@ TEST_F(BucketCatalogTest, InsertBatchHelperFillsUpSingleBucket) {
     const auto& bucketsColl = autoColl.getCollection();
     BSONObj measurement = BSON(_timeField << Date_t::now() << _metaField << 1);
     auto swResult =
-        prepareInsert(*_bucketCatalog, _uuid1, nullptr, _getTimeseriesOptions(_ns1), measurement);
+        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), measurement);
     ASSERT_OK(swResult);
     auto& [insertContext, time] = swResult.getValue();
 
@@ -2257,7 +2244,7 @@ TEST_F(BucketCatalogTest, InsertBatchHelperHandlesRollover) {
     const auto& bucketsColl = autoColl.getCollection();
     BSONObj measurement = BSON(_timeField << Date_t::now() << _metaField << 1);
     auto swResult =
-        prepareInsert(*_bucketCatalog, _uuid1, nullptr, _getTimeseriesOptions(_ns1), measurement);
+        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), measurement);
     ASSERT_OK(swResult);
     auto& [insertContext, time] = swResult.getValue();
 
@@ -2345,7 +2332,7 @@ TEST_F(BucketCatalogTest, InsertBatch) {
     const auto& bucketsColl = autoColl.getCollection();
     auto measurement = BSON(_timeField << Date_t::now());
     auto swResult =
-        prepareInsert(*_bucketCatalog, _uuid1, nullptr, _getTimeseriesOptions(_ns1), measurement);
+        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), measurement);
     ASSERT_OK(swResult);
     auto& [insertContext, time] = swResult.getValue();
 

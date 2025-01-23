@@ -114,7 +114,6 @@ std::vector<BSONObj> generateReopeningPipeline(const Date_t& time,
 void handleDirectWrite(RecoveryUnit&,
                        BucketCatalog&,
                        const TimeseriesOptions& options,
-                       const StringDataComparator* comparator,
                        const UUID& collectionUUID,
                        const BSONObj& bucket);
 }  // namespace mongo::timeseries::bucket_catalog

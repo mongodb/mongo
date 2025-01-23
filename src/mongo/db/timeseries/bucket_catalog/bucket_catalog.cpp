@@ -717,17 +717,8 @@ void freeze(BucketCatalog& catalog, const BucketId& bucketId) {
     freezeBucket(catalog.bucketStateRegistry, bucketId);
 }
 
-void freeze(BucketCatalog& catalog,
-            const TimeseriesOptions& options,
-            const StringDataComparator* comparator,
-            const UUID& collectionUUID,
-            const BSONObj& bucket) {
-    freeze(catalog, extractBucketId(catalog, options, comparator, collectionUUID, bucket));
-}
-
 BucketId extractBucketId(BucketCatalog& bucketCatalog,
                          const TimeseriesOptions& options,
-                         const StringDataComparator* comparator,
                          const UUID& collectionUUID,
                          const BSONObj& bucket) {
     const OID bucketOID = bucket[kBucketIdFieldName].OID();
@@ -741,7 +732,6 @@ BucketId extractBucketId(BucketCatalog& bucketCatalog,
 }
 
 BucketKey::Signature getKeySignature(const TimeseriesOptions& options,
-                                     const StringDataComparator* comparator,
                                      const UUID& collectionUUID,
                                      const BSONObj& metadataObj) {
     tracking::Context trackingContext;
@@ -768,13 +758,11 @@ void appendExecutionStats(const BucketCatalog& catalog,
 
 StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catalog,
                                                             const UUID& collectionUUID,
-                                                            const StringDataComparator* comparator,
                                                             const TimeseriesOptions& options,
                                                             const BSONObj& measurementDoc) {
     auto res = internal::extractBucketingParameters(
         getTrackingContext(catalog.trackingContexts, TrackingScope::kOpenBucketsByKey),
         collectionUUID,
-        comparator,
         options,
         measurementDoc);
     if (!res.isOK()) {

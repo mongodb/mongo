@@ -246,11 +246,8 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucketWithReopening(
 
                     if (!suitableBucket.isEmpty() &&
                         !timeseries::isCompressedBucket(suitableBucket)) {
-                        uncompressedBucketId = extractBucketId(bucketCatalog,
-                                                               options,
-                                                               bucketsColl->getDefaultCollator(),
-                                                               bucketsColl->uuid(),
-                                                               suitableBucket);
+                        uncompressedBucketId = extractBucketId(
+                            bucketCatalog, options, bucketsColl->uuid(), suitableBucket);
                         return StatusWith<bucket_catalog::InsertResult>{
                             bucket_catalog::InsertResult{
                                 std::in_place_type<bucket_catalog::ReopeningContext>,
@@ -327,7 +324,7 @@ BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
                            const StringDataComparator* comparator) {
     tracking::Context trackingContext;
     auto res = uassertStatusOK(bucket_catalog::internal::extractBucketingParameters(
-        trackingContext, collectionUUID, comparator, options, measurements[0]));
+        trackingContext, collectionUUID, options, measurements[0]));
     auto time = res.second;
     auto [oid, _] = bucket_catalog::internal::generateBucketOID(time, options);
     write_ops_utils::BucketDocument bucketDoc =
@@ -364,11 +361,8 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
     const BSONObj& measurementDoc,
     BucketReopeningPermittance reopening,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc) {
-    auto insertContextAndDate = bucket_catalog::prepareInsert(bucketCatalog,
-                                                              bucketsColl->uuid(),
-                                                              bucketsColl->getDefaultCollator(),
-                                                              timeSeriesOptions,
-                                                              measurementDoc);
+    auto insertContextAndDate = bucket_catalog::prepareInsert(
+        bucketCatalog, bucketsColl->uuid(), timeSeriesOptions, measurementDoc);
 
     if (!insertContextAndDate.isOK()) {
         return insertContextAndDate.getStatus();

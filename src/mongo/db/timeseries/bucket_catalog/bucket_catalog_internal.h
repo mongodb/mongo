@@ -103,7 +103,6 @@ StripeNumber getStripeNumber(const BucketCatalog& catalog, const BucketId& bucke
 StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(
     tracking::Context&,
     const UUID& collectionUUID,
-    const StringDataComparator* comparator,
     const TimeseriesOptions& options,
     const BSONObj& doc);
 
