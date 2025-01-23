@@ -113,11 +113,13 @@ public:
         }
     }
 
-    RecordId(RecordId&& other) : _format(other._format), _data(other._data) {
+    RecordId(RecordId&& other)
+        : _format(other._format), _data(_format != Format::kNull ? other._data : Content{}) {
         other._format = kNull;
     }
 
-    RecordId(const RecordId& other) : _format(other._format), _data(other._data) {
+    RecordId(const RecordId& other)
+        : _format(other._format), _data(_format != Format::kNull ? other._data : Content{}) {
         if (_format == Format::kBigStr) {
             // Re-initialize the SharedBuffer to get the correct reference count.
             auto* buffer = &HeapStr::getBufferFrom(_data);
