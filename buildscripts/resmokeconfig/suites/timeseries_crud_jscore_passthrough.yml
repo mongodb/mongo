@@ -27,6 +27,7 @@ selector:
   - jstests/core/list_namespaces_invalidation.js
   - jstests/core/write/bulk/bulk_write.js
   - jstests/core/write/bulk/bulk_write_non_transaction.js
+  - jstests/core/query/json_schema_validate_empty_path.js
   # Sparse indexes.
   - jstests/core/query/distinct/distinct_hint.js
   - jstests/core/query/query_hash_stability.js
