@@ -43,9 +43,12 @@ def get_deps_dirs(deps):
     bazel_out_dir = os.path.join(REPO_ROOT, "bazel-out")
     bazel_bin = os.path.join(REPO_ROOT, "bazel-bin")
     for dep in deps:
-        for child in os.listdir(bazel_out_dir):
-            yield f"{bazel_out_dir}/{child}/bin/external/poetry/{dep}", dep
-        yield f"{bazel_bin}/bin/external/poetry/{dep}", dep
+        try:
+            for child in os.listdir(bazel_out_dir):
+                yield f"{bazel_out_dir}/{child}/bin/external/poetry/{dep}", dep
+        except OSError:
+            pass
+        yield f"{bazel_bin}/external/poetry/{dep}", dep
 
 
 def search_for_modules(deps, deps_installed, lockfile_changed=False):
@@ -90,7 +93,8 @@ def install_modules(bazel):
     if os.path.exists(lockfile_hash_file):
         with open(lockfile_hash_file) as f:
             old_hash = f.read()
-    else:
+
+    if old_hash != current_hash:
         with open(lockfile_hash_file, "w") as f:
             f.write(current_hash)
 
