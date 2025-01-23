@@ -259,7 +259,7 @@ TEST_F(ThroughputProbingTest, ProbeDownSucceeds) {
     ASSERT_GT(_readTicketHolder.outof(), size);
     ASSERT_LT(_writeTicketHolder.outof(), initialSize);
     ASSERT_GT(_writeTicketHolder.outof(), size);
-    ASSERT(_statsTester.concurrencyIncreased()) << _statsTester.toString();
+    ASSERT(_statsTester.concurrencyDecreased()) << _statsTester.toString();
 }
 
 TEST_F(ThroughputProbingTest, ProbeDownFails) {

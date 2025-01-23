@@ -271,8 +271,8 @@ void ThroughputProbing::_probeDown(OperationContext* opCtx, double throughput) {
         _stableConcurrency = newConcurrency;
         _resetConcurrency(opCtx);
 
-        _stats.timesIncreased.fetchAndAdd(1);
-        _stats.totalAmountIncreased.fetchAndAdd(oldStableConcurrency - _readTicketHolder->outof() -
+        _stats.timesDecreased.fetchAndAdd(1);
+        _stats.totalAmountDecreased.fetchAndAdd(oldStableConcurrency - _readTicketHolder->outof() -
                                                 _writeTicketHolder->outof());
     } else {
         // Decreasing concurrency did not cause throughput to increase, so go back to stable and
