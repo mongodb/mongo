@@ -195,9 +195,8 @@ public:
 
     void truncateCollection() {
         WriteUnitOfWork wunit(&_opCtx);
-        auto collection =
-            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespaceForMetadataWrite(&_opCtx,
-                                                                                         nss);
+        CollectionWriter writer{&_opCtx, nss};
+        auto collection = writer.getWritableCollection(&_opCtx);
         ASSERT_OK(collection->truncate(&_opCtx));
         wunit.commit();
         _refreshCollection();

@@ -48,16 +48,17 @@ bool locked(OperationContext* opCtx, const NamespaceString& ns) {
         return true;
     }
 
+    const auto& locker = shard_role_details::getLocker(opCtx);
     if (ns.isOplog()) {
-        return shard_role_details::getLocker(opCtx)->isReadLocked();
+        return locker->isReadLocked();
     }
 
     if (ns.isChangeCollection() && ns.tenantId()) {
-        return shard_role_details::getLocker(opCtx)->isLockHeldForMode(
-            {ResourceType::RESOURCE_TENANT, *ns.tenantId()}, MODE_IS);
+        return locker->isR() || locker->isW() ||
+            locker->isLockHeldForMode({ResourceType::RESOURCE_TENANT, *ns.tenantId()}, MODE_IS);
     }
 
-    return shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(ns, MODE_IS);
+    return locker->isCollectionLockedForMode(ns, MODE_IS);
 }
 
 }  // namespace

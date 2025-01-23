@@ -192,7 +192,8 @@ void DatabaseImpl::init(OperationContext* const opCtx) {
         // If this is called from the repair path, the collection is already initialized.
         if (!collection->isInitialized()) {
             WriteUnitOfWork wuow(opCtx);
-            catalog->lookupCollectionByUUIDForMetadataWrite(opCtx, uuid)->init(opCtx);
+            CollectionWriter writer{opCtx, uuid};
+            writer.getWritableCollection(opCtx)->init(opCtx);
             wuow.commit();
         }
     }

@@ -313,9 +313,11 @@ void CollectionTest::makeCollectionForMultikey(NamespaceString nss, StringData i
     {
         AutoGetCollection autoColl(opCtx, nss, MODE_X);
         WriteUnitOfWork wuow(opCtx);
-        auto collWriter = autoColl.getWritableCollection(opCtx);
-        ASSERT_OK(collWriter->getIndexCatalog()->createIndexOnEmptyCollection(
-            opCtx, collWriter, BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1))));
+        CollectionWriter writer{opCtx, autoColl};
+
+        auto writableColl = writer.getWritableCollection(opCtx);
+        ASSERT_OK(writableColl->getIndexCatalog()->createIndexOnEmptyCollection(
+            opCtx, writableColl, BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1))));
         wuow.commit();
     }
 }

@@ -201,8 +201,8 @@ Status createIndexFromSpec(OperationContext* opCtx,
     AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
     {
         WriteUnitOfWork wunit(opCtx);
-        auto coll =
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(opCtx, nss);
+        CollectionWriter writer{opCtx, nss};
+        auto coll = writer.getWritableCollection(opCtx);
         if (!coll) {
             auto db = autoDb.ensureDbExists(opCtx);
             invariant(db);
@@ -2057,7 +2057,7 @@ public:
             // timestamp.
             ASSERT_OK(indexer.commit(
                 _opCtx,
-                autoColl.getWritableCollection(_opCtx),
+                coll.getWritableCollection(_opCtx),
                 [&](const BSONObj& indexSpec) {
                     if (simulatePrimary) {
                         // The timestamping responsibility for each index is placed

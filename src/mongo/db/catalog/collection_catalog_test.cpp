@@ -3660,10 +3660,11 @@ TEST_F(CollectionCatalogTimestampTest, IndexCatalogEntryCopying) {
         auto desc = IndexDescriptor(IndexNames::BTREE, spec.toBSON());
         AutoGetCollection autoColl(opCtx.get(), nss, MODE_X);
         WriteUnitOfWork wuow(opCtx.get());
-        auto collWriter = autoColl.getWritableCollection(opCtx.get());
-        ASSERT_OK(collWriter->prepareForIndexBuild(opCtx.get(), &desc, boost::none));
-        collWriter->getIndexCatalog()->createIndexEntry(
-            opCtx.get(), collWriter, std::move(desc), CreateIndexEntryFlags::kNone);
+        CollectionWriter writer{opCtx.get(), autoColl};
+        auto writableColl = writer.getWritableCollection(opCtx.get());
+        ASSERT_OK(writableColl->prepareForIndexBuild(opCtx.get(), &desc, boost::none));
+        writableColl->getIndexCatalog()->createIndexEntry(
+            opCtx.get(), writableColl, std::move(desc), CreateIndexEntryFlags::kNone);
         wuow.commit();
     }
 
@@ -3686,11 +3687,13 @@ TEST_F(CollectionCatalogTimestampTest, IndexCatalogEntryCopying) {
         // Now finish the index build on the original client.
         AutoGetCollection autoColl(opCtx.get(), nss, MODE_X);
         WriteUnitOfWork wuow(opCtx.get());
-        auto collWriter = autoColl.getWritableCollection(opCtx.get());
-        auto writableEntry = collWriter->getIndexCatalog()->getWritableEntryByName(
+        CollectionWriter writer{opCtx.get(), autoColl};
+        auto writableColl = writer.getWritableCollection(opCtx.get());
+        auto writableEntry = writableColl->getIndexCatalog()->getWritableEntryByName(
             opCtx.get(), "x_1", IndexCatalog::InclusionPolicy::kUnfinished);
         ASSERT_NOT_EQUALS(desc, writableEntry->descriptor());
-        collWriter->getIndexCatalog()->indexBuildSuccess(opCtx.get(), collWriter, writableEntry);
+        writableColl->getIndexCatalog()->indexBuildSuccess(
+            opCtx.get(), writableColl, writableEntry);
         ASSERT(writableEntry->isReady());
         wuow.commit();
     }
