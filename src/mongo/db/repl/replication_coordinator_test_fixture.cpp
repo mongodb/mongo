@@ -173,10 +173,8 @@ void ReplCoordTest::init() {
 
     TopologyCoordinator::Options settings;
     auto topo = std::make_unique<TopologyCoordinator>(settings);
-    auto net = std::make_unique<NetworkInterfaceMock>();
-    _net = net.get();
+    auto net = std::make_shared<NetworkInterfaceMock>();
     auto externalState = std::make_unique<ReplicationCoordinatorExternalStateMock>();
-    _externalState = externalState.get();
     executor::ThreadPoolMock::Options tpOptions;
     tpOptions.onCreateThread = []() {
         Client::initThread("replexec",
@@ -184,9 +182,8 @@ void ReplCoordTest::init() {
                            Client::noSession(),
                            ClientOperationKillableByStepdown{false});
     };
-    auto pool = std::make_unique<executor::ThreadPoolMock>(_net, seed, tpOptions);
-    auto replExec = executor::ThreadPoolTaskExecutor::create(std::move(pool), std::move(net));
-    _replExec = replExec.get();
+    auto pool = std::make_unique<executor::ThreadPoolMock>(net.get(), seed, tpOptions);
+    auto replExec = executor::ThreadPoolTaskExecutor::create(std::move(pool), net);
     _repl = std::make_unique<ReplicationCoordinatorImpl>(service,
                                                          _settings,
                                                          std::move(externalState),
@@ -195,6 +192,17 @@ void ReplCoordTest::init() {
                                                          replicationProcess,
                                                          _storageInterface,
                                                          seed);
+    // Need to do this after the moves to make the static analyzer happy.
+    // The pointer is stored as a ReplicationCoordinatorExternalState pointer, so we need to
+    // reinterpret cast during retrieval.
+    _externalState =
+        dynamic_cast<ReplicationCoordinatorExternalStateMock*>(_repl->getExternalState_forTest());
+    invariant(_externalState != nullptr);
+    _replExec = _repl->getReplExecutor_forTest();
+    invariant(_replExec != nullptr);
+    _net = dynamic_cast<NetworkInterfaceMock*>(
+        dynamic_cast<executor::ThreadPoolTaskExecutor*>(_replExec)->getNetworkInterface().get());
+    invariant(_net != nullptr);
 }
 
 void ReplCoordTest::init(const ReplSettings& settings) {

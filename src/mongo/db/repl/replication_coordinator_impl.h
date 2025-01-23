@@ -715,6 +715,9 @@ public:
     bool isDataConsistent() const override;
     void setConsistentDataAvailable_forTest();
 
+    ReplicationCoordinatorExternalState* getExternalState_forTest();
+    executor::TaskExecutor* getReplExecutor_forTest();
+
 private:
     using CallbackFn = executor::TaskExecutor::CallbackFn;
 
