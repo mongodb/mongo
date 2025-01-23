@@ -105,8 +105,11 @@ public:
         return _collections;
     }
 
-    std::shared_ptr<const CollectionCatalog> getCatalog() const override {
-        return _catalog;
+    StatusWith<ResolvedView> resolveView(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<BSONObj> timeSeriesCollator) const override {
+        return view_catalog_helpers::resolveView(opCtx, _catalog, nss, timeSeriesCollator);
     }
 
     boost::optional<UUID> getUUID() const override {
@@ -272,8 +275,11 @@ public:
         return _emptyMultipleCollectionAccessor;
     }
 
-    std::shared_ptr<const CollectionCatalog> getCatalog() const override {
-        return _catalog;
+    StatusWith<ResolvedView> resolveView(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<BSONObj> timeSeriesCollator) const override {
+        return view_catalog_helpers::resolveView(opCtx, _catalog, nss, timeSeriesCollator);
     }
 
     boost::optional<UUID> getUUID() const override {
@@ -393,7 +399,7 @@ StatusWith<StringMap<ResolvedNamespace>> AggExState::resolveInvolvedNamespaces()
     return resolvedNamespaces;
 }
 
-void AggExState::setView(std::shared_ptr<const CollectionCatalog> catalog,
+void AggExState::setView(std::unique_ptr<AggCatalogState>& aggCatalogStage,
                          const ViewDefinition* view) {
     // Queries on timeseries views may specify non-default collation whereas queries
     // on all other types of views must match the default collator (the collation used
@@ -402,8 +408,8 @@ void AggExState::setView(std::shared_ptr<const CollectionCatalog> catalog,
     auto timeSeriesCollator =
         view->timeseries() ? _aggReqDerivatives->request.getCollation() : boost::none;
 
-    auto resolvedView = uassertStatusOK(view_catalog_helpers::resolveView(
-        _opCtx, catalog, _aggReqDerivatives->request.getNamespace(), timeSeriesCollator));
+    auto resolvedView = uassertStatusOK(aggCatalogStage->resolveView(
+        _opCtx, _aggReqDerivatives->request.getNamespace(), timeSeriesCollator));
 
     uassert(std::move(resolvedView),
             "Explain of a resolved view must be executed by mongos",

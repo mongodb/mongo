@@ -793,7 +793,7 @@ Status runAggregateOnView(AggExState& aggExState,
         }
     }
 
-    aggExState.setView(aggCatalogState->getCatalog(), view);
+    aggExState.setView(aggCatalogState, view);
     // Resolved view will be available after view has been set on AggregationExecutionState
     auto resolvedView = aggExState.getResolvedView().value();
 

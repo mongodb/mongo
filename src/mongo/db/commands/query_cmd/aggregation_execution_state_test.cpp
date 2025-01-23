@@ -34,6 +34,7 @@
 #include "mongo/db/commands/query_cmd/aggregation_execution_state.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -50,26 +51,33 @@ protected:
     /**
      * Add a collection with the given name to the catalog.
      */
-    void createCollection(StringData coll) {
+    NamespaceString createCollection(StringData coll) {
         NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", coll);
         auto opCtx = operationContext();
         DBDirectClient client{opCtx};
         auto cmd = BSON("create" << coll);
         BSONObj result;
         ASSERT_TRUE(client.runCommand(nss.dbName(), cmd, result));
+        return nss;
     }
 
     /**
      * Add a view with the given name to the catalog.
      */
-    void createView(StringData viewName, StringData collName) {
-        NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", collName);
+    std::pair<NamespaceString, std::vector<BSONObj>> createView(StringData viewName,
+                                                                StringData collName) {
+        NamespaceString collNss = NamespaceString::createNamespaceString_forTest("test", collName);
+        NamespaceString viewNss = NamespaceString::createNamespaceString_forTest("test", viewName);
+
         auto opCtx = operationContext();
         DBDirectClient client{opCtx};
-        auto cmd = BSON("create" << viewName << "viewOn" << collName << "pipeline"
-                                 << BSON_ARRAY(BSON("$match" << BSON("a" << 1))));
+        auto match = BSON("$match" << BSON("a" << 1));
+        auto cmd =
+            BSON("create" << viewName << "viewOn" << collName << "pipeline" << BSON_ARRAY(match));
         BSONObj result;
-        ASSERT_TRUE(client.runCommand(nss.dbName(), cmd, result));
+        ASSERT_TRUE(client.runCommand(collNss.dbName(), cmd, result));
+        std::vector<BSONObj> expectedResolvedPipeline = {match};
+        return std::make_pair(viewNss, expectedResolvedPipeline);
     }
 
     /**
@@ -146,7 +154,7 @@ private:
 
 TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogState) {
     StringData coll{"coll"};
-    createCollection(coll);
+    auto nss = createCollection(coll);
     std::unique_ptr<AggExState> aggExState = createDefaultAggExState(coll);
     std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
 
@@ -165,8 +173,6 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogState) {
 
     ASSERT_TRUE(aggCatalogState->getCollections().hasMainCollection());
 
-    ASSERT_EQ(aggCatalogState->getCatalog(), CollectionCatalog::latest(operationContext()));
-
     ASSERT_TRUE(aggCatalogState->getUUID().has_value());
 
     // This call should not throw.
@@ -176,8 +182,8 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogState) {
 TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateView) {
     StringData coll{"coll"};
     StringData view{"view"};
-    createCollection(coll);
-    createView(view, coll);
+    auto viewOn = createCollection(coll);
+    auto [viewNss, expectedPipeline] = createView(view, coll);
     std::unique_ptr<AggExState> aggExState = createDefaultAggExState(view);
     std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
 
@@ -194,10 +200,18 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateView) {
     ASSERT_TRUE(CollatorInterface::isSimpleCollator(collator.get()));
     ASSERT_EQ(matchesDefault, ExpressionContextCollationMatchesDefault::kYes);
 
+    // Check the resolved view correspond to the expected one
+    auto resolvedView = aggCatalogState->resolveView(operationContext(), viewNss, boost::none);
+    ASSERT_TRUE(resolvedView.isOK());
+    ASSERT_EQ(resolvedView.getValue().getNamespace(), viewOn);
+    std::vector<BSONObj> result = resolvedView.getValue().getPipeline();
+    ASSERT_EQ(expectedPipeline.size(), result.size());
+    for (uint32_t i = 0; i < expectedPipeline.size(); i++) {
+        ASSERT(SimpleBSONObjComparator::kInstance.evaluate(expectedPipeline[i] == result[i]));
+    }
+
     // It's a view so apparently there is no main collection, per se.
     ASSERT_FALSE(aggCatalogState->getCollections().hasMainCollection());
-
-    ASSERT_EQ(aggCatalogState->getCatalog(), CollectionCatalog::latest(operationContext()));
 
     ASSERT_FALSE(aggCatalogState->getUUID().has_value());
 
@@ -225,8 +239,6 @@ TEST_F(AggregationExecutionStateTest, CreateOplogAggCatalogState) {
     ASSERT_EQ(matchesDefault, ExpressionContextCollationMatchesDefault::kYes);
 
     ASSERT_TRUE(aggCatalogState->getCollections().hasMainCollection());
-
-    ASSERT_EQ(aggCatalogState->getCatalog(), CollectionCatalog::latest(operationContext()));
 
     // UUIDs are not used for change stream queries.
     ASSERT_FALSE(aggCatalogState->getUUID().has_value());

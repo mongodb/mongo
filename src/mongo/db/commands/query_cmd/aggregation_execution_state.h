@@ -189,7 +189,7 @@ public:
      *
      * TODO SERVER-93539 remove this function and construct a ResolvedViewAggExState instead.
      */
-    void setView(std::shared_ptr<const CollectionCatalog> catalog, const ViewDefinition* view);
+    void setView(std::unique_ptr<AggCatalogState>& catalog, const ViewDefinition* view);
 
     /**
      * Only to be used after this class has been set as a resolved view.
@@ -410,10 +410,12 @@ public:
     virtual const MultipleCollectionAccessor& getCollections() const = 0;
 
     /**
-     * Get the collection catalog instance for this pipeline.
+     * Use the acquired catalog to resolve the view.
      */
-    virtual std::shared_ptr<const CollectionCatalog> getCatalog() const = 0;
-
+    virtual StatusWith<ResolvedView> resolveView(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<BSONObj> timeSeriesCollator) const = 0;
     /**
      * Get the UUID, if any, for the primary collection of the pipeline.
      */
