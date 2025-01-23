@@ -622,8 +622,6 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
 
     auto pipeline = Pipeline::makePipeline(rawPipeline, expCtx, pipelineOpts);
 
-    const Document serializedCommand =
-        aggregation_request_helper::serializeToCommandDoc(expCtx, request);
     repl::ReadConcernArgs readConcern(repl::ReadConcernLevel::kSnapshotReadConcern);
     readConcern.setArgsAtClusterTimeForSnapshot(_atClusterTime);
     readConcern.setWaitLastStableRecoveryTimestamp(true);
@@ -636,7 +634,7 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
     ReadPreferenceSetting::get(opCtx) = readPref;
 
     auto dispatchResults =
-        sharded_agg_helpers::dispatchShardPipeline(serializedCommand,
+        sharded_agg_helpers::dispatchShardPipeline(Document(request.toBSON()),
                                                    sharded_agg_helpers::PipelineDataSource::kNormal,
                                                    false /* eligibleForSampling */,
                                                    std::move(pipeline),

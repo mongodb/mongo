@@ -95,8 +95,8 @@ TEST_F(DispatchShardPipelineTest, DoesNotSplitPipelineIfTargetingOneShard) {
     };
     auto pipeline = Pipeline::create(
         {parseStage(stages[0]), parseStage(stages[1]), parseStage(stages[2])}, expCtx());
-    const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(
-        expCtx(), AggregateCommandRequest(expCtx()->getNamespaceString(), stages));
+    const auto serializedCommand =
+        Document(AggregateCommandRequest(expCtx()->getNamespaceString(), stages).toBSON());
     const auto pipelineDataSource = PipelineDataSource::kNormal;
     const bool eligibleForSampling = false;
 
@@ -130,8 +130,8 @@ TEST_F(DispatchShardPipelineTest, DoesSplitPipelineIfMatchSpansTwoShards) {
     };
     auto pipeline = Pipeline::create(
         {parseStage(stages[0]), parseStage(stages[1]), parseStage(stages[2])}, expCtx());
-    const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(
-        expCtx(), AggregateCommandRequest(expCtx()->getNamespaceString(), stages));
+    const auto serializedCommand =
+        Document(AggregateCommandRequest(expCtx()->getNamespaceString(), stages).toBSON());
     const auto pipelineDataSource = PipelineDataSource::kNormal;
     const bool eligibleForSampling = false;
 
@@ -168,8 +168,8 @@ TEST_F(DispatchShardPipelineTest, DispatchShardPipelineRetriesOnNetworkError) {
     };
     auto pipeline = Pipeline::create(
         {parseStage(stages[0]), parseStage(stages[1]), parseStage(stages[2])}, expCtx());
-    const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(
-        expCtx(), AggregateCommandRequest(expCtx()->getNamespaceString(), stages));
+    const auto serializedCommand =
+        Document(AggregateCommandRequest(expCtx()->getNamespaceString(), stages).toBSON());
     const auto pipelineDataSource = PipelineDataSource::kNormal;
     const bool eligibleForSampling = false;
     auto future = launchAsync([&] {
@@ -217,8 +217,8 @@ TEST_F(DispatchShardPipelineTest, DispatchShardPipelineDoesNotRetryOnStaleConfig
     };
     auto pipeline = Pipeline::create(
         {parseStage(stages[0]), parseStage(stages[1]), parseStage(stages[2])}, expCtx());
-    const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(
-        expCtx(), AggregateCommandRequest(expCtx()->getNamespaceString(), stages));
+    const auto serializedCommand =
+        Document(AggregateCommandRequest(expCtx()->getNamespaceString(), stages).toBSON());
     const auto pipelineDataSource = PipelineDataSource::kNormal;
     const bool eligibleForSampling = false;
 
@@ -259,8 +259,8 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
     };
     auto pipeline = Pipeline::create(
         {parseStage(stages[0]), parseStage(stages[1]), parseStage(stages[2])}, expCtx());
-    const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(
-        expCtx(), AggregateCommandRequest(expCtx()->getNamespaceString(), stages));
+    const auto serializedCommand =
+        Document(AggregateCommandRequest(expCtx()->getNamespaceString(), stages).toBSON());
     const auto pipelineDataSource = PipelineDataSource::kNormal;
     const bool eligibleForSampling = false;
     auto future = launchAsync([&] {

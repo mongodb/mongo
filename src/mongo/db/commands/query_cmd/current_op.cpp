@@ -47,7 +47,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/util/serialization_context.h"
@@ -83,7 +82,7 @@ public:
 
     StatusWith<CursorResponse> runAggregation(OperationContext* opCtx,
                                               AggregateCommandRequest& request) const final {
-        auto aggCmdObj = aggregation_request_helper::serializeToCommandObj(request);
+        auto aggCmdObj = request.toBSON();
 
         rpc::OpMsgReplyBuilder replyBuilder;
 

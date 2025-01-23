@@ -96,20 +96,11 @@ StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none);
 
 /**
- * Serializes the options to a Document. Note that this serialization includes the original
- * pipeline object, as specified. Callers will likely want to override this field with a
- * serialization of a parsed and optimized Pipeline object.
- *
- * The explain option is not serialized. The preferred way to send an explain is with the explain
- * command, like: {explain: {aggregate: ...}, ...}, explain options are not part of the aggregate
- * command object.
- *
- * In case query settings are attached to 'expCtx', they will be serialized to the command document.
+ * Retrieves the query settings from 'expCtx' and if they are not empty, attaches them to the
+ * request object.
  */
-Document serializeToCommandDoc(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                               const AggregateCommandRequest& request);
-
-BSONObj serializeToCommandObj(const AggregateCommandRequest& request);
+void addQuerySettingsToRequest(AggregateCommandRequest& request,
+                               const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 /**
  * Validates if 'AggregateCommandRequest' specs complies with API versioning. Throws uassert in case

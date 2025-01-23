@@ -208,9 +208,7 @@ TEST(AggregationRequestTest, ShouldOnlySerializeRequiredFieldsIfNoOptionalFields
         Document{{AggregateCommandRequest::kCommandName, nss.coll()},
                  {AggregateCommandRequest::kPipelineFieldName, std::vector<Value>{}},
                  {AggregateCommandRequest::kCursorFieldName, Value(kDefaultCursorOptionDocument)}};
-    ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(
-                           make_intrusive<ExpressionContextForTest>(nss), request),
-                       expectedSerialization);
+    ASSERT_DOCUMENT_EQ(Document(request.toBSON()), expectedSerialization);
 }
 
 TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
@@ -265,9 +263,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
         {query_request_helper::cmdOptionMaxTimeMS, 10},
         {repl::ReadConcernArgs::kReadConcernFieldName, readConcernObj},
         {query_request_helper::kUnwrappedReadPrefField, readPrefObj}};
-    ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(
-                           make_intrusive<ExpressionContextForTest>(nss), request),
-                       expectedSerialization);
+    ASSERT_DOCUMENT_EQ(Document(request.toBSON()), expectedSerialization);
 }
 
 TEST(AggregationRequestTest, ShouldSerializeBatchSizeIfSetAndExplainFalse) {
@@ -281,9 +277,7 @@ TEST(AggregationRequestTest, ShouldSerializeBatchSizeIfSetAndExplainFalse) {
         {AggregateCommandRequest::kCommandName, nss.coll()},
         {AggregateCommandRequest::kPipelineFieldName, std::vector<Value>{}},
         {AggregateCommandRequest::kCursorFieldName, Value(Document({{kBatchSizeFieldName, 10}}))}};
-    ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(
-                           make_intrusive<ExpressionContextForTest>(nss), request),
-                       expectedSerialization);
+    ASSERT_DOCUMENT_EQ(Document(request.toBSON()), expectedSerialization);
 }
 
 TEST(AggregationRequestTest, ShouldSerialiseAggregateFieldToOneIfCollectionIsAggregateOneNSS) {
@@ -298,9 +292,7 @@ TEST(AggregationRequestTest, ShouldSerialiseAggregateFieldToOneIfCollectionIsAgg
                   Value(Document({{aggregation_request_helper::kBatchSizeField,
                                    aggregation_request_helper::kDefaultBatchSize}}))}};
 
-    ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(
-                           make_intrusive<ExpressionContextForTest>(nss), request),
-                       expectedSerialization);
+    ASSERT_DOCUMENT_EQ(Document(request.toBSON()), expectedSerialization);
 }
 
 TEST(AggregationRequestTest, ShouldSetBatchSizeToDefaultOnEmptyCursorObject) {
@@ -336,9 +328,7 @@ TEST(AggregationRequestTest, ShouldNotSerializeBatchSizeWhenExplainSet) {
         Document{{AggregateCommandRequest::kCommandName, nss.coll()},
                  {AggregateCommandRequest::kPipelineFieldName, std::vector<Value>{}},
                  {AggregateCommandRequest::kCursorFieldName, Value(Document())}};
-    ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(
-                           make_intrusive<ExpressionContextForTest>(nss), request),
-                       expectedSerialization);
+    ASSERT_DOCUMENT_EQ(Document(request.toBSON()), expectedSerialization);
 }
 
 //

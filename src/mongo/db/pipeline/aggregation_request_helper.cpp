@@ -105,20 +105,12 @@ AggregateCommandRequest parseFromBSON(const BSONObj& cmdObj,
     return request;
 }
 
-BSONObj serializeToCommandObj(const AggregateCommandRequest& request) {
-    return request.toBSON();
-}
-
-Document serializeToCommandDoc(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                               const AggregateCommandRequest& request) {
-    MutableDocument doc(Document(request.toBSON().getOwned()));
-
-    if (auto querySettingsBSON = expCtx->getQuerySettings().toBSON();
-        !querySettingsBSON.isEmpty()) {
-        doc.setField(AggregateCommandRequest::kQuerySettingsFieldName, Value(querySettingsBSON));
+void addQuerySettingsToRequest(AggregateCommandRequest& request,
+                               const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const auto& querySettings = expCtx->getQuerySettings();
+    if (!querySettings.toBSON().isEmpty()) {
+        request.setQuerySettings(querySettings);
     }
-
-    return doc.freeze();
 }
 
 void validate(const AggregateCommandRequest& aggregate,

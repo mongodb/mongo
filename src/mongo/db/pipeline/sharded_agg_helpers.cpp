@@ -189,12 +189,11 @@ RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<Expressi
     cursor.setBatchSize(0);
     aggReq.setCursor(cursor);
     setReadWriteConcern(expCtx->getOperationContext(), aggReq, true, !expCtx->getExplain());
-    auto cmdObjWithRWC = aggregation_request_helper::serializeToCommandObj(aggReq);
     auto configCursor = establishCursors(expCtx->getOperationContext(),
                                          expCtx->getMongoProcessInterface()->taskExecutor,
                                          aggReq.getNamespace(),
                                          ReadPreferenceSetting{ReadPreference::SecondaryPreferred},
-                                         {{configShard->getId(), cmdObjWithRWC}},
+                                         {{configShard->getId(), aggReq.toBSON()}},
                                          false);
     invariant(configCursor.size() == 1);
     return std::move(*configCursor.begin());
@@ -653,11 +652,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> runPipelineDirectlyOnSingleShard(
         uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, request.getNamespace()));
 
     auto requests =
-        buildVersionedRequests(expCtx,
-                               request.getNamespace(),
-                               cri,
-                               {shardId},
-                               aggregation_request_helper::serializeToCommandObj(request));
+        buildVersionedRequests(expCtx, request.getNamespace(), cri, {shardId}, request.toBSON());
     auto cursors = establishCursors(opCtx,
                                     expCtx->getMongoProcessInterface()->taskExecutor,
                                     request.getNamespace(),
@@ -1503,25 +1498,25 @@ BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
 
     sharding::router::CollectionRouter router(expCtx->getOperationContext()->getServiceContext(),
                                               expCtx->getNamespaceString());
-    return router.route(
-        expCtx->getOperationContext(),
-        "collecting explain from shards"_sd,
-        [&](OperationContext* opCtx, const CollectionRoutingInfo& _) {
-            auto shardDispatchResults = dispatchShardPipeline(
-                aggregation_request_helper::serializeToCommandDoc(expCtx, aggRequest),
-                pipelineDataSource,
-                expCtx->eligibleForSampling(),
-                pipeline->clone(),
-                expCtx->getExplain(),
-                false /* requestQueryStatsFromRemotes */,
-                uassertStatusOK(
-                    getCollectionRoutingInfoForTxnCmd(opCtx, expCtx->getNamespaceString())));
-            BSONObjBuilder explainBuilder;
-            auto appendStatus =
-                appendExplainResults(std::move(shardDispatchResults), expCtx, &explainBuilder);
-            uassertStatusOK(appendStatus);
-            return BSON("pipeline" << explainBuilder.done());
-        });
+    aggregation_request_helper::addQuerySettingsToRequest(aggRequest, expCtx);
+    return router.route(expCtx->getOperationContext(),
+                        "collecting explain from shards"_sd,
+                        [&](OperationContext* opCtx, const CollectionRoutingInfo& _) {
+                            auto shardDispatchResults = dispatchShardPipeline(
+                                Document(aggRequest.toBSON()),
+                                pipelineDataSource,
+                                expCtx->eligibleForSampling(),
+                                pipeline->clone(),
+                                expCtx->getExplain(),
+                                false /* requestQueryStatsFromRemotes */,
+                                uassertStatusOK(getCollectionRoutingInfoForTxnCmd(
+                                    opCtx, expCtx->getNamespaceString())));
+                            BSONObjBuilder explainBuilder;
+                            auto appendStatus = appendExplainResults(
+                                std::move(shardDispatchResults), expCtx, &explainBuilder);
+                            uassertStatusOK(appendStatus);
+                            return BSON("pipeline" << explainBuilder.done());
+                        });
 }
 
 StatusWith<CollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* opCtx,
@@ -1577,18 +1572,18 @@ std::unique_ptr<Pipeline, PipelineDeleter> dispatchTargetedPipelineAndAddMergeCu
         aggRequest.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
     }
 
-    auto shardDispatchResults = dispatchTargetedShardPipeline(
-        aggregation_request_helper::serializeToCommandDoc(expCtx, aggRequest),
-        targeting,
-        hasChangeStream,
-        expCtx->eligibleForSampling(),
-        cri,
-        std::move(pipeline),
-        boost::none /* explain */,
-        requestQueryStatsFromRemotes,
-        readConcern,
-        {} /* designatedHostsMap */,
-        {} /* resumeTokenMap */);
+    aggregation_request_helper::addQuerySettingsToRequest(aggRequest, expCtx);
+    auto shardDispatchResults = dispatchTargetedShardPipeline(Document(aggRequest.toBSON()),
+                                                              targeting,
+                                                              hasChangeStream,
+                                                              expCtx->eligibleForSampling(),
+                                                              cri,
+                                                              std::move(pipeline),
+                                                              boost::none /* explain */,
+                                                              requestQueryStatsFromRemotes,
+                                                              readConcern,
+                                                              {} /* designatedHostsMap */,
+                                                              {} /* resumeTokenMap */);
 
     std::vector<ShardId> targetedShards;
     targetedShards.reserve(shardDispatchResults.remoteCursors.size());

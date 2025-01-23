@@ -74,7 +74,7 @@ TEST(ResolvedViewTest, ExpandingAggRequestWithEmptyPipelineOnNoOpViewYieldsEmpty
     BSONObj expected =
         BSON("aggregate" << backingNss.coll() << "pipeline" << BSONArray() << "cursor"
                          << kDefaultCursorOptionDocument << "collation" << BSONObj());
-    ASSERT_BSONOBJ_EQ(aggregation_request_helper::serializeToCommandObj(result), expected);
+    ASSERT_BSONOBJ_EQ(result.toBSON(), expected);
 }
 
 TEST(ResolvedViewTest, ExpandingAggRequestWithNonemptyPipelineAppendsToViewPipeline) {
@@ -88,7 +88,7 @@ TEST(ResolvedViewTest, ExpandingAggRequestWithNonemptyPipelineAppendsToViewPipel
         BSON("aggregate" << backingNss.coll() << "pipeline"
                          << BSON_ARRAY(BSON("skip" << 7) << BSON("limit" << 3)) << "cursor"
                          << kDefaultCursorOptionDocument << "collation" << BSONObj());
-    ASSERT_BSONOBJ_EQ(aggregation_request_helper::serializeToCommandObj(result), expected);
+    ASSERT_BSONOBJ_EQ(result.toBSON(), expected);
 }
 
 TEST(ResolvedViewTest, ExpandingAggRequestPreservesExplain) {

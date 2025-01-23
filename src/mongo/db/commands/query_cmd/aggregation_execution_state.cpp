@@ -416,7 +416,7 @@ void AggExState::setView(std::shared_ptr<const CollectionCatalog> catalog,
     _resolvedViewLiteParsedPipeline = _resolvedViewRequest.value();
     _aggReqDerivatives = std::make_unique<AggregateRequestDerivatives>(
         _resolvedViewRequest.value(), _resolvedViewLiteParsedPipeline.value(), [this]() {
-            return aggregation_request_helper::serializeToCommandObj(_resolvedViewRequest.value());
+            return _resolvedViewRequest.value().toBSON();
         });
 
     _executionNss = _aggReqDerivatives->request.getNamespace();

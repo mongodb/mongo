@@ -217,13 +217,11 @@ public:
             auto aggRequestOnView =
                 query_request_conversion::asAggregateCommandRequest(countRequest, boost::none);
             auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView);
-            auto resolvedAggCmd =
-                aggregation_request_helper::serializeToCommandObj(resolvedAggRequest);
 
             BSONObj aggResult = CommandHelpers::runCommandDirectly(
                 opCtx,
                 OpMsgRequestBuilder::create(
-                    auth::ValidatedTenancyScope::get(opCtx), dbName, std::move(resolvedAggCmd)));
+                    auth::ValidatedTenancyScope::get(opCtx), dbName, resolvedAggRequest.toBSON()));
 
             result.resetToEmpty();
             ViewResponseFormatter formatter(aggResult);

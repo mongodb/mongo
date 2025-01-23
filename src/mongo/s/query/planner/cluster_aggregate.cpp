@@ -146,7 +146,8 @@ Document serializeForPassthrough(const boost::intrusive_ptr<ExpressionContext>& 
     req.setMaxTimeMS(maxTimeMS);
     req.setReadConcern(std::move(readConcern));
     req.setWriteConcern(std::move(writeConcern));
-    return aggregation_request_helper::serializeToCommandDoc(expCtx, req);
+    aggregation_request_helper::addQuerySettingsToRequest(req, expCtx);
+    return Document(req.toBSON());
 }
 
 // Build an appropriate ExpressionContext for the pipeline. This helper instantiates an appropriate
