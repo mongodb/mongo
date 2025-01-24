@@ -184,7 +184,7 @@ def validate_bazel_groups(generate_report, fix):
 
         if groups[group] != group_tests:
             for test in group_tests:
-                if test not in groups[group]:
+                if test not in bazel_unittests:
                     failures.append(
                         [
                             test + " tag",
