@@ -491,6 +491,46 @@ python-dateutil = "*"
 
 [[package]]
 name = "cryptography"
+version = "2.3"
+description = "cryptography is a package which provides cryptographic recipes and primitives to Python developers."
+optional = false
+python-versions = ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*"
+files = [
+    {file = "cryptography-2.3-cp27-cp27m-macosx_10_6_intel.whl", hash = "sha256:87d092a7c2a44e5f7414ab02fb4145723ebba411425e1a99773531dd4c0e9b8d"},
+    {file = "cryptography-2.3-cp27-cp27m-manylinux1_i686.whl", hash = "sha256:67f7f57eae8dede577f3f7775957f5bec93edd6bdb6ce597bb5b28e1bdf3d4fb"},
+    {file = "cryptography-2.3-cp27-cp27m-manylinux1_x86_64.whl", hash = "sha256:27bb401a20a838d6d0ea380f08c6ead3ccd8c9d8a0232dc9adcc0e4994576a66"},
+    {file = "cryptography-2.3-cp27-cp27m-win32.whl", hash = "sha256:7ba834564daef87557e7fcd35c3c3183a4147b0b3a57314e53317360b9b201b3"},
+    {file = "cryptography-2.3-cp27-cp27m-win_amd64.whl", hash = "sha256:9449f5d4d7c516a6118fa9210c4a00f34384cb1d2028672100ee0c6cce49d7f6"},
+    {file = "cryptography-2.3-cp27-cp27mu-manylinux1_i686.whl", hash = "sha256:c3d945b7b577f07a477700f618f46cbc287af3a9222cd73035c6ef527ef2c363"},
+    {file = "cryptography-2.3-cp27-cp27mu-manylinux1_x86_64.whl", hash = "sha256:bc2301170986ad82d9349a91eb8884e0e191209c45f5541b16aa7c0cfb135978"},
+    {file = "cryptography-2.3-cp34-abi3-macosx_10_6_intel.whl", hash = "sha256:d01dfc5c2b3495184f683574e03c70022674ca9a7be88589c5aba130d835ea90"},
+    {file = "cryptography-2.3-cp34-abi3-manylinux1_i686.whl", hash = "sha256:2a35b7570d8f247889784010aac8b384fd2e4a47b33e15c4a60b45a7c1944120"},
+    {file = "cryptography-2.3-cp34-abi3-manylinux1_x86_64.whl", hash = "sha256:5eb86f03f9c4f0ac2336ac5431271072ddf7ecc76b338e26366732cfac58aa19"},
+    {file = "cryptography-2.3-cp34-cp34m-win32.whl", hash = "sha256:29720c4253263cff9aea64585adbbe85013ba647f6e98367efff9db2d7193ded"},
+    {file = "cryptography-2.3-cp34-cp34m-win_amd64.whl", hash = "sha256:82409f5150e529d699e5c33fa8fd85e965104db03bc564f5f4b6a9199e591f7c"},
+    {file = "cryptography-2.3-cp35-cp35m-win32.whl", hash = "sha256:7d7f084cbe1fdb82be5a0545062b59b1ad3637bc5a48612ac2eb428ff31b31ea"},
+    {file = "cryptography-2.3-cp35-cp35m-win_amd64.whl", hash = "sha256:6ec84edcbc966ae460560a51a90046503ff0b5b66157a9efc61515c68059f6c8"},
+    {file = "cryptography-2.3-cp36-cp36m-win32.whl", hash = "sha256:8c56ef989342e42b9fcaba7c74b446f0cc9bed546dd00034fa7ad66fc00307ef"},
+    {file = "cryptography-2.3-cp36-cp36m-win_amd64.whl", hash = "sha256:42c531a6a354407f42ee07fda5c2c0dc822cf6d52744949c182f2b295fbd4183"},
+    {file = "cryptography-2.3-cp37-cp37m-win32.whl", hash = "sha256:21af753934f2f6d1a10fe8f4c0a64315af209ef6adeaee63ca349797d747d687"},
+    {file = "cryptography-2.3-cp37-cp37m-win_amd64.whl", hash = "sha256:cee18beb4c807b5c0b178f4fa2fae03cef9d51821a358c6890f8b23465b7e5d2"},
+    {file = "cryptography-2.3.tar.gz", hash = "sha256:c132bab45d4bd0fff1d3fe294d92b0a6eb8404e93337b3127bdec9f21de117e6"},
+]
+
+[package.dependencies]
+asn1crypto = ">=0.21.0"
+cffi = ">=1.7,<1.11.3 || >1.11.3"
+idna = ">=2.1"
+six = ">=1.4.1"
+
+[package.extras]
+docs = ["sphinx (>=1.6.5)", "sphinx-rtd-theme"]
+docstest = ["doc8", "pyenchant (>=1.6.11)", "readme-renderer (>=16.0)", "sphinxcontrib-spelling (>=4.0.1)"]
+pep8test = ["flake8", "flake8-import-order", "pep8-naming"]
+test = ["cryptography-vectors (==2.3)", "hypothesis (>=1.11.4)", "iso8601", "pretend", "pytest (>=3.2.1,!=3.3.0)", "pytz"]
+
+[[package]]
+name = "cryptography"
 version = "36.0.2"
 description = "cryptography is a package which provides cryptographic recipes and primitives to Python developers."
 optional = false
@@ -2455,6 +2495,26 @@ email = ["email-validator (>=1.0.3)"]
 
 [[package]]
 name = "pygithub"
+version = "1.58.0"
+description = "Use the full Github API v3"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "PyGithub-1.58.0-py3-none-any.whl", hash = "sha256:b7bac601492a2b6c876ef326e4ffa3c1923e32707e415da76bfb8307ee8ffb7e"},
+    {file = "PyGithub-1.58.0.tar.gz", hash = "sha256:e325f5ca2c111d19dea2796c8f1e7ae11da77287007736582196341390d31d35"},
+]
+
+[package.dependencies]
+deprecated = "*"
+pyjwt = ">=2.4.0"
+pynacl = ">=1.4.0"
+requests = ">=2.14.0"
+
+[package.extras]
+integrations = ["cryptography"]
+
+[[package]]
+name = "pygithub"
 version = "1.59.1"
 description = "Use the full Github API v3"
 optional = false
@@ -4273,4 +4333,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<4.0"
-content-hash = "d1e4f07a3ee8d738b59950cd62653fbbf2362a79dd310cae7ca19dfb09ad97d7"
+content-hash = "8b2fd11d487b1af76827bc04fa8056db1ee29c1765169fadc90af5a04d793b89"

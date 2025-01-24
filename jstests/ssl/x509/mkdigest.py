@@ -5,11 +5,11 @@ Invoke as `mkdigest.py <cert|crl> <sha256|sha1> <filename1> [filename2 ...]`
 """
 
 import argparse
-import hashlib
 
+import cryptography.hazmat.primitives.hashes as hashes
 import OpenSSL
 
-DIGEST_NAME_TO_HASH = {"sha256": hashlib.sha256(), "sha1": hashlib.sha1()}
+DIGEST_NAME_TO_HASH = {"sha256": hashes.SHA256(), "sha1": hashes.SHA1()}
 
 
 def make_digest(filename, item_type, digest_type):
