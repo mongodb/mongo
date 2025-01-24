@@ -797,7 +797,7 @@ last-continuous:
     ticket: SERVER-95670
   - test_file: jstests/core/write/update/upsert_duplicate_key_retry_collation.js
     ticket: SERVER-84089
-  - test_file: jstests/core/query/doc_validation/json_schema_validate_empty_path.js
+  - test_file: jstests/core/query/json_schema_validate_empty_path.js
     ticket: SERVER-97254
   - test_file: jstests/change_streams/update_lookup_before_ddl.js
     ticket: SERVER-95976
@@ -1672,7 +1672,7 @@ last-lts:
     ticket: SERVER-95670
   - test_file: jstests/core/write/update/upsert_duplicate_key_retry_collation.js
     ticket: SERVER-84089
-  - test_file: jstests/core/query/doc_validation/json_schema_validate_empty_path.js
+  - test_file: jstests/core/query/json_schema_validate_empty_path.js
     ticket: SERVER-97254
   - test_file: jstests/change_streams/update_lookup_before_ddl.js
     ticket: SERVER-95976
