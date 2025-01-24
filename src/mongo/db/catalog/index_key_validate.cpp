@@ -96,7 +96,6 @@ namespace {
 // names will be disabled. This will allow for creation of indexes with invalid field names in their
 // specification.
 MONGO_FAIL_POINT_DEFINE(skipIndexCreateFieldNameValidation);
-MONGO_FAIL_POINT_DEFINE(skipIndexCreateWeightsFieldValidation);
 
 // When the skipTTLIndexExpireAfterSecondsValidation failpoint is enabled,
 // validation for TTL index 'expireAfterSeconds' will be disabled in certain codepaths.
@@ -664,12 +663,10 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
     }
 
     if (indexType != IndexNames::TEXT && hasWeightsField) {
-        if (!skipIndexCreateWeightsFieldValidation.shouldFail()) {
-            return {ErrorCodes::CannotCreateIndex,
-                    str::stream() << "Invalid index specification " << indexSpec << "; the field '"
-                                  << IndexDescriptor::kWeightsFieldName
-                                  << "' can only be specified with text indexes"};
-        }
+        return {ErrorCodes::CannotCreateIndex,
+                str::stream() << "Invalid index specification " << indexSpec << "; the field '"
+                              << IndexDescriptor::kWeightsFieldName
+                              << "' can only be specified with text indexes"};
     }
 
     if (unique && prepareUnique) {

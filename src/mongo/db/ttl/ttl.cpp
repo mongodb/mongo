@@ -51,7 +51,6 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -78,7 +77,6 @@
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
@@ -115,8 +113,23 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
-
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangTTLMonitorWithLock);
+MONGO_FAIL_POINT_DEFINE(hangTTLMonitorBetweenPasses);
+
+// A TTL pass completes when there are no more expired documents to remove. A single TTL pass may
+// consist of multiple sub-passes. Each sub-pass deletes all the expired documents it can up to
+// 'ttlSubPassTargetSecs'. It is possible for a sub-pass to complete before all expired documents
+// have been removed.
+auto& ttlPasses = *MetricBuilder<Counter64>{"ttl.passes"};
+auto& ttlSubPasses = *MetricBuilder<Counter64>{"ttl.subPasses"};
+auto& ttlDeletedDocuments = *MetricBuilder<Counter64>{"ttl.deletedDocuments"};
+
+// Tracks the number of TTL deletes skipped due to a TTL secondary index being present, but not
+// valid for TTL removal. A non-zero value indicates there is a TTL non-conformant index present and
+// users must manually modify the secondary index to utilize automatic TTL deletion.
+auto& ttlInvalidTTLIndexSkips = *MetricBuilder<Counter64>{"ttl.invalidTTLIndexSkips"};
 
 namespace {
 const auto getTTLMonitor = ServiceContext::declareDecoration<std::unique_ptr<TTLMonitor>>();
@@ -201,16 +214,7 @@ const IndexDescriptor* getValidTTLIndex(OperationContext* opCtx,
         return nullptr;
     }
 
-    const BSONObj key = spec["key"].Obj();
-    if (key.nFields() != 1) {
-        LOGV2_ERROR(22540,
-                    "key for ttl index can only have 1 field, skipping TTL job",
-                    "index"_attr = spec);
-        return nullptr;
-    }
-
     const IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
-
     if (!desc) {
         LOGV2_DEBUG(22535, 1, "index not found; skipping ttl job", "index"_attr = spec);
         return nullptr;
@@ -220,10 +224,12 @@ const IndexDescriptor* getValidTTLIndex(OperationContext* opCtx,
         LOGV2_ERROR(22541,
                     "special index can't be used as a TTL index, skipping TTL job",
                     "index"_attr = spec);
+        ttlInvalidTTLIndexSkips.increment();
         return nullptr;
     }
 
     if (auto status = index_key_validate::validateIndexSpecTTL(spec); !status.isOK()) {
+        ttlInvalidTTLIndexSkips.increment();
         LOGV2_ERROR(6909100,
                     "Skipping TTL job due to invalid index spec",
                     "reason"_attr = status.reason(),
@@ -236,61 +242,7 @@ const IndexDescriptor* getValidTTLIndex(OperationContext* opCtx,
     return desc;
 }
 
-/**
- * Runs on primaries and secondaries. Forwards replica set events to the TTLMonitor.
- */
-class TTLMonitorService : public ReplicaSetAwareService<TTLMonitorService> {
-public:
-    static TTLMonitorService* get(ServiceContext* serviceContext);
-    TTLMonitorService() = default;
-
-private:
-    void onStartup(OperationContext* opCtx) override {}
-    void onSetCurrentConfig(OperationContext* opCtx) override {}
-    void onConsistentDataAvailable(OperationContext* opCtx,
-                                   bool isMajority,
-                                   bool isRollback) override {}
-    void onShutdown() override {}
-    void onStepUpBegin(OperationContext* opCtx, long long term) override {}
-    void onStepUpComplete(OperationContext* opCtx, long long term) override {
-        auto ttlMonitor = TTLMonitor::get(opCtx->getServiceContext());
-        if (!ttlMonitor) {
-            // Some test fixtures might not install the TTLMonitor.
-            return;
-        }
-        ttlMonitor->onStepUp();
-    }
-    void onStepDown() override {}
-    void onRollbackBegin() override {}
-    void onBecomeArbiter() override {}
-    inline std::string getServiceName() const final {
-        return "TTLMonitorService";
-    }
-};
-
-const auto _ttlMonitorService = ServiceContext::declareDecoration<TTLMonitorService>();
-
-const ReplicaSetAwareServiceRegistry::Registerer<TTLMonitorService> _ttlMonitorServiceRegisterer(
-    "TTLMonitorService");
-
-// static
-TTLMonitorService* TTLMonitorService::get(ServiceContext* serviceContext) {
-    return &_ttlMonitorService(serviceContext);
-}
-
 }  // namespace
-
-MONGO_FAIL_POINT_DEFINE(hangTTLMonitorWithLock);
-MONGO_FAIL_POINT_DEFINE(hangTTLMonitorBetweenPasses);
-MONGO_FAIL_POINT_DEFINE(TTLMonitorSkipRunningCollMod);
-
-// A TTL pass completes when there are no more expired documents to remove. A single TTL pass may
-// consist of multiple sub-passes. Each sub-pass deletes all the expired documents it can up to
-// 'ttlSubPassTargetSecs'. It is possible for a sub-pass to complete before all expired documents
-// have been removed.
-auto& ttlPasses = *MetricBuilder<Counter64>{"ttl.passes"};
-auto& ttlSubPasses = *MetricBuilder<Counter64>{"ttl.subPasses"};
-auto& ttlDeletedDocuments = *MetricBuilder<Counter64>{"ttl.deletedDocuments"};
 
 TTLMonitor::TTLMonitor()
     : BackgroundJob(false /* selfDelete */),
@@ -785,133 +737,16 @@ void shutdownTTLMonitor(ServiceContext* serviceContext) {
     }
 }
 
-void TTLMonitor::doStepUpFixes(OperationContext* opCtx) {
-    auto&& ttlCollectionCache = TTLCollectionCache::get(opCtx->getServiceContext());
-    auto ttlInfos = ttlCollectionCache.getTTLInfos();
-    for (const auto& [uuid, infos] : ttlInfos) {
-        auto collectionCatalog = CollectionCatalog::get(opCtx);
-
-        // The collection was dropped.
-        auto nss = collectionCatalog->lookupNSSByUUID(opCtx, uuid);
-        if (!nss) {
-            continue;
-        }
-
-        if (nss->isTemporaryReshardingCollection()) {
-            continue;
-        }
-
-        try {
-            uassertStatusOK(userAllowedWriteNS(opCtx, *nss));
-
-            for (const auto& info : infos) {
-                // Skip clustered indexes with TTL. This includes time-series collections.
-                if (info.isClustered()) {
-                    continue;
-                }
-
-                // If the cached value is fine, we don't need to check any closer.
-                if (!info.isExpireAfterSecondsInvalid() && !info.isExpireAfterSecondsNonInt()) {
-                    continue;
-                }
-
-                // At this point we need to look closer at the current version of the index
-                // spec, and hold the lock to prevent concurrent collMod.
-                auto coll = acquireCollection(
-                    opCtx,
-                    CollectionAcquisitionRequest::fromOpCtx(
-                        opCtx, *nss, AcquisitionPrerequisites::OperationType::kWrite),
-                    MODE_X);
-
-                if (!coll.exists() || coll.uuid() != uuid) {
-                    continue;
-                }
-                const auto& collectionPtr = coll.getCollectionPtr();
-
-                auto indexName = info.getIndexName();
-                if (!collectionPtr->isIndexPresent(indexName)) {
-                    // This index must have been dropped, clean up the cache.
-                    ttlCollectionCache.deregisterTTLIndexByName(uuid, indexName);
-                    continue;
-                }
-
-                BSONObj spec = collectionPtr->getIndexSpec(indexName);
-                auto expireAfterSecondsElem = spec[IndexDescriptor::kExpireAfterSecondsFieldName];
-                if (!expireAfterSecondsElem) {
-                    // This index must have been modified, clean up the cache.
-                    ttlCollectionCache.deregisterTTLIndexByName(uuid, indexName);
-                    continue;
-                }
-
-                if (auto correctedExpireAfterSeconds =
-                        index_key_validate::normalizeExpireAfterSeconds(expireAfterSecondsElem)) {
-                    if (MONGO_unlikely(TTLMonitorSkipRunningCollMod.shouldFail())) {
-                        LOGV2(90449,
-                              "TTL monitor skipping running collMod to fix TTL index due to "
-                              "failpoint");
-                        continue;
-                    }
-                    LOGV2(6847700,
-                          "Running collMod to fix TTL index with invalid "
-                          "'expireAfterSeconds'.",
-                          "ns"_attr = *nss,
-                          "uuid"_attr = uuid,
-                          "name"_attr = indexName,
-                          "expireAfterSecondsNew"_attr = correctedExpireAfterSeconds.value());
-
-                    // Compose collMod command to amend 'expireAfterSeconds' to same value that
-                    // would be used by listIndexes() to convert an invalid value in the
-                    // catalog.
-                    CollModIndex collModIndex;
-                    collModIndex.setName(indexName);
-                    collModIndex.setExpireAfterSeconds(correctedExpireAfterSeconds.value());
-
-                    CollMod collModCmd{*nss};
-                    collModCmd.getCollModRequest().setIndex(collModIndex);
-
-                    BSONObjBuilder builder;
-                    uassertStatusOK(processCollModCommand(
-                        opCtx, {nss->dbName(), uuid}, collModCmd, &coll, &builder));
-                    auto result = builder.obj();
-                    LOGV2(6847701,
-                          "Successfully fixed TTL index with invalid 'expireAfterSeconds' using "
-                          "collMod",
-                          "ns"_attr = *nss,
-                          "uuid"_attr = uuid,
-                          "name"_attr = indexName,
-                          "result"_attr = result);
-                }
-            }
-        } catch (const DBException& ex) {
-            LOGV2_ERROR(6835901,
-                        "Error checking TTL job on collection during step up",
-                        logAttrs(*nss),
-                        "error"_attr = ex);
-            continue;
-        }
-    }
-}
-
-void TTLMonitor::onStepUp() {
-    // A prepared transaction, which has a write to a collection "foo",  will reacquire an IX lock
-    // on "foo" prior to running this function. Thus processCollModCommand(), which will acquire
-    // MODE_X access to the collection, can't run synchronously here. Spawn and detach a thread to
-    // run it in background.
-    stdx::thread([]() mutable {
-        ThreadClient tc("InvalidTTLIndexFixer",
-                        getGlobalServiceContext()->getService(ClusterRole::ShardServer));
-        AuthorizationSession::get(cc())->grantInternalAuthorization();
-        const auto opCtxCtr = cc().makeOperationContext();
-        doStepUpFixes(opCtxCtr.get());
-    }).detach();
-}
-
 long long TTLMonitor::getTTLPasses_forTest() {
     return ttlPasses.get();
 }
 
 long long TTLMonitor::getTTLSubPasses_forTest() {
     return ttlSubPasses.get();
+}
+
+long long TTLMonitor::getInvalidTTLIndexSkips_forTest() {
+    return ttlInvalidTTLIndexSkips.get();
 }
 
 }  // namespace mongo
