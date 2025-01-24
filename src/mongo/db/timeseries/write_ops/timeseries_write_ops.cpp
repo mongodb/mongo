@@ -340,8 +340,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
 
     timeseries::getOpTimeAndElectionId(opCtx, opTime, electionId);
 
-    auto closedBucket = bucket_catalog::finish(
-        bucketCatalog, batch, bucket_catalog::CommitInfo{*opTime, *electionId});
+    auto closedBucket = bucket_catalog::finish(bucketCatalog, batch);
 
     if (closedBucket) {
         // If this write closed a bucket, compress the bucket
@@ -582,8 +581,7 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
         timeseries::getOpTimeAndElectionId(opCtx, opTime, electionId);
 
         for (auto batch : batchesToCommit) {
-            auto closedBucket = bucket_catalog::finish(
-                bucketCatalog, batch, bucket_catalog::CommitInfo{*opTime, *electionId});
+            auto closedBucket = bucket_catalog::finish(bucketCatalog, batch);
             batch.get().reset();
 
             if (!closedBucket) {
@@ -677,7 +675,7 @@ void processBatchResults(OperationContext* opCtx,
             continue;
         }
 
-        auto batchStatus = bucket_catalog::getWriteBatchResult(*batch).getStatus();
+        auto batchStatus = bucket_catalog::getWriteBatchStatus(*batch);
         if (batchStatus == ErrorCodes::TimeseriesBucketCleared) {
             docsToRetry->push_back(index);
             continue;

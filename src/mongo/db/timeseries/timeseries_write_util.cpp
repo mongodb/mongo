@@ -585,12 +585,8 @@ void commitTimeseriesBucketsAtomically(
         performAtomicWrites(
             opCtx, coll, recordId, modificationOp, insertOps, updateOps, fromMigrate, stmtId);
 
-        boost::optional<repl::OpTime> opTime;
-        boost::optional<OID> electionId;
-        getOpTimeAndElectionId(opCtx, &opTime, &electionId);
-
         for (auto batch : batchesToCommit) {
-            finish(sideBucketCatalog, batch, bucket_catalog::CommitInfo{opTime, electionId});
+            finish(sideBucketCatalog, batch);
             batch.get().reset();
         }
     } catch (...) {

@@ -107,11 +107,11 @@ void prepareWriteBatchForCommit(TrackingContexts& trackingContexts,
 }
 
 /**
- * Reports the result and status of a commit, and notifies anyone waiting on getResult().
+ * Notifies anyone waiting on the promise.
  * Inactive batches only.
  */
-void finishWriteBatch(WriteBatch& batch, const CommitInfo& info) {
-    batch.promise.emplaceValue(info);
+void finishWriteBatch(WriteBatch& batch) {
+    batch.promise.emplaceValue();
 }
 
 /**
@@ -495,7 +495,7 @@ StatusWith<InsertResult> insert(BucketCatalog& catalog,
 
 void waitToInsert(InsertWaiter* waiter) {
     if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(waiter)) {
-        getWriteBatchResult(**batch).getStatus().ignore();
+        getWriteBatchStatus(**batch).ignore();
     } else if (auto* request = get_if<std::shared_ptr<ReopeningRequest>>(waiter)) {
         waitForReopeningRequest(**request);
     }
@@ -505,7 +505,7 @@ Status prepareCommit(BucketCatalog& catalog,
                      std::shared_ptr<WriteBatch> batch,
                      const StringDataComparator* comparator) {
     auto getBatchStatus = [&] {
-        return batch->promise.getFuture().getNoThrow().getStatus();
+        return batch->promise.getFuture().getNoThrow();
     };
 
     if (isWriteBatchFinished(*batch)) {
@@ -546,14 +546,12 @@ Status prepareCommit(BucketCatalog& catalog,
     return Status::OK();
 }
 
-boost::optional<ClosedBucket> finish(BucketCatalog& catalog,
-                                     std::shared_ptr<WriteBatch> batch,
-                                     const CommitInfo& info) {
+boost::optional<ClosedBucket> finish(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch) {
     invariant(!isWriteBatchFinished(*batch));
 
     boost::optional<ClosedBucket> closedBucket;
 
-    finishWriteBatch(*batch, info);
+    finishWriteBatch(*batch);
 
     auto& stripe = *catalog.stripes[internal::getStripeNumber(catalog, batch->bucketId)];
     stdx::lock_guard stripeLock{stripe.mutex};

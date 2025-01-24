@@ -284,7 +284,7 @@ void BucketCatalogTest::_commit(const NamespaceString& ns,
                                       ns.makeTimeseriesBucketsNamespace(),
                                       &insertOps,
                                       &updateOps);
-    finish(*_bucketCatalog, batch, {});
+    finish(*_bucketCatalog, batch);
 }
 
 void BucketCatalogTest::_insertOneAndCommit(const NamespaceString& ns,
@@ -577,10 +577,9 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucket) {
     ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0);
 
     // Once the commit has occurred, the waiter should be notified.
-    finish(*_bucketCatalog, batch1, {});
+    finish(*_bucketCatalog, batch1);
     ASSERT(isWriteBatchFinished(*batch2));
-    auto result3 = getWriteBatchResult(*batch2);
-    ASSERT_OK(result3.getStatus());
+    ASSERT_OK(getWriteBatchStatus(*batch2));
 }
 
 TEST_F(BucketCatalogTest, GetMetadataReturnsEmptyDocOnMissingBucket) {
@@ -652,12 +651,12 @@ TEST_F(BucketCatalogTest, InsertThroughDifferentCatalogsIntoDifferentBuckets) {
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
     ASSERT_EQ(batch1->measurements.size(), 1);
     ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0);
-    finish(*_bucketCatalog, batch1, {});
+    finish(*_bucketCatalog, batch1);
 
     ASSERT_OK(prepareCommit(temporaryBucketCatalog, batch2, _getCollator(_ns2)));
     ASSERT_EQ(batch2->measurements.size(), 1);
     ASSERT_EQ(batch2->numPreviouslyCommittedMeasurements, 0);
-    finish(temporaryBucketCatalog, batch2, {});
+    finish(temporaryBucketCatalog, batch2);
 }
 
 TEST_F(BucketCatalogTest, InsertIntoSameBucketArray) {
@@ -803,7 +802,7 @@ TEST_F(BucketCatalogTest, InsertBetweenPrepareAndFinish) {
     (void)write_ops_utils::makeTimeseriesInsertOp(batch1,
                                                   _ns1.makeTimeseriesBucketsNamespace(),
                                                   getMetadata(*_bucketCatalog, batch1->bucketId));
-    finish(*_bucketCatalog, batch1, {});
+    finish(*_bucketCatalog, batch1);
     ASSERT(isWriteBatchFinished(*batch1));
 
     // Verify the second batch still commits one doc, and that the first batch only commited one.
@@ -894,11 +893,11 @@ TEST_F(BucketCatalogTest, AbortBatchOnBucketWithPreparedCommit) {
 
     abort(*_bucketCatalog, batch2, {ErrorCodes::TimeseriesBucketCleared, ""});
     ASSERT(isWriteBatchFinished(*batch2));
-    ASSERT_EQ(getWriteBatchResult(*batch2).getStatus(), ErrorCodes::TimeseriesBucketCleared);
+    ASSERT_EQ(getWriteBatchStatus(*batch2), ErrorCodes::TimeseriesBucketCleared);
 
-    finish(*_bucketCatalog, batch1, {});
+    finish(*_bucketCatalog, batch1);
     ASSERT(isWriteBatchFinished(*batch1));
-    ASSERT_OK(getWriteBatchResult(*batch1).getStatus());
+    ASSERT_OK(getWriteBatchStatus(*batch1));
 }
 
 TEST_F(BucketCatalogTest, ClearNamespaceWithConcurrentWrites) {
@@ -910,7 +909,7 @@ TEST_F(BucketCatalogTest, ClearNamespaceWithConcurrentWrites) {
 
     ASSERT_NOT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT(isWriteBatchFinished(*batch));
-    ASSERT_EQ(getWriteBatchResult(*batch).getStatus(), ErrorCodes::TimeseriesBucketCleared);
+    ASSERT_EQ(getWriteBatchStatus(*batch), ErrorCodes::TimeseriesBucketCleared);
 
     result =
         _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
@@ -926,9 +925,9 @@ TEST_F(BucketCatalogTest, ClearNamespaceWithConcurrentWrites) {
     // operation got the collection lock. So the write did actually happen, but is has since been
     // removed, and that's fine for our purposes. The finish just records the result to the batch
     // and updates some statistics.
-    finish(*_bucketCatalog, batch, {});
+    finish(*_bucketCatalog, batch);
     ASSERT(isWriteBatchFinished(*batch));
-    ASSERT_OK(getWriteBatchResult(*batch).getStatus());
+    ASSERT_OK(getWriteBatchStatus(*batch));
 }
 
 
@@ -945,7 +944,7 @@ TEST_F(BucketCatalogTest, ClearBucketWithPreparedBatchThrowsConflict) {
 
     abort(*_bucketCatalog, batch, {ErrorCodes::TimeseriesBucketCleared, ""});
     ASSERT(isWriteBatchFinished(*batch));
-    ASSERT_EQ(getWriteBatchResult(*batch).getStatus(), ErrorCodes::TimeseriesBucketCleared);
+    ASSERT_EQ(getWriteBatchStatus(*batch), ErrorCodes::TimeseriesBucketCleared);
 }
 
 TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
@@ -969,7 +968,7 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
     // Now try to prepare the second batch. Ensure it aborts the batch.
     ASSERT_NOT_OK(prepareCommit(*_bucketCatalog, batch2, _getCollator(_ns2)));
     ASSERT(isWriteBatchFinished(*batch2));
-    ASSERT_EQ(getWriteBatchResult(*batch2).getStatus(), ErrorCodes::TimeseriesBucketCleared);
+    ASSERT_EQ(getWriteBatchStatus(*batch2), ErrorCodes::TimeseriesBucketCleared);
 
     // Make sure we didn't clear the bucket state when we aborted the second batch.
     clear(*_bucketCatalog, _uuid1);
@@ -986,9 +985,9 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
     abort(*_bucketCatalog, batch3, {ErrorCodes::TimeseriesBucketCleared, ""});
 
     // Make sure we can finish the cleanly prepared batch.
-    finish(*_bucketCatalog, batch1, {});
+    finish(*_bucketCatalog, batch1);
     ASSERT(isWriteBatchFinished(*batch1));
-    ASSERT_OK(getWriteBatchResult(*batch1).getStatus());
+    ASSERT_OK(getWriteBatchStatus(*batch1));
 }
 
 TEST_F(BucketCatalogTest, PrepareCommitOnAlreadyAbortedBatch) {
@@ -998,11 +997,11 @@ TEST_F(BucketCatalogTest, PrepareCommitOnAlreadyAbortedBatch) {
 
     abort(*_bucketCatalog, batch, {ErrorCodes::TimeseriesBucketCleared, ""});
     ASSERT(isWriteBatchFinished(*batch));
-    ASSERT_EQ(getWriteBatchResult(*batch).getStatus(), ErrorCodes::TimeseriesBucketCleared);
+    ASSERT_EQ(getWriteBatchStatus(*batch), ErrorCodes::TimeseriesBucketCleared);
 
     ASSERT_NOT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT(isWriteBatchFinished(*batch));
-    ASSERT_EQ(getWriteBatchResult(*batch).getStatus(), ErrorCodes::TimeseriesBucketCleared);
+    ASSERT_EQ(getWriteBatchStatus(*batch), ErrorCodes::TimeseriesBucketCleared);
 }
 
 TEST_F(BucketCatalogTest, InsertRollsOverAlternateBucket) {
@@ -1064,11 +1063,11 @@ TEST_F(BucketCatalogTest, CannotConcurrentlyCommitBatchesForSameBucket) {
             }};
 
         // Finish the first batch.
-        finish(*_bucketCatalog, batch1, {});
+        finish(*_bucketCatalog, batch1);
         ASSERT(isWriteBatchFinished(*batch1));
     }
 
-    finish(*_bucketCatalog, batch2, {});
+    finish(*_bucketCatalog, batch2);
     ASSERT(isWriteBatchFinished(*batch2));
 }
 
@@ -1108,7 +1107,7 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
         // can then finish the first batch, which will allow the second batch to proceed. It should
         // recognize it has been aborted and clean up the bucket.
         abort(*_bucketCatalog, batch3, Status{ErrorCodes::TimeseriesBucketCleared, "cleared"});
-        finish(*_bucketCatalog, batch1, {});
+        finish(*_bucketCatalog, batch1);
         ASSERT(isWriteBatchFinished(*batch1));
     }
     // Wait for the batch 2 task to finish preparing commit. Since batch 1 finished, batch 2 should
@@ -1143,7 +1142,7 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresNewInsertsGoToNewBucket) {
     // Batch 1 will be in a prepared state now. Abort the second batch so that bucket 1 will be
     // closed after batch 1 finishes.
     abort(*_bucketCatalog, batch2, Status{ErrorCodes::TimeseriesBucketCleared, "cleared"});
-    finish(*_bucketCatalog, batch1, {});
+    finish(*_bucketCatalog, batch1);
     ASSERT(isWriteBatchFinished(*batch1));
     ASSERT(isWriteBatchFinished(*batch2));
 
@@ -1174,13 +1173,13 @@ TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
     (void)write_ops_utils::makeTimeseriesInsertOp(batch2,
                                                   _ns1.makeTimeseriesBucketsNamespace(),
                                                   getMetadata(*_bucketCatalog, batch2->bucketId));
-    finish(*_bucketCatalog, batch2, {});
+    finish(*_bucketCatalog, batch2);
 
     // Batch 1 was the first batch to insert the time field, but by commit time it was already
     // committed by batch 2.
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
     ASSERT(batch1->newFieldNamesToBeInserted.empty());
-    finish(*_bucketCatalog, batch1, {});
+    finish(*_bucketCatalog, batch1);
 }
 
 TEST_F(BucketCatalogTest, SchemaChanges) {
@@ -1420,7 +1419,7 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement
         batch->max,
         BSON("u" << BSON("time" << Date_t::fromMillisSinceEpoch(1654529680000) << "b" << 100)));
 
-    finish(*_bucketCatalog, batch, {});
+    finish(*_bucketCatalog, batch);
 }
 
 TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) {
@@ -1475,7 +1474,7 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
         batch->max,
         BSON("u" << BSON("time" << Date_t::fromMillisSinceEpoch(1654529680000) << "b" << 100)));
 
-    finish(*_bucketCatalog, batch, {});
+    finish(*_bucketCatalog, batch);
 }
 
 TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement) {
@@ -1526,7 +1525,7 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
     // Since the reopened bucket was incompatible, we opened a new one.
     ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 0);
 
-    finish(*_bucketCatalog, batch, {});
+    finish(*_bucketCatalog, batch);
 }
 
 TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
@@ -1563,7 +1562,7 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
         bucketId = batch->bucketId;
         ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
         ASSERT_EQ(batch->measurements.size(), 1);
-        finish(*_bucketCatalog, batch, {});
+        finish(*_bucketCatalog, batch);
     }
 
     // Time backwards should hint to re-open.
@@ -1616,7 +1615,7 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
         ASSERT(batch);
         ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
         ASSERT_EQ(batch->measurements.size(), 1);
-        finish(*_bucketCatalog, batch, {});
+        finish(*_bucketCatalog, batch);
     }
 
     // If we try to insert something that could fit in the archived bucket, we should get it back as
@@ -1651,7 +1650,7 @@ TEST_F(BucketCatalogTest, TryInsertWillCreateBucketIfWeWouldCloseExistingBucket)
     auto bucketId = batch->bucketId;
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT_EQ(batch->measurements.size(), 1);
-    finish(*_bucketCatalog, batch, {});
+    finish(*_bucketCatalog, batch);
 
     // Incompatible schema would close the existing bucket, so we should expect to open a new bucket
     // and proceed to insert the document.
@@ -1667,7 +1666,7 @@ TEST_F(BucketCatalogTest, TryInsertWillCreateBucketIfWeWouldCloseExistingBucket)
     ASSERT_NE(batch->bucketId, bucketId);
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT_EQ(batch->measurements.size(), 1);
-    finish(*_bucketCatalog, batch, {});
+    finish(*_bucketCatalog, batch);
 }
 
 TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
@@ -1687,7 +1686,7 @@ TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
     auto oldBucketId = batch->bucketId;
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT_EQ(batch->measurements.size(), 1);
-    finish(*_bucketCatalog, batch, {});
+    finish(*_bucketCatalog, batch);
 
     BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},

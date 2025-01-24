@@ -72,7 +72,7 @@ BSONObj WriteBatch::toBSON() const {
                                                     newFieldNamesToBeInserted.end(), toFieldName)));
 }
 
-StatusWith<CommitInfo> getWriteBatchResult(WriteBatch& batch) {
+Status getWriteBatchStatus(WriteBatch& batch) {
     if (!batch.promise.getFuture().isReady()) {
         batch.stats.incNumWaits();
     }

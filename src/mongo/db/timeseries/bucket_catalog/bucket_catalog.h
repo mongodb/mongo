@@ -288,13 +288,12 @@ Status prepareCommit(BucketCatalog& catalog,
                      const StringDataComparator* comparator);
 
 /**
- * Records the result of a batch commit. Batch must have been previously prepared.
+ * Finishes committing the batch and notifies other threads waiting for preparing their batches.
+ * Batch must have been previously prepared.
  *
  * Returns bucket information of a bucket if one was closed.
  */
-boost::optional<ClosedBucket> finish(BucketCatalog& catalog,
-                                     std::shared_ptr<WriteBatch> batch,
-                                     const CommitInfo& info);
+boost::optional<ClosedBucket> finish(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch);
 
 /**
  * Aborts the given write batch and any other outstanding (unprepared) batches on the same bucket,

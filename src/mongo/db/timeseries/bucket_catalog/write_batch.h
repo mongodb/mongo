@@ -52,11 +52,6 @@ namespace mongo::timeseries::bucket_catalog {
 
 struct Bucket;
 
-struct CommitInfo {
-    boost::optional<repl::OpTime> opTime;
-    boost::optional<OID> electionId;
-};
-
 struct Sizes {
     // Contains the verified size for:
     // - The meta, control, and field names for previously unaccounted fields in a Bucket.
@@ -127,7 +122,7 @@ struct WriteBatch {
     BSONObj min;  // Batch-local min; full if first batch, updates otherwise.
     BSONObj max;  // Batch-local max; full if first batch, updates otherwise.
 
-    SharedPromise<CommitInfo> promise;
+    SharedPromise<void> promise;
 
     ExecutionStatsController stats;
 
@@ -168,8 +163,8 @@ void setUncompressedBucketDoc(WriteBatch& batch, BSONObj uncompressedBucketDoc);
 bool isWriteBatchFinished(const WriteBatch& batch);
 
 /**
- * Retrieves the result of the write batch commit. Blocking.
+ * Retrieves the status of the write batch commit. Blocking.
  */
-StatusWith<CommitInfo> getWriteBatchResult(WriteBatch& batch);
+Status getWriteBatchStatus(WriteBatch& batch);
 
 }  // namespace mongo::timeseries::bucket_catalog
