@@ -229,6 +229,9 @@ public:
 
     void checkIfOptionsConflict(const BSONObj& stateDoc) const final {}
 
+    boost::optional<SharedSemiFuture<void>> fullfillAllDonorsPreparedToDonate(
+        CloneDetails cloneDetails, bool noChunksToCopy = false);
+
 private:
     class CloningMetrics {
     public:
@@ -350,6 +353,9 @@ private:
     // Get indexesToBuild and indexesBuilt from the index catalog, then save them in _metrics
     void _tryFetchBuildIndexMetrics(OperationContext* opCtx);
 
+    // Waits for majority replication of the latest opTime unless token is cancelled.
+    SemiFuture<void> _waitForMajority(const CancellationToken& token,
+                                      const CancelableOperationContextFactory& factory);
     // Return the total and per-donor number documents and bytes cloned if the numbers are available
     // in the cloner resume data documents. Otherwise, return none.
     boost::optional<CloningMetrics> _tryFetchCloningMetrics(OperationContext* opCtx);
@@ -425,6 +431,10 @@ private:
     SharedPromise<void> _coordinatorHasDecisionPersisted;
 
     SharedPromise<void> _completionPromise;
+    // ------------------------------------------------------------------------------------
+
+    // This promise is emplaced if the recipient has majority committed the createCollection state.
+    SharedPromise<void> _transitionedToCreateCollection;
 };
 
 }  // namespace mongo

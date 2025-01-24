@@ -236,3 +236,23 @@ commands:
             gte: 1
             lte: 256
         optional: true
+
+  _shardsvrReshardRecipientClone:
+    description: "The internal recipient clone command."
+    command_name: _shardsvrReshardRecipientClone
+    cpp_name: ShardsvrReshardRecipientClone
+    type: uuid
+    strict: false
+    namespace: type
+    reply_type: OkReply
+    api_version: ""
+    fields:
+      cloneTimestamp:
+          type: timestamp
+          description: "The timestamp for the snapshot read while cloning from the donors."
+      donorShards:
+        type: array<DonorShardFetchTimestamp>
+        description: "The list of donors to clone from."
+      approxCopySize:
+        type: ReshardingApproxCopySize
+        description: "Not meant to be used directly. Only use internal fields."

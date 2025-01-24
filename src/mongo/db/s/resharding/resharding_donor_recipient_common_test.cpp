@@ -486,7 +486,8 @@ public:
         const ShardId& primaryShard,
         boost::optional<bool> performVerification,
         bool expectRecipientStateMachine,
-        boost::optional<RecipientFieldsValidator> fieldsValidator = boost::none) {
+        boost::optional<RecipientFieldsValidator> fieldsValidator = boost::none,
+        bool reshardingNoRefreshEnabled = false) {
         ASSERT(!expectRecipientStateMachine || fieldsValidator.has_value());
         OperationContext* opCtx = operationContext();
 
@@ -531,31 +532,36 @@ public:
             resharding::processReshardingFieldsForCollection(
                 opCtx, kTemporaryReshardingNss, temporaryCollMetadata, reshardingFields);
 
-            bool noChunksToCopy = shardThatChunkExistsOn != kThisShard.getShardId();
-            while (true) {
+            if (reshardingNoRefreshEnabled) {
+                opCtx->sleepFor(Milliseconds{50});
                 auto recipientDoc = getPersistedRecipientDocument(opCtx, kReshardingUUID);
-                fieldsValidator->validate(recipientDoc);
-                if (!recipientDoc.getCloneTimestamp()) {
-                    opCtx->sleepFor(Milliseconds{10});
-                    continue;
+                ASSERT(!recipientDoc.getCloneTimestamp());
+            } else {
+                bool noChunksToCopy = shardThatChunkExistsOn != kThisShard.getShardId();
+                while (true) {
+                    auto recipientDoc = getPersistedRecipientDocument(opCtx, kReshardingUUID);
+                    fieldsValidator->validate(recipientDoc);
+                    if (!recipientDoc.getCloneTimestamp()) {
+                        opCtx->sleepFor(Milliseconds{10});
+                        continue;
+                    }
+                    auto metrics = recipientDoc.getMetrics();
+                    ASSERT_EQ(*metrics->getApproxBytesToCopy(),
+                              noChunksToCopy ? 0 : _approxBytesToCopy);
+                    ASSERT_EQ(*metrics->getApproxDocumentsToCopy(),
+                              noChunksToCopy ? 0 : _approxDocumentsToCopy);
+                    break;
                 }
-                auto metrics = recipientDoc.getMetrics();
-                ASSERT_EQ(*metrics->getApproxBytesToCopy(),
-                          noChunksToCopy ? 0 : _approxBytesToCopy);
-                ASSERT_EQ(*metrics->getApproxDocumentsToCopy(),
-                          noChunksToCopy ? 0 : _approxDocumentsToCopy);
-                break;
+                // Schedule a dummy response to the find command against config.shards from the
+                // shard registry to avoid a hang.
+                onCommand([&](const executor::RemoteCommandRequest& request) {
+                    ASSERT_EQ(request.dbname, DatabaseName::kConfig);
+                    auto firstElement = request.cmdObj.firstElement();
+                    ASSERT_EQ(firstElement.fieldNameStringData(), "find");
+                    ASSERT_EQ(firstElement.str(), "shards");
+                    return BSONObj();
+                });
             }
-
-            // Schedule a dummy response to the find command against config.shards from the shard
-            // registry to avoid a hang.
-            onCommand([&](const executor::RemoteCommandRequest& request) {
-                ASSERT_EQ(request.dbname, DatabaseName::kConfig);
-                auto firstElement = request.cmdObj.firstElement();
-                ASSERT_EQ(firstElement.fieldNameStringData(), "find");
-                ASSERT_EQ(firstElement.str(), "shards");
-                return BSONObj();
-            });
         } else {
             ASSERT(recipientStateMachine == boost::none);
         }
@@ -1121,6 +1127,18 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMeta
             CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
         ASSERT(csr->getCurrentMetadataIfKnown() != boost::none);
     }
+}
+
+TEST_F(ReshardingDonorRecipientCommonTest, ProcessRecipientFieldsForCloningNoRefresh) {
+    RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+        "featureFlagReshardingNoRefresh", true);
+
+    testProcessRecipientFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
+                               kThisShard.getShardId() /* primaryShard */,
+                               boost::none /* performVerification */,
+                               true /* expectRecipientStateMachine */,
+                               RecipientFieldsValidator{},
+                               true /* reshardingNoRefreshEnabled */);
 }
 
 }  // namespace

@@ -1448,6 +1448,41 @@ TEST_F(ReshardingCoordinatorServiceTest, CoordinatorHonorsCriticalSectionTimeout
                        ErrorCodes::ReshardingCriticalSectionTimeout);
 }
 
+TEST_F(ReshardingCoordinatorServiceTest, FeatureFlagReshardingNoRefreshSendsCloneCmd) {
+    const std::vector<CoordinatorStateEnum> states = {
+        CoordinatorStateEnum::kPreparingToDonate,
+    };
+
+    RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+        "featureFlagReshardingNoRefresh", true);
+    auto pauseBeforeTellingRecipientsToClone =
+        globalFailPointRegistry().find("reshardingPauseBeforeTellingRecipientsToClone");
+    auto timesEnteredFailPoint =
+        pauseBeforeTellingRecipientsToClone->setMode(FailPoint::alwaysOn, 0);
+
+    PauseDuringStateTransitions stateTransitionsGuard{controller(), states};
+
+    auto opCtx = operationContext();
+
+    auto reshardingOptions = makeDefaultReshardingOptions();
+    auto coordinator = initializeAndGetCoordinator(_reshardingUUID,
+                                                   _originalNss,
+                                                   _tempNss,
+                                                   _newShardKey,
+                                                   _originalUUID,
+                                                   _oldShardKey,
+                                                   reshardingOptions);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kPreparingToDonate);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kPreparingToDonate);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
+
+    makeDonorsReadyToDonateWithAssert(opCtx);
+    pauseBeforeTellingRecipientsToClone->waitForTimesEntered(timesEnteredFailPoint + 1);
+    stepDown(opCtx);
+    pauseBeforeTellingRecipientsToClone->setMode(FailPoint::off, 0);
+}
+
 class ReshardingCoordinatorServiceFailCloningVerificationTest
     : public ReshardingCoordinatorServiceTestBase {
 public:

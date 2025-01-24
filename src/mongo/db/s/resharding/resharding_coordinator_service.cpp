@@ -108,6 +108,7 @@
 #include "mongo/s/request_types/drop_collection_if_uuid_not_matching_gen.h"
 #include "mongo/s/request_types/flush_resharding_state_change_gen.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
+#include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/s/resharding/resharding_coordinator_service_conflicting_op_in_progress_info.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
@@ -152,6 +153,7 @@ MONGO_FAIL_POINT_DEFINE(pauseBeforeTellDonorToRefresh);
 MONGO_FAIL_POINT_DEFINE(pauseAfterInsertCoordinatorDoc);
 MONGO_FAIL_POINT_DEFINE(pauseBeforeCTHolderInitialization);
 MONGO_FAIL_POINT_DEFINE(pauseAfterEngagingCriticalSection);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseBeforeTellingRecipientsToClone);
 
 const std::string kReshardingCoordinatorActiveIndexName = "ReshardingCoordinatorActiveIndex";
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
@@ -1540,7 +1542,12 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                    .then([this, executor] { return _awaitAllDonorsReadyToDonate(executor); })
                    .then([this, executor] {
                        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kCloning) {
-                           _tellAllRecipientsToRefresh(executor);
+                           if (resharding::gFeatureFlagReshardingNoRefresh.isEnabled(
+                                   serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                               _tellAllRecipientsToClone(executor);
+                           } else {
+                               _tellAllRecipientsToRefresh(executor);
+                           }
                        }
                    })
                    .then([this, executor] { return _awaitAllRecipientsFinishedCloning(executor); })
@@ -2665,6 +2672,29 @@ void ReshardingCoordinator::_tellAllRecipientsToRefresh(
                                                         _ctHolder->getStepdownToken());
     opts->cmd.setDbName(DatabaseName::kAdmin);
     generic_argument_util::setMajorityWriteConcern(opts->cmd, &kMajorityWriteConcern);
+    _sendCommandToAllRecipients(executor, opts);
+}
+
+void ReshardingCoordinator::_tellAllRecipientsToClone(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    {
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+        // TODO (SERVER-99772): Remove failpoint.
+        reshardingPauseBeforeTellingRecipientsToClone.pauseWhileSetAndNotCanceled(
+            opCtx.get(), _ctHolder->getAbortToken());
+    }
+
+    auto recipientFields = constructRecipientFields(_coordinatorDoc);
+    ShardsvrReshardRecipientClone cmd(_coordinatorDoc.getReshardingUUID());
+    cmd.setCloneTimestamp(recipientFields.getCloneTimestamp().get());
+    cmd.setDonorShards(recipientFields.getDonorShards());
+    cmd.setApproxCopySize(recipientFields.getReshardingApproxCopySizeStruct());
+
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrReshardRecipientClone>>(
+        **executor, _ctHolder->getStepdownToken(), cmd);
+
+    generic_argument_util::setMajorityWriteConcern(opts->cmd, &kMajorityWriteConcern);
+    opts->cmd.setDbName(DatabaseName::kAdmin);
     _sendCommandToAllRecipients(executor, opts);
 }
 

@@ -195,6 +195,7 @@ let testCases = {
     _shardsvrRenameIndexMetadata: {skip: "internal command"},
     _shardsvrReshardCollection: {skip: "internal command"},
     _shardsvrReshardingOperationTime: {skip: "internal command"},
+    _shardsvrReshardRecipientClone: {skip: "internal command"},
     _shardsvrRunSearchIndexCommand: {skip: "internal command"},
     _shardsvrSetAllowMigrations: {skip: "internal command"},
     _shardsvrSetClusterParameter: {skip: "internal command"},

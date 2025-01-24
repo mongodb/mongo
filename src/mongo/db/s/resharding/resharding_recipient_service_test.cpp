@@ -28,6 +28,7 @@
  */
 
 
+#include "mongo/platform/random.h"
 #include <absl/container/node_hash_map.h>
 #include <boost/cstdint.hpp>
 #include <boost/none.hpp>
@@ -527,8 +528,22 @@ public:
 
     void notifyToStartCloning(OperationContext* opCtx,
                               RecipientStateMachine& recipient,
-                              const ReshardingRecipientDocument& recipientDoc) {
-        _onReshardingFieldsChanges(opCtx, recipient, recipientDoc, CoordinatorStateEnum::kCloning);
+                              const ReshardingRecipientDocument& recipientDoc,
+                              bool noRefreshReshardingEnabled = false) {
+        if (noRefreshReshardingEnabled) {
+            auto recipientFields = _makeRecipientFields(recipientDoc);
+            bool noChunksToCopy = recipientDoc.getSkipCloningAndApplying().value_or(false) ||
+                _noChunksToCopy.value_or(false);
+            recipient.fullfillAllDonorsPreparedToDonate(
+                {recipientFields.getCloneTimestamp().get(),
+                 recipientFields.getApproxDocumentsToCopy().get(),
+                 recipientFields.getApproxBytesToCopy().get(),
+                 recipientFields.getDonorShards()},
+                noChunksToCopy);
+        } else {
+            _onReshardingFieldsChanges(
+                opCtx, recipient, recipientDoc, CoordinatorStateEnum::kCloning);
+        }
     }
 
     void notifyReshardingCommitting(OperationContext* opCtx,
@@ -914,6 +929,8 @@ protected:
         checkCoordinatorOplogMetrics(testRecipientMetrics, coordinatorDoc, recipientState);
     }
 
+    PseudoRandom _random = PseudoRandom(123456);
+
 private:
     TypeCollectionRecipientFields _makeRecipientFields(
         const ReshardingRecipientDocument& recipientDoc) {
@@ -957,10 +974,18 @@ private:
 
 TEST_F(ReshardingRecipientServiceTest, CanTransitionThroughEachStateToCompletion) {
     for (const auto& testOptions : makeBasicTestOptions()) {
+        bool isNoRefreshEnabled = false;
+        if (_random.nextInt32(2) == 0) {
+            isNoRefreshEnabled = true;
+        }
         LOGV2(5551105,
               "Running case",
               "test"_attr = _agent.getTestName(),
-              "testOptions"_attr = testOptions);
+              "testOptions"_attr = testOptions,
+              "noRefreshEnabled"_attr = isNoRefreshEnabled);
+
+        RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+            "featureFlagReshardingNoRefresh", isNoRefreshEnabled);
         auto removeRecipientDocFailpoint =
             globalFailPointRegistry().find("removeRecipientDocFailpoint");
         auto timesEnteredFailPoint = removeRecipientDocFailpoint->setMode(FailPoint::alwaysOn);
@@ -969,7 +994,7 @@ TEST_F(ReshardingRecipientServiceTest, CanTransitionThroughEachStateToCompletion
         RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
         auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
-        notifyToStartCloning(opCtx.get(), *recipient, doc);
+        notifyToStartCloning(opCtx.get(), *recipient, doc, isNoRefreshEnabled);
 
         notifyReshardingCommitting(opCtx.get(), *recipient, doc);
 
@@ -1047,10 +1072,15 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
                                                           RecipientStateEnum::kStrictConsistency,
                                                           RecipientStateEnum::kDone};
     for (const auto& testOptions : makeBasicTestOptions()) {
+        bool isNoRefreshEnabled = false;
+        if (_random.nextInt32(2) == 0) {
+            isNoRefreshEnabled = true;
+        }
         LOGV2(5551106,
               "Running case",
               "test"_attr = _agent.getTestName(),
-              "testOptions"_attr = testOptions);
+              "testOptions"_attr = testOptions,
+              "noRefreshEnabled"_attr = isNoRefreshEnabled);
 
         PauseDuringStateTransitions stateTransitionsGuard{controller(), recipientStates};
         auto doc = makeRecipientDocument(testOptions);
@@ -1095,7 +1125,7 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
             switch (state) {
                 case RecipientStateEnum::kCreatingCollection:
                 case RecipientStateEnum::kCloning: {
-                    notifyToStartCloning(opCtx.get(), *recipient, doc);
+                    notifyToStartCloning(opCtx.get(), *recipient, doc, isNoRefreshEnabled);
                     break;
                 }
                 case RecipientStateEnum::kDone: {
@@ -1578,10 +1608,18 @@ TEST_F(ReshardingRecipientServiceTest, ReshardingMetricsBasic) {
                                                           RecipientStateEnum::kDone};
 
     for (auto& testOptions : makeAllTestOptions()) {
+        bool isNoRefreshEnabled = false;
+        if (_random.nextInt32(2) == 0) {
+            isNoRefreshEnabled = true;
+        }
         LOGV2(9297807,
               "Running case",
               "test"_attr = _agent.getTestName(),
-              "testOptions"_attr = testOptions);
+              "testOptions"_attr = testOptions,
+              "noRefreshEnabled"_attr = isNoRefreshEnabled);
+
+        RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+            "featureFlagReshardingNoRefresh", isNoRefreshEnabled);
         setNoChunksToCopy(testOptions);
 
         PauseDuringStateTransitions stateTransitionsGuard{controller(), recipientStates};
@@ -1660,7 +1698,7 @@ TEST_F(ReshardingRecipientServiceTest, ReshardingMetricsBasic) {
             switch (state) {
                 case RecipientStateEnum::kCreatingCollection:
                 case RecipientStateEnum::kCloning: {
-                    notifyToStartCloning(opCtx.get(), *recipient, recipientDoc);
+                    notifyToStartCloning(opCtx.get(), *recipient, recipientDoc, isNoRefreshEnabled);
                     break;
                 }
                 case RecipientStateEnum::kDone: {
@@ -1704,11 +1742,18 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
                                                           RecipientStateEnum::kDone};
 
     for (const auto& testOptions : makeAllTestOptions()) {
+        bool isNoRefreshEnabled = false;
+        if (_random.nextInt32(2) == 0) {
+            isNoRefreshEnabled = true;
+        }
         LOGV2(9297808,
               "Running case",
               "test"_attr = _agent.getTestName(),
-              "testOptions"_attr = testOptions);
+              "testOptions"_attr = testOptions,
+              "noRefreshEnabled"_attr = isNoRefreshEnabled);
 
+        RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+            "featureFlagReshardingNoRefresh", isNoRefreshEnabled);
         setNoChunksToCopy(testOptions);
 
         PauseDuringStateTransitions stateTransitionsGuard{controller(), recipientStates};
@@ -1759,7 +1804,7 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
             switch (state) {
                 case RecipientStateEnum::kCreatingCollection:
                 case RecipientStateEnum::kCloning: {
-                    notifyToStartCloning(opCtx.get(), *recipient, doc);
+                    notifyToStartCloning(opCtx.get(), *recipient, doc, isNoRefreshEnabled);
                     break;
                 }
                 case RecipientStateEnum::kDone: {

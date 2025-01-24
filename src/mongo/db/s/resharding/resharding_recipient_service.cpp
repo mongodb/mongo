@@ -333,7 +333,6 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
                               }) != _donorShards.end();
       }()) {
     invariant(_externalState);
-
     _metrics->onStateTransition(boost::none, _recipientCtx.getState());
 }
 
@@ -691,12 +690,15 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
         int64_t approxDocumentsToCopy =
             noChunksToCopy ? 0 : *recipientFields.getApproxDocumentsToCopy();
         int64_t approxBytesToCopy = noChunksToCopy ? 0 : *recipientFields.getApproxBytesToCopy();
-        ensureFulfilledPromise(lk,
-                               _allDonorsPreparedToDonate,
-                               {*recipientFields.getCloneTimestamp(),
-                                approxDocumentsToCopy,
-                                approxBytesToCopy,
-                                recipientFields.getDonorShards()});
+        if (!resharding::gFeatureFlagReshardingNoRefresh.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            ensureFulfilledPromise(lk,
+                                   _allDonorsPreparedToDonate,
+                                   {*recipientFields.getCloneTimestamp(),
+                                    approxDocumentsToCopy,
+                                    approxBytesToCopy,
+                                    recipientFields.getDonorShards()});
+        }
     }
 
     if (coordinatorState >= CoordinatorStateEnum::kCommitting) {
@@ -725,9 +727,34 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                   ReshardingRecipientService::RecipientStateMachine::CloneDetails cloneDetails) {
             _transitionToCreatingCollection(
                 cloneDetails, (*executor)->now() + _minimumOperationDuration, factory);
+            {
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
+                ensureFulfilledPromise(lk, _transitionedToCreateCollection);
+            }
             _metrics->setDocumentsToProcessCounts(cloneDetails.approxDocumentsToCopy,
                                                   cloneDetails.approxBytesToCopy);
         });
+}
+
+boost::optional<SharedSemiFuture<void>>
+ReshardingRecipientService::RecipientStateMachine::fullfillAllDonorsPreparedToDonate(
+    CloneDetails cloneDetails, bool noChunksToCopy) {
+    // When a participant steps up, this being a primary only service guarantees that the persisted
+    // state won't be rolled-back.
+    if (_recipientCtx.getState() > RecipientStateEnum::kAwaitingFetchTimestamp) {
+        return boost::none;
+    }
+
+    if (noChunksToCopy) {
+        cloneDetails.approxDocumentsToCopy = 0;
+        cloneDetails.approxBytesToCopy = 0;
+    }
+
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        ensureFulfilledPromise(lk, _allDonorsPreparedToDonate, cloneDetails);
+    }
+    return _transitionedToCreateCollection.getFuture();
 }
 
 void ReshardingRecipientService::RecipientStateMachine::
@@ -1864,6 +1891,16 @@ void ReshardingRecipientService::RecipientStateMachine::abort(bool isUserCancell
     if (abortSource) {
         abortSource->cancel();
     }
+}
+
+SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::_waitForMajority(
+    const CancellationToken& token, const CancelableOperationContextFactory& factory) {
+    auto opCtx = factory.makeOperationContext(&cc());
+    auto client = opCtx->getClient();
+    repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(opCtx.get());
+    auto opTime = repl::ReplClientInfo::forClient(client).getLastOp();
+    return WaitForMajorityService::get(client->getServiceContext())
+        .waitUntilMajorityForWrite(opTime, token);
 }
 
 }  // namespace mongo
