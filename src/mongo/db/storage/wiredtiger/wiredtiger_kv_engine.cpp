@@ -1008,10 +1008,12 @@ Status WiredTigerKVEngine::beginBackup() {
 }
 
 void WiredTigerKVEngine::endBackup() {
+    // There could be a race with clean shutdown which unconditionally closes all the sessions.
+    WiredTigerConnection::BlockShutdown block(_connection.get());
     if (_connection->isShuttingDown()) {
-        // There could be a race with clean shutdown which unconditionally closes all the sessions.
         _backupSession->dropSessionBeforeDeleting();
     }
+
     _backupSession.reset();
 }
 
