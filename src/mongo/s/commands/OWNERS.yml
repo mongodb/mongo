@@ -171,3 +171,9 @@ filters:
   - "strategy.*":
     approvers:
       - 10gen/server-programmability
+  - "cluster_ftdc_commands.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "cluster_netstat_cmd.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability

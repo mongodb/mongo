@@ -157,3 +157,33 @@ filters:
   - "filemd5*":
     approvers:
       - 10gen/query-execution
+  - "command_mirroring_test.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "conn_pool_stats.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "conn_pool_sync.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "drop_connections_command.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "http_client.*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "parse_log_component_settings*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "traffic_recording_cmds.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "whats_my_sni_command.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "whats_my_uri_cmd.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "xray_commands.*":
+    approvers:
+      - 10gen/server-networking-and-observability

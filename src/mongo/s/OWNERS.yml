@@ -153,3 +153,15 @@ filters:
   - "shard_targeting_helpers*":
     approvers:
       - 10gen/query-optimization-cluster-planning
+  - "append_raw_responses_test.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "async_requests_sender*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "async_rpc_shard*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "load_balancer_support*":
+    approvers:
+      - 10gen/server-networking-and-observability

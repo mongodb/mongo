@@ -60,3 +60,6 @@ filters:
   - "catalogtests.cpp":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "socktests.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
