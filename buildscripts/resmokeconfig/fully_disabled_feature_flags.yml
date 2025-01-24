@@ -17,3 +17,4 @@
 - featureFlagEgressGrpcForSearch
 - featureFlagTrackUnshardedCollectionsUponCreation
 - featureFlagTSBucketingParametersUnchanged
+- featureFlagMongogProxyProcolSupport
