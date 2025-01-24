@@ -143,6 +143,33 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
     if (retCode == 0)
         return Status::OK();
 
+    // Handle WT-sublevel-error to server error code. Sub level errors are only defined as the
+    // session level, and since connection level calls use wtRCToStatus as well, these connection
+    // level calls may pass in a nullptr for the session.
+    if (session) {
+        int err, sub_level_err;
+        const char* err_msg;
+        session->get_last_error(session, &err, &sub_level_err, &err_msg);
+
+        auto subLevelStatus = [&]() -> Status {
+            if (sub_level_err == WT_NONE) {
+                return Status::OK();
+            }
+
+            auto s = generateContextStrStream(prefix, err_msg, err);
+
+            if (sub_level_err == WT_BACKGROUND_COMPACT_ALREADY_RUNNING) {
+                return Status(ErrorCodes::AlreadyInitialized, s);
+            }
+
+            // Return OK when we have an unhandled sublevel error code.
+            return Status::OK();
+        }();
+        if (!subLevelStatus.isOK()) {
+            return subLevelStatus;
+        }
+    }
+
     if (retCode == WT_ROLLBACK) {
         double cacheThreshold = gTransactionTooLargeForCacheThreshold.load();
         bool txnTooLargeEnabled = cacheThreshold < 1.0;

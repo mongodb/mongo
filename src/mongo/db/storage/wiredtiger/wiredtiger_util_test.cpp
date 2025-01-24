@@ -865,6 +865,51 @@ DEATH_TEST_REGEX(WiredTigerConfigParserTest,
     parser.isTableLoggingSettingValid();
 }
 
+TEST_F(WiredTigerUtilTest, ReconfigureBackgroundCompaction) {
+    WiredTigerEventHandler eventHandler;
+
+    // Define a WiredTiger connection configuration that enables JSON encoding for all messages
+    // related to the WT_VERB_COMPACT category.
+    const std::string connection_cfg =
+        "json_output=[error,message],verbose=[compact],statistics=(all)";
+
+    // Initialize WiredTiger.
+    WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
+    WiredTigerSession* wtSession = ru->getSession();
+
+    // Turn on background compaction.
+    const std::string uri = "table:ev_compact";
+    startCapturingLogMessages();
+    ASSERT_OK(wtRCToStatus(wtSession->create(uri.c_str(), nullptr), *wtSession));
+    ASSERT_OK(wtRCToStatus(wtSession->compact(nullptr, "background=true,timeout=0"), *wtSession));
+
+    // Starting compaction requires setting up background threads, which may take some time. We
+    // query WiredTiger Statistics to ensure these threads have started before we continue.
+    StatusWith<int64_t> backgroundCompactionRunning = WiredTigerUtil::getStatisticsValue(
+        *wtSession, "statistics:", "statistics=(fast)", WT_STAT_CONN_BACKGROUND_COMPACT_RUNNING);
+    ASSERT_OK(backgroundCompactionRunning);
+
+    // A value of 0 here indicates that the background threads are not set up yet.
+    while (backgroundCompactionRunning.getValue() == 0) {
+        sleepmillis(100);
+        backgroundCompactionRunning =
+            WiredTigerUtil::getStatisticsValue(*wtSession,
+                                               "statistics:",
+                                               "statistics=(fast)",
+                                               WT_STAT_CONN_BACKGROUND_COMPACT_RUNNING);
+        ASSERT_OK(backgroundCompactionRunning);
+    }
+
+    // We should get an error when we try reconfigure background compaction
+    // while it is already running.
+    ASSERT_EQUALS(
+        ErrorCodes::AlreadyInitialized,
+        wtRCToStatus(wtSession->compact(nullptr, "background=true,timeout=0,run_once=true"),
+                     *wtSession));
+    stopCapturingLogMessages();
+}
+
 TEST_F(WiredTigerUtilTest, GetLastErrorFromSuccessfulCall) {
     WiredTigerEventHandler eventHandler;
     const std::string connection_cfg = "json_output=[error,message],verbose=[compact]";
@@ -872,6 +917,7 @@ TEST_F(WiredTigerUtilTest, GetLastErrorFromSuccessfulCall) {
     WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
     auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
     WiredTigerSession* wtSession = ru->getSession();
+
 
     const std::string uri = "table:get_last_err_on_success";
 
@@ -910,9 +956,9 @@ TEST_F(WiredTigerUtilTest, GetLastErrorFromFailedCall) {
     const char* err_msg;
     wtSession->get_last_error(&err, &sub_level_err, &err_msg);
 
-    // The last session api call to open the cursor failed, but no sub-level error code is defined
-    // for this case. Thus we should get EINVAL and WT_NONE as the error code, and sub-level error
-    // code respectively.
+    // The last session api call to open the cursor failed, but no sub-level error code is
+    // defined for this case. Thus we should get EINVAL and WT_NONE as the error code, and
+    // sub-level error code respectively.
     ASSERT_EQUALS(EINVAL, err);
     ASSERT_EQUALS(WT_NONE, sub_level_err);
     ASSERT_EQUALS("should be passed either a URI or a cursor to duplicate, but not both"_sd,
