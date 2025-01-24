@@ -5,6 +5,7 @@
 import {
     canonicalizePlan,
     getExecutionStats,
+    getPlanStage,
     getRejectedPlans,
     getWinningPlanFromExplain,
     isCollscan
@@ -31,9 +32,11 @@ assert.commandWorked(coll.insertMany(Array.from({length: 3000}, (_, i) => {
     const doc = {a: 1, b: i, c: i % 7, x: i % 5, mixed: i};
     if (i % 9 === 0) {
         doc.missing_90_percent = i;
+        doc.bool_field = true;
     }
     if (i % 9 !== 0) {
         doc.missing_10_percent = i;
+        doc.bool_field = false;
     }
     return doc;
 })));
@@ -61,7 +64,8 @@ coll.createIndexes([
     {c: 1, a: 1},
     {missing_10_percent: 1},
     {missing_90_percent: 1},
-    {mixed: 1}
+    {mixed: 1},
+    {bool_field: 1},
 ]);
 
 assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
@@ -72,6 +76,7 @@ assert.commandWorked(
 assert.commandWorked(
     coll.runCommand({analyze: collName, key: "missing_10_percent", numberBuckets: 10}));
 assert.commandWorked(coll.runCommand({analyze: collName, key: "mixed", numberBuckets: 10}));
+assert.commandWorked(coll.runCommand({analyze: collName, key: "bool_field", numberBuckets: 10}));
 
 // Test queries
 const queries = [
@@ -165,6 +170,8 @@ const queries = [
     // wrong plan {mixed: {$type: 'int'}}
     {mixed: {$type: 'string'}},
     {mixed: {$type: 'double'}},
+    {bool_field: true},
+    {bool_field: false},
     // TODO SERVER-97790 Show estimates of SUBPLAN phases
     // {$or: [{a: 3}, {a: {$size: 9}}]},
     // {$or: [{a: 3}, {b: {$size: 9}}]},
@@ -233,7 +240,12 @@ function checkWinningPlan({query = {}, project = {}, order = {}}) {
     // CBR's plan must be no worse than the Classic plan
     assert(e1.executionStats.totalKeysExamined <= e0.executionStats.totalKeysExamined);
     assert(e1.executionStats.totalDocsExamined <= e0.executionStats.totalDocsExamined);
-    assert(e1.executionStats.executionStages.works <= e0.executionStats.executionStages.works);
+    // There are cases when a plan may scan twice fewer keys and documents, and still produce more
+    // works because of e.g. a sort. Sort is usually an in-memory operation thus much faster than
+    // I/O. "Works" do not reflect that, but is apparent from measurements.
+    const worksFactor = getPlanStage(e1, "SORT") ? 1.1 : 1.0;
+    assert(e1.executionStats.executionStages.works <=
+           e0.executionStats.executionStages.works * worksFactor);
 }
 
 function verifyCollectionCardinalityEstimate() {

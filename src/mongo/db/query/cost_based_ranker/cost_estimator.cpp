@@ -241,7 +241,7 @@ const CostCoefficient CostEstimator::hashJoinIncrement =
     CostCoefficient{CostCoefficientType{250.6_ms}};
 
 const CostCoefficient CostEstimator::sortStartup = CostCoefficient{CostCoefficientType{100.0_ms}};
-const CostCoefficient CostEstimator::sortIncrement = CostCoefficient{CostCoefficientType{250.0_ms}};
+const CostCoefficient CostEstimator::sortIncrement = CostCoefficient{CostCoefficientType{210.0_ms}};
 const CostCoefficient CostEstimator::sortWithLimitIncrement =
     CostCoefficient{CostCoefficientType{100.0_ms}};
 
