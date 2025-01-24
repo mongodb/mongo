@@ -118,6 +118,7 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/mirror_maestro.h"
 #include "mongo/db/mongod_options.h"
+#include "mongo/db/mongod_options_general_gen.h"
 #include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
@@ -322,6 +323,7 @@ const ntservice::NtServiceDefaultStrings defaultServiceStrings = {
 auto makeTransportLayer(ServiceContext* svcCtx) {
     boost::optional<int> routerPort;
     boost::optional<int> loadBalancerPort;
+    boost::optional<int> proxyPort;
 
     if (serverGlobalParams.routerPort) {
         routerPort = serverGlobalParams.routerPort;
@@ -332,6 +334,23 @@ auto makeTransportLayer(ServiceContext* svcCtx) {
             quickExit(ExitCode::badOptions);
         }
         // TODO SERVER-78730: add support for load-balanced connections.
+    }
+
+    if (serverGlobalParams.proxyPort) {
+        proxyPort = *serverGlobalParams.proxyPort;
+        if (*proxyPort == serverGlobalParams.port) {
+            LOGV2_ERROR(9967800,
+                        "The proxy port must be different from the public listening port.",
+                        "port"_attr = serverGlobalParams.port);
+            quickExit(ExitCode::badOptions);
+        }
+
+        if (routerPort && *proxyPort == *routerPort) {
+            LOGV2_ERROR(9967801,
+                        "The proxy port must be different from the public router port.",
+                        "port"_attr = *routerPort);
+            quickExit(ExitCode::badOptions);
+        }
     }
 
     // Mongod should not bind to any ports in repair mode so only allow egress.

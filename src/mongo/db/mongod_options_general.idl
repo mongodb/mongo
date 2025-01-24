@@ -113,3 +113,9 @@ configs:
         source: [ cli, ini ]
         condition:
             preprocessor: 'defined(__linux__)'
+    'net.proxyPort':
+        description: 'The port that accepts connections with a proxy protocol header.'
+        short_name: proxyPort
+        arg_vartype: Int
+        source: [ cli, yaml ]
+        validator: { gte: 1, lte: 65535 }

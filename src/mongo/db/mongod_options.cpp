@@ -707,6 +707,10 @@ Status storeMongodOptions(const moe::Environment& params) {
             ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
     }
 
+    if (params.count("net.proxyPort")) {
+        serverGlobalParams.proxyPort = params["net.proxyPort"].as<int>();
+    }
+
     if (!params.count("net.port")) {
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             serverGlobalParams.port = ServerGlobalParams::ConfigServerPort;
