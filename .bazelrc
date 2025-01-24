@@ -132,6 +132,9 @@ common --flag_alias=dbg_level=//bazel/config:dbg_level
 # dbg_tsan
 # opt
 
+# Bazel will by default strip on fastbuild, if we want stripping we will handle it ourselves
+common --strip=never
+
 # Current default profile - fastbuild - this matches the config options of fastbuild. It does not just set --config=fastbuild
 # To avoid the bazel warning about passing multiple configs
 common -c fastbuild
