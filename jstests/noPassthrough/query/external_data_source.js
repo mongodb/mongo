@@ -8,6 +8,7 @@
  * ]
  */
 import {aggPlanHasStage} from "jstests/libs/query/analyze_plan.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
 // Runs tests on a standalone mongod.
 let conn = MongoRunner.runMongod({setParameter: {enableComputeMode: true}});
@@ -19,10 +20,9 @@ const kDefaultPipePath = (() => {
     return hostInfo.os.type == "Windows" ? "//./pipe/" : "/tmp/";
 })();
 
-// Create two random pipe names to avoid collisions with tests running concurrently on the same box.
-const randomNum = Math.floor(1000 * 1000 * 1000 * Math.random());  // 0-999,999,999
-const pipeName1 = "external_data_source_" + randomNum;
-const pipeName2 = "external_data_source_" + (randomNum + 1);
+function getRandomPipeName() {
+    return "external_data_source_" + extractUUIDFromObject(UUID());
+}
 
 // Empty option
 assert.throwsWithCode(() => {
@@ -40,7 +40,7 @@ assert.throwsWithCode(() => {
     db.coll.aggregate([{$match: {a: 1}}], {
         $_externalDataSources: [{
             collName: "coll",
-            dataSources: [{url: kUrlProtocolFile + pipeName1, storageType: "pipe"}]
+            dataSources: [{url: kUrlProtocolFile + getRandomPipeName(), storageType: "pipe"}]
         }]
     });
 }, ErrorCodes.IDLFailedToParse);
@@ -50,8 +50,11 @@ assert.throwsWithCode(() => {
     db.coll.aggregate([{$match: {a: 1}}], {
         $_externalDataSources: [{
             collName: "coll",
-            dataSources:
-                [{url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "unknown"}]
+            dataSources: [{
+                url: kUrlProtocolFile + getRandomPipeName(),
+                storageType: "pipe",
+                fileType: "unknown"
+            }]
         }]
     });
 }, ErrorCodes.BadValue);
@@ -59,9 +62,10 @@ assert.throwsWithCode(() => {
 // No storage type
 assert.throwsWithCode(() => {
     db.coll.aggregate([{$match: {a: 1}}], {
-        $_externalDataSources: [
-            {collName: "coll", dataSources: [{url: kUrlProtocolFile + pipeName1, fileType: "bson"}]}
-        ]
+        $_externalDataSources: [{
+            collName: "coll",
+            dataSources: [{url: kUrlProtocolFile + getRandomPipeName(), fileType: "bson"}]
+        }]
     });
 }, ErrorCodes.IDLFailedToParse);
 
@@ -70,8 +74,11 @@ assert.throwsWithCode(() => {
     db.coll.aggregate([{$match: {a: 1}}], {
         $_externalDataSources: [{
             collName: "coll",
-            dataSources:
-                [{url: kUrlProtocolFile + pipeName1, storageType: "unknown", fileType: "bson"}]
+            dataSources: [{
+                url: kUrlProtocolFile + getRandomPipeName(),
+                storageType: "unknown",
+                fileType: "bson"
+            }]
         }]
     });
 }, ErrorCodes.BadValue);
@@ -110,8 +117,9 @@ assert.throwsWithCode(() => {
     db.unknown.aggregate([{$match: {a: 1}}], {
         $_externalDataSources: [{
             collName: "coll",
-            dataSources:
-                [{url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"}]
+            dataSources: [
+                {url: kUrlProtocolFile + getRandomPipeName(), storageType: "pipe", fileType: "bson"}
+            ]
         }]
     });
 }, 7039003);
@@ -120,8 +128,9 @@ assert.throwsWithCode(() => {
     const explain = db.coll.explain().aggregate([{$sample: {size: 10}}], {
         $_externalDataSources: [{
             collName: "coll",
-            dataSources:
-                [{url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"}]
+            dataSources: [
+                {url: kUrlProtocolFile + getRandomPipeName(), storageType: "pipe", fileType: "bson"}
+            ]
         }]
     });
     assert(aggPlanHasStage(explain, "$sample"),
@@ -138,7 +147,7 @@ assert.throwsWithCode(() => {
                     {
                         collName: "coll",
                         dataSources: [{
-                            url: kUrlProtocolFile + pipeName1,
+                            url: kUrlProtocolFile + getRandomPipeName(),
                             storageType: "pipe",
                             fileType: "bson"
                         }]
@@ -146,7 +155,7 @@ assert.throwsWithCode(() => {
                     {
                         collName: "out",
                         dataSources: [{
-                            url: kUrlProtocolFile + pipeName2,
+                            url: kUrlProtocolFile + getRandomPipeName(),
                             storageType: "pipe",
                             fileType: "bson"
                         }]
@@ -180,6 +189,8 @@ let objsPerPipe = 25;
 (function testBasicPipeReadWrite() {
     jsTestLog("Testing testBasicPipeReadWrite()");
 
+    const pipeName1 = getRandomPipeName();
+    const pipeName2 = pipeName1 + "1";
     _writeTestPipe(pipeName1, objsPerPipe);
     _writeTestPipe(pipeName2, objsPerPipe);
     let result = _readTestPipes(pipeName1, pipeName2);
@@ -197,6 +208,8 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
         jsTestLog("Testing testCountOverMultiplePipes()");
 
         objsPerPipe = 100;
+        const pipeName1 = getRandomPipeName();
+        const pipeName2 = pipeName1 + "1";
         _writeTestPipe(pipeName1, objsPerPipe, 0, 2048, pipeDir);
         _writeTestPipe(pipeName2, objsPerPipe, 0, 2048, pipeDir);
         let result = db.coll.aggregate([{$count: "objects"}], {
@@ -234,6 +247,8 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
     (function testRoundtripOverMultiplePipes() {
         jsTestLog("Testing testRoundtripOverMultiplePipes()");
 
+        const pipeName1 = getRandomPipeName();
+        const pipeName2 = pipeName1 + "1";
         _writeTestPipeObjects(pipeName1, objsPerPipe, kObjsToWrite, pipeDir);
         _writeTestPipeObjects(pipeName2, objsPerPipe, kObjsToWrite, pipeDir);
         let cursor = db.coll.aggregate([], {
@@ -263,6 +278,8 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
     (function testRoundtripOverMultiplePipesUsingBsonFile() {
         jsTestLog("Testing testRoundtripOverMultiplePipesUsingBsonFile()");
 
+        const pipeName1 = getRandomPipeName();
+        const pipeName2 = pipeName1 + "1";
         _writeTestPipeBsonFile(pipeName1,
                                objsPerPipe,
                                "jstests/noPassthrough/query/external_data_source.bson",
@@ -307,6 +324,7 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
     (function testMatchOverExternalDataSource() {
         jsTestLog("Testing testMatchOverExternalDataSource()");
 
+        const pipeName1 = getRandomPipeName();
         _writeTestPipeObjects(pipeName1, collObjs.length, collObjs, pipeDir);
 
         const kNumFilter = 5;
@@ -350,6 +368,7 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
     (function testGroupOverExternalDataSource() {
         jsTestLog("Testing testGroupOverExternalDataSource()");
 
+        const pipeName1 = getRandomPipeName();
         _writeTestPipeObjects(pipeName1, collObjs.length, collObjs, pipeDir);
 
         const expectedRes = getCountPerGroupResult(collObjs);
@@ -368,6 +387,8 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
     (function testUnionWithOverExternalDataSource() {
         jsTestLog("Testing testUnionWithOverExternalDataSource()");
 
+        const pipeName1 = getRandomPipeName();
+        const pipeName2 = getRandomPipeName() + "1";
         _writeTestPipeObjects(pipeName1, collObjs.length, collObjs, pipeDir);
         _writeTestPipeObjects(pipeName2, collObjs.length, collObjs, pipeDir);
 
@@ -417,6 +438,7 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
                 }))
                 .was;
 
+        const pipeName1 = getRandomPipeName();
         _writeTestPipeObjects(pipeName1, collObjs.length, collObjs, pipeDir);
 
         const expectedRes = getCountPerGroupResult(collObjs);
@@ -464,6 +486,8 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
         const collName2 = "coll2";
 
         // 250K docs almost reaches 16MB BSONObj size limit.
+        const pipeName1 = getRandomPipeName();
+        const pipeName2 = getRandomPipeName() + "1";
         _writeTestPipeObjects(pipeName1, largeCollObjs.length, largeCollObjs, pipeDir);
         _writeTestPipeObjects(pipeName2, largeCollObjs.length, largeCollObjs, pipeDir);
 
