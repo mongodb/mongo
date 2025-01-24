@@ -1627,8 +1627,11 @@ StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedR
         auto ceRes = cardEstimator.estimatePlan(*soln);
         if (!ceRes.isOK()) {
             // This plan's cardinality cannot be estimated.
-            if (cbrMode == QueryPlanRankerModeEnum::kAutomaticCE) {
-                // In automatic CE mode fallback to multi-planning for inestimable plans.
+            if (cbrMode == QueryPlanRankerModeEnum::kAutomaticCE ||
+                ceRes.getStatus().code() == ErrorCodes::UnsupportedCbrNode) {
+                // We'll fallback to multi-planning for an inestimable plan if either:
+                // * We are in automatic CE mode
+                // * The reason for the inestimable plan was an unsupported node
                 acceptedSoln.push_back(std::move(soln));
             } else {
                 // All other CE modes are considered "strict", that is, when a CE method couldn't

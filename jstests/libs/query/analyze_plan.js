@@ -1233,3 +1233,10 @@ export function getIndexOfStageOnSingleNode(root, stageName) {
     }
     return -1;
 }
+
+/**
+ * Given the root of an explain, return an array of all enumerated plans.
+ */
+export function getAllPlans(explain) {
+    return [getWinningPlanFromExplain(explain), ...getRejectedPlans(explain)];
+}
