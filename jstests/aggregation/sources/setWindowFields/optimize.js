@@ -8,6 +8,7 @@
  *   # This feature flag adjusts the desugaring a bit - requesting 'outputSortKeyMetadata' from the
  *   # $sort stage.
  *   featureFlagRankFusionBasic,
+ *   requires_fcv_81,
  * ]
  */
 import {aggPlanHasStage, getAggPlanStages} from "jstests/libs/query/analyze_plan.js";

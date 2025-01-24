@@ -5,6 +5,7 @@
  * @tags: [featureFlagRankFusionBasic, requires_fcv_81]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
     getMovieData,
@@ -239,14 +240,22 @@ const expectedResultIdOrder = [6, 4, 1, 5, 2, 3, 8, 9, 10, 12, 13, 14, 11, 7, 15
 
 // Run tests with search in $unionWith
 runTest(expectedResultIdOrder, getSearchPipeline(), getVectorSearchPipeline());
-runTest(expectedResultIdOrder,
-        getSearchWithSetWindowFieldsPipeline(),
-        getVectorSearchWithSetWindowFieldsPipeline());
+if (FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'RankFusionFull')) {
+    // This test case uses a sort by {$meta: "searchScore"} which is protected by
+    // 'featureFlagRankFusionFull'.
+    runTest(expectedResultIdOrder,
+            getSearchWithSetWindowFieldsPipeline(),
+            getVectorSearchWithSetWindowFieldsPipeline());
+}
 
 // Run tests with vectorSearch in $unionwith
 runTestFlipped(expectedResultIdOrder, getSearchPipeline(), getVectorSearchPipeline());
-runTestFlipped(expectedResultIdOrder,
-               getSearchWithSetWindowFieldsPipeline(),
-               getVectorSearchWithSetWindowFieldsPipeline());
+if (FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'RankFusionFull')) {
+    // This test case uses a sort by {$meta: "searchScore"} which is protected by
+    // 'featureFlagRankFusionFull'.
+    runTestFlipped(expectedResultIdOrder,
+                   getSearchWithSetWindowFieldsPipeline(),
+                   getVectorSearchWithSetWindowFieldsPipeline());
+}
 dropSearchIndex(coll, {name: getMovieSearchIndexSpec().name});
 dropSearchIndex(coll, {name: getMovieVectorSearchIndexSpec().name});

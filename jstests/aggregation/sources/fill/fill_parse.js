@@ -1,11 +1,11 @@
 /**
  * Test the syntax of $fill.
  * @tags: [
- *   requires_fcv_52,
  *   # We're testing the explain plan, not the query results, so the facet passthrough would fail.
  *   do_not_wrap_aggregations_in_facets,
  *   # This feature flag adjusts the desugaring a bit - requesting 'outputSortKeyMetadata' from the
  *   # $sort stage.
+ *   requires_fcv_81,
  *   featureFlagRankFusionBasic,
  * ]
  */

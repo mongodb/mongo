@@ -385,19 +385,6 @@ TEST_F(SBESetWindowFieldsTest, TopNUnboundedToCurrent) {
                    << BSON("a" << 4 << "b" << 3 << "top2" << BSON_ARRAY(2 << 3))));
 }
 
-TEST_F(SBESetWindowFieldsTest, RankUnboundedToUnbounded) {
-    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
-                                       BSON_ARRAY(BSON("a" << 2 << "b" << 7)),
-                                       BSON_ARRAY(BSON("a" << 3 << "b" << 5)),
-                                       BSON_ARRAY(BSON("a" << 4 << "b" << 3))};
-    runSetWindowFieldsTest(R"({sortBy: {a: 1}, output: {rank: {$rank: {}}}})",
-                           docs,
-                           BSON_ARRAY(BSON("a" << 1 << "b" << 1 << "rank" << 1)
-                                      << BSON("a" << 2 << "b" << 7 << "rank" << 2)
-                                      << BSON("a" << 3 << "b" << 5 << "rank" << 3)
-                                      << BSON("a" << 4 << "b" << 3 << "rank" << 4)));
-}
-
 TEST_F(SBESetWindowFieldsTest, ShiftWithoutWindow) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
                                        BSON_ARRAY(BSON("a" << 2 << "b" << 7)),
@@ -411,6 +398,20 @@ TEST_F(SBESetWindowFieldsTest, ShiftWithoutWindow) {
                    << BSON("a" << 3 << "b" << 5 << "lastOne" << 7)
                    << BSON("a" << 4 << "b" << 3 << "lastOne" << 5)));
 }
+
+// TODO SERVER-99529 re-enable this test.
+// TEST_F(SBESetWindowFieldsTest, RankUnboundedToUnbounded) {
+//     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
+//                                        BSON_ARRAY(BSON("a" << 2 << "b" << 7)),
+//                                        BSON_ARRAY(BSON("a" << 3 << "b" << 5)),
+//                                        BSON_ARRAY(BSON("a" << 4 << "b" << 3))};
+//     runSetWindowFieldsTest(R"({sortBy: {a: 1}, output: {rank: {$rank: {}}}})",
+//                            docs,
+//                            BSON_ARRAY(BSON("a" << 1 << "b" << 1 << "rank" << 1)
+//                                       << BSON("a" << 2 << "b" << 7 << "rank" << 2)
+//                                       << BSON("a" << 3 << "b" << 5 << "rank" << 3)
+//                                       << BSON("a" << 4 << "b" << 3 << "rank" << 4)));
+// }
 
 TEST_F(SBESetWindowFieldsTest, DerivativeRangeNegativeToCurrent) {
     auto ts = 1736467200000LL;

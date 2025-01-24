@@ -7,8 +7,8 @@ export function testPerformUpgradeDowngradeReplSet({
     setupFn,
     whenFullyDowngraded,
     whenSecondariesAreLatestBinary,
-    whenFullyUpgraded,
-    whenBinariesAreLatestAndFCVIsLastLTS
+    whenBinariesAreLatestAndFCVIsLastLTS,
+    whenFullyUpgraded
 }) {
     const lastLTSVersion = {binVersion: "last-lts"};
     const latestVersion = {binVersion: "latest"};

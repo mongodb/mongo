@@ -10,7 +10,8 @@
  *   do_not_wrap_aggregations_in_facets,
  *   # This feature flag adjusts the desugaring a bit - requesting 'outputSortKeyMetadata' from the
  *   # $sort stage.
- *  featureFlagRankFusionBasic,
+ *   featureFlagRankFusionBasic,
+ *   requires_fcv_81,
  * ]
  */
 import {getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";

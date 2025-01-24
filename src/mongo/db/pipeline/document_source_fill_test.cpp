@@ -74,7 +74,7 @@ TEST_F(DocumentSourceFillTest, FillWithSortDesugarsCorrectly) {
                                                   << "sortBy" << BSON("val" << 1)));
     auto stages = document_source_fill::createFromBson(fillSpec.firstElement(), getExpCtx());
     auto expectedStageOne = fromjson(R"({
-        $sort: { sortKey: { val: 1 } }
+        $sort: { sortKey: { val: 1 }, outputSortKeyMetadata: true }
     })");
     auto expectedStageTwo = fromjson(R"({
         $_internalSetWindowFields: { sortBy: { val: 1 }, output: { valToFill: { $linearFill: "$valToFill" } } }
@@ -95,11 +95,16 @@ TEST_F(DocumentSourceFillTest, FillWithPartitionsDesugarsCorrectly) {
         $addFields: { __internal_setWindowFields_partition_key: { $expr: { part: "$part" } } }
     })");
     auto expectedSort = fromjson(R"({
-       $sort: { sortKey: { __internal_setWindowFields_partition_key: 1, val: 1 } }
-    })");
+        $sort: {
+            sortKey: { __internal_setWindowFields_partition_key: 1, val: 1 },
+            outputSortKeyMetadata: true
+    }})");
     auto expectedSetWindowFields = fromjson(R"({
-        $_internalSetWindowFields: { partitionBy: "$__internal_setWindowFields_partition_key", sortBy: { val: 1 }, output: { valToFill: { $linearFill: "$valToFill" } } }
-    })");
+        $_internalSetWindowFields: {
+            partitionBy: "$__internal_setWindowFields_partition_key",
+            sortBy: { val: 1 },
+            output: { valToFill: { $linearFill: "$valToFill" } }
+    }})");
     auto expectedExclusion = fromjson(R"({
         $project: { __internal_setWindowFields_partition_key: false, _id: true }
     })");

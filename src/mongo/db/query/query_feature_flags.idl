@@ -176,7 +176,8 @@ feature_flags:
       description: "Feature flag to introduce the $rankFusion stage and the $sigmoid helper. (First
                     milestone of Vector Search Hybrid Scoring)"
       cpp_varname: gFeatureFlagRankFusionBasic
-      default: false
+      default: true
+      version: 8.1
       shouldBeFCVGated: true
 
     featureFlagRankFusionFull:
