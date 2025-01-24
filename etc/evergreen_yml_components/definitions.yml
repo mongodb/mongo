@@ -1986,6 +1986,7 @@ functions:
           - "./src/evergreen/wiki_page_minimized_agg_query_fuzzer.sh"
     - command: attach.artifacts
       params:
+        exact_file_names: true
         files:
           - wiki_page_running_minimized_test_location.json
 
@@ -2362,6 +2363,7 @@ functions:
     command: attach.artifacts
     display_name: "archive mongo coredumps"
     params:
+      exact_file_names: true
       files:
         - src/mongo-coredumps.json
 
@@ -2424,6 +2426,7 @@ functions:
     - command: attach.artifacts
       params:
         optional: true
+        exact_file_names: true
         files:
           - src/core_analyzer_artifact.json
     - command: s3.put
@@ -2795,6 +2798,7 @@ functions:
     command: attach.artifacts
     params:
       optional: true
+      exact_file_names: true
       ignore_artifacts_for_spawn: false
       files:
         - ${archive_file|src/archive.json}
@@ -2808,6 +2812,7 @@ functions:
           - "./src/evergreen/wiki_page.sh"
     - command: attach.artifacts
       params:
+        exact_file_names: true
         files:
           - wiki_page_location.json
 
