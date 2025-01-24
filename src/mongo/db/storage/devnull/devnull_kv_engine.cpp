@@ -317,7 +317,7 @@ public:
 
     std::variant<Status, DuplicateKey> insert(
         OperationContext* opCtx,
-        const key_string::Value& keyString,
+        const key_string::View& keyString,
         bool dupsAllowed,
         IncludeDuplicateRecordId includeDuplicateRecordId) override {
         return Status::OK();

@@ -151,7 +151,7 @@ public:
                     bool isLogged);
 
     std::variant<Status, DuplicateKey> insert(OperationContext* opCtx,
-                                              const key_string::Value& keyString,
+                                              const key_string::View& keyString,
                                               bool dupsAllowed,
                                               IncludeDuplicateRecordId includeDuplicateRecordId =
                                                   IncludeDuplicateRecordId::kOff) override;
@@ -227,7 +227,7 @@ protected:
         OperationContext* opCtx,
         WT_CURSOR* c,
         WiredTigerSession* session,
-        const key_string::Value& keyString,
+        const key_string::View& keyString,
         bool dupsAllowed,
         IncludeDuplicateRecordId includeDuplicateRecordId = IncludeDuplicateRecordId::kOff) = 0;
 
@@ -335,7 +335,7 @@ protected:
         OperationContext* opCtx,
         WT_CURSOR* c,
         WiredTigerSession* session,
-        const key_string::Value& keyString,
+        const key_string::View& keyString,
         bool dupsAllowed,
         IncludeDuplicateRecordId includeDuplicateRecordId =
             IncludeDuplicateRecordId::kOff) override;
@@ -354,11 +354,6 @@ protected:
                                  WT_CURSOR* c,
                                  const key_string::View& keyString,
                                  bool dupsAllowed);
-
-private:
-    Status _insertOldFormatKey(OperationContext* opCtx,
-                               WT_CURSOR* c,
-                               const key_string::Value& keyString);
 };
 
 class WiredTigerIdIndex : public WiredTigerIndex {
@@ -400,7 +395,7 @@ protected:
         OperationContext* opCtx,
         WT_CURSOR* c,
         WiredTigerSession* session,
-        const key_string::Value& keyString,
+        const key_string::View& keyString,
         bool dupsAllowed,
         IncludeDuplicateRecordId includeDuplicateRecordId =
             IncludeDuplicateRecordId::kOff) override;
@@ -415,7 +410,7 @@ protected:
      */
     Status _checkDups(OperationContext* opCtx,
                       WT_CURSOR* c,
-                      const key_string::Value& keyString,
+                      const key_string::View& keyString,
                       IncludeDuplicateRecordId includeDuplicateRecordId) = delete;
 };
 
@@ -455,7 +450,7 @@ protected:
         OperationContext* opCtx,
         WT_CURSOR* c,
         WiredTigerSession* session,
-        const key_string::Value& keyString,
+        const key_string::View& keyString,
         bool dupsAllowed,
         IncludeDuplicateRecordId includeDuplicateRecordId =
             IncludeDuplicateRecordId::kOff) override;

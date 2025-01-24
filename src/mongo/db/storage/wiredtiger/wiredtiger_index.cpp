@@ -300,7 +300,7 @@ void dassertRecordIdAtEnd(const key_string::View& keyString, KeyFormat keyFormat
 
 std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndex::insert(
     OperationContext* opCtx,
-    const key_string::Value& keyString,
+    const key_string::View& keyString,
     bool dupsAllowed,
     IncludeDuplicateRecordId includeDuplicateRecordId) {
     dassertRecordIdAtEnd(keyString, _rsKeyFormat);
@@ -1451,14 +1451,14 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIdIndex::_inse
     OperationContext* opCtx,
     WT_CURSOR* c,
     WiredTigerSession* session,
-    const key_string::Value& keyString,
+    const key_string::View& keyString,
     bool dupsAllowed,
     IncludeDuplicateRecordId includeDuplicateRecordId) {
     invariant(KeyFormat::Long == _rsKeyFormat);
     invariant(!dupsAllowed);
 
-    auto size = setCursorKeyValue(
-        c, keyString.getViewWithoutRecordId(), keyString.getRecordIdAndTypeBitsView());
+    auto size =
+        setCursorKeyValue(c, keyString.getKeyView(), keyString.getRecordIdAndTypeBitsView());
     int ret = WT_OP_CHECK(wiredTigerCursorInsert(
         *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), c));
 
@@ -1488,47 +1488,15 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIdIndex::_inse
                         std::move(foundValueRecordId)};
 }
 
-Status WiredTigerIndexUnique::_insertOldFormatKey(OperationContext* opCtx,
-                                                  WT_CURSOR* c,
-                                                  const key_string::Value& keyString) {
-    LOGV2_DEBUG(8596201,
-                1,
-                "Inserting old format key into unique index due to "
-                "WTIndexInsertUniqueKeysInOldFormat failpoint",
-                "key"_attr = keyString.toString(),
-                "indexName"_attr = _indexName,
-                "collectionUUID"_attr = _collectionUUID);
-
-    auto size = setCursorKeyValue(
-        c, keyString.getViewWithoutRecordId(), keyString.getRecordIdAndTypeBitsView());
-    int ret = WT_OP_CHECK(wiredTigerCursorInsert(
-        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), c));
-
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementOneIdxEntryWritten(c->uri, size);
-
-    // We don't expect WT_DUPLICATE_KEY here as we only insert old format keys when dupsAllowed is
-    // false. At this point we will have already triggered a write conflict with any concurrent
-    // writers in the new format, so we can safely insert without worrying about duplicates.
-    invariantWTOK(ret,
-                  c->session,
-                  fmt::format("WiredTigerIndexUnique::_insertOldFormatKey error: {}; uri: {}",
-                              _indexName,
-                              _uri));
-    return Status::OK();
-}
-
 std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndexUnique::_insert(
     OperationContext* opCtx,
     WT_CURSOR* c,
     WiredTigerSession* session,
-    const key_string::Value& keyString,
+    const key_string::View& keyString,
     bool dupsAllowed,
     IncludeDuplicateRecordId includeDuplicateRecordId) {
     LOGV2_TRACE_INDEX(
         20097, "Timestamp safe unique idx KeyString: {keyString}", "keyString"_attr = keyString);
-
-    int ret;
 
     // Pre-checks before inserting on a primary.
     if (!dupsAllowed) {
@@ -1540,20 +1508,31 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndexUnique::_
         }
     }
 
-    if (MONGO_unlikely(!dupsAllowed && hasOldFormatVersion() && _rsKeyFormat == KeyFormat::Long &&
-                       WTIndexInsertUniqueKeysInOldFormat.shouldFail())) {
-        // To support correctness testing of old-format index keys that might still be in the index
-        // after an upgrade, this failpoint can be configured to insert keys in the old format,
-        // given the required prerequisites. We can't do this when dups are allowed (on
-        // secondaries), as this could result in concurrent writes to the same key, the very thing
-        // the new format intends to avoid. Note that in testing, the only way to create a unique
-        // index with the old format version is with the WTIndexCreateUniqueIndexesInOldFormat
-        // failpoint. Old format keys also predated support for KeyFormat::String.
-        return _insertOldFormatKey(opCtx, c, keyString);
-    }
+    // Prior to v4.2 unique indexes put the record id in the value field on the index entry rather
+    // than appending it to the key. Existing indexes are not rewritten when upgrading versions, so
+    // we need to be able to insert keys in the old format for testing purposes. Given the required
+    // prerequisites, the WTIndexCreateUniqueIndexesInOldFormat failpoint can be set to insert keys
+    // in the old format. We can't do this when dups are allowed (on secondaries), as this could
+    // result in concurrent writes to the same key, the very thing the new format intends to avoid.
+    // Old format keys also predated KeyFormat::String, so those cannot be inserted.
+    bool forceOldFormat = !dupsAllowed && hasOldFormatVersion() &&
+        _rsKeyFormat == KeyFormat::Long && WTIndexInsertUniqueKeysInOldFormat.shouldFail();
+    auto size = [&] {
+        if (MONGO_unlikely(forceOldFormat)) {
+            LOGV2_DEBUG(8596201,
+                        1,
+                        "Inserting old format key into unique index due to "
+                        "WTIndexInsertUniqueKeysInOldFormat failpoint",
+                        "key"_attr = keyString.toString(),
+                        "indexName"_attr = _indexName,
+                        "collectionUUID"_attr = _collectionUUID);
+            return setCursorKeyValue(
+                c, keyString.getKeyView(), keyString.getRecordIdAndTypeBitsView());
+        }
+        return setCursorKeyValue(c, keyString.getKeyAndRecordIdView(), keyString.getTypeBitsView());
+    }();
 
-    auto size = setCursorKeyValue(c, keyString.getView(), keyString.getTypeBitsView());
-    ret = WT_OP_CHECK(wiredTigerCursorInsert(
+    auto ret = WT_OP_CHECK(wiredTigerCursorInsert(
         *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), c));
 
     // Account for the actual key insertion, but do not attempt account for the complexity of any
@@ -1561,8 +1540,9 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndexUnique::_
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     metricsCollector.incrementOneIdxEntryWritten(_uri, size);
 
-    // It is possible that this key is already present during a concurrent background index build.
-    if (ret != WT_DUPLICATE_KEY) {
+    // Unless we're forcing the old format, It is possible that this key is already present during a
+    // concurrent background index build.
+    if (ret != WT_DUPLICATE_KEY || forceOldFormat) {
         invariantWTOK(ret,
                       c->session,
                       fmt::format("WiredTigerIndexUnique::_insert: duplicate: {}; uri: {}",
@@ -1778,10 +1758,9 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndexStandard:
     OperationContext* opCtx,
     WT_CURSOR* c,
     WiredTigerSession* session,
-    const key_string::Value& keyString,
+    const key_string::View& keyString,
     bool dupsAllowed,
     IncludeDuplicateRecordId includeDuplicateRecordId) {
-    int ret;
 
     // Pre-checks before inserting on a primary.
     if (!dupsAllowed) {
@@ -1793,8 +1772,9 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndexStandard:
         }
     }
 
-    auto size = setCursorKeyValue(c, keyString.getView(), keyString.getTypeBitsView());
-    ret = WT_OP_CHECK(wiredTigerCursorInsert(
+    auto size =
+        setCursorKeyValue(c, keyString.getKeyAndRecordIdView(), keyString.getTypeBitsView());
+    auto ret = WT_OP_CHECK(wiredTigerCursorInsert(
         *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), c));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
