@@ -79,6 +79,17 @@ uint64_t SorterStats::spilledRanges() const {
     return _spilledRanges;
 }
 
+void SorterStats::incrementSpilledKeyValuePairs(uint64_t records) {
+    _spilledKeyValuePairs += records;
+    if (_sorterTracker) {
+        _sorterTracker->spilledKeyValuePairs.fetchAndAdd(records);
+    }
+}
+
+uint64_t SorterStats::spilledKeyValuePairs() const {
+    return _spilledKeyValuePairs;
+}
+
 void SorterStats::incrementNumSorted(uint64_t sortedKeys) {
     _numSorted += sortedKeys;
     if (_sorterTracker) {

@@ -124,7 +124,7 @@ assert.commandWorked(db.adminCommand({
 }));
 expectedCounters = generateExpectedCounters(lookupStrategy.hashLookup,
                                             16 /* 2 spills per foreign collection row */,
-                                            851 /* spillToDiskBytes */);
+                                            1130 /* spillToDiskBytes */);
 assert.eq(
     db.people
         .aggregate([

@@ -256,9 +256,12 @@ std::unique_ptr<PlanStageStats> HashLookupStage::getStats(bool includeDebugInfo)
     if (includeDebugInfo) {
         BSONObjBuilder bob(StorageAccessStatsVisitor::collectStats(*this, *ret).toBSON());
         // Spilling stats.
+        auto spillingStats = specificStats->getTotalSpillingStats();
         bob.appendBool("usedDisk", specificStats->usedDisk)
-            .appendNumber("spilledRecords", specificStats->getSpilledRecords())
-            .appendNumber("spilledBytesApprox", specificStats->getSpilledBytesApprox());
+            .appendNumber("spilledRecords",
+                          static_cast<long long>(spillingStats.getSpilledRecords()))
+            .appendNumber("spilledBytesApprox",
+                          static_cast<long long>(spillingStats.getSpilledBytes()));
         ret->debugInfo = bob.obj();
     }
     return ret;

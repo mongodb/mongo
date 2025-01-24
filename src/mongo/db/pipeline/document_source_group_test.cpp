@@ -1267,7 +1267,7 @@ public:
         for (int sharded = 0; sharded < 2; ++sharded) {
             runSharded(sharded);
             const auto* groupStats = static_cast<const GroupStats*>(group()->getSpecificStats());
-            ASSERT_EQ(groupStats->spills, _expectedSpills);
+            ASSERT_EQ(groupStats->spillingStats.getSpills(), _expectedSpills);
         }
     }
 

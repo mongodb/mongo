@@ -124,10 +124,10 @@ struct PlanStatsSpecificStatsPrinter : PlanStatsVisitorBase<true> {
 
     void visit(tree_walker::MaybeConstPtr<true, sbe::HashLookupStats> stats) final {
         _stream << "dsk:" << stats->usedDisk << "\n";
-        _stream << "htRecs:" << stats->spilledHtRecords << "\n";
-        _stream << "htIndices:" << stats->spilledHtBytesOverAllRecords << "\n";
-        _stream << "buffRecs:" << stats->spilledBuffRecords << "\n";
-        _stream << "buffBytes:" << stats->spilledBuffBytesOverAllRecords << "\n";
+        _stream << "htRecs:" << stats->spillingHtStats.getSpilledRecords() << "\n";
+        _stream << "htIndices:" << stats->spillingHtStats.getSpilledBytes() << "\n";
+        _stream << "buffRecs:" << stats->spillingBuffStats.getSpilledRecords() << "\n";
+        _stream << "buffBytes:" << stats->spillingBuffStats.getSpilledBytes() << "\n";
     }
 
     // TODO: Add an overload for the specific stats of other stages by overriding their

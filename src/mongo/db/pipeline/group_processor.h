@@ -84,7 +84,7 @@ public:
      * Returns true if this GroupProcessor stage used disk during execution and false otherwise.
      */
     bool usedDisk() const {
-        return _stats.spills > 0;
+        return _stats.spillingStats.getSpills() > 0;
     }
 
 private:

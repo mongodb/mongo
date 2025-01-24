@@ -270,8 +270,8 @@ TEST_F(SpoolStageTest, spillEveryRecordId) {
 
     // Validate the spilling stats. We should have spilled for each record.
     auto stats = static_cast<const SpoolStats*>(spool.getSpecificStats());
-    ASSERT_EQUALS(stats->spills, 3);
-    ASSERT_GREATER_THAN(stats->spilledDataStorageSize, 0);
+    ASSERT_EQUALS(stats->spillingStats.getSpills(), 3);
+    ASSERT_GREATER_THAN(stats->spillingStats.getSpilledDataStorageSize(), 0);
     ASSERT_EQUALS(stats->maxMemoryUsageBytes, maxAllowedMemoryUsageBytes);
 }
 
@@ -296,10 +296,10 @@ TEST_F(SpoolStageTest, spillEveryOtherRecordId) {
 
     // Validate the spilling stats. We should have spilled every other record.
     auto stats = static_cast<const SpoolStats*>(spool.getSpecificStats());
-    ASSERT_EQUALS(stats->spills, 2);
-    ASSERT_EQUALS(stats->spilledRecords, 4);
-    ASSERT_GREATER_THAN(stats->spilledUncompressedDataSize, 0);
-    ASSERT_GREATER_THAN(stats->spilledDataStorageSize, 0);
+    ASSERT_EQUALS(stats->spillingStats.getSpills(), 2);
+    ASSERT_EQUALS(stats->spillingStats.getSpilledRecords(), 4);
+    ASSERT_GREATER_THAN(stats->spillingStats.getSpilledBytes(), 0);
+    ASSERT_GREATER_THAN(stats->spillingStats.getSpilledDataStorageSize(), 0);
     ASSERT_EQUALS(stats->maxMemoryUsageBytes, maxAllowedMemoryUsageBytes);
 }
 
@@ -324,10 +324,10 @@ TEST_F(SpoolStageTest, spillStringRecordId) {
 
     // Validate the spilling stats. We should have spilled every other record.
     auto stats = static_cast<const SpoolStats*>(spool.getSpecificStats());
-    ASSERT_EQUALS(stats->spills, 2);
-    ASSERT_EQUALS(stats->spilledRecords, 4);
-    ASSERT_GREATER_THAN(stats->spilledUncompressedDataSize, 0);
-    ASSERT_GREATER_THAN(stats->spilledDataStorageSize, 0);
+    ASSERT_EQUALS(stats->spillingStats.getSpills(), 2);
+    ASSERT_EQUALS(stats->spillingStats.getSpilledRecords(), 4);
+    ASSERT_GREATER_THAN(stats->spillingStats.getSpilledBytes(), 0);
+    ASSERT_GREATER_THAN(stats->spillingStats.getSpilledDataStorageSize(), 0);
     ASSERT_EQUALS(stats->maxMemoryUsageBytes, maxAllowedMemoryUsageBytes);
 }
 

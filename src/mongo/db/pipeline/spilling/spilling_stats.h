@@ -40,33 +40,24 @@ namespace mongo {
 class SpillingStats {
 public:
     void incrementSpills(uint64_t spills = 1);
-    void setSpills(uint64_t spills) {
-        _spills = spills;
-    }
     uint64_t getSpills() const {
         return _spills;
     }
 
     void incrementSpilledBytes(uint64_t spilledBytes);
-    void setSpilledBytes(uint64_t spilledBytes) {
-        _spilledBytes = spilledBytes;
-    }
     uint64_t getSpilledBytes() const {
         return _spilledBytes;
     }
 
     void incrementSpilledDataStorageSize(uint64_t spilledDataStorageSize);
-    void setSpilledDataStorageSize(uint64_t spilledDataStorageSize) {
-        _spilledDataStorageSize = spilledDataStorageSize;
+    void updateSpilledDataStorageSize(uint64_t totalSpilledDataStorageSize) {
+        _spilledDataStorageSize = std::max(_spilledDataStorageSize, totalSpilledDataStorageSize);
     }
     uint64_t getSpilledDataStorageSize() const {
         return _spilledDataStorageSize;
     }
 
     void incrementSpilledRecords(uint64_t spilledRecords);
-    void setSpilledRecords(uint64_t spilledRecords) {
-        _spilledRecords = spilledRecords;
-    }
     uint64_t getSpilledRecords() const {
         return _spilledRecords;
     }
@@ -78,7 +69,14 @@ public:
         incrementSpills(additionalSpills);
         incrementSpilledBytes(additionalSpilledBytes);
         incrementSpilledRecords(additionalSpilledRecords);
-        setSpilledDataStorageSize(std::max(_spilledDataStorageSize, currentSpilledDataStorageSize));
+        updateSpilledDataStorageSize(currentSpilledDataStorageSize);
+    }
+
+    void accumulate(const SpillingStats& rhs) {
+        incrementSpills(rhs.getSpills());
+        incrementSpilledBytes(rhs.getSpilledBytes());
+        incrementSpilledDataStorageSize(rhs.getSpilledDataStorageSize());
+        incrementSpilledRecords(rhs.getSpilledRecords());
     }
 
 private:

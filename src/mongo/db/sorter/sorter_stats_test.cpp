@@ -42,6 +42,10 @@ TEST(SorterStatsTest, Basics) {
     ASSERT_EQ(sorterStats.spilledRanges(), 1);
     ASSERT_EQ(sorterTracker.spilledRanges.load(), 1);
 
+    sorterStats.incrementSpilledKeyValuePairs(10);
+    ASSERT_EQ(sorterStats.spilledKeyValuePairs(), 10);
+    ASSERT_EQ(sorterTracker.spilledKeyValuePairs.load(), 10);
+
     sorterStats.incrementNumSorted();
     ASSERT_EQ(sorterStats.numSorted(), 1);
     ASSERT_EQ(sorterTracker.numSorted.load(), 1);
@@ -122,6 +126,28 @@ TEST(SorterStatsTest, MultipleSortersSpilledRanges) {
     sorterStats3.setSpilledRanges(10);
     ASSERT_EQ(sorterStats3.spilledRanges(), 10);
     ASSERT_EQ(sorterTracker.spilledRanges.load(), 12);
+}
+
+TEST(SorterStatsTest, SingleSorterSpilledKeyValuePairs) {
+    SorterTracker sorterTracker;
+    SorterStats sorterStats(&sorterTracker);
+
+    sorterStats.incrementSpilledKeyValuePairs(2);
+    sorterStats.incrementSpilledKeyValuePairs(3);
+    ASSERT_EQ(sorterStats.spilledKeyValuePairs(), 5);
+    ASSERT_EQ(sorterTracker.spilledKeyValuePairs.load(), 5);
+}
+
+TEST(SorterStatsTest, MultipleSortersSpilledKeyValuePairs) {
+    SorterTracker sorterTracker;
+    SorterStats sorterStats1(&sorterTracker);
+    SorterStats sorterStats2(&sorterTracker);
+
+    sorterStats1.incrementSpilledKeyValuePairs(2);
+    sorterStats2.incrementSpilledKeyValuePairs(3);
+    ASSERT_EQ(sorterStats1.spilledKeyValuePairs(), 2);
+    ASSERT_EQ(sorterStats2.spilledKeyValuePairs(), 3);
+    ASSERT_EQ(sorterTracker.spilledKeyValuePairs.load(), 5);
 }
 
 TEST(SorterStatsTest, MultipleSortersNumSorted) {

@@ -34,6 +34,7 @@
 #include <set>
 #include <string>
 
+#include "mongo/db/pipeline/spilling/spilling_stats.h"
 #include "mongo/util/container_size_helper.h"
 
 namespace mongo {
@@ -92,14 +93,17 @@ struct PlanSummaryStats {
     // Did this plan use disk space?
     bool usedDisk = false;
 
-    // The total number of spills to disk from sort stages
+    // The total number of spills to disk from sort stages.
     long long sortSpills = 0;
 
-    // The total number of bytes spilled to disk from sort stages
+    // The total number of bytes spilled to disk from sort stages.
     long long sortSpillBytes = 0;
 
-    // The amount of data we've sorted in bytes
+    // The amount of data we've sorted in bytes.
     size_t sortTotalDataSizeBytes = 0;
+
+    // The spilling stats, accumulated across all stages.
+    SpillingStats totalSpillingStats;
 
     // The number of keys that we've sorted.
     long long keysSorted = 0;

@@ -67,7 +67,7 @@ namespace mongo {
 
 DocumentSourceGroupBase::~DocumentSourceGroupBase() {
     const auto& stats = _groupProcessor.getStats();
-    groupCounters.incrementGroupCountersPerQuery(stats.spilledDataStorageSize);
+    groupCounters.incrementGroupCountersPerQuery(stats.spillingStats.getSpilledDataStorageSize());
 }
 
 Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const {
@@ -128,13 +128,15 @@ Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const
         const auto& stats = _groupProcessor.getStats();
         out["totalOutputDataSizeBytes"] =
             opts.serializeLiteral(static_cast<long long>(stats.totalOutputDataSizeBytes));
-        out["usedDisk"] = opts.serializeLiteral(stats.spills > 0);
-        out["spills"] = opts.serializeLiteral(static_cast<long long>(stats.spills));
-        out["spilledDataStorageSize"] =
-            opts.serializeLiteral(static_cast<long long>(stats.spilledDataStorageSize));
+        out["usedDisk"] = opts.serializeLiteral(stats.spillingStats.getSpills() > 0);
+        out["spills"] =
+            opts.serializeLiteral(static_cast<long long>(stats.spillingStats.getSpills()));
+        out["spilledDataStorageSize"] = opts.serializeLiteral(
+            static_cast<long long>(stats.spillingStats.getSpilledDataStorageSize()));
         out["numBytesSpilledEstimate"] =
-            opts.serializeLiteral(static_cast<long long>(stats.numBytesSpilledEstimate));
-        out["spilledRecords"] = opts.serializeLiteral(static_cast<long long>(stats.spilledRecords));
+            opts.serializeLiteral(static_cast<long long>(stats.spillingStats.getSpilledBytes()));
+        out["spilledRecords"] =
+            opts.serializeLiteral(static_cast<long long>(stats.spillingStats.getSpilledRecords()));
     }
 
     return out.freezeToValue();

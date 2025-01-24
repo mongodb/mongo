@@ -657,13 +657,8 @@ void DocumentSourceGraphLookUp::spill(int64_t maximumMemoryUsage) {
 
 void DocumentSourceGraphLookUp::updateSpillingStats() {
     _stats.maxMemoryUsageBytes = _memoryUsageTracker.maxMemoryBytes();
-    _stats.spills = _queue.getSpillingStats().getSpills() + _visited.getSpillingStats().getSpills();
-    _stats.spilledBytes =
-        _queue.getSpillingStats().getSpilledBytes() + _visited.getSpillingStats().getSpilledBytes();
-    _stats.spilledDataStorageSize = _queue.getSpillingStats().getSpilledDataStorageSize() +
-        _visited.getSpillingStats().getSpilledDataStorageSize();
-    _stats.spilledRecords = _queue.getSpillingStats().getSpilledRecords() +
-        _visited.getSpillingStats().getSpilledRecords();
+    _stats.spillingStats = _queue.getSpillingStats();
+    _stats.spillingStats.accumulate(_visited.getSpillingStats());
 }
 
 void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
@@ -718,13 +713,15 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
     out[getSourceName()] = spec.freezeToValue();
 
     if (opts.verbosity && *opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
-        out["usedDisk"] = opts.serializeLiteral(_stats.spills > 0);
-        out["spills"] = opts.serializeLiteral(static_cast<long long>(_stats.spills));
-        out["spilledDataStorageSize"] =
-            opts.serializeLiteral(static_cast<long long>(_stats.spilledDataStorageSize));
-        out["spilledBytes"] = opts.serializeLiteral(static_cast<long long>(_stats.spilledBytes));
+        out["usedDisk"] = opts.serializeLiteral(_stats.spillingStats.getSpills() > 0);
+        out["spills"] =
+            opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpills()));
+        out["spilledDataStorageSize"] = opts.serializeLiteral(
+            static_cast<long long>(_stats.spillingStats.getSpilledDataStorageSize()));
+        out["spilledBytes"] =
+            opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledBytes()));
         out["spilledRecords"] =
-            opts.serializeLiteral(static_cast<long long>(_stats.spilledRecords));
+            opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledRecords()));
     }
 
     array.push_back(out.freezeToValue());
@@ -822,8 +819,11 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
 }
 
 DocumentSourceGraphLookUp::~DocumentSourceGraphLookUp() {
-    graphLookupCounters.incrementPerSpilling(
-        _stats.spills, _stats.spilledBytes, _stats.spilledRecords, _stats.spilledDataStorageSize);
+    const SpillingStats& stats = _stats.spillingStats;
+    graphLookupCounters.incrementPerSpilling(stats.getSpills(),
+                                             stats.getSpilledBytes(),
+                                             stats.getSpilledRecords(),
+                                             stats.getSpilledDataStorageSize());
 }
 
 intrusive_ptr<DocumentSourceGraphLookUp> DocumentSourceGraphLookUp::create(

@@ -10,20 +10,28 @@ exports_files(
 )
 
 mongo_cc_library(
+    name = "spilling_stats",
+    srcs = ["//src/mongo/db/pipeline/spilling:spilling_stats.cpp"],
+    hdrs = ["//src/mongo/db/pipeline/spilling:spilling_stats.h"],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
     name = "spilling",
     srcs = [
         "//src/mongo/db/pipeline/spilling:record_store_batch_writer.cpp",
         "//src/mongo/db/pipeline/spilling:spillable_deque.cpp",
         "//src/mongo/db/pipeline/spilling:spillable_map.cpp",
-        "//src/mongo/db/pipeline/spilling:spilling_stats.cpp",
     ],
     hdrs = [
         "//src/mongo/db/pipeline/spilling:record_store_batch_writer.h",
         "//src/mongo/db/pipeline/spilling:spillable_deque.h",
         "//src/mongo/db/pipeline/spilling:spillable_map.h",
-        "//src/mongo/db/pipeline/spilling:spilling_stats.h",
     ],
     deps = [
+        ":spilling_stats",
         "//src/mongo:base",
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/query:spill_util",

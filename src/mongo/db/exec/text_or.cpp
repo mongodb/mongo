@@ -398,14 +398,12 @@ void TextOrStage::doForceSpill() {
     }
     _sorter->spill();
 
-    _specificStats.spills++;
-    _specificStats.spilledRecords += recordsToSpill;
-    _specificStats.spilledBytes += _currentMemoryBytes;
     int64_t currentSpillDataStorageSize =
-        _sorterStats->bytesSpilled() - _specificStats.spilledDataStorageSize;
-    _specificStats.spilledDataStorageSize = _sorterStats->bytesSpilled();
+        _sorterStats->bytesSpilled() - _specificStats.spillingStats.getSpilledDataStorageSize();
     textOrCounters.incrementPerSpilling(
         1 /*spills*/, _currentMemoryBytes, recordsToSpill, currentSpillDataStorageSize);
+    _specificStats.spillingStats.updateSpillingStats(
+        1 /*spills*/, _currentMemoryBytes, recordsToSpill, _sorterStats->bytesSpilled());
 
     _currentMemoryBytes = 0;
 }

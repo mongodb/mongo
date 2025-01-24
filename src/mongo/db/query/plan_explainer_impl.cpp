@@ -541,10 +541,11 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("totalDataSizeSorted",
                               static_cast<long long>(spec->totalDataSizeBytes));
-            bob->appendBool("usedDisk", (spec->spills > 0));
-            bob->appendNumber("spills", static_cast<long long>(spec->spills));
-            bob->appendNumber("spilledDataStorageSize",
-                              static_cast<long long>(spec->spilledDataStorageSize));
+            bob->appendBool("usedDisk", (spec->spillingStats.getSpills() > 0));
+            bob->appendNumber("spills", static_cast<long long>(spec->spillingStats.getSpills()));
+            bob->appendNumber(
+                "spilledDataStorageSize",
+                static_cast<long long>(spec->spillingStats.getSpilledDataStorageSize()));
         }
     } else if (STAGE_SORT_MERGE == stats.stageType) {
         MergeSortStats* spec = static_cast<MergeSortStats*>(stats.specific.get());
@@ -570,12 +571,15 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("docsExamined", static_cast<long long>(spec->fetches));
-            bob->appendBool("usedDisk", (spec->spills > 0));
-            bob->appendNumber("spills", static_cast<long long>(spec->spills));
-            bob->appendNumber("spilledRecords", static_cast<long long>(spec->spilledRecords));
-            bob->appendNumber("spilledBytes", static_cast<long long>(spec->spilledBytes));
-            bob->appendNumber("spilledDataStorageSize",
-                              static_cast<long long>(spec->spilledDataStorageSize));
+            bob->appendBool("usedDisk", (spec->spillingStats.getSpills() > 0));
+            bob->appendNumber("spills", static_cast<long long>(spec->spillingStats.getSpills()));
+            bob->appendNumber("spilledRecords",
+                              static_cast<long long>(spec->spillingStats.getSpilledRecords()));
+            bob->appendNumber("spilledBytes",
+                              static_cast<long long>(spec->spillingStats.getSpilledBytes()));
+            bob->appendNumber(
+                "spilledDataStorageSize",
+                static_cast<long long>(spec->spillingStats.getSpilledDataStorageSize()));
         }
     } else if (STAGE_TIMESERIES_MODIFY == stats.stageType) {
         TimeseriesModifyStats* spec = static_cast<TimeseriesModifyStats*>(stats.specific.get());
@@ -623,13 +627,15 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("totalDataSizeSpooled",
                               static_cast<long long>(spec->totalDataSizeBytes));
-            bob->appendBool("usedDisk", (spec->spills > 0));
-            bob->appendNumber("spills", static_cast<long long>(spec->spills));
-            bob->appendNumber("spilledRecords", static_cast<long long>(spec->spilledRecords));
-            bob->appendNumber("spilledDataStorageSize",
-                              static_cast<long long>(spec->spilledDataStorageSize));
+            bob->appendBool("usedDisk", (spec->spillingStats.getSpills() > 0));
+            bob->appendNumber("spills", static_cast<long long>(spec->spillingStats.getSpills()));
+            bob->appendNumber("spilledRecords",
+                              static_cast<long long>(spec->spillingStats.getSpilledRecords()));
+            bob->appendNumber(
+                "spilledDataStorageSize",
+                static_cast<long long>(spec->spillingStats.getSpilledDataStorageSize()));
             bob->appendNumber("spilledUncompressedDataSize",
-                              static_cast<long long>(spec->spilledUncompressedDataSize));
+                              static_cast<long long>(spec->spillingStats.getSpilledBytes()));
         }
     } else if (STAGE_EOF == stats.stageType) {
         EofStats* spec = static_cast<EofStats*>(stats.specific.get());

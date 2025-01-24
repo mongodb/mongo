@@ -87,7 +87,8 @@ void SpoolStage::spill() {
             _memTracker.allowDiskUse());
     uassert(7443700,
             "Exceeded disk use limit for spool",
-            _specificStats.spilledDataStorageSize < _specificStats.maxDiskUsageBytes);
+            _specificStats.spillingStats.getSpilledDataStorageSize() <
+                _specificStats.maxDiskUsageBytes);
 
     // Initialize '_file' in a lazy manner only when it is needed.
     if (!_file) {
@@ -100,17 +101,17 @@ void SpoolStage::spill() {
     opts.FileStats(_spillStats.get());
 
     SortedFileWriter<RecordId, NullValue> writer(opts, _file);
-    _specificStats.spilledRecords += _buffer.size();
     for (size_t i = 0; i < _buffer.size(); ++i) {
         writer.addAlreadySorted(_buffer[i], NullValue());
     }
     _spillFileIters.emplace_back(writer.done());
-    _buffer.clear();
 
+    _specificStats.spillingStats.updateSpillingStats(1 /* spills */,
+                                                     _memTracker.currentMemoryBytes(),
+                                                     _buffer.size(),
+                                                     _spillStats->bytesSpilled());
+    _buffer.clear();
     _memTracker.resetCurrent();
-    ++_specificStats.spills;
-    _specificStats.spilledDataStorageSize = _spillStats->bytesSpilled();
-    _specificStats.spilledUncompressedDataSize = _spillStats->bytesSpilledUncompressed();
 }
 
 PlanStage::StageState SpoolStage::doWork(WorkingSetID* out) {

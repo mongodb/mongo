@@ -705,12 +705,15 @@ protected:
 
                 auto mergeIterator = Iterator::merge(spillsToMerge, this->_opts, _comp);
                 SortedFileWriter<Key, Value> writer(this->_opts, newSpillsFile, _settings);
+                uint64_t pairCount = 0;
                 while (mergeIterator->more()) {
                     auto pair = mergeIterator->next();
                     writer.addAlreadySorted(pair.first, pair.second);
+                    ++pairCount;
                 }
                 this->_iters.push_back(writer.done());
                 this->_stats.incrementSpilledRanges();
+                this->_stats.incrementSpilledKeyValuePairs(pairCount);
             }
             iterators.clear();
             this->_file = std::move(newSpillsFile);
@@ -921,6 +924,7 @@ private:
             writer.addAlreadySorted(data.first, data.second);
         }
 
+        this->_stats.incrementSpilledKeyValuePairs(_data.size());
         _data.clear();
         // _data may have grown very large. Even though it's clear()ed, we need to
         // free the excess memory.
@@ -1276,6 +1280,7 @@ private:
             writer.addAlreadySorted(_data[i].first, _data[i].second);
         }
 
+        this->_stats.incrementSpilledKeyValuePairs(_data.size());
         _data.clear();
         // _data may have grown very large. Even though it's clear()ed, we need to
         // free the excess memory.
@@ -1766,6 +1771,7 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::_spill() {
                           << " bytes, but did not opt in to external sorting.",
             _opts.extSortAllowed);
 
+    this->_stats.incrementSpilledKeyValuePairs(_heap.size());
     this->_stats.incrementSpilledRanges();
 
     // Write out all the values from the heap in sorted order.

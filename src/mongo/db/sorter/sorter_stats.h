@@ -40,6 +40,7 @@ namespace mongo {
  */
 struct SorterTracker {
     AtomicWord<long long> spilledRanges{0};
+    AtomicWord<long long> spilledKeyValuePairs{0};
     AtomicWord<long long> bytesSpilled{0};
     AtomicWord<long long> bytesSpilledUncompressed{0};
     AtomicWord<long long> numSorted{0};
@@ -89,6 +90,9 @@ public:
     void setSpilledRanges(uint64_t spills);
     uint64_t spilledRanges() const;
 
+    void incrementSpilledKeyValuePairs(uint64_t keyValuePairs);
+    uint64_t spilledKeyValuePairs() const;
+
     void incrementNumSorted(uint64_t sortedKeys = 1);
     uint64_t numSorted() const;
 
@@ -102,10 +106,11 @@ public:
     uint64_t memUsage() const;
 
 private:
-    uint64_t _spilledRanges = 0;  // Number of spills.
-    uint64_t _numSorted = 0;      // Number of keys sorted.
-    uint64_t _bytesSorted = 0;    // Total bytes of data sorted.
-    uint64_t _memUsage = 0;       // Current memory being used.
+    uint64_t _spilledRanges = 0;         // Number of spills.
+    uint64_t _spilledKeyValuePairs = 0;  // Number of spilled pairs.
+    uint64_t _numSorted = 0;             // Number of keys sorted.
+    uint64_t _bytesSorted = 0;           // Total bytes of data sorted.
+    uint64_t _memUsage = 0;              // Current memory being used.
 
     // All SorterStats update the SorterTracker to report sorter statistics for the
     // server.

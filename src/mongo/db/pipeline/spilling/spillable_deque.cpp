@@ -152,10 +152,8 @@ void SpillableDeque::spillToDisk() {
 }
 
 void SpillableDeque::updateStorageSizeStat() {
-    _stats.setSpilledDataStorageSize(
-        std::max(_stats.getSpilledDataStorageSize(),
-                 static_cast<uint64_t>(_diskCache->rs()->storageSize(
-                     *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext())))));
+    _stats.updateSpilledDataStorageSize(_diskCache->rs()->storageSize(
+        *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext())));
 }
 
 Document SpillableDeque::readDocumentFromDiskById(int desired) {

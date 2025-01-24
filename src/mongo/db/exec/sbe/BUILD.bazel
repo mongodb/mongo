@@ -256,6 +256,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:cluster_role",
+        "//src/mongo/db/pipeline/spilling:spilling_stats",
         "//src/mongo/db/stats:counter_ops",
         "//src/mongo/db/storage:damage_vector",
     ],

@@ -52,24 +52,29 @@ public:
         _summary.totalKeysExamined += stats->keysExamined;
     }
     void visit(tree_walker::MaybeConstPtr<true, sbe::HashAggStats> stats) final {
-        _summary.usedDisk |= stats->spilledRecords > 0;
+        _summary.usedDisk |= stats->spillingStats.getSpills() > 0;
+        _summary.totalSpillingStats.accumulate(stats->spillingStats);
     }
     void visit(tree_walker::MaybeConstPtr<true, sbe::WindowStats> stats) final {
-        _summary.usedDisk |= stats->spilledRecords > 0;
+        _summary.usedDisk |= stats->spillingStats.getSpills() > 0;
+        _summary.totalSpillingStats.accumulate(stats->spillingStats);
     }
     void visit(tree_walker::MaybeConstPtr<true, SortStats> stats) final {
         _summary.hasSortStage = true;
-        _summary.usedDisk = _summary.usedDisk || stats->spills > 0;
-        _summary.sortSpills += stats->spills;
-        _summary.sortSpillBytes += stats->spilledDataStorageSize;
+        _summary.usedDisk |= stats->spillingStats.getSpills() > 0;
+        _summary.totalSpillingStats.accumulate(stats->spillingStats);
+        _summary.sortSpills += stats->spillingStats.getSpills();
+        _summary.sortSpillBytes += stats->spillingStats.getSpilledDataStorageSize();
         _summary.sortTotalDataSizeBytes += stats->totalDataSizeBytes;
         _summary.keysSorted += stats->keysSorted;
     }
     void visit(tree_walker::MaybeConstPtr<true, GroupStats> stats) final {
-        _summary.usedDisk = _summary.usedDisk || stats->spills > 0;
+        _summary.usedDisk |= stats->spillingStats.getSpills() > 0;
+        _summary.totalSpillingStats.accumulate(stats->spillingStats);
     }
     void visit(tree_walker::MaybeConstPtr<true, TextOrStats> stats) final {
-        _summary.usedDisk = _summary.usedDisk || stats->spills > 0;
+        _summary.usedDisk |= stats->spillingStats.getSpills() > 0;
+        _summary.totalSpillingStats.accumulate(stats->spillingStats);
     }
     void visit(tree_walker::MaybeConstPtr<true, DocumentSourceCursorStats> stats) final {
         accumulate(stats->planSummaryStats);
@@ -91,7 +96,8 @@ public:
         accumulate(stats->planSummaryStats);
     }
     void visit(tree_walker::MaybeConstPtr<true, DocumentSourceGraphLookupStats> stats) final {
-        _summary.usedDisk |= stats->spills > 0;
+        _summary.usedDisk |= stats->spillingStats.getSpills() > 0;
+        _summary.totalSpillingStats.accumulate(stats->spillingStats);
         accumulate(stats->planSummaryStats);
     }
 
@@ -120,6 +126,7 @@ private:
         _summary.keysSorted += statsIn.keysSorted;
         _summary.planFailed |= statsIn.planFailed;
         _summary.indexesUsed.insert(statsIn.indexesUsed.begin(), statsIn.indexesUsed.end());
+        _summary.totalSpillingStats.accumulate(statsIn.totalSpillingStats);
     }
 
     /**

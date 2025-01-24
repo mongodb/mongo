@@ -120,10 +120,8 @@ RecordId SpillableDocumentMap::computeKey(const Value& id) const {
 }
 
 void SpillableDocumentMap::updateStorageSizeStat() {
-    _stats.setSpilledDataStorageSize(
-        std::max(_stats.getSpilledDataStorageSize(),
-                 static_cast<uint64_t>(_diskMap->rs()->storageSize(
-                     *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext())))));
+    _stats.updateSpilledDataStorageSize(_diskMap->rs()->storageSize(
+        *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext())));
 }
 
 template <bool IsConst>

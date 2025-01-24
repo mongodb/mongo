@@ -362,8 +362,9 @@ void DocumentSourceSort::serializeWithVerbosity(std::vector<Value>& array,
 
         mutDoc["totalDataSizeSortedBytesEstimate"] =
             opts.serializeLiteral(static_cast<long long>(stats.totalDataSizeBytes));
-        mutDoc["usedDisk"] = opts.serializeLiteral(stats.spills > 0);
-        mutDoc["spills"] = opts.serializeLiteral(static_cast<long long>(stats.spills));
+        mutDoc["usedDisk"] = opts.serializeLiteral(stats.spillingStats.getSpills() > 0);
+        mutDoc["spills"] =
+            opts.serializeLiteral(static_cast<long long>(stats.spillingStats.getSpills()));
         mutDoc["spilledDataStorageSize"] =
             opts.serializeLiteral(static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
     }

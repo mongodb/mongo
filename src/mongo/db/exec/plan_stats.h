@@ -37,6 +37,7 @@
 #include "mongo/db/exec/plan_stats_visitor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/pipeline/spilling/spilling_stats.h"
 #include "mongo/db/query/eof_node_type.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
@@ -838,11 +839,7 @@ struct SortStats : public SpecificStats {
     // The number of keys that we've sorted.
     uint64_t keysSorted = 0u;
 
-    // The number of times that we spilled data to disk during the execution of this query.
-    uint64_t spills = 0u;
-
-    // The maximum size of the spill file written to disk, or 0 if no spilling occurred.
-    uint64_t spilledDataStorageSize = 0u;
+    SpillingStats spillingStats;
 };
 
 struct MergeSortStats : public SpecificStats {
@@ -1042,18 +1039,7 @@ struct TextOrStats : public SpecificStats {
     }
 
     size_t fetches;
-
-    // The number of times the stage spilled.
-    uint64_t spills = 0;
-
-    // The size, in bytes, of the memory released with spilling.
-    uint64_t spilledBytes = 0;
-
-    // The size, in bytes, of disk space used for spilling.
-    uint64_t spilledDataStorageSize = 0;
-
-    // The total number of records spilled.
-    uint64_t spilledRecords = 0;
+    SpillingStats spillingStats;
 };
 
 struct TrialStats : public SpecificStats {
@@ -1103,18 +1089,7 @@ struct GroupStats : public SpecificStats {
     // Tracks an estimate of the total size of all documents output by the group stage in bytes.
     size_t totalOutputDataSizeBytes = 0;
 
-    // The size of the file spilled to disk. Note that this is not the same as the number of bytes
-    // spilled to disk, as any data spilled to disk will be compressed before being written to a
-    // file.
-    uint64_t spilledDataStorageSize = 0u;
-
-    // The number of bytes evicted from memory and spilled to disk.
-    uint64_t numBytesSpilledEstimate = 0u;
-
-    // The number of times that we spilled data to disk while grouping the data.
-    uint64_t spills = 0u;
-
-    uint64_t spilledRecords = 0u;
+    SpillingStats spillingStats;
 };
 
 struct DocumentSourceCursorStats : public SpecificStats {
@@ -1331,17 +1306,7 @@ struct SpoolStats : public SpecificStats {
     // The amount of data we've spooled in bytes.
     uint64_t totalDataSizeBytes = 0u;
 
-    // The number of times that we spilled data to disk during the execution of this query.
-    uint64_t spills = 0u;
-
-    // The maximum size of the spill file written to disk, or 0 if no spilling occurred.
-    uint64_t spilledDataStorageSize = 0u;
-
-    // The number of individual records spilled to disk.
-    uint64_t spilledRecords = 0u;
-
-    // The amount of data that has been spilled to the spill file, or 0 if no spilling occurred.
-    uint64_t spilledUncompressedDataSize = 0u;
+    SpillingStats spillingStats;
 };
 
 struct EofStats : public SpecificStats {
@@ -1408,14 +1373,8 @@ struct DocumentSourceGraphLookupStats : public SpecificStats {
 
     // The peak amount of RAM used by the stage during execution.
     uint64_t maxMemoryUsageBytes = 0;
-    // The number of times the stage spilled.
-    uint64_t spills = 0;
-    // The size, in bytes, of the memory released with spilling.
-    uint64_t spilledBytes = 0;
-    // The size, in bytes, of disk space used for spilling.
-    uint64_t spilledDataStorageSize = 0;
-    // The total number of records spilled.
-    uint64_t spilledRecords = 0;
+
+    SpillingStats spillingStats;
 
     // Tracks the summary stats in aggregate across all executions of the subpipeline.
     PlanSummaryStats planSummaryStats;

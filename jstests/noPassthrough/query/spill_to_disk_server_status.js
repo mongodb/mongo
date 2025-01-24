@@ -174,7 +174,7 @@ testSpillingMetrics({
 if (isSbeEnabled) {
     testSpillingMetrics({
         stage: stages['lookup'],
-        expectedSbeSpillingMetrics: {spills: 20, spilledBytes: 790},
+        expectedSbeSpillingMetrics: {spills: 20, spilledBytes: 471},
     });
 }
 testSpillingMetrics({

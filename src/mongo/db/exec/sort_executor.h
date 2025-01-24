@@ -115,7 +115,7 @@ public:
     }
 
     bool wasDiskUsed() const {
-        return _stats.spills > 0;
+        return _stats.spillingStats.getSpills() > 0;
     }
 
     /**
@@ -138,6 +138,13 @@ public:
             return nullptr;
         }
         return _sorterFileStats.get();
+    }
+
+    long long spilledBytes() const {
+        if (!_sorterFileStats) {
+            return 0;
+        }
+        return _sorterFileStats->bytesSpilledUncompressed();
     }
 
     long long spilledDataStorageSize() const {
@@ -163,9 +170,11 @@ public:
         ensureSorter();
         _output = _sorter->done();
         _stats.keysSorted += _sorter->stats().numSorted();
-        _stats.spills += _sorter->stats().spilledRanges();
+        _stats.spillingStats.incrementSpills(_sorter->stats().spilledRanges());
+        _stats.spillingStats.incrementSpilledBytes(spilledBytes());
+        _stats.spillingStats.incrementSpilledDataStorageSize(spilledDataStorageSize());
+        _stats.spillingStats.incrementSpilledRecords(_sorter->stats().spilledKeyValuePairs());
         _stats.totalDataSizeBytes += _sorter->stats().bytesSorted();
-        _stats.spilledDataStorageSize += spilledDataStorageSize();
         _stats.memoryUsageBytes = 0;
         _sorter.reset();
     }

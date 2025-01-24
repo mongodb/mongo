@@ -232,6 +232,13 @@ void SpillingStore::switchToOriginal(OperationContext* opCtx) {
                 _spillingUnit->getState() == RecoveryUnit::State::kActive));
 }
 
+int64_t SpillingStore::storageSize(OperationContext* opCtx) {
+    switchToSpilling(opCtx);
+    ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
+
+    return rs()->storageSize(*shard_role_details::getRecoveryUnit(opCtx));
+}
+
 void SpillingStore::saveState() {
     _spillingUnit->abandonSnapshot();
 }

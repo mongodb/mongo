@@ -41,10 +41,6 @@ TEST(SpillingStatsTest, Spills) {
     ASSERT_EQ(stats.getSpills(), 1);
     stats.incrementSpills(5);
     ASSERT_EQ(stats.getSpills(), 6);
-    stats.setSpills(15);
-    ASSERT_EQ(stats.getSpills(), 15);
-    stats.setSpills(2);
-    ASSERT_EQ(stats.getSpills(), 2);
 
     // Increase by a large number.
     auto current = stats.getSpills();
@@ -64,10 +60,6 @@ TEST(SpillingStatsTest, SpilledBytes) {
     ASSERT_EQ(stats.getSpilledBytes(), 0);
     stats.incrementSpilledBytes(6);
     ASSERT_EQ(stats.getSpilledBytes(), 6);
-    stats.setSpilledBytes(15);
-    ASSERT_EQ(stats.getSpilledBytes(), 15);
-    stats.setSpilledBytes(2);
-    ASSERT_EQ(stats.getSpilledBytes(), 2);
 
     // Increase by a large number.
     auto current = stats.getSpilledBytes();
@@ -87,10 +79,6 @@ TEST(SpillingStatsTest, SpilledDataStorageSize) {
     ASSERT_EQ(stats.getSpilledDataStorageSize(), 0);
     stats.incrementSpilledDataStorageSize(6);
     ASSERT_EQ(stats.getSpilledDataStorageSize(), 6);
-    stats.setSpilledDataStorageSize(15);
-    ASSERT_EQ(stats.getSpilledDataStorageSize(), 15);
-    stats.setSpilledDataStorageSize(2);
-    ASSERT_EQ(stats.getSpilledDataStorageSize(), 2);
 
     // Increase by a large number.
     auto current = stats.getSpilledDataStorageSize();
@@ -111,10 +99,6 @@ TEST(SpillingStatsTest, SpilledRecords) {
     ASSERT_EQ(stats.getSpilledRecords(), 0);
     stats.incrementSpilledRecords(6);
     ASSERT_EQ(stats.getSpilledRecords(), 6);
-    stats.setSpilledRecords(15);
-    ASSERT_EQ(stats.getSpilledRecords(), 15);
-    stats.setSpilledRecords(2);
-    ASSERT_EQ(stats.getSpilledRecords(), 2);
 
     // Increase by a large number.
     auto current = stats.getSpilledRecords();
