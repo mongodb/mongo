@@ -119,6 +119,10 @@ MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest
       _journalListener(std::move(options._journalListener)) {
     auto serviceContext = getServiceContext();
 
+    for (auto& observer : options._clientObservers) {
+        serviceContext->registerClientObserver(std::move(observer));
+    }
+
     auto setupClient = serviceContext->getService()->makeClient("MongoDSCTestCtor");
     AlternativeClientRegion acr(setupClient);
 
