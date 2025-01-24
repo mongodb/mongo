@@ -164,11 +164,13 @@ NormalizationOptsSet Test::parseResultType(const std::string& type) {
              NormalizationOpts::kSortArrays | NormalizationOpts::kNormalizeNumerics},
         {":sortFull",
          NormalizationOpts::kSortResults | NormalizationOpts::kSortBSON |
-             NormalizationOpts::kSortArrays},
+             NormalizationOpts::kSortArrays | NormalizationOpts::kRoundFloatingPointNumerics},
         {":sortBSONNormalizeNumerics",
          NormalizationOpts::kSortResults | NormalizationOpts::kSortBSON |
              NormalizationOpts::kNormalizeNumerics},
-        {":sortBSON", NormalizationOpts::kSortResults | NormalizationOpts::kSortBSON},
+        {":sortBSON",
+         NormalizationOpts::kSortResults | NormalizationOpts::kSortBSON |
+             NormalizationOpts::kRoundFloatingPointNumerics},
         {":sortResultsNormalizeNumerics",
          NormalizationOpts::kSortResults | NormalizationOpts::kNormalizeNumerics},
         {":normalizeNumerics", NormalizationOpts::kNormalizeNumerics},

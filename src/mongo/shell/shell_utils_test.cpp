@@ -402,5 +402,14 @@ TEST(NormalizationOpts, NormalizeFullConflateNullAndMissing) {
         "c: 1.000000000000000000000000000000000 } }";
     ASSERT_EQ(normalizeBSONObj(bson, opts).toString(), expected);
 }
+
+TEST(NormalizationOpts, RoundedFloatingPointNumericsAreEqual) {
+    auto bson = fromjson("{a: {z: 1.234567890123456789, y: [9.876543210987654321, 1]}}");
+    auto opts = NormalizationOpts::kRoundFloatingPointNumerics | NormalizationOpts::kSortBSON |
+        NormalizationOpts::kSortArrays;
+
+    auto expected = "{ a: { y: [ 1, 9.87654321098765 ], z: 1.23456789012346 } }";
+    ASSERT_EQ(normalizeBSONObj(bson, opts).toString(), expected);
+}
 }  // namespace
 }  // namespace mongo

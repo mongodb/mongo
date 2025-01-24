@@ -125,6 +125,8 @@ enum class NormalizationOpts : uint32_t {
     kNormalizeNumerics = 1 << 3,
     // Set this bit to treat null and missing as the same value.
     kConflateNullAndMissing = 1 << 4,
+    // Set this bit to round floating points to 15 digits of precision.
+    kRoundFloatingPointNumerics = 1 << 5,
 };
 using NormalizationOptsSet = NormalizationOpts;
 

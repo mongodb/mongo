@@ -919,6 +919,54 @@ BSONObj normalizeNumerics(const BSONObj& input) {
     return bob.obj();
 }
 
+void roundFloatingPointNumericElementsHelper(const BSONObj& input, BSONObjBuilder& bob);
+
+void roundFloatingPointNumericElements(const BSONElement& el, BSONObjBuilder& bob) {
+    switch (el.type()) {
+        case NumberDouble: {
+            // Take advantage of Decimal128's ability to round to 15 digits at construction time.
+            bob.append(el.fieldName(),
+                       Decimal128(el.numberDouble(), Decimal128::kRoundTo15Digits).toDouble());
+            break;
+        }
+        case Array: {
+            BSONObjBuilder sub(bob.subarrayStart(el.fieldNameStringData()));
+            for (const auto& child : el.Array()) {
+                roundFloatingPointNumericElements(child, sub);
+            }
+            sub.doneFast();
+            break;
+        }
+        case Object: {
+            BSONObjBuilder sub(bob.subobjStart(el.fieldNameStringData()));
+            roundFloatingPointNumericElementsHelper(el.Obj(), sub);
+            sub.doneFast();
+            break;
+        }
+        default:
+            bob.append(el);
+            break;
+    }
+}
+
+void roundFloatingPointNumericElementsHelper(const BSONObj& input, BSONObjBuilder& bob) {
+    BSONObjIterator it(input);
+    while (it.more()) {
+        roundFloatingPointNumericElements(it.next(), bob);
+    }
+}
+
+/**
+ * Returns a new BSONObj with the same field/value pairings, but with floating-point types rounded
+ * to 15 digits of precision. For example, 1.000000000000001 and NumberDecimal('1') would
+ * be normalized into the same number.
+ */
+BSONObj roundFloatingPointNumerics(const BSONObj& input) {
+    BSONObjBuilder bob(input.objsize());
+    roundFloatingPointNumericElementsHelper(input, bob);
+    return bob.obj();
+}
+
 void removeNullAndUndefinedElementsHelper(const BSONObj& input, BSONObjBuilder& bob);
 
 template <typename Builder>
@@ -985,6 +1033,9 @@ BSONObj normalizeBSONObj(const BSONObj& input, NormalizationOptsSet opts) {
     BSONObj result = input;
     if (isSet(opts, NormalizationOpts::kConflateNullAndMissing)) {
         result = removeNullAndUndefined(result);
+    }
+    if (isSet(opts, NormalizationOpts::kRoundFloatingPointNumerics)) {
+        result = roundFloatingPointNumerics(result);
     }
     if (isSet(opts, NormalizationOpts::kNormalizeNumerics)) {
         result = normalizeNumerics(result);
