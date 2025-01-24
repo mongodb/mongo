@@ -294,5 +294,36 @@ TEST_F(SpillableDocumentHashMapTest, EraseIfInMemoryFreesMemory) {
     ASSERT_EQ(it, map.end());
 }
 
+TEST_F(SpillableDocumentHashMapTest, IteratorCanResumeAfterSwitchingOpCtx) {
+    _expCtx->setAllowDiskUse(true);
+    auto map = createSpillableMap(10 * 1024);
+    const std::vector<Document> docs = generateDocuments(30, 1024);
+    for (const auto& doc : docs) {
+        map.add(doc);
+    }
+
+    auto unseenDocs = _expCtx->getValueComparator().makeFlatUnorderedValueSet();
+    unseenDocs.insert(docs.begin(), docs.end());
+
+    auto it = map.begin();
+    for (size_t i = 0; i < docs.size(); ++i) {
+        if (i % 5 == 4) {
+            _opCtx.reset();
+            _opCtx = makeOperationContext();
+            _expCtx->setOperationContext(_opCtx.get());
+        }
+
+        Value value{*it};
+        auto unseenIt = unseenDocs.find(value);
+        ASSERT_NE(unseenIt, unseenDocs.end())
+            << "Document " << it->toString() << " is found in map but not expected";
+        unseenDocs.erase(unseenIt);
+        ++it;
+    }
+    ASSERT_TRUE(it == map.end());
+    ASSERT_TRUE(unseenDocs.empty())
+        << "Documents not found in map but expected. Example: " << unseenDocs.begin()->toString();
+}
+
 }  // namespace
 }  // namespace mongo

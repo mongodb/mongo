@@ -32,6 +32,7 @@
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/transaction_resources.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -197,6 +198,7 @@ void SpillableDocumentMap::IteratorImpl<IsConst>::spill() {
     _diskDocuments.clear();
 
     restoreDiskIt();
+    ON_BLOCK_EXIT([&]() { saveDiskIt(); });
 
     boost::optional<Record> bson = _diskIt->seekExact(frontRecordId);
     tassert(2398005, "Previously present RecordId not found", bson.has_value());
@@ -205,8 +207,6 @@ void SpillableDocumentMap::IteratorImpl<IsConst>::spill() {
     Document doc{bson->data.releaseToBson()};
     _diskDocuments.emplace_back(MemoryUsageToken{doc.getApproximateSize(), &_map->_memTracker},
                                 doc.getOwned());
-
-    saveDiskIt();
 }
 
 template <bool IsConst>
@@ -226,6 +226,7 @@ void SpillableDocumentMap::IteratorImpl<IsConst>::readNextBatchFromDisk() {
     }
 
     restoreDiskIt();
+    ON_BLOCK_EXIT([&]() { saveDiskIt(); });
 
     // Always read at least one document
     do {
@@ -238,8 +239,6 @@ void SpillableDocumentMap::IteratorImpl<IsConst>::readNextBatchFromDisk() {
         _diskDocuments.emplace_back(MemoryUsageToken{doc.getApproximateSize(), &_map->_memTracker},
                                     doc.getOwned());
     } while (!_diskItExhausted && _map->_memTracker.withinMemoryLimit());
-
-    saveDiskIt();
 }
 
 template <bool IsConst>
