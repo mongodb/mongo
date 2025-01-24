@@ -717,6 +717,33 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
+    name = "multiple_collection_accessor_test",
+    srcs = [
+        "//src/mongo/db/query:multiple_collection_accessor.h",
+        "//src/mongo/db/query:multiple_collection_accessor_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":query_exec",
+        ":shard_role",
+        "//src/mongo/db/admission:ticketholder_manager",
+        "//src/mongo/db/catalog:catalog_control",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/catalog:collection_uuid_mismatch_info",
+        "//src/mongo/db/catalog:database_holder",
+        "//src/mongo/db/catalog:database_holder_mock",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/query/client_cursor",
+        "//src/mongo/db/s:shard_server_test_fixture",
+        "//src/mongo/db/s:sharding_runtime_d",
+        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/util:progress_meter",
+        "//src/mongo/util/concurrency:ticketholder",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "vector_clock_test",
     srcs = [
         "keys_collection_document_test.cpp",

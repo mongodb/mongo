@@ -78,6 +78,14 @@ public:
         : MultipleCollectionAccessor(&mainColl) {}
 
     explicit MultipleCollectionAccessor(CollectionAcquisition mainAcq) : _mainAcq(mainAcq) {}
+    MultipleCollectionAccessor(
+        CollectionAcquisition mainAcq,
+        const std::vector<CollectionOrViewAcquisition>& secondaryAcquisitions)
+        : _mainAcq(mainAcq) {
+        for (auto& acq : secondaryAcquisitions) {
+            _secondaryAcq.emplace(acq.nss(), acq);
+        }
+    }
 
     bool hasMainCollection() const {
         return (_mainColl && _mainColl->get()) || (_mainAcq && _mainAcq->exists());
@@ -88,17 +96,11 @@ public:
     }
 
     std::map<NamespaceString, CollectionPtr> getSecondaryCollections() const {
-        std::map<NamespaceString, CollectionPtr> collMap;
-        for (const auto& [nss, uuid] : _secondaryColls) {
-            collMap.emplace(nss,
-                            uuid ? CollectionCatalog::get(_opCtx)->establishConsistentCollection(
-                                       _opCtx,
-                                       NamespaceStringOrUUID{nss.dbName(), *uuid},
-                                       shard_role_details::getRecoveryUnit(_opCtx)
-                                           ->getPointInTimeReadTimestamp())
-                                 : nullptr);
+        if (isAcquisition()) {
+            return _getSecondaryAcquisitions();
+        } else {
+            return _getSecondaryCollectionsAutoGetters();
         }
-        return collMap;
     }
 
     bool isAnySecondaryNamespaceAViewOrNotFullyLocal() const {
@@ -119,24 +121,18 @@ public:
     }
 
     CollectionPtr lookupCollection(const NamespaceString& nss) const {
-        if (_mainColl && _mainColl->get() && nss == _mainColl->get()->ns()) {
-            return CollectionPtr{_mainColl->get()};
-        } else if (_mainAcq && nss == _mainAcq->getCollectionPtr()->ns()) {
-            return CollectionPtr{_mainAcq->getCollectionPtr().get()};
-        } else if (auto itr = _secondaryColls.find(nss);
-                   itr != _secondaryColls.end() && itr->second) {
-            auto timestamp =
-                shard_role_details::getRecoveryUnit(_opCtx)->getPointInTimeReadTimestamp();
-            return CollectionPtr{CollectionCatalog::get(_opCtx)->establishConsistentCollection(
-                _opCtx, NamespaceStringOrUUID{nss.dbName(), *itr->second}, timestamp)};
+        if (isAcquisition()) {
+            return _lookupCollectionAcquisition(nss);
+        } else {
+            return _lookupCollectionAutoGetters(nss);
         }
-        return CollectionPtr{nullptr};
     }
 
     void clear() {
         _mainColl = &CollectionPtr::null;
         _mainAcq.reset();
         _secondaryColls.clear();
+        _secondaryAcq.clear();
     }
 
     void forEach(std::function<void(const CollectionPtr&)> func) const {
@@ -151,17 +147,64 @@ public:
     }
 
 private:
-    const CollectionPtr* _mainColl{&CollectionPtr::null};
+    inline std::map<NamespaceString, CollectionPtr> _getSecondaryAcquisitions() const {
+        std::map<NamespaceString, CollectionPtr> collMap;
+        for (const auto& [nss, acq] : _secondaryAcq) {
+            collMap.emplace(nss, CollectionPtr{acq.getCollectionPtr().get()});
+        }
+        return collMap;
+    }
+
+    inline std::map<NamespaceString, CollectionPtr> _getSecondaryCollectionsAutoGetters() const {
+        std::map<NamespaceString, CollectionPtr> collMap;
+        for (const auto& [nss, uuid] : _secondaryColls) {
+            collMap.emplace(nss,
+                            uuid ? CollectionCatalog::get(_opCtx)->establishConsistentCollection(
+                                       _opCtx,
+                                       NamespaceStringOrUUID{nss.dbName(), *uuid},
+                                       shard_role_details::getRecoveryUnit(_opCtx)
+                                           ->getPointInTimeReadTimestamp())
+                                 : nullptr);
+        }
+        return collMap;
+    }
+
+    inline CollectionPtr _lookupCollectionAcquisition(const NamespaceString& nss) const {
+        if (nss == _mainAcq->nss()) {
+            return CollectionPtr{_mainAcq->getCollectionPtr().get()};
+        } else if (auto itr = _secondaryAcq.find(nss); itr != _secondaryAcq.end()) {
+            return CollectionPtr{itr->second.getCollectionPtr().get()};
+        }
+        return CollectionPtr{nullptr};
+    }
+
+    inline CollectionPtr _lookupCollectionAutoGetters(const NamespaceString& nss) const {
+        if (_mainColl && _mainColl->get() && nss == _mainColl->get()->ns()) {
+            return CollectionPtr{_mainColl->get()};
+        } else if (auto itr = _secondaryColls.find(nss);
+                   itr != _secondaryColls.end() && itr->second) {
+            auto timestamp =
+                shard_role_details::getRecoveryUnit(_opCtx)->getPointInTimeReadTimestamp();
+            return CollectionPtr{CollectionCatalog::get(_opCtx)->establishConsistentCollection(
+                _opCtx, NamespaceStringOrUUID{nss.dbName(), *itr->second}, timestamp)};
+        }
+        return CollectionPtr{nullptr};
+    }
+
+    // Shard role api collection access.
     boost::optional<CollectionAcquisition> _mainAcq;
+    CollectionOrViewAcquisitionMap _secondaryAcq;
 
-    // Tracks whether any secondary namespace is a view or is not fully local based on information
-    // captured at the time of AutoGet* object acquisition. This is used to determine if a $lookup
-    // is eligible for pushdown into the query execution subsystem as $lookup against a foreign view
-    // or a  non-local collection is not currently supported by the execution subsystem.
-    bool _isAnySecondaryNamespaceAViewOrNotFullyLocal = false;
-
-    // Map from namespace to corresponding UUID
+    // Manual collection access state
+    const CollectionPtr* _mainColl{&CollectionPtr::null};
     stdx::unordered_map<NamespaceString, boost::optional<UUID>> _secondaryColls{};
+
+    // Tracks whether any secondary namespace is a view or is not fully local based on
+    // information captured at the time of AutoGet* object acquisition. This is used to
+    // determine if a $lookup is eligible for pushdown into the query execution subsystem as
+    // $lookup against a foreign view or a non-local collection is not currently supported
+    // by the execution subsystem.
+    bool _isAnySecondaryNamespaceAViewOrNotFullyLocal = false;
 
     OperationContext* _opCtx = nullptr;
 };

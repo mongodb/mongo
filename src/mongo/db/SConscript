@@ -224,6 +224,12 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target="multiple_collection_accessor_test",
+    source=[],
+    LIBDEPS=[],
+)
+
+env.CppUnitTest(
     target="vector_clock_test",
     source=[],
     LIBDEPS=[],
