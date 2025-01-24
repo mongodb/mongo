@@ -5,11 +5,13 @@ from __future__ import absolute_import
 import os
 import unittest
 
-from mock import MagicMock, patch
+from mock import MagicMock, mock_open, patch
 
 import buildscripts.patch_builds.change_data as under_test
 
 NS = "buildscripts.patch_builds.change_data"
+
+FILE_CONTENT = "Hello, Universe!\n"
 
 
 def ns(relative_name):  # pylint: disable=invalid-name
@@ -71,3 +73,41 @@ class TestGenerateRevisionMap(unittest.TestCase):
 
         self.assertEqual(revision_map[mock_repo_list[0].git_dir], revision_data["mongo"])
         self.assertEqual(len(revision_map), 1)
+
+
+class TestFindChangedFilesAndLinesInRepos(unittest.TestCase):
+    @patch("builtins.open", new_callable=mock_open, read_data=FILE_CONTENT)
+    def test_detects_file_and_line_modifications_no_change(self, mock_open):
+        repo_mock = MagicMock()
+        repo_mock.git.diff.return_value = ""
+
+        changed_files = ["src/module/test1.cpp"]
+        revision_map = {}
+
+        result = under_test.find_modified_lines_for_files(repo_mock, changed_files, revision_map)
+
+        expected_result = {}
+
+        mock_open.assert_called_once_with("src/module/test1.cpp", "r")
+
+        self.assertEqual(result, expected_result)
+
+    @patch("builtins.open", new_callable=mock_open, read_data=FILE_CONTENT)
+    def test_detects_file_and_line_modifications_one_file(self, mock_open):
+        repo_mock = MagicMock()
+        repo_mock.git.diff.return_value = """\
+@@ -1,2 +1,2 @@
+-Hello, World!
++Hello, Universe!
+ """
+
+        changed_files = ["src/module/test1.cpp"]
+        revision_map = {}
+
+        result = under_test.find_modified_lines_for_files(repo_mock, changed_files, revision_map)
+
+        expected_result = {"src/module/test1.cpp": [(1, "Hello, Universe!")]}
+
+        mock_open.assert_called_once_with("src/module/test1.cpp", "r")
+
+        self.assertEqual(result, expected_result)

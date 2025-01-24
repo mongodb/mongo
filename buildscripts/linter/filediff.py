@@ -2,7 +2,7 @@
 
 import os
 import sys
-from typing import Callable, List, Tuple
+from typing import Callable, Dict, List, Tuple
 
 import structlog
 from git import Repo
@@ -16,6 +16,7 @@ from buildscripts.linter import git
 from buildscripts.patch_builds.change_data import (
     RevisionMap,
     find_changed_files_in_repos,
+    find_modified_lines_for_files_in_repos,
     generate_revision_map,
 )
 
@@ -66,3 +67,19 @@ def gather_changed_files_for_lint(is_interesting_file: Callable[[str], bool]) ->
 
     LOGGER.info("Found files to lint", files=files)
     return files
+
+
+def gather_changed_files_with_lines(
+    is_interesting_file: Callable[[str], bool],
+) -> Dict[str, List[Tuple[int, str]]]:
+    """
+    Get the files that have changes since the last git commit, along with details of the specific lines that have changed.
+
+    :param is_interesting_file: Filter for whether a file should be returned.
+    :return: Dictionary mapping each changed file to a list of tuples, where each tuple contains the modified line number and its content.
+    """
+    repos, revision_map = _get_repos_and_revisions()
+    changed_files = find_changed_files_in_repos(repos, revision_map)
+
+    filtered_files = [f for f in changed_files if is_interesting_file(f)]
+    return find_modified_lines_for_files_in_repos(repos, filtered_files, revision_map)

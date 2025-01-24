@@ -4,14 +4,14 @@
 import os
 import re
 import sys
-from typing import Iterable
+from typing import List, Tuple
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
 
 # pylint: disable=wrong-import-position
-from buildscripts.linter.filediff import gather_changed_files_for_lint
+from buildscripts.linter.filediff import gather_changed_files_with_lines
 
 LEGACY_TYPES = [
     "public Command {",
@@ -22,14 +22,15 @@ LEGACY_TYPES = [
 ]
 
 
-def check_file_for_legacy_type(file_contents: Iterable[str]) -> bool:
+def check_file_for_legacy_type(modified_lines: List[Tuple[int, str]]) -> bool:
     """Return false if a file defines a legacy command."""
 
     file_has_legacy_type = False
 
-    for i, line in enumerate(file_contents):
-        if any(legacy_type in line for legacy_type in LEGACY_TYPES):
-            print(f"On line {i}: {line.strip()}")
+    for i in range(len(modified_lines)):
+        modified_line = modified_lines[i][1]
+        if any(legacy_type in modified_line for legacy_type in LEGACY_TYPES):
+            print(f"On line {i}: {modified_line.strip()}")
             file_has_legacy_type = True
 
     return file_has_legacy_type
@@ -54,19 +55,18 @@ def main():
     default_dir = os.getenv("BUILD_WORKSPACE_DIRECTORY", ".")
     os.chdir(default_dir)
 
-    files = gather_changed_files_for_lint(is_interesting_file)
+    files = gather_changed_files_with_lines(is_interesting_file)
     found_legacy_command = False
 
     for file in files:
-        with open(file, "r") as search_file:
-            hasLegacyCommandDefinition = check_file_for_legacy_type(search_file)
+        hasLegacyCommandDefinition = check_file_for_legacy_type(files[file])
 
-            if hasLegacyCommandDefinition:
-                found_legacy_command = True
-                print(
-                    file
-                    + " contains a legacy command type definition. Please define a TypedCommand instead."
-                )
+        if hasLegacyCommandDefinition:
+            found_legacy_command = True
+            print(
+                file
+                + " contains a legacy command type definition. Please define a TypedCommand instead."
+            )
 
     if found_legacy_command:
         sys.exit(1)
