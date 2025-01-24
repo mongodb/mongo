@@ -107,6 +107,11 @@ void DocumentSourceMergeCursors::addNewShardCursors(std::vector<RemoteCursor>&& 
     _blockingResultsMerger->addNewShardCursors(std::move(newCursors));
 }
 
+void DocumentSourceMergeCursors::closeShardCursors(const stdx::unordered_set<ShardId>& shardIds) {
+    tassert(8456113, "_blockingResultsMerger must be set", _blockingResultsMerger);
+    _blockingResultsMerger->closeShardCursors(shardIds);
+}
+
 void DocumentSourceMergeCursors::populateMerger() {
     tassert(9535001, "_blockingResultsMerger must not yet be set", !_blockingResultsMerger);
     tassert(9535002, "_armParams must be set", _armParams);

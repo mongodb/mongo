@@ -37,7 +37,6 @@
 #include <memory>
 #include <mutex>
 #include <string>
-#include <system_error>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -60,7 +59,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/query/exec/async_results_merger.h"
 #include "mongo/s/query/exec/results_merger_test_fixture.h"
 #include "mongo/s/session_catalog_router.h"
@@ -318,6 +316,316 @@ TEST_F(AsyncResultsMergerTest, MultiShardSorted) {
     // cursors were exhausted.
     ASSERT_TRUE(arm->ready());
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
+}
+
+TEST_F(AsyncResultsMergerTest, SingleShardUnsortedCloseAfterReceivingAllResults) {
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 5, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+    ASSERT_EQ(1, arm->getNumRemotes());
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
+    ASSERT_FALSE(arm->ready());
+
+    // Schedule requests.
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+
+    // Shard responds; the handleBatchResponse callbacks are run and ARM's remotes get updated.
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch = {fromjson("{_id: 1}")};
+
+    // Respond with a cursorId of 0, meaning the remote cursor is already closed.
+    responses.emplace_back(kTestNss, CursorId(0), batch);
+    scheduleNetworkResponses(std::move(responses));
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_TRUE(arm->remotesExhausted());
+
+    // ARM returns the correct result.
+    executor()->waitForEvent(readyEvent);
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_TRUE(arm->ready());
+    ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
+    ASSERT_FALSE(networkHasReadyRequests());
+
+    // Remove the only shard.
+    arm->closeShardCursors({kTestShardIds[0]});
+
+    // No killCursors command is supposed to be executed here, as the remote cursor was already
+    // closed before.
+    ASSERT_FALSE(networkHasReadyRequests());
+
+    ASSERT_EQ(0, arm->getNumRemotes());
+    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
+    ASSERT_TRUE(arm->remotesExhausted());
+}
+
+TEST_F(AsyncResultsMergerTest, SingleShardUnsortedCloseWithMoreResultsPending) {
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 5, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+    ASSERT_EQ(1, arm->getNumRemotes());
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
+    ASSERT_FALSE(arm->ready());
+
+    // Schedule requests.
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+
+    // Shard responds; the handleBatchResponse callbacks are run and ARM's remotes get updated.
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch = {fromjson("{_id: 1}")};
+
+    // Respond with a non-zero cursorId, meaning the remote cursor remains open.
+    responses.emplace_back(kTestNss, CursorId(5), batch);
+    scheduleNetworkResponses(std::move(responses));
+
+    ASSERT_TRUE(arm->ready());
+
+    // ARM returns the correct result.
+    executor()->waitForEvent(readyEvent);
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_FALSE(arm->ready());
+
+    arm->closeShardCursors({kTestShardIds[0]});
+
+    // We expect to see one killCursors command call for the remote cursor.
+    ASSERT_TRUE(networkHasReadyRequests());
+    ASSERT_EQ(1, getNumPendingRequests());
+    assertKillCursorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 5);
+    blackHoleNextRequest();
+
+    ASSERT_EQ(0, arm->getNumRemotes());
+    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
+    ASSERT_TRUE(arm->remotesExhausted());
+}
+
+TEST_F(AsyncResultsMergerTest, MultiShardSortedClose) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', sort: {_id: 1}}");
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 5, {})));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 6, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors), findCmd);
+    ASSERT_EQ(2, arm->getNumRemotes());
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[1]));
+    ASSERT_FALSE(arm->ready());
+    ASSERT_FALSE(arm->remotesExhausted());
+
+    // Schedule requests.
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+
+    // First shard responds; the handleBatchResponse callback is run and ARM's remote gets updated.
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch1 = {fromjson("{$sortKey: [5]}"), fromjson("{$sortKey: [6]}")};
+    responses.emplace_back(kTestNss, CursorId(5), batch1);
+    scheduleNetworkResponses(std::move(responses));
+
+    // ARM is not ready to return results until receiving responses from all remotes.
+    ASSERT_FALSE(arm->ready());
+    ASSERT_FALSE(arm->remotesExhausted());
+
+    // Second shard responds; the handleBatchResponse callback is run and ARM's remote gets updated.
+    responses.clear();
+    std::vector<BSONObj> batch2 = {fromjson("{$sortKey: [3]}"), fromjson("{$sortKey: [9]}")};
+
+    // Respond with a cursorId of 0, meaning the remote cursor is closed.
+    responses.emplace_back(kTestNss, CursorId(0), batch2);
+    scheduleNetworkResponses(std::move(responses));
+
+    // ARM returns all results in sorted order.
+    executor()->waitForEvent(readyEvent);
+    ASSERT_TRUE(arm->ready());
+    ASSERT_FALSE(arm->remotesExhausted());
+
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [3]}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_TRUE(arm->ready());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [5]}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_TRUE(arm->ready());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [6]}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
+
+    // First shard has only responded up to '6', we cannot move forward to '9' already because the
+    // first shard may return further values between '6' and '9' in the future.
+    ASSERT_FALSE(arm->ready());
+
+    // Close shard 1. Note that we have one buffered result from this shard in the merge queue.
+    arm->closeShardCursors({kTestShardIds[1]});
+
+    // No killCursors command is supposed to be executed here, as the remote cursor was already
+    // closed.
+    ASSERT_FALSE(networkHasReadyRequests());
+
+    ASSERT_EQ(1, arm->getNumRemotes());
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
+    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[1]));
+
+    readyEvent = unittest::assertGet(arm->nextEvent());
+
+    // First shard responds with more data.
+    responses.clear();
+    std::vector<BSONObj> batch3 = {
+        fromjson("{$sortKey: [7]}"), fromjson("{$sortKey: [11]}"), fromjson("{$sortKey: [12]}")};
+
+    // Respond with a cursorId of 5, meaning the remote cursor remains open.
+    responses.emplace_back(kTestNss, CursorId(5), batch3);
+    scheduleNetworkResponses(std::move(responses));
+
+    executor()->waitForEvent(readyEvent);
+
+    ASSERT_TRUE(arm->ready());
+
+    // We can now process all responses, including the one from the closed shard that is still in
+    // the merge queue.
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [7]}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [9]}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [11]}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
+
+    // Close shard 0.
+    arm->closeShardCursors({kTestShardIds[0]});
+
+    // We expect to see one killCursors command call for the remote cursor.
+    ASSERT_TRUE(networkHasReadyRequests());
+    assertKillCursorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 5);
+    blackHoleNextRequest();
+
+    ASSERT_EQ(0, arm->getNumRemotes());
+    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
+
+    // We still have one buffered result from shard 0 in the merge queue, which we can consume now.
+    ASSERT_TRUE(arm->ready());
+    ASSERT_TRUE(arm->remotesExhausted());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [12]}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
+
+    // Now everything is fully consumed.
+    ASSERT_TRUE(arm->ready());
+    ASSERT_TRUE(arm->remotesExhausted());
+}
+
+TEST_F(AsyncResultsMergerTest, MultiShardSortedCloseAndReopen) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', sort: {_id: 1}}");
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 5, {})));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 6, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors), findCmd);
+    ASSERT_EQ(2, arm->getNumRemotes());
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[1]));
+    ASSERT_FALSE(arm->ready());
+    ASSERT_FALSE(arm->remotesExhausted());
+
+    // Schedule requests.
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+
+    // First responses from the shards; the handleBatchResponse callback is run and ARM's remote
+    // gets updated.
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch1 = {fromjson("{$sortKey: [1]}")};
+    responses.emplace_back(kTestNss, CursorId(5), batch1);
+    std::vector<BSONObj> batch2 = {fromjson("{$sortKey: [2]}")};
+    responses.emplace_back(kTestNss, CursorId(6), batch2);
+
+    scheduleNetworkResponses(std::move(responses));
+
+    executor()->waitForEvent(readyEvent);
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_FALSE(arm->remotesExhausted());
+
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [1]}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
+
+    // Close shard 1
+    arm->closeShardCursors({kTestShardIds[1]});
+
+    // We expect to see one killCursors command call for the remote cursor.
+    ASSERT_TRUE(networkHasReadyRequests());
+    ASSERT_EQ(1, getNumPendingRequests());
+    assertKillCursorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 6);
+    blackHoleNextRequest();
+
+    ASSERT_EQ(1, arm->getNumRemotes());
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
+    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[1]));
+
+    ASSERT_FALSE(arm->ready());
+
+    readyEvent = unittest::assertGet(arm->nextEvent());
+
+    // First shard responds with more data.
+    responses.clear();
+    std::vector<BSONObj> batch3 = {fromjson("{$sortKey: [3]}")};
+    responses.emplace_back(kTestNss, CursorId(5), batch3);
+
+    scheduleNetworkResponses(std::move(responses));
+
+    executor()->waitForEvent(readyEvent);
+
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [2]}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
+
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [3]}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
+
+    // Re-add shard 1
+    cursors.clear();
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 7, {})));
+    arm->addNewShardCursors(std::move(cursors));
+
+    ASSERT_EQ(2, arm->getNumRemotes());
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[1]));
+
+    // After returning all the buffered results, the ARM returns EOF immediately because both shards
+    // cursors were exhausted.
+    ASSERT_FALSE(arm->ready());
+    ASSERT_FALSE(arm->remotesExhausted());
+
+    readyEvent = unittest::assertGet(arm->nextEvent());
+
+    // Shards respond with more data.
+    responses.clear();
+    std::vector<BSONObj> batch4 = {fromjson("{$sortKey: [4]}"), fromjson("{$sortKey: [6]}")};
+    responses.emplace_back(kTestNss, CursorId(5), batch4);
+    std::vector<BSONObj> batch5 = {fromjson("{$sortKey: [5]}"), fromjson("{$sortKey: [6]}")};
+    responses.emplace_back(kTestNss, CursorId(7), batch5);
+
+    scheduleNetworkResponses(std::move(responses));
+
+    executor()->waitForEvent(readyEvent);
+
+    ASSERT_TRUE(arm->ready());
+
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [4]}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [5]}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [6]}"),
+                      *unittest::assertGet(arm->nextReady()).getResult());
+
+    arm->closeShardCursors({kTestShardIds[0], kTestShardIds[1]});
+
+    // We expect to see two killCursors command calls for the remote cursors.
+    ASSERT_EQ(2, getNumPendingRequests());
+    assertKillCursorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 5);
+    assertKillCursorsCmdHasCursorId(getNthPendingRequest(1u).cmdObj, 7);
+    blackHoleNextRequest();
+    blackHoleNextRequest();
+
+    ASSERT_EQ(0, arm->getNumRemotes());
+    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
+    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[1]));
 }
 
 TEST_F(AsyncResultsMergerTest, MultiShardMultipleGets) {
@@ -848,7 +1156,7 @@ TEST_F(AsyncResultsMergerTest, KillNoBatchesRequested) {
 
     ASSERT_FALSE(arm->ready());
     auto killFuture = arm->kill(operationContext());
-    assertKillCusorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 1);
+    assertKillCursorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 1);
 
     // Killed cursors are considered ready, but return an error when you try to receive the next
     // doc.
@@ -918,7 +1226,7 @@ TEST_F(AsyncResultsMergerTest, KillNonExhaustedCursorWithoutPendingRequest) {
     auto killFuture = arm->kill(operationContext());
 
     // ARM should schedule killCursors on cursor 123
-    assertKillCusorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 123);
+    assertKillCursorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 123);
 
     ASSERT_TRUE(arm->ready());
     ASSERT_NOT_OK(arm->nextReady().getStatus());
@@ -948,8 +1256,8 @@ TEST_F(AsyncResultsMergerTest, KillTwoOutstandingBatches) {
     auto killFuture = arm->kill(operationContext());
 
     // Check that the ARM kills both batches.
-    assertKillCusorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 2);
-    assertKillCusorsCmdHasCursorId(getNthPendingRequest(1u).cmdObj, 3);
+    assertKillCursorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 2);
+    assertKillCursorsCmdHasCursorId(getNthPendingRequest(1u).cmdObj, 3);
 
     // Run the callbacks which were canceled.
     runReadyCallbacks();
@@ -1575,7 +1883,7 @@ DEATH_TEST_REGEX_F(
 
 DEATH_TEST_REGEX_F(AsyncResultsMergerTest,
                    SortedTailableCursorInvariantsIfOneOrMoreRemotesHasEmptyPostBatchResumeToken,
-                   R"#(Invariant failure.*!response.getPostBatchResumeToken\(\)->isEmpty\(\))#") {
+                   R"#(Invariant failure.*!postBatchResumeToken->isEmpty\(\))#") {
     AsyncResultsMergerParams params;
     params.setNss(kTestNss);
     UUID uuid = UUID::gen();
@@ -2055,7 +2363,7 @@ TEST_F(AsyncResultsMergerTest, KillShouldNotWaitForRemoteCommandsBeforeSchedulin
     auto killFuture = arm->kill(operationContext());
 
     // Check that the ARM will run killCursors.
-    assertKillCusorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 1);
+    assertKillCursorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 1);
 
     // Let the callback run now that it's been canceled.
     runReadyCallbacks();

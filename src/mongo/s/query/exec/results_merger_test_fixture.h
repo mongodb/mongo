@@ -31,10 +31,8 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <list>
 #include <memory>
 #include <string>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -48,8 +46,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
-#include "mongo/crypto/sha256_block.h"
-#include "mongo/db/basic_types.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
@@ -70,7 +66,6 @@
 #include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/util/assert_util_core.h"
-#include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
@@ -226,11 +221,21 @@ protected:
         net->exitNetwork();
     }
 
+    size_t getNumPendingRequests() {
+        executor::NetworkInterfaceMock* net = network();
+        net->enterNetwork();
+        size_t numPending = net->getNumReadyRequests();
+        net->exitNetwork();
+        return numPending;
+    }
+
     executor::RemoteCommandRequest getNthPendingRequest(size_t n) {
         executor::NetworkInterfaceMock* net = network();
         net->enterNetwork();
         ASSERT_TRUE(net->hasReadyRequests());
         executor::NetworkInterfaceMock::NetworkOperationIterator noi = net->getNthReadyRequest(n);
+        // Ensure that we have a valid iterator before dereferencing it.
+        ASSERT_FALSE(net->isNetworkOperationIteratorAtEnd(noi));
         executor::RemoteCommandRequest retRequest = noi->getRequest();
         net->exitNetwork();
         return retRequest;
@@ -267,7 +272,7 @@ protected:
         net->exitNetwork();
     }
 
-    void assertKillCusorsCmdHasCursorId(const BSONObj& killCmd, CursorId cursorId) {
+    void assertKillCursorsCmdHasCursorId(const BSONObj& killCmd, CursorId cursorId) {
         ASSERT_TRUE(killCmd.hasElement("killCursors"));
         ASSERT_EQ(killCmd["cursors"].type(), BSONType::Array);
 

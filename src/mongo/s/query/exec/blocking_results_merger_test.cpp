@@ -239,7 +239,7 @@ TEST_F(ResultsMergerTestFixture, ShouldBeInterruptibleDuringBlockingNext) {
         // Wait for the kill to schedule it's killCursors. It may schedule a getMore first before
         // cancelling it, so wait until the pending request is actually a killCursors.
     }
-    assertKillCusorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 1);
+    assertKillCursorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 1);
 
     // Run the callback for the killCursors. We don't actually inspect the value so we don't have to
     // schedule a response.
