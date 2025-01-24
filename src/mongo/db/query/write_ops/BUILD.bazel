@@ -210,7 +210,6 @@ mongo_cc_library(
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/db/timeseries:timeseries_write_util",
         "//src/mongo/db/timeseries/bucket_catalog",
-        "//src/mongo/db/timeseries/write_ops:timeseries_write_ops",
         "//src/mongo/db/timeseries/write_ops:timeseries_write_ops_utils",
         "//src/mongo/db/transaction",
         "//src/mongo/db/transaction:transaction_api",

@@ -39,4 +39,6 @@ namespace mongo::timeseries::write_ops {
 mongo::write_ops::UpdateCommandRequest buildSingleUpdateOp(
     const mongo::write_ops::UpdateCommandRequest& wholeOp, size_t opIndex);
 
+void assertTimeseriesBucketsCollectionNotFound(const mongo::NamespaceString& ns);
+
 }  // namespace mongo::timeseries::write_ops

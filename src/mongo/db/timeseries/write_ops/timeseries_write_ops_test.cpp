@@ -35,6 +35,7 @@
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/timeseries/bucket_compression.h"
+#include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
@@ -112,7 +113,7 @@ TEST_F(TimeseriesWriteOpsTest, PerformAtomicTimeseriesWritesWithTransform) {
         op.setWriteCommandRequestBase(std::move(base));
         op.setCollectionUUID(bucketsColl->uuid());
 
-        ASSERT_OK(timeseries::write_ops::details::performAtomicTimeseriesWrites(opCtx, {}, {op}));
+        ASSERT_OK(timeseries::write_ops::internal::performAtomicTimeseriesWrites(opCtx, {}, {op}));
     }
 
     // Check the document is actually decompressed on disk.
@@ -278,7 +279,7 @@ TEST_F(TimeseriesWriteOpsTest, CommitTimeseriesBucketNoCollection) {
     write_ops::InsertCommandRequest insertCmdReq(nss.makeTimeseriesBucketsNamespace());
 
     ASSERT_THROWS_CODE(
-        timeseries::write_ops::details::commitTimeseriesBucket(
+        timeseries::write_ops::internal::commitTimeseriesBucket(
             opCtx, batch, 0, 0, {}, {}, nullptr, nullptr, nullptr, map, insertCmdReq),
         DBException,
         8555700);

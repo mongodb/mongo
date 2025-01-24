@@ -43,4 +43,10 @@ mongo::write_ops::UpdateCommandRequest buildSingleUpdateOp(
     return singleUpdateOp;
 }
 
+void assertTimeseriesBucketsCollectionNotFound(const mongo::NamespaceString& ns) {
+    uasserted(ErrorCodes::NamespaceNotFound,
+              str::stream() << "Buckets collection not found for time-series collection "
+                            << ns.getTimeseriesViewNamespace().toStringForErrorMsg());
+}
+
 }  // namespace mongo::timeseries::write_ops
