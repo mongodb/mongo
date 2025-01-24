@@ -831,6 +831,7 @@ UpdateResult performUpdate(OperationContext* opCtx,
 
     if (updateRequest->shouldReturnAnyDocs()) {
         docFound = exec->executeFindAndModify();
+        curOp->debug().additiveMetrics.nreturned = docFound ? 1 : 0;
     } else {
         // The 'UpdateResult' object will be obtained later, so discard the return value.
         (void)exec->executeUpdate();
@@ -951,6 +952,7 @@ long long performDelete(OperationContext* opCtx,
 
     if (deleteRequest->getReturnDeleted()) {
         docFound = exec->executeFindAndModify();
+        curOp->debug().additiveMetrics.nreturned = docFound ? 1 : 0;
     } else {
         // The number of deleted documents will be obtained from the plan executor later, so discard
         // the return value.

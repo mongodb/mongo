@@ -1,6 +1,6 @@
 /**
- * Tests "metrics.commands.findAndModify.pipeline" and "metrics.commands.findAndModify.arrayFilters"
- * counters of the findAndModify command.
+ * Tests "metrics.commands.findAndModify.pipeline", "metrics.commands.findAndModify.arrayFilters"
+ * and "metrics.document" counters of the findAndModify command.
  *
  * @tags: [
  *   # The test relies on the precise number of executions of commands.
@@ -77,4 +77,50 @@ assert.eq(1, result.key);
 serverStatusAfterTest = testDB.serverStatus();
 assert.eq(serverStatusBeforeTest.metrics.commands.findAndModify.arrayFilters + 1,
           serverStatusAfterTest.metrics.commands.findAndModify.arrayFilters,
+          `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`);
+
+// Verify that findAndModify command increments document metrics correctly.
+// Update and return no document
+serverStatusBeforeTest = testDB.serverStatus();
+result = coll.findAndModify({query: {a: 2}, update: {$set: {b: 2}}});
+serverStatusAfterTest = testDB.serverStatus();
+assert.eq(serverStatusBeforeTest.metrics.document.updated,
+          serverStatusAfterTest.metrics.document.updated,
+          `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`);
+assert.eq(serverStatusBeforeTest.metrics.document.returned,
+          serverStatusAfterTest.metrics.document.returned,
+          `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`);
+
+// Update and return a single document
+assert.commandWorked(coll.insert([{a: 1, b: 1}]));
+serverStatusBeforeTest = testDB.serverStatus();
+result = coll.findAndModify({query: {a: 1}, update: {$set: {b: 2}}});
+serverStatusAfterTest = testDB.serverStatus();
+assert.eq(serverStatusBeforeTest.metrics.document.updated + 1,
+          serverStatusAfterTest.metrics.document.updated,
+          `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`);
+assert.eq(serverStatusBeforeTest.metrics.document.returned + 1,
+          serverStatusAfterTest.metrics.document.returned,
+          `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`);
+
+// Delete and return no document
+serverStatusBeforeTest = testDB.serverStatus();
+result = coll.findAndModify({query: {a: 2}, remove: true});
+serverStatusAfterTest = testDB.serverStatus();
+assert.eq(serverStatusBeforeTest.metrics.document.deleted,
+          serverStatusAfterTest.metrics.document.deleted,
+          `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`);
+assert.eq(serverStatusBeforeTest.metrics.document.returned,
+          serverStatusAfterTest.metrics.document.returned,
+          `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`);
+
+// Delete and return a single document
+serverStatusBeforeTest = testDB.serverStatus();
+result = coll.findAndModify({query: {a: 1}, remove: true});
+serverStatusAfterTest = testDB.serverStatus();
+assert.eq(serverStatusBeforeTest.metrics.document.deleted + 1,
+          serverStatusAfterTest.metrics.document.deleted,
+          `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`);
+assert.eq(serverStatusBeforeTest.metrics.document.returned + 1,
+          serverStatusAfterTest.metrics.document.returned,
           `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`);
