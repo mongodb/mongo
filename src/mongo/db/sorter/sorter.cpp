@@ -1294,7 +1294,6 @@ private:
         // Merge spills to remain below the `fileIteratorsMaxBytesSize` threshold.
         if (this->_iters.size() >= this->fileIteratorsMaxNum) {
             this->_mergeSpills(this->_iters.size() / 2, this->_spillsNumToRespectMemoryLimits);
-            this->_stats.setSpilledRanges(this->_iters.size());
         }
     }
 
