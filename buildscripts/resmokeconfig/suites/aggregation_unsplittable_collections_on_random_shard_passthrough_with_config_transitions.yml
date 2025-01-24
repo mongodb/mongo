@@ -98,6 +98,10 @@ selector:
     # These tests run larger aggregations that can take a long time and can repeatedly get interrupted by config transitions.
     - jstests/aggregation/query_limits_test.js
     - jstests/aggregation/accumulators/accumulator_js_size_limits.js
+    - jstests/aggregation/accumulators/min_n_max_n.js
+
+    # This test can partially insert documents before a retry due to shard transitions, resulting in duplicate inserts.
+    - jstests/aggregation/sources/merge/mode_keep_existing_insert.js
 
     # This test sets an index filter on a particular shard which is only in memory and thus not copied over to a new shard
     # after a config transition moves the collection.
