@@ -83,6 +83,13 @@ filters:
   - "*.idl":
     approvers:
       - 10gen/query-optimization-parsers
+  - "query_feature_flags.idl":
+    approvers:
+      # Almost every project will create and adjust a feature flag.
+      # These changes are typically straightforward so they don't need
+      # an extra review from query-optimization-parsers; anyone on query
+      # can approve these changes.
+      - 10gen/query
   - "projection_parser*":
     approvers:
       - 10gen/query-optimization-parsers

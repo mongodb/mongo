@@ -1710,6 +1710,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/**/canonical_query_encoder* @10gen/query-optimization-plan-cache @svc-auto-approve-bot
 /src/mongo/db/query/**/plan_rank* @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
 /src/mongo/db/query/**/*.idl @10gen/query-optimization-parsers @svc-auto-approve-bot
+/src/mongo/db/query/**/query_feature_flags.idl @10gen/query @svc-auto-approve-bot
 /src/mongo/db/query/**/projection_parser* @10gen/query-optimization-parsers @svc-auto-approve-bot
 /src/mongo/db/query/**/hint_parser* @10gen/query-optimization-parsers @svc-auto-approve-bot
 /src/mongo/db/query/**/parsed* @10gen/query-optimization-parsers @svc-auto-approve-bot
