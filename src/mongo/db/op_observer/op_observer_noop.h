@@ -237,6 +237,8 @@ public:
 
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) override {}
+
+    void onDatabaseMetadataUpdate(OperationContext* opCtx, const DatabaseName& nss) override {}
 };
 
 }  // namespace mongo

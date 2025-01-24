@@ -674,6 +674,12 @@ public:
     virtual void onMajorityCommitPointUpdate(ServiceContext* service,
                                              const repl::OpTime& newCommitPoint) = 0;
 
+    /**
+     * Called when the authoritative DSS is updated. This function is a placeholder, the name and/or
+     * parameters are subjet to change.
+     */
+    virtual void onDatabaseMetadataUpdate(OperationContext* opCtx, const DatabaseName& nss) = 0;
+
     struct Times;
 
 protected:

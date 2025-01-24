@@ -555,6 +555,11 @@ public:
             o->onMajorityCommitPointUpdate(service, newCommitPoint);
     }
 
+    void onDatabaseMetadataUpdate(OperationContext* opCtx, const DatabaseName& nss) override {
+        for (auto& o : _observers)
+            o->onDatabaseMetadataUpdate(opCtx, nss);
+    }
+
 private:
     static repl::OpTime _getOpTimeToReturn(const std::vector<repl::OpTime>& times) {
         if (times.empty()) {

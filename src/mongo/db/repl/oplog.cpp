@@ -1159,6 +1159,11 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          }
          return Status::OK();
      }}},
+    {"databaseMetadataUpdate",
+     {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
+          -> Status {
+         return Status::OK();
+     }}},
 };
 
 // Writes a change stream pre-image 'preImage' associated with oplog entry 'oplogEntry' and a write

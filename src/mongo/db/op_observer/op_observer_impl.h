@@ -242,6 +242,8 @@ public:
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) final {}
 
+    void onDatabaseMetadataUpdate(OperationContext* opCtx, const DatabaseName& nss) final;
+
 private:
     std::unique_ptr<OperationLogger> _operationLogger;
 };
