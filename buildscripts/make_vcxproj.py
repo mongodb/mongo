@@ -17,7 +17,6 @@ import argparse
 import io
 import json
 import os
-import re
 import uuid
 import xml.etree.ElementTree as ET
 
@@ -238,17 +237,25 @@ class ProjFileGenerator(object):
         # Replace build commands
         _replace_vcxproj(self.vcxproj_file_name, self.existing_build_commands)
 
-    def parse_line(self, line):
+    def parse_args(self, args):
         """Parse a build line."""
-        cl_exe_end = line.lower().find('cl.exe" ')
-        cl_len = len('cl.exe" ')
-        if cl_exe_end:
-            self.__parse_cl_line(line[cl_exe_end + cl_len :])
+        self.__parse_cl_line(args[1:])
 
-    def __parse_cl_line(self, line):
+    def __parse_cl_line(self, args):
         """Parse a compiler line."""
         # Get the file we are compilong
-        file_name = re.search(r"/c ([\w\\.-]+)", line).group(1)
+        file_name = None
+        prev_arg = None
+        for arg in reversed(args):
+            if not file_name:
+                if arg == "/c":
+                    file_name = prev_arg
+                elif arg.startswith("/c"):
+                    file_name = arg[2:]
+
+            if file_name:
+                break
+            prev_arg = arg
 
         # Skip files made by scons for configure testing
         if "sconf_temp" in file_name:
@@ -256,8 +263,6 @@ class ProjFileGenerator(object):
 
         if file_name not in self.files:
             self.files.add(file_name)
-
-            args = line.split(" ")
 
             file_defines = set()
             for arg in get_defines(args):
@@ -402,8 +407,8 @@ def main():
             commands = json.loads(contents)
 
         for command in commands:
-            command_str = command["command"]
-            projfile.parse_line(command_str)
+            command_args = command["arguments"]
+            projfile.parse_args(command_args)
 
 
 main()

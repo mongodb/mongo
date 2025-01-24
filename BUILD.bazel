@@ -1,7 +1,7 @@
-load("@hedron_compile_commands//:refresh_compile_commands.bzl", "refresh_compile_commands")
 load("@npm//:defs.bzl", "npm_link_all_packages")
 load("//bazel/install_rules:install_rules.bzl", "mongo_install")
 load("//bazel/toolchains:mongo_toolchain.bzl", "setup_mongo_toolchain_aliases")
+load("//bazel/config:render_template.bzl", "render_template")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -27,32 +27,40 @@ alias(
 
 setup_mongo_toolchain_aliases()
 
-# This rule makes it possible to set the clang-tidy configuration setting:
-genrule(
+render_template(
     name = "clang_tidy_config",
     srcs = [
         ".clang-tidy.in",
+        "//buildscripts:clang_tidy_config_gen.py",
     ],
-    outs = [".clang-tidy"],
-
-    # Note: we use sed to substitute the known good value `build/compiledb/mongo`; testing
-    # has confirmed that this is the correct value.
-    # We also use it to append a line to opt-in to warnings as errors.
-    cmd = """
-    cp $(location .clang-tidy.in) $@ && \
-    sed -i 's|@MONGO_BUILD_DIR@|$(RULEDIR)/src/mongo|g ; s|@MONGO_BRACKET_BUILD_DIR@|$(RULEDIR)/src/mongo|g ; $$aWarningsAsErrors: "*"' $@
-    """,
-    visibility = ["//visibility:public"],
+    cmd = [
+        "$(location //buildscripts:clang_tidy_config_gen.py)",
+        "--input=$(location .clang-tidy.in)",
+        "--output=$(location .clang-tidy)",
+    ],
+    output = ".clang-tidy",
 )
 
-refresh_compile_commands(
+render_template(
+    name = "clang_tidy_config_strict",
+    srcs = [
+        ".clang-tidy.in",
+        "//buildscripts:clang_tidy_config_gen.py",
+    ],
+    cmd = [
+        "$(location //buildscripts:clang_tidy_config_gen.py)",
+        "--input=$(location .clang-tidy.in)",
+        "--output=$(location .clang-tidy.strict)",
+        "--warnings-as-errors",
+    ],
+    output = ".clang-tidy.strict",
+)
+
+genrule(
     name = "compiledb",
-    exclude_external_sources = True,
-    exclude_headers = "all",  # not using "all" adds headers as sources to compile_commands.json which is never what we want
-    tags = ["compiledb"],
-    targets = {
-        "//src/...": "",
-    },
+    srcs = ["compile_commands.json"],
+    outs = ["compile_commands_done"],
+    cmd = "echo noop > $(location :compile_commands_done)",
 )
 
 mongo_install(

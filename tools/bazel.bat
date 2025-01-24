@@ -7,23 +7,34 @@ set REPO_ROOT=%~dp0..
 
 for %%I in (%REPO_ROOT%) do set cur_dir=%%~nxI
 
-set python="%REPO_ROOT%\bazel-%cur_dir%\external\py_windows_x86_64\dist\python.exe"
-
+set bazel_python="%REPO_ROOT%\bazel-%cur_dir%\external\py_windows_x86_64\dist\python.exe"
+set compdb_python="%Temp%\compiledb-%cur_dir%\external\py_windows_x86_64\dist\python.exe"
+set python=%bazel_python%
+if not exist "%python%" (
+    set python=%compdb_python%
+)
 if not exist "%python%" (
     echo python prereq missing, using bazel to install python... 1>&2
     "%BAZEL_REAL%" build --config=local @py_windows_x86_64//:all 1>&2
+    
     if %ERRORLEVEL% NEQ 0 (
+        if "%CI%"=="" if "%MONGO_BAZEL_WRAPPER_FALLBACK%"=="" exit %ERRORLEVEL%
         echo wrapper script failed to install python! falling back to normal bazel call...
         "%BAZEL_REAL%" %*
         exit %ERRORLEVEL%
     )
 )
+set python=%bazel_python%
+if not exist "%python%" (
+    set python=%compdb_python%
+)
 SET STARTTIME=%TIME%
 
 set "MONGO_BAZEL_WRAPPER_ARGS=%tmp%\bat~%RANDOM%.tmp"
 echo "" > %MONGO_BAZEL_WRAPPER_ARGS%
-%python% %REPO_ROOT%/bazel/wrapper_hook.py "%BAZEL_REAL%" %*
+%python% %REPO_ROOT%/bazel/wrapper_hook/wrapper_hook.py "%BAZEL_REAL%" %*
 if %ERRORLEVEL% NEQ 0 (
+    if "%CI%"=="" if "%MONGO_BAZEL_WRAPPER_FALLBACK%"=="" exit %ERRORLEVEL%
     echo wrapper script failed! falling back to normal bazel call...
     "%BAZEL_REAL%" %*
     exit %ERRORLEVEL%
