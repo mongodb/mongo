@@ -8,6 +8,7 @@
 
 REPO_ROOT=$(dirname $(dirname $(realpath "$0")))
 bazel_real="$BAZEL_REAL"
+echo $BAZEL_REAL > "$REPO_ROOT/.bazel_real"
 bazelrc_xcode_lines=()
 
 
@@ -110,27 +111,14 @@ for cert in ${cert_locs[@]}; do
 done
 
 cur_dir=$(basename $REPO_ROOT)
-bazel_python="$REPO_ROOT/bazel-$cur_dir/external/py_${os}_${ARCH}/dist/bin/python3"
-compdb_python="/tmp/compiledb-$cur_dir/external/py_${os}_${ARCH}/dist/bin/python3"
-python=$bazel_python
-if [ ! -f $python ]; then
-  python=$compdb_python
-fi
+python="$REPO_ROOT/bazel-$cur_dir/external/py_${os}_${ARCH}/dist/bin/python3"
 if [ ! -f $python ]; then
   >&2 echo "python prereq missing, using bazel to install python..."
   >&2 $bazel_real build --config=local @py_${os}_${ARCH}//:all
   if [[ $? != 0 ]]; then
-    if [[ ! -z "$CI" ]] || [[ $MONGO_BAZEL_WRAPPER_FALLBACK == 1 ]]; then
-      >&2 echo "wrapper script failed to install python! falling back to normal bazel call..."
-      exec "$bazel_real" $@
-    else
-      exit $?
-    fi
+    >&2 echo "wrapper script failed to install python! falling back to normal bazel call..."
+    exec "$bazel_real" $@
   fi
-fi
-python=$bazel_python
-if [ ! -f $python ]; then
-  python=$compdb_python
 fi
 
 autocomplete_query=0
@@ -148,14 +136,10 @@ MONGO_BAZEL_WRAPPER_ARGS=$(mktemp)
 
 MONGO_BAZEL_WRAPPER_ARGS=$MONGO_BAZEL_WRAPPER_ARGS \
 MONGO_AUTOCOMPLETE_QUERY=$autocomplete_query \
-$python $REPO_ROOT/bazel/wrapper_hook/wrapper_hook.py $bazel_real "$@"
+$python $REPO_ROOT/bazel/wrapper_hook.py $bazel_real "$@"
 if [[ $? != 0 ]]; then
-  if [[ ! -z "$CI" ]] || [[ $MONGO_BAZEL_WRAPPER_FALLBACK == 1 ]]; then
-    >&2 echo "wrapper script failed! falling back to normal bazel call..."
-    exec "$bazel_real" $@
-  else
-    exit $? 
-  fi
+  >&2 echo "wrapper script failed! falling back to normal bazel call..."
+  exec "$bazel_real" $@
 fi
 new_args=$(<$MONGO_BAZEL_WRAPPER_ARGS)
 

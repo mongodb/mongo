@@ -1,16 +1,31 @@
+import hashlib
 import os
-import pathlib
 import platform
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 
-REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
-sys.path.append(str(REPO_ROOT))
+REPO_ROOT = os.path.join(os.path.dirname(__file__), os.path.pardir)
+sys.path.append(REPO_ROOT)
 
-from bazel.wrapper_hook.compiledb import generate_compiledb
-from bazel.wrapper_hook.wrapper_debug import wrapper_debug
+
+# This script should be careful not to disrupt automatic mechanism which
+# may be expecting certain stdout, always print to stderr.
+sys.stdout = sys.stderr
+
+if (
+    os.environ.get("MONGO_BAZEL_WRAPPER_DEBUG") == "1"
+    and os.environ.get("MONGO_AUTOCOMPLETE_QUERY") != "1"
+):
+
+    def wrapper_debug(x):
+        print("[WRAPPER_HOOK_DEBUG]: " + x, file=sys.stderr)
+else:
+
+    def wrapper_debug(x):
+        pass
 
 
 class BinAndSourceIncompatible(Exception):
@@ -21,15 +36,99 @@ class DuplicateSourceNames(Exception):
     pass
 
 
+wrapper_debug(f"wrapper hook script is using {sys.executable}")
+
+
+def get_deps_dirs(deps):
+    bazel_out_dir = os.path.join(REPO_ROOT, "bazel-out")
+    bazel_bin = os.path.join(REPO_ROOT, "bazel-bin")
+    for dep in deps:
+        try:
+            for child in os.listdir(bazel_out_dir):
+                yield f"{bazel_out_dir}/{child}/bin/external/poetry/{dep}", dep
+        except OSError:
+            pass
+        yield f"{bazel_bin}/external/poetry/{dep}", dep
+
+
+def search_for_modules(deps, deps_installed, lockfile_changed=False):
+    deps_not_found = deps.copy()
+    wrapper_debug(f"deps_installed: {deps_installed}")
+    for target_dir, dep in get_deps_dirs(deps):
+        wrapper_debug(f"checking for {dep} in target_dir: {target_dir}")
+        if dep in deps_installed:
+            continue
+
+        if not os.path.exists(target_dir):
+            continue
+
+        if not lockfile_changed:
+            for entry in os.listdir(target_dir):
+                if entry.endswith(".dist-info"):
+                    wrapper_debug(f"found: {target_dir}")
+                    deps_installed.append(dep)
+                    deps_not_found.remove(dep)
+                    sys.path.append(target_dir)
+                    break
+        else:
+            os.chmod(target_dir, 0o777)
+            for root, dirs, files in os.walk(target_dir):
+                for somedir in dirs:
+                    os.chmod(os.path.join(root, somedir), 0o777)
+                for file in files:
+                    os.chmod(os.path.join(root, file), 0o777)
+            shutil.rmtree(target_dir)
+    wrapper_debug(f"deps_not_found: {deps_not_found}")
+    return deps_not_found
+
+
+def install_modules(bazel):
+    need_to_install = False
+    pwd_hash = hashlib.md5(os.path.abspath(REPO_ROOT).encode()).hexdigest()
+    lockfile_hash_file = os.path.join(tempfile.gettempdir(), f"{pwd_hash}_lockfile_hash")
+    with open(os.path.join(REPO_ROOT, "poetry.lock"), "rb") as f:
+        current_hash = hashlib.md5(f.read()).hexdigest()
+
+    old_hash = None
+    if os.path.exists(lockfile_hash_file):
+        with open(lockfile_hash_file) as f:
+            old_hash = f.read()
+
+    if old_hash != current_hash:
+        with open(lockfile_hash_file, "w") as f:
+            f.write(current_hash)
+
+    deps = ["retry"]
+    deps_installed = []
+    deps_needed = search_for_modules(
+        deps, deps_installed, lockfile_changed=old_hash != current_hash
+    )
+
+    if deps_needed:
+        need_to_install = True
+
+    if old_hash != current_hash:
+        need_to_install = True
+        deps_needed = deps
+
+    if need_to_install:
+        subprocess.run(
+            [bazel, "build", "--config=local"] + ["@poetry//:install_" + dep for dep in deps_needed]
+        )
+        deps_missing = search_for_modules(deps_needed, deps_installed)
+        if deps_missing:
+            raise Exception(f"Failed to install python deps {deps_missing}")
+
+
 def get_buildozer_output(autocomplete_query):
     from buildscripts.install_bazel import install_bazel
 
     buildozer_name = "buildozer" if not platform.system() == "Windows" else "buildozer.exe"
     buildozer = shutil.which(buildozer_name)
     if not buildozer:
-        buildozer = str(pathlib.Path(f"~/.local/bin/{buildozer_name}").expanduser())
+        buildozer = os.path.expanduser(f"~/.local/bin/{buildozer_name}")
         if not os.path.exists(buildozer):
-            bazel_bin_dir = str(pathlib.Path("~/.local/bin").expanduser())
+            bazel_bin_dir = os.path.expanduser("~/.local/bin")
             if not os.path.exists(bazel_bin_dir):
                 os.makedirs(bazel_bin_dir)
             install_bazel(bazel_bin_dir)
@@ -50,58 +149,55 @@ def get_buildozer_output(autocomplete_query):
     return p.stdout
 
 
+def engflow_auth(args):
+    start = time.time()
+    from buildscripts.engflow_auth import setup_auth
+
+    args_str = " ".join(args)
+    if (
+        "--config=local" not in args_str
+        and "--config=public-release" not in args_str
+        and "--config local" not in args_str
+        and "--config public-release" not in args_str
+    ):
+        if os.environ.get("CI") is None:
+            setup_auth(verbose=False)
+    wrapper_debug(f"engflow auth time: {time.time() - start}")
+
+
 def test_runner_interface(args, autocomplete_query, get_buildozer_output=get_buildozer_output):
     start = time.time()
 
     plus_autocomplete_query = False
-    plus_starts = ("+", ":+", "//:+")
-    skip_plus_interface = True
-    compiledb_target = False
-    persistent_compdb = True
-    compiledb_targets = ["//:compiledb", ":compiledb", "compiledb"]
-    sources_to_bin = {}
-    select_sources = {}
-    current_select = None
-    in_select = False
-    c_exts = (".c", ".cc", ".cpp")
-    replacements = {}
-    fileNameFilter = []
-    bin_targets = []
-    source_targets = {}
-
     if autocomplete_query:
         str_args = " ".join(args)
         if "'//:*'" in str_args or "':*'" in str_args or "//:all" in str_args or ":all" in str_args:
             plus_autocomplete_query = True
 
-    if os.environ.get("CI") is not None:
-        persistent_compdb = False
-
+    plus_starts = ("+", ":+", "//:+")
+    skip_plus_interface = True
     for arg in args:
-        if arg in compiledb_targets:
-            compiledb_target = True
-        if arg == "--intree_compdb":
-            replacements[arg] = []
-            persistent_compdb = False
-            skip_plus_interface = False
         if arg.startswith(plus_starts):
             skip_plus_interface = False
-
-    if compiledb_target:
-        generate_compiledb(args[0], persistent_compdb)
 
     if skip_plus_interface and not autocomplete_query:
         return args[1:]
 
+    sources_to_bin = {}
+    select_sources = {}
+    current_select = None
+    in_select = False
+    c_exts = (".c", ".cc", ".cpp")
+
     def add_source_test(source_file, bin_file, sources_to_bin):
-        src_key = pathlib.Path(
-            pathlib.Path(source_file.replace("//", "").replace(":", "/")).name
-        ).stem
+        src_key = os.path.splitext(
+            os.path.basename(source_file.replace("//", "").replace(":", "/"))
+        )[0]
         if src_key in sources_to_bin:
             raise DuplicateSourceNames(
                 f"Two test files with the same name:\n  {bin_file}->{src_key}\n  {sources_to_bin[src_key]}->{src_key}"
             )
-        if src_key == pathlib.Path(bin_file.replace("//", "").replace(":", "/")).name:
+        if src_key == os.path.basename(bin_file.replace("//", "").replace(":", "/")):
             src_key = f"{src_key}-{src_key}"
         sources_to_bin[src_key] = bin_file
 
@@ -129,10 +225,9 @@ def test_runner_interface(args, autocomplete_query, get_buildozer_output=get_bui
     if plus_autocomplete_query:
         autocomplete_target = ["//:+" + test for test in sources_to_bin.keys()]
         autocomplete_target += [
-            "//:+" + pathlib.Path(test.replace("//", "").replace(":", "/")).name
+            "//:+" + os.path.basename(test.replace("//", "").replace(":", "/"))
             for test in set(sources_to_bin.values())
         ]
-        autocomplete_target += ["//:compiledb"]
         with open("/tmp/mongo_autocomplete_plus_targets", "w") as f:
             f.write(" ".join(autocomplete_target))
     elif autocomplete_query:
@@ -142,6 +237,11 @@ def test_runner_interface(args, autocomplete_query, get_buildozer_output=get_bui
     if autocomplete_query or plus_autocomplete_query:
         return args[1:]
 
+    replacements = {}
+    fileNameFilter = []
+    bin_targets = []
+    source_targets = {}
+
     for arg in args[1:]:
         if arg.startswith(plus_starts):
             test_name = arg[arg.find("+") + 1 :]
@@ -150,7 +250,7 @@ def test_runner_interface(args, autocomplete_query, get_buildozer_output=get_bui
             if not real_target:
                 for bin_target in set(sources_to_bin.values()):
                     if (
-                        pathlib.Path(bin_target.replace("//", "").replace(":", "/")).name
+                        os.path.basename(bin_target.replace("//", "").replace(":", "/"))
                         == test_name
                     ):
                         bin_targets.append(bin_target)
@@ -186,7 +286,7 @@ def test_runner_interface(args, autocomplete_query, get_buildozer_output=get_bui
             + "Conflicting binary targets:\n    "
             + "\n    ".join(
                 [
-                    pathlib.Path(bin_target.replace("//", "").replace(":", "/")).name
+                    os.path.basename(bin_target.replace("//", "").replace(":", "/"))
                     for bin_target in bin_targets
                 ]
             )
@@ -215,3 +315,20 @@ def test_runner_interface(args, autocomplete_query, get_buildozer_output=get_bui
     wrapper_debug(f"plus interface time: {time.time() - start}")
 
     return new_args
+
+
+def main():
+    install_modules(sys.argv[1])
+
+    engflow_auth(sys.argv)
+
+    args = test_runner_interface(
+        sys.argv[1:], autocomplete_query=os.environ.get("MONGO_AUTOCOMPLETE_QUERY") == "1"
+    )
+    os.chmod(os.environ.get("MONGO_BAZEL_WRAPPER_ARGS"), 0o644)
+    with open(os.environ.get("MONGO_BAZEL_WRAPPER_ARGS"), "w") as f:
+        f.write(" ".join(args))
+
+
+if __name__ == "__main__":
+    main()

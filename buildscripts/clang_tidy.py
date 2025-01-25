@@ -21,19 +21,6 @@ import yaml
 from clang_tidy_vscode import CHECKS_SO
 from simple_report import make_report, put_report, try_combine_reports
 
-checks_so = ""
-for module in CHECKS_SO:
-    if os.path.exists(module):
-        checks_so = module
-        break
-
-
-config_file = ""
-for config in ["/tmp/compiledb-bin/.clang-tidy.strict", "bazel-bin/.clang-tidy.strict"]:
-    if os.path.exists(config):
-        config_file = config
-        break
-
 
 def _clang_tidy_executor(
     clang_tidy_filename: Path,
@@ -357,7 +344,7 @@ def main():
         "-m",
         "--check-module",
         type=str,
-        default=checks_so,
+        default=CHECKS_SO,
         help="Path to load the custom mongo checks module.",
     )
     parser.add_argument(
@@ -368,7 +355,7 @@ def main():
     )
     # TODO: Is there someway to get this without hardcoding this much
     parser.add_argument("-y", "--clang-tidy-toolchain", type=str, default="v4")
-    parser.add_argument("-f", "--clang-tidy-cfg", type=str, default=config_file)
+    parser.add_argument("-f", "--clang-tidy-cfg", type=str, default=".clang-tidy")
     args = parser.parse_args()
 
     if args.only_process_fixes:

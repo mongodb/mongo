@@ -3,11 +3,7 @@ import unittest
 
 sys.path.append(".")
 
-from bazel.wrapper_hook.plus_interface import (
-    BinAndSourceIncompatible,
-    DuplicateSourceNames,
-    test_runner_interface,
-)
+from bazel.wrapper_hook import BinAndSourceIncompatible, DuplicateSourceNames, test_runner_interface
 
 
 class Tests(unittest.TestCase):

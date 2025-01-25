@@ -1,10 +1,5 @@
 load("@poetry//:dependencies.bzl", "dependency")
 
-exports_files([
-    "cheetah_source_generator.py",
-    "clang_tidy_config_gen.py",
-])
-
 py_binary(
     name = "codeowners",
     srcs = ["codeowners_generate.py"],
@@ -138,6 +133,8 @@ py_binary(
         "//buildscripts/patch_builds",
     ],
 )
+
+exports_files(["cheetah_source_generator.py"])
 
 sh_binary(
     name = "shellscripts_linters",

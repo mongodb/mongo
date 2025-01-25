@@ -6437,6 +6437,13 @@ def injectModule(env, module, **kwargs):
 
 env.AddMethod(injectModule, "InjectModule")
 
+if get_option("ninja") == "disabled":
+    compileCommands = env.CompilationDatabase("compile_commands.json")
+    # Initialize generated-sources Alias as a placeholder so that it can be used as a
+    # dependency for compileCommands. This Alias will be properly updated in other SConscripts.
+    env.Depends(compileCommands, env.Alias("generated-sources"))
+    compileDb = env.Alias("compiledb", compileCommands)
+
 msvc_version = ""
 if "MSVC_VERSION" in env and env["MSVC_VERSION"]:
     msvc_version = "--version " + env["MSVC_VERSION"] + " "
@@ -6445,7 +6452,7 @@ if "MSVC_VERSION" in env and env["MSVC_VERSION"]:
 if get_option("ninja") == "disabled":
     vcxprojFile = env.Command(
         "mongodb.vcxproj",
-        "compiledb",
+        compileCommands,
         r"$PYTHON buildscripts\make_vcxproj.py " + msvc_version + "mongodb",
     )
     vcxproj = env.Alias("vcxproj", vcxprojFile)

@@ -28,21 +28,13 @@ import os
 import subprocess
 import sys
 
-CHECKS_SO = [
-    "build/install/lib/libmongo_tidy_checks.so",
-]
-
-if os.path.exists(".mongo_checks_module_path"):
-    with open(".mongo_checks_module_path") as f:
-        CHECKS_SO = [f.read().strip()] + CHECKS_SO
+CHECKS_SO = "build/install/lib/libmongo_tidy_checks.so"
 
 
 def main():
     clang_tidy_args = ["/opt/mongodbtoolchain/v4/bin/clang-tidy"]
-    for check_lib in CHECKS_SO:
-        if os.path.isfile(check_lib):
-            clang_tidy_args += [f"-load={check_lib}"]
-            break
+    if os.path.isfile(CHECKS_SO):
+        clang_tidy_args += [f"-load={CHECKS_SO}"]
 
     # Filter out non src/mongo files for clang tidy checks
     files_to_check = []

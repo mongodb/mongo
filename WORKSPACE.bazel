@@ -96,6 +96,34 @@ load("@rules_coverity//coverity:repositories.bzl", "rules_coverity_toolchains")
 
 rules_coverity_toolchains()
 
+# Hedron's Compile Commands Extractor for Bazel
+# https://github.com/hedronvision/bazel-compile-commands-extractor
+http_archive(
+    # TODO SERVER-91979
+    # the compile commands extractor is tied to bazel version and toolchain resolution
+    # so this might need to be update when bazel version is updated.
+    name = "hedron_compile_commands",
+    sha256 = "d699c5e3a82b811d7051e833b1808358256a9c52285a43e6a3abb76c809ab03f",
+    strip_prefix = "bazel-compile-commands-extractor-33658bab23a4858b513d767480b43d3d8fb6a3d1",
+    url = "https://github.com/hedronvision/bazel-compile-commands-extractor/archive/33658bab23a4858b513d767480b43d3d8fb6a3d1.tar.gz",
+)
+
+load("@hedron_compile_commands//:workspace_setup.bzl", "hedron_compile_commands_setup")
+
+hedron_compile_commands_setup()
+
+load("@hedron_compile_commands//:workspace_setup_transitive.bzl", "hedron_compile_commands_setup_transitive")
+
+hedron_compile_commands_setup_transitive()
+
+load("@hedron_compile_commands//:workspace_setup_transitive_transitive.bzl", "hedron_compile_commands_setup_transitive_transitive")
+
+hedron_compile_commands_setup_transitive_transitive()
+
+load("@hedron_compile_commands//:workspace_setup_transitive_transitive_transitive.bzl", "hedron_compile_commands_setup_transitive_transitive_transitive")
+
+hedron_compile_commands_setup_transitive_transitive_transitive()
+
 http_archive(
     name = "platforms",
     sha256 = "8150406605389ececb6da07cbcb509d5637a3ab9a24bc69b1101531367d89d74",

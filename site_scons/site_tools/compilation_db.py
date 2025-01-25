@@ -199,9 +199,10 @@ def WriteCompilationDb(target, source, env):
     else:
         bazel_compdb = ["--bazel-compdb", "compile_commands.json"]
         env.RunBazelCommand(
-            [env["SCONS2BAZEL_TARGETS"].bazel_executable, "build"]
+            [env["SCONS2BAZEL_TARGETS"].bazel_executable, "run"]
             + env["BAZEL_FLAGS_STR"]
-            + ["//:compiledb"]
+            + ["//:compiledb", "--"]
+            + env["BAZEL_FLAGS_STR"]
         )
 
     subprocess.run(
