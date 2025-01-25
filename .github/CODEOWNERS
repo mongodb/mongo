@@ -585,8 +585,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/libs/**/write_commands.js @10gen/query-execution-write-exec @svc-auto-approve-bot
 /jstests/libs/**/replsettest.js @10gen/server-replication @svc-auto-approve-bot
 /jstests/libs/**/shardingtest.js @10gen/server-cluster-scalability @svc-auto-approve-bot
-/jstests/libs/**/*golden_test.js @10gen/query-optimization @svc-auto-approve-bot
-/jstests/libs/**/sharded_cluster_fixture_helpers.js @10gen/query-optimization-golden-test @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/libs/**/*golden_test.js @10gen/query-optimization-golden-test @svc-auto-approve-bot
+/jstests/libs/**/sharded_cluster_fixture_helpers.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/libs/**/assert_schema_match.js @10gen/query-execution-doc-validation @svc-auto-approve-bot
 /jstests/libs/**/doc_validation_utils.js @10gen/query-execution-doc-validation @svc-auto-approve-bot
 /jstests/libs/**/json_schema_test_runner.js @10gen/query-execution-doc-validation @svc-auto-approve-bot
