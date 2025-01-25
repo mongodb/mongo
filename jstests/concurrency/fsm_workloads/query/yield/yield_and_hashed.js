@@ -3,82 +3,74 @@
  *
  * Intersperse queries which use the AND_HASH stage with updates and deletes of documents they may
  * match.
+ *
  * @tags: [
- *  # internalQueryForceIntersectionPlans knob could affect concurrent tests to use unexpected plan.
- *  incompatible_with_concurrency_simultaneous,
+ *   # stagedebug can only be run against a standalone mongod
+ *   assumes_against_mongod_not_mongos,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/query/yield/yield_rooted_or.js";
-import {planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     /*
-     * Issue a query that will use the AND_HASH stage.
+     * Issue a query that will use the AND_HASH stage. This is a little tricky, so use
+     * stagedebug to force it to happen. Unfortunately this means it can't be batched.
      */
     $config.states.query = function andHash(db, collName) {
-        const nMatches = 100;
+        var nMatches = 100;
         assert.lte(nMatches, this.nDocs);
-        const query = {c: {$lte: nMatches}, d: {$gte: this.nDocs - nMatches}};
+        // Construct the query plan: two ixscans under an andHashed.
+        // Scan c <= nMatches
+        var ixscan1 = {
+            ixscan: {
+                args: {
+                    name: 'stages_and_hashed',
+                    keyPattern: {c: 1},
+                    startKey: {'': nMatches},
+                    endKey: {},
+                    startKeyInclusive: true,
+                    endKeyInclusive: true,
+                    direction: -1
+                }
+            }
+        };
 
-        const explain = db[collName].explain().find(query).finish();
-        assert(planHasStage(db, explain.queryPlanner.winningPlan, 'AND_HASH'));
+        // Scan d >= this.nDocs - nMatches
+        var ixscan2 = {
+            ixscan: {
+                args: {
+                    name: 'stages_and_hashed',
+                    keyPattern: {d: 1},
+                    startKey: {'': this.nDocs - nMatches},
+                    endKey: {},
+                    startKeyInclusive: true,
+                    endKeyInclusive: true,
+                    direction: 1
+                }
+            }
+        };
 
-        const res = db[collName].find(query).toArray();
-        for (const result of res) {
+        var andix1ix2 = {andHash: {args: {nodes: [ixscan1, ixscan2]}}};
+
+        // On non-MMAP storage engines, index intersection plans will always re-filter
+        // the docs to make sure we don't get any spurious matches.
+        var fetch = {
+            fetch: {
+                filter: {c: {$lte: nMatches}, d: {$gte: (this.nDocs - nMatches)}},
+                args: {node: andix1ix2}
+            }
+        };
+
+        var res = db.runCommand({stageDebug: {plan: fetch, collection: collName}});
+        assert.commandWorked(res);
+        for (var i = 0; i < res.results.length; i++) {
+            var result = res.results[i];
             assert.lte(result.c, nMatches);
             assert.gte(result.d, this.nDocs - nMatches);
         }
-    };
-
-    $config.data.originalQueryPlannerEnableHashIntersection = {};
-    $config.data.originalQueryPlannerEnableIndexIntersection = {};
-    $config.data.originalQueryForceIntersectionPlans = {};
-
-    $config.setup = function setup(db, collName, cluster) {
-        $super.setup.apply(this, arguments);
-
-        cluster.executeOnMongodNodes((db) => {
-            const res1 = assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryPlannerEnableHashIntersection: true,
-            }));
-            this.originalQueryPlannerEnableHashIntersection[db.getMongo().host] = res1.was;
-            const res2 = assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryPlannerEnableIndexIntersection: true,
-            }));
-            this.originalQueryPlannerEnableIndexIntersection[db.getMongo().host] = res2.was;
-            const res3 = assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryForceIntersectionPlans: true,
-            }));
-            this.originalQueryForceIntersectionPlans[db.getMongo().host] = res3.was;
-        });
-    };
-
-    $config.teardown = function teardown(db, collName, cluster) {
-        $super.teardown.apply(this, arguments);
-
-        cluster.executeOnMongodNodes((db) => {
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryPlannerEnableHashIntersection:
-                    this.originalQueryPlannerEnableHashIntersection[db.getMongo().host],
-            }));
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryPlannerEnableIndexIntersection:
-                    this.originalQueryPlannerEnableIndexIntersection[db.getMongo().host],
-            }));
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryForceIntersectionPlans:
-                    this.originalQueryForceIntersectionPlans[db.getMongo().host],
-            }));
-        });
     };
 
     return $config;
