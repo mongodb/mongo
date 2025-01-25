@@ -355,6 +355,13 @@ CEResult CardinalityEstimator::scanCard(const QuerySolutionNode* node,
                                         const CardinalityEstimate& card) {
     QSNEstimate est;
     est.inCE = card;
+
+    if (_inputCard == zeroCE) {
+        est.outCE = _inputCard;
+        _qsnEstimates.emplace(node, std::move(est));
+        return _inputCard;
+    }
+
     if (const MatchExpression* filter = node->filter.get()) {
         auto ceRes = estimate(filter, true);
         if (!ceRes.isOK()) {
@@ -388,6 +395,14 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
     }
 
     QSNEstimate est;
+
+    if (_inputCard == zeroCE) {
+        est.inCE = _inputCard;
+        est.outCE = _inputCard;
+        _qsnEstimates.emplace(node, std::move(est));
+        return _inputCard;
+    }
+
     // Ignore selectivities pushed by other operators up to this point
     size_t selOffset = _conjSels.size();
 
@@ -444,6 +459,12 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
         return ceRes1;
     }
 
+    if (ceRes1 == zeroCE) {
+        est.outCE = ceRes1.getValue();
+        _qsnEstimates.emplace(node, std::move(est));
+        return ceRes1.getValue();
+    }
+
     if (node->children[0]->getType() == STAGE_IXSCAN &&
         static_cast<const IndexScanNode*>(node->children[0].get())->filter ==
             nullptr &&  // TODO SERVER-98577: Remove this restriction
@@ -495,15 +516,24 @@ CEResult CardinalityEstimator::indexIntersectionCard(const T* node) {
     // Ignore selectivities pushed by other operators up to this point.
     size_t selOffset = _conjSels.size();
 
+    bool hasZeroCEChild = false;
     for (auto&& child : node->children) {
         auto ceRes = estimate(child.get());
         if (!ceRes.isOK()) {
             return ceRes;
         }
+        if (ceRes == zeroCE) {
+            hasZeroCEChild = true;
+        }
     }
 
-    // Combine the selectivities of all child nodes.
-    est.outCE = conjCard(selOffset, _inputCard);
+    if (hasZeroCEChild) {
+        est.outCE = zeroCE;
+    } else {
+        // Combine the selectivities of all child nodes.
+        est.outCE = conjCard(selOffset, _inputCard);
+    }
+
     CardinalityEstimate outCE{est.outCE};
     _qsnEstimates.emplace(node, std::move(est));
 
@@ -525,14 +555,23 @@ CEResult CardinalityEstimator::indexUnionCard(const T* node) {
         if (!ceRes.isOK()) {
             return ceRes;
         }
+        if (ceRes.getValue() == zeroCE) {
+            continue;
+        }
         popSelectivities(selOffset);
         disjSels.emplace_back(ceRes.getValue() / _inputCard);
     }
-
-    // Combine the selectivities of all child nodes.
-    est.outCE = disjCard(_inputCard, disjSels);
+    if (!disjSels.empty()) {
+        // Combine the selectivities of all child nodes.
+        est.outCE = disjCard(_inputCard, disjSels);
+    } else {
+        est.outCE = zeroCE;
+    }
+    popSelectivities();
     CardinalityEstimate outCE{est.outCE};
-    _conjSels.emplace_back(outCE / _inputCard);
+    if (_inputCard != zeroCE) {
+        _conjSels.emplace_back(outCE / _inputCard);
+    }
     _qsnEstimates.emplace(node, std::move(est));
 
     return outCE;
@@ -655,6 +694,10 @@ CEResult CardinalityEstimator::estimate(const LimitNode* node) {
     if (!ceRes.isOK()) {
         return ceRes;
     }
+    if (ceRes == zeroCE) {
+        _qsnEstimates.emplace(node, QSNEstimate{.outCE = ceRes.getValue()});
+        return ceRes.getValue();
+    }
     auto est = std::min(CardinalityEstimate{CardinalityType{static_cast<double>(node->limit)},
                                             EstimationSource::Metadata},
                         ceRes.getValue());
@@ -667,6 +710,10 @@ CEResult CardinalityEstimator::estimate(const SkipNode* node) {
     auto ceRes = estimate(node->children[0].get());
     if (!ceRes.isOK()) {
         return ceRes;
+    }
+    if (ceRes == zeroCE) {
+        _qsnEstimates.emplace(node, QSNEstimate{.outCE = ceRes.getValue()});
+        return ceRes.getValue();
     }
     auto childEst = ceRes.getValue();
     auto skip =
