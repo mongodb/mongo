@@ -1327,6 +1327,18 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         }
     }
 
+    // Past this point, if an EOF solution is _possible_, it will be
+    // used regardless of sort, project, skip, or limit. We explicitly
+    // do this before considering a hint. Missing the opportunity for
+    // an EOF plan may result in an unbounded index scan where all
+    // fetched documents are filtered out by something like
+    // $alwaysFalse.
+    if (auto soln = tryEofSoln(query)) {
+        // A query with a trivially false primary match expression will never have any
+        // results, so a simple EOF is all that is required.
+        return singleSolution(std::move(soln));
+    }
+
     // An index was hinted. If there are any solutions, they use the hinted index.  If not, we
     // scan the entire index to provide results and output that as our plan.  This is the
     // desired behavior when an index is hinted that is not relevant to the query. In the case
@@ -1354,15 +1366,6 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         }
         return Status(ErrorCodes::NoQueryExecutionPlans,
                       "Failed to build whole-index solution for $hint");
-    }
-
-    // Past this point, if an EOF solution is _possible_, it will be used regardless of sort,
-    // project, skip, or limit. Only a hinted index would prevent this, and that has been checked
-    // already.
-    if (auto soln = tryEofSoln(query)) {
-        // A query with a trivially false primary match expression will never have any
-        // results, so a simple EOF is all that is required.
-        return singleSolution(std::move(soln));
     }
 
     // If a sort order is requested, there may be an index that provides it, even if that

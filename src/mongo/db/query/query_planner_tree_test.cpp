@@ -3128,32 +3128,25 @@ TEST_F(QueryPlannerTest, NoEOFForHintedIndex) {
     runInvalidQueryHint(fromjson("{one: 1, $and:[{two:{$in:[]}}]}"), fromjson("{one:1}"));
     runInvalidQueryHint(fromjson("{one: 1, $and:[{two:{$in:[]}}]}"), fromjson("{two:1}"));
     // Verify that if a useable index has been explicitly hinted, that is respected and an EOF
-    // solution is _not_ generated for a trivially false match expression.
+    // solution is generated for a trivially false match expression.
     withIndex(
         [&] {
             runQueryHint(fromjson("{one: 1, $and:[{two:{$in:[]}}]}"), fromjson("{one:1}"));
-            assertSolutionDoesntExist("{eof: 1}");
-            assertSolutionExists(
-                "{fetch: {filter: {'$alwaysFalse':1}, node: {ixscan: "
-                "{filter: null, pattern: {one: 1}}}}}");
+            assertSolutionExists("{eof: 1}");
         },
         BSON("one" << 1));
     withIndex(
         [&] {
             runQueryHint(fromjson("{one: 1, $and:[{two:{$in:[]}}]}"), fromjson("{two:1}"));
-            assertSolutionExists(
-                "{fetch: {filter: {'$alwaysFalse':1}, node: {ixscan: "
-                "{filter: null, pattern: {two: 1}}}}}");
+            assertSolutionExists("{eof: 1}");
         },
         BSON("two" << 1));
 
-    // An irrelevant hinted index should still not allow eof.
+    // An irrelevant hinted index should allow eof.
     withIndex(
         [&] {
             runQueryHint(fromjson("{one: 1, $and:[{two:{$in:[]}}]}"), fromjson("{three:1}"));
-            assertSolutionExists(
-                "{fetch: {filter: {'$alwaysFalse':1}, node: {ixscan: "
-                "{filter: null, pattern: {three: 1}}}}}");
+            assertSolutionExists("{eof: 1}");
         },
         BSON("three" << 1));
 }
