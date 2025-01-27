@@ -1265,7 +1265,10 @@ void OpDebug::report(OperationContext* opCtx,
     }
 
     if (planCacheShapeHash) {
-        pAttrs->addDeepCopy("planCacheShapeHash", zeroPaddedHex(*planCacheShapeHash));
+        // TODO SERVER-93305: Remove deprecated 'queryHash' usages.
+        std::string planCacheShapeHashStr = zeroPaddedHex(*planCacheShapeHash);
+        pAttrs->addDeepCopy("planCacheShapeHash", planCacheShapeHashStr);
+        pAttrs->addDeepCopy("queryHash", planCacheShapeHashStr);
     }
     if (planCacheKey) {
         pAttrs->addDeepCopy("planCacheKey", zeroPaddedHex(*planCacheKey));
@@ -1485,7 +1488,10 @@ void OpDebug::append(OperationContext* opCtx,
     }
 
     if (planCacheShapeHash) {
-        b.append("planCacheShapeHash", zeroPaddedHex(*planCacheShapeHash));
+        // TODO SERVER-93305: Remove deprecated 'queryHash' usages.
+        std::string planCacheShapeHashStr = zeroPaddedHex(*planCacheShapeHash);
+        b.append("planCacheShapeHash", planCacheShapeHashStr);
+        b.append("queryHash", planCacheShapeHashStr);
     }
     if (planCacheKey) {
         b.append("planCacheKey", zeroPaddedHex(*planCacheKey));
@@ -1796,6 +1802,12 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     });
 
     addIfNeeded("planCacheShapeHash", [](auto field, auto args, auto& b) {
+        if (args.op.planCacheShapeHash) {
+            b.append(field, zeroPaddedHex(*args.op.planCacheShapeHash));
+        }
+    });
+    // TODO SERVER-93305: Remove deprecated 'queryHash' usages.
+    addIfNeeded("queryHash", [](auto field, auto args, auto& b) {
         if (args.op.planCacheShapeHash) {
             b.append(field, zeroPaddedHex(*args.op.planCacheShapeHash));
         }
