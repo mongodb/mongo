@@ -278,6 +278,27 @@ bool isTimeseries(const boost::optional<CollectionAcquisition>& collection) {
         collection->getCollectionPtr()->getTimeseriesOptions().has_value();
 }
 
+void assertTimeseriesOptionsConsistency(const Collection* coll) {
+    tassert(9934501,
+            "Encountered invalid state for target collection '{}'. "_format(
+                coll->ns().toStringForErrorMsg()) +
+                "The collection namespace is prefixed with 'system.buckets.' but does not have "
+                "associated time-series options. Please consider options to correct this, "
+                "including renaming the collection or dropping the collection after inspecting "
+                "and/or backing up its contents.",
+            !coll->ns().isTimeseriesBucketsCollection() ||
+                coll->getTimeseriesOptions().has_value());
+    tassert(9934502,
+            "Encountered invalid state for target collection '{}'. "_format(
+                coll->ns().toStringForErrorMsg()) +
+                "The collection namespace is not prefixed with 'system.buckets.' but has "
+                "associated time-series options. Please consider options to correct this, "
+                "including renaming the collection or dropping the collection after inspecting "
+                "and/or backing up its contents.",
+            coll->ns().isTimeseriesBucketsCollection() ||
+                !coll->getTimeseriesOptions().has_value());
+}
+
 // NOTES on the 'collation' optional parameter contained by the shardCollection() request:
 // 1. It specifies the ordering criteria that will be applied when comparing chunk boundaries
 // during sharding operations (such as move/mergeChunks).
@@ -644,6 +665,11 @@ void checkLocalCatalogCollectionOptions(OperationContext* opCtx,
                                         const NamespaceString& targetNss,
                                         const ShardsvrCreateCollectionRequest& request,
                                         boost::optional<CollectionAcquisition>&& targetColl) {
+    tassert(9934500,
+            "expected the target collection to exist",
+            targetColl.has_value() && targetColl->exists());
+    assertTimeseriesOptionsConsistency(targetColl->getCollectionPtr().get());
+
     if (request.getRegisterExistingCollectionInGlobalCatalog()) {
         // No need to check for collection options when registering an existing collection
         return;
