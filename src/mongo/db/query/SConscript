@@ -490,6 +490,7 @@ env.CppUnitTest(
         'plan_cache_indexability_test.cpp',
         'plan_cache_key_info_test.cpp',
         'plan_cache_test.cpp',
+        'plan_executor_express_test.cpp',
         'plan_ranker_index_prefix_test.cpp',
         'plan_ranker_test.cpp',
         'planner_access_test.cpp',
