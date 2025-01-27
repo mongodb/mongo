@@ -68,8 +68,6 @@ namespace {
 class GRPCTransportLayerTest : public ServiceContextTest {
 public:
     void setUp() override {
-        ServiceContextTest::setUp();
-
         auto svcCtx = getServiceContext();
 
         // Default SEP behavior is to fail.
@@ -90,7 +88,6 @@ public:
     }
 
     void tearDown() override {
-        ServiceContextTest::tearDown();
         ServiceExecutor::shutdownAll(getServiceContext(), Seconds{10});
     }
 
@@ -107,10 +104,11 @@ public:
         auto sm = options.enableIngress
             ? std::make_unique<GRPCSessionManager>(svcCtx, clientCache, std::move(observers))
             : nullptr;
+        bool enableIngress = options.enableIngress;
         auto tl =
             std::make_unique<GRPCTransportLayerImpl>(svcCtx, std::move(options), std::move(sm));
 
-        if (options.enableIngress) {
+        if (enableIngress) {
             uassertStatusOK(tl->registerService(
                 std::make_unique<CommandService>(tl.get(),
                                                  std::move(serverCb),
@@ -397,7 +395,6 @@ public:
 
     void tearDown() override {
         _tl.reset();
-        ServiceContextTest::tearDown();
     }
 
     GRPCTransportLayer& transportLayer() {

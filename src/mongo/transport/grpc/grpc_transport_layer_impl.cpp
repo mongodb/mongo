@@ -115,10 +115,10 @@ std::unique_ptr<GRPCTransportLayerImpl> GRPCTransportLayerImpl::createWithConfig
     auto sm = options.enableIngress
         ? std::make_unique<GRPCSessionManager>(svcCtx, clientCache, std::move(observers))
         : nullptr;
-
+    bool enableIngress = options.enableIngress;
     auto tl = std::make_unique<GRPCTransportLayerImpl>(svcCtx, std::move(options), std::move(sm));
 
-    if (options.enableIngress) {
+    if (enableIngress) {
         uassertStatusOK(tl->registerService(std::make_unique<CommandService>(
             tl.get(),
             [tlPtr = tl.get()](auto session) {

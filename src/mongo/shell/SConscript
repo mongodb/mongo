@@ -16,7 +16,7 @@ env = env.Clone()
 
 
 def shouldBuildGRPC(myEnv):
-    return myEnv.TargetOSIs("linux") and myEnv["ENABLE_GRPC_BUILD"]
+    return myEnv.TargetOSIs("linux") and get_option("ssl") == "on"
 
 
 if shouldBuildGRPC(env):

@@ -392,7 +392,7 @@ if wiredtiger:
             'wiredtiger/wiredtiger',
         ])
 
-if env.TargetOSIs('linux') and env['ENABLE_GRPC_BUILD']:
+if env.TargetOSIs('linux') and get_option("ssl") == "on":
 
     protobufEnv = env.Clone(NINJA_GENSOURCE_INDEPENDENT=True)
     if use_system_version_of_library("protobuf"):

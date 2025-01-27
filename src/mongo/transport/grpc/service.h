@@ -93,7 +93,7 @@ public:
                    std::shared_ptr<WireVersionProvider> wvProvider,
                    std::shared_ptr<ClientCache> clientCache = nullptr);
 
-    ~CommandService() = default;
+    ~CommandService() override = default;
 
     StringData name() const override {
         return "mongodb.CommandService"_sd;

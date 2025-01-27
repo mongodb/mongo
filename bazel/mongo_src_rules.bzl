@@ -2102,6 +2102,16 @@ def _mongo_cc_binary_and_test(
         "//conditions:default": {},
     })
 
+    # This is used as a tool in part of the shared archive build, so it needs to be marked
+    # as compatible with a shared archive build.
+    if name in ["grpc_cpp_plugin", "protobuf_compiler"]:
+        features = features + ["-pie", "pic"]
+    else:
+        target_compatible_with += select({
+            "//bazel/config:shared_archive_enabled": ["@platforms//:incompatible"],
+            "//conditions:default": [],
+        })
+
     args = {
         "name": name + WITH_DEBUG_SUFFIX,
         "srcs": srcs + fincludes_hdr + SANITIZER_DENYLIST_HEADERS,
@@ -2124,10 +2134,7 @@ def _mongo_cc_binary_and_test(
             "//bazel/config:linkstatic_disabled": deps,
             "//conditions:default": [],
         }),
-        "target_compatible_with": target_compatible_with + enterprise_compatible + select({
-            "//bazel/config:shared_archive_enabled": ["@platforms//:incompatible"],
-            "//conditions:default": [],
-        }),
+        "target_compatible_with": target_compatible_with + enterprise_compatible,
         "additional_linker_inputs": additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
         "exec_properties": exec_properties,
         "env": env | SANITIZER_ENV,

@@ -841,7 +841,6 @@ int mongo_main(int argc, char* argv[]) {
         parsedURI.setOptionIfNecessary("authSource"s, shellGlobalParams.authenticationDatabase);
         parsedURI.setOptionIfNecessary("gssapiServiceName"s, shellGlobalParams.gssapiServiceName);
         parsedURI.setOptionIfNecessary("gssapiHostName"s, shellGlobalParams.gssapiHostName);
-// TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
 #ifdef MONGO_CONFIG_GRPC
         parsedURI.setOptionIfNecessary("gRPC"s, shellGlobalParams.gRPC ? "true" : "false");
 #endif
@@ -856,23 +855,24 @@ int mongo_main(int argc, char* argv[]) {
         auto asioLayer = tls[0].get();
 
 #ifdef MONGO_CONFIG_GRPC
-        // If built with gRPC support, the shell will always start an egress gRPC layer in addition
-        // to the asio one. It will decide at runtime during Mongo construction which layer to use
-        // based on the options/URI provided to it.
+        // The shell will start an egress gRPC layer in addition to the asio one if it was
+        // configured to communicate with gRPC. It will decide at runtime during Mongo construction
+        // which layer to use based on the options/URI provided to it.
+        if (shellGlobalParams.gRPC) {
+            // Create the gRPC client metadata.
+            boost::optional<std::string> appname = parsedURI.getAppName();
+            BSONObjBuilder bob;
+            uassertStatusOK(DBClientSession::appendClientMetadata(
+                appname.value_or(MongoURI::kDefaultTestRunnerAppName), &bob));
+            auto metadataDoc = bob.obj();
 
-        // Create the gRPC client metadata.
-        boost::optional<std::string> appname = parsedURI.getAppName();
-        BSONObjBuilder bob;
-        uassertStatusOK(DBClientSession::appendClientMetadata(
-            appname.value_or(MongoURI::kDefaultTestRunnerAppName), &bob));
-        auto metadataDoc = bob.obj();
-
-        // Create the gRPC transport layer.
-        transport::grpc::GRPCTransportLayer::Options grpcOpts;
-        grpcOpts.enableEgress = true;
-        grpcOpts.clientMetadata = metadataDoc.getObjectField(kMetadataDocumentName).getOwned();
-        tls.push_back(std::make_unique<transport::grpc::GRPCTransportLayerImpl>(
-            serviceContext, grpcOpts, nullptr));
+            // Create the gRPC transport layer.
+            transport::grpc::GRPCTransportLayer::Options grpcOpts;
+            grpcOpts.enableEgress = true;
+            grpcOpts.clientMetadata = metadataDoc.getObjectField(kMetadataDocumentName).getOwned();
+            tls.push_back(std::make_unique<transport::grpc::GRPCTransportLayerImpl>(
+                serviceContext, grpcOpts, nullptr));
+        }
 #endif
 
         serviceContext->setTransportLayerManager(

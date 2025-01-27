@@ -77,7 +77,6 @@ struct URITestCase {
     MongoURI::OptionsMap options;
     std::string database;
     ConnectSSLMode sslMode;
-// TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
 #ifdef MONGO_CONFIG_GRPC
     bool gRPC = false;
 #endif
@@ -513,7 +512,6 @@ const URITestCase validCases[] = {
     {"mongodb://localhost/?ssl=false", "", "", kMaster, "", 1, {{"ssl", "false"}}, "", kDisableSSL},
     {"mongodb://localhost/?tls=true", "", "", kMaster, "", 1, {{"tls", "true"}}, "", kEnableSSL},
     {"mongodb://localhost/?tls=false", "", "", kMaster, "", 1, {{"tls", "false"}}, "", kDisableSSL},
-// TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
 #ifdef MONGO_CONFIG_GRPC
     {"mongodb://localhost", "", "", kMaster, "", 1, {}, "", kDisableSSL, false},
     {"mongodb://localhost/?grpc=false",
@@ -612,7 +610,6 @@ const InvalidURITestCase invalidCases[] = {
     {"mongodb://127.0.0.1:1234/dbName?ssl=blah", ErrorCodes::FailedToParse},
     {"mongodb://127.0.0.1:1234/dbName?tls=blah", ErrorCodes::FailedToParse},
 
-// TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
 #ifdef MONGO_CONFIG_GRPC
     {"mongodb://127.0.0.1:1234/dbName?gRPC=blah", ErrorCodes::FailedToParse},
 #endif
