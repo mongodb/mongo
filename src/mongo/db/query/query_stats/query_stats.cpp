@@ -353,7 +353,7 @@ void registerRequest(OperationContext* opCtx,
                     "Error encountered when creating the Query Stats store key. Metrics will not "
                     "be collected for this command",
                     "status"_attr = status,
-                    "command"_attr = cmdObj);
+                    "command"_attr = redact(cmdObj));
         if (kDebugBuild || internalQueryStatsErrorsAreCommandFatal.load()) {
             // uassert rather than tassert so that we avoid creating fatal failures on queries that
             // were going to fail anyway, but trigger the error here first. A query that ONLY fails

@@ -426,12 +426,13 @@ QuerySettings lookupQuerySettingsForFind(const boost::intrusive_ptr<ExpressionCo
             // TODO: SERVER-94227 Stop validating pipelines if re-parsing for query stats, plus a
             // refactor.
             // Introduce tassert in debug builds only.
-            LOGV2_WARNING_OPTIONS(9423800,
-                                  {logv2::LogComponent::kQuery},
-                                  "Failed to perform query settings lookup",
-                                  "command"_attr =
-                                      parsedFind.findCommandRequest->toBSON(BSONObj()).toString(),
-                                  "error"_attr = ex.toString());
+            LOGV2_WARNING_OPTIONS(
+                9423800,
+                {logv2::LogComponent::kQuery},
+                "Failed to perform query settings lookup",
+                "command"_attr =
+                    redact(parsedFind.findCommandRequest->toBSON(BSONObj())).toString(),
+                "error"_attr = ex.toString());
             return query_settings::QuerySettings();
         }
     }();
@@ -507,7 +508,7 @@ QuerySettings lookupQuerySettingsForAgg(
                                   {logv2::LogComponent::kQuery},
                                   "Failed to perform query settings lookup",
                                   "command"_attr =
-                                      aggregateCommandRequest.toBSON(BSONObj()).toString(),
+                                      redact(aggregateCommandRequest.toBSON(BSONObj())).toString(),
                                   "error"_attr = ex.toString());
             return query_settings::QuerySettings();
         }
@@ -572,7 +573,7 @@ QuerySettings lookupQuerySettingsForDistinct(const boost::intrusive_ptr<Expressi
                 {logv2::LogComponent::kQuery},
                 "Failed to perform query settings lookup",
                 "command"_attr =
-                    parsedDistinct.distinctCommandRequest->toBSON(BSONObj()).toString(),
+                    redact(parsedDistinct.distinctCommandRequest->toBSON(BSONObj())).toString(),
                 "error"_attr = ex.toString());
             return query_settings::QuerySettings();
         }
@@ -728,7 +729,8 @@ void sanitizeQuerySettingsHints(std::vector<QueryShapeConfiguration>& queryShape
             LOGV2_WARNING(9646003,
                           "query settings became default after index hint sanitization",
                           "queryShapeShash"_attr = queryShapeItem.getQueryShapeHash().toHexString(),
-                          "queryInstance"_attr = queryShapeItem.getRepresentativeQuery());
+                          "queryInstance"_attr = queryShapeItem.getRepresentativeQuery().map(
+                              [](const BSONObj& b) { return redact(b); }));
             return true;
         }
         return false;

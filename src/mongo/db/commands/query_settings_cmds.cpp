@@ -347,12 +347,14 @@ public:
                             representativeQueryInfo,
                             boost::none /*previousRepresentativeQuery*/,
                             newQueryShapeConfiguration.getSettings());
-                        LOGV2_DEBUG(8911805,
-                                    1,
-                                    "Inserting query settings entry",
-                                    "representativeQuery"_attr = representativeQuery,
-                                    "settings"_attr =
-                                        newQueryShapeConfiguration.getSettings().toBSON());
+
+                        LOGV2_DEBUG(
+                            8911805,
+                            1,
+                            "Inserting query settings entry",
+                            "representativeQuery"_attr =
+                                representativeQuery.map([](const BSONObj& b) { return redact(b); }),
+                            "settings"_attr = newQueryShapeConfiguration.getSettings().toBSON());
                         queryShapeConfigurations.push_back(newQueryShapeConfiguration);
 
                         // Update the reply with the new query shape configuration.
@@ -372,7 +374,8 @@ public:
                         LOGV2_DEBUG(8911806,
                                     1,
                                     "Updating query settings entry",
-                                    "representativeQuery"_attr = representativeQuery,
+                                    "representativeQuery"_attr = representativeQuery.map(
+                                        [](const BSONObj& b) { return redact(b); }),
                                     "settings"_attr = mergedQuerySettings.toBSON());
                         queryShapeConfigurationToUpdate.setSettings(mergedQuerySettings);
 
@@ -454,11 +457,12 @@ public:
                         findQueryShapeConfigurationByQueryShapeHash(queryShapeConfigurations,
                                                                     queryShapeHash);
                     if (matchingQueryShapeConfigurationIt != queryShapeConfigurations.end()) {
+                        const auto& rep = queryShapeHashAndRepresentativeQuery.second;
                         LOGV2_DEBUG(8911807,
                                     1,
                                     "Removing query settings entry",
                                     "representativeQuery"_attr =
-                                        queryShapeHashAndRepresentativeQuery.second);
+                                        rep.map([](const BSONObj& b) { return redact(b); }));
                         queryShapeConfigurations.erase(matchingQueryShapeConfigurationIt);
                     }
                 });

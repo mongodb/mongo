@@ -160,8 +160,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     LOGV2_DEBUG(4822860,
                 5,
                 "SBE plan",
-                "slots"_attr = data.debugString(),
-                "stages"_attr = sbe::DebugPrinter{}.print(*rootStage));
+                "slots"_attr = redact(data.debugString()),
+                "stages"_attr = redact(sbe::DebugPrinter{}.print(*rootStage)));
 
     return {{new PlanExecutorSBE(
                  opCtx,
@@ -203,8 +203,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     LOGV2_DEBUG(4822861,
                 5,
                 "SBE plan",
-                "slots"_attr = candidates.winner().data.stageData.debugString(),
-                "stages"_attr = sbe::DebugPrinter{}.print(*candidates.winner().root));
+                "slots"_attr = redact(candidates.winner().data.stageData.debugString()),
+                "stages"_attr = redact(sbe::DebugPrinter{}.print(*candidates.winner().root)));
 
     return {{new PlanExecutorSBE(opCtx,
                                  std::move(cq),

@@ -1548,7 +1548,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
                         2,
                         "Encountered planning error while running with query settings. Retrying "
                         "without query settings.",
-                        "query"_attr = canonicalQuery->toStringForErrorMsg(),
+                        "query"_attr = redact(canonicalQuery->toStringForErrorMsg()),
                         "querySettings"_attr = querySettings,
                         "reason"_attr = exception.reason(),
                         "code"_attr = exception.codeString());
