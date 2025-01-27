@@ -1278,6 +1278,7 @@ tasks:
         "incompatible_ppc",
         "incompatible_s390x",
         "requires_large_host",
+        "blocked_in_query_alias",
       ]
     commands:
       - func: "do setup"
