@@ -1583,14 +1583,19 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     }
 
     // If CanonicalQuery is distinct-like and we haven't generated a plan that features
-    // a DISTINCT_SCAN, we should use SBE instead.
-    if (isDistinctMultiplanningEnabled && query.isSbeCompatible() && query.getDistinct()) {
-        const bool noDistinctScans = std::none_of(out.begin(), out.end(), [](const auto& soln) {
-            return soln->hasNode(STAGE_DISTINCT_SCAN);
-        });
-        if (noDistinctScans) {
-            return Status(ErrorCodes::NoDistinctScansForDistinctEligibleQuery,
-                          "No DISTINCT_SCAN plans available");
+    // a DISTINCT_SCAN, we should use SBE or subplanning if possible instead.
+    if (isDistinctMultiplanningEnabled && query.getDistinct()) {
+        const bool canSubplan =
+            MatchExpression::OR == query.getPrimaryMatchExpression()->matchType() &&
+            query.getPrimaryMatchExpression()->numChildren() > 0;
+        if (query.isSbeCompatible() || canSubplan) {
+            const bool noDistinctScans = std::none_of(out.begin(), out.end(), [](const auto& soln) {
+                return soln->hasNode(STAGE_DISTINCT_SCAN);
+            });
+            if (noDistinctScans) {
+                return Status(ErrorCodes::NoDistinctScansForDistinctEligibleQuery,
+                              "No DISTINCT_SCAN plans available");
+            }
         }
     }
 

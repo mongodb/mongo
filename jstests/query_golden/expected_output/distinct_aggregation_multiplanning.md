@@ -2602,6 +2602,806 @@ Execution Engine: classic
 }
 ```
 
+## 4. Rooted $or can only use a DISTINCT_SCAN when all predicates have mergeable bounds for a single index scan
+### Rooted $or with one index bound uses DISTINCT_SCAN
+### Pipeline
+```json
+[
+	{
+		"$match" : {
+			"$or" : [
+				{
+					"a" : {
+						"$lte" : 5
+					}
+				},
+				{
+					"a" : {
+						"$gt" : 8
+					}
+				}
+			]
+		}
+	},
+	{
+		"$group" : {
+			"_id" : "$a"
+		}
+	}
+]
+```
+### Results
+```json
+{  "_id" : 4 }
+{  "_id" : 5 }
+```
+### Summarized explain
+Execution Engine: classic
+```json
+{
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [
+					[
+						{
+							"stage" : "PROJECTION_COVERED",
+							"transformBy" : {
+								"_id" : 0,
+								"a" : 1
+							}
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"[-inf.0, 5.0]",
+									"(8.0, inf.0]"
+								],
+								"b" : [
+									"[MinKey, MaxKey]"
+								]
+							},
+							"indexName" : "a_1_b_1",
+							"isFetching" : false,
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isShardFiltering" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : 1,
+								"b" : 1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ],
+								"b" : [ ]
+							},
+							"stage" : "DISTINCT_SCAN"
+						}
+					],
+					[
+						{
+							"stage" : "PROJECTION_COVERED",
+							"transformBy" : {
+								"_id" : 0,
+								"a" : 1
+							}
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"[inf.0, 8.0)",
+									"[5.0, -inf.0]"
+								],
+								"b" : [
+									"[MinKey, MaxKey]"
+								]
+							},
+							"indexName" : "a_-1_b_1",
+							"isFetching" : false,
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isShardFiltering" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : -1,
+								"b" : 1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ],
+								"b" : [ ]
+							},
+							"stage" : "DISTINCT_SCAN"
+						}
+					],
+					[
+						{
+							"stage" : "PROJECTION_COVERED",
+							"transformBy" : {
+								"_id" : 0,
+								"a" : 1
+							}
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"[-inf.0, 5.0]",
+									"(8.0, inf.0]"
+								],
+								"b" : [
+									"[MaxKey, MinKey]"
+								]
+							},
+							"indexName" : "a_1_b_-1",
+							"isFetching" : false,
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isShardFiltering" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : 1,
+								"b" : -1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ],
+								"b" : [ ]
+							},
+							"stage" : "DISTINCT_SCAN"
+						}
+					],
+					[
+						{
+							"stage" : "PROJECTION_COVERED",
+							"transformBy" : {
+								"_id" : 0,
+								"a" : 1
+							}
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"[-inf.0, 5.0]",
+									"(8.0, inf.0]"
+								],
+								"b" : [
+									"[MinKey, MaxKey]"
+								],
+								"c" : [
+									"[MinKey, MaxKey]"
+								]
+							},
+							"indexName" : "a_1_b_1_c_1",
+							"isFetching" : false,
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isShardFiltering" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : 1,
+								"b" : 1,
+								"c" : 1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ],
+								"b" : [ ],
+								"c" : [ ]
+							},
+							"stage" : "DISTINCT_SCAN"
+						}
+					],
+					[
+						{
+							"stage" : "PROJECTION_COVERED",
+							"transformBy" : {
+								"_id" : 0,
+								"a" : 1
+							}
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"[-inf.0, 5.0]",
+									"(8.0, inf.0]"
+								],
+								"b" : [
+									"[MinKey, MaxKey]"
+								],
+								"d" : [
+									"[MinKey, MaxKey]"
+								]
+							},
+							"indexName" : "a_1_b_1_d_1",
+							"isFetching" : false,
+							"isMultiKey" : true,
+							"isPartial" : false,
+							"isShardFiltering" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : 1,
+								"b" : 1,
+								"d" : 1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ],
+								"b" : [ ],
+								"d" : [
+									"d"
+								]
+							},
+							"stage" : "DISTINCT_SCAN"
+						}
+					],
+					[
+						{
+							"stage" : "PROJECTION_DEFAULT",
+							"transformBy" : {
+								"_id" : 0,
+								"a" : 1
+							}
+						},
+						{
+							"stage" : "OR"
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"[-inf.0, 5.0]"
+								],
+								"b" : [
+									"[MinKey, MaxKey]"
+								]
+							},
+							"indexName" : "a_1_b_1",
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : 1,
+								"b" : 1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ],
+								"b" : [ ]
+							},
+							"stage" : "IXSCAN"
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"(8.0, inf.0]"
+								]
+							},
+							"indexName" : "a_1",
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : 1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ]
+							},
+							"stage" : "IXSCAN"
+						}
+					],
+					[
+						{
+							"stage" : "PROJECTION_DEFAULT",
+							"transformBy" : {
+								"_id" : 0,
+								"a" : 1
+							}
+						},
+						{
+							"stage" : "OR"
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"[5.0, -inf.0]"
+								],
+								"b" : [
+									"[MinKey, MaxKey]"
+								]
+							},
+							"indexName" : "a_-1_b_1",
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : -1,
+								"b" : 1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ],
+								"b" : [ ]
+							},
+							"stage" : "IXSCAN"
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"(8.0, inf.0]"
+								]
+							},
+							"indexName" : "a_1",
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : 1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ]
+							},
+							"stage" : "IXSCAN"
+						}
+					],
+					[
+						{
+							"stage" : "PROJECTION_DEFAULT",
+							"transformBy" : {
+								"_id" : 0,
+								"a" : 1
+							}
+						},
+						{
+							"stage" : "OR"
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"[-inf.0, 5.0]"
+								],
+								"b" : [
+									"[MaxKey, MinKey]"
+								]
+							},
+							"indexName" : "a_1_b_-1",
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : 1,
+								"b" : -1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ],
+								"b" : [ ]
+							},
+							"stage" : "IXSCAN"
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"(8.0, inf.0]"
+								]
+							},
+							"indexName" : "a_1",
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : 1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ]
+							},
+							"stage" : "IXSCAN"
+						}
+					],
+					[
+						{
+							"stage" : "PROJECTION_DEFAULT",
+							"transformBy" : {
+								"_id" : 0,
+								"a" : 1
+							}
+						},
+						{
+							"stage" : "OR"
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"[-inf.0, 5.0]"
+								],
+								"b" : [
+									"[MinKey, MaxKey]"
+								],
+								"c" : [
+									"[MinKey, MaxKey]"
+								]
+							},
+							"indexName" : "a_1_b_1_c_1",
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : 1,
+								"b" : 1,
+								"c" : 1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ],
+								"b" : [ ],
+								"c" : [ ]
+							},
+							"stage" : "IXSCAN"
+						},
+						{
+							"direction" : "forward",
+							"indexBounds" : {
+								"a" : [
+									"(8.0, inf.0]"
+								]
+							},
+							"indexName" : "a_1",
+							"isMultiKey" : false,
+							"isPartial" : false,
+							"isSparse" : false,
+							"isUnique" : false,
+							"keyPattern" : {
+								"a" : 1
+							},
+							"multiKeyPaths" : {
+								"a" : [ ]
+							},
+							"stage" : "IXSCAN"
+						}
+					]
+				],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"a" : 1
+						}
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"a" : [
+								"[-inf.0, 5.0]",
+								"(8.0, inf.0]"
+							]
+						},
+						"indexName" : "a_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : false,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"a" : 1
+						},
+						"multiKeyPaths" : {
+							"a" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$groupByDistinctScan" : {
+				"newRoot" : {
+					"_id" : "$a"
+				}
+			}
+		}
+	]
+}
+```
+
+### Rooted $or + $and on one field prevents use of DISTINCT_SCAN
+### Pipeline
+```json
+[
+	{
+		"$match" : {
+			"$or" : [
+				{
+					"a" : {
+						"$lte" : 5
+					}
+				},
+				{
+					"a" : {
+						"$gt" : 6,
+						"$lt" : 7
+					}
+				},
+				{
+					"a" : {
+						"$gt" : 8
+					}
+				}
+			]
+		}
+	},
+	{
+		"$group" : {
+			"_id" : "$a"
+		}
+	}
+]
+```
+### Results
+```json
+{  "_id" : 4 }
+{  "_id" : 5 }
+```
+### Summarized explain
+Execution Engine: sbe
+```json
+{
+	"rejectedPlans" : [ ],
+	"winningPlan" : [
+		{
+			"stage" : "GROUP"
+		},
+		{
+			"stage" : "OR"
+		},
+		{
+			"direction" : "forward",
+			"indexBounds" : {
+				"a" : [
+					"[-inf.0, 5.0]",
+					"(8.0, inf.0]"
+				]
+			},
+			"indexName" : "a_1",
+			"isMultiKey" : false,
+			"isPartial" : false,
+			"isSparse" : false,
+			"isUnique" : false,
+			"keyPattern" : {
+				"a" : 1
+			},
+			"multiKeyPaths" : {
+				"a" : [ ]
+			},
+			"stage" : "IXSCAN"
+		},
+		{
+			"direction" : "forward",
+			"indexBounds" : {
+				"a" : [
+					"(6.0, 7.0)"
+				]
+			},
+			"indexName" : "a_1",
+			"isMultiKey" : false,
+			"isPartial" : false,
+			"isSparse" : false,
+			"isUnique" : false,
+			"keyPattern" : {
+				"a" : 1
+			},
+			"multiKeyPaths" : {
+				"a" : [ ]
+			},
+			"stage" : "IXSCAN"
+		}
+	]
+}
+```
+
+### Rooted $or on different fields prevents use of DISTINCT_SCAN
+### Pipeline
+```json
+[
+	{
+		"$match" : {
+			"$or" : [
+				{
+					"a" : {
+						"$gt" : 0
+					}
+				},
+				{
+					"b" : {
+						"$lt" : 10
+					}
+				}
+			]
+		}
+	},
+	{
+		"$group" : {
+			"_id" : "$a"
+		}
+	}
+]
+```
+### Results
+```json
+{  "_id" : 4 }
+{  "_id" : 5 }
+```
+### Summarized explain
+Execution Engine: sbe
+```json
+{
+	"rejectedPlans" : [ ],
+	"winningPlan" : [
+		{
+			"stage" : "GROUP"
+		},
+		{
+			"stage" : "OR"
+		},
+		{
+			"direction" : "forward",
+			"indexBounds" : {
+				"a" : [
+					"[MinKey, MaxKey]"
+				],
+				"b" : [
+					"[-inf.0, 10.0)"
+				]
+			},
+			"indexName" : "b_1_a_1",
+			"isMultiKey" : false,
+			"isPartial" : false,
+			"isSparse" : false,
+			"isUnique" : false,
+			"keyPattern" : {
+				"a" : 1,
+				"b" : 1
+			},
+			"multiKeyPaths" : {
+				"a" : [ ],
+				"b" : [ ]
+			},
+			"stage" : "IXSCAN"
+		},
+		{
+			"direction" : "forward",
+			"indexBounds" : {
+				"a" : [
+					"(0.0, inf.0]"
+				]
+			},
+			"indexName" : "a_1",
+			"isMultiKey" : false,
+			"isPartial" : false,
+			"isSparse" : false,
+			"isUnique" : false,
+			"keyPattern" : {
+				"a" : 1
+			},
+			"multiKeyPaths" : {
+				"a" : [ ]
+			},
+			"stage" : "IXSCAN"
+		}
+	]
+}
+```
+
+### Pipeline
+```json
+[
+	{
+		"$match" : {
+			"$or" : [
+				{
+					"a" : {
+						"$gt" : 0
+					},
+					"b" : {
+						"$lt" : 10
+					}
+				},
+				{
+					"a" : {
+						"$lt" : 10
+					}
+				}
+			]
+		}
+	},
+	{
+		"$group" : {
+			"_id" : "$a"
+		}
+	}
+]
+```
+### Results
+```json
+{  "_id" : 4 }
+{  "_id" : 5 }
+```
+### Summarized explain
+Execution Engine: sbe
+```json
+{
+	"rejectedPlans" : [ ],
+	"winningPlan" : [
+		{
+			"stage" : "GROUP"
+		},
+		{
+			"stage" : "OR"
+		},
+		{
+			"direction" : "forward",
+			"indexBounds" : {
+				"a" : [
+					"[-inf.0, 10.0)"
+				]
+			},
+			"indexName" : "a_1",
+			"isMultiKey" : false,
+			"isPartial" : false,
+			"isSparse" : false,
+			"isUnique" : false,
+			"keyPattern" : {
+				"a" : 1
+			},
+			"multiKeyPaths" : {
+				"a" : [ ]
+			},
+			"stage" : "IXSCAN"
+		},
+		{
+			"direction" : "forward",
+			"indexBounds" : {
+				"a" : [
+					"(0.0, inf.0]"
+				],
+				"b" : [
+					"[-inf.0, 10.0)"
+				]
+			},
+			"indexName" : "a_1_b_1",
+			"isMultiKey" : false,
+			"isPartial" : false,
+			"isSparse" : false,
+			"isUnique" : false,
+			"keyPattern" : {
+				"a" : 1,
+				"b" : 1
+			},
+			"multiKeyPaths" : {
+				"a" : [ ],
+				"b" : [ ]
+			},
+			"stage" : "IXSCAN"
+		}
+	]
+}
+```
+
 ### Multiplanning tie between DISTINCT_SCAN and IXSCAN favors DISTINCT_SCAN
 ### Pipeline
 ```json
@@ -2891,7 +3691,7 @@ Execution Engine: classic
 }
 ```
 
-## 4. No DISTINCT_SCAN candidates considered due to conflicting sort specs
+## 5. No DISTINCT_SCAN candidates considered due to conflicting sort specs
 ### Pipeline
 ```json
 [
@@ -3228,7 +4028,7 @@ Execution Engine: sbe
 }
 ```
 
-## 5. No DISTINCT_SCAN candidates considered due to multikey index
+## 6. No DISTINCT_SCAN candidates considered due to multikey index
 ### Pipeline
 ```json
 [
@@ -3466,7 +4266,7 @@ Execution Engine: sbe
 }
 ```
 
-## 6. $group by non-multikey field with $first/$last on a multikey field
+## 7. $group by non-multikey field with $first/$last on a multikey field
 ### Pipeline
 ```json
 [

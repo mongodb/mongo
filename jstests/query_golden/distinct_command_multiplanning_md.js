@@ -55,6 +55,14 @@ outputDistinctPlanAndResults(coll, "x");
 outputDistinctPlanAndResults(coll, "x", {x: 3});
 outputDistinctPlanAndResults(coll, "x", {x: {$gt: 3}, y: 5});
 
+subSection("Prefer DISTINCT_SCAN with combined bounds under $or");
+outputDistinctPlanAndResults(coll, "x", {$or: [{x: {$lt: 4}}, {x: {$gt: 6}}]});
+subSection("Prefer DISTINCT_SCAN with $or -> $in optimization");
+outputDistinctPlanAndResults(coll, "x", {$or: [{x: {$eq: 2}}, {x: {$eq: 4}}, {x: {$eq: 6}}]});
+subSection("No DISTINCT_SCAN candidate considered due to rooted $or");
+outputDistinctPlanAndResults(coll, "x", {$or: [{x: {$gt: 3}}, {y: {$eq: 5}}]});
+outputDistinctPlanAndResults(coll, "x", {$or: [{x: {$eq: 5}, z: {$ne: 4}}, {y: {$lt: 7}}]});
+
 section("Prefer DISTINCT_SCAN for many duplicate values in the collection");
 coll.drop();
 for (let i = 0; i < 100; ++i)
@@ -72,6 +80,9 @@ coll.createIndex({x: 1});
 coll.createIndex({x: 1, y: 1});
 coll.createIndex({y: 1, z: 1});
 outputDistinctPlanAndResults(coll, "x", {x: {$gt: -1}, y: {$lt: 105}});
+
+subSection("Maintain prior behavior even under a rooted $or");
+outputDistinctPlanAndResults(coll, "x", {$or: [{x: {$gt: -1}, y: {$lt: 105}}, {x: {$eq: 0}}]});
 
 section("Use hinted DISTINCT_SCAN");
 coll.drop();

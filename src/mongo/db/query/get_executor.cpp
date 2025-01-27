@@ -1335,13 +1335,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
                 return makePlanner(makeQueryPlannerParams(plannerOptions));
             }
         } catch (const ExceptionFor<ErrorCodes::NoDistinctScansForDistinctEligibleQuery>&) {
-            // The planner failed to generate a DISTINCT_SCAN for a distinct-like query. Replan
-            // using SBE.
-            tassert(
-                936940, "Expected query to be SBE-compatible", canonicalQuery->isSbeCompatible());
+            // The planner failed to generate a DISTINCT_SCAN for a distinct-like query. Remove the
+            // distinct property and replan using SBE or subplanning as applicable.
             canonicalQuery->resetDistinct();
-            // Stages still need to be finalized for SBE since classic was used previously.
-            finalizePipelineStages(pipeline, unavailableMetadata, canonicalQuery.get());
+            if (canonicalQuery->isSbeCompatible()) {
+                // Stages still need to be finalized for SBE since classic was used previously.
+                finalizePipelineStages(pipeline, unavailableMetadata, canonicalQuery.get());
+            }
             return makePlanner(makeQueryPlannerParams(plannerOptions));
         }
     }();

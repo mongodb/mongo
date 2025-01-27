@@ -64,10 +64,21 @@ public:
                       boost::optional<BSONObj> projSpec = boost::none,
                       bool flipDistinctScanDirection = false)
         : _key(std::move(key)),
-          _mirrored(std::move(mirrored)),
+          _mirrored(mirrored),
           _sampleId(std::move(sampleId)),
           _projSpec(std::move(projSpec)),
-          _flipDistinctScanDirection(std::move(flipDistinctScanDirection)) {}
+          _flipDistinctScanDirection(flipDistinctScanDirection) {}
+
+    CanonicalDistinct(const CanonicalDistinct& other)
+        : _key(other.getKey()),
+          _mirrored(other.isMirrored()),
+          _sampleId(other.getSampleId()),
+          _projSpec(other.getProjectionSpec()),
+          _flipDistinctScanDirection(other.isDistinctScanDirectionFlipped()) {
+        setSortRequirement(other.getSortRequirement());
+    }
+
+    CanonicalDistinct& operator=(const CanonicalDistinct&) = delete;
 
     const std::string& getKey() const {
         return _key;
@@ -83,6 +94,10 @@ public:
 
     const boost::optional<BSONObj>& getProjectionSpec() const {
         return _projSpec;
+    }
+
+    void setProjectionSpec(const BSONObj& projSpec) {
+        _projSpec = std::move(projSpec);
     }
 
     bool isDistinctScanDirectionFlipped() const {
