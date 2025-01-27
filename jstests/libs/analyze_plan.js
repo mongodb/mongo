@@ -1055,13 +1055,12 @@ export function getPlanCacheKeyFromExplain(explain) {
 }
 
 /**
- * Get the 'planCacheShapeHash' from 'object'.
+ * Get the 'queryHash' from 'object'.
  */
 export function getPlanCacheShapeHashFromObject(object) {
-    // TODO SERVER 93305: Remove deprecated 'queryHash' usages.
-    const planCacheShapeHash = object.planCacheShapeHash || object.queryHash;
-    assert.neq(planCacheShapeHash, undefined);
-    return planCacheShapeHash;
+    const queryHash = object.queryHash;
+    assert.neq(queryHash, undefined);
+    return queryHash;
 }
 
 /**
