@@ -79,7 +79,8 @@ ValidateState::ValidateState(OperationContext* opCtx,
                              RepairMode repairMode,
                              const AdditionalOptions& additionalOptions,
                              bool logDiagnostics)
-    : _nss(nss),
+    : _globalLock(opCtx, isBackground(mode) ? MODE_IS : MODE_IX),
+      _nss(nss),
       _mode(mode),
       _repairMode(repairMode),
       _dataThrottle(opCtx, [&]() { return gMaxValidateMBperSec.load(); }),
@@ -187,8 +188,6 @@ Status ValidateState::initializeCollection(OperationContext* opCtx) {
         shard_role_details::getRecoveryUnit(opCtx)->setTimestampReadSource(
             RecoveryUnit::ReadSource::kProvided, *_validateTs);
 
-        _globalLock.emplace(opCtx, MODE_IS);
-
         try {
             shard_role_details::getRecoveryUnit(opCtx)->preallocateSnapshot();
         } catch (const ExceptionFor<ErrorCodes::SnapshotTooOld>&) {
@@ -206,7 +205,6 @@ Status ValidateState::initializeCollection(OperationContext* opCtx) {
         _collection =
             CollectionPtr(_catalog->establishConsistentCollection(opCtx, _nss, _validateTs));
     } else {
-        _globalLock.emplace(opCtx, MODE_IX);
         _databaseLock.emplace(opCtx, _nss.dbName(), MODE_IX);
         _collectionLock.emplace(opCtx, _nss, MODE_X);
         _catalog = CollectionCatalog::get(opCtx);

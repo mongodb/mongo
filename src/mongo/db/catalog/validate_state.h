@@ -89,7 +89,7 @@ public:
     }
 
     bool isBackground() const {
-        return _mode == ValidateMode::kBackground || _mode == ValidateMode::kBackgroundCheckBSON;
+        return isBackground(_mode);
     }
 
     bool shouldEnforceFastCount() const;
@@ -233,6 +233,13 @@ public:
 private:
     ValidateState() = delete;
 
+    static bool isBackground(ValidateMode mode) {
+        return mode == ValidateMode::kBackground || mode == ValidateMode::kBackgroundCheckBSON;
+    }
+
+    // To avoid racing with shutdown/rollback, this lock must be initialized early.
+    Lock::GlobalLock _globalLock;
+
     NamespaceString _nss;
     ValidateMode _mode;
     RepairMode _repairMode;
@@ -242,9 +249,6 @@ private:
     bool _BSONDataNonConformant = false;
     bool _enforceTimeseriesBucketsAreAlwaysCompressed = false;
     ValidationVersion _validationVersion = currentValidationVersion;
-
-    // To avoid racing with shutdown.
-    boost::optional<Lock::GlobalLock> _globalLock;
 
     // Locks for foreground validation only.
     boost::optional<AutoGetDb> _databaseLock;
