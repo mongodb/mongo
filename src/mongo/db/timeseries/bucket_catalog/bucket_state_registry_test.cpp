@@ -741,13 +741,8 @@ TEST_F(BucketStateRegistryTest, ArchivingBucketStopsTrackingState) {
     auto& bucket = createBucket(info1, date);
     auto bucketId = bucket.bucketId;
 
-    ClosedBuckets closedBuckets;
-    internal::archiveBucket(*this,
-                            *stripes[info1.stripeNumber],
-                            WithLock::withoutLock(),
-                            bucket,
-                            stats(bucket),
-                            closedBuckets);
+    internal::archiveBucket(
+        *this, *stripes[info1.stripeNumber], WithLock::withoutLock(), bucket, stats(bucket));
     auto state = getBucketState(bucketStateRegistry, bucketId);
     ASSERT_EQ(state, boost::none);
 }

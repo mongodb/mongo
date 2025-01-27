@@ -138,8 +138,7 @@ void updateBucketFetchAndQueryStats(const ReopeningContext& context,
 }
 }  // namespace
 
-SuccessfulInsertion::SuccessfulInsertion(std::shared_ptr<WriteBatch>&& b, ClosedBuckets&& c)
-    : batch{std::move(b)}, closedBuckets{std::move(c)} {}
+SuccessfulInsertion::SuccessfulInsertion(std::shared_ptr<WriteBatch>&& b) : batch{std::move(b)} {}
 
 Stripe::Stripe(TrackingContexts& trackingContexts)
     : openBucketsById(
@@ -294,7 +293,7 @@ StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
     // If our insert was successful, return a SuccessfulInsertion with our
     // WriteBatch.
     if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
-        return SuccessfulInsertion{std::move(*batch), std::move(insertContext.closedBuckets)};
+        return SuccessfulInsertion{std::move(*batch)};
     }
 
     auto* reason = get_if<RolloverReason>(&insertionResult);
@@ -324,8 +323,7 @@ StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
                                                    ? RolloverAction::kArchive
                                                    : RolloverAction::kSoftClose);
             if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
-                return SuccessfulInsertion{std::move(*batch),
-                                           std::move(insertContext.closedBuckets)};
+                return SuccessfulInsertion{std::move(*batch)};
             }
 
             // We weren't able to insert into the other bucket, so fall through to the regular
@@ -402,8 +400,7 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
                                               insertContext.stats,
                                               insertContext.key,
                                               std::move(rehydratedBucket.getValue()),
-                                              reopeningContext.catalogEra,
-                                              insertContext.closedBuckets);
+                                              reopeningContext.catalogEra);
         }
 
         if (swBucket.isOK()) {
@@ -421,7 +418,7 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
                                                     comparator);
             auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
             invariant(batch);
-            return SuccessfulInsertion{std::move(*batch), std::move(insertContext.closedBuckets)};
+            return SuccessfulInsertion{std::move(*batch)};
         } else {
             insertContext.stats.incNumBucketReopeningsFailed();
             if (swBucket.getStatus().code() == ErrorCodes::WriteConflict) {
@@ -454,7 +451,7 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
                                             comparator);
     auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
     invariant(batch);
-    return SuccessfulInsertion{std::move(*batch), std::move(insertContext.closedBuckets)};
+    return SuccessfulInsertion{std::move(*batch)};
 }
 
 StatusWith<InsertResult> insert(BucketCatalog& catalog,
@@ -490,7 +487,7 @@ StatusWith<InsertResult> insert(BucketCatalog& catalog,
 
     auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
     invariant(batch);
-    return SuccessfulInsertion{std::move(*batch), std::move(insertContext.closedBuckets)};
+    return SuccessfulInsertion{std::move(*batch)};
 }
 
 void waitToInsert(InsertWaiter* waiter) {
@@ -546,10 +543,8 @@ Status prepareCommit(BucketCatalog& catalog,
     return Status::OK();
 }
 
-boost::optional<ClosedBucket> finish(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch) {
+void finish(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch) {
     invariant(!isWriteBatchFinished(*batch));
-
-    boost::optional<ClosedBucket> closedBucket;
 
     finishWriteBatch(*batch);
 
@@ -614,11 +609,7 @@ boost::optional<ClosedBucket> finish(BucketCatalog& catalog, std::shared_ptr<Wri
                 break;
             }
             case RolloverAction::kArchive: {
-                ClosedBuckets closedBuckets;
-                internal::archiveBucket(catalog, stripe, stripeLock, *bucket, stats, closedBuckets);
-                if (!closedBuckets.empty()) {
-                    closedBucket = std::move(closedBuckets[0]);
-                }
+                internal::archiveBucket(catalog, stripe, stripeLock, *bucket, stats);
                 break;
             }
             case RolloverAction::kNone: {
@@ -627,7 +618,6 @@ boost::optional<ClosedBucket> finish(BucketCatalog& catalog, std::shared_ptr<Wri
             }
         }
     }
-    return closedBucket;
 }
 
 void abort(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch, const Status& status) {

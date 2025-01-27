@@ -209,7 +209,6 @@ void doRollover(BucketCatalog& catalog,
                 Stripe& stripe,
                 WithLock stripeLock,
                 Bucket& bucket,
-                ClosedBuckets& closedBuckets,
                 RolloverAction action) {
     invariant(action != RolloverAction::kNone);
     if (allCommitted(bucket)) {
@@ -217,7 +216,7 @@ void doRollover(BucketCatalog& catalog,
         // action now.
         ExecutionStatsController stats = getExecutionStats(catalog, bucket.bucketId.collectionUUID);
         if (action == RolloverAction::kArchive) {
-            archiveBucket(catalog, stripe, stripeLock, bucket, stats, closedBuckets);
+            archiveBucket(catalog, stripe, stripeLock, bucket, stats);
         } else {
             closeOpenBucket(catalog, stripe, stripeLock, bucket, stats);
         }
@@ -584,11 +583,10 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(BucketCatalog& catalog,
                                                         ExecutionStatsController& stats,
                                                         const BucketKey& key,
                                                         tracking::unique_ptr<Bucket>&& bucket,
-                                                        std::uint64_t targetEra,
-                                                        ClosedBuckets& closedBuckets) {
+                                                        std::uint64_t targetEra) {
     invariant(bucket.get());
 
-    expireIdleBuckets(catalog, stripe, stripeLock, key.collectionUUID, stats, closedBuckets);
+    expireIdleBuckets(catalog, stripe, stripeLock, key.collectionUUID, stats);
 
     auto status = initializeBucketState(
         catalog.bucketStateRegistry, bucket->bucketId, bucket.get(), targetEra);
@@ -922,8 +920,7 @@ void archiveBucket(BucketCatalog& catalog,
                    Stripe& stripe,
                    WithLock stripeLock,
                    Bucket& bucket,
-                   ExecutionStatsController& stats,
-                   ClosedBuckets& closedBuckets) {
+                   ExecutionStatsController& stats) {
     bool archived =
         stripe.archivedBuckets
             .emplace(
@@ -1117,8 +1114,7 @@ void expireIdleBuckets(BucketCatalog& catalog,
                        Stripe& stripe,
                        WithLock stripeLock,
                        const UUID& collectionUUID,
-                       ExecutionStatsController& collectionStats,
-                       ClosedBuckets& closedBuckets) {
+                       ExecutionStatsController& collectionStats) {
     // As long as we still need space and have entries and remaining attempts, close idle buckets.
     int32_t numExpired = 0;
 
@@ -1140,7 +1136,7 @@ void expireIdleBuckets(BucketCatalog& catalog,
         auto state = materializeAndGetBucketState(catalog.bucketStateRegistry, bucket);
         if (state && !conflictsWithInsertions(state.value())) {
             // Can archive a bucket if it's still eligible for insertions.
-            archiveBucket(catalog, stripe, stripeLock, *bucket, stats, closedBuckets);
+            archiveBucket(catalog, stripe, stripeLock, *bucket, stats);
             stats.incNumBucketsArchivedDueToMemoryThreshold();
         } else if (state &&
                    (isBucketStateCleared(state.value()) || isBucketStateFrozen(state.value()))) {
@@ -1229,8 +1225,7 @@ Bucket& allocateBucket(BucketCatalog& catalog,
                        InsertContext& info,
                        const Date_t& time,
                        const StringDataComparator* comparator) {
-    expireIdleBuckets(
-        catalog, stripe, stripeLock, info.key.collectionUUID, info.stats, info.closedBuckets);
+    expireIdleBuckets(catalog, stripe, stripeLock, info.key.collectionUUID, info.stats);
 
     // In rare cases duplicate bucket _id fields can be generated in the same stripe and fail to be
     // inserted. We will perform a limited number of retries to minimize the probability of
@@ -1294,15 +1289,10 @@ Bucket& rollover(BucketCatalog& catalog,
                  const StringDataComparator* comparator,
                  Bucket* additionalBucket,
                  boost::optional<RolloverAction> additionalAction) {
-    doRollover(catalog, stripe, stripeLock, bucket, info.closedBuckets, action);
+    doRollover(catalog, stripe, stripeLock, bucket, action);
     if (additionalBucket) {
         invariant(additionalAction.has_value());
-        doRollover(catalog,
-                   stripe,
-                   stripeLock,
-                   *additionalBucket,
-                   info.closedBuckets,
-                   additionalAction.value());
+        doRollover(catalog, stripe, stripeLock, *additionalBucket, additionalAction.value());
     }
 
     return allocateBucket(catalog, stripe, stripeLock, info, time, comparator);

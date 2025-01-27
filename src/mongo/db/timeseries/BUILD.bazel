@@ -101,7 +101,6 @@ mongo_cc_library(
         "//src/mongo/db/timeseries/bucket_catalog:bucket_identifiers.h",
         "//src/mongo/db/timeseries/bucket_catalog:bucket_metadata.h",
         "//src/mongo/db/timeseries/bucket_catalog:bucket_state_registry.h",
-        "//src/mongo/db/timeseries/bucket_catalog:closed_bucket.h",
         "//src/mongo/db/timeseries/bucket_catalog:execution_stats.h",
         "//src/mongo/db/timeseries/bucket_catalog:flat_bson.h",
         "//src/mongo/db/timeseries/bucket_catalog:measurement_map.h",

@@ -47,7 +47,6 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
-#include "mongo/db/timeseries/bucket_catalog/closed_bucket.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_catalog/reopening.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
@@ -181,8 +180,7 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(BucketCatalog& catalog,
                                                         ExecutionStatsController& stats,
                                                         const BucketKey& key,
                                                         tracking::unique_ptr<Bucket>&& bucket,
-                                                        std::uint64_t targetEra,
-                                                        ClosedBuckets& closedBuckets);
+                                                        std::uint64_t targetEra);
 
 /**
  * Check to see if 'insert' can use existing bucket rather than reopening a candidate bucket. If
@@ -244,8 +242,7 @@ void archiveBucket(BucketCatalog& catalog,
                    Stripe& stripe,
                    WithLock stripeLock,
                    Bucket& bucket,
-                   ExecutionStatsController& stats,
-                   ClosedBuckets& closedBuckets);
+                   ExecutionStatsController& stats);
 
 /**
  * Identifies a previously archived bucket that may be able to accommodate the measurement
@@ -316,8 +313,7 @@ void expireIdleBuckets(BucketCatalog& catalog,
                        Stripe& stripe,
                        WithLock stripeLock,
                        const UUID& collectionUUID,
-                       ExecutionStatsController& collectioStats,
-                       ClosedBuckets& closedBuckets);
+                       ExecutionStatsController& collectionStats);
 
 /**
  * Generates an OID for the bucket _id field, setting the timestamp portion to a value determined by

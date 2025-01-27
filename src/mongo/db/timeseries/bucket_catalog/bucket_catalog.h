@@ -47,7 +47,6 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
-#include "mongo/db/timeseries/bucket_catalog/closed_bucket.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_catalog/reopening.h"
 #include "mongo/db/timeseries/bucket_catalog/tracking_contexts.h"
@@ -75,7 +74,6 @@ struct InsertContext {
     StripeNumber stripeNumber;
     TimeseriesOptions options;
     ExecutionStatsController stats;
-    ClosedBuckets closedBuckets = ClosedBuckets();
 
     bool operator==(const InsertContext& other) const {
         return key == other.key;
@@ -93,10 +91,9 @@ public:
     SuccessfulInsertion& operator=(SuccessfulInsertion&&) = default;
     SuccessfulInsertion(const SuccessfulInsertion&) = delete;
     SuccessfulInsertion& operator=(const SuccessfulInsertion&) = delete;
-    SuccessfulInsertion(std::shared_ptr<WriteBatch>&&, ClosedBuckets&&);
+    SuccessfulInsertion(std::shared_ptr<WriteBatch>&&);
 
     std::shared_ptr<WriteBatch> batch;
-    ClosedBuckets closedBuckets;
 };
 
 /**
@@ -290,10 +287,8 @@ Status prepareCommit(BucketCatalog& catalog,
 /**
  * Finishes committing the batch and notifies other threads waiting for preparing their batches.
  * Batch must have been previously prepared.
- *
- * Returns bucket information of a bucket if one was closed.
  */
-boost::optional<ClosedBucket> finish(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch);
+void finish(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch);
 
 /**
  * Aborts the given write batch and any other outstanding (unprepared) batches on the same bucket,

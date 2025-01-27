@@ -457,15 +457,13 @@ Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj
     auto& stripe = *_bucketCatalog->stripes[stripeNumber];
     stdx::lock_guard stripeLock{stripe.mutex};
 
-    ClosedBuckets closedBuckets;
     return internal::reopenBucket(*_bucketCatalog,
                                   stripe,
                                   stripeLock,
                                   stats,
                                   key,
                                   std::move(bucket),
-                                  getCurrentEra(_bucketCatalog->bucketStateRegistry),
-                                  closedBuckets)
+                                  getCurrentEra(_bucketCatalog->bucketStateRegistry))
         .getStatus();
 }
 
@@ -1402,8 +1400,6 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement
         ::mongo::fromjson(
             R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},"tag":42, "a":-100,"b":100})"));
 
-    // No buckets are closed.
-    ASSERT(get<SuccessfulInsertion>(result.getValue()).closedBuckets.empty());
     ASSERT_EQ(0, _getExecutionStat(_uuid1, kNumSchemaChanges));
 
     auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
@@ -1457,8 +1453,6 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
                          ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},
                                                      "a":-100,"b":100})"));
 
-    // No buckets are closed.
-    ASSERT(get<SuccessfulInsertion>(result.getValue()).closedBuckets.empty());
     ASSERT_EQ(0, _getExecutionStat(_uuid1, kNumSchemaChanges));
 
     auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
@@ -1512,10 +1506,6 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
                          ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},
                                                      "a":{},"b":{}})"));
 
-    // The reopened bucket is closed but not added to closedBuckets anyore, when the feature flag
-    // is enabled, because closedBuckets only stored buckets that would need to be compressed on
-    // closing. With the feature flag enabled buckets are already compressed.
-    ASSERT_EQ(0, get<SuccessfulInsertion>(result.getValue()).closedBuckets.size());
     ASSERT_EQ(1, _getExecutionStat(_uuid1, kNumSchemaChanges));
 
     auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
@@ -1923,7 +1913,6 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
     // Initialize the side bucket catalog.
     auto sideBucketCatalog = std::make_unique<timeseries::bucket_catalog::BucketCatalog>(
         1, getTimeseriesSideBucketCatalogMemoryUsageThresholdBytes);
-    ClosedBuckets closedBuckets;
 
     // Create dummy bucket and populate bucket state registry.
     auto dummyUUID = UUID::gen();
@@ -1984,8 +1973,7 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
     // to close archived buckets, until we hit the global expiry max count limit (or if we run out
     // of idle buckets in this stripe). Then, we try to close any archived buckets. In this
     // particular execution we should expect not to close any buckets, but we should archive one.
-    internal::expireIdleBuckets(
-        *sideBucketCatalog, stripe, stripeLock, dummyUUID, statsController, closedBuckets);
+    internal::expireIdleBuckets(*sideBucketCatalog, stripe, stripeLock, dummyUUID, statsController);
 
     ASSERT_EQ(1, collectionStats->numBucketsArchivedDueToMemoryThreshold.load());
     ASSERT_EQ(
@@ -2004,8 +1992,7 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
     // previously archived.
     sideContext.stats().bytesAllocated(getTimeseriesSideBucketCatalogMemoryUsageThresholdBytes() -
                                        getMemoryUsage(*sideBucketCatalog) + +1);
-    internal::expireIdleBuckets(
-        *sideBucketCatalog, stripe, stripeLock, dummyUUID, statsController, closedBuckets);
+    internal::expireIdleBuckets(*sideBucketCatalog, stripe, stripeLock, dummyUUID, statsController);
 
     ASSERT_EQ(1, collectionStats->numBucketsArchivedDueToMemoryThreshold.load());
     ASSERT_EQ(
