@@ -532,6 +532,7 @@ mongo_cc_unit_test(
         "sbe_pattern_value_cmp_test.cpp",
         "sbe_plan_size_test.cpp",
         "sbe_plan_stage_test.h",
+        "sbe_scan_test.cpp",
         "sbe_search_cursor_test.cpp",
         "sbe_sort_test.cpp",
         "sbe_sorted_merge_test.cpp",

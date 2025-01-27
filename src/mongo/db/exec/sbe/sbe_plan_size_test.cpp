@@ -288,6 +288,25 @@ TEST_F(PlanSizeTest, Scan) {
     assertPlanSize(*stage);
 }
 
+TEST_F(PlanSizeTest, ParallelScan) {
+    auto collUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
+    auto stage =
+        makeS<sbe::ParallelScanStage>(collUuid,
+                                      DatabaseName(),
+                                      generateSlotId() /* recordSlot */,
+                                      generateSlotId() /* recordIdSlot */,
+                                      generateSlotId() /* snapshotIdSlot */,
+                                      generateSlotId() /* indexIdSlot */,
+                                      generateSlotId() /* indexKeySlot */,
+                                      generateSlotId() /* indexKeyPatternSlot */,
+                                      std::vector<std::string>{"field"} /* scanFieldNames */,
+                                      mockSV() /* scanFieldSlots */,
+                                      nullptr /* yieldPolicy */,
+                                      kEmptyPlanNodeId /* nodeId */,
+                                      ScanCallbacks());
+    assertPlanSize(*stage);
+}
+
 TEST_F(PlanSizeTest, Sort) {
     auto stage =
         makeS<SortStage>(mockS(),
