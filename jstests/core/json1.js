@@ -233,3 +233,10 @@ x = {
 assert.eq(
     JSON.stringify(x),
     '{"data_binary":{"$binary":"VG8gYmUgb3Igbm90IHRvIGJlLi4uIFRoYXQgaXMgdGhlIHF1ZXN0aW9uLg==","$type":"00"},"data_timestamp":{"$timestamp":{"t":987654321,"i":0}},"data_regex":{"$regex":"^acme","$options":"i"},"data_oid":{"$oid":"579a70d9e249393f153b5bc1"},"data_ref":{"$ref":"test","$id":"579a70d9e249393f153b5bc1"},"data_minkey":{"$minKey":1},"data_maxkey":{"$maxKey":1},"data_numberlong":{"$numberLong":"12345"},"data_numberint":5,"data_numberdecimal":{"$numberDecimal":"3.14000000000000"}}');
+
+// serializing Error instances
+const stringThatNeedsEscaping = 'ho\"la';
+assert.eq('\"ho\\\"la\"', JSON.stringify(stringThatNeedsEscaping));
+assert.eq('\"ho\\\"la\"', tojson(stringThatNeedsEscaping));
+assert.eq('{}', JSON.stringify(new Error(stringThatNeedsEscaping)));
+assert.eq('Error(\"ho\\\"la\")', tojson(new Error(stringThatNeedsEscaping)));

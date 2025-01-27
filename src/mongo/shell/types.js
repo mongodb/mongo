@@ -730,7 +730,7 @@ tojsonObject = function(x, indent, nolint, depth, sortKeys) {
     }
 
     if (x instanceof Error) {
-        return x.toString();
+        return `Error(${JSON.stringify(x.message)})`;
     }
 
     try {
