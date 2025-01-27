@@ -38,6 +38,11 @@ _BUILD_ID_REGISTRY: dict = {}
 # Maps job nums to fixture loggers.
 _FIXTURE_LOGGER_REGISTRY: dict = {}
 
+# URL of parsley logs.
+RAW_TEST_LOGS_URL = "https://evergreen.mongodb.com/rest/v2/tasks/{task_id}/build/TestLogs/job{job_num}%2F{test_id}.log?execution={execution}&print_time=true"
+RAW_JOBS_LOGS_URL = "https://evergreen.mongodb.com/rest/v2/tasks/{task_id}/build/TestLogs/job{job_num}?execution={execution}&print_time=true"
+PARSLEY_JOBS_LOGS_URL = "https://parsley.mongodb.com/test/{task_id}/{execution}/job{job_num}/all"
+
 
 def _build_logger_server():
     """Create and return a new BuildloggerServer.
@@ -235,7 +240,7 @@ def new_test_logger(test_shortname, test_basename, command, parent, job_num, tes
     name = "%s:%s" % (parent.name, test_shortname)
     logger = logging.Logger(name)
     logger.parent = parent
-    _add_evergreen_handler(logger, job_num, test_id)
+    _add_evergreen_handler(logger, job_num, test_id, test_basename)
 
     def _get_test_endpoint(job_num, test_basename, command, meta_logger):
         """Get a new test endpoint for the buildlogger server."""
@@ -391,7 +396,7 @@ def _write_evergreen_log_spec():
         yaml.dump(log_spec, f)
 
 
-def _add_evergreen_handler(logger, job_num, test_id=None):
+def _add_evergreen_handler(logger, job_num, test_id=None, test_name=None):
     """Add a new evergreen handler to a logger."""
     logger_info = config.LOGGING_CONFIG[TESTS_LOGGER_NAME]
     evergreen_handler_info = None
@@ -410,9 +415,29 @@ def _add_evergreen_handler(logger, job_num, test_id=None):
         logger.addHandler(handler)
 
         if test_id:
+            raw_url = RAW_TEST_LOGS_URL.format(
+                task_id=config.EVERGREEN_TASK_ID,
+                job_num=job_num,
+                test_id=test_id,
+                execution=config.EVERGREEN_EXECUTION,
+            )
             ROOT_EXECUTOR_LOGGER.info("Writing output of %s to %s.", test_id, fp)
+            ROOT_EXECUTOR_LOGGER.info("Raw logs for %s can be viewed at %s", test_name, raw_url)
         else:
+            parsley_url = PARSLEY_JOBS_LOGS_URL.format(
+                task_id=config.EVERGREEN_TASK_ID,
+                job_num=job_num,
+                execution=config.EVERGREEN_EXECUTION,
+            )
+            raw_url = RAW_JOBS_LOGS_URL.format(
+                task_id=config.EVERGREEN_TASK_ID,
+                job_num=job_num,
+                execution=config.EVERGREEN_EXECUTION,
+            )
             ROOT_EXECUTOR_LOGGER.info("Writing output of job #%d to %s.", job_num, fp)
+            ROOT_EXECUTOR_LOGGER.info("Parsley logs for job #%s can be viewed at %s", job_num,
+                                      parsley_url)
+            ROOT_EXECUTOR_LOGGER.info("Raw logs for job #%s can be viewed at %s", job_num, raw_url)
 
 
 def _get_evergreen_log_dirname():
