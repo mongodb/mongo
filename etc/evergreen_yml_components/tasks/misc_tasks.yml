@@ -1575,6 +1575,8 @@ tasks:
       - func: "set up venv"
       - func: "upload pip requirements"
       - func: "generate version burn in"
+        vars:
+          run_covered_tests: true
 
   - name: version_gen
     run_on: ubuntu2004-medium
@@ -1590,6 +1592,8 @@ tasks:
       - func: "set up venv"
       - func: "upload pip requirements"
       - func: "generate version"
+        vars:
+          run_covered_tests: true
 
   - name: version_gen_validation
     run_on: ubuntu2004-medium
@@ -1609,3 +1613,5 @@ tasks:
       - func: "set up venv"
       - func: "upload pip requirements"
       - func: "generate version validation"
+        vars:
+          run_covered_tests: true
