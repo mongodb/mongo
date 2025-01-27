@@ -229,7 +229,7 @@ selector:
     - jstests/core/**/query/SERVER-23626.js
 
     # Creates a session explicitly causing override to resume a transaction that was not started.
-    - jstests/core_sharding/refine_collection_shard_key.js
+    - jstests/core_sharding/ddl/refine_collection_shard_key.js
 
   exclude_with_any_tags:
     # "Cowardly refusing to override read concern of command: ..."

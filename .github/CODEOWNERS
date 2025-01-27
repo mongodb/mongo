@@ -532,9 +532,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/core/write/insert/OWNERS.yml
 /jstests/core/write/insert/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
 
-# The following patterns are parsed from ./jstests/core_sharding/OWNERS.yml
-/jstests/core_sharding/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
-
 # The following patterns are parsed from ./jstests/core_sharding/balancer/OWNERS.yml
 /jstests/core_sharding/balancer/**/* @10gen/server-catalog-and-routing @10gen/server-cluster-scalability @svc-auto-approve-bot
 
@@ -544,6 +541,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/core_sharding/ddl/OWNERS.yml
 /jstests/core_sharding/ddl/**/* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /jstests/core_sharding/ddl/**/move_primary* @10gen/server-catalog-and-routing @10gen/server-cluster-scalability @svc-auto-approve-bot
+/jstests/core_sharding/ddl/**/refine_collection_shard_key* @10gen/server-catalog-and-routing @10gen/server-cluster-scalability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core_sharding/global_catalog/OWNERS.yml
 /jstests/core_sharding/global_catalog/**/* @10gen/server-catalog-and-routing @svc-auto-approve-bot

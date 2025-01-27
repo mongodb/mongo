@@ -32,7 +32,7 @@ selector:
     - jstests/core_sharding/move_collection/move_collection_capped_collection.js
 
     # refineCollectionShardKey smoke tests
-    - jstests/core_sharding/refine_collection_shard_key.js
+    - jstests/core_sharding/ddl/refine_collection_shard_key.js
 
 executor:
   archive:

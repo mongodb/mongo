@@ -197,7 +197,7 @@ selector:
     - jstests/core/**/benchrun_pipeline_updates.js
     - jstests/core/**/cursora.js
     - jstests/core/**/query/SERVER-23626.js
-    - jstests/core_sharding/refine_collection_shard_key.js
+    - jstests/core_sharding/ddl/refine_collection_shard_key.js
     - jstests/core/timeseries/write/timeseries_delete_hint.js
     - jstests/core/**/set_param1.js
     - jstests/core/**/profile*.js
