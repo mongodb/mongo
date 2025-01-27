@@ -40,7 +40,7 @@
 
 #include <boost/optional/optional.hpp>
 
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/static_immortal.h"

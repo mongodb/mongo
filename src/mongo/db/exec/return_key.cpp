@@ -36,7 +36,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/snapshot.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

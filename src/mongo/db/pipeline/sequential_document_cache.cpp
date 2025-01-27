@@ -31,7 +31,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/pipeline/sequential_document_cache.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

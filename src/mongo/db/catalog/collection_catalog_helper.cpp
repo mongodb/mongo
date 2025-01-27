@@ -45,7 +45,7 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/views/view.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 

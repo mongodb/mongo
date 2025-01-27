@@ -33,7 +33,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/stats/single_transaction_stats.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

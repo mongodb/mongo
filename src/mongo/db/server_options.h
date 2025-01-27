@@ -46,7 +46,7 @@
 #include "mongo/logv2/log_format.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/process_id.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/net/cidr.h"
 #include "mongo/util/version/releases.h"
 #include "mongo/util/versioned_value.h"

@@ -95,7 +95,7 @@
 #include "mongo/dbtests/storage_debug_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/uuid.h"

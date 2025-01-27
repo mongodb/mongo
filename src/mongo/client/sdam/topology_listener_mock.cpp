@@ -31,7 +31,7 @@
 #include <boost/move/utility_core.hpp>
 
 #include "mongo/client/sdam/topology_listener_mock.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::sdam {
 

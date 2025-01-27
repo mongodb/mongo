@@ -31,7 +31,7 @@
 
 #include "mongo/db/sorter/sorter_stats.h"
 
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 SorterFileStats::SorterFileStats(SorterTracker* sorterTracker) : _sorterTracker(sorterTracker){};

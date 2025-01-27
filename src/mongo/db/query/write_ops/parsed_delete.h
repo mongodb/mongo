@@ -45,7 +45,7 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/write_ops/parsed_writes_common.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {

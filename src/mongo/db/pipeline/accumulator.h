@@ -51,7 +51,7 @@
 #include "mongo/platform/basic.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/memory_usage_tracker.h"
 #include "mongo/util/summation.h"

@@ -45,7 +45,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/server_options.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/str.h"
 

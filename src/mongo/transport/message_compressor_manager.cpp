@@ -50,7 +50,7 @@
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/session.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/shared_buffer.h"
 

@@ -33,7 +33,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/count.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

@@ -38,7 +38,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/s/primary_only_service_helpers/retrying_cancelable_operation_context_factory.h"
 #include "mongo/db/s/primary_only_service_helpers/with_automatic_retry.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"

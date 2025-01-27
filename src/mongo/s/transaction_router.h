@@ -56,7 +56,7 @@
 #include "mongo/db/stats/single_transaction_stats.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/string_map.h"

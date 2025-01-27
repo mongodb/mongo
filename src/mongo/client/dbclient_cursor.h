@@ -49,7 +49,7 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/rpc/message.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {

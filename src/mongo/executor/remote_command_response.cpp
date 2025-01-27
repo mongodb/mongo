@@ -38,7 +38,7 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {

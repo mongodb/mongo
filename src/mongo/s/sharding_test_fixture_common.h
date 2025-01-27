@@ -47,7 +47,7 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/transport/session.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 

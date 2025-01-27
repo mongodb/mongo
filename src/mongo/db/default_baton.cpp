@@ -39,7 +39,7 @@
 #include "mongo/db/default_baton.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"

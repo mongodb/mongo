@@ -72,7 +72,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/unittest/assert.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"

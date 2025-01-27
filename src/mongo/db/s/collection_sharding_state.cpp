@@ -44,7 +44,7 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/namespace_string_util.h"
 

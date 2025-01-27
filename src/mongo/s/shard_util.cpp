@@ -61,7 +61,7 @@
 #include "mongo/s/request_types/auto_split_vector_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_util.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"

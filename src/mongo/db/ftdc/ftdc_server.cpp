@@ -53,7 +53,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/transport/transport_layer_ftdc_collector.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"

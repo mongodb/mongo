@@ -41,7 +41,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::timeseries::bucket_catalog {
 

@@ -38,7 +38,7 @@
 #include "mongo/s/resource_yielders.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 
 namespace mongo {

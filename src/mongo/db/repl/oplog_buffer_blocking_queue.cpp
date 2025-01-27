@@ -33,7 +33,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace repl {

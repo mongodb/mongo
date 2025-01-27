@@ -39,7 +39,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::doc_validation_error {
 // The default maximum allowed size for a single doc validation error.

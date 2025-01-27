@@ -46,7 +46,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 
 namespace mongo {

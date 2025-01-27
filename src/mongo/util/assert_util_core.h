@@ -49,6 +49,14 @@
  *     v    v
  *     [assert_util_core.h]
  */
+// IWYU pragma: private, include "mongo/util/assert_util.h"
+// IWYU pragma: friend "mongo/util/assert_util.h"
+// IWYU pragma: friend "mongo/base/checked_cast.h"
+// IWYU pragma: friend "mongo/base/status.h"
+// IWYU pragma: friend "mongo/base/status_with.h"
+// IWYU pragma: friend "mongo/base/string_data.h"
+// IWYU pragma: friend "mongo/util/intrusive_counter.h"
+
 namespace mongo {
 
 MONGO_COMPILER_NORETURN void invariantFailed(const char* expr,

@@ -34,7 +34,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/repl/initial_sync_shared_data.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace repl {

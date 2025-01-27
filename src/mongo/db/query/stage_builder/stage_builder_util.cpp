@@ -34,7 +34,7 @@
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::stage_builder {
 std::unique_ptr<PlanStage> buildClassicExecutableTree(OperationContext* opCtx,

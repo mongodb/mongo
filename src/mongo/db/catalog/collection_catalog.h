@@ -58,7 +58,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/views/view.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/immutable/map.h"
 #include "mongo/util/immutable/unordered_map.h"

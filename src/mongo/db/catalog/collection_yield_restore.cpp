@@ -38,7 +38,7 @@
 #include "mongo/db/direct_connection_util.h"
 #include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/transaction_resources.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {

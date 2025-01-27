@@ -43,7 +43,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/mock_periodic_runner.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/testing_proctor.h"

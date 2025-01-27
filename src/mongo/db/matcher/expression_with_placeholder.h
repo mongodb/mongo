@@ -43,7 +43,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/match_details.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

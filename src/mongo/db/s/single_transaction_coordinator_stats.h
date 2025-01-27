@@ -38,7 +38,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/s/transaction_coordinator.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/tick_source.h"

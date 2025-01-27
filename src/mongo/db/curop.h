@@ -76,7 +76,7 @@
 #include "mongo/logv2/log_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/serialization_context.h"

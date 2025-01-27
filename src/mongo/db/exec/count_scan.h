@@ -50,7 +50,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

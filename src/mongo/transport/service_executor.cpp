@@ -43,7 +43,7 @@
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/processinfo.h"

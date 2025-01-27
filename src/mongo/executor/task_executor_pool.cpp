@@ -32,7 +32,7 @@
 
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/task_executor_pool_parameters_gen.h"  // IWYU pragma: keep
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/processinfo.h"  // IWYU pragma: keep
 
 namespace mongo {

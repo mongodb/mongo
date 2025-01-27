@@ -38,7 +38,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query/exec/cluster_cursor_cleanup_job.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/exit.h"

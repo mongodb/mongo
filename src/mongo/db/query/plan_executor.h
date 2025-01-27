@@ -57,7 +57,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/future.h"
 
