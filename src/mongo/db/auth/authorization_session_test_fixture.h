@@ -101,14 +101,14 @@ public:
                                         bool bypassDocValidation);
 
 private:
-    static Options createServiceContextOptions() {
-        Options o;
-        return o.useMockClock(true).useMockAuthzManagerExternalState(
+    static Options createServiceContextOptions(Options options) {
+        return options.useMockClock(true).useMockAuthzManagerExternalState(
             std::make_unique<FailureCapableAuthzManagerExternalStateMock>());
     }
 
 protected:
-    AuthorizationSessionTestFixture() : ServiceContextMongoDTest(createServiceContextOptions()) {
+    explicit AuthorizationSessionTestFixture(Options options = Options{})
+        : ServiceContextMongoDTest(createServiceContextOptions(std::move(options))) {
         managerState =
             dynamic_cast<FailureCapableAuthzManagerExternalStateMock*>(_authzExternalState);
         invariant(managerState);

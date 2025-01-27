@@ -112,6 +112,11 @@ protected:
             return std::move(*this);
         }
 
+        Options setAuthEnabled(bool enableAuth) {
+            _setAuthEnabled = enableAuth;
+            return std::move(*this);
+        }
+
     private:
         std::string _engine = "wiredTiger";
         // We use ephemeral instances by default to advise Storage Engines (in particular
@@ -121,6 +126,7 @@ protected:
         StorageEngineInitFlags _initFlags = kDefaultStorageEngineInitFlags;
         bool _useReplSettings = false;
         bool _useMockClock = false;
+        bool _setAuthEnabled = true;
         Milliseconds _autoAdvancingMockClockIncrement{0};
         std::unique_ptr<TickSource> _mockTickSource;
         std::unique_ptr<JournalListener> _journalListener;
