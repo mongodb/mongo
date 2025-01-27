@@ -140,6 +140,12 @@ env.Library(
 )
 
 env.CppUnitTest(
+    target="diagnostic_printers_test",
+    source=[],
+    LIBDEPS=[],
+)
+
+env.CppUnitTest(
     target='server_base_test',
     source=[
         '$BUILD_DIR/mongo/util/database_name_util_test.cpp',
@@ -929,6 +935,7 @@ env.Library(
         'coll_mod_reply_validation.cpp',
         'commands.cpp',
         'curop.cpp',
+        'curop_diagnostic_printer.cpp',
         'drop.idl',
         'drop_database.idl',
         'explain.idl',
