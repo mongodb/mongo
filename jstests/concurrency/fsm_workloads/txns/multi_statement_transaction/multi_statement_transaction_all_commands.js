@@ -1,7 +1,7 @@
 /**
  * Runs findAndModify, update, delete, find, and getMore within a transaction.
  *
- * @tags: [uses_transactions, state_functions_share_transaction]
+ * @tags: [uses_transactions, state_functions_share_transaction, requires_getmore]
  */
 import {cleanupOnLastIteration} from "jstests/concurrency/fsm_workload_helpers/cleanup_txns.js";
 import {TxnUtil} from "jstests/libs/txns/txn_util.js";
