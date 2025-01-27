@@ -29,8 +29,8 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/curop_diagnostic_printer.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/command_diagnostic_printer.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log_util.h"
 #include "mongo/rpc/op_msg.h"
@@ -76,9 +76,9 @@ public:
     }
 };
 
-class CommandDiagnosticPrinterTest : public ServiceContextTest {
+class DiagnosticPrinterTest : public ServiceContextTest {
 public:
-    CommandDiagnosticPrinterTest() {
+    DiagnosticPrinterTest() {
         _nss = NamespaceString::createNamespaceString_forTest("myDB.myColl");
         _opCtxHolder = makeOperationContext();
         _cmdBson = BSON(kCmdName << kCmdValue << kSensitiveFieldName << kSensitiveValue);
@@ -102,8 +102,8 @@ public:
         curOp()->setGenericOpRequestDetails(clientLock, _nss, cmdObj, cmdBson, NetworkOp::dbQuery);
     }
 
-    std::string printCommandDiagnostics() {
-        command_diagnostics::Printer printer{opCtx()};
+    std::string printCurOpDiagnostics() {
+        diagnostic_printers::CurOpPrinter printer{opCtx()};
         return "{}"_format(printer);
     }
 
@@ -113,49 +113,42 @@ public:
     BSONObj _cmdBson;
 };
 
-TEST_F(CommandDiagnosticPrinterTest, PrinterOmitsCommandFieldsWhenThereIsNoCommandSet) {
-    // When CurOp doesn't have a command object on it, the diagnostic printer shouldn't log any
-    // command fields, since it's unclear if any of them are sensitive.
-    ASSERT_EQ(command_diagnostics::Printer::kOmitUnrecognizedCommandMsg, printCommandDiagnostics());
+TEST_F(DiagnosticPrinterTest, IsIneligibleForPrintingWhenOpCtxIsNull) {
+    ASSERT_EQ(diagnostic_printers::kOpCtxIsNullMsg,
+              diagnostic_printers::isIneligibleForDiagnosticPrinting(nullptr));
 }
 
-TEST_F(CommandDiagnosticPrinterTest, PrinterOmitsAllFieldsWhenRequested) {
-    // When a command requests to omit diagnostic logging, the diagnostic printer shouldn't log any
-    // fields.
+TEST_F(DiagnosticPrinterTest, IsIneligibleForPrintingWhenCurOpIsIneligible) {
     setMockCmdOnCurOp();
     {
         stdx::lock_guard<Client> clientLock(*opCtx()->getClient());
         curOp()->setShouldOmitDiagnosticInformation(clientLock, true);
     }
-    ASSERT_EQ(command_diagnostics::Printer::kOmitUnsupportedCurOpMsg, printCommandDiagnostics());
+    ASSERT_EQ(diagnostic_printers::kOmitUnsupportedCurOpMsg,
+              diagnostic_printers::isIneligibleForDiagnosticPrinting(opCtx()));
 }
 
-TEST_F(CommandDiagnosticPrinterTest, PrinterRedactsSensitiveCommandFields) {
-    // The diagnostic printer should always redact the values of fields specified as sensitive by
-    // the command.
+TEST_F(DiagnosticPrinterTest, IsIneligibleForPrintingWhenThereIsNoCommandSet) {
+    // When no command is set, it's not clear if any of the command fields are sensitive.
+    ASSERT_EQ(diagnostic_printers::kOmitUnrecognizedCommandMsg,
+              diagnostic_printers::isIneligibleForDiagnosticPrinting(opCtx()));
+}
+
+TEST_F(DiagnosticPrinterTest, IsEligibleWhenCommandHasSensitiveFields) {
     setMockCmdOnCurOp();
-    auto str = printCommandDiagnostics();
-    ASSERT_STRING_CONTAINS(str, kCmdName);
-    ASSERT_STRING_CONTAINS(str, kCmdValue);
-    ASSERT_STRING_CONTAINS(str, kSensitiveFieldName);
-    ASSERT_STRING_OMITS(str, kSensitiveValue);
+    ASSERT_EQ(boost::none, diagnostic_printers::isIneligibleForDiagnosticPrinting(opCtx()));
 }
 
-TEST_F(CommandDiagnosticPrinterTest, PrinterRedactsWhenRedactionIsEnabled) {
-    // When redaction is enabled, all field values should be redacted.
+TEST_F(DiagnosticPrinterTest, IsEligibleWhenRedactionEnabled) {
     setMockCmdOnCurOp();
     logv2::setShouldRedactLogs(true);
-    auto str = printCommandDiagnostics();
-    ASSERT_STRING_CONTAINS(str, kCmdName);
-    ASSERT_STRING_OMITS(str, kCmdValue);
-    ASSERT_STRING_CONTAINS(str, kSensitiveFieldName);
-    ASSERT_STRING_OMITS(str, kSensitiveValue);
+    ASSERT_EQ(boost::none, diagnostic_printers::isIneligibleForDiagnosticPrinting(opCtx()));
 
     // Reset at the end of the test to not affect other test cases.
     logv2::setShouldRedactLogs(false);
 }
 
-TEST_F(CommandDiagnosticPrinterTest, OmitsAllFieldsWhenCommandDoesNotEnableDiagnosticPrinting) {
+TEST_F(DiagnosticPrinterTest, IsIneligibleWhenCommandDoesNotEnableDiagnosticPrinting) {
     class MockCmdWithoutDiagnosticPrinting : public MockCmd {
         bool enableDiagnosticPrintingOnFailure() const final {
             return false;
@@ -165,15 +158,71 @@ TEST_F(CommandDiagnosticPrinterTest, OmitsAllFieldsWhenCommandDoesNotEnableDiagn
     MockCmdWithoutDiagnosticPrinting cmdWithoutPrinting;
     BSONObj mockBson = BSON("mockCmd" << 1);
     setCmdOnCurOp(&cmdWithoutPrinting, mockBson);
-    ASSERT_EQ(command_diagnostics::Printer::kOmitUnsupportedCommandMsg, printCommandDiagnostics());
+    ASSERT_EQ(diagnostic_printers::kOmitUnsupportedCommandMsg,
+              diagnostic_printers::isIneligibleForDiagnosticPrinting(opCtx()));
 }
 
-TEST_F(CommandDiagnosticPrinterTest, FormattingGracefullyExitsWhenOpCtxIsNull) {
-    command_diagnostics::Printer printer{nullptr};
-    ASSERT_EQ(command_diagnostics::Printer::kOpCtxIsNullMsg, "{}"_format(printer));
+TEST_F(DiagnosticPrinterTest, PrinterOmitsCommandFieldsWhenThereIsNoCommandSet) {
+    // When CurOp doesn't have a command object on it, the diagnostic printer shouldn't log any
+    // command fields, since it's unclear if any of them are sensitive.
+    ASSERT_EQ(diagnostic_printers::kOmitUnrecognizedCommandMsg, printCurOpDiagnostics());
 }
 
-TEST_F(CommandDiagnosticPrinterTest, CreateIndexCommandIsEligibleForDiagnosticLog) {
+TEST_F(DiagnosticPrinterTest, PrinterOmitsAllFieldsWhenRequested) {
+    // When a command requests to omit diagnostic logging, the diagnostic printer shouldn't log any
+    // fields.
+    setMockCmdOnCurOp();
+    {
+        stdx::lock_guard<Client> clientLock(*opCtx()->getClient());
+        curOp()->setShouldOmitDiagnosticInformation(clientLock, true);
+    }
+    ASSERT_EQ(diagnostic_printers::kOmitUnsupportedCurOpMsg, printCurOpDiagnostics());
+}
+
+TEST_F(DiagnosticPrinterTest, PrinterRedactsSensitiveCommandFields) {
+    // The diagnostic printer should always redact the values of fields specified as sensitive by
+    // the command.
+    setMockCmdOnCurOp();
+    auto str = printCurOpDiagnostics();
+    ASSERT_STRING_CONTAINS(str, kCmdName);
+    ASSERT_STRING_CONTAINS(str, kCmdValue);
+    ASSERT_STRING_CONTAINS(str, kSensitiveFieldName);
+    ASSERT_STRING_OMITS(str, kSensitiveValue);
+}
+
+TEST_F(DiagnosticPrinterTest, PrinterRedactsWhenRedactionIsEnabled) {
+    // When redaction is enabled, all field values should be redacted.
+    setMockCmdOnCurOp();
+    logv2::setShouldRedactLogs(true);
+    auto str = printCurOpDiagnostics();
+    ASSERT_STRING_CONTAINS(str, kCmdName);
+    ASSERT_STRING_OMITS(str, kCmdValue);
+    ASSERT_STRING_CONTAINS(str, kSensitiveFieldName);
+    ASSERT_STRING_OMITS(str, kSensitiveValue);
+
+    // Reset at the end of the test to not affect other test cases.
+    logv2::setShouldRedactLogs(false);
+}
+
+TEST_F(DiagnosticPrinterTest, OmitsAllFieldsWhenCommandDoesNotEnableDiagnosticPrinting) {
+    class MockCmdWithoutDiagnosticPrinting : public MockCmd {
+        bool enableDiagnosticPrintingOnFailure() const final {
+            return false;
+        }
+    };
+
+    MockCmdWithoutDiagnosticPrinting cmdWithoutPrinting;
+    BSONObj mockBson = BSON("mockCmd" << 1);
+    setCmdOnCurOp(&cmdWithoutPrinting, mockBson);
+    ASSERT_EQ(diagnostic_printers::kOmitUnsupportedCommandMsg, printCurOpDiagnostics());
+}
+
+TEST_F(DiagnosticPrinterTest, FormattingGracefullyExitsWhenOpCtxIsNull) {
+    diagnostic_printers::CurOpPrinter printer{nullptr};
+    ASSERT_EQ(diagnostic_printers::kOpCtxIsNullMsg, "{}"_format(printer));
+}
+
+TEST_F(DiagnosticPrinterTest, CreateIndexCommandIsEligibleForDiagnosticLog) {
     auto command = CommandHelpers::findCommand(opCtx(), "createIndexes");
     auto createIndexesReq =
         BSON("createIndexes" << _nss.coll() << "indexes"
@@ -187,7 +236,7 @@ TEST_F(CommandDiagnosticPrinterTest, CreateIndexCommandIsEligibleForDiagnosticLo
 
     // Diagnostics log includes the entire command BSON (command name, namespace, and index spec).
     setCmdOnCurOp(command, createIndexesReq);
-    auto str = printCommandDiagnostics();
+    auto str = printCurOpDiagnostics();
     ASSERT_STRING_CONTAINS(str, createIndexesReq.toString());
 }
 }  // namespace

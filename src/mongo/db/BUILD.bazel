@@ -991,6 +991,7 @@ mongo_cc_library(
         "coll_mod_reply_validation.cpp",
         "commands.cpp",
         "curop.cpp",
+        "curop_diagnostic_printer.cpp",
         "error_labels.h",
         ":drop_database_gen",
         ":drop_gen",
@@ -1002,6 +1003,7 @@ mongo_cc_library(
         "coll_mod_reply_validation.h",
         "commands.h",
         "curop.h",
+        "curop_diagnostic_printer.h",
     ],
     deps = [
         ":api_parameters",  # TODO(SERVER-93876): Remove.
@@ -1024,7 +1026,6 @@ mongo_cc_library(
         "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/db/exec/mutable_bson",
-        "//src/mongo/db/query:command_diagnostic_printer",
         "//src/mongo/db/query:common_query_enums_and_helpers",
         "//src/mongo/db/query/client_cursor:cursor_response_idl",
         "//src/mongo/db/query/client_cursor:generic_cursor",
@@ -1046,6 +1047,19 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
+)
+
+mongo_cc_unit_test(
+    name = "diagnostic_printers_test",
+    srcs = [
+        "diagnostic_printers_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":commands",
+        ":service_context_test_fixture",
+        "//src/mongo/db/commands:standalone",
+    ],
 )
 
 mongo_cc_library(
