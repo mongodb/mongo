@@ -264,6 +264,34 @@ TEST_F(GRPCClientTest, GRPCClientConnect) {
     CommandServiceTestFixtures::runWithServers(serverOptions, serverHandler, clientThreadBody);
 }
 
+TEST_F(GRPCClientTest, GRPCClientConnectWithInvalidCertificate) {
+    auto options = CommandServiceTestFixtures::makeServerOptions();
+    options.tlsAllowConnectionsWithoutCertificates = true;
+    options.tlsAllowInvalidCertificates = true;
+
+    auto clientThreadBody = [&](auto& server, auto& monitor) {
+        GRPCClient::Options options;
+        // The signing CA is unavailable, and so this is invalid.
+        options.tlsCertificateKeyFile = CommandServiceTestFixtures::kClientCertificateKeyFile;
+        options.tlsAllowInvalidCertificates = true;
+
+        auto client = makeClient(std::move(options));
+        client->start();
+
+        auto session = client
+                           ->connect(server.getListeningAddresses().at(0),
+                                     getReactor(),
+                                     CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                     {})
+                           .get();
+        assertEchoSucceeds(*session);
+        ASSERT_OK(session->finish());
+    };
+
+    CommandServiceTestFixtures::runWithServer(
+        CommandServiceTestFixtures::makeEchoHandler(), clientThreadBody, std::move(options));
+}
+
 TEST_F(GRPCClientTest, GRPCClientConnectNoClientCertificate) {
     auto options = CommandServiceTestFixtures::makeServerOptions();
     options.tlsAllowConnectionsWithoutCertificates = true;

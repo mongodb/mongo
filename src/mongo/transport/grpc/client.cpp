@@ -508,9 +508,16 @@ private:
 
         tsi_result result =
             tsi_create_ssl_client_handshaker_factory_with_options(&options, &handshakerFactory);
-        uassert(ErrorCodes::InvalidSSLConfiguration,
-                "Invalid certificates provided.",
-                result == TSI_OK);
+
+        if (result != TSI_OK) {
+            if (_options.tlsAllowInvalidCertificates) {
+                LOGV2_WARNING(9977700, "Invalid certificates provided");
+                return;
+            } else {
+                uasserted(ErrorCodes::InvalidSSLConfiguration, "Invalid certificates provided");
+            }
+        }
+
         tsi_ssl_client_handshaker_factory_unref(handshakerFactory);
     }
 
