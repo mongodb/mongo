@@ -231,6 +231,7 @@ executor:
         TestData:
           alwaysInjectTransactionNumber: true
           shardsAddedRemoved: true
+          runningWithBalancer: true
           sessionOptions:
             retryWrites: true
   hooks:
