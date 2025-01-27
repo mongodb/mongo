@@ -151,16 +151,7 @@ public:
         }
     }
 
-    void TearDown(benchmark::State& state) override {
-        const auto iterations = _iterations.load();
-        const auto instructions = _instructions.load();
-        const auto cycles = _cycles.load();
-        state.counters["instructions"] = instructions;
-        state.counters["instructions_per_iteration"] =
-            static_cast<int>(static_cast<double>(instructions) / iterations);
-        state.counters["cycles"] = cycles;
-        state.counters["cycles_per_iteration"] = static_cast<double>(cycles) / iterations;
-    }
+    void TearDown(benchmark::State& state) override {}
 
     template <typename BenchmarkFunc>
     void runBenchmarkWithProfiler(const BenchmarkFunc& benchmarkFunc, benchmark::State& state) {
@@ -169,16 +160,13 @@ public:
             benchmarkFunc();
         }
         auto profile = bp.capture();
-        _instructions.fetchAndAdd(profile.instructions);
-        _cycles.fetchAndAdd(profile.cycles);
-        _iterations.fetchAndAdd(state.iterations());
-        state.SetItemsProcessed(static_cast<int64_t>(state.iterations()));
+        state.counters["cycles_per_iteration"] =
+            benchmark::Counter(profile.cycles, benchmark::Counter::kAvgIterations);
+        state.counters["instructions_per_iteration"] =
+            benchmark::Counter(profile.instructions, benchmark::Counter::kAvgIterations);
     }
 
 private:
-    Atomic<uint64_t> _instructions;
-    Atomic<uint64_t> _cycles;
-    Atomic<uint64_t> _iterations;
 };
 
 }  // namespace mongo
