@@ -90,6 +90,7 @@ private:
     CEResult estimate(const AndSortedNode* node);
     CEResult estimate(const OrNode* node);
     CEResult estimate(const MergeSortNode* node);
+    CEResult estimate(const SortNode* node);
     CEResult estimate(const LimitNode* node);
     CEResult estimate(const SkipNode* node);
 
@@ -131,8 +132,9 @@ private:
     CEResult indexUnionCard(const T* node);
 
     // Cardinality of nodes that do not affect the number of documents - their output cardinality
-    // is the same as their input.
+    // is the same as their input unless the node has a limit.
     CEResult passThroughNodeCard(const QuerySolutionNode* node);
+    CEResult limitNodeCard(const QuerySolutionNode* node, size_t limit);
 
     CardinalityEstimate conjCard(size_t offset, CardinalityEstimate inputCard) {
         std::span selsToEstimate(std::span(_conjSels.begin() + offset, _conjSels.end()));

@@ -104,7 +104,15 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
             ceRes = indexUnionCard(static_cast<const MergeSortNode*>(node));
             break;
         case STAGE_SORT_DEFAULT:
-        case STAGE_SORT_SIMPLE:
+        case STAGE_SORT_SIMPLE: {
+            const SortNode* sortNode = static_cast<const SortNode*>(node);
+            ceRes = estimate(sortNode);
+            if (sortNode->limit > 0) {
+                // If there is no limit, this node is just a sort and doesn't affect cardinality.
+                isConjunctionBreaker = true;
+            }
+            break;
+        }
         case STAGE_PROJECTION_DEFAULT:
         case STAGE_PROJECTION_COVERED:
         case STAGE_PROJECTION_SIMPLE: {
@@ -508,6 +516,22 @@ CEResult CardinalityEstimator::passThroughNodeCard(const QuerySolutionNode* node
     return ceRes.getValue();
 }
 
+CEResult CardinalityEstimator::limitNodeCard(const QuerySolutionNode* node, size_t limit) {
+    auto ceRes = estimate(node->children[0].get());
+    if (!ceRes.isOK()) {
+        return ceRes;
+    }
+    if (ceRes == zeroCE) {
+        _qsnEstimates.emplace(node, QSNEstimate{.outCE = ceRes.getValue()});
+        return ceRes.getValue();
+    }
+    auto limitCE = CardinalityEstimate{CardinalityType{static_cast<double>(limit)},
+                                       EstimationSource::Metadata};
+    auto est = std::min(limitCE, ceRes.getValue());
+    _qsnEstimates.emplace(node, QSNEstimate{.outCE = est});
+    return est;
+}
+
 template <IntersectionType T>
 CEResult CardinalityEstimator::indexIntersectionCard(const T* node) {
     tassert(9586703, "Index intersection nodes are not expected to have filters.", !node->filter);
@@ -689,21 +713,16 @@ CEResult CardinalityEstimator::tryHistogramAnd(const AndMatchExpression* node) {
     return conjCard(selOffset, _inputCard);
 }
 
+CEResult CardinalityEstimator::estimate(const SortNode* node) {
+    if (node->limit > 0) {
+        return limitNodeCard(node, node->limit);
+    } else {
+        return passThroughNodeCard(node);
+    }
+}
+
 CEResult CardinalityEstimator::estimate(const LimitNode* node) {
-    auto ceRes = estimate(node->children[0].get());
-    if (!ceRes.isOK()) {
-        return ceRes;
-    }
-    if (ceRes == zeroCE) {
-        _qsnEstimates.emplace(node, QSNEstimate{.outCE = ceRes.getValue()});
-        return ceRes.getValue();
-    }
-    auto est = std::min(CardinalityEstimate{CardinalityType{static_cast<double>(node->limit)},
-                                            EstimationSource::Metadata},
-                        ceRes.getValue());
-    _qsnEstimates.emplace(node, QSNEstimate{.outCE = est});
-    _conjSels.push_back(est / _inputCard);
-    return est;
+    return limitNodeCard(node, node->limit);
 }
 
 CEResult CardinalityEstimator::estimate(const SkipNode* node) {

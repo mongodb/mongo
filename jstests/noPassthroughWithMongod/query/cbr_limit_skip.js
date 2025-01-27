@@ -27,14 +27,18 @@ assert.commandWorked(coll.insert(docs));
 
 coll.createIndexes([{a: 1}]);
 assert.commandWorked(coll.runCommand({analyze: collName, key: "a"}));
+assert.commandWorked(coll.runCommand({analyze: collName, key: "b"}));
 
-function runTest({query, skip, limit, expectedCard}) {
+function runTest({query, sort, skip, limit, expectedCard}) {
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "histogramCE"}));
     let cmd = coll.find(query);
-    if (skip !== null) {
+    if (sort !== undefined) {
+        cmd = cmd.sort(sort);
+    }
+    if (skip !== undefined) {
         cmd = cmd.skip(skip);
     }
-    if (limit !== null) {
+    if (limit !== undefined) {
         cmd = cmd.limit(limit);
     }
     const explain = cmd.explain();
@@ -64,7 +68,11 @@ try {
     runTest({query: {a: {$gt: 500}}, skip: 450, limit: 100, expectedCard: 49.4});
     runTest({query: {a: {$gt: 500}}, skip: 500, limit: 100, expectedCard: 0});
     runTest({query: {a: {$gt: 10000}}, skip: 100, limit: 100, expectedCard: 0});
-
+    runTest({query: {}, sort: {b: 1}, limit: 42, expectedCard: 42});
+    runTest({query: {}, sort: {b: 1}, limit: 1001, expectedCard: 1000});
+    runTest({query: {}, sort: {b: 1}, limit: 0, expectedCard: 1000});
+    runTest({query: {}, sort: {b: 1}, skip: 10, limit: 42, expectedCard: 42});
+    runTest({query: {}, sort: {a: 1}, skip: 10, limit: 42, expectedCard: 42});
     // TODO SERVER-99273: Support SORT stage with absorbed limit (top-K sort)
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
