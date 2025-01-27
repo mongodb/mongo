@@ -747,13 +747,13 @@ static bool IsDiamondPattern(MBasicBlock* initialBlock) {
   MTest* initialTest = ins->toTest();
 
   MBasicBlock* trueBranch = initialTest->ifTrue();
-  if (trueBranch->numPredecessors() != 1 || trueBranch->numSuccessors() != 1) {
+  if (trueBranch->numPredecessors() != 1 || !trueBranch->lastIns()->isGoto()) {
     return false;
   }
 
   MBasicBlock* falseBranch = initialTest->ifFalse();
   if (falseBranch->numPredecessors() != 1 ||
-      falseBranch->numSuccessors() != 1) {
+      !falseBranch->lastIns()->isGoto()) {
     return false;
   }
 

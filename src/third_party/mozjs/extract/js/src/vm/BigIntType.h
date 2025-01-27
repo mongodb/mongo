@@ -398,6 +398,7 @@ class BigInt final : public js::gc::CellWithLengthAndFlags {
   static JSLinearString* toStringGeneric(JSContext* cx, Handle<BigInt*>,
                                          unsigned radix);
 
+  friend struct ::JSStructuredCloneReader; // So it can call the following:
   static BigInt* destructivelyTrimHighZeroDigits(JSContext* cx, BigInt* x);
 
   bool absFitsInUint64() const { return digitLength() <= 64 / DigitBits; }

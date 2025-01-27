@@ -297,7 +297,7 @@ bool LookupBuiltinThunk(void* pc, const CodeRange** codeRange,
 
 bool EnsureBuiltinThunksInitialized();
 
-bool HandleThrow(JSContext* cx, WasmFrameIter& iter,
+void HandleThrow(JSContext* cx, WasmFrameIter& iter,
                  jit::ResumeFromException* rfe);
 
 void* SymbolicAddressTarget(SymbolicAddress sym);

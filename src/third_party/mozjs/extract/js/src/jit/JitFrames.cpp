@@ -656,11 +656,10 @@ static JitFrameLayout* GetLastProfilingFrame(ResumeFromException* rfe) {
   return nullptr;
 }
 
-void HandleExceptionWasm(JSContext* cx, wasm::WasmFrameIter* iter,
-                         ResumeFromException* rfe) {
+static void HandleExceptionWasm(JSContext* cx, wasm::WasmFrameIter* iter,
+                                ResumeFromException* rfe) {
   MOZ_ASSERT(cx->activation()->asJit()->hasWasmExitFP());
   wasm::HandleThrow(cx, *iter, rfe);
-  MOZ_ASSERT(iter->done());
 }
 
 void HandleException(ResumeFromException* rfe) {
@@ -707,15 +706,15 @@ void HandleException(ResumeFromException* rfe) {
     if (iter.isWasm()) {
       prevJitFrame = nullptr;
       HandleExceptionWasm(cx, &iter.asWasm(), rfe);
-      // If a wasm try-catch handler is found, we can immediately jump to it
-      // and quit iterating through the stack.
       if (rfe->kind == ExceptionResumeKind::WasmCatch) {
-        return;
+        // Jump to a Wasm try-catch handler.
+        MOZ_ASSERT(!iter.done());
+      } else {
+        // Return to the Wasm entry frame.
+        MOZ_ASSERT(rfe->kind == ExceptionResumeKind::Wasm);
+        MOZ_ASSERT(iter.done());
       }
-      if (!iter.done()) {
-        ++iter;
-      }
-      continue;
+      return;
     }
 
     JSJitFrameIter& frame = iter.asJSJit();
@@ -897,32 +896,32 @@ static void TraceThisAndArguments(JSTracer* trc, const JSJitFrameIter& frame,
     return;
   }
 
-  size_t nargs = layout->numActualArgs();
-  size_t nformals = 0;
-
   JSFunction* fun = CalleeTokenToFunction(layout->calleeToken());
+
+  size_t numFormals = fun->nargs();
+  size_t numArgs = std::max(layout->numActualArgs(), numFormals);
+  size_t firstArg = 0;
+
   if (frame.type() != FrameType::JSJitToWasm &&
       !frame.isExitFrameLayout<CalledFromJitExitFrameLayout>() &&
       !fun->nonLazyScript()->mayReadFrameArgsDirectly()) {
-    nformals = fun->nargs();
+    firstArg = numFormals;
   }
-
-  size_t newTargetOffset = std::max(nargs, fun->nargs());
 
   Value* argv = layout->thisAndActualArgs();
 
   // Trace |this|.
   TraceRoot(trc, argv, "ion-thisv");
 
-  // Trace actual arguments beyond the formals. Note + 1 for thisv.
-  for (size_t i = nformals + 1; i < nargs + 1; i++) {
-    TraceRoot(trc, &argv[i], "ion-argv");
+  // Trace arguments. Note + 1 for thisv.
+  for (size_t i = firstArg; i < numArgs; i++) {
+    TraceRoot(trc, &argv[i + 1], "ion-argv");
   }
 
   // Always trace the new.target from the frame. It's not in the snapshots.
   // +1 to pass |this|
   if (CalleeTokenIsConstructing(layout->calleeToken())) {
-    TraceRoot(trc, &argv[1 + newTargetOffset], "ion-newTarget");
+    TraceRoot(trc, &argv[1 + numArgs], "ion-newTarget");
   }
 }
 

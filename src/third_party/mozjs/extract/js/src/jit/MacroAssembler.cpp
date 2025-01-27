@@ -2662,11 +2662,11 @@ void MacroAssembler::emitMegamorphicCachedSetSlot(
   branchTest32(Assembler::Zero, scratch2, scratch2, &doAddDynamic);
 
   AllocatableRegisterSet regs(RegisterSet::Volatile());
-  LiveRegisterSet save(regs.asLiveSet());
+  regs.takeUnchecked(scratch2);
 
+  LiveRegisterSet save(regs.asLiveSet());
   PushRegsInMask(save);
 
-  regs.takeUnchecked(scratch2);
   Register tmp;
   if (regs.has(obj)) {
     regs.takeUnchecked(obj);
