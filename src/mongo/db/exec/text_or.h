@@ -200,7 +200,7 @@ private:
                                                             const SorterDeserializeSettings&) {
             TextRecordDataForSorter result;
             result.document = SortableWorkingSetMember::deserializeForSorter(buf, {});
-            buf.read(result.score);
+            result.score = buf.read<LittleEndian<double>>();
             return result;
         }
     };
