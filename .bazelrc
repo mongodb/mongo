@@ -39,6 +39,8 @@ common --remote_download_regex=.*\.(dwo|h|cpp)$
 
 common:macos --repo_env=BAZEL_NO_APPLE_CPP_TOOLCHAIN=1
 
+common:windows --features=-compiler_param_file
+
 # Restrict local actions to 20% to prevent linking from hitting OOM issues, but give the
 # freedom to remote execution to schedule more compilation actions.
 common --local_resources=cpu=HOST_CPUS*.2
@@ -329,7 +331,7 @@ common:clang-tidy --build_tag_filters=-third_party,-mongo-tidy-tests
 common:clang-tidy --//bazel/config:compiler_type=clang
 common:clang-tidy --aspects @bazel_clang_tidy//clang_tidy:clang_tidy.bzl%clang_tidy_aspect
 common:clang-tidy --output_groups=report
-common:clang-tidy --@bazel_clang_tidy//:clang_tidy_config=//:clang_tidy_config
+common:clang-tidy --@bazel_clang_tidy//:clang_tidy_config=//:clang_tidy_config_strict
 common:clang-tidy --@bazel_clang_tidy//:clang_tidy_executable=//:clang_tidy
 common:clang-tidy --@bazel_clang_tidy//:clang_tidy_additional_deps=//:toolchain_files
 common:clang-tidy --@bazel_clang_tidy//:clang_tidy_plugin_deps=//src/mongo/tools/mongo_tidy_checks:mongo_tidy_checks

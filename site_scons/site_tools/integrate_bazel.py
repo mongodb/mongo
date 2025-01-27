@@ -646,9 +646,6 @@ def bazel_build_thread_func(env, log_dir: str, verbose: bool, ninja_generate: bo
         extra_args += ["--build_tag_filters=scons_link_lists"]
         bazel_cmd = Globals.bazel_base_build_command + extra_args + ["//src/..."]
 
-    elif SCons.Script.BUILD_TARGETS == ["compiledb"]:
-        extra_args += ["--build_tag_filters=scons_link_lists,compiledb,gen_source"]
-        bazel_cmd = Globals.bazel_base_build_command + extra_args + ["//:compiledb", "//src/..."]
     elif SCons.Script.BUILD_TARGETS == ["compiledb", "+mongo-tidy-tests"]:
         extra_args += [
             "--build_tag_filters=scons_link_lists,compiledb,gen_source,mongo-tidy-tests,mongo-tidy-checks"
@@ -662,6 +659,8 @@ def bazel_build_thread_func(env, log_dir: str, verbose: bool, ninja_generate: bo
             build_tags += ["scons_link_lists", "gen_source"]
             extra_args += [f"--build_tag_filters={','.join(build_tags)}"]
         bazel_cmd = Globals.bazel_base_build_command + extra_args + ["//src/..."]
+        if "compiledb" in SCons.Script.BUILD_TARGETS:
+            bazel_cmd = bazel_cmd + ["//:compiledb"]
 
     if ninja_generate:
         print("Generating bazel link deps...")
@@ -858,10 +857,9 @@ def generate_bazel_info_for_ninja(env: SCons.Environment.Environment) -> None:
     # that bazel will need to construct the correct command line for any given targets
     ninja_bazel_build_json = {
         "bazel_cmd": Globals.bazel_base_build_command,
-        "compiledb_cmd": [Globals.bazel_executable, "run"]
+        "compiledb_cmd": [Globals.bazel_executable, "build"]
         + env["BAZEL_FLAGS_STR"]
-        + ["//:compiledb", "--"]
-        + env["BAZEL_FLAGS_STR"],
+        + ["//:compiledb"],
         "defaults": [str(t) for t in SCons.Script.DEFAULT_TARGETS],
         "targets": Globals.scons2bazel_targets,
         "CC": env.get("CC", ""),
@@ -1743,6 +1741,17 @@ def generate(env: SCons.Environment.Environment) -> None:
                 "bazel_target": target,
                 "bazel_output": bazel_output_file.replace("\\", "/"),
             }
+    compiledb_nodes = env.ThinTarget(
+        target=env.Alias("compiledb"),
+        source="compile_commands.json",
+        NINJA_GENSOURCE_INDEPENDENT=True,
+    )
+    env.NoCache(compiledb_nodes)
+
+    Globals.scons2bazel_targets["compiledb"] = {
+        "bazel_target": "//:compiledb",
+        "bazel_output": "compile_commands.json",
+    }
 
     globals = Globals()
     env["SCONS2BAZEL_TARGETS"] = globals

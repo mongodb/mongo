@@ -824,22 +824,6 @@ class NinjaState:
 
         template_builders = []
 
-        # If we ever change the name/s of the rules that include
-        # compile commands (i.e. something like CC) we will need to
-        # update this build to reflect that complete list.
-        compile_commands = "compile_commands_ninja.json"
-        compdb_expand = "-x " if self.env.get("NINJA_COMPDB_EXPAND") else ""
-        adjust_script_out = self.env.File("#site_scons/site_tools/compdb_adjust.py").path
-        self.builds[compile_commands] = {
-            "rule": "CMD_PRECIOUS",
-            "outputs": ["compile_commands.json", "compdb_always_rebuild"],
-            "pool": "console",
-            "implicit": [ninja_file, "bazel_run_first"],
-            "variables": {
-                "cmd": f"ninja -f {ninja_file} -t compdb {compdb_expand}COMPDB_CC COMPDB_CXX > {compile_commands} && "
-                + f"{sys.executable} {adjust_script_out} --ninja --input-compdb {compile_commands} --output-compdb compile_commands.json --bazel-compdb compile_commands.json"
-            },
-        }
         self.builds["compiledb"] = {
             "rule": "phony",
             "outputs": ["compiledb"],
