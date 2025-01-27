@@ -20,14 +20,56 @@ function drop() {
     foreign.drop();
 }
 
-const bigStr = Array(1024 * 1024).toString();  // ~ 1MB of ','
-
 function getKnob(knob) {
     return assert.commandWorked(db.adminCommand({getParameter: 1, [knob]: 1}))[knob];
 }
 
 function setKnob(knob, value) {
     setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()), knob, value);
+}
+
+const string1MB = Array(1024 * 1024).toString();
+const string1KB = Array(1024).toString();
+
+function testResultSizeLimitKnob() {
+    drop();
+
+    const resultSizeLimitKnob = "internalGraphLookupStageIntermediateDocumentMaxSizeBytes";
+    const originalResultSizeLimit = getKnob(resultSizeLimitKnob);
+    setKnob(resultSizeLimitKnob, 17 * 1024 * 1024);
+
+    const docCount = 18;
+    for (let i = 0; i < docCount; ++i) {
+        assert.commandWorked(foreign.insertOne({_id: i, to: i + 1, payload: string1MB}));
+    }
+    assert.commandWorked(local.insertOne({start: 0}));
+
+    let pipeline = [
+        {
+            $graphLookup: {
+                from: "foreign",
+                startWith: "$start",
+                connectFromField: "to",
+                connectToField: "_id",
+                as: "output"
+            }
+        }
+    ];
+
+    assert.throwsWithCode(() => local.aggregate(pipeline).itcount(), 8442700);
+
+    pipeline.push({$unwind: "$output"});
+    pipeline.push({$project: {payload: 0, "output.payload": 0}});
+
+    assert.eq(local.aggregate(pipeline).itcount(), docCount);
+
+    setKnob(resultSizeLimitKnob, originalResultSizeLimit);
+}
+testResultSizeLimitKnob();
+
+function assertFieldPositive(fieldName, filteredExplain, fullExplain) {
+    assert.gt(
+        filteredExplain[fieldName], 0, `Expected ${fieldName} > 0. Found: ` + tojson(fullExplain));
 }
 
 function runPipelineAndCheckUsedDiskValue(pipeline, expectSpilling = true) {
@@ -44,18 +86,28 @@ function runPipelineAndCheckUsedDiskValue(pipeline, expectSpilling = true) {
             filteredExplains[0].usedDisk,
             expectSpilling,
             "Expected usedDisk: " + expectSpilling + ". Found: " + tojson(graphLookupExplains));
+        if (expectSpilling) {
+            assertFieldPositive("spills", filteredExplains[0], explain);
+            assertFieldPositive("spilledBytes", filteredExplains[0], explain);
+            assertFieldPositive("spilledRecords", filteredExplains[0], explain);
+            assertFieldPositive("spilledDataStorageSize", filteredExplains[0], explain);
+        }
     }
 
-    return local.aggregate(pipeline).toArray();
+    return local.aggregate(pipeline);
 }
+
+const memoryLimitKnob = "internalDocumentSourceGraphLookupMaxMemoryBytes";
+const originalMemoryLimitKnobValues = getKnob(memoryLimitKnob);
+setKnob(memoryLimitKnob, 50 * 1024);
 
 function testKnobsAndVisitedSpilling() {
     drop();
 
-    const docCount = 120;
+    const docCount = 100;
     const docs = [];
     for (let i = 0; i < docCount; ++i) {
-        docs.push({_id: i, to: i + 1, payload: bigStr});
+        docs.push({_id: i, to: i + 1, payload: string1KB});
     }
     assert.commandWorked(foreign.insertMany(docs));
     assert.commandWorked(local.insertOne({start: 0}));
@@ -72,8 +124,15 @@ function testKnobsAndVisitedSpilling() {
         }
     ];
 
-    // Without $unwind even with spilling we will fail to generate output.
-    assert.throwsWithCode(() => local.aggregate(pipeline).toArray(), 8442700);
+    function assertCorrectResult(cursor) {
+        let index = 0;
+        while (cursor.hasNext()) {
+            const doc = cursor.next();
+            assert.eq(doc, docs[index]);
+            index++;
+        }
+        assert.eq(index, docCount);
+    }
 
     function testGraphLookupWorksWithoutAbsorbingUnwind(pipeline, options) {
         // $project should prevent $graphLookup from absorbing $unwind.
@@ -93,41 +152,28 @@ function testKnobsAndVisitedSpilling() {
         ]);
 
         let expectSpilling = !(options.allowDiskUse === false);
-        assert.eq(runPipelineAndCheckUsedDiskValue(pipeline, expectSpilling), docs);
+        assertCorrectResult(runPipelineAndCheckUsedDiskValue(pipeline, expectSpilling));
     }
 
-    const resultSizeLimitKnob = "internalGraphLookupStageIntermediateDocumentMaxSizeBytes";
-    const originalResultSizeLimit = getKnob(resultSizeLimitKnob);
-    try {
-        // Raise result size limit to fit everything without absorbing $unwind.
-        setKnob(resultSizeLimitKnob, 500 * 1024 * 1024);
-        testGraphLookupWorksWithoutAbsorbingUnwind(pipeline, {} /*options*/);
+    testGraphLookupWorksWithoutAbsorbingUnwind(pipeline, {} /*options*/);
 
-        // Even with raised result size limit, we still hit memory limit and should fail without
-        // spilling.
-        const disableSpillingOptions = {allowDiskUse: false};
-        assert.throwsWithCode(() => local.aggregate(pipeline, disableSpillingOptions).toArray(),
-                              ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
+    // We hit memory limit and should fail without spilling.
+    const disableSpillingOptions = {allowDiskUse: false};
+    assert.throwsWithCode(() => local.aggregate(pipeline, disableSpillingOptions).itcount(),
+                          ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
 
-        const memoryLimitKnob = "internalDocumentSourceGraphLookupMaxMemoryBytes";
-        const originalMemoryLimitValue = getKnob(memoryLimitKnob);
-        try {
-            // Raise memory limit to fit everything without spilling.
-            setKnob(memoryLimitKnob, 500 * 1024 * 1024);
-            testGraphLookupWorksWithoutAbsorbingUnwind(pipeline, disableSpillingOptions);
-        } finally {
-            setKnob(memoryLimitKnob, originalMemoryLimitValue);
-        }
-    } finally {
-        setKnob(resultSizeLimitKnob, originalResultSizeLimit);
-    }
+    const previousMemoryLimitKnobValue = getKnob(memoryLimitKnob);
+    setKnob(memoryLimitKnob, 100 * 1024 * 1024);
+    testGraphLookupWorksWithoutAbsorbingUnwind(pipeline, disableSpillingOptions);
+
+    setKnob(memoryLimitKnob, previousMemoryLimitKnobValue);
 
     pipeline.push({$unwind: "$output"});
     pipeline.push({$replaceRoot: {newRoot: "$output"}});
     pipeline.push({$sort: {_id: 1}});
 
-    // With default knob values, pipeline with $unwind should work and spill.
-    assert.eq(runPipelineAndCheckUsedDiskValue(pipeline), docs);
+    // With restored knob values, pipeline with $unwind should work and spill.
+    assertCorrectResult(runPipelineAndCheckUsedDiskValue(pipeline));
 }
 testKnobsAndVisitedSpilling();
 
@@ -135,16 +181,14 @@ function testQueueSpilling() {
     drop();
 
     const docCount = 128;
-    const docs = [];
     for (let i = 1; i <= docCount; ++i) {
         // Adding payload to _id so queue also have to be spilled.
-        docs.push({
-            _id: {index: i, payload: bigStr},
-            to: [{index: 2 * i, payload: bigStr}, {index: 2 * i + 1, payload: bigStr}]
-        });
+        assert.commandWorked(db.foreign.insertOne({
+            _id: {index: i, payload: string1KB},
+            to: [{index: 2 * i, payload: string1KB}, {index: 2 * i + 1, payload: string1KB}]
+        }));
     }
-    foreign.insertMany(docs);
-    local.insertOne({start: {index: 1, payload: bigStr}});
+    local.insertOne({start: {index: 1, payload: string1KB}});
 
     const pipeline = [
         {
@@ -157,24 +201,21 @@ function testQueueSpilling() {
                 as: "output"
             }
         },
-        {$unwind: "$output"},
-        {$replaceRoot: {newRoot: "$output"}},
-        {$sort: {_id: 1}}
+        { $unwind: "$output" },
+        { $replaceRoot: { newRoot: "$output" } },
+        {$sort: {_id: 1}},
     ];
 
-    const memoryLimitKnob = "internalDocumentSourceGraphLookupMaxMemoryBytes";
-    const originalMemoryLimitValue = getKnob(memoryLimitKnob);
-    try {
-        // Lower the limit to guarantee queue spilling
-        setKnob(memoryLimitKnob, 500 * 1024 * 1024);
-
-        const results = runPipelineAndCheckUsedDiskValue(pipeline);
-        assert.eq(results.length, docCount);
-        for (let result of results) {
-            assert.eq(result.depth, Math.trunc(Math.log2(result._id.index)), result);
-        }
-    } finally {
-        setKnob(memoryLimitKnob, originalMemoryLimitValue);
+    const c = runPipelineAndCheckUsedDiskValue(pipeline);
+    let count = 0;
+    while (c.hasNext()) {
+        const doc = c.next();
+        count++;
+        assert.eq(doc._id.index, count, doc);
+        assert.eq(doc.depth, Math.trunc(Math.log2(doc._id.index)), doc);
     }
+    assert.eq(count, docCount);
 }
 testQueueSpilling();
+
+setKnob(memoryLimitKnob, originalMemoryLimitKnobValues);
