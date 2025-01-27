@@ -42,6 +42,7 @@ namespace mongo::timeseries::bucket_catalog {
 
 BucketMetadata::BucketMetadata(TrackingContext& trackingContext,
                                BSONElement elem,
+                               const StringDataComparator* comparator,
                                boost::optional<StringData> trueMetaFieldName)
     : _metadata([&] {
           if (!elem) {
@@ -57,7 +58,8 @@ BucketMetadata::BucketMetadata(TrackingContext& trackingContext,
           builder.doneFast();
           return builder.bb().release();
       }()),
-      _metadataElement(toBSON().firstElement()) {}
+      _metadataElement(toBSON().firstElement()),
+      _comparator(comparator) {}
 
 bool BucketMetadata::operator==(const BucketMetadata& other) const {
     return _metadataElement.binaryEqualValues(other._metadataElement);
@@ -74,6 +76,10 @@ BSONElement BucketMetadata::element() const {
 boost::optional<StringData> BucketMetadata::getMetaField() const {
     return _metadataElement ? boost::make_optional(_metadataElement.fieldNameStringData())
                             : boost::none;
+}
+
+const StringDataComparator* BucketMetadata::getComparator() const {
+    return _comparator;
 }
 
 }  // namespace mongo::timeseries::bucket_catalog

@@ -60,16 +60,11 @@
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
-#include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
-#include "mongo/db/timeseries/bucket_catalog/tracking_contexts.h"
-#include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/time_support.h"
-#include "mongo/util/tracking_context.h"
 
 namespace mongo {
 namespace {
@@ -597,37 +592,6 @@ TEST_F(WriteOpsExecOplogTest, VerifyMultiInsertBatchedAndUnbatched) {
     ASSERT_BSONOBJ_EQ(_opObserverMock->batches[0][0], docsToInsert[0]);
     ASSERT_BSONOBJ_EQ(_opObserverMock->batches[0][1], docsToInsert[1]);
     ASSERT_BSONOBJ_EQ(_opObserverMock->unbatched_docs[0], docsToInsert[2]);
-}
-
-TEST_F(WriteOpsExecOplogTest, CommitTimeseriesBucketNoCollection) {
-    auto opCtx = operationContext();
-    auto uuid = UUID::gen();
-
-    TrackingContext trackingContext;
-    timeseries::bucket_catalog::TrackingContexts trackingContexts;
-    timeseries::bucket_catalog::BucketId bucketId{uuid, OID::gen(), 0};
-    timeseries::bucket_catalog::BucketKey key{uuid, {trackingContext, {}, boost::none}};
-
-    auto collectionStats = std::make_shared<timeseries::bucket_catalog::ExecutionStats>();
-    auto executionStats = timeseries::bucket_catalog::ExecutionStats();
-    auto stats =
-        timeseries::bucket_catalog::ExecutionStatsController(collectionStats, executionStats);
-
-    auto batch = std::make_shared<timeseries::bucket_catalog::WriteBatch>(
-        trackingContexts, bucketId, key, 0, stats, "");
-
-    absl::flat_hash_map<int, int> map;
-    auto nss =
-        NamespaceString::createNamespaceString_forTest("db_timeseries_write_ops_test", "dne");
-
-    write_ops::InsertCommandRequest insertCmdReq(nss.makeTimeseriesBucketsNamespace());
-    ASSERT(timeseries::bucket_catalog::claimWriteBatchCommitRights(*batch));
-
-    ASSERT_THROWS_CODE(
-        write_ops_exec::details::commitTimeseriesBucket(
-            opCtx, batch, 0, 0, {}, {}, nullptr, nullptr, nullptr, map, insertCmdReq),
-        DBException,
-        8555700);
 }
 
 }  // namespace

@@ -328,8 +328,7 @@ void waitToInsert(InsertWaiter* waiter);
  */
 Status prepareCommit(BucketCatalog& catalog,
                      const NamespaceString& nss,
-                     std::shared_ptr<WriteBatch> batch,
-                     const StringDataComparator* comparator);
+                     std::shared_ptr<WriteBatch> batch);
 
 /**
  * Records the result of a batch commit. Caller must already have commit rights on batch, and batch

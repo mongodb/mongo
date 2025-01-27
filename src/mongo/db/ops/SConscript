@@ -167,7 +167,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
         '$BUILD_DIR/mongo/db/session/session_catalog',
-        '$BUILD_DIR/mongo/db/timeseries/bucket_catalog/bucket_catalog',
         '$BUILD_DIR/mongo/db/timeseries/bucket_compression',
         '$BUILD_DIR/mongo/db/transaction/transaction',
         'write_ops',
