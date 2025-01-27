@@ -5,6 +5,7 @@ load(
     "allocator",
     "asan",
     "build_enterprise",
+    "build_grpc",
     "build_otel",
     "compiler_type",
     "dbg",
@@ -1204,13 +1205,18 @@ selects.config_setting_group(
 # grpc options
 # --------------------------------------
 
+build_grpc(
+    name = "build_grpc",
+    build_setting_default = False,
+)
+
 config_setting(
     name = "build_grpc_enabled",
     constraint_values = [
         "@platforms//os:linux",
     ],
     flag_values = {
-        "//bazel/config:ssl": "True",
+        "//bazel/config:build_grpc": "True",
     },
 )
 

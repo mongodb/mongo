@@ -61,7 +61,7 @@ namespace mongo::transport::grpc {
 template <class Base>
 class MockServerStreamBase : public Base {
 public:
-    void setUp() override {
+    virtual void setUp() override {
         Base::setUp();
 
         MockStubTestFixtures fixtures;

@@ -39,8 +39,8 @@
 #include <grpcpp/security/tls_credentials_options.h>
 #include <grpcpp/support/async_stream.h>
 
-#include <src/core/tsi/ssl_transport_security.h>
-#include <src/core/tsi/transport_security_interface.h>
+#include "src/core/tsi/ssl_transport_security.h"
+#include "src/core/tsi/transport_security_interface.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/service_context.h"
@@ -393,13 +393,12 @@ public:
         // operations.
         _pool = std::make_shared<ChannelPool<std::shared_ptr<Channel>, Stub>>(
             svcCtx->getFastClockSource(),
-            [](ConnectSSLMode sslMode) -> bool {
+            [](ConnectSSLMode sslMode) {
 #ifndef MONGO_CONFIG_SSL
                 if (sslMode == kEnableSSL) {
                     uasserted(ErrorCodes::InvalidSSLConfiguration,
                               "SSL requested but not supported");
                 }
-                return false;
 #else
                 auto globalSSLMode =
                     static_cast<SSLParams::SSLModes>(getSSLGlobalParams().sslMode.load());

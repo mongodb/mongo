@@ -55,17 +55,17 @@ class GRPCReactorTimer : public ReactorTimer {
 public:
     GRPCReactorTimer(std::weak_ptr<GRPCReactor> reactor) : _reactor(reactor) {}
 
-    ~GRPCReactorTimer() override {
+    ~GRPCReactorTimer() {
         cancel();
     }
 
-    void cancel(const BatonHandle& baton = nullptr) override {
+    void cancel(const BatonHandle& baton = nullptr) {
         if (_alarm) {
             _alarm->Cancel();
         }
     };
 
-    Future<void> waitUntil(Date_t deadline, const BatonHandle& baton = nullptr) override;
+    Future<void> waitUntil(Date_t deadline, const BatonHandle& baton = nullptr);
 
 private:
     std::shared_ptr<::grpc::Alarm> _alarm;

@@ -439,6 +439,7 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
+        ENABLE_GRPC_BUILD=1
       compile_variant: enterprise-rhel-8-arm64-grpc
       scons_cache_scope: shared
     tasks:

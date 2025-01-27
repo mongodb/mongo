@@ -35,10 +35,10 @@
 #include <grpcpp/security/credentials.h>
 #include <grpcpp/server_builder.h>
 
-#include <src/core/lib/security/credentials/ssl/ssl_credentials.h>
-#include <src/core/lib/security/security_connector/ssl_utils.h>
-#include <src/core/tsi/ssl_transport_security.h>
-#include <src/cpp/server/secure_server_credentials.h>
+#include "src/core/lib/security/credentials/ssl/ssl_credentials.h"
+#include "src/core/lib/security/security_connector/ssl_utils.h"
+#include "src/core/tsi/ssl_transport_security.h"
+#include "src/cpp/server/secure_server_credentials.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/logv2/log.h"

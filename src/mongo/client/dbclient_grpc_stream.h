@@ -61,7 +61,7 @@ public:
         : DBClientSession(_autoReconnect, so_timeout, uri, hook, apiParameters),
           _authToken{std::move(authToken)} {}
 
-    ~DBClientGRPCStream() override;
+    ~DBClientGRPCStream();
 
     /**
      * Logout is not implemented for gRPC, throws an exception.

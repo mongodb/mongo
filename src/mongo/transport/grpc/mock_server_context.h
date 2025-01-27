@@ -37,7 +37,7 @@ namespace mongo::transport::grpc {
 class MockServerContext : public ServerContext {
 public:
     explicit MockServerContext(MockServerStream* stream) : _stream{stream} {}
-    ~MockServerContext() override = default;
+    ~MockServerContext() = default;
 
     void addInitialMetadataEntry(const std::string& key, const std::string& value) override;
     const MetadataView& getClientMetadata() const override;

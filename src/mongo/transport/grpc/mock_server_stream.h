@@ -45,7 +45,7 @@ namespace mongo::transport::grpc {
 
 class MockServerStream : public ServerStream {
 public:
-    ~MockServerStream() override = default;
+    ~MockServerStream() = default;
 
     boost::optional<SharedBuffer> read() override;
 

@@ -219,6 +219,7 @@ Status storeMongoShellOptions(const moe::Environment& params,
         shellGlobalParams.shouldUseImplicitSessions = false;
     }
 
+// TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
 #ifdef MONGO_CONFIG_GRPC
     if (params.count("gRPC")) {
         shellGlobalParams.gRPC = true;

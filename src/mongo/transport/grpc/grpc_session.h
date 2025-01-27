@@ -86,7 +86,7 @@ class GRPCSession : public Session {
 public:
     explicit GRPCSession(TransportLayer* tl, HostAndPort remote);
 
-    virtual ~GRPCSession() override = default;
+    virtual ~GRPCSession() = default;
 
     const HostAndPort& remote() const override {
         return _remote;
@@ -291,7 +291,7 @@ public:
                    boost::optional<std::string> authToken,
                    boost::optional<StringData> encodedClientMetadata);
 
-    ~IngressSession() override;
+    ~IngressSession();
 
     StatusWith<Message> _readFromStream() noexcept override;
 
@@ -422,7 +422,7 @@ public:
                   UUID clientId,
                   std::shared_ptr<SharedState> sharedState);
 
-    ~EgressSession() override;
+    ~EgressSession();
 
     StatusWith<Message> _readFromStream() noexcept override {
         return _asyncReadFromStream().getNoThrow();
@@ -432,11 +432,11 @@ public:
         return _asyncWriteToStream(message).getNoThrow();
     }
 
-    Future<Message> _asyncReadFromStream() final;
+    Future<Message> _asyncReadFromStream() override final;
 
-    Future<void> _asyncWriteToStream(Message message) final;
+    Future<void> _asyncWriteToStream(Message message) override final;
 
-    void _cancelAsyncOperations() final;
+    void _cancelAsyncOperations() override final;
 
     /**
      * Get this session's current idea of what the cluster's maxWireVersion is.

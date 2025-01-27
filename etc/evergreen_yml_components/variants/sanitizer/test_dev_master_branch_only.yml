@@ -644,6 +644,7 @@ buildvariants:
         --ocsp-stapling=off
         -j$(grep -c ^processor /proc/cpuinfo)
         --link-model=dynamic
+        ENABLE_GRPC_BUILD=1
       compile_variant: *linux-debug-aubsan-compile-grpc
       large_distro_name: rhel80-xlarge
       test_flags: >-

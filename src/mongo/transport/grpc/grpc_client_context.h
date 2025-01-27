@@ -44,7 +44,7 @@ class GRPCClientContext : public ClientContext {
 public:
     GRPCClientContext() = default;
 
-    ~GRPCClientContext() override = default;
+    ~GRPCClientContext() = default;
 
     void addMetadataEntry(const std::string& key, const std::string& value) override {
         _ctx.AddMetadata(key, value);

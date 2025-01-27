@@ -47,7 +47,7 @@ class DBClientGRPCTest : public ServiceContextTest {
 public:
     inline static const HostAndPort kServerHostAndPort = HostAndPort("localhost", 12345);
 
-    void setUp() override {
+    void setUp() {
         ServiceContextTest::setUp();
 
         // Mock resolver that automatically returns the producer end of the test's pipe.
@@ -69,7 +69,7 @@ public:
         _server = std::make_unique<MockServer>(std::move(_pipe.consumer));
     }
 
-    void tearDown() override {
+    void tearDown() {
         getServiceContext()->getTransportLayerManager()->shutdown();
         ServiceContextTest::tearDown();
     }

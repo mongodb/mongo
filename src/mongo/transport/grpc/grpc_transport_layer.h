@@ -73,7 +73,7 @@ public:
         boost::optional<BSONObj> clientMetadata;
     };
 
-    ~GRPCTransportLayer() override {}
+    virtual ~GRPCTransportLayer() {}
 
     /**
      * Add the service to the list that will be served once this transport layer has been started.
