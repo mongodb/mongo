@@ -1,4 +1,14 @@
-// Test for startuo warning when X509 auth and tlsAllowInvalidCertificates are enabled
+/**
+ * Test for startup warning when X509 auth and tlsAllowInvalidCertificates are enabled.
+ * TODO SERVER-99909 Re-enable this test under TSAN once shutdown-during-startup issues are fixed.
+ * @tags: [
+ *   tsan_incompatible,
+ * ]
+ */
+
+// Due to a race condition in shutdown-during-startup, this test sometimes produces core dumps.
+// TODO SERVER-99909 Remove this once shutdown-during-startup issues are fixed.
+TestData.cleanUpCoreDumpsFromExpectedCrash = true;
 
 function runTest(checkMongos, opts, expectWarningCertifcates, expectWarningHostnames) {
     clearRawMongoProgramOutput();
