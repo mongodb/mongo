@@ -478,5 +478,7 @@ inline Status validateReshardBlockingWritesO2FieldType(const std::string& value)
     return Status::OK();
 }
 
+Date_t getCurrentTime();
+
 }  // namespace resharding
 }  // namespace mongo
