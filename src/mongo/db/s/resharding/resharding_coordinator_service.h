@@ -558,12 +558,6 @@ private:
      */
     void _tellAllDonorsToRefresh(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
-
-    /**
-     * Sends '_shardsvrReshardRecipientClone' to all recipient shards.
-     */
-    void _tellAllRecipientsToClone(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
-
     /**
      * Sends '_shardsvrCommitReshardCollection' to all participant shards.
      */

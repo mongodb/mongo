@@ -123,7 +123,6 @@ const allCommands = {
     _shardsvrDropDatabaseParticipant: {skip: isPrimaryOnly},
     _shardsvrReshardCollection: {skip: isPrimaryOnly},
     _shardsvrReshardingOperationTime: {skip: isPrimaryOnly},
-    _shardsvrReshardRecipientClone: {skip: isPrimaryOnly},
     _shardsvrRefineCollectionShardKey: {skip: isPrimaryOnly},
     _shardsvrSetAllowMigrations: {skip: isPrimaryOnly},
     _shardsvrSetClusterParameter: {skip: isAnInternalCommand},

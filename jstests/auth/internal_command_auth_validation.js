@@ -692,15 +692,6 @@ const internalCommandsMap = {
             _shardsvrReshardingOperationTime: "test.x",
         },
     },
-    _shardsvrReshardRecipientClone: {
-        testname: "_shardsvrReshardRecipientClone",
-        command: {
-            _shardsvrReshardRecipientClone: UUID(),
-            cloneTimestamp: Timestamp(),
-            approxCopySize: {},
-            donorShards: []
-        },
-    },
     _shardsvrRefineCollectionShardKey: {
         testname: "_shardsvrRefineCollectionShardKey",
         command: {_shardsvrRefineCollectionShardKey: "test.x", newShardKey: {}},
