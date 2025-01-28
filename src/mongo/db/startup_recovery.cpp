@@ -601,7 +601,11 @@ void reconcileCatalogAndRestartUnfinishedIndexBuilds(
     // complete. Therefore, when a replica set member is started in standalone mode, we cannot
     // restart the index build because it will never complete.
     if (getReplSetMemberInStandaloneMode(opCtx->getServiceContext())) {
-        LOGV2(21005, "Not restarting unfinished index builds because we are in standalone mode");
+        LOGV2(
+            9871800,
+            "Any unfinished index builds will not be resumed nor restarted due to standalone mode",
+            "numIndexBuildsToRestart"_attr = reconcileResult.indexBuildsToRestart.size(),
+            "numIndexBuildsToResume"_attr = reconcileResult.indexBuildsToResume.size());
         return;
     }
 
