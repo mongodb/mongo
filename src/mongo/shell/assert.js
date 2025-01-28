@@ -113,10 +113,6 @@ assert = (function() {
                 doassert("msg parameter must be a string, function or object. Found type: " +
                          typeof (msg));
             }
-
-            if (msg && assert._debug) {
-                print("in assert for: " + _processMsg(msg));
-            }
         }
     }
 
@@ -151,8 +147,6 @@ assert = (function() {
 
         doassert(_buildAssertionMessage(msg, "assert failed"));
     };
-
-    assert._debug = false;
 
     function _isEq(a, b) {
         if (a == b) {

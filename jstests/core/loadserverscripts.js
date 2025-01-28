@@ -22,8 +22,6 @@ const systemJsColl = testdb.getCollection("system.js");
 jsTest.log("testing db.loadServerScripts()");
 var x;
 
-// assert._debug = true;
-
 // clear out any data from old tests
 systemJsColl.remove({});
 
