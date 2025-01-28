@@ -122,6 +122,8 @@ private:
 
     std::string getServerAddress() const override;
 
+    std::string getLocalAddress() const override;
+
     void say(Message& toSend, bool isRetry = false, std::string* actualServer = nullptr) override;
 
     ConnectionString::ConnectionType type() const override;

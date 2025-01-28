@@ -133,6 +133,8 @@ public:
 
     std::string getServerAddress() const final;
 
+    std::string getLocalAddress() const final;
+
     void say(Message& toSend, bool isRetry, std::string* actualServer) final;
 
     using DBClientBase::runCommandWithTarget;

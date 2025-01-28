@@ -23,8 +23,24 @@ function testProxyProtocolConnect(ingressPort, egressPort, version) {
 
     const uri = `mongodb://127.0.0.1:${ingressPort}/?loadBalanced=true`;
     const conn = new Mongo(uri);
+    const mongoShellPort = conn.getShellPort();
+    const proxyServerPort = proxy_server.getServerPort();
+
     assert.neq(null, conn, 'Client was unable to connect to the load balancer port');
     assert.commandWorked(conn.getDB('admin').runCommand({hello: 1}));
+
+    const fcv = conn.getDB("admin").runCommand({getParameter: 1, featureCompatibilityVersion: 1});
+    if (fcv === latestFCV) {
+        assert(checkLog.checkContainsOnceJsonStringMatch(st.s, 22943, "isLoadBalanced", "true"),
+               "isLoadBalanced was set to false");
+        assert(checkLog.checkContainsOnceJsonStringMatch(
+                   st.s, 22943, "remote", `127.0.0.1:${proxyServerPort}`),
+               "Remote had a different address");
+        assert(checkLog.checkContainsOnceJsonStringMatch(
+                   st.s, 22943, "sourceClient", `127.0.0.1:${mongoShellPort}`),
+               "Source client was not included, or had a different address");
+    }
+
     proxy_server.stop();
     st.stop();
 }

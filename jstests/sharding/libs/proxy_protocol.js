@@ -86,6 +86,25 @@ export class ProxyProtocolServer {
     }
 
     /**
+     * Get the proxy server port used to connect to the egress port provided.
+     */
+    getServerPort() {
+        const args = ["ss", "-nt", `dst 127.0.0.1:${this.egress_port}`];
+        clearRawMongoProgramOutput();
+        _startMongoProgram({args: args});
+
+        sleep(1000);
+
+        const output = rawMongoProgramOutput(".*");
+        const regexMatch = `127.0.0.1:(\\d+)\\s+127.0.0.1:${this.egress_port}`;
+        const match = output.match(regexMatch);
+        if (!match) {
+            throw Error("Could not find connection to egress port");
+        }
+        return parseInt(match[1]);
+    }
+
+    /**
      * Stop the server.
      */
     stop() {
