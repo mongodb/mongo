@@ -176,9 +176,9 @@ public:
      * Add the value. Returns true if a new values was added, false otherwise.
      */
     bool addChecked(uint64_t value) {
-        if (_size == _threshold) {
-            _state = (_maxValue - _minValue) < _universeSize ? kHashTableAndBitmap : kHashTable;
-            ++_size;
+        if (_size == _threshold && _maxValue - _minValue < _universeSize) {
+            _state = kHashTableAndBitmap;
+            ++_size;  // Increase _size to skip this if next time.
             if (_onSwitchToRoaring) {
                 _onSwitchToRoaring();
             }
