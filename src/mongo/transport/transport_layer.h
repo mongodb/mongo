@@ -37,6 +37,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/baton.h"
@@ -65,6 +66,18 @@ namespace transport {
 
 enum ConnectSSLMode { kGlobalSSLMode, kEnableSSL, kDisableSSL };
 enum class TransportProtocol { MongoRPC, GRPC };
+
+inline StringData connectSSLModeToString(ConnectSSLMode mode) {
+    switch (mode) {
+        case kGlobalSSLMode:
+            return "global"_sd;
+        case kEnableSSL:
+            return "enabled"_sd;
+        case kDisableSSL:
+            return "disabled"_sd;
+    }
+    MONGO_UNREACHABLE;
+}
 
 class Reactor;
 using ReactorHandle = std::shared_ptr<Reactor>;

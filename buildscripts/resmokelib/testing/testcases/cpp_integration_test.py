@@ -31,7 +31,21 @@ class CPPIntegrationTestCase(interface.ProcessTestCase):
         """Configure the test case."""
         interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
 
-        self.program_options["connectionString"] = self.fixture.get_internal_connection_string()
+        self.program_options["connectionString"] = self.fixture.get_shell_connection_string()
+
+        tls_mode = self.fixture.config.TLS_MODE
+        ca_file = self.fixture.config.TLS_CA_FILE
+        cert_file = self.fixture.config.SHELL_TLS_CERTIFICATE_KEY_FILE
+        shell_grpc = self.fixture.config.SHELL_GRPC
+
+        self.program_options["useEgressGRPC"] = shell_grpc
+
+        if tls_mode:
+            self.program_options["tlsMode"] = tls_mode
+        if ca_file:
+            self.program_options["tlsCAFile"] = ca_file
+        if cert_file:
+            self.program_options["tlsCertificateKeyFile"] = cert_file
 
     def _make_process(self):
         return core.programs.generic_program(

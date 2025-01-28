@@ -787,6 +787,23 @@ tasks:
           install_dir: build/install/bin
 
   - <<: *task_template
+    name: integration_tests_standalone_grpc
+    tags:
+      [
+        "assigned_to_jira_team_server_networking_and_observability",
+        "auxiliary",
+        "integration",
+        "standalone_grpc",
+      ]
+    depends_on:
+      - name: compile_integration_test
+    commands:
+      - func: "do integration_tests setup"
+      - func: "run tests"
+        vars:
+          install_dir: build/install/bin
+
+  - <<: *task_template
     name: libunwind_tests
     tags:
       [
@@ -3128,6 +3145,12 @@ task_groups:
       - integration_tests_replset
       - integration_tests_replset_ssl_auth
       - integration_tests_sharded
+
+  - <<: *compile_task_group_template
+    name: compile_grpc_integration_and_test_parallel_stream_TG
+    tasks:
+      - compile_integration_test
+      - integration_tests_standalone_grpc
 
   # SERVER-76006
   # This is a compile stream meant for non-cached and/or underpowered systems.

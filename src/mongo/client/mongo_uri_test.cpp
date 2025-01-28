@@ -683,7 +683,10 @@ TEST(MongoURI, InvalidURIs) {
     }
 }
 
-TEST_F(ServiceContextTest, ValidButBadURIsFailToConnect) {
+class URIConnectionTest : service_context_test::WithSetupTransportLayer,
+                          public ServiceContextTest {};
+
+TEST_F(URIConnectionTest, ValidButBadURIsFailToConnect) {
     // "invalid" is a TLD that cannot exit on the public internet (see rfc2606). It should always
     // parse as a valid URI, but connecting should always fail.
     auto sw_uri = MongoURI::parse("mongodb://user:pass@hostname.invalid:12345");

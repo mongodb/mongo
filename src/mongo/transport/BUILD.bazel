@@ -281,7 +281,7 @@ mongo_cc_library(
 )
 
 # This library will initialize an egress transport layer in a mongo initializer
-# for C++ tests that require networking.
+# for C++ integration tests that require networking.
 mongo_cc_library(
     name = "transport_layer_egress_init",
     srcs = [
@@ -289,7 +289,14 @@ mongo_cc_library(
     ],
     deps = [
         ":transport_layer_manager",
-    ],
+        "//src/mongo/unittest:integration_test_main",
+    ] + select({
+        "//bazel/config:build_grpc_enabled": [
+            "//src/mongo/transport/grpc:grpc_transport_layer",
+            "//src/mongo/util:periodic_runner_factory",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 mongo_cc_library(
@@ -321,7 +328,6 @@ mongo_cc_library(
         "transport_layer_integration_test_fixture.h",
     ],
     deps = [
-        ":transport_layer_egress_init",
         "//src/mongo/client:async_client",
         "//src/mongo/executor:task_executor_interface",
         "//src/mongo/unittest:integration_test_main",

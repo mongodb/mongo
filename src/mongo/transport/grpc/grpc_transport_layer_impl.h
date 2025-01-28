@@ -56,7 +56,7 @@ public:
      * sessionManager->startSession().
      *
      * Note that this TransportLayer will throw during `setup()`
-     * if no tlsCertificateKeyFile is available.
+     * if no tlsCertificateKeyFile is available when ingress mode is set.
      */
     static std::unique_ptr<GRPCTransportLayerImpl> createWithConfig(
         ServiceContext*,

@@ -45,15 +45,14 @@ namespace mongo::transport {
 std::shared_ptr<AsyncDBClient> AsyncClientIntegrationTestFixture::makeClient() {
     auto svcCtx = getServiceContext();
     auto metrics = std::make_shared<ConnectionMetrics>(svcCtx->getFastClockSource());
-    auto client =
-        AsyncDBClient::connect(getServer(),
-                               transport::kGlobalSSLMode,
-                               svcCtx,
-                               svcCtx->getTransportLayerManager()->getDefaultEgressLayer(),
-                               _reactor,
-                               Milliseconds::max(),
-                               metrics)
-            .get();
+    auto client = AsyncDBClient::connect(getServer(),
+                                         kGlobalSSLMode,
+                                         svcCtx,
+                                         getTransportLayer(svcCtx),
+                                         _reactor,
+                                         Milliseconds::max(),
+                                         metrics)
+                      .get();
     client->initWireVersion(__FILE__, nullptr).get();
     return client;
 }
@@ -143,15 +142,14 @@ void AsyncClientIntegrationTestFixture::testAsyncConnectTimeoutCleansUpSocket() 
     FailPointEnableBlock fp("asioTransportLayerAsyncConnectTimesOut");
     auto svcCtx = getServiceContext();
     auto metrics = std::make_shared<ConnectionMetrics>(svcCtx->getFastClockSource());
-    auto client =
-        AsyncDBClient::connect(getServer(),
-                               transport::kGlobalSSLMode,
-                               svcCtx,
-                               svcCtx->getTransportLayerManager()->getDefaultEgressLayer(),
-                               getReactor(),
-                               Milliseconds{500},
-                               metrics)
-            .getNoThrow();
+    auto client = AsyncDBClient::connect(getServer(),
+                                         kGlobalSSLMode,
+                                         svcCtx,
+                                         getTransportLayer(svcCtx),
+                                         getReactor(),
+                                         Milliseconds{500},
+                                         metrics)
+                      .getNoThrow();
     ASSERT_EQ(client.getStatus(), ErrorCodes::NetworkTimeout);
 }
 

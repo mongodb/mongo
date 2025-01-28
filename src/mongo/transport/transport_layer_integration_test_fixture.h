@@ -77,6 +77,8 @@ public:
         return _reactor;
     }
 
+    virtual TransportLayer* getTransportLayer(ServiceContext* svc) const = 0;
+
     std::shared_ptr<AsyncDBClient> makeClient();
 
     static executor::RemoteCommandRequest makeTestRequest(

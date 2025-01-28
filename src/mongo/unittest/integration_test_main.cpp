@@ -70,6 +70,7 @@ ConnectionString fixtureConnectionString{};
 std::string testFilter;
 std::string fileNameFilter;
 std::vector<std::string> testSuites{};
+bool useEgressGRPC;
 
 }  // namespace
 
@@ -78,6 +79,10 @@ namespace unittest {
 
 ConnectionString getFixtureConnectionString() {
     return fixtureConnectionString;
+}
+
+bool shouldUseGRPCEgress() {
+    return useEgressGRPC;
 }
 
 }  // namespace unittest
@@ -134,6 +139,7 @@ MONGO_STARTUP_OPTIONS_STORE(IntegrationTestOptions)(InitializerContext*) {
     uassertStatusOK(storeBaseOptions(env));
 
     std::string connectionString = env["connectionString"].as<std::string>();
+    useEgressGRPC = env["useEgressGRPC"].as<bool>();
 
     env.get("filter", &testFilter).ignore();
     env.get("fileNameFilter", &fileNameFilter).ignore();

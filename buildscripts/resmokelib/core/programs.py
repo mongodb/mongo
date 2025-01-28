@@ -134,9 +134,6 @@ def mongod_program(
         suite_set_parameters, "defaultConfigCommandTimeoutMS", bin_version, "7.3.0"
     )
 
-    if "grpcPort" not in mongod_options and suite_set_parameters.get("featureFlagGRPC"):
-        mongod_options["grpcPort"] = network.PortAllocator.next_fixture_port(job_num)
-
     remove_set_parameter_if_before_version(
         suite_set_parameters, "internalQueryStatsRateLimit", bin_version, "7.3.0"
     )
@@ -201,9 +198,6 @@ def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos
     remove_set_parameter_if_before_version(
         suite_set_parameters, "defaultConfigCommandTimeoutMS", bin_version, "7.3.0"
     )
-
-    if "grpcPort" not in mongos_options and suite_set_parameters.get("featureFlagGRPC"):
-        mongos_options["grpcPort"] = network.PortAllocator.next_fixture_port(job_num)
 
     remove_set_parameter_if_before_version(
         suite_set_parameters, "internalQueryStatsRateLimit", bin_version, "7.3.0"

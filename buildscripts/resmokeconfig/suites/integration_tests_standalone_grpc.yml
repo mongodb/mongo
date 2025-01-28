@@ -1,0 +1,27 @@
+test_kind: cpp_integration_test
+
+selector:
+  root: build/integration_tests.txt
+  include_files:
+    - build/**/grpc_transport_integration_test*
+
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config: {}
+  hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        featureFlagGRPC: true
+        logComponentVerbosity:
+          command: 2
+        enableTestCommands: 1
+      tlsMode: preferTLS
+      tlsCAFile: jstests/libs/ca.pem
+      tlsCertificateKeyFile: jstests/libs/server.pem

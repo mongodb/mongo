@@ -31,11 +31,14 @@
 #include <array>
 #include <string>
 #include <system_error>
+#include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/transport_layer_integration_test_fixture.h"
 #include "mongo/transport/transport_layer_manager.h"
@@ -107,7 +110,7 @@ public:
         auto server = connectionString.getServers().front();
 
         auto sc = getGlobalServiceContext();
-        auto tl = sc->getTransportLayerManager()->getDefaultEgressLayer();
+        auto tl = getTransportLayer(sc);
         _reactor = tl->getReactor(transport::TransportLayer::kNewReactor);
         _reactorThread = stdx::thread([&] {
             _reactor->run();
@@ -118,6 +121,12 @@ public:
     void tearDown() override {
         _reactor->stop();
         _reactorThread.join();
+    }
+
+    TransportLayer* getTransportLayer(ServiceContext* svc) const override {
+        auto tl = svc->getTransportLayerManager()->getTransportLayer(TransportProtocol::MongoRPC);
+        invariant(tl);
+        return tl;
     }
 
 private:

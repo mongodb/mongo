@@ -3,6 +3,7 @@ load(
     "idl_generator",
     "mongo_cc_binary",
     "mongo_cc_grpc_library",
+    "mongo_cc_integration_test",
     "mongo_cc_library",
     "mongo_cc_proto_library",
     "mongo_cc_unit_test",
@@ -238,6 +239,21 @@ mongo_cc_unit_test(
     deps = [
         "core_test_cc_grpc",
         "//src/mongo:base",
+        "//src/third_party/grpc:grpc++_reflection",
+        "//src/third_party/protobuf",
+    ],
+)
+
+mongo_cc_integration_test(
+    name = "grpc_transport_integration_test",
+    srcs = [
+        "grpc_transport_layer_integration_test.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/transport:transport_layer_egress_init",
+        "//src/mongo/transport:transport_layer_integration_test_fixture",
+        "//src/mongo/util/net:ssl_options_server",
         "//src/third_party/grpc:grpc++_reflection",
         "//src/third_party/protobuf",
     ],

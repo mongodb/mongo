@@ -11,6 +11,12 @@ env.CppUnitTest(
     LIBDEPS=[],
 )
 
+env.CppIntegrationTest(
+    target="grpc_transport_integration_test",
+    source=[],
+    LIBDEPS=[],
+)
+
 protoEnv = env.Clone()
 protoEnv.InjectThirdParty(libraries=["proto"])
 protoEnv.AppendUnique(

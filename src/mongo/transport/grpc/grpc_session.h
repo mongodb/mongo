@@ -495,24 +495,9 @@ private:
         return false;
     }
 
-    template <typename T>
-    Future<T> _withCancellation(const CancellationToken& token, Future<T> f) {
-        return future_util::withCancellation(std::move(f),
-                                             token)
-            .unsafeToInlineFuture();  // The returned Future is intended to run inline (typically on
-                                      // the reactor thread). Cancellation callbacks must not run on
-                                      // the thread calling cancelAsyncOperations-- the
-                                      // implementation of _cancelAsyncOperations ensures that the
-                                      // cancellation source is cancelled (and callbacks are
-                                      // correctly run) on the reactor thread.
-    }
-
     void _updateWireVersion();
 
     const std::shared_ptr<GRPCReactor> _reactor;
-    // Calls to _asyncCancelSource.cancel() must always occur on the reactor thread to ensure
-    // cancellation tasks are run on the correct thread.
-    CancellationSource _asyncCancelSource;
 
     AtomicWord<bool> _checkedWireVersion;
     const std::shared_ptr<ClientContext> _ctx;

@@ -170,13 +170,13 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
                 3,
                 "Establishing gRPC stream",
                 "remote"_attr = remote,
-                "sslMode"_attr = options.sslMode,
+                "sslMode"_attr = connectSSLModeToString(options.sslMode),
                 "timeout"_attr = timeout);
     if (connectionMetrics) {
         connectionMetrics->onConnectionStarted();
     }
 
-    if (timeout > Milliseconds(0)) {
+    if (timeout > Milliseconds(0) && timeout < Milliseconds::max()) {
         streamState->setTimer(reactor->makeTimer());
         streamState->getTimer()
             ->waitUntil(reactor->now() + timeout)
