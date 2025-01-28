@@ -8,34 +8,43 @@
  * ]
  */
 
+let testDB = db.getSiblingDB('jstests_dropdb');
+const dbName = testDB.getName();
+const collNames = ['coll1', 'coll2', 'coll3'];
+
 function listDatabases(options) {
     return assert
         .commandWorked(db.adminCommand(Object.assign({listDatabases: 1, nameOnly: true}, options)))
         .databases;
 }
 
-function assertDatabaseDoesNotExist(dbName) {
+function assertNamespacesDoNotExist() {
     assert.eq(0, listDatabases({filter: {name: dbName}}).length);
+    assert.eq(0, testDB.getCollectionNames());
 }
 
-function assertDatabaseExists(dbName) {
+function assertNamespacesExist() {
     assert.eq(1,
               listDatabases({filter: {name: dbName}}).length,
-              "database " + dbName + " not found in " + tojson(listDatabases()));
+              'database ' + dbName + ' not found in ' + tojson(listDatabases()));
+    const dbCollections = testDB.getCollectionNames();
+    assert.sameMembers(dbCollections, collNames);
 }
 
-let ddb = db.getSiblingDB("jstests_dropdb");
-const dbName = ddb.getName();
-const collName = "unshardedColl";
+jsTest.log('dropDatabase cleans data and metadata about itself and its child collections');
+for (let i = 0; i < collNames.length; i++) {
+    for (let j = 0; j < collNames.length; j++) {
+        const collName = collNames[(i + j) % collNames.length];
+        assert.commandWorked(testDB[collName].insert({x: 1}));
+    }
 
-jsTest.log("Initial DBs: " + tojson(listDatabases()));
-
-for (var i = 0; i < 3; i++) {
-    assert.commandWorked(ddb[collName].insert({x: i}));
-    assertDatabaseExists(dbName);
-    assert.commandWorked(ddb.dropDatabase());
-    assertDatabaseDoesNotExist(dbName);
+    assertNamespacesExist();
+    assert.commandWorked(testDB.dropDatabase());
+    assertNamespacesDoNotExist();
 }
 
-assert.commandWorked(ddb.dropDatabase());
-assertDatabaseDoesNotExist(dbName);
+jsTest.log('dropDatabase is idempotent');
+{
+    assert.commandWorked(testDB.dropDatabase());
+    assertNamespacesDoNotExist();
+}
