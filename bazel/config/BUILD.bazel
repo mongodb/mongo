@@ -7,6 +7,7 @@ load(
     "build_enterprise",
     "build_grpc",
     "build_otel",
+    "clang_tidy_toolchain_version",
     "compiler_type",
     "dbg",
     "dbg_level",
@@ -302,17 +303,75 @@ mongo_toolchain_version(
 )
 
 config_setting(
-    name = "mongo_toolchain_v4",
+    name = "mongo_toolchain_v4_user",
     flag_values = {
         "//bazel/config:mongo_toolchain_version": "v4",
     },
 )
 
 config_setting(
-    name = "mongo_toolchain_v5",
+    name = "mongo_toolchain_v5_user",
     flag_values = {
         "//bazel/config:mongo_toolchain_version": "v5",
     },
+)
+
+clang_tidy_toolchain_version(
+    name = "clang_tidy_toolchain_version",
+    build_setting_default = "auto",
+)
+
+config_setting(
+    name = "clang_tidy_toolchain_version_auto",
+    flag_values = {
+        "//bazel/config:clang_tidy_toolchain_version": "auto",
+    },
+)
+
+config_setting(
+    name = "clang_tidy_toolchain_version_v4",
+    flag_values = {
+        "//bazel/config:clang_tidy_toolchain_version": "v4",
+    },
+)
+
+config_setting(
+    name = "clang_tidy_toolchain_version_v5",
+    flag_values = {
+        "//bazel/config:clang_tidy_toolchain_version": "v5",
+    },
+)
+
+selects.config_setting_group(
+    name = "clang_tidy_toolchain_version_auto_or_v5",
+    match_any = [
+        ":clang_tidy_toolchain_version_auto",
+        ":clang_tidy_toolchain_version_v5",
+    ],
+)
+
+selects.config_setting_group(
+    name = "mongo_toolchain_v4_override",
+    match_all = [
+        ":mongo_toolchain_v5_user",
+        ":clang_tidy_toolchain_version_v4",
+    ],
+)
+
+selects.config_setting_group(
+    name = "mongo_toolchain_v4",
+    match_any = [
+        ":mongo_toolchain_v4_user",
+        ":mongo_toolchain_v4_override",
+    ],
+)
+
+selects.config_setting_group(
+    name = "mongo_toolchain_v5",
+    match_all = [
+        ":mongo_toolchain_v5_user",
+        ":clang_tidy_toolchain_version_auto_or_v5",
+    ],
 )
 
 # ==========
