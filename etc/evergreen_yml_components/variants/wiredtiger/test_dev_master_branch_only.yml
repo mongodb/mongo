@@ -7,7 +7,6 @@
 variables:
   # THIS HAS COPIES IN
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
