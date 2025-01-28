@@ -98,14 +98,12 @@ public:
     // Safe accessor for the internal session
     template <typename Functor>
     auto with(Functor functor) {
-        stdx::lock_guard<stdx::mutex> lock(_sessionGuard);
         return functor(_session);
     }
 
 #define WRAPPED_WT_SESSION_METHOD(name)                               \
     template <typename... Args>                                       \
     auto name(Args&&... args) {                                       \
-        stdx::lock_guard<stdx::mutex> lock(_sessionGuard);            \
         return _session->name(_session, std::forward<Args>(args)...); \
     }
 
@@ -242,9 +240,6 @@ private:
 
     const uint64_t _epoch;
 
-    // This protects against concurrent calls into the WiredTiger API through this session (i.e. it
-    // must be locked for uses of the session, or any cursor created from it).
-    stdx::mutex _sessionGuard;
     WT_SESSION* _session;  // owned
     CursorCache _cursors;  // owned
     uint64_t _cursorGen;
