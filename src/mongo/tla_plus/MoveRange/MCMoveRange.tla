@@ -10,7 +10,7 @@ EXTENDS MoveRange
 \* Intentionally overlaps with the `PropertyAllKeysReturned' liveness invariant.
 ConstraintAllKeysReturned == /\ UNION {sReturned[s] : s \in Shards} # Keys
 
-\* Define symmetry for TLA to avoid exploring equivalent states.
+\* Define symmetry for model checking to avoid exploring equivalent states.
 Symmetry == Permutations(Shards) \union Permutations(Keys)
 
 (**************************************************************************************************)

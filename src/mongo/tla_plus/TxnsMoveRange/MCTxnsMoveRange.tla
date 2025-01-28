@@ -9,6 +9,12 @@ EXTENDS TxnsMoveRange
 
 StateConstraint == /\ \E t \in Txns : rCompletedStmt[t] < TXN_STMTS
 
+\* Define symmetry for model checking to avoid exploring equivalent states.
+Symmetry == Permutations(Txns)
+            \union Permutations(NameSpaces)
+            \union Permutations(Shards)
+            \union Permutations(Keys)
+
 (**************************************************************************************************)
 (* Counterexamples.                                                                               *)
 (**************************************************************************************************)
