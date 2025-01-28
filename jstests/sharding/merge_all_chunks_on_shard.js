@@ -5,6 +5,7 @@
  *   requires_fcv_70,
  * ]
  */
+
 import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
@@ -137,19 +138,6 @@ function waitForAutomergerToCompleteAndAssert(configDB, coll, expectedChunksPerS
         assertExpectedChunks(configDB, coll, expectedChunksPerShard);
         return true;
     }, "Automerger didn't merge the expected chunks within a reasonable time");
-}
-
-function isFcvGraterOrEqualTo(fcvRequired) {
-    // Requires all primary shard nodes to be running the fcvRequired version.
-    let isFcvGreater = true;
-    st.forEachConnection(function(conn) {
-        const fcvDoc = conn.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
-        if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version,
-                                           fcvRequired) < 0) {
-            isFcvGreater = false;
-        }
-    });
-    return isFcvGreater;
 }
 
 /* Build the following scenario:
@@ -563,9 +551,6 @@ executeTestCase(mergeAllChunksOnShardConsideringHistoryWindowTest);
 executeTestCase(mergeAllChunksOnShardConsideringJumboFlagTest);
 executeTestCase(balancerTriggersAutomergerWhenIsEnabledTest);
 executeTestCase(testConfigurableAutoMergerIntervalSecs);
-// TODO: SERVER-97584 remove the FCV check once this feature is backported to v8.0
-if (isFcvGraterOrEqualTo("8.1")) {
-    executeTestCase(testMaxTimeProcessingChunksMSParameter);
-}
+executeTestCase(testMaxTimeProcessingChunksMSParameter);
 
 st.stop();
