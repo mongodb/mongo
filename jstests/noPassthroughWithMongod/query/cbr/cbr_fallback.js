@@ -4,6 +4,7 @@
 import {
     getAllPlans,
     getPlanStages,
+    isExpress,
 } from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -172,15 +173,24 @@ function testClusteredIndex() {
         "clusteredColl",
         {clusteredIndex: {"key": {_id: 1}, unique: true, name: "clustered_index"}}));
     const clusteredColl = db.clusteredColl;
-    assert.commandWorked(clusteredColl.createIndex({a: 1}));
     clusteredColl.insert({_id: 1});
-    const explain = clusteredColl.find({_id: 1, a: 1}).explain();
-    const plans = getAllPlans(explain);
-    plans
-        .filter(plan => {
-            return getPlanStages(plan, "CLUSTERED_IXSCAN").length > 0;
-        })
-        .forEach(assertPlanNotCosted);
+    {
+        // This query ends up running through the express path and should not be costed
+        const explain = clusteredColl.find({_id: 1}, {a: 1}).explain();
+        getAllPlans(explain).forEach(assertPlanNotCosted);
+    }
+    {
+        // This query is not eligible for express and runs through the query planner, verify that we
+        // do not cost it. This is a regression test for SERVER-99690.
+        const explain = clusteredColl.find({_id: 1}, {'a.b': 1}).explain();
+        const plans = getAllPlans(explain);
+        plans
+            .filter(plan => {
+                assert(!isExpress(db, plan), plan);
+                return getPlanStages(plan, "CLUSTERED_IXSCAN").length > 0;
+            })
+            .forEach(assertPlanNotCosted);
+    }
     clusteredColl.drop();
 }
 
