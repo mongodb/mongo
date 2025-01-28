@@ -35,11 +35,13 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/window_function/spillable_cache.h"
+#include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
@@ -131,6 +133,11 @@ void SpillableCache::spillToDisk() {
         _diskCache =
             _expCtx->mongoProcessInterface->createTemporaryRecordStore(_expCtx, KeyFormat::Long);
     }
+
+    // Ensure there is sufficient disk space for spilling
+    uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
+        storageGlobalParams.dbpath, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+
     // If we've freed things from cache before writing to disk, we need to update
     // '_diskWrittenIndex' to be the actual index of the document we're going to write.
     if (_diskWrittenIndex < _nextFreedIndex) {

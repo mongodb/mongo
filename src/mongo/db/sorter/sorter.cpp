@@ -79,6 +79,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -755,6 +756,21 @@ protected:
             for (std::size_t i = 0; i < iterators.size(); i += numParallelSpills) {
                 std::vector<std::shared_ptr<Iterator>> spillsToMerge;
                 auto endIndex = std::min(i + numParallelSpills, iterators.size());
+
+                // Since we are merging the spills to a new file, we make sure we have sufficient
+                // available disk space
+                int64_t minRequiredDiskSpace = 0;
+                std::for_each(
+                    iterators.begin() + i, iterators.begin() + endIndex, [&](const auto& it) {
+                        minRequiredDiskSpace +=
+                            it->getRange().getEndOffset() - it->getRange().getStartOffset();
+                    });
+                minRequiredDiskSpace = std::max(
+                    minRequiredDiskSpace,
+                    static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+                uassertStatusOK(ensureSufficientDiskSpaceForSpilling(this->_opts.tempDir,
+                                                                     minRequiredDiskSpace));
+
                 std::move(iterators.begin() + i,
                           iterators.begin() + endIndex,
                           std::back_inserter(spillsToMerge));
@@ -981,6 +997,10 @@ private:
                           << (this->_opts.maxMemoryUsageBytes + this->fileIteratorsMaxBytesSize)
                           << " bytes, but did not opt in to external sorting.");
         }
+
+        // Ensure there is sufficient disk space for spilling
+        uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
+            this->_opts.tempDir, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
 
         sort();
 

@@ -31,7 +31,9 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/storage/storage_options.h"
 
 namespace mongo::sbe {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -149,6 +151,19 @@ std::tuple<bool, value::TypeTags, value::Value> LookupHashTable::normalizeString
     return {false, tag, val};
 }
 
+bool LookupHashTable::shouldCheckDiskSpace() {
+    _spilledBytesSinceLastCheck += _hashLookupStats.spilledBuffBytesOverAllRecords +
+        _hashLookupStats.spilledHtBytesOverAllRecords - _totalSpilledBytes;
+    _totalSpilledBytes = _hashLookupStats.spilledBuffBytesOverAllRecords +
+        _hashLookupStats.spilledHtBytesOverAllRecords;
+
+    if (_spilledBytesSinceLastCheck > kMaxSpilledBytesForDiskSpaceCheck) {
+        _spilledBytesSinceLastCheck = 0;
+    }
+
+    return _spilledBytesSinceLastCheck == 0;
+}
+
 boost::optional<std::vector<size_t>> LookupHashTable::readIndicesFromRecordStore(
     SpillingStore* rs, value::TypeTags tagKey, value::Value valKey) {
     _htProbeKey.reset(0, false, tagKey, valKey);
@@ -237,6 +252,12 @@ void LookupHashTable::addHashTableEntry(value::SlotAccessor* keyAccessor, size_t
 void LookupHashTable::spillBufferedValueToDisk(SpillingStore* rs,
                                                size_t bufferIdx,
                                                const value::MaterializedRow& val) {
+    // Ensure there is sufficient disk space for spilling
+    if (shouldCheckDiskSpace()) {
+        uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
+            storageGlobalParams.dbpath, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+    }
+
     RecordId rid = getValueRecordId(bufferIdx);
 
     BufBuilder buf;
@@ -303,6 +324,12 @@ void LookupHashTable::spillIndicesToRecordStore(SpillingStore* rs,
                                                 value::TypeTags tagKey,
                                                 value::Value valKey,
                                                 const std::vector<size_t>& value) {
+    // Ensure there is sufficient disk space for spilling
+    if (shouldCheckDiskSpace()) {
+        uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
+            storageGlobalParams.dbpath, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+    }
+
     auto [owned, tagKeyColl, valKeyColl] = normalizeStringIfCollator(tagKey, valKey);
     _htProbeKey.reset(0, owned, tagKeyColl, valKeyColl);
 
@@ -393,6 +420,9 @@ void LookupHashTable::reset(bool fromClose) {
 
     _valueId = 0;
     htIter.clear();
+
+    _spilledBytesSinceLastCheck = 0;
+    _totalSpilledBytes = 0;
 }
 
 void LookupHashTable::doSaveState(bool relinquishCursor) {
