@@ -398,7 +398,7 @@ dir_store_path(WT_FILE_SYSTEM *file_system, const char *dir, const char *name, c
     if ((p = malloc(len)) == NULL)
         return (dir_store_err(FS2DS(file_system), NULL, ENOMEM, "dir_store_path"));
     if (snprintf(p, len, "%s/%s", dir, name) >= (int)len)
-        return (dir_store_err(FS2DS(file_system), NULL, EINVAL, "overflow sprintf"));
+        return (dir_store_err(FS2DS(file_system), NULL, EINVAL, "overflow snprintf"));
     *pathp = p;
     return (ret);
 }

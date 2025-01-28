@@ -200,7 +200,7 @@ WorkloadRunner::start_table_idle_cycle(WT_CONNECTION *conn)
     }
 
     for (cycle_count = 0; !stopping; ++cycle_count) {
-        sprintf(uri, "table:test_cycle%04d", cycle_count);
+        snprintf(uri, BUF_SIZE, "table:test_cycle%04d", cycle_count);
 
         workgen_clock(&start);
         /* Create a table. */
@@ -258,13 +258,13 @@ WorkloadRunner::increment_timestamp(WT_CONNECTION *conn)
     while (!stopping) {
         if (_workload->options.oldest_timestamp_lag > 0) {
             time_us = WorkgenTimeStamp::get_timestamp_lag(_workload->options.oldest_timestamp_lag);
-            sprintf(buf, "oldest_timestamp=%" PRIu64, time_us);
+            snprintf(buf, BUF_SIZE, "oldest_timestamp=%" PRIu64, time_us);
             conn->set_timestamp(conn, buf);
         }
 
         if (_workload->options.stable_timestamp_lag > 0) {
             time_us = WorkgenTimeStamp::get_timestamp_lag(_workload->options.stable_timestamp_lag);
-            sprintf(buf, "stable_timestamp=%" PRIu64, time_us);
+            snprintf(buf, BUF_SIZE, "stable_timestamp=%" PRIu64, time_us);
             conn->set_timestamp(conn, buf);
         }
 
@@ -1061,9 +1061,10 @@ ThreadRunner::op_run(Operation *op)
             if (op->transaction->read_timestamp_lag > 0) {
                 uint64_t read =
                   WorkgenTimeStamp::get_timestamp_lag(op->transaction->read_timestamp_lag);
-                sprintf(buf, "%s=%" PRIu64, op->transaction->_begin_config.c_str(), read);
+                snprintf(
+                  buf, BUF_SIZE, "%s=%" PRIu64, op->transaction->_begin_config.c_str(), read);
             } else {
-                sprintf(buf, "%s", op->transaction->_begin_config.c_str());
+                snprintf(buf, BUF_SIZE, "%s", op->transaction->_begin_config.c_str());
             }
             WT_ERR(_session->begin_transaction(_session, buf));
 
@@ -1154,14 +1155,14 @@ err:
             // Set prepare, commit and durable timestamp if prepare is set.
             if (op->transaction->use_prepare_timestamp) {
                 time_us = WorkgenTimeStamp::get_timestamp();
-                sprintf(buf, "prepare_timestamp=%" PRIu64, time_us);
+                snprintf(buf, BUF_SIZE, "prepare_timestamp=%" PRIu64, time_us);
                 ret = _session->prepare_transaction(_session, buf);
-                sprintf(
-                  buf, "commit_timestamp=%" PRIu64 ",durable_timestamp=%" PRIu64, time_us, time_us);
+                snprintf(buf, BUF_SIZE, "commit_timestamp=%" PRIu64 ",durable_timestamp=%" PRIu64,
+                  time_us, time_us);
                 ret = _session->commit_transaction(_session, buf);
             } else if (op->transaction->use_commit_timestamp) {
                 uint64_t commit_time_us = WorkgenTimeStamp::get_timestamp();
-                sprintf(buf, "commit_timestamp=%" PRIu64, commit_time_us);
+                snprintf(buf, BUF_SIZE, "commit_timestamp=%" PRIu64, commit_time_us);
                 ret = _session->commit_transaction(_session, buf);
             } else {
                 ret =

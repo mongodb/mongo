@@ -653,7 +653,7 @@ OVERRIDE_METHOD(__wt_cursor, WT_CURSOR, search_near, (self))
 		metadata = PyBytes_FromStringAndSize(*$1, *$2);
 		$result = metadata;
 		data = PyBytes_FromStringAndSize(*$3, *$4);
-		$result = SWIG_Python_AppendOutput($result, data);
+		$result = SWIG_AppendOutput($result, data);
 	}
 }
 

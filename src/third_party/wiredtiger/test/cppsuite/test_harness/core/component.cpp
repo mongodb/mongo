@@ -72,9 +72,14 @@ component::enabled() const
 }
 
 void
+component::end_run()
+{
+    _running = false;
+}
+
+void
 component::finish()
 {
-    logger::log_msg(LOG_INFO, "Finishing component: " + _name);
-    _running = false;
+    logger::log_msg(LOG_INFO, "Running finish stage of component: " + _name);
 }
 } // namespace test_harness

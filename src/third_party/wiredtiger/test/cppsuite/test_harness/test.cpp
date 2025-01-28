@@ -147,14 +147,19 @@ test::run()
       "Waiting {" + std::to_string(duration_seconds) + "} seconds for testing to complete.");
     std::this_thread::sleep_for(std::chrono::seconds(duration_seconds));
 
-    /* End the test by calling finish on all known components. */
+    /* Notify components that they should complete their last iteration. */
     for (const auto &it : _components)
-        it->finish();
+        it->end_run();
 
+    /* Call join on the components threads so we know they have finished their loop. */
     logger::log_msg(LOG_INFO,
       "Joining all component threads.\n This could take a while as we need to wait"
       " for all components to finish their current loop.");
     _thread_manager->join();
+
+    /* End the test by calling finish on all known components. */
+    for (const auto &it : _components)
+        it->finish();
 
     /* Validation stage. */
     if (_workload_tracking->enabled()) {

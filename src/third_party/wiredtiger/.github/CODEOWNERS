@@ -1,0 +1,8 @@
+# All backports must be approved by the backport-approvers Github team.
+* @wiredtiger/backport-approvers
+
+# Exclude some test and non-functional folders from the backport approvals.
+bench/
+dist/
+test/
+tools/
