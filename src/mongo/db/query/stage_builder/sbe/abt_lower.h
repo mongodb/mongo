@@ -34,10 +34,9 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
-#include "mongo/db/exec/sbe/abt/slots_provider.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
+#include "mongo/db/exec/sbe/slots_provider.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -45,9 +44,12 @@
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/stage_builder/sbe/abt_lower_defs.h"
 #include "mongo/util/assert_util.h"
 
-namespace mongo::optimizer {
+namespace mongo::stage_builder::abt {
+
+using namespace optimizer;
 
 class VarResolver {
 public:
@@ -73,7 +75,7 @@ class SBEExpressionLowering {
 public:
     SBEExpressionLowering(const VariableEnvironment& env,
                           VarResolver vr,
-                          SlotsProvider& providedSlots,
+                          sbe::SlotsProvider& providedSlots,
                           sbe::value::SlotIdGenerator& ids,
                           sbe::InputParamToSlotMap& inputParamToSlotMap,
                           sbe::value::FrameIdGenerator* frameIdGenerator = nullptr)
@@ -132,7 +134,7 @@ private:
 
     const VariableEnvironment& _env;
     VarResolver _varResolver;
-    SlotsProvider& _providedSlots;
+    sbe::SlotsProvider& _providedSlots;
     sbe::value::SlotIdGenerator& _slotIdGenerator;
 
     // Map to record newly allocated slots and the parameter ids they were generated from.
@@ -148,7 +150,7 @@ private:
     stdx::unordered_map<const LambdaAbstraction*, sbe::FrameId> _lambdaMap;
 };
 
-inline sbe::EPrimUnary::Op getEPrimUnaryOp(optimizer::Operations op) {
+inline sbe::EPrimUnary::Op getEPrimUnaryOp(Operations op) {
     switch (op) {
         case Operations::Neg:
             return sbe::EPrimUnary::negate;
@@ -159,7 +161,7 @@ inline sbe::EPrimUnary::Op getEPrimUnaryOp(optimizer::Operations op) {
     }
 }
 
-inline sbe::EPrimBinary::Op getEPrimBinaryOp(optimizer::Operations op) {
+inline sbe::EPrimBinary::Op getEPrimBinaryOp(Operations op) {
     switch (op) {
         case Operations::Eq:
             return sbe::EPrimBinary::eq;
@@ -193,4 +195,4 @@ inline sbe::EPrimBinary::Op getEPrimBinaryOp(optimizer::Operations op) {
             MONGO_UNREACHABLE;
     }
 }
-}  // namespace mongo::optimizer
+}  // namespace mongo::stage_builder::abt

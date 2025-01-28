@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -20,5 +20,96 @@ mongo_cc_benchmark(
         "//src/mongo/db/catalog:catalog_test_fixture",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_sbe_abt",
+    srcs = [
+        "abt_lower.cpp",
+    ],
+    hdrs = [
+        "abt_lower.h",
+        "abt_lower_defs.h",
+    ],
+    deps = [
+        "//src/mongo/db/exec/sbe:query_sbe",
+        "//src/mongo/db/exec/sbe:query_sbe_stages",
+        "//src/mongo/db/exec/sbe:query_sbe_storage",
+        "//src/mongo/db/query/optimizer:optimizer_base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "abt_lower_test",
+    srcs = [
+        "//src/mongo/db/query/stage_builder/sbe/tests:abt_lower_test.cpp",
+    ],
+    data = ["//src/mongo/db/test_output/query/stage_builder/sbe/a_b_t_plan_generation:test_data"],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":abt_unit_test_utils",
+        ":query_sbe_abt",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "sbe_abt_test",
+    srcs = [
+        "//src/mongo/db/exec/sbe:expression_test_base.h",
+        "//src/mongo/db/exec/sbe:sbe_unittest.h",
+        "//src/mongo/db/query/stage_builder/sbe/tests:sbe_abt_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":abt_unit_test_utils",
+        ":query_sbe_abt",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/collation:collator_interface_mock",
+    ],
+)
+
+# Lightweight test utils.
+mongo_cc_library(
+    name = "abt_unit_test_utils",
+    srcs = [
+        "//src/mongo/db/query/stage_builder/sbe/tests:abt_unit_test_utils.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db/query/stage_builder/sbe/tests:abt_unit_test_literals.h",
+        "//src/mongo/db/query/stage_builder/sbe/tests:abt_unit_test_utils.h",
+    ],
+    deps = [
+        "//src/mongo/db/query/bson:dotted_path_support",
+        "//src/mongo/db/query/optimizer:optimizer_base",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "abt_unit_test_infra_test",
+    srcs = [
+        "//src/mongo/db/query/stage_builder/sbe/tests:abt_unit_test_infra_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":abt_unit_test_utils",
+        "//src/mongo/db/exec/sbe:query_sbe",  # needed to register extended type destruction for MakeObjSpec :(
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "abt_lower_bm",
+    srcs = [
+        "//src/mongo/db/query/stage_builder/sbe/tests:abt_lower_bm.cpp",
+    ],
+    deps = [
+        ":abt_unit_test_utils",
+        ":query_sbe_abt",
+        "//src/mongo/unittest",
     ],
 )

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/sbe/abt/abt_lower.h"
+#include "mongo/db/query/stage_builder/sbe/abt_lower.h"
 
 #include <absl/container/inlined_vector.h>
 #include <absl/container/node_hash_map.h>
@@ -51,8 +51,8 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/exec/sbe/abt/slots_provider.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/slots_provider.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
@@ -81,7 +81,7 @@
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
-namespace mongo::optimizer {
+namespace mongo::stage_builder::abt {
 
 static sbe::EExpression::Vector toInlinedVector(
     std::vector<std::unique_ptr<sbe::EExpression>> args) {
@@ -361,4 +361,4 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
 
     return sbe::makeE<sbe::EFunction>(name, toInlinedVector(std::move(args)));
 }
-}  // namespace mongo::optimizer
+}  // namespace mongo::stage_builder::abt

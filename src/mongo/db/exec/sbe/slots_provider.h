@@ -31,7 +31,7 @@
 
 #include "mongo/db/exec/sbe/values/slot.h"
 
-namespace mongo::optimizer {
+namespace mongo::sbe {
 
 class SlotsProvider {
 public:
@@ -43,4 +43,4 @@ public:
                                             sbe::value::SlotIdGenerator* slotIdGenerator) = 0;
 };
 
-}  // namespace mongo::optimizer
+}  // namespace mongo::sbe

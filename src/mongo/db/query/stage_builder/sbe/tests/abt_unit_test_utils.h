@@ -44,26 +44,26 @@
 #include "mongo/unittest/inline_auto_update.h"
 
 
-namespace mongo::optimizer {
+namespace mongo::stage_builder::abt {
 
-void maybePrintABT(ABT::reference_type abt);
+void maybePrintABT(optimizer::ABT::reference_type abt);
 
-#define ASSERT_EXPLAIN_V2(expected, abt) \
-    maybePrintABT(abt);                  \
-    ASSERT_EQ(expected, ExplainGenerator::explainV2(abt))
+#define ASSERT_EXPLAIN_V2(expected, abtTree)           \
+    mongo::stage_builder::abt::maybePrintABT(abtTree); \
+    ASSERT_EQ(expected, mongo::optimizer::ExplainGenerator::explainV2(abtTree))
 
-#define ASSERT_EXPLAIN_V2_AUTO(expected, abt) \
-    maybePrintABT(abt);                       \
-    ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explainV2(abt))
+#define ASSERT_EXPLAIN_V2_AUTO(expected, abtTree)      \
+    mongo::stage_builder::abt::maybePrintABT(abtTree); \
+    ASSERT_STR_EQ_AUTO(expected, mongo::optimizer::ExplainGenerator::explainV2(abtTree))
 
-#define ASSERT_EXPLAIN_BSON(expected, abt) \
-    maybePrintABT(abt);                    \
-    ASSERT_EQ(expected, ExplainGenerator::explainBSONStr(abt))
+#define ASSERT_EXPLAIN_BSON(expected, abtTree)         \
+    mongo::stage_builder::abt::maybePrintABT(abtTree); \
+    ASSERT_EQ(expected, mongo::optimizer::ExplainGenerator::explainBSONStr(abtTree))
 
 // Do not remove macro even if unused: used to update tests before committing code.
-#define ASSERT_EXPLAIN_BSON_AUTO(expected, abt) \
-    maybePrintABT(abt);                         \
-    ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explainBSONStr(abt))
+#define ASSERT_EXPLAIN_BSON_AUTO(expected, abtTree)    \
+    mongo::stage_builder::abt::maybePrintABT(abtTree); \
+    ASSERT_STR_EQ_AUTO(expected, mongo::optimizer::ExplainGenerator::explainBSONStr(abtTree))
 
 #define ASSERT_BETWEEN(a, b, value) \
     ASSERT_LTE(a, value);           \
@@ -83,4 +83,4 @@ void maybePrintABT(ABT::reference_type abt);
                                   false));                                  \
     }
 
-}  // namespace mongo::optimizer
+}  // namespace mongo::stage_builder::abt

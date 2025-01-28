@@ -32,12 +32,12 @@
 #include <absl/container/node_hash_map.h>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/exec/sbe/abt/abt_unit_test_utils.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
+#include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
 #include "mongo/db/query/stage_builder/sbe/vectorizer.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"

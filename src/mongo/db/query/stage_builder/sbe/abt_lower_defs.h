@@ -33,9 +33,9 @@
 #include "mongo/db/query/optimizer/defs.h"
 
 
-namespace mongo::optimizer {
+namespace mongo::stage_builder::abt {
 
-class SlotsProvider;
-using SlotVarMap = stdx::unordered_map<ProjectionName, sbe::value::SlotId, ProjectionName::Hasher>;
+using SlotVarMap = stdx::
+    unordered_map<optimizer::ProjectionName, sbe::value::SlotId, optimizer::ProjectionName::Hasher>;
 
-}  // namespace mongo::optimizer
+}  // namespace mongo::stage_builder::abt

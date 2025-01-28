@@ -9,31 +9,7 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target="abt_unit_test_infra_test",
-    source=[],
-    LIBDEPS=[],
-)
-
-env.CppUnitTest(
-    target="sbe_abt_test",
-    source=[],
-    LIBDEPS=[],
-)
-
-env.CppUnitTest(
     target="makeobj_spec_hash_test",
-    source=[],
-    LIBDEPS=[],
-)
-
-env.CppUnitTest(
-    target="abt_lower_test",
-    source=[],
-    LIBDEPS=[],
-)
-
-env.Benchmark(
-    target="abt_lower_bm",
     source=[],
     LIBDEPS=[],
 )

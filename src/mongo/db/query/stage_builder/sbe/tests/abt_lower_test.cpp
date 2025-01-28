@@ -41,9 +41,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/exec/sbe/abt/abt_lower.h"
-#include "mongo/db/exec/sbe/abt/abt_unit_test_literals.h"
-#include "mongo/db/exec/sbe/abt/abt_unit_test_utils.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
@@ -53,6 +50,9 @@
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/strong_alias.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/stage_builder/sbe/abt_lower.h"
+#include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_literals.h"
+#include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
@@ -63,13 +63,14 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
-namespace mongo::optimizer {
+namespace mongo::stage_builder::abt {
 namespace {
 
-unittest::GoldenTestConfig goldenTestConfig{"src/mongo/db/test_output/exec/sbe"};
+unittest::GoldenTestConfig goldenTestConfig{"src/mongo/db/test_output/query/stage_builder/sbe"};
 using GoldenTestContext = unittest::GoldenTestContext;
 using GoldenTestConfig = unittest::GoldenTestConfig;
 using namespace unit_test_abt_literals;
+using namespace optimizer;
 class ABTPlanGeneration : public unittest::Test {
 protected:
     sbe::InputParamToSlotMap inputParamToSlotMap;
@@ -87,8 +88,8 @@ protected:
         SlotVarMap map;
         sbe::RuntimeEnvironment runtimeEnv;
         sbe::value::SlotIdGenerator ids;
-        auto expr = optimizer::SBEExpressionLowering{env, map, runtimeEnv, ids, inputParamToSlotMap}
-                        .optimize(n);
+        auto expr =
+            SBEExpressionLowering{env, map, runtimeEnv, ids, inputParamToSlotMap}.optimize(n);
         stream << expr->toString() << std::endl;
     }
 
@@ -97,8 +98,8 @@ protected:
         SlotVarMap map;
         sbe::RuntimeEnvironment runtimeEnv;
         sbe::value::SlotIdGenerator ids;
-        auto expr = optimizer::SBEExpressionLowering{env, map, runtimeEnv, ids, inputParamToSlotMap}
-                        .optimize(n);
+        auto expr =
+            SBEExpressionLowering{env, map, runtimeEnv, ids, inputParamToSlotMap}.optimize(n);
         return expr->toString();
     }
 };
@@ -131,4 +132,4 @@ TEST_F(ABTPlanGeneration, LowerBinaryOpEqMemberRHSArray) {
 }
 
 }  // namespace
-}  // namespace mongo::optimizer
+}  // namespace mongo::stage_builder::abt

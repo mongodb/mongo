@@ -205,7 +205,7 @@ SbExpr SbExprBuilder::makeBinaryOp(sbe::EPrimBinary::Op binaryOp, SbExpr lhs, Sb
 }
 
 SbExpr SbExprBuilder::makeBinaryOp(optimizer::Operations binaryOp, SbExpr lhs, SbExpr rhs) {
-    return makeBinaryOp(getEPrimBinaryOp(binaryOp), std::move(lhs), std::move(rhs));
+    return makeBinaryOp(abt::getEPrimBinaryOp(binaryOp), std::move(lhs), std::move(rhs));
 }
 
 SbExpr SbExprBuilder::makeConstant(sbe::value::TypeTags tag, sbe::value::Value val) {

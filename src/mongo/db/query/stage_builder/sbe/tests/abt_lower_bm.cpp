@@ -39,9 +39,6 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/exec/sbe/abt/abt_lower.h"
-#include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
-#include "mongo/db/exec/sbe/abt/abt_unit_test_utils.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
@@ -49,21 +46,25 @@
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/stage_builder/sbe/abt_lower.h"
+#include "mongo/db/query/stage_builder/sbe/abt_lower_defs.h"
+#include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
-namespace mongo::optimizer {
+namespace mongo::stage_builder::abt {
 namespace {
 void BM_LowerABTLetExpr(benchmark::State& state) {
     auto nLets = state.range(0);
-    ABT n = Constant::boolean(true);
+    optimizer::ABT n = optimizer::Constant::boolean(true);
     for (int i = 0; i < nLets; i++) {
-        n = make<Let>(ProjectionName{std::string(str::stream() << "var" << std::to_string(i))},
-                      Constant::int32(i),
-                      std::move(n));
+        n = make<optimizer::Let>(
+            optimizer::ProjectionName{std::string(str::stream() << "var" << std::to_string(i))},
+            optimizer::Constant::int32(i),
+            std::move(n));
     }
     for (auto keepRunning : state) {
-        auto env = VariableEnvironment::build(n);
+        auto env = optimizer::VariableEnvironment::build(n);
         SlotVarMap map;
         sbe::RuntimeEnvironment runtimeEnv;
         sbe::value::SlotIdGenerator ids;
@@ -76,4 +77,4 @@ void BM_LowerABTLetExpr(benchmark::State& state) {
 
 BENCHMARK(BM_LowerABTLetExpr)->Arg(1)->Arg(10)->Arg(20)->Arg(40)->Arg(100);
 }  // namespace
-}  // namespace mongo::optimizer
+}  // namespace mongo::stage_builder::abt

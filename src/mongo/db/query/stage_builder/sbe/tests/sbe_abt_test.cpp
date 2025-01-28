@@ -45,10 +45,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
-#include "mongo/db/exec/sbe/abt/abt_lower.h"
-#include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
-#include "mongo/db/exec/sbe/abt/abt_unit_test_literals.h"
-#include "mongo/db/exec/sbe/abt/abt_unit_test_utils.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
@@ -65,7 +61,11 @@
 #include "mongo/db/query/optimizer/strong_alias.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/stage_builder/sbe/abt_lower.h"
+#include "mongo/db/query/stage_builder/sbe/abt_lower_defs.h"
 #include "mongo/db/query/stage_builder/sbe/expression_const_eval.h"
+#include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_literals.h"
+#include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/platform/decimal128.h"
@@ -73,11 +73,11 @@
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 
-
-namespace mongo::optimizer {
+namespace mongo::stage_builder::abt {
 namespace {
 
 using namespace unit_test_abt_literals;
+using namespace optimizer;
 
 class AbtToSbeExpression : public sbe::EExpressionTestFixture {
 public:
@@ -496,4 +496,4 @@ TEST_F(AbtToSbeExpression, NullableLhsAndTrueConstFold) {
     assertEqualValues(res, resConstFold);
 }
 }  // namespace
-}  // namespace mongo::optimizer
+}  // namespace mongo::stage_builder::abt
