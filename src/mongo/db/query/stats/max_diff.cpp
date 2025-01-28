@@ -364,10 +364,11 @@ ScalarHistogram genMaxDiffHistogram(const DataDistribution& dataDistrib,
     // bucket for every type class (except when the first type bracket has a single value, in which
     // case we the number of buckets can equal the number of types).
     // For example, {0, 1, 2, "foo", "bar"} needs buckets with values: 0, 2, and "bar".
-    uassert(7299701,
-            "number of buckets: {}, must be larger than number of types: {} in the data"_format(
-                numBuckets, numTypes),
-            numBuckets >= numTypes);
+    uassert(
+        7299701,
+        "number of buckets: {}, the number of buckets must exceed the number of types ({}) in the data by 1. For this case the minimum number of buckets is: {}"_format(
+            numBuckets, numTypes, numTypes + 1),
+        numBuckets >= (numTypes + 1));
 
     std::vector<ValFreq> topKBuckets = generateTopKBuckets(dataDistrib, numBuckets, sortArg);
     uassert(6660504,

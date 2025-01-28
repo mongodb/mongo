@@ -173,7 +173,7 @@ TEST(CEHistograms, SingleEntryHistogram) {
     for (auto&& v : values) {
         std::vector<SBEValue> singleValVec{sbe::value::copyValue(v.getTag(), v.getValue())};
         auto ceHist = createCEHistogram(singleValVec, ScalarHistogram::kMaxBuckets);
-        ceHist = createCEHistogram(singleValVec, 1);
+        ceHist = createCEHistogram(singleValVec, 2);
     }
 }
 

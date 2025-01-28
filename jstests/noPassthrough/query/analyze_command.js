@@ -169,4 +169,56 @@ assert.eq(100, syscoll.find({_id: "a"})[0].statistics.scalarHistogram.buckets.le
 
 cleanup();
 
+(function validateBucketsNumberOfBucketsAndTypes() {
+    try {
+        // Test CE histogram creation: Number of collection types 1, Number of histogram buckets 1
+        // (fail) and 2 (success).
+        assert.commandWorked(coll.insert({a: NumberInt(1)}));
+        assert.commandWorked(coll.insert({a: NumberInt(2)}));
+        assert.commandWorked(coll.insert({a: NumberInt(3)}));
+        assert.commandWorked(coll.insert({a: NumberLong(1234)}));
+        assert.commandWorked(coll.insert({a: NumberLong(2324)}));
+        assert.commandWorked(coll.insert({a: NumberLong(3345)}));
+        assert.commandWorked(coll.insert({a: NumberDecimal(365)}));
+        assert.commandWorked(coll.insert({a: NumberDecimal(37987)}));
+
+        assert.commandFailedWithCode(
+            coll.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 1}), 7299701);
+        assert.commandWorked(
+            coll.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 2}));
+
+        assert.commandWorked(coll.insert({a: 'a'}));
+        assert.commandWorked(coll.insert({a: 'b'}));
+        assert.commandWorked(coll.insert({a: 'asdasdafsadfsaasdasdasddf'}));
+
+        // Test CE histogram creation: Number of collection types 2, Number of histogram buckets 2
+        // (fail) and 3 (success).
+        assert.commandFailedWithCode(
+            coll.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 2}), 7299701);
+        assert.commandWorked(
+            coll.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 3}));
+
+        assert.commandWorked(coll.insert({a: null}));
+        assert.commandWorked(coll.insert({a: true}));
+        assert.commandWorked(coll.insert({a: [1, 2, 3, 4]}));
+        assert.commandWorked(
+            coll.insert({a: Timestamp(new Date(Date.UTC(1984, 0, 1)).getTime() / 1000, 0)}));
+
+        // Test CE histogram creation: Number of collection types 3, Number of histogram buckets 2,
+        // 3 (fail) and 4 (success).
+        assert.commandFailedWithCode(
+            coll.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 2}), 7299701);
+        assert.commandFailedWithCode(
+            coll.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 3}), 7299701);
+        assert.commandWorked(
+            coll.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 4}));
+
+    } finally {
+        // Ensure that query knob doesn't leak into other testcases in the suite.
+        cleanup();
+    }
+})();
+
+cleanup();
+
 MongoRunner.stopMongod(conn);
