@@ -1,7 +1,7 @@
 /**
  * Tests stepdown while dbcheck is running.
  * @tags: [
- *   requires_fcv_81
+ *   requires_fcv_80
  * ]
  */
 

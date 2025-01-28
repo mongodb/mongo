@@ -3,7 +3,7 @@
  * detects the inconsistency.
  *
  * @tags: [
- *   requires_fcv_81
+ *   requires_fcv_80
  * ]
  */
 
