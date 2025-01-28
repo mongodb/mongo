@@ -162,6 +162,22 @@ AsyncResultsMerger::~AsyncResultsMerger() {
     invariant(_lifecycleState == kKillComplete || _remotesExhausted(lk));
 }
 
+std::shared_ptr<AsyncResultsMerger> AsyncResultsMerger::create(
+    OperationContext* opCtx,
+    std::shared_ptr<executor::TaskExecutor> executor,
+    AsyncResultsMergerParams params) {
+    // We cannot use 'std::make_shared<T>' if T's constructor is private. This is a workaround so
+    // that we can still call 'make_shared()' on an object that is derived from the
+    // 'AsyncResultsMerger'.
+    struct SharedFromThisEnabler final : public AsyncResultsMerger {
+        SharedFromThisEnabler(OperationContext* opCtx,
+                              std::shared_ptr<executor::TaskExecutor> executor,
+                              AsyncResultsMergerParams params)
+            : AsyncResultsMerger(opCtx, std::move(executor), std::move(params)) {}
+    };
+    return std::make_shared<SharedFromThisEnabler>(opCtx, std::move(executor), std::move(params));
+}
+
 const AsyncResultsMergerParams& AsyncResultsMerger::params() const {
     return _params;
 }
@@ -691,9 +707,10 @@ Status AsyncResultsMerger::_scheduleGetMoresForRemotes(
     for (size_t i = 0; i < executorRequests.size(); i++) {
         auto& remote = remotes[i];
         auto callbackStatus = _executor->scheduleRemoteCommand(
-            executorRequests[i], [this, remote /* intrusive_ptr copy! */](auto const& cbData) {
-                stdx::lock_guard<stdx::mutex> lk(this->_mutex);
-                this->_handleBatchResponse(lk, cbData, remote);
+            executorRequests[i],
+            [self = shared_from_this(), remote /* intrusive_ptr copy! */](auto const& cbData) {
+                stdx::lock_guard<stdx::mutex> lk(self->_mutex);
+                self->_handleBatchResponse(lk, cbData, remote);
             });
 
         if (!callbackStatus.isOK()) {
