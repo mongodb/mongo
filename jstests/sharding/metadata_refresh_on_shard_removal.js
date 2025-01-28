@@ -34,15 +34,18 @@ const dbName = 'TestDB';
  * 4. Remove shard0 by sending removeShard through router 0. All data will be migrated to shard1.
  * 5. Send a query through router 1 to target the sharded collection. This should correctly target
  *    shard1.
+ * 6. Ensure that no full refresh of the routing information is triggered on router 1, as a result
+ *    of the CRUD operations on the sharded collection after the shard0 removal.
  */
 (() => {
     jsTestLog(
-        "Test that sharded collections with data on a shard that gets removed are correctly invalidated in a router's catalog cache.");
+        "Test that metadata of a sharded collection with data on a shard that gets removed is correctly invalidated in a router's catalog cache.");
 
     const shardedCollName = 'Coll';
     const shardedCollNs = dbName + '.' + shardedCollName;
 
     var st = new ShardingTest({shards: 2, mongos: 2});
+
     let router0ShardedColl = st.s0.getDB(dbName)[shardedCollName];
     let router1ShardedColl = st.s1.getDB(dbName)[shardedCollName];
 
@@ -50,7 +53,7 @@ const dbName = 'TestDB';
         st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
     assert.commandWorked(st.s0.adminCommand({shardCollection: shardedCollNs, key: {_id: 1}}));
 
-    // Make sure data is inserted into shard0
+    // Make sure data is inserted into shard0.
     assert.commandWorked(st.s0.adminCommand({
         moveChunk: shardedCollNs,
         find: {_id: -1},
@@ -81,6 +84,9 @@ const dbName = 'TestDB';
         st.rs0.stopSet();
     }
 
+    const initCatalogCacheStats =
+        st.s1.getDB(dbName).serverStatus({}).shardingStatistics.catalogCache;
+
     // Ensure that s1, the router which did not run removeShard, eventually stops targeting chunks
     // for the sharded collection which previously resided on a shard that no longer exists.
     assert.soon(() => {
@@ -92,6 +98,18 @@ const dbName = 'TestDB';
             return false;
         }
     });
+
+    // Removing shard0 updates the metadata version in the catalog cache of all nodes. The
+    // subsequent CRUD operation on router1 triggered a incremental refresh (instead of a full
+    // refresh) of its catalog cache.
+    const updatedCatalogCacheStats =
+        st.s1.getDB(dbName).serverStatus({}).shardingStatistics.catalogCache;
+    assert.eq(0,
+              updatedCatalogCacheStats.countFullRefreshesStarted -
+                  initCatalogCacheStats.countFullRefreshesStarted);
+    assert.eq(1,
+              updatedCatalogCacheStats.countIncrementalRefreshesStarted -
+                  initCatalogCacheStats.countIncrementalRefreshesStarted);
 
     st.stop();
 })();
@@ -105,8 +123,10 @@ const dbName = 'TestDB';
  * 3. Ensure both routers have up-to-date routing info.
  * 4. Move all data of the database to shard1.
  * 4. Remove shard0 by sending removeShard through router 0.
- * 5. Send a query through router 1 to target the sharded and unsharded collections. This should
- *    correctly target shard1.
+ * 5. Send a query through router 1 to target the unsharded collection. This should correctly target
+ *    shard1.
+ * 6. Ensure that no full refresh of the routing information is triggered on router 1, as a result
+ *    of the CRUD operations on the unsharded collection after the shard0 removal.
  */
 (() => {
     jsTestLog(
@@ -156,5 +176,12 @@ const dbName = 'TestDB';
             return false;
         }
     });
+
+    // TODO (SERVER-80724): Implement the following test case when database metadata refresh
+    // statistics are available.
+    // Removing shard0 updates the metadata version in the catalog cache of all nodes. The
+    // subsequent CRUD operation on router1 triggered a incremental refresh (instead of a full
+    // refresh) of its catalog cache.
+
     st.stop();
 })();

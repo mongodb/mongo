@@ -606,11 +606,10 @@ Status initializeSharding(
     // List of hooks which will be called by the ShardRegistry when it discovers a shard has been
     // removed.
     std::vector<ShardRegistry::ShardRemovalHook> shardRemovalHooks = {
-        // Invalidate appropriate entries in the catalog cache when a shard is removed. It's safe to
-        // capture the catalog cache pointer since the Grid (and therefore CatalogCache and
-        // ShardRegistry) are never destroyed.
+        // It's safe to capture the CatalogCache pointer since the Grid (and therefore CatalogCache
+        // and ShardRegistry) are never destroyed.
         [catCache = catalogCache.get()](const ShardId& removedShard) {
-            catCache->invalidateEntriesThatReferenceShard(removedShard);
+            catCache->advanceTimeInStoreForEntriesThatReferenceShard(removedShard);
         }};
 
     if (!mongosGlobalParams.configdbs) {

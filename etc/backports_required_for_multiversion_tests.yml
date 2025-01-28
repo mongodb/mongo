@@ -370,6 +370,8 @@ last-continuous:
       ticket: SERVER-95687
     - test_file: jstests/sharding/remove_shard_with_unsharded.js
       ticket: SERVER-89883
+    - test_file: jstests/sharding/metadata_refresh_on_shard_removal.js
+      ticket: SERVER-99277
   suites: null
 last-lts:
   all:
@@ -787,4 +789,6 @@ last-lts:
       ticket: SERVER-95687
     - test_file: jstests/sharding/remove_shard_with_unsharded.js
       ticket: SERVER-89883
+    - test_file: jstests/sharding/metadata_refresh_on_shard_removal.js
+      ticket: SERVER-99277
   suites: null

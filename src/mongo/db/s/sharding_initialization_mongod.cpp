@@ -402,11 +402,10 @@ void _initializeGlobalShardingState(OperationContext* opCtx,
     // List of hooks which will be called by the ShardRegistry when it discovers a shard has been
     // removed.
     std::vector<ShardRegistry::ShardRemovalHook> shardRemovalHooks = {
-        // Invalidate appropriate entries in the CatalogCache when a shard is removed. It's safe to
-        // capture the CatalogCache pointer since the Grid (and therefore CatalogCache and
-        // ShardRegistry) are never destroyed.
+        // It's safe to capture the CatalogCache pointer since the Grid (and therefore CatalogCache
+        // and ShardRegistry) are never destroyed.
         [catCache = catalogCache.get()](const ShardId& removedShard) {
-            catCache->invalidateEntriesThatReferenceShard(removedShard);
+            catCache->advanceTimeInStoreForEntriesThatReferenceShard(removedShard);
         }};
 
     auto shardRegistry = std::make_unique<ShardRegistry>(
