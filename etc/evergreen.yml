@@ -1055,7 +1055,6 @@ buildvariants:
   - name: .jscore .common !.auth
   - name: json_schema
   - name: .jstestfuzz !.initsync !.flow_control !.stepdowns
-  - name: powercycle_gen
   - name: .query_fuzzer
   - name: .read_write_concern
   - name: replica_sets_gen
