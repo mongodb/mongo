@@ -38,6 +38,7 @@
 #include <sys/resource.h>
 #endif
 
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/startup_warnings_common.h"
@@ -396,6 +397,19 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
                               {logv2::LogTag::kStartupWarnings},
                               "Setting mongod to readOnly mode as a result of specifying "
                               "'recoverFromOplogAsStandalone'");
+    }
+
+    const auto kFrameworkControl =
+        ServerParameterSet::getNodeParameterSet()->get<QueryFrameworkControl>(
+            "internalQueryFrameworkControl");
+    if (kFrameworkControl &&
+        kFrameworkControl->_data.get() != QueryFrameworkControlEnum::kForceClassicEngine) {
+        LOGV2_WARNING_OPTIONS(9473500,
+                              {logv2::LogTag::kStartupWarnings},
+                              "'internalQueryFrameworkControl' is set to a non-default value. SBE "
+                              "is no longer a supported engine in version 7.0, and should not be "
+                              "used in production environments. Please set "
+                              "'internalQueryFrameworkControl' to 'forceClassicEngine'");
     }
 }
 }  // namespace mongo

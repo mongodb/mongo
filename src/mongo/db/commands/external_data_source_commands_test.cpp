@@ -38,6 +38,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/named_pipe.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
@@ -687,6 +688,11 @@ TEST_F(ExternalDataSourceCommandsTest, GroupAggRequest) {
 }
 
 TEST_F(ExternalDataSourceCommandsTest, LookupAggRequest) {
+    // This test is run with 'internalQueryFrameworkControl' set to 'trySbeRestricted' as it is
+    // written assuming that $lookup will be pushed down to SBE, and that it will use the hash join
+    // algorithm to execute.
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryFrameworkControl",
+                                                       "trySbeRestricted");
     std::vector<BSONObj> srcDocs = {
         fromjson(R"(
             {

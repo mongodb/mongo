@@ -172,6 +172,7 @@ env.Library(
         'startup_warnings_mongod.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/query_knobs',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/repl/repl_settings',
         '$BUILD_DIR/mongo/util/processinfo',
