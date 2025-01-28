@@ -76,3 +76,4 @@ try {
     rstest.stopSet(15);
 } catch (e) {
 }
+mock_ocsp.stop();
