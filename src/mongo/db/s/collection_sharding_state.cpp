@@ -46,7 +46,6 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -65,11 +64,9 @@ public:
 
     struct CSSAndLock {
         CSSAndLock(const NamespaceString& nss, std::unique_ptr<CollectionShardingState> css)
-            : cssMutex("CSSMutex::" +
-                       NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
-              css(std::move(css)) {}
+            : css(std::move(css)) {}
 
-        const Lock::ResourceMutex cssMutex;
+        std::shared_mutex cssMutex;  // NOLINT
         std::unique_ptr<CollectionShardingState> css;
     };
 
@@ -133,7 +130,7 @@ const ServiceContext::Decoration<boost::optional<CollectionShardingStateMap>>
 }  // namespace
 
 CollectionShardingState::ScopedCollectionShardingState::ScopedCollectionShardingState(
-    Lock::ResourceLock lock, CollectionShardingState* css)
+    LockType lock, CollectionShardingState* css)
     : _lock(std::move(lock)), _css(css) {}
 
 CollectionShardingState::ScopedCollectionShardingState::ScopedCollectionShardingState(
@@ -151,15 +148,24 @@ CollectionShardingState::ScopedCollectionShardingState::~ScopedCollectionShardin
 CollectionShardingState::ScopedCollectionShardingState
 CollectionShardingState::ScopedCollectionShardingState::acquireScopedCollectionShardingState(
     OperationContext* opCtx, const NamespaceString& nss, LockMode mode) {
+    // Only IS and X modes are supported.
+    invariant(mode == MODE_IS || mode == MODE_X);
+    const bool shared = mode == MODE_IS;
+
     CollectionShardingStateMap::CSSAndLock* cssAndLock =
         CollectionShardingStateMap::get(opCtx->getServiceContext())->getOrCreate(nss);
 
     if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-        // First lock the RESOURCE_MUTEX associated to this nss to guarantee stability of the
+        // First lock the shared_mutex associated to this nss to guarantee stability of the
         // CollectionShardingState* . After that, it is safe to get and store the
-        // CollectionShadingState*, as long as the RESOURCE_MUTEX is kept locked.
-        Lock::ResourceLock lock(opCtx, cssAndLock->cssMutex.getRid(), mode);
-        return ScopedCollectionShardingState(std::move(lock), cssAndLock->css.get());
+        // CollectionShardingState*, as long as the mutex is kept locked.
+        if (shared) {
+            return ScopedCollectionShardingState(std::shared_lock(cssAndLock->cssMutex),
+                                                 cssAndLock->css.get());
+        } else {
+            return ScopedCollectionShardingState(std::unique_lock(cssAndLock->cssMutex),
+                                                 cssAndLock->css.get());
+        }
     } else {
         // No need to lock the CSSLock on non-shardsvrs. For performance, skip doing it.
         return ScopedCollectionShardingState(cssAndLock->css.get());

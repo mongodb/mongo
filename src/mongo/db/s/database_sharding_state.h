@@ -31,6 +31,7 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <shared_mutex>
 #include <utility>
 #include <vector>
 
@@ -81,9 +82,11 @@ public:
     private:
         friend class DatabaseShardingState;
 
-        ScopedExclusiveDatabaseShardingState(Lock::ResourceLock lock, DatabaseShardingState* dss);
+        ScopedExclusiveDatabaseShardingState(std::unique_lock<std::shared_mutex> lock,  // NOLINT
+                                             DatabaseShardingState* dss);
 
-        Lock::ResourceLock _lock;
+        // This used to be a ResourceMutex, we use a shared_mutex instead to keep similar semantics.
+        std::unique_lock<std::shared_mutex> _lock;  // NOLINT
         DatabaseShardingState* _dss;
     };
 
@@ -91,7 +94,7 @@ public:
      * Obtains the sharding state for the specified database along with a resource lock in shared
      * mode, which will be held until the object goes out of scope.
      */
-    class ScopedSharedDatabaseShardingState : public ScopedExclusiveDatabaseShardingState {
+    class ScopedSharedDatabaseShardingState {
     public:
         const DatabaseShardingState* operator->() const {
             return _dss;
@@ -104,7 +107,11 @@ public:
     private:
         friend class DatabaseShardingState;
 
-        ScopedSharedDatabaseShardingState(Lock::ResourceLock lock, DatabaseShardingState* dss);
+        ScopedSharedDatabaseShardingState(std::shared_lock<std::shared_mutex> lock,  // NOLINT
+                                          DatabaseShardingState* dss);
+        // This used to be a ResourceMutex, we use a shared_mutex instead to keep similar semantics.
+        std::shared_lock<std::shared_mutex> _lock;  // NOLINT
+        DatabaseShardingState* _dss;
     };
 
     static ScopedExclusiveDatabaseShardingState acquireExclusive(OperationContext* opCtx,
