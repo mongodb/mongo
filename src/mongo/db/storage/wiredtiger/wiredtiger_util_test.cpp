@@ -907,6 +907,18 @@ TEST_F(WiredTigerUtilTest, ReconfigureBackgroundCompaction) {
         ErrorCodes::AlreadyInitialized,
         wtRCToStatus(wtSession->compact(nullptr, "background=true,timeout=0,run_once=true"),
                      *wtSession));
+
+    // WT_SESSION::get_last_error should give us more information about reconfiguring background
+    // compaction while it is already running.
+    int err, sub_level_err;
+    const char* err_msg;
+    wtSession->get_last_error(&err, &sub_level_err, &err_msg);
+
+    ASSERT_EQUALS(EINVAL, err);
+    ASSERT_EQUALS(WT_BACKGROUND_COMPACT_ALREADY_RUNNING, sub_level_err);
+    ASSERT_EQUALS("Cannot reconfigure background compaction while it's already running."_sd,
+                  StringData(err_msg));
+
     stopCapturingLogMessages();
 }
 
