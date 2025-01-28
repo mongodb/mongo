@@ -706,11 +706,30 @@ Status AsyncResultsMerger::_scheduleGetMoresForRemotes(
 
     for (size_t i = 0; i < executorRequests.size(); i++) {
         auto& remote = remotes[i];
+        // Make a copy of the remote's cursorId here while holding the mutex. The copy is passed
+        // into the lambda so the cursorId can be accessed without holding the mutex.
+        const auto cursorId = remote->cursorId;
         auto callbackStatus = _executor->scheduleRemoteCommand(
             executorRequests[i],
-            [self = shared_from_this(), remote /* intrusive_ptr copy! */](auto const& cbData) {
+            [self = shared_from_this(), cursorId, remote /* intrusive_ptr copy! */](
+                auto const& cbData) {
+                // Parse response outside of the mutex.
+                auto parsedResponse = [&](const auto& cbData) -> StatusWith<CursorResponse> {
+                    if (!cbData.response.isOK()) {
+                        return cbData.response.status;
+                    }
+                    auto cursorResponseStatus =
+                        _parseCursorResponse(cbData.response.data, cursorId);
+                    if (!cursorResponseStatus.isOK()) {
+                        return cursorResponseStatus.getStatus().withContext(
+                            "Error on remote shard " + remote->shardHostAndPort.toString());
+                    }
+                    return std::move(cursorResponseStatus.getValue());
+                }(cbData);
+
+                // Handle the response and update the remote's status under the mutex.
                 stdx::lock_guard<stdx::mutex> lk(self->_mutex);
-                self->_handleBatchResponse(lk, cbData, remote);
+                self->_handleBatchResponse(lk, cbData, parsedResponse, remote);
             });
 
         if (!callbackStatus.isOK()) {
@@ -895,11 +914,12 @@ bool AsyncResultsMerger::_checkHighWaterMarkEligibility(WithLock,
 
 void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
                                               CbData const& cbData,
+                                              StatusWith<CursorResponse>& parsedResponse,
                                               const RemoteCursorPtr& remote) {
     // Got a response from remote, so indicate we are no longer waiting for one.
     remote->cbHandle = executor::TaskExecutor::CallbackHandle();
 
-    if (cbData.response.isOK()) {
+    if (parsedResponse.isOK()) {
         // We store the original unprocessed response in order to process additional transaction
         // participants when reading it. Additional transaction participants processing cannot occur
         // here since access to the underlying transaction router is not thread-safe.
@@ -921,7 +941,11 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
         // If the remote for which we received a result has been closed via 'closeShardCursors()'
         // before, we do not add the batch results.
         if (!remote->closed) {
-            _processBatchResults(lk, cbData.response, remote);
+            if (parsedResponse.isOK()) {
+                _processBatchResults(lk, parsedResponse.getValue(), remote);
+            } else {
+                _cleanUpFailedBatch(lk, parsedResponse.getStatus(), *remote);
+            }
         }
     } catch (DBException const& e) {
         remote->status = e.toStatus();
@@ -947,23 +971,8 @@ void AsyncResultsMerger::_cleanUpFailedBatch(WithLock, Status status, RemoteCurs
 }
 
 void AsyncResultsMerger::_processBatchResults(WithLock lk,
-                                              CbResponse const& response,
+                                              const CursorResponse& cursorResponse,
                                               const RemoteCursorPtr& remote) {
-    if (!response.isOK()) {
-        _cleanUpFailedBatch(lk, response.status, *remote);
-        return;
-    }
-
-    auto cursorResponseStatus = _parseCursorResponse(response.data, remote->cursorId);
-    if (!cursorResponseStatus.isOK()) {
-        _cleanUpFailedBatch(lk,
-                            cursorResponseStatus.getStatus().withContext(
-                                "Error on remote shard " + remote->shardHostAndPort.toString()),
-                            *remote);
-        return;
-    }
-
-    CursorResponse cursorResponse = std::move(cursorResponseStatus.getValue());
     if (const auto& remoteMetrics = cursorResponse.getCursorMetrics()) {
         _metrics.aggregateCursorMetrics(*remoteMetrics);
     }

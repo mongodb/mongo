@@ -510,7 +510,10 @@ private:
      * When nextEvent() schedules remote work, the callback uses this function to process
      * results.
      */
-    void _handleBatchResponse(WithLock, CbData const&, const RemoteCursorPtr& remote);
+    void _handleBatchResponse(WithLock lk,
+                              CbData const&,
+                              StatusWith<CursorResponse>& response,
+                              const RemoteCursorPtr& remote);
 
     /**
      * Schedule a killCursors request for the remote if the remote still has a cursor open.
@@ -534,13 +537,17 @@ private:
     /**
      * Processes results from a remote query.
      */
-    void _processBatchResults(WithLock, CbResponse const& response, const RemoteCursorPtr& remote);
+    void _processBatchResults(WithLock lk,
+                              const CursorResponse& cursorResponse,
+                              const RemoteCursorPtr& remote);
 
     /**
      * Adds the batch of results to the RemoteCursorData. Returns false if there was an error
      * parsing the batch.
      */
-    bool _addBatchToBuffer(WithLock, const RemoteCursorPtr& remote, const CursorResponse& response);
+    bool _addBatchToBuffer(WithLock lk,
+                           const RemoteCursorPtr& remote,
+                           const CursorResponse& response);
 
     /**
      * If there is a valid unsignaled event that has been requested via nextEvent() and there
