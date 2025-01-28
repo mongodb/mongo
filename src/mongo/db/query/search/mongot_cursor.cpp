@@ -169,7 +169,7 @@ executor::RemoteCommandRequest getRemoteCommandRequest(OperationContext* opCtx,
     doThrowIfNotRunningWithMongotHostConfigured();
     executor::RemoteCommandRequest rcr(
         executor::RemoteCommandRequest(getMongotAddress(), nss.dbName(), cmdObj, opCtx));
-    rcr.sslMode = transport::ConnectSSLMode::kDisableSSL;
+    rcr.sslMode = globalMongotParams.sslMode;
     return rcr;
 }
 // TODO SERVER-91594 makeTaskExecutorCursorForExplain() can be removed when mongot will always

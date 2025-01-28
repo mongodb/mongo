@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/search/search_index_common.h"
 #include "mongo/db/query/search/manage_search_index_request_gen.h"
+#include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/query/search/search_index_options.h"
 #include "mongo/db/query/search/search_index_options_gen.h"
 #include "mongo/db/query/search/search_index_process_interface.h"
@@ -85,7 +86,7 @@ executor::RemoteCommandRequest createManageSearchIndexRemoteCommandRequest(
     // Create a RemoteCommandRequest with the request and host-and-port.
     executor::RemoteCommandRequest remoteManageSearchIndexRequest(executor::RemoteCommandRequest(
         swHostAndPort.getValue(), nss.dbName(), manageSearchIndexRequest.toBSON(), opCtx));
-    remoteManageSearchIndexRequest.sslMode = transport::ConnectSSLMode::kDisableSSL;
+    remoteManageSearchIndexRequest.sslMode = globalMongotParams.sslMode;
     return remoteManageSearchIndexRequest;
 }
 }  // namespace

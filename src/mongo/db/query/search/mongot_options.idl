@@ -29,7 +29,7 @@
 global:
     cpp_namespace: 'mongo'
     cpp_includes:
-      - 'mongo/db/query/search/mongot_options.h'
+        - 'mongo/db/query/search/mongot_options.h'
 
 server_parameters:
     mongotHost:
@@ -77,3 +77,14 @@ server_parameters:
         default: false
         cpp_varname: 'globalMongotParams.useGRPC'
         redact: false
+
+    searchTLSMode:
+      description: "Sets the TLS mode for mongod to mongot connection (globalTLS|disabled|allowTLS|preferTLS|requireTLS). globalTLS will use the setting provided in net.tls.mode, while the other settings will operate according to their usual behavior."
+      set_at: [ startup ]
+      cpp_vartype: std::string
+      cpp_varname: 'searchTLSMode'
+      # TODO SERVER-99787 Change default to "globalTLS"
+      default: 'disabled'
+      redact: false
+
+
