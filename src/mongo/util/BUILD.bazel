@@ -961,7 +961,6 @@ mongo_cc_unit_test(
         "log_with_sampling_test.cpp",
         "lru_cache_test.cpp",
         "md5_test.cpp",
-        "memory_usage_tracker_test.cpp",
         "optional_util_test.cpp",
         "out_of_line_executor_test.cpp",
         "overloaded_visitor_test.cpp",

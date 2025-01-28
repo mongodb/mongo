@@ -32,9 +32,9 @@
 #include <utility>
 
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
-#include "mongo/util/memory_usage_tracker.h"
 
 namespace mongo {
 

@@ -360,7 +360,6 @@ mongo_cc_library(
         "//src/mongo/util:intrusive_counter.h",
         "//src/mongo/util:itoa.h",
         "//src/mongo/util:lockable_adapter.h",
-        "//src/mongo/util:memory_usage_tracker.h",
         "//src/mongo/util:modules.h",
         "//src/mongo/util:murmur3.h",
         "//src/mongo/util:optional_util.h",
@@ -414,6 +413,7 @@ mongo_cc_library(
         "//conditions:default": [],
     }),
     deps = [
+        "//src/mongo/db/memory_tracking",
         "//src/mongo/stdx",
         "//src/mongo/util:boost_assert_shim",
         "//src/mongo/util:debugger",

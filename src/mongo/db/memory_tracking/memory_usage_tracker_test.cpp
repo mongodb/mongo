@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/util/memory_usage_tracker.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"

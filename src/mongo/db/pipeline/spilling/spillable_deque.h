@@ -34,10 +34,10 @@
 #include <memory>
 
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/spilling/spilling_stats.h"
 #include "mongo/db/storage/temporary_record_store.h"
-#include "mongo/util/memory_usage_tracker.h"
 
 namespace mongo {
 

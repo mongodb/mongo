@@ -349,24 +349,4 @@ using MemoryUsageTokenWith = MemoryUsageTokenWithImpl<MemoryUsageTracker::Impl, 
 template <typename T>
 using SimpleMemoryUsageTokenWith = MemoryUsageTokenWithImpl<SimpleMemoryUsageTracker, T>;
 
-// Updatable version of `MemoryUsageTokenImpl`.
-template <typename Tracker>
-class MemoryUsageHandleImpl : public MemoryUsageTokenImpl<Tracker> {
-public:
-    MemoryUsageHandleImpl(Tracker* tracker = nullptr) : MemoryUsageTokenImpl<Tracker>(0, tracker) {}
-    MemoryUsageHandleImpl(int64_t initial, Tracker* tracker = nullptr)
-        : MemoryUsageTokenImpl<Tracker>(initial, tracker) {}
-
-    void add(int64_t diff) {
-        this->_curMemoryUsageBytes += diff;
-        this->_tracker->add(diff);
-    }
-
-    void set(int64_t total) {
-        add(total - this->_curMemoryUsageBytes);
-    }
-};  // class MemoryUsageHandleImpl
-
-using SimpleMemoryUsageHandle = MemoryUsageHandleImpl<SimpleMemoryUsageTracker>;
-
 }  // namespace mongo

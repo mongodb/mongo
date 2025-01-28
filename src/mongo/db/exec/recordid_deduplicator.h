@@ -29,13 +29,13 @@
 
 #pragma once
 
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/spilling/spilling_stats.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/util/hash_roaring_set.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/temporary_record_store.h"
-#include "mongo/util/memory_usage_tracker.h"
 
 namespace mongo {
 
