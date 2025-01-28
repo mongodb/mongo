@@ -63,7 +63,7 @@ public:
                                              const Status& status,
                                              HandshakeStage handshakeStage,
                                              bool isApplicationOperation,
-                                             BSONObj bson) noexcept = 0;
+                                             BSONObj bson) = 0;
 
 protected:
     sdam::HelloOutcome _createErrorHelloOutcome(const HostAndPort& host,
@@ -81,7 +81,7 @@ public:
                                      const Status& status,
                                      HandshakeStage handshakeStage,
                                      bool isApplicationOperation,
-                                     BSONObj bson) noexcept override;
+                                     BSONObj bson) override;
 
 private:
     int _getConsecutiveErrorsWithoutHelloOutcome(const HostAndPort& host) const;

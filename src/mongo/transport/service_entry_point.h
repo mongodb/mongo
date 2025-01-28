@@ -56,7 +56,6 @@ public:
     /**
      * Processes a request and fills out a DbResponse.
      */
-    virtual Future<DbResponse> handleRequest(OperationContext* opCtx,
-                                             const Message& request) noexcept = 0;
+    virtual Future<DbResponse> handleRequest(OperationContext* opCtx, const Message& request) = 0;
 };
 }  // namespace mongo

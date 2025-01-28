@@ -96,13 +96,13 @@ public:
         return _local;
     }
 
-    StatusWith<Message> sourceMessage() noexcept override;
+    StatusWith<Message> sourceMessage() override;
 
-    Status sinkMessage(Message m) noexcept override;
+    Status sinkMessage(Message m) override;
 
-    Future<Message> asyncSourceMessage(const BatonHandle&) noexcept final;
+    Future<Message> asyncSourceMessage(const BatonHandle&) final;
 
-    Future<void> asyncSinkMessage(Message m, const BatonHandle&) noexcept final;
+    Future<void> asyncSinkMessage(Message m, const BatonHandle&) final;
 
     void cancelAsyncOperations(const BatonHandle&) final {
         _cancelAsyncOperations();
@@ -169,11 +169,11 @@ public:
     /**
      * The following APIs are not implemented for both ingress and egress gRPC sessions.
      */
-    Status waitForData() noexcept final {
+    Status waitForData() final {
         MONGO_UNIMPLEMENTED;
     }
 
-    Future<void> asyncWaitForData() noexcept final {
+    Future<void> asyncWaitForData() final {
         MONGO_UNIMPLEMENTED;
     }
 
@@ -293,9 +293,9 @@ public:
 
     ~IngressSession();
 
-    StatusWith<Message> _readFromStream() noexcept override;
+    StatusWith<Message> _readFromStream() override;
 
-    Status _writeToStream(Message message) noexcept override;
+    Status _writeToStream(Message message) override;
 
     boost::optional<UUID> getRemoteClientId() const {
         return _remoteClientId;
@@ -424,11 +424,11 @@ public:
 
     ~EgressSession();
 
-    StatusWith<Message> _readFromStream() noexcept override {
+    StatusWith<Message> _readFromStream() override {
         return _asyncReadFromStream().getNoThrow();
     }
 
-    Status _writeToStream(Message message) noexcept override {
+    Status _writeToStream(Message message) override {
         return _asyncWriteToStream(message).getNoThrow();
     }
 

@@ -178,7 +178,7 @@ public:
      *
      * Note: Must only be called from one thread at a time, and invalid to call if done() is true.
      */
-    Response next() noexcept;
+    Response next();
 
     /**
      * Stops the ARS from retrying requests.
@@ -214,7 +214,7 @@ private:
          * Additionally this call can trigger a refresh of the ShardRegistry so it could possibly
          * return other network error status related to the refresh.
          */
-        SemiFuture<std::shared_ptr<Shard>> getShard() noexcept;
+        SemiFuture<std::shared_ptr<Shard>> getShard();
 
         /**
          * Returns true if we've already queued a response from the remote.

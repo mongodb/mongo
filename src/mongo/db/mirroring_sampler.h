@@ -96,13 +96,13 @@ public:
      * Use the given imr and params to determine if we should attempt to sample.
      */
     bool shouldSample(const std::shared_ptr<const repl::HelloResponse>& imr,
-                      const SamplingParameters& params) const noexcept;
+                      const SamplingParameters& params) const;
 
     /**
      * Return all eligible hosts from a HelloResponse that we should mirror to.
      */
     std::vector<HostAndPort> getRawMirroringTargets(
-        const std::shared_ptr<const repl::HelloResponse>& helloResponse) noexcept;
+        const std::shared_ptr<const repl::HelloResponse>& helloResponse);
 
     /**
      * Approximate use of the MirroringSampler for testing.
@@ -113,7 +113,7 @@ public:
         const std::shared_ptr<const repl::HelloResponse>& helloResponse,
         double ratio,
         RandomFunc rnd = defaultRandomFunc(),
-        int rndMax = defaultRandomMax()) noexcept;
+        int rndMax = defaultRandomMax());
 };
 
 }  // namespace mongo

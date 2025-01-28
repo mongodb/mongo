@@ -156,7 +156,7 @@ void NetworkInterfaceThreadPool::_consumeTasks(stdx::unique_lock<stdx::mutex> lk
     invariant(ret.isOK() || ErrorCodes::isShutdownError(ret.code()));
 }
 
-void NetworkInterfaceThreadPool::_consumeTasksInline(stdx::unique_lock<stdx::mutex> lk) noexcept {
+void NetworkInterfaceThreadPool::_consumeTasksInline(stdx::unique_lock<stdx::mutex> lk) {
     _consumeState = ConsumeState::kConsuming;
     const ScopeGuard consumingTasksGuard([&] { _consumeState = ConsumeState::kNeutral; });
 

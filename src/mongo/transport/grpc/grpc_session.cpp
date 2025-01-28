@@ -65,7 +65,7 @@ GRPCSession::GRPCSession(TransportLayer* tl, HostAndPort remote)
     _restrictionEnvironment = RestrictionEnvironment(std::move(remoteAddr), SockAddr());
 }
 
-StatusWith<Message> GRPCSession::sourceMessage() noexcept {
+StatusWith<Message> GRPCSession::sourceMessage() {
     if (auto s = _verifyNotTerminated(); !s.isOK()) {
         return s.withContext("Could not read from gRPC stream");
     }
@@ -73,7 +73,7 @@ StatusWith<Message> GRPCSession::sourceMessage() noexcept {
     return _readFromStream();
 }
 
-Status GRPCSession::sinkMessage(Message m) noexcept {
+Status GRPCSession::sinkMessage(Message m) {
     if (auto s = _verifyNotTerminated(); !s.isOK()) {
         return s.withContext("Could not write to gRPC stream");
     }
@@ -81,7 +81,7 @@ Status GRPCSession::sinkMessage(Message m) noexcept {
     return _writeToStream(std::move(m));
 }
 
-Future<Message> GRPCSession::asyncSourceMessage(const BatonHandle&) noexcept {
+Future<Message> GRPCSession::asyncSourceMessage(const BatonHandle&) {
     if (auto s = _verifyNotTerminated(); !s.isOK()) {
         return Future<Message>::makeReady(s.withContext("Could not read from gRPC stream"));
     }
@@ -89,7 +89,7 @@ Future<Message> GRPCSession::asyncSourceMessage(const BatonHandle&) noexcept {
     return _asyncReadFromStream();
 }
 
-Future<void> GRPCSession::asyncSinkMessage(Message m, const BatonHandle&) noexcept {
+Future<void> GRPCSession::asyncSinkMessage(Message m, const BatonHandle&) {
     if (auto s = _verifyNotTerminated(); !s.isOK()) {
         return Future<void>::makeReady(s.withContext("Could not write to gRPC stream"));
     }
@@ -165,7 +165,7 @@ IngressSession::~IngressSession() {
                 "status"_attr = terminationStatus());
 }
 
-StatusWith<Message> IngressSession::_readFromStream() noexcept {
+StatusWith<Message> IngressSession::_readFromStream() {
     if (auto maybeBuffer = _stream->read()) {
         networkCounter.hitPhysicalIn(NetworkCounter::ConnectionType::kIngress,
                                      MsgData::ConstView(maybeBuffer->get()).getLen());
@@ -182,7 +182,7 @@ StatusWith<Message> IngressSession::_readFromStream() noexcept {
     }
 }
 
-Status IngressSession::_writeToStream(Message message) noexcept {
+Status IngressSession::_writeToStream(Message message) {
     if (_stream->write(message.sharedBuffer())) {
         networkCounter.hitPhysicalOut(NetworkCounter::ConnectionType::kIngress, message.size());
         return Status::OK();

@@ -188,7 +188,7 @@ private:
          *
          * This must be called from the networking thread (i.e. the reactor).
          */
-        void returnConnection(Status status) noexcept;
+        void returnConnection(Status status);
 
         /**
          * Set a timer to cancel the request at the requested deadline, if any.
@@ -199,7 +199,7 @@ private:
         /**
          * Return the client for a given connection
          */
-        static AsyncDBClient* getClient(const ConnectionPool::ConnectionHandle& conn) noexcept;
+        static AsyncDBClient* getClient(const ConnectionPool::ConnectionHandle& conn);
 
         /**
          * Cancel the operation with the provided status.

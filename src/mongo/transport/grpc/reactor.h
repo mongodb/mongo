@@ -121,7 +121,7 @@ public:
 
     GRPCReactor() : _clkSource(this), _stats(&_clkSource), _cq() {}
 
-    void run() noexcept override;
+    void run() override;
 
     /**
      * Once stop() is called, all calls to schedule() will fail the task with a ShutdownInProgress

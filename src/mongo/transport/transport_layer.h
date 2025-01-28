@@ -252,7 +252,7 @@ public:
     /*
      * Run the event loop of the reactor until stop() is called.
      */
-    virtual void run() noexcept = 0;
+    virtual void run() = 0;
 
     /**
      * Stop the polling loop in run(). drain() must be called after stop() to ensure no outstanding

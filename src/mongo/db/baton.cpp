@@ -65,7 +65,7 @@ public:
         invariant(_isDead);
     }
 
-    void schedule(Task func) noexcept override {
+    void schedule(Task func) override {
         {
             stdx::unique_lock lk(_mutex);
 

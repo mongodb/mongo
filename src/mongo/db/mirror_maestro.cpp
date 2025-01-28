@@ -115,17 +115,17 @@ public:
     /**
      * Make the TaskExecutor and initialize other components.
      */
-    void init(ServiceContext* serviceContext) noexcept;
+    void init(ServiceContext* serviceContext);
 
     /**
      * Shutdown the TaskExecutor and cancel any outstanding work.
      */
-    void shutdown() noexcept;
+    void shutdown();
 
     /**
      * Mirror only if this maestro has been initialized.
      */
-    void tryMirror(const std::shared_ptr<CommandInvocation>& invocation) noexcept;
+    void tryMirror(const std::shared_ptr<CommandInvocation>& invocation);
 
     /**
      * Maintains the state required for mirroring requests.
@@ -145,7 +145,7 @@ public:
 
         MirroredRequestState() = delete;
 
-        void mirror() noexcept {
+        void mirror() {
             invariant(_maestro);
             _maestro->_mirror(_hosts, *_invocation, _params, _mirrorCount);
         }
@@ -167,7 +167,7 @@ private:
     void _mirror(const std::vector<HostAndPort>& hosts,
                  const CommandInvocation& invocation,
                  const MirroredReadsParameters& params,
-                 double mirrorCount) noexcept;
+                 double mirrorCount);
 
     /**
      * An enum detailing the liveness of the Maestro
@@ -241,7 +241,7 @@ public:
      */
     class ResolvedBreakdownByHost {
     public:
-        void onResponseReceived(const HostAndPort& host) noexcept {
+        void onResponseReceived(const HostAndPort& host) {
             const auto hostName = host.toString();
             stdx::lock_guard<stdx::mutex> lk(_mutex);
 
@@ -252,7 +252,7 @@ public:
             _resolved[hostName]++;
         }
 
-        BSONObj toBSON() const noexcept {
+        BSONObj toBSON() const {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
             BSONObjBuilder bob;
             for (const auto& entry : _resolved) {
@@ -333,7 +333,7 @@ Status MirroredReadsServerParameter::setFromString(StringData str,
     return e.toStatus();
 }
 
-void MirrorMaestro::init(ServiceContext* serviceContext) noexcept {
+void MirrorMaestro::init(ServiceContext* serviceContext) {
     auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
     invariant(replCoord);
     if (!replCoord->getSettings().isReplSet()) {
@@ -345,12 +345,12 @@ void MirrorMaestro::init(ServiceContext* serviceContext) noexcept {
     impl.init(serviceContext);
 }
 
-void MirrorMaestro::shutdown(ServiceContext* serviceContext) noexcept {
+void MirrorMaestro::shutdown(ServiceContext* serviceContext) {
     auto& impl = getMirrorMaestroImpl(serviceContext);
     impl.shutdown();
 }
 
-void MirrorMaestro::tryMirrorRequest(OperationContext* opCtx) noexcept {
+void MirrorMaestro::tryMirrorRequest(OperationContext* opCtx) {
     auto& impl = getMirrorMaestroImpl(opCtx->getServiceContext());
 
     const auto& invocation = CommandInvocation::get(opCtx);
@@ -358,14 +358,14 @@ void MirrorMaestro::tryMirrorRequest(OperationContext* opCtx) noexcept {
     impl.tryMirror(invocation);
 }
 
-void MirrorMaestro::onReceiveMirroredRead(OperationContext* opCtx) noexcept {
+void MirrorMaestro::onReceiveMirroredRead(OperationContext* opCtx) {
     const auto& invocation = CommandInvocation::get(opCtx);
     if (MONGO_unlikely(invocation->isMirrored())) {
         gMirroredReadsSection.processedAsSecondary.fetchAndAddRelaxed(1);
     }
 }
 
-void MirrorMaestroImpl::tryMirror(const std::shared_ptr<CommandInvocation>& invocation) noexcept {
+void MirrorMaestroImpl::tryMirror(const std::shared_ptr<CommandInvocation>& invocation) {
     if (!_isInitialized.load()) {
         // If we're not even available, nothing to do
         return;
@@ -428,7 +428,7 @@ void MirrorMaestroImpl::tryMirror(const std::shared_ptr<CommandInvocation>& invo
 void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
                                 const CommandInvocation& invocation,
                                 const MirroredReadsParameters& params,
-                                const double mirrorCount) noexcept try {
+                                const double mirrorCount) try {
     auto payload = [&] {
         BSONObjBuilder bob;
 
@@ -542,7 +542,7 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
     LOGV2_DEBUG(31456, 2, "Mirroring failed", "reason"_attr = e);
 }
 
-void MirrorMaestroImpl::init(ServiceContext* serviceContext) noexcept {
+void MirrorMaestroImpl::init(ServiceContext* serviceContext) {
     LOGV2_DEBUG(31452, 2, "Initializing MirrorMaestro");
 
     // Until the end of this scope, no other thread can mutate _initGuard.liveness, so no other
@@ -593,7 +593,7 @@ void MirrorMaestroImpl::init(ServiceContext* serviceContext) noexcept {
     _isInitialized.store(true);
 }
 
-void MirrorMaestroImpl::shutdown() noexcept {
+void MirrorMaestroImpl::shutdown() {
     LOGV2_DEBUG(31454, 2, "Shutting down MirrorMaestro");
 
     // Until the end of this scope, no other thread can mutate _initGuard.liveness, so no other

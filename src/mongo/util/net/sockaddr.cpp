@@ -82,7 +82,7 @@ AddrInfoPtr resolveAddrInfo(StringData hostOrIp, int port, sa_family_t familyHin
     const auto hostString = std::string(hostOrIp);
     const auto portString = ItoA(port).toString();
 
-    auto tryResolve = [&](bool allowDns) noexcept {
+    auto tryResolve = [&](bool allowDns) {
         AddrError result;
 
         addrinfo hints;

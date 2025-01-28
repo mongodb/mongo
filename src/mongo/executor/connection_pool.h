@@ -115,7 +115,7 @@ public:
     /**
      * Make a vanilla LimitController as a decent default option
      */
-    static std::shared_ptr<ControllerInterface> makeLimitController() noexcept;
+    static std::shared_ptr<ControllerInterface> makeLimitController();
 
     struct Options {
         Options() {}

@@ -50,7 +50,7 @@ void ReplicaSetChangeNotifier::_addListener(std::shared_ptr<Listener> listener) 
     _listeners.push_back(listener);
 }
 
-void ReplicaSetChangeNotifier::onFoundSet(const std::string& name) noexcept {
+void ReplicaSetChangeNotifier::onFoundSet(const std::string& name) {
     LOGV2_DEBUG(20158, 2, "Signaling found set", "replicaSet"_attr = name);
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
@@ -67,7 +67,7 @@ void ReplicaSetChangeNotifier::onFoundSet(const std::string& name) noexcept {
     };
 }
 
-void ReplicaSetChangeNotifier::onPossibleSet(ConnectionString connectionString) noexcept {
+void ReplicaSetChangeNotifier::onPossibleSet(ConnectionString connectionString) {
     LOGV2_DEBUG(20159, 2, "Signaling possible set", "connectionString"_attr = connectionString);
 
     const auto& name = connectionString.getSetName();
@@ -96,7 +96,7 @@ void ReplicaSetChangeNotifier::onPossibleSet(ConnectionString connectionString) 
 
 void ReplicaSetChangeNotifier::onConfirmedSet(ConnectionString connectionString,
                                               HostAndPort primary,
-                                              std::set<HostAndPort> passives) noexcept {
+                                              std::set<HostAndPort> passives) {
     LOGV2_DEBUG(20160,
                 2,
                 "Signaling confirmed set with primary",
@@ -127,7 +127,7 @@ void ReplicaSetChangeNotifier::onConfirmedSet(ConnectionString connectionString,
     };
 }
 
-void ReplicaSetChangeNotifier::onDroppedSet(const std::string& name) noexcept {
+void ReplicaSetChangeNotifier::onDroppedSet(const std::string& name) {
     LOGV2_DEBUG(20161, 2, "Signaling dropped set", "replicaSet"_attr = name);
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);

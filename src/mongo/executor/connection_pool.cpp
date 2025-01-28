@@ -95,7 +95,7 @@ auto makeSeveritySuppressor() {
 }
 
 template <typename Map, typename Key>
-auto& getOrInvariant(Map&& map, const Key& key) noexcept {
+auto& getOrInvariant(Map&& map, const Key& key) {
     auto it = std::forward<Map>(map).find(key);
     invariant(it != std::forward<Map>(map).end(), "Unable to find key in map");
 
@@ -103,12 +103,12 @@ auto& getOrInvariant(Map&& map, const Key& key) noexcept {
 }
 
 template <typename Map, typename... Args>
-void emplaceOrInvariant(Map&& map, Args&&... args) noexcept {
+void emplaceOrInvariant(Map&& map, Args&&... args) {
     auto ret = std::forward<Map>(map).emplace(std::forward<Args>(args)...);
     invariant(ret.second, "Element already existed in map/set");
 }
 
-bool shouldInvariantOnPoolCorrectness() noexcept {
+bool shouldInvariantOnPoolCorrectness() {
     return kDebugBuild;
 }
 
@@ -243,7 +243,7 @@ protected:
 };
 
 
-auto ConnectionPool::makeLimitController() noexcept -> std::shared_ptr<ControllerInterface> {
+auto ConnectionPool::makeLimitController() -> std::shared_ptr<ControllerInterface> {
     return std::make_shared<LimitController>();
 }
 

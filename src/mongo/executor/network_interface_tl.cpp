@@ -495,7 +495,7 @@ void NetworkInterfaceTL::CommandStateBase::cancel(Status status) {
 }
 
 AsyncDBClient* NetworkInterfaceTL::CommandStateBase::getClient(
-    const ConnectionPool::ConnectionHandle& conn) noexcept {
+    const ConnectionPool::ConnectionHandle& conn) {
     if (!conn) {
         return nullptr;
     }
@@ -556,7 +556,7 @@ void NetworkInterfaceTL::CommandStateBase::setTimer() {
         });
 }
 
-void NetworkInterfaceTL::CommandStateBase::returnConnection(Status status) noexcept {
+void NetworkInterfaceTL::CommandStateBase::returnConnection(Status status) {
     invariant(conn);
 
     auto connToReturn = std::exchange(conn, {});
@@ -992,7 +992,7 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::_runCommand(
                     return err;
                 });
         })
-        .onCompletion([cmdState, this](StatusWith<RemoteCommandResponse> swResponse) noexcept {
+        .onCompletion([cmdState, this](StatusWith<RemoteCommandResponse> swResponse) {
             // If the command was cancelled for a reason, return a status that reflects that.
             if (swResponse == ErrorCodes::CallbackCanceled) {
                 stdx::lock_guard<stdx::mutex> lk(cmdState->cancelMutex);

@@ -240,21 +240,21 @@ void CommonAsioSession::end() {
     }
 }
 
-StatusWith<Message> CommonAsioSession::sourceMessage() noexcept try {
+StatusWith<Message> CommonAsioSession::sourceMessage() try {
     ensureSync();
     return sourceMessageImpl().getNoThrow();
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
 
-Future<Message> CommonAsioSession::asyncSourceMessage(const BatonHandle& baton) noexcept try {
+Future<Message> CommonAsioSession::asyncSourceMessage(const BatonHandle& baton) try {
     ensureAsync();
     return sourceMessageImpl(baton);
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
 
-Status CommonAsioSession::waitForData() noexcept try {
+Status CommonAsioSession::waitForData() try {
     ensureSync();
     asio::error_code ec;
     getSocket().wait(asio::ip::tcp::socket::wait_read, ec);
@@ -263,22 +263,21 @@ Status CommonAsioSession::waitForData() noexcept try {
     return ex.toStatus();
 }
 
-Future<void> CommonAsioSession::asyncWaitForData() noexcept try {
+Future<void> CommonAsioSession::asyncWaitForData() try {
     ensureAsync();
     return getSocket().async_wait(asio::ip::tcp::socket::wait_read, UseFuture{});
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
 
-Status CommonAsioSession::sinkMessage(Message message) noexcept try {
+Status CommonAsioSession::sinkMessage(Message message) try {
     ensureSync();
     return sinkMessageImpl(std::move(message)).getNoThrow();
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
 
-Future<void> CommonAsioSession::asyncSinkMessage(Message message, const BatonHandle& baton) noexcept
-    try {
+Future<void> CommonAsioSession::asyncSinkMessage(Message message, const BatonHandle& baton) try {
     ensureAsync();
     return sinkMessageImpl(std::move(message), baton);
 } catch (const DBException& ex) {

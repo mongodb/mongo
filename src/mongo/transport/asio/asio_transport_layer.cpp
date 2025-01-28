@@ -185,7 +185,7 @@ class AsioReactor final : public Reactor {
 public:
     AsioReactor() : _clkSource(this), _stats(&_clkSource), _ioContext() {}
 
-    void run() noexcept override {
+    void run() override {
         ThreadIdGuard threadIdGuard(this);
         asio::io_context::work work(_ioContext);
         _ioContext.run();
@@ -1134,7 +1134,7 @@ void AsioTransportLayer::appendStatsForFTDC(BSONObjBuilder& bob) const {
     queueDepthsArrayBuilder.done();
 }
 
-void AsioTransportLayer::_runListener() noexcept {
+void AsioTransportLayer::_runListener() {
     setThreadName("listener");
 
     stdx::unique_lock lk(_mutex);
@@ -1371,8 +1371,7 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
     acceptor.async_accept(*_ingressReactor, std::move(acceptCb));
 }
 
-void AsioTransportLayer::_trySetListenerSocketBacklogQueueDepth(
-    GenericAcceptor& acceptor) noexcept {
+void AsioTransportLayer::_trySetListenerSocketBacklogQueueDepth(GenericAcceptor& acceptor) {
 #ifdef __linux__
     try {
         if (!isTcp(acceptor.local_endpoint().protocol()))

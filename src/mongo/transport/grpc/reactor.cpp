@@ -56,7 +56,7 @@ Future<void> GRPCReactorTimer::waitUntil(Date_t deadline, const BatonHandle& bat
     return reactor->_setAlarm(_alarm, ::grpc::TimePoint(deadline.toSystemTimePoint()).raw_time());
 };
 
-void GRPCReactor::run() noexcept {
+void GRPCReactor::run() {
     ThreadIdGuard threadIdGuard(this);
     void* tag;
     bool ok = false;

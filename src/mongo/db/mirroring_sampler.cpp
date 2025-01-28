@@ -66,7 +66,7 @@ MirroringSampler::SamplingParameters::SamplingParameters(const double ratio,
       }()) {}
 
 bool MirroringSampler::shouldSample(const std::shared_ptr<const repl::HelloResponse>& helloResp,
-                                    const SamplingParameters& params) const noexcept {
+                                    const SamplingParameters& params) const {
     if (!helloResp) {
         // If we don't have a HelloResponse, we can't know where to send our mirrored request.
         return false;
@@ -90,7 +90,7 @@ bool MirroringSampler::shouldSample(const std::shared_ptr<const repl::HelloRespo
 }
 
 std::vector<HostAndPort> MirroringSampler::getRawMirroringTargets(
-    const std::shared_ptr<const repl::HelloResponse>& helloResp) noexcept {
+    const std::shared_ptr<const repl::HelloResponse>& helloResp) {
     invariant(helloResp);
     if (!helloResp->isWritablePrimary()) {
         // Don't mirror if we're not primary
@@ -119,7 +119,7 @@ std::vector<HostAndPort> MirroringSampler::getMirroringTargets(
     const std::shared_ptr<const repl::HelloResponse>& helloResp,
     const double ratio,
     RandomFunc rnd,
-    const int rndMax) noexcept {
+    const int rndMax) {
 
     auto sampler = MirroringSampler();
 

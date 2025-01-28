@@ -111,7 +111,7 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
     CurOp::get(_opCtx)->ensureRecordRemoteOpWait();
 }
 
-AsyncRequestsSender::Response AsyncRequestsSender::next() noexcept {
+AsyncRequestsSender::Response AsyncRequestsSender::next() {
     invariant(!done());
 
     hangBeforePollResponse.executeIf(
@@ -262,7 +262,7 @@ AsyncRequestsSender::RemoteData::RemoteData(AsyncRequestsSender* ars,
       _designatedHostAndPort(std::move(designatedHostAndPort)),
       _shard(std::move(shard)) {}
 
-SemiFuture<std::shared_ptr<Shard>> AsyncRequestsSender::RemoteData::getShard() noexcept {
+SemiFuture<std::shared_ptr<Shard>> AsyncRequestsSender::RemoteData::getShard() {
     if (_shard) {
         // Clear the cached shard so any retries will look up the shard again, in case its state has
         // changed.
