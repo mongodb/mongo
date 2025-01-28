@@ -27,17 +27,28 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/shell/shell_utils.h"
+#include "mongo/shell/shell_utils_extended.h"
 
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/unittest/temp_dir.h"
 
 namespace mongo {
 namespace {
+using shell_utils::getObjInDumpFile;
 using shell_utils::NormalizationOpts;
 using shell_utils::NormalizationOptsSet;
 using shell_utils::normalizeBSONObj;
+using shell_utils::numObjsInDumpFile;
+using shell_utils::readDumpFile;
+using shell_utils::removeFile;
+using shell_utils::writeBsonArrayToFile;
 
 const auto fullOpts = NormalizationOpts::kSortBSON | NormalizationOpts::kSortArrays |
     NormalizationOpts::kNormalizeNumerics;
@@ -401,6 +412,50 @@ TEST(NormalizationOpts, NormalizeFullConflateNullAndMissing) {
         "{ a: { b: [ 1.000000000000000000000000000000000, 2.000000000000000000000000000000000 ], "
         "c: 1.000000000000000000000000000000000 } }";
     ASSERT_EQ(normalizeBSONObj(bson, opts).toString(), expected);
+}
+
+TEST(DumpUtils, BasicDumpWriteRead) {
+    unittest::TempDir tempDir("DumpUtils_BasicDumpWriteRead");
+
+    BSONObj one = fromjson("{foo: 1}");
+    BSONObj two = fromjson("{bar: 2}");
+    BSONObj three = fromjson("{bam: 3}");
+    BSONArray dump = BSON_ARRAY(one << two << three);
+    std::vector<BSONObj> expected = {one, two, three};
+
+    // Write our test array
+    BSONObj result = writeBsonArrayToFile(BSON("a" << tempDir.path() + "/test.bson"
+                                                   << "b" << dump),
+                                          nullptr);
+    ASSERT_EQ(1, result.nFields());
+    ASSERT_EQ(BSONType::Undefined, result.firstElement().type());
+
+    // Check bulk read
+    result = readDumpFile(BSON("a" << tempDir.path() + "/test.bson"), nullptr);
+    ASSERT_EQ(1, result.nFields());
+    ASSERT_EQ(BSONType::Array, result.firstElement().type());
+    ASSERT_EQ(3, result.firstElement().Array().size());
+    ASSERT_TRUE(one.binaryEqual(result.firstElement().Array().at(0).Obj()));
+    ASSERT_TRUE(two.binaryEqual(result.firstElement().Array().at(1).Obj()));
+    ASSERT_TRUE(three.binaryEqual(result.firstElement().Array().at(2).Obj()));
+
+    // Check iterative read
+    result = numObjsInDumpFile(BSON("a" << tempDir.path() + "/test.bson"), nullptr);
+    ASSERT_EQ(1, result.nFields());
+    ASSERT_EQ(3, result.firstElement().safeNumberInt());
+    for (size_t i = 0; i < expected.size(); ++i) {
+        BSONObjBuilder cmdBuilder;
+        cmdBuilder.append("a", tempDir.path() + "/test.bson");
+        cmdBuilder.appendNumber("b", (int)i);
+        result = getObjInDumpFile(cmdBuilder.obj(), nullptr);
+        ASSERT_EQ(1, result.nFields());
+        ASSERT_TRUE(expected[i].binaryEqual(result.firstElement().Obj()));
+    }
+
+    // Cleanup
+    result = removeFile(BSON("a" << tempDir.path() + "/test.bson"), nullptr);
+    ASSERT_EQ(1, result.nFields());
+    ASSERT_TRUE(result.firstElement().booleanSafe());
 }
 
 TEST(NormalizationOpts, RoundedFloatingPointNumericsAreEqual) {
