@@ -333,6 +333,9 @@ __wt_session_compact(WT_SESSION *wt_session, const char *uri, const char *config
     session = (WT_SESSION_IMPL *)wt_session;
     SESSION_API_CALL(session, compact, config, cfg);
 
+    if (uri == NULL)
+        WT_ERR_MSG(session, EINVAL, "Compaction requires a URI");
+
     WT_STAT_CONN_SET(session, session_table_compact_running, 1);
 
     /*

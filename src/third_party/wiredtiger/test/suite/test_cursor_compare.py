@@ -26,13 +26,16 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import sys, wiredtiger, wttest
 from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
 from wtscenario import make_scenarios
 
 # Test cursor comparisons.
 class test_cursor_comparison(wttest.WiredTigerTestCase):
     name = 'test_compare'
+    # Note: SWIG generates a TypeError instead of a RuntimeError for several cases.
+    # The same error on all platforms would be better.
+    expected_exception = TypeError if sys.platform.startswith('darwin') else RuntimeError
 
     types = [
         ('file', dict(type='file:', lsm=False, dataset=SimpleDataSet)),
@@ -114,7 +117,7 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
             wiredtiger.WiredTigerError, lambda: cX.compare(c1), msg)
         msg = '/wt_cursor.* is None/'
         self.assertRaisesHavingMessage(
-            RuntimeError,  lambda: cX.compare(None), msg)
+            self.expected_exception,  lambda: cX.compare(None), msg)
         if ix0_0 != None:
             self.assertEqual(ix0_0.compare(ix0_1), 0)
             ix0_1.reset()
@@ -203,7 +206,7 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
             wiredtiger.WiredTigerError, lambda: cX.equals(c1), msg)
         msg = '/wt_cursor.* is None/'
         self.assertRaisesHavingMessage(
-            RuntimeError,  lambda: cX.equals(None), msg)
+            self.expected_exception,  lambda: cX.equals(None), msg)
         if ix0_0 != None:
             self.assertTrue(ix0_0.equals(ix0_1))
             ix0_1.reset()

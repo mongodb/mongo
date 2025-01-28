@@ -191,7 +191,7 @@ def session_compact_replace(orig_session_compact, session_self, uri, config):
     # a tiered table, but we don't have the create config around to check.
     # We want readonly connections to do the real call, see comment in testcase_is_readonly.
     ret = 0
-    if not uri.startswith("table:") or testcase_is_readonly():
+    if not uri or not uri.startswith("table:") or testcase_is_readonly():
         ret = orig_session_compact(session_self, uri, config)
     return ret
 
