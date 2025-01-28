@@ -711,6 +711,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
                 uassert(5346503,
                         "include or exclude field element must be a single-element field path",
                         field.find('.') == std::string::npos);
+                // TODO SERVER-98589: Remove when BSON field name type is implemented.
+                uassert(9568705,
+                        "include or exclude field element must not contain an embedded null byte",
+                        field.find('\0') == std::string::npos);
                 bucketSpec.addIncludeExcludeField(field);
             }
             bucketSpec.setBehavior(fieldName == kInclude ? BucketSpec::Behavior::kInclude
@@ -725,7 +729,12 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
             uassert(5346504,
                     str::stream() << "timeField field must be a string, got: " << elem.type(),
                     elem.type() == BSONType::String);
-            bucketSpec.setTimeField(elem.str());
+            auto timeField = elem.str();
+            // TODO SERVER-98589: Remove when BSON field name type is implemented.
+            uassert(9568701,
+                    str::stream() << "timeField must not contain an embedded null byte",
+                    timeField.find('\0') == std::string::npos);
+            bucketSpec.setTimeField(std::move(timeField));
             hasTimeField = true;
         } else if (fieldName == timeseries::kMetaFieldName) {
             uassert(5346505,
@@ -735,6 +744,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
             uassert(5545700,
                     str::stream() << "metaField field must be a single-element field path",
                     metaField.find('.') == std::string::npos);
+            // TODO SERVER-98589: Remove when BSON field name type is implemented.
+            uassert(9568702,
+                    str::stream() << "metaField field must not contain an embedded null byte",
+                    metaField.find('\0') == std::string::npos);
             bucketSpec.setMetaField(std::move(metaField));
         } else if (fieldName == kBucketMaxSpanSeconds) {
             uassert(5510600,
@@ -762,6 +775,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
                 uassert(5509902,
                         "computedMetaProjFields field element must be a single-element field path",
                         field.find('.') == std::string::npos);
+                // TODO SERVER-98589: Remove when BSON field name type is implemented.
+                uassert(9568706,
+                        "computedMetaProjFields field must not contain an embedded null byte",
+                        field.find('\0') == std::string::npos);
                 bucketSpec.addComputedMetaProjFields(field);
             }
         } else if (fieldName == kIncludeMinTimeAsMetadata) {
@@ -846,10 +863,15 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
         auto fieldName = elem.fieldNameStringData();
         // We only expose "timeField" and "metaField" as parameters in $_unpackBucket.
         if (fieldName == timeseries::kTimeFieldName) {
+            auto timeField = elem.str();
             uassert(5612401,
                     str::stream() << "timeField field must be a string, got: " << elem.type(),
                     elem.type() == BSONType::String);
-            bucketSpec.setTimeField(elem.str());
+            // TODO SERVER-98589: Remove when BSON field name type is implemented.
+            uassert(9568703,
+                    str::stream() << "timeField must not contain an embedded null byte",
+                    timeField.find('\0') == std::string::npos);
+            bucketSpec.setTimeField(std::move(timeField));
             hasTimeField = true;
         } else if (fieldName == timeseries::kMetaFieldName) {
             uassert(5612402,
@@ -859,6 +881,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
             uassert(5612403,
                     str::stream() << "metaField field must be a single-element field path",
                     metaField.find('.') == std::string::npos);
+            // TODO SERVER-98589: Remove when BSON field name type is implemented.
+            uassert(9568704,
+                    str::stream() << "metaField field must not contain an embedded null byte",
+                    metaField.find('\0') == std::string::npos);
             bucketSpec.setMetaField(std::move(metaField));
         } else if (fieldName == kAssumeNoMixedSchemaData) {
             uassert(6067203,

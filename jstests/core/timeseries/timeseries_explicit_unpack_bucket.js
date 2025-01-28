@@ -152,3 +152,79 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     assert.throws(() => sysCollWithMeta.aggregate([{$_unpackBucket: {timeField: "start"}}])),
                  5369601);
+
+// Collection creation fails if 'timeField' or 'metaField' contains embedded null bytes.
+const tsCollNullByte = testDB.getCollection("tsCollNullByte");
+assert.commandFailedWithCode(
+    assert.throws(() => assert.commandWorked(testDB.createCollection(
+                      tsCollNullByte.getName(),
+                      {timeseries: {timeField: "a\x00b", metaField: "tags"}}))),
+                 ErrorCodes.BadValue);
+
+assert.commandFailedWithCode(
+    assert.throws(() => assert.commandWorked(testDB.createCollection(
+                      tsCollNullByte.getName(),
+                      {timeseries: {timeField: "time", metaField: "a\x00b"}}))),
+                 ErrorCodes.BadValue);
+
+// $_unpackBucket fails if timeField or metaField contains null bytes.
+assert.commandFailedWithCode(
+    assert.throws(() => sysCollWithMeta.aggregate(
+                      [{$_unpackBucket: {timeField: "a\x00b", metaField: "tags"}}])),
+                 9568703);
+
+assert.commandFailedWithCode(
+    assert.throws(() => sysCollWithMeta.aggregate(
+                      [{$_unpackBucket: {timeField: "time", metaField: "a\x00b"}}])),
+                 9568704);
+
+// $_internalUnpackBucket fails if timeField or metaField contains null bytes.
+assert.commandFailedWithCode(assert.throws(() => sysCollWithMeta.aggregate([{
+                                              $_internalUnpackBucket: {
+                                                  timeField: "a\x00b",
+                                                  metaField: "tags",
+                                                  bucketMaxSpanSeconds: NumberInt(3600)
+                                              }
+                                          }])),
+                                          9568701);
+
+assert.commandFailedWithCode(assert.throws(() => sysCollWithMeta.aggregate([{
+                                              $_internalUnpackBucket: {
+                                                  timeField: "time",
+                                                  metaField: "a\x00b",
+                                                  bucketMaxSpanSeconds: NumberInt(3600)
+                                              }
+                                          }])),
+                                          9568702);
+
+// $_internalUnpackBucket fails if include or exclude contains null bytes.
+// "include"
+assert.commandFailedWithCode(assert.throws(() => sysCollWithMeta.aggregate([{
+                                              $_internalUnpackBucket: {
+                                                  include: ["start", "invalid_\x00"],
+                                                  timeField: "start",
+                                                  metaField: "tags",
+                                                  bucketMaxSpanSeconds: NumberInt(3600)
+                                              }
+                                          }])),
+                                          9568705);
+// "exclude"
+assert.commandFailedWithCode(assert.throws(() => sysCollWithMeta.aggregate([{
+                                              $_internalUnpackBucket: {
+                                                  exclude: ["start", "value_\x00"],
+                                                  timeField: "start",
+                                                  metaField: "tags",
+                                                  bucketMaxSpanSeconds: NumberInt(3600)
+                                              }
+                                          }])),
+                                          9568705);
+
+// $_internalUnpackBucket fails if computedMetaProjFields contains null bytes.
+assert.commandFailedWithCode(assert.throws(() => sysCollWithMeta.aggregate([{
+                                              $_internalUnpackBucket: {
+                                                  timeField: "time",
+                                                  metaField: "tags",
+                                                  computedMetaProjFields: ["invalid_\x00_field"]
+                                              }
+                                          }])),
+                                          9568706);
