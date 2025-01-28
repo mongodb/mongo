@@ -390,7 +390,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
     }
 
     if (needsSpecialHandling &&
-        args.coll->ns() == NamespaceString::kShardConfigDatabasesNamespace) {
+        args.coll->ns() == NamespaceString::kConfigCacheDatabasesNamespace) {
         // Notification of routing table changes is only needed on secondaries that are applying
         // oplog entries.
         if (opCtx->isEnforcingConstraints()) {
@@ -630,7 +630,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(opCtx, documentId);
     }
 
-    if (nss == NamespaceString::kShardConfigDatabasesNamespace) {
+    if (nss == NamespaceString::kConfigCacheDatabasesNamespace) {
         // Primaries take locks when writing to certain internal namespaces. It must
         // be ensured that those locks are also taken on secondaries, when applying
         // the related oplog entries. Return early, if the node is not a secondary

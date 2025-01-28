@@ -65,3 +65,7 @@ structs:
             userSelectedPrimary:
                 type: bool
                 description: "If the primary shard was specified by the user."
+            authoritativeShardCommit:
+                type: safeBool
+                description: "If the coordinator needs to commit to the shard-local durable collection"
+                optional: true

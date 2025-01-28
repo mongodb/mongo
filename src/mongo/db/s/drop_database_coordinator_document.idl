@@ -69,4 +69,8 @@ structs:
                 description: "Collection currently being dropped."
                 type: CollectionInfo
                 optional: true
+            authoritativeShardCommit:
+                 type: safeBool
+                 description: "If the primary shard needs to commit to the shard-local durable collection"
+                 optional: true
 

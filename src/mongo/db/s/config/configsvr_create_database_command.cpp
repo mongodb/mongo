@@ -112,6 +112,9 @@ public:
                 bool createDatabaseDDLCoordinatorFeatureFlagEnabled =
                     feature_flags::gCreateDatabaseDDLCoordinator.isEnabled(
                         (*fixedFcvRegion).acquireFCVSnapshot());
+                bool shardAuthoritativeDbMetadataFeatureFlagEnabled =
+                    feature_flags::gShardAuthoritativeDbMetadata.isEnabled(
+                        (*fixedFcvRegion).acquireFCVSnapshot());
 
                 if (!createDatabaseDDLCoordinatorFeatureFlagEnabled) {
                     getCreateDatabaseResponse = [&]() {
@@ -129,6 +132,8 @@ public:
                         {{NamespaceString(dbName), DDLCoordinatorTypeEnum::kCreateDatabase}});
                     coordinatorDoc.setPrimaryShard(optResolvedPrimaryShard);
                     coordinatorDoc.setUserSelectedPrimary(optResolvedPrimaryShard.is_initialized());
+                    coordinatorDoc.setAuthoritativeShardCommit(
+                        shardAuthoritativeDbMetadataFeatureFlagEnabled);
                     auto service = ShardingDDLCoordinatorService::getService(opCtx);
                     auto createDatabaseCoordinator =
                         checked_pointer_cast<CreateDatabaseCoordinator>(

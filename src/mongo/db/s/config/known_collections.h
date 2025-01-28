@@ -76,7 +76,7 @@ const StringDataSet kConfigCollections{
     NamespaceString::kSetChangeStreamStateCoordinatorNamespace.coll(),
     NamespaceString::kShardCollectionCatalogNamespace.coll(),
     NamespaceString::kShardConfigCollectionsNamespace.coll(),
-    NamespaceString::kShardConfigDatabasesNamespace.coll(),
+    NamespaceString::kConfigCacheDatabasesNamespace.coll(),
     NamespaceString::kShardIndexCatalogNamespace.coll(),
     NamespaceString::kShardingDDLCoordinatorsNamespace.coll(),
     NamespaceString::kShardingRenameParticipantsNamespace.coll(),

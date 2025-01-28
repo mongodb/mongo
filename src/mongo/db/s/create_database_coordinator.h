@@ -32,6 +32,7 @@
 #include "mongo/db/s/create_database_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
@@ -84,6 +85,10 @@ private:
                               std::shared_ptr<executor::ScopedTaskExecutor> executor,
                               const CancellationToken& token,
                               bool throwIfReasonDiffers);
+
+    DatabaseType _commitClusterCatalog(OperationContext* opCtx);
+
+    void _commitShardLocalCatalog(OperationContext* opCtx, const DatabaseType& db);
 
     const BSONObj _critSecReason;
 

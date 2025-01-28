@@ -57,6 +57,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/move_primary_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
@@ -101,6 +102,10 @@ public:
             const auto coordinatorFuture = [&] {
                 FixedFCVRegion fcvRegion(opCtx);
 
+                const bool shardAuthoritativeDbMetadataFeatureFlagEnabled =
+                    feature_flags::gShardAuthoritativeDbMetadata.isEnabled(
+                        (*fcvRegion).acquireFCVSnapshot());
+
                 auto shardRegistry = Grid::get(opCtx)->shardRegistry();
                 // Ensure that the shard information is up-to-date as possible to catch the case
                 // where a shard with the same name, but with a different host, has been
@@ -115,6 +120,7 @@ public:
                     doc.setShardingDDLCoordinatorMetadata(
                         {{dbNss, DDLCoordinatorTypeEnum::kMovePrimary}});
                     doc.setToShardId(toShard->getId());
+                    doc.setAuthoritativeShardCommit(shardAuthoritativeDbMetadataFeatureFlagEnabled);
                     return doc.toBSON();
                 }();
 

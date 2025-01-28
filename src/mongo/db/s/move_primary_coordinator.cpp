@@ -61,6 +61,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
+#include "mongo/db/s/shard_database_metadata_client.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_recovery_service.h"
@@ -77,7 +78,6 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -313,7 +313,11 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                 const auto& preCommitDbVersion = *_doc.getDatabaseVersion();
 
                 commitMetadataToConfig(opCtx, preCommitDbVersion);
-                assertChangedMetadataOnConfig(opCtx, preCommitDbVersion);
+
+                auto dbMetadata = getPostCommitDatabaseMetadata(opCtx);
+                assertChangedMetadataOnConfig(opCtx, dbMetadata, preCommitDbVersion);
+
+                commitMetadataToShards(opCtx, dbMetadata.getVersion());
 
                 notifyChangeStreamsOnMovePrimary(
                     opCtx, _dbName, ShardingState::get(opCtx)->shardId(), _doc.getToShardId());
@@ -672,34 +676,48 @@ void MovePrimaryCoordinator::commitMetadataToConfig(
             _dbName.toStringForErrorMsg()));
 }
 
+DatabaseType MovePrimaryCoordinator::getPostCommitDatabaseMetadata(OperationContext* opCtx) const {
+    const auto config = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto findResponse = uassertStatusOK(config->exhaustiveFindOnConfig(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        repl::ReadConcernLevel::kMajorityReadConcern,
+        NamespaceString::kConfigDatabasesNamespace,
+        BSON(DatabaseType::kDbNameFieldName
+             << DatabaseNameUtil::serialize(_dbName, SerializationContext::stateDefault())),
+        BSONObj(),
+        1));
+
+    const auto databases = std::move(findResponse.docs);
+    uassert(ErrorCodes::IncompatibleShardingMetadata,
+            "Tried to find version for database {}, but found no databases"_format(
+                _dbName.toStringForErrorMsg()),
+            !databases.empty());
+
+    return DatabaseType::parse(IDLParserContext("DatabaseType"), databases.front());
+}
+
 void MovePrimaryCoordinator::assertChangedMetadataOnConfig(
-    OperationContext* opCtx, const DatabaseVersion& preCommitDbVersion) const {
-    const auto postCommitDbType = [&]() {
-        const auto config = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto findResponse = uassertStatusOK(config->exhaustiveFindOnConfig(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kMajorityReadConcern,
-            NamespaceString::kConfigDatabasesNamespace,
-            BSON(DatabaseType::kDbNameFieldName
-                 << DatabaseNameUtil::serialize(_dbName, SerializationContext::stateDefault())),
-            BSONObj(),
-            1));
-
-        const auto databases = std::move(findResponse.docs);
-        uassert(ErrorCodes::IncompatibleShardingMetadata,
-                "Tried to find version for database {}, but found no databases"_format(
-                    _dbName.toStringForErrorMsg()),
-                !databases.empty());
-
-        return DatabaseType::parse(IDLParserContext("DatabaseType"), databases.front());
-    }();
+    OperationContext* opCtx,
+    const DatabaseType& postCommitDbType,
+    const DatabaseVersion& preCommitDbVersion) const {
     tassert(7120208,
             "Error committing movePrimary: database version went backwards",
             postCommitDbType.getVersion() > preCommitDbVersion);
     uassert(7120209,
             "Error committing movePrimary: update of config.databases failed",
             postCommitDbType.getPrimary() != ShardingState::get(opCtx)->shardId());
+}
+
+void MovePrimaryCoordinator::commitMetadataToShards(
+    OperationContext* opCtx, const DatabaseVersion& preCommitDbVersion) const {
+    if (_doc.getAuthoritativeShardCommit().get_value_or(false)) {
+        ShardDatabaseMetadataClient oldPrimaryClient{opCtx, ShardingState::get(opCtx)->shardId()};
+        oldPrimaryClient.remove(_dbName);
+
+        ShardDatabaseMetadataClient newPrimaryClient{opCtx, _doc.getToShardId()};
+        newPrimaryClient.insert({_dbName, _doc.getToShardId(), preCommitDbVersion});
+    }
 }
 
 void MovePrimaryCoordinator::clearDbMetadataOnPrimary(OperationContext* opCtx) const {

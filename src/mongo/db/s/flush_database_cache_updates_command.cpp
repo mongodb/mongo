@@ -94,7 +94,7 @@ Status insertDatabaseEntryForBackwardCompatibility(OperationContext* opCtx,
         auto dbMetadata =
             DatabaseType(dbName, ShardId::kConfigServerId, DatabaseVersion::makeFixed());
 
-        write_ops::InsertCommandRequest insertOp(NamespaceString::kShardConfigDatabasesNamespace);
+        write_ops::InsertCommandRequest insertOp(NamespaceString::kConfigCacheDatabasesNamespace);
         insertOp.setDocuments({dbMetadata.toBSON()});
         return insertOp.serialize();
     }());

@@ -48,6 +48,7 @@
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/executor/scoped_task_executor.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/database_version.h"
 #include "mongo/util/assert_util.h"
@@ -131,11 +132,24 @@ private:
                                 const DatabaseVersion& preCommitDbVersion) const;
 
     /**
+     * Retrieves the metadata for the database after the commit to the config server.
+     */
+    DatabaseType getPostCommitDatabaseMetadata(OperationContext* opCtx) const;
+
+    /**
      * Ensures that the metadata changes have been actually commited on the config server, asserting
      * otherwise. This is a pedantic check to rule out any potentially disastrous problems.
      */
     void assertChangedMetadataOnConfig(OperationContext* opCtx,
+                                       const DatabaseType& postCommitDbType,
                                        const DatabaseVersion& preCommitDbVersion) const;
+
+    /**
+     * Commits the database metadata to the new primary shard and removes it from the old primary
+     * shard.
+     */
+    void commitMetadataToShards(OperationContext* opCtx,
+                                const DatabaseVersion& preCommitDbVersion) const;
 
     /**
      * Clears the database metadata in the local catalog cache. Secondary nodes clear the database

@@ -69,3 +69,7 @@ structs:
                 type: array<namespacestring>
                 description: "List of collections to be cloned by the destination shard."
                 optional: true
+            authoritativeShardCommit:
+                 type: safeBool
+                 description: "If the primary shard needs to commit to the shard-local durable collection"
+                 optional: true
