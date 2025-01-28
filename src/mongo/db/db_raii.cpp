@@ -934,11 +934,10 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
     direct_connection_util::checkDirectShardOperationAllowed(opCtx, _resolvedNss);
 
     // Post-snapshot shard version checks.
-    auto scopedCss = CollectionShardingState::acquire(opCtx, _resolvedNss);
-    scopedCss->checkShardVersionOrThrow(opCtx);
-
     checkSecondaryNssShardVersions(
         opCtx, _options._secondaryNssOrUUIDsBegin, _options._secondaryNssOrUUIDsEnd);
+    auto scopedCss = CollectionShardingState::acquire(opCtx, _resolvedNss);
+    scopedCss->checkShardVersionOrThrow(opCtx);
 
     if (_collectionPtr) {
         assertReadConcernSupported(

@@ -1337,5 +1337,26 @@ DEATH_TEST_F(LockerTest, SaveAndRestoreGlobalRecursivelyIsFatal, "7033800") {
     locker.saveLockStateAndUnlock(&lockInfo);
 }
 
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+DEATH_TEST_F(LockerTest, LockOrderingViolationCrashesTheServer, "9915000") {
+    Lock::ResourceMutex mutexA{"Lock A"};
+    Lock::ResourceMutex mutexB{"Lock B"};
+
+    auto opCtx = makeOperationContext();
+
+    Locker locker(opCtx->getServiceContext());
+
+    {
+        // Establish lock ordering dependency.
+        Lock::ResourceLock lockA{opCtx.get(), mutexA.getRid(), MODE_X};
+        Lock::ResourceLock lockB{opCtx.get(), mutexB.getRid(), MODE_X};
+    }
+
+    // We now flip the lock acquisition ordering. This should crash the server
+    Lock::ResourceLock lockB{opCtx.get(), mutexB.getRid(), MODE_X};
+    Lock::ResourceLock lockA{opCtx.get(), mutexA.getRid(), MODE_X};
+}
+#endif
+
 }  // namespace
 }  // namespace mongo

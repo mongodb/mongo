@@ -1494,6 +1494,14 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         // Unblock ShardingDDLCoordinators on the cluster.
         if (feature_flags::gStopDDLCoordinatorsDuringTopologyChanges.isEnabled(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            // TODO SERVER-99708: Investigate if we can remove this. unblockDDLCoordinators ends up
+            // calling the configSvrSetClusterParameter command which takes the FCV lock. At this
+            // point we are still holding the clusterCardinalityParameterLock. Other operations
+            // proceed to take the locks in the inverse order, that is, they first take the FCV lock
+            // followed by the clusterCardinalityParameterLock. We should review if we must unlock
+            // the clusterCardinalityParameterLock here to prevent a lock cycle or see if this can
+            // be refactored to prevent it.
+            DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
             unblockDDLCoordinators(opCtx);
         }
         unblockDDLCoordinatorsGuard.dismiss();
@@ -1840,6 +1848,14 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // has already waited for the commit to be majority-acknowledged.
     if (feature_flags::gStopDDLCoordinatorsDuringTopologyChanges.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        // TODO SERVER-99708: Investigate if we can remove this. unblockDDLCoordinators ends up
+        // calling the configSvrSetClusterParameter command which takes the FCV lock. At this point
+        // we are still holding the clusterCardinalityParameterLock. Other operations proceed to
+        // take the locks in the inverse order, that is, they first take the FCV lock followed by
+        // the clusterCardinalityParameterLock. We should review if we must unlock the
+        // clusterCardinalityParameterLock here to prevent a lock cycle or see if this can be
+        // refactored to prevent it.
+        DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
         unblockDDLCoordinators(opCtx);
     }
     unblockDDLCoordinatorsGuard.dismiss();

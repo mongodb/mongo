@@ -73,6 +73,10 @@ void registerTaskWithOngoingQueriesOnOpLogEntryCommit(OperationContext* opCtx,
     shard_role_details::getRecoveryUnit(opCtx)->onCommit([rdt](OperationContext* opCtx,
                                                                boost::optional<Timestamp>) {
         try {
+            // TODO SERVER-99704: Investigate if the ordering of lock acquisitions here is safe.
+            // We've detected that in some cases the lock ordering goes from target database to
+            // config database, but here we're going from config to target.
+            DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
             AutoGetCollection autoColl(opCtx, rdt.getNss(), MODE_IS);
             auto waitForActiveQueriesToComplete =
                 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx,

@@ -254,6 +254,10 @@ protected:
     std::unique_ptr<ReplicationConsistencyMarkers> _consistencyMarkers;
     ServiceContext* serviceContext;
     OplogApplierImplOpObserver* _opObserver = nullptr;
+    // TODO SERVER-99926: We disable all lock ordering checks for unit tests to avoid having to fix
+    // all instances of lock ordering violations. This is okay to do temporarily as unit tests are
+    // not representative of the actual production lock ordering.
+    boost::optional<DisableLockerRuntimeOrderingChecks> _disableChecks;
 
     template <typename T>
     inline void setServerParameter(const std::string& name, T value) {

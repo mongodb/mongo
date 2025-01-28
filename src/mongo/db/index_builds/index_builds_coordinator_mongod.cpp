@@ -602,6 +602,10 @@ Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(OperationContext* opCt
     auto replState = swReplState.getValue();
 
     {
+        // TODO SERVER-99706: Investigate if this is safe. Other commit quorum operations take the
+        // RSTL lock before locking the commit quorum lock. However, this operation follows the
+        // inverse order.
+        DisableLockerRuntimeOrderingChecks disable{opCtx};
         // Secondary nodes will always try to vote regardless of the commit quorum value. If the
         // commit quorum is disabled, do not record their entry into the commit ready nodes.
         // If we fail to retrieve the persisted commit quorum, the index build might be in the
@@ -639,6 +643,11 @@ void IndexBuildsCoordinatorMongod::_sendCommitQuorumSatisfiedSignal(
 
 bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumIsSatisfied(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
+
+    // TODO SERVER-99706: Investigate if this is safe. Other commit quorum operations take the
+    // RSTL lock before locking the commit quorum lock. However, this operation follows the
+    // inverse order.
+    DisableLockerRuntimeOrderingChecks disable{opCtx};
 
     // Acquire the commitQuorumLk in shared mode to make sure commit quorum value did not change
     // after reading it from config.system.indexBuilds collection.
@@ -687,6 +696,11 @@ bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
     if (!replCoord->canAcceptWritesFor(opCtx, dbAndUUID)) {
         return false;
     }
+
+    // TODO SERVER-99706: Investigate if this is safe. Other commit quorum operations take the
+    // RSTL lock before locking the commit quorum lock. However, this operation follows the
+    // inverse order.
+    DisableLockerRuntimeOrderingChecks disable{opCtx};
 
     // Acquire the commitQuorumLk in shared mode to make sure commit quorum value did not change
     // after reading it from config.system.indexBuilds collection.

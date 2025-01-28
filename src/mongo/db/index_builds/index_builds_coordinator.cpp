@@ -1443,8 +1443,10 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
         const auto lockOptions =
             makeAutoGetCollectionOptions(IndexBuildProtocol::kSinglePhase == replState->protocol);
         AutoGetCollection autoGetColl(opCtx, dbAndUUID, MODE_X, lockOptions);
+        // Same options used here in order to avoid locking the RSTL after having taken the Global
+        // lock.
         AutoGetCollection indexBuildEntryColl(
-            opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
+            opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX, lockOptions);
 
         hangAbortIndexBuildByBuildUUIDAfterLocks.pauseWhileSet();
 

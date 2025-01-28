@@ -134,6 +134,9 @@ public:
         NamespaceString fromNs(NamespaceStringUtil::deserialize(dbName, from));
         NamespaceString toNs(NamespaceStringUtil::deserialize(dbName, to));
 
+        // TODO SERVER-99148: These locks are potentially not taken in ResourceId order. We disable
+        // the checks here as a temporary fix while we wait.
+        DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
         AutoGetCollection autoColl(opCtx, fromNs, MODE_X);
         Lock::CollectionLock collLock(opCtx, toNs, MODE_X);
 

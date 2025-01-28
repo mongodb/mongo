@@ -1024,6 +1024,8 @@ Status renameCollection(OperationContext* opCtx,
     if (source.isEqualDb(target))
         return renameCollectionWithinDB(opCtx, source, target, options);
     else {
+        // TODO SERVER-99621: Remove this line once renames take locks in proper order.
+        DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
         return renameCollectionAcrossDatabases(opCtx, source, target, options);
     }
 }
@@ -1110,6 +1112,8 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
 
         // Downgrade renameCollection to dropCollection.
         if (dropTargetNss) {
+            // TODO SERVER-99621: Remove this line once renames take locks in proper order.
+            DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
             return dropCollectionForApplyOps(
                 opCtx,
                 *dropTargetNss,
@@ -1137,6 +1141,8 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
         return renameCollectionWithinDBForApplyOps(
             opCtx, sourceNss, targetNss, uuidToDrop, renameOpTime, options);
     } else {
+        // TODO SERVER-99621: Remove this line once renames take locks in proper order.
+        DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
         return renameCollectionAcrossDatabases(opCtx, sourceNss, targetNss, options);
     }
 }
