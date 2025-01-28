@@ -960,9 +960,10 @@ public:
                            const CanonicalQuery& cq,
                            boost::optional<ExplainOptions::Verbosity> verbosity,
                            rpc::ReplyBuilderInterface* replyBuilder) {
-            auto aggRequest =
-                query_request_conversion::asAggregateCommandRequest(cq.getFindCommandRequest());
-            aggRequest.setExplain(verbosity);
+            bool hasExplain = verbosity.has_value();
+            auto aggRequest = query_request_conversion::asAggregateCommandRequest(
+                cq.getFindCommandRequest(), hasExplain);
+
             aggRequest.setQuerySettings(cq.getExpCtx()->getQuerySettings());
 
             // An empty PrivilegeVector for explain is acceptable because these privileges are only
@@ -978,8 +979,8 @@ public:
                                              {aggRequest},
                                              _request.body,
                                              privileges,
-                                             replyBuilder,
-                                             {} /* usedExternalDataSources  */);
+                                             verbosity,
+                                             replyBuilder);
             if (status.code() == ErrorCodes::InvalidPipelineOperator) {
                 uasserted(ErrorCodes::InvalidPipelineOperator,
                           str::stream() << "Unsupported in view pipeline: " << status.reason());

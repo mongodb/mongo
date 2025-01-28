@@ -137,6 +137,7 @@ ALLOW_CPP_TYPE_CHANGE_LIST:
   # equivalent params for other commands (aggregate)
   - "find-param-maxTimeMS-std::int32_t-std::int64_t"
   - "count-param-maxTimeMS-std::int32_t-std::int64_t"
+  - "aggregate-param-explain-mongo::ExplainOptions::Verbosity-bool"
 
 ALLOWED_NEW_COMPLEX_ACCESS_CHECKS:
   # Do not add any command other the aggregate command or any access check that is not required

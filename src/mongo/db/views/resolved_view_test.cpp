@@ -94,11 +94,11 @@ TEST(ResolvedViewTest, ExpandingAggRequestWithNonemptyPipelineAppendsToViewPipel
 TEST(ResolvedViewTest, ExpandingAggRequestPreservesExplain) {
     const ResolvedView resolvedView{backingNss, emptyPipeline, kSimpleCollation};
     AggregateCommandRequest aggRequest{viewNss, std::vector<mongo::BSONObj>()};
-    aggRequest.setExplain(ExplainOptions::Verbosity::kExecStats);
+    aggRequest.setExplain(true);
 
     auto result = resolvedView.asExpandedViewAggregation(aggRequest);
     ASSERT(result.getExplain());
-    ASSERT(*result.getExplain() == ExplainOptions::Verbosity::kExecStats);
+    ASSERT(*result.getExplain() == true);
 }
 
 TEST(ResolvedViewTest, ExpandingAggRequestWithCursorAndExplainOnlyPreservesExplain) {
@@ -107,11 +107,11 @@ TEST(ResolvedViewTest, ExpandingAggRequestWithCursorAndExplainOnlyPreservesExpla
     SimpleCursorOptions cursor;
     cursor.setBatchSize(10);
     aggRequest.setCursor(cursor);
-    aggRequest.setExplain(ExplainOptions::Verbosity::kExecStats);
+    aggRequest.setExplain(true);
 
     auto result = resolvedView.asExpandedViewAggregation(aggRequest);
     ASSERT(result.getExplain());
-    ASSERT(*result.getExplain() == ExplainOptions::Verbosity::kExecStats);
+    ASSERT(*result.getExplain() == true);
     ASSERT_EQ(
         result.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
         aggregation_request_helper::kDefaultBatchSize);

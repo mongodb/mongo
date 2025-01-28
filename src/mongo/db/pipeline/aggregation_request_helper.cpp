@@ -97,7 +97,9 @@ AggregateCommandRequest parseFromBSON(const BSONObj& cmdObj,
                 str::stream() << "The '" << AggregateCommandRequest::kExplainFieldName
                               << "' option is illegal when a explain verbosity is also provided",
                 !cmdObj.hasField(AggregateCommandRequest::kExplainFieldName));
-        request.setExplain(explainVerbosity);
+        // The explain field on the aggregate request is a boolean with default value boost::none,
+        // so we set it to true if expainVerbosity is defined.
+        request.setExplain(true);
     }
 
     validate(request, cmdObj, request.getNamespace(), explainVerbosity);
@@ -263,26 +265,22 @@ void setFromRouter(MutableDocument& doc, mongo::Value value) {
  * IMPORTANT: The method should not be modified, as API version input/output guarantees could
  * break because of it.
  */
-boost::optional<mongo::ExplainOptions::Verbosity> parseExplainModeFromBSON(
-    const BSONElement& explainElem) {
+boost::optional<bool> parseExplainModeFromBSON(const BSONElement& explainElem) {
     uassert(ErrorCodes::TypeMismatch,
             "explain must be a boolean",
             explainElem.type() == BSONType::Bool);
-
     if (explainElem.Bool()) {
-        return ExplainOptions::Verbosity::kQueryPlanner;
+        return true;
+    } else {
+        return boost::none;
     }
-
-    return boost::none;
 }
 
 /**
  * IMPORTANT: The method should not be modified, as API version input/output guarantees could
  * break because of it.
  */
-void serializeExplainToBSON(const mongo::ExplainOptions::Verbosity& explain,
-                            StringData fieldName,
-                            BSONObjBuilder* builder) {
+void serializeExplainToBSON(const bool& explain, StringData fieldName, BSONObjBuilder* builder) {
     // Note that we do not serialize 'explain' field to the command object. This serializer only
     // serializes an empty cursor object for field 'cursor' when it is an explain command.
     builder->append(AggregateCommandRequest::kCursorFieldName, BSONObj());

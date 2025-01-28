@@ -351,7 +351,7 @@ function validateCmdNetworkErrorCompatibility(cmdName, cmdObj) {
         }
 
         const hasExplain = cmdObj.hasOwnProperty("explain");
-        if (hasExplain) {
+        if (hasExplain && cmdObj.explain) {
             throw new Error(
                 "Refusing to run a test that issues an aggregation command with explain" +
                 " because it may return incomplete results if interrupted by a stepdown." +

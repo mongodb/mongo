@@ -91,6 +91,7 @@ private:
             request,
             {request},
             {Privilege(ResourcePattern::forClusterResource(nss.tenantId()), ActionType::inprog)},
+            boost::none, /* verbosity */
             &responseBuilder);
 
         if (!status.isOK()) {

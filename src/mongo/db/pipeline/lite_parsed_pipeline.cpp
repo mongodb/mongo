@@ -48,13 +48,11 @@
 
 namespace mongo {
 
-ReadConcernSupportResult LiteParsedPipeline::supportsReadConcern(
-    repl::ReadConcernLevel level,
-    bool isImplicitDefault,
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+ReadConcernSupportResult LiteParsedPipeline::supportsReadConcern(repl::ReadConcernLevel level,
+                                                                 bool isImplicitDefault,
+                                                                 bool explain) const {
     // Start by assuming that we will support both readConcern and cluster-wide default.
     ReadConcernSupportResult result = ReadConcernSupportResult::allSupportedAndDefaultPermitted();
-
     // 2. Determine whether the default read concern must be denied for any pipeline-global reasons.
     if (explain) {
         result.defaultReadConcernPermit = {
@@ -86,8 +84,7 @@ ReadConcernSupportResult LiteParsedPipeline::sourcesSupportReadConcern(
     return result;
 }
 
-void LiteParsedPipeline::assertSupportsMultiDocumentTransaction(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+void LiteParsedPipeline::assertSupportsMultiDocumentTransaction(bool explain) const {
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             "Operation not permitted in transaction :: caused by :: Explain for the aggregate "
             "command cannot run within a multi-document transaction",
@@ -98,8 +95,7 @@ void LiteParsedPipeline::assertSupportsMultiDocumentTransaction(
     }
 }
 
-void LiteParsedPipeline::assertSupportsReadConcern(
-    OperationContext* opCtx, boost::optional<ExplainOptions::Verbosity> explain) const {
+void LiteParsedPipeline::assertSupportsReadConcern(OperationContext* opCtx, bool explain) const {
     const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     auto readConcernSupport = supportsReadConcern(
         readConcernArgs.getLevel(), readConcernArgs.isImplicitDefault(), explain);
@@ -114,7 +110,7 @@ void LiteParsedPipeline::assertSupportsReadConcern(
 void LiteParsedPipeline::verifyIsSupported(
     OperationContext* opCtx,
     const std::function<bool(OperationContext*, const NamespaceString&)> isSharded,
-    const boost::optional<ExplainOptions::Verbosity> explain) const {
+    bool explain) const {
     // Verify litePipe can be run in a transaction.
     const bool inMultiDocumentTransaction = opCtx->inMultiDocumentTransaction();
     if (inMultiDocumentTransaction) {

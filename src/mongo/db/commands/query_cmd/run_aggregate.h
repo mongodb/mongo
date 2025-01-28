@@ -61,6 +61,7 @@ Status runAggregate(
     const LiteParsedPipeline& liteParsedPipeline,
     const BSONObj& cmdObj,
     const PrivilegeVector& privileges,
+    boost::optional<ExplainOptions::Verbosity> verbosity,
     rpc::ReplyBuilderInterface* result,
     const std::vector<std::pair<NamespaceString, std::vector<ExternalDataSourceInfo>>>&
         usedExternalDataSources = {});

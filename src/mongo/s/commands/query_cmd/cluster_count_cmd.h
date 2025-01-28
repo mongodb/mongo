@@ -215,7 +215,7 @@ public:
             // Rewrite the count command as an aggregation.
             auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
             auto aggRequestOnView =
-                query_request_conversion::asAggregateCommandRequest(countRequest, boost::none);
+                query_request_conversion::asAggregateCommandRequest(countRequest);
             auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView);
 
             BSONObj aggResult = CommandHelpers::runCommandDirectly(
@@ -345,8 +345,8 @@ public:
             } catch (...) {
                 return exceptionToStatus();
             }
-            auto aggRequestOnView =
-                query_request_conversion::asAggregateCommandRequest(countRequest, verbosity);
+            auto aggRequestOnView = query_request_conversion::asAggregateCommandRequest(
+                countRequest, true /* hasExplain */);
             auto bodyBuilder = result->getBodyBuilder();
             // An empty PrivilegeVector is acceptable because these privileges are only checked
             // on getMore and explain will not open a cursor.
@@ -355,6 +355,7 @@ public:
                                                       *ex.extraInfo<ResolvedView>(),
                                                       nss,
                                                       PrivilegeVector(),
+                                                      verbosity,
                                                       &bodyBuilder);
         }
 

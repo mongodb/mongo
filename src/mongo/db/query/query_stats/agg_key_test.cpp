@@ -86,7 +86,7 @@ TEST_F(AggKeyTest, SizeOfAggCmdComponents) {
     acr.setPipeline(rawPipeline);
     auto pipeline = Pipeline::parse(rawPipeline, expCtx);
     auto namespaces = pipeline->getInvolvedCollections();
-    auto aggComponents = std::make_unique<AggCmdComponents>(acr, namespaces);
+    auto aggComponents = std::make_unique<AggCmdComponents>(acr, namespaces, expCtx->getExplain());
 
     const auto minimumSize = sizeof(SpecificKeyComponents) +
         sizeof(stdx::unordered_set<NamespaceString>) + 2 /*size for bool and HasField*/ +
@@ -97,6 +97,7 @@ TEST_F(AggKeyTest, SizeOfAggCmdComponents) {
 
 TEST_F(AggKeyTest, EquivalentAggCmdComponentSizes) {
     auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
+    expCtx->setExplain(ExplainOptions::Verbosity::kQueryPlanner);
     auto rawPipeline = {fromjson(R"({
             $match: {
                 foo: { $in: ["a", "b"] },
@@ -111,14 +112,14 @@ TEST_F(AggKeyTest, EquivalentAggCmdComponentSizes) {
     SimpleCursorOptions cursor;
     cursor.setBatchSize(10);
     acrAllValues.setCursor(cursor);
-    acrAllValues.setExplain(explain::VerbosityEnum::kQueryPlanner);
+    acrAllValues.setExplain(true);
     acrAllValues.setBypassDocumentValidation(true);
     acrAllValues.setPassthroughToShard(PassthroughToShardOptions("shard1"));
 
     auto pipeline = Pipeline::parse(rawPipeline, expCtx);
     auto namespaces = pipeline->getInvolvedCollections();
-
-    auto aggComponentsAllValues = std::make_unique<AggCmdComponents>(acrAllValues, namespaces);
+    auto aggComponentsAllValues =
+        std::make_unique<AggCmdComponents>(acrAllValues, namespaces, expCtx->getExplain());
 
     // Confirm all values are set.
     BSONObjBuilder bob;
@@ -132,7 +133,8 @@ TEST_F(AggKeyTest, EquivalentAggCmdComponentSizes) {
     // Create a request that has no values set.
     AggregateCommandRequest acrNoSetValues(kDefaultTestNss.nss());
     acrNoSetValues.setPipeline(rawPipeline);
-    auto aggComponentsNoValues = std::make_unique<AggCmdComponents>(acrNoSetValues, namespaces);
+    auto aggComponentsNoValues =
+        std::make_unique<AggCmdComponents>(acrNoSetValues, namespaces, expCtx->getExplain());
 
     ASSERT_EQ(aggComponentsAllValues->size(), aggComponentsNoValues->size());
 }
@@ -161,8 +163,10 @@ TEST_F(AggKeyTest, DifferentAggCmdComponentSizes) {
     largeNamespaces.insert(namespaceStringOne);
     largeNamespaces.insert(namespaceStringTwo);
 
-    auto smallAggComponents = std::make_unique<AggCmdComponents>(acr, smallNamespaces);
-    auto largeAggComponents = std::make_unique<AggCmdComponents>(acr, largeNamespaces);
+    auto smallAggComponents =
+        std::make_unique<AggCmdComponents>(acr, smallNamespaces, expCtx->getExplain());
+    auto largeAggComponents =
+        std::make_unique<AggCmdComponents>(acr, largeNamespaces, expCtx->getExplain());
 
     ASSERT_LT(namespaceSize(smallNamespaces), namespaceSize(largeNamespaces));
     ASSERT_LT(smallAggComponents->size(), largeAggComponents->size());

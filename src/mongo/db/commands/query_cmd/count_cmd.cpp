@@ -480,7 +480,7 @@ public:
             curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
             const auto vts = auth::ValidatedTenancyScope::get(opCtx);
             auto viewAggRequest =
-                query_request_conversion::asAggregateCommandRequest(req, verbosity);
+                query_request_conversion::asAggregateCommandRequest(req, true /* hasExplain */);
             // An empty PrivilegeVector is acceptable because these privileges are only checked
             // on getMore and explain will not open a cursor.
             auto runStatus = runAggregate(opCtx,
@@ -488,13 +488,14 @@ public:
                                           {viewAggRequest},
                                           req.toBSON(),
                                           PrivilegeVector(),
+                                          verbosity,
                                           replyBuilder);
             uassertStatusOK(runStatus);
         }
 
         CountCommandReply runCountOnView(OperationContext* opCtx, const RequestType& req) {
             const auto vts = auth::ValidatedTenancyScope::get(opCtx);
-            auto aggRequest = query_request_conversion::asAggregateCommandRequest(req, boost::none);
+            auto aggRequest = query_request_conversion::asAggregateCommandRequest(req);
             auto opMsgAggRequest =
                 OpMsgRequestBuilder::create(vts, aggRequest.getDbName(), aggRequest.toBSON());
             BSONObj aggResult = CommandHelpers::runCommandDirectly(opCtx, opMsgAggRequest);

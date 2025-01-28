@@ -83,11 +83,13 @@ public:
                const BSONObj& cmdObj,
                const PrivilegeVector& privileges,
                const std::vector<std::pair<NamespaceString, std::vector<ExternalDataSourceInfo>>>&
-                   usedExternalDataSources)
+                   usedExternalDataSources,
+               const boost::optional<ExplainOptions::Verbosity>& verbosity)
         : _aggReqDerivatives(new AggregateRequestDerivatives(request, liteParsedPipeline, cmdObj)),
           _opCtx(opCtx),
           _executionNss(request.getNamespace()),
           _privileges(privileges),
+          _verbosity(verbosity),
           _originalAggReqDerivatives(request, liteParsedPipeline, cmdObj) {
         // Create virtual collections and drop them when aggregate command is done.
         // If a cursor is registered, the ExternalDataSourceScopeGuard will be stored in the cursor;
@@ -144,6 +146,10 @@ public:
 
     std::shared_ptr<ExternalDataSourceScopeGuard> getExternalDataSourceScopeGuard() const {
         return _externalDataSourceGuard;
+    }
+
+    boost::optional<ExplainOptions::Verbosity> getVerbosity() const {
+        return _verbosity;
     }
 
     /**
@@ -322,6 +328,10 @@ private:
     const PrivilegeVector& _privileges;
 
     std::shared_ptr<ExternalDataSourceScopeGuard> _externalDataSourceGuard;
+
+    // Has a value if the aggregation has explain: true, to be used in
+    // AggCatalogState::createExpressionContext to populate verbosity on the expression context.
+    boost::optional<ExplainOptions::Verbosity> _verbosity;
 
     /* The following member variables are added to support views */
 

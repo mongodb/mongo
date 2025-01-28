@@ -1085,12 +1085,13 @@ Status runAggregate(
     const LiteParsedPipeline& liteParsedPipeline,
     const BSONObj& cmdObj,
     const PrivilegeVector& privileges,
+    boost::optional<ExplainOptions::Verbosity> verbosity,
     rpc::ReplyBuilderInterface* result,
     const std::vector<std::pair<NamespaceString, std::vector<ExternalDataSourceInfo>>>&
         usedExternalDataSources) {
 
     AggExState aggExState(
-        opCtx, request, liteParsedPipeline, cmdObj, privileges, usedExternalDataSources);
+        opCtx, request, liteParsedPipeline, cmdObj, privileges, usedExternalDataSources, verbosity);
 
     Status status = _runAggregate(aggExState, result);
 

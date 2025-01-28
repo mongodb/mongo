@@ -382,7 +382,6 @@ ExpressionContextBuilder& ExpressionContextBuilder::fromRequest(
 ExpressionContextBuilder& ExpressionContextBuilder::fromRequest(
     OperationContext* operationContext, const AggregateCommandRequest& request, bool useDisk) {
     opCtx(operationContext);
-    explain(request.getExplain());
     fromRouter(aggregation_request_helper::getFromRouter(request));
     needsMerge(request.getNeedsMerge());
     allowDiskUse(request.getAllowDiskUse().value_or(useDisk));

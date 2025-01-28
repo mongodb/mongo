@@ -720,8 +720,8 @@ public:
                                          {viewAggRequest},
                                          viewAggCmd,
                                          PrivilegeVector(),
-                                         replyBuilder,
-                                         {} /* usedExternalDataSources */));
+                                         verbosity,
+                                         replyBuilder));
             return;
         }
 
@@ -735,8 +735,8 @@ public:
                                      {viewAggRequest},
                                      viewAggCmd,
                                      privileges,
-                                     replyBuilder,
-                                     {} /* usedExternalDataSources */));
+                                     verbosity,
+                                     replyBuilder));
 
         // Copy the result from the aggregate command.
         auto resultBuilder = replyBuilder->getBodyBuilder();

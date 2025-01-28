@@ -262,8 +262,8 @@ public:
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const override {
-            return _liteParsedPipeline.supportsReadConcern(
-                level, isImplicitDefault, _aggregationRequest.getExplain());
+            bool isExplain = _aggregationRequest.getExplain().get_value_or(false);
+            return _liteParsedPipeline.supportsReadConcern(level, isImplicitDefault, isExplain);
         }
 
         bool allowsSpeculativeMajorityReads() const override {
@@ -276,12 +276,16 @@ public:
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
             CommandHelpers::handleMarkKillOnClientDisconnect(
                 opCtx, !Pipeline::aggHasWriteStage(_request.body));
-
+            boost::optional<ExplainOptions::Verbosity> verbosity = boost::none;
+            if (_aggregationRequest.getExplain().get_value_or(false)) {
+                verbosity = ExplainOptions::Verbosity::kQueryPlanner;
+            }
             uassertStatusOK(runAggregate(opCtx,
                                          _aggregationRequest,
                                          _liteParsedPipeline,
                                          _request.body,
                                          _privileges,
+                                         verbosity,
                                          reply,
                                          _usedExternalDataSources));
 
@@ -308,11 +312,13 @@ public:
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) override {
             // See run() method for details.
+
             uassertStatusOK(runAggregate(opCtx,
                                          _aggregationRequest,
                                          _liteParsedPipeline,
                                          _request.body,
                                          _privileges,
+                                         verbosity,
                                          result,
                                          _usedExternalDataSources));
         }

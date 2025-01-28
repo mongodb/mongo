@@ -160,7 +160,8 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     BSONObj collationObj,
     boost::optional<UUID> uuid,
     StringMap<ResolvedNamespace> resolvedNamespaces,
-    bool hasChangeStream) {
+    bool hasChangeStream,
+    boost::optional<ExplainOptions::Verbosity> verbosity) {
 
     std::unique_ptr<CollatorInterface> collation;
     if (!collationObj.isEmpty()) {
@@ -173,6 +174,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     // mergeCtx->tempDir.
     auto mergeCtx = ExpressionContextBuilder{}
                         .fromRequest(opCtx, request)
+                        .explain(verbosity)
                         .collator(std::move(collation))
                         .mongoProcessInterface(std::make_shared<MongosProcessInterface>(
                             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor()))
@@ -372,7 +374,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     boost::optional<CollectionRoutingInfo> cri,
     bool hasChangeStream,
     bool shouldDoFLERewrite,
-    bool requiresCollationForParsingUnshardedAggregate) {
+    bool requiresCollationForParsingUnshardedAggregate,
+    boost::optional<ExplainOptions::Verbosity> verbosity) {
     // Populate the collation. If this is a change stream, take the user-defined collation if one
     // exists, or an empty BSONObj otherwise. Change streams never inherit the collection's default
     // collation, and since collectionless aggregations generally run on the 'admin'
@@ -396,8 +399,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
                               collationObj,
                               boost::none /* uuid */,
                               resolveInvolvedNamespaces(involvedNamespaces),
-                              hasChangeStream);
-
+                              hasChangeStream,
+                              verbosity);
     auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
     // Skip query stats recording for queryable encryption queries.
     if (!shouldDoFLERewrite) {
@@ -424,8 +427,9 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       const Namespaces& namespaces,
                                       AggregateCommandRequest& request,
                                       const PrivilegeVector& privileges,
+                                      boost::optional<ExplainOptions::Verbosity> verbosity,
                                       BSONObjBuilder* result) {
-    return runAggregate(opCtx, namespaces, request, {request}, privileges, result);
+    return runAggregate(opCtx, namespaces, request, {request}, privileges, verbosity, result);
 }
 
 Status ClusterAggregate::runAggregate(OperationContext* opCtx,
@@ -433,9 +437,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       AggregateCommandRequest& request,
                                       const LiteParsedPipeline& liteParsedPipeline,
                                       const PrivilegeVector& privileges,
+                                      boost::optional<ExplainOptions::Verbosity> verbosity,
                                       BSONObjBuilder* result) {
     return runAggregate(
-        opCtx, namespaces, request, liteParsedPipeline, privileges, boost::none, result);
+        opCtx, namespaces, request, liteParsedPipeline, privileges, boost::none, verbosity, result);
 }
 
 Status ClusterAggregate::runAggregate(OperationContext* opCtx,
@@ -444,6 +449,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       const LiteParsedPipeline& liteParsedPipeline,
                                       const PrivilegeVector& privileges,
                                       boost::optional<CollectionRoutingInfo> cri,
+                                      boost::optional<ExplainOptions::Verbosity> verbosity,
                                       BSONObjBuilder* result) {
     // Perform some validations on the LiteParsedPipeline and request before continuing with the
     // aggregation command.
@@ -462,8 +468,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         const auto [resolvedNsCM, _] = uassertStatusOK(criSW);
         return resolvedNsCM.isSharded();
     };
-
-    liteParsedPipeline.verifyIsSupported(opCtx, isSharded, request.getExplain());
+    bool isExplain = request.getExplain().get_value_or(false);
+    liteParsedPipeline.verifyIsSupported(opCtx, isSharded, isExplain);
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();
     CurOp::get(opCtx)->debug().isChangeStreamQuery = hasChangeStream;
     const auto& involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
@@ -517,7 +523,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                     cri,
                     hasChangeStream,
                     shouldDoFLERewrite,
-                    requiresCollationForParsingUnshardedAggregate);
+                    requiresCollationForParsingUnshardedAggregate,
+                    verbosity);
                 pipeline->validateCommon(false);
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
                 LOGV2_DEBUG(8396400,
@@ -546,7 +553,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                                cri,
                                                hasChangeStream,
                                                shouldDoFLERewrite,
-                                               requiresCollationForParsingUnshardedAggregate);
+                                               requiresCollationForParsingUnshardedAggregate,
+                                               verbosity);
         expCtx = pipeline->getContext();
 
         // If the aggregate command supports encrypted collections, do rewrites of the pipeline to
@@ -693,7 +701,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                     return cluster_aggregation_planner::runPipelineOnSpecificShardOnly(
                         expCtx,
                         namespaces,
-                        request.getExplain(),
+                        expCtx->getExplain(),
                         serializeForPassthrough(expCtx, request),
                         privileges,
                         shardId,
@@ -758,6 +766,7 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
                                           const ResolvedView& resolvedView,
                                           const NamespaceString& requestedNss,
                                           const PrivilegeVector& privileges,
+                                          boost::optional<ExplainOptions::Verbosity> verbosity,
                                           BSONObjBuilder* result,
                                           unsigned numberRetries) {
     if (numberRetries >= kMaxViewRetries) {
@@ -810,8 +819,14 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
         resolvedAggRequest.setPipeline(patchedPipeline);
     }
 
-    auto status = ClusterAggregate::runAggregate(
-        opCtx, nsStruct, resolvedAggRequest, {resolvedAggRequest}, privileges, snapshotCri, result);
+    auto status = ClusterAggregate::runAggregate(opCtx,
+                                                 nsStruct,
+                                                 resolvedAggRequest,
+                                                 {resolvedAggRequest},
+                                                 privileges,
+                                                 snapshotCri,
+                                                 verbosity,
+                                                 result);
 
     // If the underlying namespace was changed to a view during retry, then re-run the aggregation
     // on the new resolved namespace.
@@ -821,6 +836,7 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
                                                   *status.extraInfo<ResolvedView>(),
                                                   requestedNss,
                                                   privileges,
+                                                  verbosity,
                                                   result,
                                                   numberRetries + 1);
     }

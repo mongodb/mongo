@@ -129,6 +129,7 @@ protected:
                                               request.getValue(),
                                               {request.getValue()},
                                               PrivilegeVector(),
+                                              boost::none, /* verbosity */
                                               &result);
     }
 };

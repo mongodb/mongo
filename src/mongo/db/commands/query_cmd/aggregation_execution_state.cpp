@@ -410,10 +410,10 @@ void AggExState::setView(std::unique_ptr<AggCatalogState>& aggCatalogStage,
 
     auto resolvedView = uassertStatusOK(aggCatalogStage->resolveView(
         _opCtx, _aggReqDerivatives->request.getNamespace(), timeSeriesCollator));
-
+    bool isExplain = _aggReqDerivatives->request.getExplain().get_value_or(false);
     uassert(std::move(resolvedView),
             "Explain of a resolved view must be executed by mongos",
-            !ShardingState::get(_opCtx)->enabled() || !_aggReqDerivatives->request.getExplain());
+            !ShardingState::get(_opCtx)->enabled() || !isExplain);
 
     _resolvedView = resolvedView;
 
@@ -438,9 +438,10 @@ void AggExState::performValidationChecks() {
 
     // If we are in a transaction, check whether the parsed pipeline supports being in
     // a transaction and if the transaction's read concern is supported.
+    bool isExplain = request.getExplain().get_value_or(false);
     if (_opCtx->inMultiDocumentTransaction()) {
-        liteParsedPipeline.assertSupportsMultiDocumentTransaction(request.getExplain());
-        liteParsedPipeline.assertSupportsReadConcern(_opCtx, request.getExplain());
+        liteParsedPipeline.assertSupportsMultiDocumentTransaction(isExplain);
+        liteParsedPipeline.assertSupportsReadConcern(_opCtx, isExplain);
     }
 }
 
@@ -615,6 +616,7 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
                       .resolvedNamespace(uassertStatusOK(_aggExState.resolveInvolvedNamespaces()))
                       .tmpDir(storageGlobalParams.dbpath + "/_tmp")
                       .collationMatchesDefault(collationMatchesDefault)
+                      .explain(_aggExState.getVerbosity())
                       .build();
     // If any involved collection contains extended-range data, set a flag which individual
     // DocumentSource parsers can check.

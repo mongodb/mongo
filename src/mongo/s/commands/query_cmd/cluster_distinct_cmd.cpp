@@ -448,7 +448,7 @@ public:
         // and without response formatting.
         if (verbosity) {
             uassertStatusOK(ClusterAggregate::retryOnViewError(
-                opCtx, viewAggRequest, resolvedView, nss, PrivilegeVector(), &bob));
+                opCtx, viewAggRequest, resolvedView, nss, PrivilegeVector(), verbosity, &bob));
             return;
         }
 
@@ -458,7 +458,7 @@ public:
                                             viewAggRequest,
                                             true /* isMongos */));
         uassertStatusOK(ClusterAggregate::retryOnViewError(
-            opCtx, viewAggRequest, resolvedView, nss, privileges, &bob));
+            opCtx, viewAggRequest, resolvedView, nss, privileges, verbosity, &bob));
 
         // Copy the result from the aggregate command.
         CommandHelpers::extractOrAppendOk(bob);

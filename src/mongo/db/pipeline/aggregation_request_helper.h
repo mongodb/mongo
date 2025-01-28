@@ -137,16 +137,13 @@ void setFromRouter(MutableDocument& doc, mongo::Value value);
  * IMPORTANT: The method should not be modified, as API version input/output guarantees could
  * break because of it.
  */
-boost::optional<mongo::ExplainOptions::Verbosity> parseExplainModeFromBSON(
-    const BSONElement& explainElem);
+boost::optional<bool> parseExplainModeFromBSON(const BSONElement& explainElem);
 
 /**
  * IMPORTANT: The method should not be modified, as API version input/output guarantees could
  * break because of it.
  */
-void serializeExplainToBSON(const mongo::ExplainOptions::Verbosity& explain,
-                            StringData fieldName,
-                            BSONObjBuilder* builder);
+void serializeExplainToBSON(const bool& explain, StringData fieldName, BSONObjBuilder* builder);
 
 /**
  * IMPORTANT: The method should not be modified, as API version input/output guarantees could

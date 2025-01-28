@@ -37,7 +37,8 @@ namespace mongo {
 
 namespace query_request_conversion {
 
-AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& findCommand) {
+AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& findCommand,
+                                                  bool hasExplain) {
     // First, check if this query has options that are not supported in aggregation.
     uassert(ErrorCodes::InvalidPipelineOperator,
             str::stream() << "Option " << FindCommandRequest::kMinFieldName
@@ -185,11 +186,17 @@ AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& find
     }
     result.setIncludeQueryStatsMetrics(findCommand.getIncludeQueryStatsMetrics());
 
+    if (hasExplain) {
+        result.setExplain(true);
+    } else {
+        result.setExplain(boost::none);
+    }
+
     return result;
 }
 
-AggregateCommandRequest asAggregateCommandRequest(
-    const CountCommandRequest& countCommand, boost::optional<ExplainOptions::Verbosity> verbosity) {
+AggregateCommandRequest asAggregateCommandRequest(const CountCommandRequest& countCommand,
+                                                  bool hasExplain) {
 
     tassert(ErrorCodes::BadValue,
             "Unsupported type UUID for namspace",
@@ -233,7 +240,12 @@ AggregateCommandRequest asAggregateCommandRequest(
         result.setUnwrappedReadPref(unwrapped);
     }
 
-    result.setExplain(verbosity);
+    if (hasExplain) {
+        result.setExplain(true);
+    } else {
+        result.setExplain(boost::none);
+    }
+
     result.setDbName(nss.dbName());
     result.setIncludeQueryStatsMetrics(countCommand.getIncludeQueryStatsMetrics());
     result.setSerializationContext(countCommand.getSerializationContext());

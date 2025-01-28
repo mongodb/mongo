@@ -62,10 +62,10 @@ types:
         deserializer: ::mongo::parseAggregateCursorFromBSON
         # SimpleCursorOptions has only non view members.
         is_view: false
-    explainVerbosity:
+    explainBool:
         bson_serialization_type: any
-        description: "The Verbosity value representing explain verbosity."
-        cpp_type: "mongo::ExplainOptions::Verbosity"
+        description: "The bool value specifying the explain field."
+        cpp_type: "bool"
         serializer: ::mongo::serializeExplainToBSON
         deserializer: ::mongo::parseExplainModeFromBSON
         # ExplainOptions::Verbosity is not a view.
@@ -219,7 +219,7 @@ commands:
                 stability: stable
             explain:
                 description: "Specifies to return the information on the processing of the pipeline."
-                type: explainVerbosity
+                type: explainBool
                 optional: true
                 stability: unstable
             allowDiskUse:

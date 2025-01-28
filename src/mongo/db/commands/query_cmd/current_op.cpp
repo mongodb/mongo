@@ -93,8 +93,13 @@ public:
                           ActionType::inprog)};
         }
 
-        auto status = runAggregate(
-            opCtx, request, {request}, std::move(aggCmdObj), privileges, &replyBuilder);
+        auto status = runAggregate(opCtx,
+                                   request,
+                                   {request},
+                                   std::move(aggCmdObj),
+                                   privileges,
+                                   boost::none, /* verbosity */
+                                   &replyBuilder);
 
         if (!status.isOK()) {
             return status;

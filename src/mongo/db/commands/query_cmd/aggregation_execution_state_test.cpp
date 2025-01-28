@@ -93,8 +93,13 @@ protected:
         _request = std::make_unique<AggregateCommandRequest>(nss, pipeline);
         _lpp = std::make_unique<LiteParsedPipeline>(*_request);
 
-        return std::make_unique<AggExState>(
-            opCtx, *_request, *_lpp, _cmdObj, _privileges, _externalSources);
+        return std::make_unique<AggExState>(opCtx,
+                                            *_request,
+                                            *_lpp,
+                                            _cmdObj,
+                                            _privileges,
+                                            _externalSources,
+                                            boost::none /* verbosity */);
     }
 
     /**
@@ -117,8 +122,13 @@ protected:
         _request = std::make_unique<AggregateCommandRequest>(nss, pipeline);
         _lpp = std::make_unique<LiteParsedPipeline>(*_request);
 
-        auto aggExState = std::make_unique<AggExState>(
-            opCtx, *_request, *_lpp, _cmdObj, _privileges, _externalSources);
+        auto aggExState = std::make_unique<AggExState>(opCtx,
+                                                       *_request,
+                                                       *_lpp,
+                                                       _cmdObj,
+                                                       _privileges,
+                                                       _externalSources,
+                                                       boost::none /* verbosity */);
 
         return aggExState;
     }
@@ -140,8 +150,13 @@ protected:
         _request = std::make_unique<AggregateCommandRequest>(nss, pipeline);
         _lpp = std::make_unique<LiteParsedPipeline>(*_request);
 
-        return std::make_unique<AggExState>(
-            opCtx, *_request, *_lpp, _cmdObj, _privileges, _externalSources);
+        return std::make_unique<AggExState>(opCtx,
+                                            *_request,
+                                            *_lpp,
+                                            _cmdObj,
+                                            _privileges,
+                                            _externalSources,
+                                            boost::none /* verbosity */);
     }
 
 private:
