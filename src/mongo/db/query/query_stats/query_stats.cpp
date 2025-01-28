@@ -222,9 +222,9 @@ void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
 }  // namespace
 
 bool isQueryStatsFeatureEnabled() {
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    return fcvSnapshot.isVersionInitialized() &&
-        (feature_flags::gFeatureFlagQueryStats.isEnabled(fcvSnapshot));
+    // (Ignore FCV check): Now that query stats is enabled on v6.0, we don't want to enforce FCV
+    // gating on v7.0.
+    return feature_flags::gFeatureFlagQueryStats.isEnabledAndIgnoreFCVUnsafe();
 }
 
 void registerRequest(OperationContext* opCtx,
