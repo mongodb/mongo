@@ -1,8 +1,11 @@
 version: 1.0.0
 filters:
-  - "TxnsMoveRange*":
+  - "MoveRange*":
     approvers:
       - 10gen/server-catalog-and-routing
   - "TxnsCollectionIncarnation*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "TxnsMoveRange*":
     approvers:
       - 10gen/server-catalog-and-routing
