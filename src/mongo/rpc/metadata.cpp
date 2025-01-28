@@ -133,11 +133,18 @@ void readRequestMetadata(OperationContext* opCtx,
 }
 
 namespace {
-const auto docSequenceFieldsForCommands = StringMap<std::string>{
-    {"insert", "documents"},  //
-    {"update", "updates"},
-    {"delete", "deletes"},
-};
+boost::optional<StringData> commandNameToDocumentSequenceName(StringData commandName) {
+    if (commandName == "insert"_sd) {
+        return "documents"_sd;
+    }
+    if (commandName == "update"_sd) {
+        return "updates"_sd;
+    }
+    if (commandName == "delete"_sd) {
+        return "deletes"_sd;
+    }
+    return boost::none;
+}
 
 bool isArrayOfObjects(BSONElement array) {
     if (array.type() != Array)
@@ -150,57 +157,111 @@ bool isArrayOfObjects(BSONElement array) {
 
     return true;
 }
+
+boost::optional<OpMsgRequest::DocumentSequence> extractDocumentSequence(BSONObj cmdObj) {
+    auto cmdName = cmdObj.firstElementFieldNameStringData();
+    auto docSeqName = commandNameToDocumentSequenceName(cmdName);
+    if (!docSeqName.has_value()) {
+        return boost::none;
+    }
+
+    auto docSeqElem = cmdObj[*docSeqName];
+    if (!isArrayOfObjects(docSeqElem)) {
+        return boost::none;
+    }
+
+    OpMsgRequest::DocumentSequence sequence{docSeqName->toString()};
+    for (auto elem : docSeqElem.Obj()) {
+        sequence.objs.push_back(elem.Obj().shareOwnershipWith(cmdObj));
+    }
+    return sequence;
+}
+
+boost::optional<BSONObj> extractLegacyReadPreference(BSONObj cmdObj, int queryFlags) {
+    if (auto queryOptions = cmdObj["$queryOptions"]) {
+        if (auto readPref = queryOptions["$readPreference"]) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "Duplicate readPreference found in command object.",
+                    !cmdObj.hasField("$readPreference"));
+            return readPref.wrap();
+        }
+    }
+
+    if (cmdObj.hasField("$readPreference")) {
+        // Early exit with 'boost::none' if a non-legacy read preference is specified. This
+        // avoids unnecessary object rebuilds.
+        return boost::none;
+    }
+
+    if (queryFlags & QueryOption_SecondaryOk) {
+        return ReadPreferenceSetting(ReadPreference::SecondaryPreferred).toContainingBSON();
+    }
+
+    return boost::none;
+}
+
+BSONObj upconvertCommandObj(BSONObj cmdObj,
+                            const boost::optional<OpMsgRequest::DocumentSequence>& docSeq,
+                            const boost::optional<BSONObj>& readPref) {
+    StringDataSet fieldsToRemove;
+    if (cmdObj.hasField("$queryOptions"_sd)) {
+        // TODO SERVER-29091: The use of $queryOptions is a holdover related to the
+        // no-longer-supported OP_QUERY format. We should remove it from the code base.
+        fieldsToRemove.insert("$queryOptions"_sd);
+    }
+
+    if (docSeq.has_value()) {
+        // Avoid the need to copy a potentially large array.
+        fieldsToRemove.insert(docSeq->name);
+    }
+
+    const bool needsRebuild = fieldsToRemove.size() > 0 || readPref.has_value();
+    if (!needsRebuild) {
+        // Avoid rebuilding 'cmdObj' if no changes are required.
+        return cmdObj;
+    }
+
+    BSONObjBuilder builder = [&] {
+        if (fieldsToRemove.size() == 0) {
+            // Initialize the 'builder' via a single bulk copy rather than a series of inserts.
+            return BSONObjBuilder{cmdObj};
+        }
+
+        BSONObjBuilder b;
+        for (auto elem : cmdObj) {
+            const bool removeField = fieldsToRemove.contains(elem.fieldNameStringData());
+            if (!removeField) {
+                b.append(elem);
+            }
+        }
+        return b;
+    }();
+    if (readPref) {
+        builder.append(readPref->firstElement());
+    }
+    return builder.obj();
+}
 }  // namespace
 
-
+/**
+ * Mongos rewrites commands with $readPreference by nesting the field inside of $queryOptions.
+ * Before forwarding this command to a shard, we need to rewrite the command to a format the shard
+ * can understand.
+ */
 OpMsgRequest upconvertRequest(const DatabaseName& dbName,
                               BSONObj cmdObj,
                               int queryFlags,
                               boost::optional<auth::ValidatedTenancyScope> vts) {
-    cmdObj = cmdObj.getOwned();  // Usually this is a no-op since it is already owned.
-
-    auto readPrefContainer = BSONObj();
-    if (auto queryOptions = cmdObj["$queryOptions"]) {
-        // Mongos rewrites commands with $readPreference to put it in a field nested inside of
-        // $queryOptions. Its command implementations often forward commands in that format to
-        // shards. This function is responsible for rewriting it to a format that the shards
-        // understand.
-        //
-        // TODO SERVER-29091: The use of $queryOptions is a holdover related to the
-        // no-longer-supported OP_QUERY format. We should remove it from the code base.
-        readPrefContainer = queryOptions.Obj().shareOwnershipWith(cmdObj);
-        cmdObj = cmdObj.removeField("$queryOptions");
-    }
-
-    if (!readPrefContainer.isEmpty()) {
-        uassert(ErrorCodes::InvalidOptions,
-                "Duplicate readPreference found in command object.",
-                !cmdObj.hasField("$readPreference"));
-        cmdObj = BSONObjBuilder(std::move(cmdObj)).appendElements(readPrefContainer).obj();
-    } else if (!cmdObj.hasField("$readPreference") && (queryFlags & QueryOption_SecondaryOk)) {
-        BSONObjBuilder bodyBuilder(std::move(cmdObj));
-        ReadPreferenceSetting(ReadPreference::SecondaryPreferred).toContainingBSON(&bodyBuilder);
-        cmdObj = bodyBuilder.obj();
-    }
-
     uassert(40621, "$db is not allowed in OP_QUERY requests", !cmdObj.hasField("$db"));
 
-    // Try to move supported array fields into document sequences.
-    auto docSequenceIt = docSequenceFieldsForCommands.find(cmdObj.firstElementFieldName());
-    auto docSequenceElem = docSequenceIt == docSequenceFieldsForCommands.end()
-        ? BSONElement()
-        : cmdObj[docSequenceIt->second];
-    if (!isArrayOfObjects(docSequenceElem))
-        return OpMsgRequestBuilder::create(vts, dbName, std::move(cmdObj));
-
-    auto docSequenceName = docSequenceElem.fieldNameStringData();
-
-    // Note: removing field before adding "$db" to avoid the need to copy the potentially large
-    // array.
-    auto out = OpMsgRequestBuilder::create(vts, dbName, cmdObj.removeField(docSequenceName));
-    out.sequences.push_back({docSequenceName.toString()});
-    for (auto elem : docSequenceElem.Obj()) {
-        out.sequences[0].objs.push_back(elem.Obj().shareOwnershipWith(cmdObj));
+    // Ensure 'cmdObj' is owned. Usually this is a no-op.
+    cmdObj = cmdObj.getOwned();
+    auto docSequence = extractDocumentSequence(cmdObj);
+    auto readPref = extractLegacyReadPreference(cmdObj, queryFlags);
+    auto out = OpMsgRequestBuilder::create(
+        vts, dbName, upconvertCommandObj(std::move(cmdObj), docSequence, readPref));
+    if (docSequence) {
+        out.sequences.push_back(std::move(*docSequence));
     }
     return out;
 }
