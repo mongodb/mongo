@@ -149,12 +149,12 @@ selector:
     - jstests/core/**/fsync.js
     - jstests/core/**/constructors.js
     - jstests/core/**/commands_namespace_parsing.js
-    - jstests/core/**/drop3.js
+    - jstests/core/ddl/drop_collection_cursors.js
     - jstests/core/**/geo_s2cursorlimitskip.js
     - jstests/core/**/getmore_invalidated_cursors.js
     - jstests/core/**/getmore_invalidated_documents.js
     - jstests/core/**/query/kill_cursors.js
-    - jstests/core/**/list_collections1.js
+    - jstests/core/catalog/list_collections.js
     - jstests/core/**/list_indexes.js
     - jstests/core/**/list_indexes_invalidation.js
     - jstests/core/**/list_namespaces_invalidation.js

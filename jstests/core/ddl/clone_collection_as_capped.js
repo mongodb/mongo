@@ -16,8 +16,8 @@
  * ]
  */
 
-let source = db.capped_convertToCapped1;
-let dest = db.capped_convertToCapped1_clone;
+let source = db.sourceCappedColl;
+let dest = db.destinationCappedColl;
 
 source.drop();
 dest.drop();

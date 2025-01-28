@@ -60,7 +60,7 @@ selector:
     - jstests/core/**/connection_string_validation.js # Does not expect a replica set connection string.
     - jstests/core/**/list_collections_filter.js # Temporary collections are dropped on failover.
     - jstests/core/**/query/top/top.js # Tests read commands (including getMore) against the secondary
-    - jstests/core/**/drop3.js # getMore is not causally consistent if collection is dropped
+    - jstests/core/**/drop_collection_cursors.js # getMore is not causally consistent if collection is dropped
     - jstests/core/**/list_collections_filter.js # Temporary collections are dropped on failover.
     - jstests/core/**/explain_large_bounds.js # Stepdown can timeout waiting for global lock.
 

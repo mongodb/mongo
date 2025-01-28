@@ -35,9 +35,9 @@ selector:
     - jstests/core/**/apply_ops*.js
     - jstests/core/**/bypass_doc_validation.js
     - jstests/core/**/query/collation/collation.js
-    - jstests/core/**/collmod_convert_to_unique_apply_ops.js
-    - jstests/core/**/collmod_without_uuid.js
-    - jstests/core/**/list_collections1.js
+    - jstests/core/ddl/coll_mod_convert_to_unique_apply_ops.js
+    - jstests/core/ddl/coll_mod_without_uuid.js
+    - jstests/core/catalog/list_collections.js
     - jstests/core/**/list_collections_filter.js
     - jstests/core/**/list_collections_no_views.js
     - jstests/core/**/rename_collection_staytemp.js

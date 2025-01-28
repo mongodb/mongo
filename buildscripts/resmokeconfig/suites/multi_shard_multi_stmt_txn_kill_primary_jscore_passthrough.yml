@@ -188,7 +188,7 @@ selector:
     - jstests/core/views/views_all_commands.js
 
     # dropDatabase is not resilient to stepdowns on sharded cluster
-    - jstests/core/**/dropdb.js
+    - jstests/core/ddl/drop_database.js
     - jstests/core/**/validate_db_metadata_command.js
 
     # Committing a transaction when the server is fsync locked fails.
@@ -199,7 +199,7 @@ selector:
 
     # txn interrupted by command outside of txn before getMore runs.
     - jstests/core/**/commands_namespace_parsing.js
-    - jstests/core/**/drop3.js
+    - jstests/core/ddl/drop_collection_cursors.js
     - jstests/core/**/geo_s2cursorlimitskip.js
     - jstests/core/**/getmore_invalidated_cursors.js
     - jstests/core/**/getmore_invalidated_documents.js

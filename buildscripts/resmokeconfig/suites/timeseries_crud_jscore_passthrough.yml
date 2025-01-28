@@ -26,7 +26,6 @@ selector:
     - jstests/core/write/bulk/bulk_api_unordered.js
     # Time-series is not compatible with viewOn.
     - jstests/core/query/collation/collation.js
-    - jstests/core/dbstats.js
     - jstests/core/query/disallow_system_views_user_writes.js
     - jstests/core/query/agg_hint.js
     - jstests/core/query/collection_uuid_find.js

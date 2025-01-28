@@ -36,7 +36,7 @@ selector:
     # by the preceding find command which establishes the cursor. Therefore,
     # getMore cannot be guaranteed to get executed after commands in between find
     # and getMore.
-    - jstests/core/**/drop3.js
+    - jstests/core/ddl/drop_collection_cursors.js
     - jstests/core/**/ord.js
     - jstests/core/**/tailable_cursor_invalidation.js
     - jstests/core/**/tailable_skip_limit.js
@@ -72,7 +72,7 @@ selector:
     # TODO (SERVER-80416): cloneCollectionAsCapped command stops working after a replica set
     # is bootstrapped as a sharded cluster.
     - jstests/core/query/collation/collation.js
-    - jstests/core/ddl/capped_convertToCapped1.js
+    - jstests/core/ddl/clone_collection_as_capped.js
     - jstests/core/replicate_record_ids/disallow_capped.js
     # A renameCollection command against a collection with invalid views fails on sharded cluster
     # but succeeds on replica set.
@@ -83,7 +83,7 @@ selector:
     # The tests below are disabled because they assert that if there have not been any successful
     # writes the test database, it should remain empty or non-existent. This suite breaks this
     # assumption since it enables profiling which creates the system.profile collection.
-    - jstests/core/ddl/clone_as_capped_nonexistant.js
+    - jstests/core/ddl/clone_collection_as_capped_non_existent.js
     - jstests/core/no_db_created.js
     - jstests/core/query/explain/explain_find_and_modify.js
     # The test below expects the listCollections command that it runs to not validate the views
@@ -101,6 +101,8 @@ selector:
     - jstests/core/query/query_settings/query_settings_reject_application.js
     # Some TS rewrites cannot be done on mongos.
     - jstests/core/timeseries/query/bucket_unpacking_group_reorder_fixed_buckets.js
+    # SERVER-99720 Remove the following exclusion rule once solved.
+    - jstests/core/ddl/drop_database.js
     # This test expects to see an unsharded collection as untracked
     - jstests/core/catalog/agg_list_cluster_catalog_sharding_fields.js
 

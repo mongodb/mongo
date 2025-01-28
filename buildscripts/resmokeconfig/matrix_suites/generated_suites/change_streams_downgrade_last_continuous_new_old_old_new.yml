@@ -205,11 +205,11 @@ selector:
     - jstests/core/**/insert_id_undefined.js
     - jstests/core/query/json_schema/misc_validation.js
     - jstests/core/views/views_all_commands.js
-    - jstests/core/**/dropdb.js
+    - jstests/core/ddl/drop_database.js
     - jstests/core/**/fsync.js
     - jstests/core/**/constructors.js
     - jstests/core/**/commands_namespace_parsing.js
-    - jstests/core/**/drop3.js
+    - jstests/core/ddl/drop_collection_cursors.js
     - jstests/core/**/geo_s2cursorlimitskip.js
     - jstests/core/**/getmore_invalidated_cursors.js
     - jstests/core/**/getmore_invalidated_documents.js

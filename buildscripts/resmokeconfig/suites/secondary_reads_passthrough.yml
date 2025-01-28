@@ -24,7 +24,7 @@ selector:
     # by the preceding find command which establishes the cursor. Therefore,
     # getMore cannot be guaranteed to get executed after commands in between find
     # and getMore.
-    - jstests/core/**/drop3.js
+    - jstests/core/ddl/drop_collection_cursors.js
     - jstests/core/**/ord.js
     - jstests/core/**/tailable_cursor_invalidation.js
     - jstests/core/**/tailable_skip_limit.js

@@ -94,7 +94,7 @@ selector:
 
     # Expects to successfully drop invalid views. As drops are no-oped, the leftover
     # invalid views fail the data consistency checker.
-    - jstests/core/catalog/catalog_list_operations_consistency.js
+    - jstests/core/catalog/list_catalog_stage_consistency.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

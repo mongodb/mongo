@@ -50,7 +50,7 @@ selector:
     - src/mongo/db/modules/enterprise/jstests/fle2/query/update_upsert.js
 
     # TODO: SERVER-85773 Reenable the following test once `cloneCollectionAsCapped` is supported on any shard
-    - jstests/core/ddl/capped_convertToCapped1.js
+    - jstests/core/ddl/clone_collection_as_capped.js
 
     # TODO: SERVER-97219 re-enable this test
     - jstests/core_sharding/move_collection/move_collection_basic.js

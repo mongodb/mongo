@@ -30,7 +30,7 @@ selector:
     - jstests/core/**/list_all_sessions.js
     - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
     # cursor.close() calls killCursors command which is not allowed with security token.
-    - jstests/core/**/list_collections1.js
+    - jstests/core/catalog/list_collections.js
     - jstests/core/**/list_indexes.js
     # collection.getPlanCache().* calls planCache* commands which are not allowed with security token.
     - jstests/core/**/cached_plan_trial_does_not_discard_work.js

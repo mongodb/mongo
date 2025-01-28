@@ -58,7 +58,7 @@ selector:
     - jstests/core/**/benchrun_pipeline_updates.js # benchRun() used for writes
     - jstests/core/**/list_collections_filter.js # Temporary collections are dropped on failover.
     - jstests/core/**/query/top/top.js # Tests read commands (including getMore) against the secondary
-    - jstests/core/**/drop3.js # getMore is not causally consistent if collection is dropped
+    - jstests/core/ddl/drop_collection_cursors.js # getMore is not causally consistent if collection is dropped
     - jstests/core/**/list_collections_filter.js # Temporary collections are dropped on failover.
     - jstests/core/**/explain_large_bounds.js # Stepdown can timeout waiting for global lock.
 

@@ -185,7 +185,7 @@ selector:
     - jstests/core/failcommand_failpoint.js
 
     # Sets cluster parameters, which do writes with timestamps that will vary b/w clusters.
-    - jstests/core/cluster_parameter_commands.js
+    - jstests/core/cluster_parameters/cluster_parameter_commands.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod
