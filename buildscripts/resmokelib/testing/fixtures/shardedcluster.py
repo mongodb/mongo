@@ -205,7 +205,14 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             # These mongot parameters are popped from shard.mongod_options when mongod is launched in above
             # setup() call. As such, the final values can't be cleanly copied over from mongod_options, but
             # need to be recreated here.
-            self.mongotHost = "localhost:" + str(self.shards[-1].mongot_port)
+            if self.mongos[0].mongos_options["set_parameters"].get("useGrpcForSearch"):
+                # If mongos & mongod are configured to use egress gRPC for search, then set the
+                # `mongotHost` parameter to the mongot listening address expecting communication via
+                # the MongoDB gRPC protocol (which we configured in setup_mongot_params).
+                self.mongotHost = "localhost:" + str(self.shards[-1].mongot_grpc_port)
+            else:
+                self.mongotHost = "localhost:" + str(self.shards[-1].mongot_port)
+
             self.searchIndexManagementHostAndPort = self.mongotHost
 
             for mongos in self.mongos:

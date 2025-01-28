@@ -631,7 +631,10 @@ buildvariants:
     run_on:
       - rhel8.8-large
     expansions:
-      <<: *generic_linux_compile_expansions
+      <<: *aubsan-lite-required-expansions
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      has_packages: false
       separate_debug: off
       san_options: *grpc_aubsan_options
       compile_flags: >-
@@ -676,13 +679,16 @@ buildvariants:
       - name: .grpc_misc_js
 
   - name: &enterprise-rhel8-debug-aubsan-search-grpc enterprise-rhel8-debug-aubsan-search-grpc
-    display_name: "~ Linux x86 Shared Library {A,UB}SAN Enterprise Search in Community with GRPC (mongotmock only)"
+    display_name: "~ Linux x86 Shared Library {A,UB}SAN Enterprise Search in Community with GRPC"
     tags: ["experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel80-large
     expansions:
-      <<: *generic_linux_compile_expansions
+      <<: *aubsan-lite-required-expansions
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      has_packages: false
       separate_debug: off
       san_options: *grpc_aubsan_options
       compile_flags: >-
@@ -697,8 +703,10 @@ buildvariants:
         --link-model=dynamic
         ENABLE_GRPC_BUILD=1
       compile_variant: *enterprise-rhel8-debug-aubsan-search-grpc
+      build_mongot: true
     tasks:
       - name: compile_ninja_quick_TG
       - name: compile_test_parallel_core_stream_TG
       - name: generate_buildid_to_debug_symbols_mapping
       - name: search_community
+      - name: .search_community_e2e_tests

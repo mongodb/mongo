@@ -517,6 +517,9 @@ class ShardedClusterBuilder(FixtureBuilder):
                 # Saving the mongot port to the ReplicaSetFixture allows the ShardedClusterFixture
                 # to spin up a mongos with a connection to the last launched mongot.
                 shard.mongot_port = shard.nodes[-1].mongot_port
+                # Also copy the mongot_grpc_port if it is available.
+                if shard.nodes[-1].mongod_options["set_parameters"].get("useGrpcForSearch"):
+                    shard.mongot_grpc_port = shard.nodes[-1].mongot_grpc_port
 
         return sharded_cluster
 

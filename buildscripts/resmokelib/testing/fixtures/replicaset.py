@@ -149,8 +149,11 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         self.initial_sync_node = None
         self.initial_sync_node_idx = -1
         self.use_auto_bootstrap_procedure = use_auto_bootstrap_procedure
-        # This will be set in setup() after the MongoTFixture has been launched.
+        # The below ports will be set in setup() after the MongoTFixture has been launched.
         self.mongot_port = None
+        # mongot_grpc_port is the ingress grpc port on mongot that is configured for the search
+        # in community architecture. See setup_mongot_params and MongoDFixture.__init__ for more details.
+        self.mongot_grpc_port = None
         # Track the fixture removal [teardown] performed during removeShard testing.
         # This is needed, because we expect the fixture to be in the 'running' state
         # when the evergeen job performs the final teardown. Therefore if the fixture was

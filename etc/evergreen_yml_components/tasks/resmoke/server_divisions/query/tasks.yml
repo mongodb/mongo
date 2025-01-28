@@ -1318,8 +1318,6 @@ tasks:
       - func: "do setup"
       - func: "get mongot version"
       - func: "run tests"
-        vars:
-          resmoke_jobs_max: 1
 
   - <<: *task_template
     name: search_end_to_end_single_node
@@ -1336,6 +1334,36 @@ tasks:
       - func: "run tests"
         vars:
           resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: search_community_end_to_end_sharded_cluster
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "experimental",
+        "incompatible_windows",
+        "search_community_e2e_tests",
+        "blocked_in_query_alias",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "get mongot version"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: search_community_end_to_end_single_node
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "experimental",
+        "incompatible_windows",
+        "search_community_e2e_tests",
+        "blocked_in_query_alias",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "get mongot version"
+      - func: "run tests"
 
   - <<: *task_template
     name: search_ssl

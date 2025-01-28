@@ -91,8 +91,22 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
 
         if launch_mongot:
             self.launch_mongot_bool = True
+
+            # mongot exposes two ports that it will listen for ingress communication on: "port",
+            # which expects the MongoRPC protocol, and "grpcPort", which expects the MongoDB
+            # gRPC protocol. When useGrpcForSearch is true, mongos and mongod will communicate
+            # with mongot using gRPC, and so we must set the "mongotHost" option to the listening
+            # address that expects the gRPC protocol. However, the testing infrastructure also
+            # communicates with mongot directly using the pymongo driver, which must communicate
+            # using MongoRPC, and so we also setup the "port" on mongot to listen for MongoRPC
+            # connections no matter what.
             self.mongot_port = fixturelib.get_next_port(job_num)
-            self.mongod_options["mongotHost"] = "localhost:" + str(self.mongot_port)
+            if self.mongod_options["set_parameters"].get("useGrpcForSearch"):
+                self.mongot_grpc_port = fixturelib.get_next_port(job_num)
+                self.mongod_options["mongotHost"] = "localhost:" + str(self.mongot_grpc_port)
+            else:
+                self.mongod_options["mongotHost"] = "localhost:" + str(self.mongot_port)
+
             # In future architectures, this could change
             self.mongod_options["searchIndexManagementHostAndPort"] = self.mongod_options[
                 "mongotHost"
@@ -187,9 +201,21 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
 
     def setup_mongot_params(self, router_endpoint_for_mongot: Optional[int] = None):
         mongot_options = {}
-        mongot_options["mongodHostAndPort"] = "localhost:" + str(self.port)
-        mongot_options["port"] = self.mongot_port
 
+        ## Set up mongot's ingress communication for query & index management commands from mongod ##
+        # Set up the listening port on mongot expecting the MongoRPC protocol. This is used for
+        # direct communication from drivers to mongot, and in the Atlas architecture.
+        mongot_options["port"] = self.mongot_port
+        # Set up the listening port on mongot expecting the MongoDB gRPC protocol, which will
+        # be used when `useGrpcForSearch` is true on mongos/mongod. This is used in the community
+        # architecture.
+        if self.mongod_options["set_parameters"].get("useGrpcForSearch"):
+            mongot_options["grpcPort"] = self.mongot_grpc_port
+
+        ## Set up mongot's egress communication for change stream/replication commands to mongot ###
+        # Point the mongodHostAndPort and mongosHostAndPort parameters on mongot to the ingress
+        # listening ports of mongod/mongos.
+        mongot_options["mongodHostAndPort"] = "localhost:" + str(self.port)
         if router_endpoint_for_mongot is not None:
             mongot_options["mongosHostAndPort"] = "localhost:" + str(router_endpoint_for_mongot)
 
