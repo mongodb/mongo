@@ -240,7 +240,7 @@ done by the
 [`SyncSourceResolver`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/sync_source_resolver.h).
 
 The `SyncSourceResolver` delegates the duty of choosing a "sync source candidate" to the
-[**`ReplicationCoordinator`**](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/replication_coordinator.h),
+[**`ReplicationCoordinator`**](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator.h),
 which in turn asks the
 [**`TopologyCoordinator`**](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/topology_coordinator.h)
 to choose a new sync source.
@@ -334,7 +334,7 @@ endless loop doing the following:
 
 #### Code References
 
-- [Start background threads like bgSync/oplogApplier/syncSourceFeedback](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_external_state_impl.cpp#L213)
+- [Start background threads like bgSync/oplogApplier/syncSourceFeedback](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_external_state_impl.cpp#L252)
 - [BackgroundSync starts SyncSourceResolver and OplogFetcher to sync log](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/bgsync.cpp#L225)
 - [SyncSourceResolver chooses a sync source to sync from](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/sync_source_resolver.cpp#L545)
 - [OplogBuffer currently uses a BlockingQueue as underlying data structure](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/oplog_buffer_blocking_queue.h#L41)
@@ -351,18 +351,18 @@ The `ReplicationCoordinator` is the public api that replication presents to the 
 base. It is in charge of coordinating the interaction of replication with the rest of the system.
 
 The `ReplicationCoordinator` communicates with the storage layer and other nodes through the
-[`ReplicationCoordinatorExternalState`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/replication_coordinator_external_state.h).
+[`ReplicationCoordinatorExternalState`](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_external_state.h).
 The external state also manages and owns all of the replication threads.
 
 The `TopologyCoordinator` is in charge of maintaining state about the topology of the cluster. On
 significant changes (anything that affects the response to hello/isMaster), the TopologyCoordinator
-updates its TopologyVersion. The [`hello`](https://github.com/mongodb/mongo/blob/r4.8.0-alpha/src/mongo/db/repl/replication_info.cpp#L241) command awaits changes in the TopologyVersion before returning. On
+updates its TopologyVersion. The [`hello`](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_info.cpp#L346) command awaits changes in the TopologyVersion before returning. On
 shutdown, if the server is a secondary, it enters quiesce mode: we increment the TopologyVersion
 and start responding to `hello` commands with a `ShutdownInProgress` error, so that clients cease
 routing new operations to the node.
 
 Since we wish to track usage of the `isMaster` command separately from the `hello` command in
-`serverStatus`, it is implemented as a [derived class](https://github.com/mongodb/mongo/blob/r4.8.0-alpha/src/mongo/db/repl/replication_info.cpp#L513) of hello. The main difference between the two commands is that
+`serverStatus`, it is implemented as a [derived class](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_info.cpp#L679) of hello. The main difference between the two commands is that
 clients will start seeing an `isWritablePrimary` response field instead of `ismaster` when switching
 to the `hello` command.
 
@@ -375,8 +375,8 @@ plans to merge these together.
 ## helloOk Protocol Negotiation
 
 In order to preserve backwards compatibility with old drivers, we currently support both the
-[`isMaster`](https://github.com/mongodb/mongo/blob/r4.8.0-alpha/src/mongo/db/repl/replication_info.cpp#L513)
-command and the [`hello`](https://github.com/mongodb/mongo/blob/r4.8.0-alpha/src/mongo/db/repl/replication_info.cpp#L241) command. New drivers and 5.0+ versions of the server will support `hello`.
+[`isMaster`](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_info.cpp#L679)
+command and the [`hello`](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_info.cpp#L346) command. New drivers and 5.0+ versions of the server will support `hello`.
 A new driver will send "helloOk: true" as a part of the initial handshake when opening a new
 connection to mongod. If the server supports hello, it will respond with "helloOk: true" as well.
 This way, new drivers know that they're communicating with a version of the server that supports
@@ -496,7 +496,7 @@ sending node for liveness checking in its `MemberData` list.
 
 If the sending node's config is newer than the receiving node's, then the receiving node schedules a
 heartbeat to get the config, except when the receiving node is [in primary state but cannot accept
-non-local writes](https://github.com/mongodb/mongo/blob/04777b82b0e0f7f83b99f1c837816bc93ba4d23b/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L610-L618).
+non-local writes](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L683-L691).
 The receiving node's `TopologyCoordinator` also updates its `MemberData` with the last update from
 the sending node and marks it as being up. See more details on config propagation via heartbeats in
 the [Reconfiguration](#Reconfiguration) section.
@@ -618,10 +618,10 @@ error, such as in a `ReplSetConfig` mismatch.
 #### Code References
 
 - [OplogFetcher passes on the metadata it received from its sync source](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/oplog_fetcher.cpp#L897)
-- [Node handles heartbeat response and schedules the next heartbeat after it receives heartbeat response](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L190)
+- [Node handles heartbeat response and schedules the next heartbeat after it receives heartbeat response](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L234)
 - [Node responds to heartbeat request](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/repl_set_commands.cpp#L752)
-- [Primary advances the replica set's commit point after receiving replSetUpdatePosition command](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L1889)
-- [Secondary advances its understanding of the replica set commit point using metadata fetched from its sync source](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L5649)
+- [Primary advances the replica set's commit point after receiving replSetUpdatePosition command](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L2171)
+- [Secondary advances its understanding of the replica set commit point using metadata fetched from its sync source](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L5144)
 - [TopologyCoordinator updates commit optime](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L2885)
 - [SyncSourceFeedback triggers replSetUpdatePosition command using Reporter](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/reporter.cpp#L189)
 - [Node updates replica set metadata after receiving replSetUpdatePosition command](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/repl_set_commands.cpp#L675)
@@ -1012,7 +1012,7 @@ survive stepdown because shards are relying on the `prepareTransaction` command 
 remaining) majority committed. As a result, after preparing a transaction, the node will [release](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L1826-L1829) the
 [RSTL](#replication-state-transition-lock) so that it does not end up conflicting with state
 transitions. When [stepdown](#step-down) is aborting transactions before acquiring the RSTL, it will
-only abort unprepared transactions. Once stepdown finishes, the node will [yield locks from all prepared transactions](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/repl/replication_coordinator_impl.cpp#L3006)
+only abort unprepared transactions. Once stepdown finishes, the node will [yield locks from all prepared transactions](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L3890)
 since secondaries don't hold locks for their transactions.
 
 ### Step Up with a Prepared Transaction
@@ -1049,7 +1049,7 @@ the transaction, apply all the operations from the oplog entry(s) and prepare th
 
 #### Code references
 
-- Function to [abort unprepared transactions during stepup or stepdown](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/repl/replication_coordinator_impl.cpp#L2766).
+- Function to [abort unprepared transactions during stepup or stepdown](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_step_up_step_down.cpp#L164).
 - Where we [yield locks for transactions](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L1282-L1287).
 - Where we [restore locks for transactions](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L1343-L1348).
 - Function to [reconstruct prepared transactions from oplog entries](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/repl/transaction_oplog_application.cpp#L804).
@@ -1372,17 +1372,17 @@ There are a number of ways that a node will run for election:
 
 ### Code references
 
-- [election timeout](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L345) ([defaults](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/repl_set_config.idl#L101))
-- [priority takeover](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L449)
+- [election timeout](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L495) ([defaults](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/repl_set_config.idl#L109))
+- [priority takeover](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L504)
 - [priority takeover: priority check](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L1568-L1578)
 - [priority takeover: wait time calculation](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/repl_set_config.cpp#L705-L709)
-- [newly elected primary catchup](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4714)
-- [primary catchup completion](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4799-L4813)
-- [primary start accepting writes](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L1361)
-- [catchup takeover](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L466)
-- [catchup takeover: takeover check](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L466)
-- [election handoff](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L2924)
-- [election handoff: skip wait](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L2917-L2921)
+- [newly elected primary catchup](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_catchup.cpp#L60)
+- [primary catchup completion](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_catchup.cpp#L146-L158)
+- [primary start accepting writes](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L1552)
+- [catchup takeover](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L519)
+- [catchup takeover: takeover check](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L519)
+- [election handoff](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L2838)
+- [election handoff: skip wait](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_step_up_step_down.cpp#L462-L467)
 
 ### Candidate Perspective
 
@@ -1411,11 +1411,11 @@ election.
 
 #### Code references
 
-- [dry-run election](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_elect_v1.cpp#L203)
-- [skipping dry-run](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_elect_v1.cpp#L185)
-- [real election](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_elect_v1.cpp#L277)
+- [dry-run election](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_elect_v1.cpp#L233)
+- [skipping dry-run](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_elect_v1.cpp#L220)
+- [real election](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_elect_v1.cpp#L303)
 - [candidate process vote response](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/vote_requester.cpp#L114)
-- [candidate checks election result](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_elect_v1.cpp#L416)
+- [candidate checks election result](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_elect_v1.cpp#L444)
 
 ### Voter Perspective
 
@@ -1441,7 +1441,7 @@ same term.
 #### Code references
 
 - [node processing vote request](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L3429)
-- [recording LastVote durably](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L5739)
+- [recording LastVote durably](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L5241)
 
 ### Transitioning to `PRIMARY`
 
@@ -1484,14 +1484,14 @@ primary.
 
 #### Code references
 
-- [clearing the sync source, notify nodes of election, prepare catch up](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4697-L4707)
-- [catchup to latest optime known via heartbeats](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4800)
-- [catchup-timeout](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4746)
-- [always allow chaining for catchup](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L5231)
-- [enter drain mode after catchup attempt](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4783)
-- [exit drain mode](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L1205)
-- [term bump](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L1300)
-- [drop temporary collections](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_external_state_impl.cpp#L532)
+- [clearing the sync source, notify nodes of election, prepare catch up](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_catchup.cpp#L384-L394)
+- [catchup to latest optime known via heartbeats](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_catchup.cpp#L147)
+- [catchup-timeout](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_catchup.cpp#L92)
+- [always allow chaining for catchup](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L4797)
+- [enter drain mode after catchup attempt](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_catchup.cpp#L130)
+- [exit drain mode](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L1411)
+- [term bump](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L1491)
+- [drop temporary collections](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_external_state_impl.cpp#L689)
 
 ## Step Down
 
@@ -1526,13 +1526,13 @@ Finally, we log stepdown metrics and update our member state to `SECONDARY`.
 #### Code references
 
 - [User-facing documentation](https://www.mongodb.com/docs/manual/reference/command/replSetStepDown/#command-fields).
-- [Replication coordinator stepDown method](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L2729)
+- [Replication coordinator stepDown method](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_step_up_step_down.cpp#L255)
 - [ReplSetStepDown command class](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/repl_set_commands.cpp#L527)
-- [The node loops trying to step down](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L2836)
+- [The node loops trying to step down](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_step_up_step_down.cpp#L377)
 - [A majority of nodes need to have reached the lastApplied optime](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L2733)
 - [At least one caught up node needs to be electable](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L2738)
 - [Set the LeaderMode to kSteppingDown](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L1721)
-- [Upon a successful stepdown, it yields locks held by prepared transactions](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L2899)
+- [Upon a successful stepdown, it yields locks held by prepared transactions](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_step_up_step_down.cpp#L444)
 
 ### Unconditional
 
@@ -1555,12 +1555,12 @@ RSTL and yield locks of prepared transactions following a successful stepdown.
 
 #### Code references
 
-- [Stepping down on learning of a higher term](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L6066)
+- [Stepping down on learning of a higher term](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L5491-L5496)
 - [Liveness timeout checks](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L1236-L1249)
-- [Stepping down on liveness timeout](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L424)
+- [Stepping down on liveness timeout](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L479)
 - [ReplSetReconfig command class](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/repl_set_commands.cpp#L431)
-- [Stepping on reconfig](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4010)
-- [Stepping down on heartbeat](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L980)
+- [Stepping on reconfig](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L3873)
+- [Stepping down on heartbeat](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L908)
 
 ### Concurrent Stepdown Attempts
 
@@ -1888,14 +1888,14 @@ is the node's lastApplied OpTime. Finally, the `InitialSyncer` shuts down and th
 
 #### Code References
 
-- [ReplicationCoordinator starts initial sync if the node is started up without any data](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L887)
+- [ReplicationCoordinator starts initial sync if the node is started up without any data](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L1026)
 - [Follow this flowchart for initial sync call stack.](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/initial_syncer.h#L278)
 - [Initial syncer uses AllDatabaseCloner/DatabaseCloner/CollectionCloner to clone data from sync source, where the state transition is defined in runStages().](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/base_cloner.cpp#L268)
 - [AllDatabaseCloner creates and runs each DatabaseCloner in its post stage.](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/all_database_cloner.cpp#L263)
 - [DatabaseCloner creates and runs each CollectionCloner in its post stage.](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/database_cloner.cpp#L137)
 - [InitialSyncer uses RollbackChecker to check if there is a rollback on sync source during initial sync.](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/initial_syncer.cpp#L2014)
 - [Set lastApplied OpTime as initialDataTimestamp to storage engine after initial sync finishes.](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/initial_syncer.cpp#L586-L590)
-- [Start steady state replication after initial sync completes.](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L847)
+- [Start steady state replication after initial sync completes.](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L965)
 
 # Reconfiguration
 
@@ -1914,13 +1914,13 @@ collection on each replica set node.
 ## Initiation
 
 When the mongod processes for members of a replica set are first started, they have [no configuration
-installed](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L486-L494) and they do not communicate with each other over the network or replicate any data. To
+installed](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L637-L644) and they do not communicate with each other over the network or replicate any data. To
 initialize the replica set, an initial config must be provided via the [`replSetInitiate`](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/repl_set_commands.cpp#L332-L334) command, so
 that nodes know who the other members of the replica set are. Upon receiving this command, which can
-be run on any node of an uninitialized set, a node [validates](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4232-L4233) and [installs](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_external_state_impl.cpp#L435-L441) the specified config. It
+be run on any node of an uninitialized set, a node [validates](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L729-L730) and [installs](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_external_state_impl.cpp#L559-L564) the specified config. It
 then establishes connections to and begins sending heartbeats to the other nodes of the replica set
 contained in the configuration it installed. Configurations are propagated between nodes [via
-heartbeats](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L397-L399), which is how nodes in the replica set will receive and install the initial config.
+heartbeats](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L470-L473), which is how nodes in the replica set will receive and install the initial config.
 
 ## Reconfiguration Behavior
 
@@ -1958,10 +1958,10 @@ two additional constraints that must be satisfied before a primary node can inst
 configuration:
 
 1. **[Config
-   Replication](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4023-L4026)**:
+   Replication](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L3963-L3966)**:
    The current config, C, must be installed on at least a majority of voting nodes in C.
 2. **[Oplog
-   Commitment](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4045-L4052)**:
+   Commitment](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L3998-L4005)**:
    Any oplog entries that were majority committed in the previous config, C0, must be replicated to at
    least a majority of voting nodes in the current config, C1.
 
@@ -1998,12 +1998,12 @@ must have some way of determining if one config is "newer" than another. Each co
 term)`](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/repl_set_config.h#L51-L56)
 pair, where `term` is compared first, and then `version`, analogous to the rules for optime
 comparison. The `term` of a config is the term of the primary that originally created that config,
-and the `version` is a [monotonically increasing number](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4112) assigned to each config. When executing a
+and the `version` is a [monotonically increasing number](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L4065) assigned to each config. When executing a
 reconfig, the version of the new config must be greater than the version of the current config. If
 the `(version, term)` pair of config A is greater than that of config B, then it is considered
 "newer" than config B. If a node hears about a newer config via a heartbeat from another node, it
 will [schedule a
-heartbeat](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L5779-L5811)
+heartbeat](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L5364-L5388)
 to fetch the config and
 [install](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/topology_coordinator.cpp#L1004-L1006)
 it locally.
@@ -2012,7 +2012,7 @@ Note that force reconfigs set the new config's term to an [uninitialized term
 value](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/optime.h#L58-L59). When we
 compare two configs, if either of them has an uninitialized term value, then we only consider config
 versions for comparison. A force reconfig also [increments the
-version](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L3520-L3527)
+version](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L3442-L3449)
 of the current config by a large, random number. This makes it very likely that the force config
 will be "newer" than any other config in the system.
 
@@ -2081,7 +2081,7 @@ secondaries to replicate one of its oplog entries as soon as there are no oplog 
 behind the entry. However, secondaries do not have to wait for the oplog entry to make it to disk
 on the primary nor for there to be no holes behind it on disk on the primary. Therefore, some
 already replicated writes may disappear from the primary if the primary crashes. The primary will
-continually [update the `oplogTruncateAfterPoint`](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_external_state_impl.cpp#L1150-L1154)
+continually [update the `oplogTruncateAfterPoint`](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_external_state_impl.cpp#L1378-L1381)
 in order to track and forward the no oplog holes
 point on disk, in case of an unclean shutdown. Then startup recovery can take care of any oplog
 inconsistency with the rest of the replica set.
@@ -2096,12 +2096,12 @@ is that it will not apply `prepareTransaction` oplog entries. Similar to [how a 
 prepared transactions during initial sync and rollback, the node will update the transactions table
 every time it sees a `prepareTransaction` oplog entry. Once the node has finished applying all the
 oplog entries through the top of the oplog, it will
-[reconstruct](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L537-L538)
+[reconstruct](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L679-L682)
 all transactions still in the prepare state.
 
-Finally, the node will [finish loading](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L547)
+Finally, the node will [finish loading](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L691)
 the replica set configuration, [set its `lastWritten`, `lastApplied` and
-`lastDurable`](https://github.com/mongodb/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/replication_coordinator_impl.cpp#L727-L729) timestamps
+`lastDurable`](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L810-L812) timestamps
 to the top of the oplog (the latest entry in the oplog) and start steady state replication.
 
 ## Recover from Unstable Checkpoint
@@ -2236,11 +2236,11 @@ oplog without any gaps.
 This is calculated at the storage level and can be retrieved through [getAllDurableTimestamp](https://github.com/mongodb/mongo/blob/2ff8fff5b01eeda5722884c5fd104716117c9606/src/mongo/db/repl/storage_interface.h#L471).  
 Contrary to what the name might imply, this timestamp does not indicate that all transactions
 preceding it are durable on disk; rather, it solely signifies they are committed. Therefore,
-replication consistently [maintains that](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4843-L4861) `stable_timestamp` <= `all_durable`.
+replication consistently [maintains that](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L4981-L4998) `stable_timestamp` <= `all_durable`.
 
 **`currentCommittedSnapshot`**: An optime maintained in `ReplicationCoordinator` that is used to
 serve majority reads and is always guaranteed to be <= `lastCommittedOpTime`. This
-is currently [set to the stable optime](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4945).
+is currently [set to the stable optime](hhttps://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L5085).
 Since it is reset every time we recalculate the stable optime, it will also be up to date.
 
 **`initialDataTimestamp`**: A timestamp used to indicate the timestamp at which history “begins”.
@@ -2300,8 +2300,8 @@ checkpoint, which can be thought of as a consistent snapshot of the data. Replic
 storage engine of where it is safe to take its next checkpoint. This timestamp is guaranteed to be
 majority committed (other than a specific caveat during restore noted below) so that RTT rollback
 can use it.  
-The calculation of this value in the replication layer occurs [here](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4824-L4881).
-The replication layer will [skip setting the stable timestamp](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4907-L4921)
+The calculation of this value in the replication layer occurs [here](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L4957-L5027).
+The replication layer will [skip setting the stable timestamp](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L5048-L5062)
 if it is earlier than the `initialDataTimestamp`, since data earlier than that timestamp may be
 inconsistent.
 During restore, we may proactively set the stable timestamp as we apply oplog batches even before
@@ -2371,7 +2371,7 @@ committed. However, this is safe because we do not allow rollbacks before the
 - **`[3]`**: With manual replSetMaintenance or when [switching sync source](https://github.com/mongodb/mongo/blob/r8.0.1/src/mongo/db/repl/bgsync.cpp#L485-L491)
 - **`[4]`**: Too stale or manual replSetMaintenance
 - **`[5]`**: When stepping down with [\_hasOnlyAuthErrorUpHeartbeats(...) returning true](https://github.com/mongodb/mongo/blob/r8.0.1/src/mongo/db/repl/topology_coordinator.cpp#L2739-L2741)
-- **`[6]`**: [Code in ReplicationCoordinatorImpl::\_startDataReplication](https://github.com/mongodb/mongo/blob/r8.0.1/src/mongo/db/repl/replication_coordinator_impl.cpp#L921-L922) allows it
+- **`[6]`**: [Code in ReplicationCoordinatorImpl::\_startDataReplication](https://github.com/mongodb/mongo/blob/c8ebdc8b2ef2379bba978ab688e2eda1ac702b15/src/mongo/db/repl/replication_coordinator_impl.cpp#L962-L963) allows it
 
 # Non-replication subsystems dependent on replication state transitions.
 
