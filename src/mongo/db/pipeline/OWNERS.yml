@@ -1,8 +1,8 @@
 version: 1.0.0
 filters:
-  # The files implementing DocumentSource and Expression each contain code related to parsing,
-  # validation, and optimization (QO concerns) as well as execution (QE). Therefore, we give default
-  # ownership of files in this directory to the entire query team.
+  # The files implementing DocumentSource each contain code related to parsing, validation, and
+  # optimization (QO concerns) as well as execution (QE). Therefore, we give default ownership
+  # of files in this directory to the entire query team.
   - "*":
     approvers:
       - 10gen/query
@@ -74,6 +74,9 @@ filters:
   - "document_source_set_window_fields*":
     approvers:
       - 10gen/query-integration-analytic-extensions
+  - "expression*":
+    approvers:
+      - 10gen/query-optimization-parsers
   - "expression_dependencies*":
     approvers:
       - 10gen/query-optimization-heuristic-rewrite

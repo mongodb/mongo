@@ -1014,7 +1014,7 @@ protected:
 
     /**
      * Construct an expression context using ExpressionContextParams. Consider using
-     * ExpressonContextBuilder instead.
+     * ExpressionContextBuilder instead.
      */
     ExpressionContext(ExpressionContextParams&& config);
 

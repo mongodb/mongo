@@ -1636,6 +1636,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_score* @10gen/query-integration-search @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_score_fusion* @10gen/query-integration-search @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_set_window_fields* @10gen/query-integration-analytic-extensions @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/expression* @10gen/query-optimization-parsers @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/expression_dependencies* @10gen/query-optimization-heuristic-rewrite @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/expression_javascript* @10gen/query-integration-javascript @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/expression_js* @10gen/query-integration-javascript @svc-auto-approve-bot
