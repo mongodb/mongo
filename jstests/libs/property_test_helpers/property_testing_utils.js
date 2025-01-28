@@ -28,3 +28,31 @@ export function concreteQueryFromFamily(queryShape, leafId) {
     }
     return queryShape;
 }
+
+/*
+ * Default documents to use for the core PBT model schema.
+ * TODO SERVER-93816 remove this function and model documents as an arbitrary so that documents can
+ * be minimized.
+ */
+export function defaultPbtDocuments() {
+    const datePrefix = 1680912440;
+    const alphabet = 'abcdefghijklmnopqrstuvwxyz';
+    const docs = [];
+    let id = 0;
+    for (let m = 0; m < 10; m++) {
+        let currentDate = 0;
+        for (let i = 0; i < 10; i++) {
+            docs.push({
+                _id: id,
+                t: new Date(datePrefix + currentDate - 100),
+                m: {m1: m, m2: 2 * m},
+                array: [i, i + 1, 2 * i],
+                a: NumberInt(10 - i),
+                b: alphabet.charAt(i)
+            });
+            currentDate += 25;
+            id += 1;
+        }
+    }
+    return docs;
+}

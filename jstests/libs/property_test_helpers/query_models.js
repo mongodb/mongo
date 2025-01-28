@@ -169,7 +169,8 @@ const simpleIndexDefArb = arrayOfSingleIndexDefsArb.map(arrayOfIndexDefs => {
     return fullDef;
 });
 const simpleIndexOptionsArb = fc.constantFrom({}, {sparse: true});
-const simpleIndexDefAndOptionsArb = fc.tuple(simpleIndexDefArb, simpleIndexOptionsArb);
+const simpleIndexDefAndOptionsArb =
+    fc.record({def: simpleIndexDefArb, options: simpleIndexOptionsArb});
 
 // Hashed indexes
 const hashedIndexDefArb =
@@ -192,16 +193,29 @@ const hashedIndexDefArb =
             return !Object.keys(fullDef).includes('array');
         });
 // No index options for hashed or wildcard indexes.
-const hashedIndexDefAndOptionsArb = fc.tuple(hashedIndexDefArb, fc.constant({}));
+const hashedIndexDefAndOptionsArb = fc.record({def: hashedIndexDefArb, options: fc.constant({})});
 
 // Wildcard indexes. TODO SERVER-91164 expand coverage.
-const wildcardIndexDefAndOptionsArb = fc.tuple(fc.constant({"$**": 1}), fc.constant({}));
+const wildcardIndexDefAndOptionsArb =
+    fc.record({def: fc.constant({"$**": 1}), options: fc.constant({})});
 
 // Map to an object with the definition and options, so it's more clear what each object is.
-const indexInfoArb =
-    fc.oneof(
-          simpleIndexDefAndOptionsArb, wildcardIndexDefAndOptionsArb, hashedIndexDefAndOptionsArb)
-        .map(([def, options]) => {
-            return {def, options};
-        });
-export const listOfIndexesModel = fc.array(indexInfoArb, {minLength: 0, maxLength: 7});
+export const indexModel = fc.oneof(
+    simpleIndexDefAndOptionsArb, wildcardIndexDefAndOptionsArb, hashedIndexDefAndOptionsArb);
+
+function isMultikey(indexDef) {
+    for (const field of Object.keys(indexDef)) {
+        if (field === 'array') {
+            return true;
+        }
+    }
+    return false;
+}
+// Wildcard, hashed, sparse, and multikey indexes are not compatible with time-series collections.
+export const timeseriesIndexModel = simpleIndexDefAndOptionsArb.filter(({def, options}) => {
+    // Filter out any indexes that won't work for time-series.
+    if (options.sparse || isMultikey(def)) {
+        return false;
+    }
+    return true;
+});
