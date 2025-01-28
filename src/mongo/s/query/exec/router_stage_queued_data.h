@@ -54,14 +54,14 @@ public:
 
     void kill(OperationContext* opCtx) final;
 
-    bool remotesExhausted() final;
+    bool remotesExhausted() const final;
 
     std::size_t getNumRemotes() const final;
 
     /**
      * Queues a BSONObj to be returned.
      */
-    void queueResult(const ClusterQueryResult& result);
+    void queueResult(ClusterQueryResult&& result);
 
     /**
      * Queues an error response.

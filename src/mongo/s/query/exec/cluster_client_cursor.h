@@ -60,7 +60,7 @@ class StatusWith;
  */
 class ClusterClientCursor {
 public:
-    virtual ~ClusterClientCursor(){};
+    virtual ~ClusterClientCursor() = default;
 
     /**
      * Returns the next available result document (along with an ok status). May block waiting
@@ -148,21 +148,21 @@ public:
      * Queued documents are returned in FIFO order. The queued results are exhausted before
      * generating further results from the underlying mongos query stages.
      *
-     * 'obj' must be owned BSON.
+     * The BSONObj in the 'ClusterQueryResult' must be owned BSON.
      */
-    virtual void queueResult(const ClusterQueryResult& result) = 0;
+    virtual void queueResult(ClusterQueryResult&& result) = 0;
 
     /**
      * Returns whether or not all the remote cursors underlying this cursor have been exhausted.
      */
-    virtual bool remotesExhausted() = 0;
+    virtual bool remotesExhausted() const = 0;
 
     /**
      * Returns whether or not the cursor has been killed. Repeated calls to kill() can occur in
      * ~ClusterClientCursorGuard() if the cursor was killed while the cursor was checked out or in
      * use with the guard.
      */
-    virtual bool hasBeenKilled() = 0;
+    virtual bool hasBeenKilled() const = 0;
 
     /**
      * Sets the maxTimeMS value that the cursor should forward with any internally issued getMore

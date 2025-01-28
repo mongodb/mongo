@@ -55,12 +55,12 @@ public:
 
     void kill(OperationContext* opCtx) final;
 
-    bool remotesExhausted() final;
+    bool remotesExhausted() const final;
 
     /**
      * Queues a BSONObj to be returned.
      */
-    void queueResult(const ClusterQueryResult& result);
+    void queueResult(ClusterQueryResult&& result);
 
     /**
      * Queues an error response.

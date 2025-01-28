@@ -110,11 +110,11 @@ public:
 
     long long getNumReturnedSoFar() const final;
 
-    void queueResult(const ClusterQueryResult& result) final;
+    void queueResult(ClusterQueryResult&& result) final;
 
-    bool remotesExhausted() final;
+    bool remotesExhausted() const final;
 
-    bool hasBeenKilled() final;
+    bool hasBeenKilled() const final;
 
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
 

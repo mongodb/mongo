@@ -333,7 +333,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
 
     if (!_stash.empty()) {
         invariant(objOut && !dlOut);
-        *objOut = {SnapshotId(), _stash.front()};
+        *objOut = {SnapshotId(), std::move(_stash.front())};
         _stash.pop_front();
         return PlanExecutor::ADVANCED;
     }

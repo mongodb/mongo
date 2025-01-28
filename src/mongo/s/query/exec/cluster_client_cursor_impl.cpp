@@ -64,17 +64,19 @@ ClusterClientCursorGuard ClusterClientCursorImpl::make(
     OperationContext* opCtx,
     std::shared_ptr<executor::TaskExecutor> executor,
     ClusterClientCursorParams&& params) {
-    std::unique_ptr<ClusterClientCursor> cursor(new ClusterClientCursorImpl(
-        opCtx, std::move(executor), std::move(params), opCtx->getLogicalSessionId()));
-    return ClusterClientCursorGuard(opCtx, std::move(cursor));
+    return ClusterClientCursorGuard(
+        opCtx,
+        std::make_unique<ClusterClientCursorImpl>(
+            opCtx, std::move(executor), std::move(params), opCtx->getLogicalSessionId()));
 }
 
 ClusterClientCursorGuard ClusterClientCursorImpl::make(OperationContext* opCtx,
                                                        std::unique_ptr<RouterExecStage> root,
                                                        ClusterClientCursorParams&& params) {
-    std::unique_ptr<ClusterClientCursor> cursor(new ClusterClientCursorImpl(
-        opCtx, std::move(root), std::move(params), opCtx->getLogicalSessionId()));
-    return ClusterClientCursorGuard(opCtx, std::move(cursor));
+    return ClusterClientCursorGuard(
+        opCtx,
+        std::make_unique<ClusterClientCursorImpl>(
+            opCtx, std::move(root), std::move(params), opCtx->getLogicalSessionId()));
 }
 
 ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
@@ -139,7 +141,7 @@ StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() {
         auto front = std::move(_stash.front());
         _stash.pop();
         ++_numReturnedSoFar;
-        return {front};
+        return {std::move(front)};
     }
 
     auto next = _root->next();
@@ -214,19 +216,19 @@ long long ClusterClientCursorImpl::getNumReturnedSoFar() const {
     return _numReturnedSoFar;
 }
 
-void ClusterClientCursorImpl::queueResult(const ClusterQueryResult& result) {
+void ClusterClientCursorImpl::queueResult(ClusterQueryResult&& result) {
     auto resultObj = result.getResult();
     if (resultObj) {
         invariant(resultObj->isOwned());
     }
-    _stash.push(result);
+    _stash.push(std::move(result));
 }
 
-bool ClusterClientCursorImpl::remotesExhausted() {
+bool ClusterClientCursorImpl::remotesExhausted() const {
     return _root->remotesExhausted();
 }
 
-bool ClusterClientCursorImpl::hasBeenKilled() {
+bool ClusterClientCursorImpl::hasBeenKilled() const {
     return _hasBeenKilled;
 }
 

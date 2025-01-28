@@ -64,7 +64,7 @@ public:
         _resultsMerger.kill(opCtx);
     }
 
-    bool remotesExhausted() final {
+    bool remotesExhausted() const final {
         return _resultsMerger.remotesExhausted();
     }
 

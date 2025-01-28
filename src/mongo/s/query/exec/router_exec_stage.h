@@ -104,7 +104,7 @@ public:
     /**
      * Returns whether or not all the remote cursors are exhausted.
      */
-    virtual bool remotesExhausted() {
+    virtual bool remotesExhausted() const {
         invariant(_child);  // The default implementation forwards to the child stage.
         return _child->remotesExhausted();
     }

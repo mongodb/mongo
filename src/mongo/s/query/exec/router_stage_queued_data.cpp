@@ -41,12 +41,12 @@
 
 namespace mongo {
 
-void RouterStageQueuedData::queueResult(const ClusterQueryResult& result) {
+void RouterStageQueuedData::queueResult(ClusterQueryResult&& result) {
     auto resultObj = result.getResult();
     if (resultObj) {
         invariant(resultObj->isOwned());
     }
-    _resultsQueue.push({result});
+    _resultsQueue.push({std::move(result)});
 }
 
 void RouterStageQueuedData::queueError(Status status) {
@@ -58,7 +58,7 @@ StatusWith<ClusterQueryResult> RouterStageQueuedData::next() {
         return {ClusterQueryResult()};
     }
 
-    auto out = _resultsQueue.front();
+    auto out = std::move(_resultsQueue.front());
     _resultsQueue.pop();
     return out;
 }
@@ -67,7 +67,7 @@ void RouterStageQueuedData::kill(OperationContext* opCtx) {
     // No child to kill.
 }
 
-bool RouterStageQueuedData::remotesExhausted() {
+bool RouterStageQueuedData::remotesExhausted() const {
     // No underlying remote cursor.
     return true;
 }

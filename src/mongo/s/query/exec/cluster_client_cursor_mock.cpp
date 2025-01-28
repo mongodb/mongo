@@ -59,7 +59,7 @@ StatusWith<ClusterQueryResult> ClusterClientCursorMock::next() {
         return {ClusterQueryResult()};
     }
 
-    auto out = _resultsQueue.front();
+    auto out = std::move(_resultsQueue.front());
     _resultsQueue.pop();
 
     if (!out.isOK()) {
@@ -133,15 +133,15 @@ bool ClusterClientCursorMock::isTailableAndAwaitData() const {
     return false;
 }
 
-void ClusterClientCursorMock::queueResult(const ClusterQueryResult& result) {
-    _resultsQueue.push({result});
+void ClusterClientCursorMock::queueResult(ClusterQueryResult&& result) {
+    _resultsQueue.push({std::move(result)});
 }
 
-bool ClusterClientCursorMock::remotesExhausted() {
+bool ClusterClientCursorMock::remotesExhausted() const {
     return _remotesExhausted;
 }
 
-bool ClusterClientCursorMock::hasBeenKilled() {
+bool ClusterClientCursorMock::hasBeenKilled() const {
     return _killed;
 }
 

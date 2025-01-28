@@ -426,7 +426,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         : ClusterCursorManager::CursorType::SingleTarget;
 
     // Only set skip, limit and sort to be applied to on the router for the multi-shard case. For
-    // the single-shard case skip/limit as well as sorts are appled on mongod.
+    // the single-shard case skip/limit as well as sorts are applied on mongod.
     if (cursorType == ClusterCursorManager::CursorType::MultiTarget) {
         params.skipToApplyOnRouter = findCommand.getSkip();
         params.limit = findCommand.getLimit();
@@ -444,7 +444,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
 
     if (findCommand.getAllowPartialResults() &&
         opCtx->checkForInterruptNoAssert().code() == ErrorCodes::MaxTimeMSExpired) {
-        // MaxTimeMS is expired in the router, but some remotes may still have outsanding requests.
+        // MaxTimeMS is expired in the router, but some remotes may still have outstanding requests.
         // Wait for all remotes to expire their requests.
 
         // Maximum number of 1ms sleeps to wait for remote cursors to be exhausted.
@@ -472,10 +472,8 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // ClusterClientCursor::next will fetch further results if necessary.
     while (!FindCommon::enoughForFirstBatch(findCommand, results->size())) {
         auto next = uassertStatusOK(ccc->next());
-        if (findCommand.getAllowPartialResults()) {
-            if (ccc->remotesExhausted()) {
-                cursorState = ClusterCursorManager::CursorState::Exhausted;
-            }
+        if (findCommand.getAllowPartialResults() && ccc->remotesExhausted()) {
+            cursorState = ClusterCursorManager::CursorState::Exhausted;
         }
         if (next.isEOF()) {
             // We reached end-of-stream. If the cursor is not tailable, then we mark it as
