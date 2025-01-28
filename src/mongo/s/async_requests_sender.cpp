@@ -338,7 +338,6 @@ auto AsyncRequestsSender::RemoteData::scheduleRemoteCommand(std::vector<HostAndP
     return std::move(f).semi();
 }
 
-
 auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandCallbackArgs&& rcr)
     -> SemiFuture<RemoteCommandCallbackArgs> {
     _shardHostAndPort = rcr.response.target;
@@ -346,19 +345,23 @@ auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandCallbackArgs&&
     auto status = rcr.response.status;
     bool isRemote = false;
 
-    if (status.isOK()) {
+    if (MONGO_likely(status.isOK())) {
         status = getStatusFromCommandResult(rcr.response.data);
         isRemote = true;
     }
 
-    if (status.isOK()) {
+    if (MONGO_likely(status.isOK())) {
         status = getWriteConcernStatusFromCommandResult(rcr.response.data);
-    }
-
-    // If we're okay (RemoteCommandResponse, command result and write concern)-wise we're done.
-    // Otherwise check for retryability
-    if (status.isOK()) {
-        return std::move(rcr);
+        if (MONGO_likely(status.isOK())) {
+            // If we're okay (RemoteCommandResponse, command result and write concern)-wise we're
+            // done. Otherwise check for retryability
+            return std::move(rcr);
+        }
+        _writeConcernErrorRCR.emplace(RemoteCommandCallbackArgs(rcr));
+        LOGV2_DEBUG(7810400,
+                    1,
+                    "Record write concern error",
+                    "error"_attr = _writeConcernErrorRCR.value().response.toString());
     }
 
     // There was an error with either the response or the command.
@@ -389,11 +392,17 @@ auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandCallbackArgs&&
                 return scheduleRequest();
             }
 
+
+            // We're not okay (on the remote), but still not going to retry
+            if (MONGO_unlikely(_writeConcernErrorRCR)) {
+                return Future<RemoteCommandCallbackArgs>::makeReady(
+                           std::move(*_writeConcernErrorRCR))
+                    .semi();
+            }
+
             // Status' in the response.status field that aren't retried get converted to top level
             // errors
             uassertStatusOK(rcr.response.status);
-
-            // We're not okay (on the remote), but still not going to retry
             return Future<RemoteCommandCallbackArgs>::makeReady(std::move(rcr)).semi();
         })
         .semi();

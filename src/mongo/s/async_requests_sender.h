@@ -290,6 +290,11 @@ private:
 
         // The number of times we've retried sending the command to this remote.
         int _retryCount = 0;
+
+        // Record the last writeConcernError received during any retry attempt and return this
+        // response if a further retry attempt results in an error signaling a write was not
+        // performed.
+        boost::optional<RemoteCommandCallbackArgs> _writeConcernErrorRCR;
     };
 
     OperationContext* _opCtx;

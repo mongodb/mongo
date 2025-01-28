@@ -474,5 +474,85 @@ TEST_F(AsyncRequestsSenderTest, PreLoadedShardIsUsedForInitialRequest) {
     future.default_timed_get();
 }
 
+TEST_F(AsyncRequestsSenderTest, MultipleRetriesReceivedInconclusiveError) {
+    auto shardRegistry = Grid::get(operationContext())->shardRegistry();
+    auto shard0 = uassertStatusOK(shardRegistry->getShard(operationContext(), kTestShardIds[0]));
+    auto shard1 = uassertStatusOK(shardRegistry->getShard(operationContext(), kTestShardIds[1]));
+    auto shard2 = uassertStatusOK(shardRegistry->getShard(operationContext(), kTestShardIds[2]));
+
+    std::vector<AsyncRequestsSender::Request> requests;
+    requests.emplace_back(kTestShardIds[0],
+                          BSON("find"
+                               << "bar"));
+    requests.emplace_back(kTestShardIds[1],
+                          BSON("find"
+                               << "bar"));
+    requests.emplace_back(kTestShardIds[2],
+                          BSON("find"
+                               << "bar"));
+
+    const BSONObj writeConcernError = BSON("code" << ErrorCodes::HostUnreachable << "errmsg"
+                                                  << "Third mock network error");
+    BSONObj resWithWriteConcernError = BSON("ok" << 1 << "writeConcernError" << writeConcernError);
+
+    auto ars = AsyncRequestsSender(operationContext(),
+                                   executor(),
+                                   kTestNss.dbName(),
+                                   requests,
+                                   ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                   Shard::RetryPolicy::kIdempotent,
+                                   nullptr,
+                                   {});
+
+    auto future = launchAsync([&]() {
+        auto response = ars.next();
+        ASSERT(response.swResponse.getStatus().isOK());
+
+        response = ars.next();
+        ASSERT(response.swResponse.getStatus().isOK());
+
+        response = ars.next();
+        ASSERT(response.swResponse.getStatus().isOK());
+        ASSERT_BSONOBJ_EQ(response.swResponse.getValue().data, resWithWriteConcernError);
+    });
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        return CursorResponse(kTestNss, 0LL, {BSON("x" << 1)})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        return CursorResponse(kTestNss, 0LL, {BSON("x" << 2)})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        return Status(ErrorCodes::HostUnreachable, "Mock network error");
+    });
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        BSONObj res = BSON("ok" << 1 << "writeConcernError"
+                                << BSON("code" << ErrorCodes::HostUnreachable << "errmsg"
+                                               << "Second mock network error"));
+        return res;
+    });
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        return resWithWriteConcernError;
+    });
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        return Status(ErrorCodes::NotWritablePrimary, "NotWritablePrimary error");
+    });
+
+    future.default_timed_get();
+}
+
 }  // namespace
 }  // namespace mongo
