@@ -142,7 +142,8 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
         case STAGE_TEXT_OR:
         case STAGE_TEXT_MATCH:
         case STAGE_GEO_NEAR_2D:
-        case STAGE_GEO_NEAR_2DSPHERE: {
+        case STAGE_GEO_NEAR_2DSPHERE:
+        case STAGE_RETURN_KEY: {
             // These stages will fallback to multiplanning.
             return Status(ErrorCodes::UnsupportedCbrNode, "encountered unsupported stages");
         }
@@ -159,7 +160,6 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
         case STAGE_QUEUED_DATA:
         case STAGE_RECORD_STORE_FAST_COUNT:
         case STAGE_REPLACE_ROOT:
-        case STAGE_RETURN_KEY:
         case STAGE_SAMPLE_FROM_TIMESERIES_BUCKET:
         case STAGE_SORT_KEY_GENERATOR:
         case STAGE_SPOOL:
