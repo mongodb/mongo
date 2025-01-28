@@ -8,7 +8,7 @@
  */
 
 const baseDir = "jstests_directoryperdb";
-const dbpath = MongoRunner.dataPath + baseDir + "/";
+const dbpath = MongoRunner.dataPath + baseDir;
 const dbname = "foo";
 
 const isDirectoryPerDBSupported =
@@ -39,7 +39,8 @@ const checkDirExists = function(dbName, dbDirPath) {
 };
 
 const checkDirRemoved = function(dbName, dbDirPath) {
-    checkLog.containsJson(db.getMongo(), 4888200, {db: dbName});
+    const pathsep = _isWindows() ? "\\" : "/";
+    checkLog.containsJson(db.getMongo(), 4888200, {path: dbDirPath + pathsep + dbname});
     assert.soon(
         function() {
             const files = getDir(dbName, dbDirPath);

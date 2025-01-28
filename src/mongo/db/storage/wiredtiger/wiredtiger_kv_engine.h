@@ -616,7 +616,11 @@ private:
     void _openWiredTiger(const std::string& path, const std::string& wtOpenConfig);
 
     Status _salvageIfNeeded(const char* uri);
-    void _ensureIdentPath(StringData ident);
+
+    // Guarantees that the necessary directories exist in case the ident lives in a subdirectory of
+    // the database (i.e. because of --directoryPerDb). The caller should hold the lock until
+    // whatever they were doing with the ident has been persisted to disk.
+    [[nodiscard]] stdx::unique_lock<Latch> _ensureIdentPath(StringData ident);
 
     /**
      * Recreates a WiredTiger ident from the provided URI by dropping and recreating the ident.
@@ -655,6 +659,10 @@ private:
     bool _canRecoverToStableTimestamp() const;
 
     std::uint64_t _getCheckpointTimestamp() const;
+
+    // Removes empty directories associated with ident (or subdirectories, when startPos is set).
+    // Returns true if directories were removed (or there weren't any to remove).
+    bool _removeIdentDirectoryIfEmpty(StringData ident, size_t startPos = 0);
 
     mutable Mutex _oldestActiveTransactionTimestampCallbackMutex =
         MONGO_MAKE_LATCH("::_oldestActiveTransactionTimestampCallbackMutex");
@@ -733,5 +741,10 @@ private:
     // This is valid because durability is a state all operations will converge to eventually.
     AtomicWord<std::uint64_t> _currentCheckpointIteration{0};
     AtomicWord<std::uint64_t> _finishedCheckpointIteration{0};
+
+    // Prevents a database's directory from being deleted concurrently with creation (necessary for
+    // --directoryPerDb).
+    Mutex _directoryModificationMutex =
+        MONGO_MAKE_LATCH("WiredTigerKVEngine::_directoryModificationMutex");
 };
 }  // namespace mongo
