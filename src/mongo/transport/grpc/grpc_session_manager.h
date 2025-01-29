@@ -44,7 +44,7 @@ class GRPCSessionManager : public SessionManagerCommon {
 public:
     GRPCSessionManager(ServiceContext* svcCtx,
                        std::shared_ptr<ClientCache> clientCache,
-                       std::vector<std::shared_ptr<ClientTransportObserver>> observers)
+                       std::vector<std::shared_ptr<ClientTransportObserver>> observers = {})
         : SessionManagerCommon(svcCtx, std::move(observers)),
           _clientCache(std::move(clientCache)) {}
 

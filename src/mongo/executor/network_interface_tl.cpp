@@ -43,7 +43,6 @@
 #include <tuple>
 #include <type_traits>
 
-#include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -55,10 +54,11 @@
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/wire_version.h"
-#include "mongo/executor/connection_pool_tl.h"
+#include "mongo/executor/async_client_factory.h"
 #include "mongo/executor/exhaust_response_reader_tl.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_tl_gen.h"
+#include "mongo/executor/pooled_async_client_factory.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
@@ -69,7 +69,6 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/transport/ssl_connection_context.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
@@ -236,7 +235,7 @@ void NetworkInterfaceTL::appendConnectionStats(ConnectionPoolStats* stats) const
         return;
     }
 
-    _pool->appendConnectionStats(stats);
+    _clientFactory->appendStats(stats);
 }
 
 void NetworkInterfaceTL::appendStats(BSONObjBuilder& bob) const {
@@ -273,19 +272,12 @@ void NetworkInterfaceTL::startup() {
     auto tl = tlm->getTransportLayer(_protocol);
     invariant(tl && tl->isEgress());
 
-    std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext;
-#ifdef MONGO_CONFIG_SSL
-    if (_connPoolOpts.transientSSLParams) {
-        transientSSLContext = uassertStatusOK(
-            tl->createTransientSSLContext(_connPoolOpts.transientSSLParams.value()));
-    }
-#endif
-
     _reactor = tl->getReactor(transport::TransportLayer::kNewReactor);
-    auto typeFactory = std::make_unique<connection_pool_tl::TLTypeFactory>(
-        _reactor, tl, std::move(_onConnectHook), _connPoolOpts, transientSSLContext);
-    _pool = std::make_shared<ConnectionPool>(
-        std::move(typeFactory), std::string("NetworkInterfaceTL-") + _instanceName, _connPoolOpts);
+    _clientFactory = std::make_shared<PooledAsyncClientFactory>(std::string("NetworkInterfaceTL-") +
+                                                                    _instanceName,
+                                                                _connPoolOpts,
+                                                                std::move(_onConnectHook));
+    _clientFactory->startup(_svcCtx, tl, _reactor);
     _initialized.store(true);
 
     if (TestingProctor::instance().isEnabled()) {
@@ -357,7 +349,7 @@ void NetworkInterfaceTL::shutdown() {
 
     // This prevents new timers from being set, cancels any ongoing operations on all connections,
     // and destructs all connections for all existing pools.
-    _pool->shutdown();
+    _clientFactory->shutdown();
 
     // Now that the commands have been canceled, ensure they've fully finished and cleaned up before
     // stopping the reactor.
@@ -464,7 +456,7 @@ NetworkInterfaceTL::CommandStateBase::CommandStateBase(
       cancelSource(token) {}
 
 NetworkInterfaceTL::CommandStateBase::~CommandStateBase() {
-    invariant(!conn);
+    invariant(!clientHandle);
     interface->_unregisterCommand(cbHandle);
 }
 
@@ -492,15 +484,6 @@ void NetworkInterfaceTL::CommandStateBase::cancel(Status status) {
                     "reason"_attr = status);
     }
     cancelSource.cancel();
-}
-
-AsyncDBClient* NetworkInterfaceTL::CommandStateBase::getClient(
-    const ConnectionPool::ConnectionHandle& conn) {
-    if (!conn) {
-        return nullptr;
-    }
-
-    return checked_cast<connection_pool_tl::TLConnection*>(conn.get())->client();
 }
 
 void NetworkInterfaceTL::CommandStateBase::setTimer() {
@@ -557,9 +540,9 @@ void NetworkInterfaceTL::CommandStateBase::setTimer() {
 }
 
 void NetworkInterfaceTL::CommandStateBase::returnConnection(Status status) {
-    invariant(conn);
+    invariant(clientHandle);
 
-    auto connToReturn = std::exchange(conn, {});
+    auto connToReturn = std::exchange(clientHandle, {});
 
     if (!status.isOK()) {
         connToReturn->indicateFailure(std::move(status));
@@ -605,7 +588,7 @@ void NetworkInterfaceTL::testEgress(const HostAndPort& hostAndPort,
                                     Status status) {
     uassert(ErrorCodes::NotYetInitialized, kNotYetStartedUpMsg, _initialized.load());
 
-    auto handle = _pool->get(hostAndPort, sslMode, timeout).get();
+    auto handle = _clientFactory->get(hostAndPort, sslMode, timeout).get();
     if (status.isOK()) {
         handle->indicateSuccess();
     } else {
@@ -616,10 +599,8 @@ void NetworkInterfaceTL::testEgress(const HostAndPort& hostAndPort,
 ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::CommandState::sendRequestImpl(
     RemoteCommandRequest req) {
     return makeReadyFutureWith([this, req = std::move(req)] {
-               const auto connAcquiredTimer =
-                   checked_cast<connection_pool_tl::TLConnection*>(conn.get())
-                       ->getConnAcquiredTimer();
-               return getClient(conn)->runCommandRequest(
+               const auto connAcquiredTimer = clientHandle->getAcquiredTimer();
+               return clientHandle->getClient().runCommandRequest(
                    std::move(req), baton, std::move(connAcquiredTimer), cancelSource.token());
            })
         .thenRunOn(makeGuaranteedExecutor())
@@ -639,8 +620,8 @@ void NetworkInterfaceTL::CommandStateBase::doMetadataHook(const RemoteCommandRes
 
 ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::ExhaustCommandState::sendRequestImpl(
     RemoteCommandRequest req) try {
-    return getClient(conn)
-        ->beginExhaustCommandRequest(req, baton, cancelSource.token())
+    return clientHandle->getClient()
+        .beginExhaustCommandRequest(req, baton, cancelSource.token())
         .thenRunOn(makeGuaranteedExecutor());
 } catch (const DBException& ex) {
     return ExecutorFuture<RemoteCommandResponse>(makeGuaranteedExecutor(), ex.toStatus());
@@ -670,19 +651,20 @@ NetworkInterfaceTL::startExhaustCommand(const TaskExecutor::CallbackHandle& cbHa
             auto& resp = swr.getValue();
 
             if (!resp.isOK()) {
-                if (cmdState->conn) {
+                if (cmdState->clientHandle) {
                     cmdState->returnConnection(resp.status);
                 }
                 return resp.status;
             }
 
-            invariant(cmdState->conn);
-            return std::make_shared<ExhaustResponseReaderTL>(cmdState->request,
-                                                             resp,
-                                                             std::exchange(cmdState->conn, {}),
-                                                             cmdState->baton,
-                                                             _reactor,
-                                                             cancelToken);
+            invariant(cmdState->clientHandle);
+            return std::make_shared<ExhaustResponseReaderTL>(
+                cmdState->request,
+                resp,
+                std::exchange(cmdState->clientHandle, {}),
+                cmdState->baton,
+                _reactor,
+                cancelToken);
         })
         .semi();
 }
@@ -848,30 +830,30 @@ void NetworkInterfaceTL::dropConnections(const HostAndPort& hostAndPort) {
         return;
     }
 
-    _pool->dropConnections(hostAndPort);
+    _clientFactory->dropConnections(hostAndPort);
 }
 
 AsyncDBClient* NetworkInterfaceTL::LeasedStream::getClient() {
-    return checked_cast<connection_pool_tl::TLConnection*>(_conn.get())->client();
+    return &_clientHandle->getClient();
 }
 
 void NetworkInterfaceTL::LeasedStream::indicateSuccess() {
-    return _conn->indicateSuccess();
+    return _clientHandle->indicateSuccess();
 }
 
 void NetworkInterfaceTL::LeasedStream::indicateFailure(Status status) {
-    _conn->indicateFailure(status);
+    _clientHandle->indicateFailure(status);
 }
 
 void NetworkInterfaceTL::LeasedStream::indicateUsed() {
-    _conn->indicateUsed();
+    _clientHandle->indicateUsed();
 }
 
 SemiFuture<std::unique_ptr<NetworkInterface::LeasedStream>> NetworkInterfaceTL::leaseStream(
     const HostAndPort& hostAndPort, transport::ConnectSSLMode sslMode, Milliseconds timeout) {
     invariant(_initialized.load());
 
-    return _pool->lease(hostAndPort, sslMode, timeout)
+    return _clientFactory->lease(hostAndPort, sslMode, timeout)
         .thenRunOn(_reactor)
         .then([](auto conn) -> std::unique_ptr<NetworkInterface::LeasedStream> {
             auto ptr = std::make_unique<NetworkInterfaceTL::LeasedStream>(std::move(conn));
@@ -880,8 +862,8 @@ SemiFuture<std::unique_ptr<NetworkInterface::LeasedStream>> NetworkInterfaceTL::
         .semi();
 }
 
-SemiFuture<ConnectionPool::ConnectionHandle> NetworkInterfaceTL::CommandStateBase::getConnection(
-    ConnectionPool& pool) {
+SemiFuture<std::shared_ptr<AsyncClientFactory::AsyncClientHandle>>
+NetworkInterfaceTL::CommandStateBase::getClient(AsyncClientFactory& factory) {
     Status failPointStatus = Status::OK();
     forceConnectionNetworkTimeout.executeIf(
         [&](const BSONObj& data) {
@@ -899,12 +881,12 @@ SemiFuture<ConnectionPool::ConnectionHandle> NetworkInterfaceTL::CommandStateBas
     if (!failPointStatus.isOK()) {
         return failPointStatus;
     }
-    return pool.get(request.target, request.sslMode, request.timeout, cancelSource.token());
+    return factory.get(request.target, request.sslMode, request.timeout, cancelSource.token());
 }
 
 ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::CommandStateBase::sendRequest(
-    ConnectionPool::ConnectionHandle retrievedConn) {
-    checked_cast<connection_pool_tl::TLConnection*>(retrievedConn.get())->startConnAcquiredTimer();
+    std::shared_ptr<AsyncClientFactory::AsyncClientHandle> retrievedClient) {
+    retrievedClient->startAcquiredTimer();
 
     LOGV2_DEBUG(4630601,
                 2,
@@ -914,7 +896,7 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::CommandStateBase::send
 
     RemoteCommandRequest requestToSend = request;
 
-    conn = std::move(retrievedConn);
+    clientHandle = std::move(retrievedClient);
 
     if (interface->_svcCtx && requestToSend.timeout != RemoteCommandRequest::kNoTimeout &&
         WireSpec::getWireSpec(interface->_svcCtx).get()->isInternalClient) {
@@ -974,24 +956,26 @@ ExecutorPtr NetworkInterfaceTL::CommandStateBase::makeGuaranteedExecutor() {
 
 ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::_runCommand(
     std::shared_ptr<CommandStateBase> cmdState) {
-    return cmdState->getConnection(*_pool)
+    return cmdState->getClient(*_clientFactory)
         .thenRunOn(cmdState->makeGuaranteedExecutor())
-        .onError([cmdState](Status status) -> StatusWith<ConnectionPool::ConnectionHandle> {
+        .onError([cmdState](Status status)
+                     -> StatusWith<std::shared_ptr<AsyncClientFactory::AsyncClientHandle>> {
             return cmdState->handleConnectionAcquisitionError(status);
         })
-        .then([this, cmdState](ConnectionPool::ConnectionHandle retrievedConn) {
-            return cmdState->sendRequest(std::move(retrievedConn))
-                .then([cmdState](RemoteCommandResponse resp) {
-                    cmdState->doMetadataHook(resp);
-                    return resp;
-                })
-                .onError([this, cmdState](Status err) -> StatusWith<RemoteCommandResponse> {
-                    if (auto opKey = cmdState->request.operationKey) {
-                        _killOperation(cmdState.get());
-                    }
-                    return err;
-                });
-        })
+        .then(
+            [this, cmdState](std::shared_ptr<AsyncClientFactory::AsyncClientHandle> retrievedConn) {
+                return cmdState->sendRequest(std::move(retrievedConn))
+                    .then([cmdState](RemoteCommandResponse resp) {
+                        cmdState->doMetadataHook(resp);
+                        return resp;
+                    })
+                    .onError([this, cmdState](Status err) -> StatusWith<RemoteCommandResponse> {
+                        if (auto opKey = cmdState->request.operationKey) {
+                            _killOperation(cmdState.get());
+                        }
+                        return err;
+                    });
+            })
         .onCompletion([cmdState, this](StatusWith<RemoteCommandResponse> swResponse) {
             // If the command was cancelled for a reason, return a status that reflects that.
             if (swResponse == ErrorCodes::CallbackCanceled) {

@@ -93,6 +93,27 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "grpc_async_client_factory",
+    srcs = [
+        "async_client_factory.cpp",
+    ],
+    hdrs = [
+        "async_client_factory.h",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_grpc_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":grpc_transport_layer",
+        "//src/mongo/db:service_context",
+        "//src/mongo/executor:async_client_factory",
+        "//src/mongo/transport:transport_layer_common",
+        "//src/mongo/util/net:network",
+    ],
+)
+
 idl_generator(
     name = "grpc_parameters_gen",
     src = "grpc_parameters.idl",
@@ -185,6 +206,7 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "grpc_transport_layer_test",
     srcs = [
+        "async_client_factory_test.cpp",
         "channel_pool_test.cpp",
         "client_cache_test.cpp",
         "grpc_client_test.cpp",
@@ -206,6 +228,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_first_group"],
     target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
     deps = [
+        ":grpc_async_client_factory",
         ":grpc_transport_layer",
         ":grpc_transport_mock",
         "//src/mongo:base",

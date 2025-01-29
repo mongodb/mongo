@@ -32,7 +32,6 @@
 #include <memory>
 
 #include "mongo/db/client.h"
-#include "mongo/executor/network_interface_factory.h"
 #include "mongo/util/net/ocsp/ocsp_manager.h"
 #include "mongo/util/net/ssl_parameters_gen.h"
 

@@ -47,6 +47,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/egress_connection_closer.h"
 #include "mongo/executor/egress_connection_closer_manager.h"
 #include "mongo/platform/compiler.h"
@@ -70,8 +71,6 @@ namespace mongo {
 class BSONObjBuilder;
 
 namespace executor {
-
-struct ConnectionPoolStats;
 
 /**
  * The actual user visible connection pool.

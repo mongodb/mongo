@@ -33,7 +33,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/baton.h"
-#include "mongo/executor/connection_pool.h"
+#include "mongo/executor/async_client_factory.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/cancellation.h"
@@ -51,7 +51,7 @@ class ExhaustResponseReaderTL : public NetworkInterface::ExhaustResponseReader {
 public:
     ExhaustResponseReaderTL(RemoteCommandRequest originalRequest,
                             RemoteCommandResponse initialResponse,
-                            ConnectionPool::ConnectionHandle conn,
+                            std::shared_ptr<AsyncClientFactory::AsyncClientHandle> conn,
                             std::shared_ptr<Baton> baton,
                             std::shared_ptr<transport::Reactor> reactor,
                             const CancellationToken& token = CancellationToken::uncancelable());
@@ -68,7 +68,7 @@ private:
     boost::optional<RemoteCommandResponse> _initialResponse;
 
     Atomic<bool> _finished{false};
-    ConnectionPool::ConnectionHandle _conn;
+    std::shared_ptr<AsyncClientFactory::AsyncClientHandle> _client;
 
     std::shared_ptr<Baton> _baton;
     std::shared_ptr<transport::Reactor> _reactor;

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_writer_batcher.h"
 #include "mongo/executor/task_executor.h"

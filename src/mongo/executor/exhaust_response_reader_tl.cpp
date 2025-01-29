@@ -37,11 +37,9 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
 
-#include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/executor/connection_pool_tl.h"
-#include "mongo/executor/network_interface.h"
+#include "mongo/executor/async_client_factory.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
@@ -55,15 +53,16 @@
 namespace mongo {
 namespace executor {
 
-ExhaustResponseReaderTL::ExhaustResponseReaderTL(RemoteCommandRequest originatingRequest,
-                                                 RemoteCommandResponse initialResponse,
-                                                 ConnectionPool::ConnectionHandle conn,
-                                                 std::shared_ptr<Baton> baton,
-                                                 std::shared_ptr<transport::Reactor> reactor,
-                                                 const CancellationToken& token)
+ExhaustResponseReaderTL::ExhaustResponseReaderTL(
+    RemoteCommandRequest originatingRequest,
+    RemoteCommandResponse initialResponse,
+    std::shared_ptr<AsyncClientFactory::AsyncClientHandle> client,
+    std::shared_ptr<Baton> baton,
+    std::shared_ptr<transport::Reactor> reactor,
+    const CancellationToken& token)
     : _originatingRequest(std::move(originatingRequest)),
       _initialResponse(std::move(initialResponse)),
-      _conn(std::move(conn)),
+      _client(std::move(client)),
       _baton(std::move(baton)),
       _reactor(std::move(reactor)),
       _cancelSource(token),
@@ -103,11 +102,11 @@ void ExhaustResponseReaderTL::_recordConnectionOutcome(Status outcome) {
                 "requestId"_attr = _originatingRequest.id,
                 "outcome"_attr = outcome);
 
-    _conn->indicateUsed();
+    _client->indicateUsed();
     if (outcome.isOK()) {
-        _conn->indicateSuccess();
+        _client->indicateSuccess();
     } else {
-        _conn->indicateFailure(std::move(outcome));
+        _client->indicateFailure(std::move(outcome));
     }
 }
 
@@ -118,8 +117,7 @@ Future<RemoteCommandResponse> ExhaustResponseReaderTL::_read() {
         return Status(ErrorCodes::ExhaustCommandFinished,
                       "No further exhaust responses available to read");
     }
-    auto client = checked_cast<connection_pool_tl::TLConnection*>(_conn.get())->client();
-    return client->awaitExhaustCommand(_baton, _cancelSource.token());
+    return _client->getClient().awaitExhaustCommand(_baton, _cancelSource.token());
 }
 
 SemiFuture<RemoteCommandResponse> ExhaustResponseReaderTL::next() {

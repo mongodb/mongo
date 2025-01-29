@@ -181,8 +181,10 @@ mongo_cc_library(
         "connection_pool_tl.h",
         "exhaust_response_reader_tl.h",
         "network_interface_tl.h",
+        "pooled_async_client_factory.h",
     ],
     deps = [
+        ":async_client_factory",
         ":connection_pool_executor",
         ":network_interface",
         "//src/mongo/client:async_client",
@@ -403,6 +405,22 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "async_client_factory",
+    srcs = [
+    ],
+    hdrs = [
+        "async_client_factory.h",
+    ],
+    deps = [
+        ":connection_pool_stats",
+        ":egress_connection_closer_manager",
+        "//src/mongo/client:async_client",
+        "//src/mongo/db:server_base",
         "//src/mongo/util/net:network",
     ],
 )

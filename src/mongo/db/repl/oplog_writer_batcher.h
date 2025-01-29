@@ -29,8 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/repl/oplog_applier_batcher.h"
 #include "mongo/db/repl/oplog_batch.h"
+#include "mongo/db/repl/oplog_buffer.h"
 
 namespace mongo {
 namespace repl {
