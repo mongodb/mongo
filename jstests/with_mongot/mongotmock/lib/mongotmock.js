@@ -298,6 +298,7 @@ export function mockAllRequestsWithBatchSizes({
 }
 
 const tlsModeOptions = ["disabled", "allowTLS", "preferTLS", "requireTLS"];
+const kSIGTERM = 15;
 
 export class MongotMock {
     /**
@@ -419,13 +420,13 @@ export class MongotMock {
     }
 
     /**
-     *  Stop mongotmock, asserting that it shutdown cleanly.
+     *  Stop mongotmock, asserting that it shutdown cleanly or with the provided code.
      */
-    stop() {
+    stop(code = kSIGTERM) {
         // Check the remaining history on the mock. There should be 0 remaining queued commands.
         this.assertEmpty();
 
-        return stopMongoProgramByPid(this.pid);
+        return stopMongoProgramByPid(this.pid, code);
     }
 
     /**
