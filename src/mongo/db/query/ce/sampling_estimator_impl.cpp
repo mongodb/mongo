@@ -55,9 +55,11 @@ using CardinalityType = mongo::cost_based_ranker::CardinalityType;
 using EstimationSource = mongo::cost_based_ranker::EstimationSource;
 
 std::unique_ptr<CanonicalQuery> SamplingEstimatorImpl::makeCanonicalQuery(
-    const NamespaceString& nss, OperationContext* opCtx, size_t sampleSize) {
+    const NamespaceString& nss, OperationContext* opCtx, boost::optional<size_t> sampleSize) {
     auto findCommand = std::make_unique<FindCommandRequest>(NamespaceStringOrUUID(nss));
-    findCommand->setLimit(sampleSize);
+    if (sampleSize) {
+        findCommand->setLimit(*sampleSize);
+    }
 
     auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *findCommand).build();
 
@@ -88,6 +90,46 @@ double getZScore(SamplingConfidenceIntervalEnum confidenceInterval) {
         default:
             MONGO_UNREACHABLE;
     }
+}
+
+/**
+ * This helper creates a 'sbe::ScanStage' that scans documents either by randomly seeking documents
+ * or sequentially scanning documents from the target collection.
+ * 'recordId'/'recordIdSlot' indicates the slot id that this scan stage produces results to. The
+ * scan stage can produce the record and the recordID if provided the slot id. RecordId is useful
+ * for the chunk-based sampling in order to pick starting point of each chunk.
+ * 'useRandomCursor' indicates the scan method. Random sampling plan requires the random cursor to
+ * perform the sampling. Sequential scan is useful to generate a repeatable sample by scanning
+ * documents from the start of the target collection.
+ */
+std::unique_ptr<sbe::PlanStage> makeScanStage(const CollectionPtr& collection,
+                                              boost::optional<sbe::value::SlotId> recordSlot,
+                                              boost::optional<sbe::value::SlotId> recordIdSlot,
+                                              boost::optional<sbe::value::SlotId> seekRecordIdSlot,
+                                              bool useRandomCursor,
+                                              PlanYieldPolicy* sbeYieldPolicy) {
+    sbe::value::SlotVector scanFieldSlots;
+    std::vector<std::string> scanFieldNames;
+    sbe::ScanCallbacks callbacks{};
+    return sbe::makeS<sbe::ScanStage>(collection->uuid(),
+                                      collection->ns().dbName(),
+                                      recordSlot,
+                                      recordIdSlot,
+                                      boost::none /* snapshotIdSlot */,
+                                      boost::none /* indexIdentSlot */,
+                                      boost::none /* indexKeySlot */,
+                                      boost::none /* keyPatternSlot */,
+                                      boost::none /* oplogTsSlot */,
+                                      std::move(scanFieldNames),
+                                      std::move(scanFieldSlots),
+                                      seekRecordIdSlot,
+                                      boost::none /* minRecordIdSlot */,
+                                      boost::none /* maxRecordIdSlot */,
+                                      true /* forward */,
+                                      sbeYieldPolicy,
+                                      0 /* nodeId */,
+                                      callbacks,
+                                      useRandomCursor);
 }
 }  // namespace
 
@@ -208,25 +250,8 @@ SamplingEstimatorImpl::generateRandomSamplingPlan(PlanYieldPolicy* sbeYieldPolic
     sbe::value::SlotIdGenerator ids;
     staticData->resultSlot = ids.generate();
     const CollectionPtr& collection = _collections.getMainCollection();
-    auto stage = sbe::makeS<sbe::ScanStage>(collection->uuid(),
-                                            collection->ns().dbName(),
-                                            staticData->resultSlot,
-                                            boost::none /* recordIdSlot */,
-                                            boost::none /* snapshotIdSlot */,
-                                            boost::none /* indexIdentSlot */,
-                                            boost::none /* indexKeySlot */,
-                                            boost::none /* keyPatternSlot */,
-                                            boost::none /* oplogTsSlot */,
-                                            std::vector<std::string>{} /* scanFieldNames */,
-                                            sbe::value::SlotVector{} /* scanFieldSlots */,
-                                            boost::none /* seekRecordIdSlot */,
-                                            boost::none /* minRecordIdSlot */,
-                                            boost::none /* maxRecordIdSlot */,
-                                            true /* forward */,
-                                            sbeYieldPolicy,
-                                            0 /* nodeId */,
-                                            sbe::ScanCallbacks{},
-                                            true /* useRandomCursor */);
+    auto stage = makeScanStage(
+        collection, staticData->resultSlot, boost::none, boost::none, true, sbeYieldPolicy);
 
     stage = sbe::makeS<sbe::LimitSkipStage>(
         std::move(stage),
@@ -251,25 +276,10 @@ SamplingEstimatorImpl::generateChunkSamplingPlan(PlanYieldPolicy* sbeYieldPolicy
     auto chunkSize = static_cast<int64_t>(_sampleSize / *_numChunks);
 
     boost::optional<sbe::value::SlotId> outerRid = ids.generate();
-    auto outerStage = sbe::makeS<sbe::ScanStage>(collection->uuid(),
-                                                 collection->ns().dbName(),
-                                                 boost::none /* recordSlot */,
-                                                 outerRid /* recordIdSlot */,
-                                                 boost::none /* snapshotIdSlot */,
-                                                 boost::none /* indexIdentSlot */,
-                                                 boost::none /* indexKeySlot */,
-                                                 boost::none /* keyPatternSlot */,
-                                                 boost::none /* oplogTsSlot */,
-                                                 std::vector<std::string>{} /* scanFieldNames */,
-                                                 sbe::value::SlotVector{} /* scanFieldSlots */,
-                                                 boost::none /* seekRecordIdSlot */,
-                                                 boost::none /* minRecordIdSlot */,
-                                                 boost::none /* maxRecordIdSlot */,
-                                                 true /* forward */,
-                                                 sbeYieldPolicy,
-                                                 0 /* nodeId */,
-                                                 sbe::ScanCallbacks{},
-                                                 true /* useRandomCursor */);
+    // There's no need for the outer stage to retrieve the record/document since it'll be seeked
+    // again in the inner stage.
+    auto outerStage =
+        makeScanStage(collection, boost::none, outerRid, boost::none, true, sbeYieldPolicy);
 
     // The outer stage randomly picks 'numChunks' RIds as the starting point of each of the chunks
     // forming the sample.
@@ -282,25 +292,8 @@ SamplingEstimatorImpl::generateChunkSamplingPlan(PlanYieldPolicy* sbeYieldPolicy
 
     // The inner stage seeks into the starting point picked by the outer stage and scans 'chunkSize'
     // documents sequentially.
-    auto innerStage = sbe::makeS<sbe::ScanStage>(collection->uuid(),
-                                                 collection->ns().dbName(),
-                                                 staticData->resultSlot,
-                                                 boost::none /* recordIdSlot */,
-                                                 boost::none /* snapshotIdSlot */,
-                                                 boost::none /* indexIdentSlot */,
-                                                 boost::none /* indexKeySlot */,
-                                                 boost::none /* keyPatternSlot */,
-                                                 boost::none /* oplogTsSlot */,
-                                                 std::vector<std::string>{} /* scanFieldNames */,
-                                                 sbe::value::SlotVector{} /* scanFieldSlots */,
-                                                 outerRid /* seekRecordIdSlot */,
-                                                 boost::none /* minRecordIdSlot */,
-                                                 boost::none /* maxRecordIdSlot */,
-                                                 true /* forward */,
-                                                 sbeYieldPolicy,
-                                                 0 /* nodeId */,
-                                                 sbe::ScanCallbacks{},
-                                                 false /* useRandomCursor */);
+    auto innerStage = makeScanStage(
+        collection, staticData->resultSlot, boost::none, outerRid, false, sbeYieldPolicy);
 
     innerStage = sbe::makeS<sbe::LimitSkipStage>(
         std::move(innerStage),
@@ -324,15 +317,10 @@ SamplingEstimatorImpl::generateChunkSamplingPlan(PlanYieldPolicy* sbeYieldPolicy
     return {std::move(loopJoinStage), std::move(data)};
 }
 
-void SamplingEstimatorImpl::generateRandomSample(size_t sampleSize) {
-    // Create a CanonicalQuery for the sampling plan.
-    auto cq = makeCanonicalQuery(_collections.getMainCollection()->ns(), _opCtx, sampleSize);
-    _sampleSize = sampleSize;
-    auto sbeYieldPolicy = PlanYieldPolicySBE::make(
-        _opCtx, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, _collections, cq->nss());
-
-    auto plan = generateRandomSamplingPlan(sbeYieldPolicy.get());
-
+void SamplingEstimatorImpl::executeSamplingQueryAndSample(
+    std::pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>& plan,
+    std::unique_ptr<CanonicalQuery> cq,
+    std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy) {
     // Prepare the SBE plan for execution.
     prepareSlotBasedExecutableTree(_opCtx,
                                    plan.first.get(),
@@ -361,6 +349,45 @@ void SamplingEstimatorImpl::generateRandomSample(size_t sampleSize) {
     while (PlanExecutor::ADVANCED == exec->getNext(&obj, nullptr)) {
         _sample.push_back(obj.getOwned());
     }
+
+    _sampleSize = _sample.size();
+}
+
+void SamplingEstimatorImpl::generateFullCollScanSample() {
+    // Create a CanonicalQuery for the CollScan plan.
+    auto cq = makeCanonicalQuery(_collections.getMainCollection()->ns(), _opCtx, boost::none);
+    auto sbeYieldPolicy = PlanYieldPolicySBE::make(
+        _opCtx, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, _collections, cq->nss());
+
+    auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
+    sbe::value::SlotIdGenerator ids;
+    staticData->resultSlot = ids.generate();
+    const CollectionPtr& collection = _collections.getMainCollection();
+
+    auto stage = makeScanStage(
+        collection, staticData->resultSlot, boost::none, boost::none, false, sbeYieldPolicy.get());
+    stage_builder::PlanStageData data{
+        stage_builder::Environment{std::make_unique<sbe::RuntimeEnvironment>()},
+        std::move(staticData)};
+    auto plan =
+        std::make_pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>(
+            std::move(stage), std::move(data));
+
+    executeSamplingQueryAndSample(plan, std::move(cq), std::move(sbeYieldPolicy));
+
+    return;
+}
+
+void SamplingEstimatorImpl::generateRandomSample(size_t sampleSize) {
+    // Create a CanonicalQuery for the sampling plan.
+    auto cq = makeCanonicalQuery(_collections.getMainCollection()->ns(), _opCtx, sampleSize);
+    _sampleSize = sampleSize;
+    auto sbeYieldPolicy = PlanYieldPolicySBE::make(
+        _opCtx, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, _collections, cq->nss());
+
+    auto plan = generateRandomSamplingPlan(sbeYieldPolicy.get());
+    executeSamplingQueryAndSample(plan, std::move(cq), std::move(sbeYieldPolicy));
+
     return;
 }
 
@@ -377,38 +404,7 @@ void SamplingEstimatorImpl::generateChunkSample(size_t sampleSize) {
         _opCtx, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, _collections, cq->nss());
 
     auto plan = generateChunkSamplingPlan(sbeYieldPolicy.get());
-
-    // Prepare the SBE plan for execution.
-    prepareSlotBasedExecutableTree(_opCtx,
-                                   plan.first.get(),
-                                   &plan.second,
-                                   *cq,
-                                   _collections,
-                                   sbeYieldPolicy.get(),
-                                   false /* preparingFromCache */);
-
-    // Create a PlanExecutor for the execution of the sampling plan.
-    auto exec = std::move(mongo::plan_executor_factory::make(_opCtx,
-                                                             std::move(cq),
-                                                             nullptr /*solution*/,
-                                                             std::move(plan),
-                                                             QueryPlannerParams::DEFAULT,
-                                                             _collections.getMainCollection()->ns(),
-                                                             std::move(sbeYieldPolicy),
-                                                             false /* isFromPlanCache */,
-                                                             false /* cachedPlanHash */)
-                              .getValue());
-
-    // This function call could be a re-sample request, so the previous sample should be cleared.
-    _sample.clear();
-    BSONObj obj;
-    // Execute the plan, exhaust results and cache the sample.
-    while (PlanExecutor::ADVANCED == exec->getNext(&obj, nullptr)) {
-        _sample.push_back(obj.getOwned());
-    }
-    // The real sample size could be a bit less than the size required in the case that there's any
-    // chunk hitting the end of the collection.
-    _sampleSize = _sample.size();
+    executeSamplingQueryAndSample(plan, std::move(cq), std::move(sbeYieldPolicy));
 
     return;
 }
@@ -497,12 +493,11 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
       _numChunks(numChunks),
       _collectionCard(collectionCard) {
 
-    uassert(9406300,
-            "Sample size cannot be larger than collection cardinality. The sample size can be "
-            "reduced by choosing a larger margin of error.",
-            (double)sampleSize <= collectionCard.cardinality().v());
-
-    if (samplingStyle == SamplingStyle::kRandom) {
+    if (sampleSize >= collectionCard.cardinality().v()) {
+        // If the required sample is larger than the collection, the sample is generated from all
+        // the documents on the collection.
+        generateFullCollScanSample();
+    } else if (samplingStyle == SamplingStyle::kRandom) {
         generateRandomSample();
     } else {
         tassert(9372901, "The number of chunks should be positive.", numChunks && *numChunks > 0);

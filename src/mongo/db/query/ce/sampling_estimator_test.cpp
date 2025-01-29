@@ -252,6 +252,32 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingProcess) {
     testChunkBasedSampling(30, 600);
 }
 
+TEST_F(SamplingEstimatorTest, FullCollScanSamplingProcess) {
+    insertDocuments(kTestNss, createDocuments(50));
+
+    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
+    auto colls = MultipleCollectionAccessor(operationContext(),
+                                            &collPtr.getCollection(),
+                                            kTestNss,
+                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
+                                            {});
+
+    // Require a sample larger than the collection.
+    const int sampleSize = 100;
+    const int collectionSize = 50;
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  sampleSize,
+                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  boost::none, /* numChunks */
+                                                  makeCardinalityEstimate(collectionSize));
+
+    auto sample = samplingEstimator.getSample();
+    // The SamplingEstimator should scan the collection and collect all the documents to generate
+    // the sample.
+    ASSERT_EQUALS(sample.size(), collectionSize);
+}
+
 TEST_F(SamplingEstimatorTest, DrawANewSample) {
     insertDocuments(kTestNss, createDocuments(10));
 
@@ -295,27 +321,6 @@ TEST_F(SamplingEstimatorTest, SampleSize) {
             SamplingEstimatorForTesting::calculateSampleSize(el.first.first, el.first.second);
         ASSERT_EQUALS(size, el.second);
     }
-}
-
-TEST_F(SamplingEstimatorTest, SampleSizeError) {
-    const size_t card = 100;
-    const size_t sampleSize = 400;
-
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
-
-    ASSERT_THROWS_CODE(SamplingEstimatorImpl(operationContext(),
-                                             colls,
-                                             sampleSize,
-                                             SamplingEstimatorImpl::SamplingStyle::kRandom,
-                                             numChunks,
-                                             makeCardinalityEstimate(card)),
-                       DBException,
-                       9406300);
 }
 
 TEST_F(SamplingEstimatorTest, EstimateCardinality) {
