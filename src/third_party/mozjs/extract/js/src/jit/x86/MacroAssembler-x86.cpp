@@ -21,6 +21,7 @@
 #include "vm/JitActivation.h"  // js::jit::JitActivation
 #include "vm/JSContext.h"
 #include "vm/StringType.h"
+#include "wasm/WasmStubs.h"
 
 #include "jit/MacroAssembler-inl.h"
 #include "vm/JSScript-inl.h"
@@ -637,10 +638,7 @@ void MacroAssemblerX86::handleFailureWithHandlerTail(Label* profilerExitTail,
 
   // Found a wasm catch handler, restore state and jump to it.
   bind(&wasmCatch);
-  loadPtr(Address(esp, ResumeFromException::offsetOfTarget()), eax);
-  loadPtr(Address(esp, ResumeFromException::offsetOfFramePointer()), ebp);
-  loadPtr(Address(esp, ResumeFromException::offsetOfStackPointer()), esp);
-  jmp(Operand(eax));
+  wasm::GenerateJumpToCatchHandler(asMasm(), esp, eax, ebx);
 }
 
 void MacroAssemblerX86::profilerEnterFrame(Register framePtr,

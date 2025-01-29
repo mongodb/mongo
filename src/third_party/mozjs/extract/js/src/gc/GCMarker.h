@@ -38,7 +38,9 @@ namespace gc {
 enum IncrementalProgress { NotFinished = 0, Finished };
 
 class AutoSetMarkColor;
+class AutoUpdateMarkStackRanges;
 struct Cell;
+class MarkStackIter;
 class ParallelMarker;
 class UnmarkGrayTracer;
 
@@ -117,6 +119,7 @@ class MarkStack {
    public:
     TaggedPtr() = default;
     TaggedPtr(Tag tag, Cell* ptr);
+    uintptr_t asBits() const;
     Tag tag() const;
     uintptr_t tagUnchecked() const;
     template <typename T>
@@ -136,10 +139,13 @@ class MarkStack {
     size_t start() const;
     TaggedPtr ptr() const;
 
+    void setStart(size_t newStart);
+    void setEmpty();
+
+   private:
     static constexpr size_t StartShift = 2;
     static constexpr size_t KindMask = (1 << StartShift) - 1;
 
-   private:
     uintptr_t startAndKind_;
     TaggedPtr ptr_;
   };
@@ -224,6 +230,13 @@ class MarkStack {
   // The maximum stack capacity to grow to.
   MainThreadOrGCTaskData<size_t> maxCapacity_{SIZE_MAX};
 #endif
+
+#ifdef DEBUG
+  MainThreadOrGCTaskData<bool> elementsRangesAreValid;
+  friend class js::GCMarker;
+#endif
+
+  friend class MarkStackIter;
 };
 
 static_assert(unsigned(SlotsOrElementsKind::Unused) ==
@@ -231,6 +244,25 @@ static_assert(unsigned(SlotsOrElementsKind::Unused) ==
               "To split the mark stack we depend on being able to tell the "
               "difference between SlotsOrElementsRange::startAndKind_ and a "
               "tagged SlotsOrElementsRange");
+
+class MOZ_STACK_CLASS MarkStackIter {
+  MarkStack& stack_;
+  size_t pos_;
+
+ public:
+  explicit MarkStackIter(MarkStack& stack);
+
+  bool done() const;
+  void next();
+
+  MarkStack::Tag peekTag() const;
+  bool isSlotsOrElementsRange() const;
+  MarkStack::SlotsOrElementsRange& slotsOrElementsRange();
+
+ private:
+  size_t position() const;
+  MarkStack::TaggedPtr peekPtr() const;
+};
 
 // Bitmask of options to parameterize MarkingTracerT.
 namespace MarkingOptions {
@@ -361,6 +393,8 @@ class GCMarker {
   void setCheckAtomMarking(bool check);
 
   bool shouldCheckCompartments() { return strictCompartmentChecking; }
+
+  bool markOneObjectForTest(JSObject* obj);
 #endif
 
   bool markCurrentColorInParallel(SliceBudget& budget);
@@ -402,6 +436,13 @@ class GCMarker {
 
   template <typename Tracer>
   void setMarkingStateAndTracer(MarkingState prev, MarkingState next);
+
+  // The mutator can shift object elements which could invalidate any elements
+  // index on the mark stack. Change the index to be relative to the elements
+  // allocation (to ignore shifted elements) while the mutator is running.
+  void updateRangesAtStartOfSlice();
+  void updateRangesAtEndOfSlice();
+  friend class gc::AutoUpdateMarkStackRanges;
 
   template <uint32_t markingOptions>
   bool processMarkStackTop(SliceBudget& budget);

@@ -42,7 +42,7 @@ a notice will be included in
 | [libmongocrypt]            | Apache-2.0                                                     | 1.8.4                                              |          ✗           |                ✗                |
 | [linenoise]                | BSD-3-Clause                                                   | 6cdc775 + changes                                  |                      |                ✗                |
 | [mongo-c-driver]           | Apache-2.0                                                     | 1.27.6                                             |          ✗           |                ✗                |
-| [MozJS]                    | MPL-2.0                                                        | ESR 115.7                                          |                      |                ✗                |
+| [Mozilla Firefox]          | MPL-2.0                                                        | 115.19.0esr                                        |       unknown        |                ✗                |
 | [MurmurHash3]              | Public Domain                                                  | a6bd3ce + changes                                  |          ✗           |                ✗                |
 | [ocspbuilder]              | MIT                                                            | 0.10.2                                             |                      |                                 |
 | [ocspresponder]            | Apache-2.0                                                     | 0.5.0                                              |                      |                                 |
@@ -88,7 +88,7 @@ a notice will be included in
 [linenoise]: https://github.com/antirez/linenoise
 [lz4]: https://github.com/lz4/lz4
 [mongo-c-driver]: https://github.com/mongodb/mongo-c-driver
-[MozJS]: https://www.mozilla.org/en-US/security/known-vulnerabilities/firefox-esr
+[Mozilla Firefox]: https://www.mozilla.org/en-US/security/known-vulnerabilities/firefox-esr
 [MurmurHash3]: https://github.com/aappleby/smhasher/blob/a6bd3ce/
 [ocspbuilder]: https://github.com/wbond/ocspbuilder
 [ocspresponder]: https://github.com/threema-ch/ocspresponder

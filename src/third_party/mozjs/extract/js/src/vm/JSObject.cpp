@@ -1221,6 +1221,10 @@ void JSObject::swap(JSContext* cx, HandleObject a, HandleObject b,
   MOZ_RELEASE_ASSERT(js::ObjectMayBeSwapped(a));
   MOZ_RELEASE_ASSERT(js::ObjectMayBeSwapped(b));
 
+  // Don't allow a GC which may observe intermediate state or run before we
+  // execute all necessary barriers.
+  gc::AutoSuppressGC nogc(cx);
+
   if (!Watchtower::watchObjectSwap(cx, a, b)) {
     oomUnsafe.crash("watchObjectSwap");
   }
@@ -1311,10 +1315,6 @@ void JSObject::swap(JSContext* cx, HandleObject a, HandleObject b,
       a->as<ProxyObject>().setInlineValueArray();
     }
   } else {
-    // Avoid GC in here to avoid confusing the tracing code with our
-    // intermediate state.
-    gc::AutoSuppressGC suppress(cx);
-
     // When the objects have different sizes, they will have different numbers
     // of fixed slots before and after the swap, so the slots for native objects
     // will need to be rearranged. Remember the original values from the
