@@ -129,6 +129,9 @@ filters:
   - "repair*":
     approvers:
       - 10gen/server-storage-engine-integration
+  - "throw_hook*":
+    approvers:
+      - 10gen/server-programmability
   - "*transaction*":
     approvers:
       - 10gen/server-cluster-scalability

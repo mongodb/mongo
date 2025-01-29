@@ -427,7 +427,10 @@ mongo_cc_library(
         "//src/third_party/boost:boost_iostreams",
         "//src/third_party/boost:boost_log",
         "//src/third_party/boost:boost_program_options",
-    ],
+    ] + select({
+        "@platforms//os:linux": ["//src/mongo/platform:throw_hook"],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(
