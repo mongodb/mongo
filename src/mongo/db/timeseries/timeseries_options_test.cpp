@@ -205,4 +205,34 @@ TEST(TimeseriesOptionsTest, ExtendedRangeRoundTimestamp) {
     }
 }
 
+TEST(TimeseriesOptionsTest, ExtendedRoundMilliTimestampBySeconds) {
+    std::vector<std::tuple<long long, Date_t, Date_t>> testCases{
+        {60l, Date_t::fromMillisSinceEpoch(-1), Date_t::fromMillisSinceEpoch(-60000)},
+        {60l, Date_t::fromMillisSinceEpoch(-1000), Date_t::fromMillisSinceEpoch(-60000)},
+        {60l, Date_t::fromMillisSinceEpoch(-1001), Date_t::fromMillisSinceEpoch(-60000)},
+        {60l, Date_t::fromMillisSinceEpoch(-60000), Date_t::fromMillisSinceEpoch(-60000)},
+        {60l, Date_t::fromMillisSinceEpoch(-60001), Date_t::fromMillisSinceEpoch(-120000)},
+        {60l, Date_t::min(), Date_t::min()},
+
+        {3600l, Date_t::fromMillisSinceEpoch(-1), Date_t::fromMillisSinceEpoch(-3600000)},
+        {3600l, Date_t::fromMillisSinceEpoch(-1000), Date_t::fromMillisSinceEpoch(-3600000)},
+        {3600l, Date_t::fromMillisSinceEpoch(-1001), Date_t::fromMillisSinceEpoch(-3600000)},
+        {3600l, Date_t::fromMillisSinceEpoch(-3600000), Date_t::fromMillisSinceEpoch(-3600000)},
+        {3600l, Date_t::fromMillisSinceEpoch(-3600001), Date_t::fromMillisSinceEpoch(-7200000)},
+        {3600l, Date_t::min(), Date_t::min()},
+
+        {86400l, Date_t::fromMillisSinceEpoch(-1), Date_t::fromMillisSinceEpoch(-86400000)},
+        {86400l, Date_t::fromMillisSinceEpoch(-1000), Date_t::fromMillisSinceEpoch(-86400000)},
+        {86400l, Date_t::fromMillisSinceEpoch(-1001), Date_t::fromMillisSinceEpoch(-86400000)},
+        {86400l, Date_t::fromMillisSinceEpoch(-86400000), Date_t::fromMillisSinceEpoch(-86400000)},
+        {86400l, Date_t::fromMillisSinceEpoch(-86400001), Date_t::fromMillisSinceEpoch(-172800000)},
+        {86400l, Date_t::min(), Date_t::min()},
+    };
+
+    for (const auto& [roundingSeconds, input, expectedOutput] : testCases) {
+        auto roundedDate = timeseries::roundTimestampBySeconds(input, roundingSeconds);
+        ASSERT_EQ(roundedDate, expectedOutput);
+    }
+}
+
 }  // namespace mongo
