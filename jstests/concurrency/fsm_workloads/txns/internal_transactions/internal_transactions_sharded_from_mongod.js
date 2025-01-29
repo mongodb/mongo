@@ -111,6 +111,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 this.startSessions(defaultDb);
                 return;
             }
+            if (e.code == ErrorCodes.IncompleteTransactionHistory &&
+                e.errmsg.includes("Incomplete history detected for transaction")) {
+                // This test sets a low transactionLifeTimeLimit so a retry may hit this error.
+                print("Ignoring retry error" + tojsononeline(e));
+                return;
+            }
             throw e;
         }
     };
