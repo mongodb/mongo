@@ -129,4 +129,6 @@ createIndexAndCheckConsistency(db.collection_simple, {fUnrelatedIndexPluginOptio
     bits: 26,
     min: -180,
     max: 180,
+    coarsestIndexedLevel: 20,
+    finestIndexedLevel: 25,
 });

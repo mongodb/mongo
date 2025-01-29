@@ -215,6 +215,10 @@ function mapListCatalogToListIndexesEntry(listCatalogEntry) {
             delete mdIndexSpec.min;
             delete mdIndexSpec.max;
         }
+        if (indexPlugin !== "2dsphere") {
+            delete mdIndexSpec.coarsestIndexedLevel;
+            delete mdIndexSpec.finestIndexedLevel;
+        }
         if (indexPlugin !== "text") {
             delete mdIndexSpec.textIndexVersion;
         }
