@@ -4630,6 +4630,8 @@ tasks:
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "generate version"
+    vars:
+      run_covered_tests: true
 
 - name: version_burn_in_gen
   commands:
@@ -4642,6 +4644,8 @@ tasks:
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "generate version burn in"
+    vars:
+      run_covered_tests: true
 
 - name: version_expansions_gen
   commands:
