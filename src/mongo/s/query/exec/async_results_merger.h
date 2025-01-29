@@ -106,7 +106,7 @@ public:
      * allowed way to create an 'AsyncResultsMerger'.
      *
      * Takes ownership of the cursors from ClusterClientCursorParams by storing their cursorIds and
-     * the hosts on which they exist in _remotes.
+     * the hosts on which they exist in '_remotes'.
      *
      * Additionally copies each remote's first batch of results, if one exists, into that remote's
      * docBuffer. If a sort is specified in the ClusterClientCursorParams, places the remotes with
@@ -486,7 +486,7 @@ private:
     // Helpers for ready().
     //
 
-    bool _ready(WithLock);
+    bool _ready(WithLock) const;
     bool _readySorted(WithLock) const;
     bool _readySortedTailable(WithLock) const;
     bool _readyUnsorted(WithLock) const;
@@ -699,6 +699,10 @@ private:
      */
     size_t _gettingFromRemote = 0;
 
+    /**
+     * Overall status of this 'AsyncResultsMerger'. Will be updated to a non-OK status if any of the
+     * remotes returns a non-OK status, and will never transition back from non-OK to OK.
+     */
     Status _status = Status::OK();
 
     executor::TaskExecutor::EventHandle _currentEvent;
@@ -717,7 +721,8 @@ private:
     BSONObj _highWaterMark;
 
     // For tailable cursors, set to true if the next result returned from nextReady() should be
-    // boost::none.
+    // boost::none. Can only ever be true for 'TailableModeEnum::kTailable' cursors, but not for
+    // other cursor types.
     bool _eofNext = false;
 
     //
