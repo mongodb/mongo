@@ -136,7 +136,7 @@ void SpillableDeque::spillToDisk() {
     RecordStoreBatchWriter writer{_expCtx, _diskCache->rs()};
     for (auto& memoryTokenWithDoc : _memCache) {
         RecordId recordId{++_diskWrittenIndex};
-        auto bsonDoc = memoryTokenWithDoc.value().toBson();
+        auto bsonDoc = memoryTokenWithDoc.value().toBsonWithMetaData();
         writer.write(recordId, std::move(bsonDoc));
     }
     _memCache.clear();

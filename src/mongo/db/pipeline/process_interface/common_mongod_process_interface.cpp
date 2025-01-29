@@ -1010,7 +1010,7 @@ Document CommonMongodProcessInterface::readRecordFromRecordStore(
     Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
     auto foundDoc = rs->findRecord(expCtx->getOperationContext(), RecordId(rID), &possibleRecord);
     tassert(775101, str::stream() << "Could not find document id " << rID, foundDoc);
-    return Document(possibleRecord.toBson());
+    return Document::fromBsonWithMetaData(possibleRecord.toBson());
 }
 
 bool CommonMongodProcessInterface::checkRecordInRecordStore(
