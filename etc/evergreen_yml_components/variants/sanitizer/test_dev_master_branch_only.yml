@@ -11,6 +11,22 @@ variables:
   # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &generic_linux_compile_params # Essential set of compile parameters used for Linux dev variants.
+    run_on:
+      - rhel8.8-xlarge
+    activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
+    tasks:
+      - name: compile_test_parallel_core_stream_TG
+      - name: compile_test_parallel_unittest_stream_TG
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: generate_buildid_to_debug_symbols_mapping
+
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+  # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &generic_linux_compile_expansions # The most commonly used compile expansions.
     scons_cache_scope: shared
     scons_cache_mode: all
@@ -710,3 +726,251 @@ buildvariants:
       - name: generate_buildid_to_debug_symbols_mapping
       - name: search_community
       - name: .search_community_e2e_tests
+
+  ###############################################
+  # Temporary variants for v5 toolchain rollout #
+  ###############################################
+
+  - name: &enterprise-rhel8-debug-tsan-compile-toolchain-v5 enterprise-rhel8-debug-tsan-compile-toolchain-v5
+    display_name: "TSAN Enterprise RHEL 8 DEBUG Compile (v5 toolchain)"
+    tags: ["forbid_tasks_tagged_with_experimental"]
+    run_on:
+      - rhel8.8-large
+    activate: false
+    stepback: false
+    expansions:
+      <<: *enterprise-rhel8-debug-tsan-expansions-template
+      compile_variant: enterprise-rhel8-debug-tsan-compile-toolchain-v5
+      compile_flags: >-
+        --variables-files=etc/scons/mongodbtoolchain_v5_clang.vars
+        --dbg=on
+        --opt=on
+        --allocator=system
+        --sanitize=thread
+        --ssl
+        --use-libunwind=off
+        --link-model=dynamic
+        -j$(grep -c ^processor /proc/cpuinfo)
+    tasks:
+      - name: search_end_to_end_sharded_cluster
+      - name: search_end_to_end_single_node
+      - name: compile_test_parallel_core_stream_TG
+      - name: compile_test_parallel_unittest_stream_TG
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: compile_integration_and_test_parallel_stream_TG
+      - name: compile_jstestshell_TG
+      - name: .development_critical .requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan
+      - name: .development_critical .requires_compile_variant .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan
+        distros:
+          - rhel8.8-xlarge
+      - name: .release_critical .requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan
+      - name: .release_critical .requires_compile_variant .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan
+        distros:
+          - rhel8.8-xlarge
+      - name: .default .requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan
+      - name: .default .requires_compile_variant .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan
+        distros:
+          - rhel8.8-xlarge
+
+  - name: enterprise-rhel8-debug-tsan-all-feature-flags-toolchain-v5
+    display_name: "TSAN Enterprise RHEL 8 DEBUG (all feature flags) (v5 toolchain)"
+    tags: ["forbid_tasks_tagged_with_experimental"]
+    run_on:
+      - rhel8.8-large
+    depends_on:
+      - name: archive_dist_test
+        variant: *enterprise-rhel8-debug-tsan-compile-toolchain-v5
+      - name: archive_jstestshell
+        variant: *enterprise-rhel8-debug-tsan-compile-toolchain-v5
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    activate: false
+    stepback: false
+    expansions:
+      <<: *enterprise-rhel8-debug-tsan-expansions-template
+      compile_variant: enterprise-rhel8-debug-tsan-compile-toolchain-v5
+      test_flags: >-
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, receiveChunkWaitForRangeDeleterTimeoutMS: 180000}"
+        --excludeWithAnyTags=tsan_incompatible
+        --runAllFeatureFlagTests
+    tasks:
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - *enterprise-rhel8-debug-tsan-large-distro-name
+      - name: .development_critical .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - *enterprise-rhel8-debug-tsan-large-distro-name
+      - name: .release_critical !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - *enterprise-rhel8-debug-tsan-large-distro-name
+      - name: .release_critical .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - *enterprise-rhel8-debug-tsan-large-distro-name
+      - name: .default !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - *enterprise-rhel8-debug-tsan-large-distro-name
+      - name: .default .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - *enterprise-rhel8-debug-tsan-large-distro-name
+      - name: .non_deterministic !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .non_deterministic .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - *enterprise-rhel8-debug-tsan-large-distro-name
+      - name: .non_deterministic .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - *enterprise-rhel8-debug-tsan-large-distro-name
+
+  - <<: *generic_linux_compile_params
+    name: &linux-x86-dynamic-debug-compile-toolchain-v5 linux-x86-dynamic-debug-compile-toolchain-v5
+    display_name: "Linux x86 Shared Library DEBUG Compile (v5 toolchain)"
+    tags: ["forbid_tasks_tagged_with_experimental"]
+    activate: false
+    stepback: false
+    expansions:
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      has_packages: false
+      compile_flags: >-
+        --dbg=on
+        --opt=on
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
+        --enable-http-client=on
+        --link-model=dynamic
+        ENABLE_OTEL_BUILD=1
+        --modules=
+      num_scons_link_jobs_available: 0.99
+      compile_variant: *linux-x86-dynamic-debug-compile-toolchain-v5
+      build_mongot: true
+      download_mongot_release: true
+      evergreen_remote_exec: on
+      test_flags: >-
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+    tasks:
+      - name: compile_test_parallel_core_stream_TG
+      - name: compile_test_parallel_unittest_stream_TG
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: .clang_tidy
+        distros:
+          - rhel8.8-xxlarge
+      - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
+      - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
+        distros:
+          - rhel8.8-xlarge
+      - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
+      - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
+        distros:
+          - rhel8.8-xlarge
+
+  - <<: *generic_linux_compile_params
+    name: &linux-debug-aubsan-compile-toolchain-v5 linux-debug-aubsan-compile-toolchain-v5
+    display_name: "Linux x86 Shared Library {A,UB}SAN Enterprise Compile (v5 toolchain)"
+    tags: ["forbid_tasks_tagged_with_experimental"]
+    activate: false
+    stepback: false
+    expansions:
+      <<: *generic_linux_compile_expansions
+      separate_debug: off
+      san_options: *aubsan_options
+      compile_flags: >-
+        --variables-files=etc/scons/mongodbtoolchain_v5_clang.vars
+        --dbg=on
+        --opt=on
+        --allocator=system
+        --sanitize=undefined,address
+        --ssl
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --link-model=dynamic
+      build_mongot: true
+      download_mongot_release: true
+      evergreen_remote_exec: on
+      compile_variant: *linux-debug-aubsan-compile-toolchain-v5
+      test_flags: >-
+        --excludeWithAnyTags=incompatible_aubsan
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+    tasks:
+      - name: compile_test_parallel_core_stream_TG
+      - name: compile_test_parallel_unittest_stream_TG
+      - name: compile_test_parallel_dbtest_stream_TG
+      - name: compile_integration_and_test_parallel_stream_TG
+      - name: compile_jstestshell_TG
+      - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+      - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+        distros:
+          - rhel8.8-xlarge
+      - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+      - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+        distros:
+          - rhel8.8-xlarge
+      - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+      - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan
+        distros:
+          - rhel8.8-xlarge
+
+  - name: linux-64-debug-required-toolchain-v5
+    display_name: "Linux x86 Shared Library DEBUG (v5 toolchain)"
+    tags: ["forbid_tasks_tagged_with_experimental"]
+    run_on:
+      - rhel8.8-medium
+    activate: false
+    stepback: false
+    expansions:
+      resmoke_jobs_factor: 0.5 # Avoid starting too many mongod's
+      test_flags: >-
+        --excludeWithAnyTags=requires_http_client
+        --enableEnterpriseTests=off
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
+      target_resmoke_time: 15
+      max_sub_suites: 5
+      large_distro_name: rhel8.8-medium
+      core_analyzer_distro_name: rhel8.8-xlarge
+      compile_variant: *linux-x86-dynamic-debug-compile-toolchain-v5
+    depends_on:
+      - name: archive_dist_test
+        variant: *linux-x86-dynamic-debug-compile-toolchain-v5
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    tasks:
+      - name: search_end_to_end_sharded_cluster
+      - name: search_end_to_end_single_node
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - rhel8.8-medium
+      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - rhel8.8-medium
+
+  - name: rhel8-debug-aubsan-lite-all-feature-flags-toolchain-v5
+    display_name: "Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags) (v5 toolchain)"
+    tags: []
+    run_on:
+      - rhel8.8-large
+    depends_on:
+      - name: archive_dist_test
+        variant: *linux-debug-aubsan-compile-toolchain-v5
+      - name: archive_jstestshell
+        variant: *linux-debug-aubsan-compile-toolchain-v5
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+    activate: false
+    stepback: false
+    expansions:
+      <<: *aubsan-lite-required-expansions
+      # To force disable feature flags even on the all feature flags variant, please use this file:
+      # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
+      compile_variant: linux-debug-aubsan-compile-toolchain-v5
+      test_flags: >-
+        --runAllFeatureFlagTests
+        --excludeWithAnyTags=incompatible_aubsan
+    tasks:
+      - name: jsCore
+      - name: jsCore_txns
+      - name: jsCore_wildcard_indexes

@@ -1,0 +1,60 @@
+# SUSE/SLES build variants for testing development environments
+#
+# After the branching variants in this file
+# should NOT run on a new rapid release (v7.1, v7.2 etc.)
+# and LTS release (v7.0, v6.0 etc.) branch projects
+
+buildvariants:
+  ###############################################
+  # Temporary variants for v5 toolchain rollout #
+  ###############################################
+
+  - name: enterprise-suse15-64-toolchain-v5
+    display_name: Enterprise SLES 15 (SP5) (v5 toolchain)
+    tags: ["forbid_tasks_tagged_with_experimental"]
+    run_on:
+      - suse15sp5-small
+    activate: false
+    stepback: false
+    expansions:
+      additional_package_targets: >-
+        archive-mongocryptd
+        archive-mongocryptd-debug
+      has_packages: true
+      packager_arch: x86_64
+      packager_distro: suse15
+      packager_script: packager_enterprise.py
+      push_arch: x86_64-enterprise-suse15
+      push_bucket: downloads.10gen.com
+      push_name: linux
+      push_path: linux
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=suse15
+        BAZEL_FLAGS="--build_otel=False"
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
+      test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_ldap_pool,resource_intensive
+      crypt_task_compile_flags: >-
+        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+        CCFLAGS="-fno-gnu-unique"
+      repo_edition: enterprise
+      scons_cache_scope: shared
+      compile_variant: enterprise-suse15-64-toolchain-v5
+      core_analyzer_distro_name: suse15sp5-large
+      core_analyzer_gdb_index_cache: off
+    tasks:
+      - name: compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - suse15sp5-large
+      - name: test_packages
+        distros:
+          - ubuntu2204-large
+      - name: .development_critical !.requires_large_host
+      - name: .development_critical .requires_large_host
+        distros:
+          - suse15sp5-large
+      - name: .release_critical !.requires_large_host
+      - name: .release_critical .requires_large_host
+        distros:
+          - suse15sp5-large
