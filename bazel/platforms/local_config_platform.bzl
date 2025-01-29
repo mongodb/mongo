@@ -38,6 +38,7 @@ def _setup_local_config_platform(ctx):
     remote_execution_pool = "x86_64" if arch == "amd64" else "default"
     result = None
     toolchain_key = "{distro}_{arch}".format(distro = distro, arch = arch)
+    print("Trying to find toolchain for {}".format(toolchain_key))
     toolchain_exists = False
     for version in TOOLCHAIN_MAP:
         if toolchain_key in TOOLCHAIN_MAP[version]:
