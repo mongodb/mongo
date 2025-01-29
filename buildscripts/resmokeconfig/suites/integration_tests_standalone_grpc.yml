@@ -4,6 +4,7 @@ selector:
   root: build/integration_tests.txt
   include_files:
     - build/**/grpc_transport_integration_test*
+    - build/**/executor_integration_test*
 
 executor:
   archive:

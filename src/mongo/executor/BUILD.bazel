@@ -685,5 +685,6 @@ mongo_cc_integration_test(
         "//src/mongo/transport:transport_layer_egress_init",
         "//src/mongo/util:version_impl",
         "//src/mongo/util/concurrency:thread_pool",
+        "//src/mongo/util/net:ssl_options_server",
     ],
 )

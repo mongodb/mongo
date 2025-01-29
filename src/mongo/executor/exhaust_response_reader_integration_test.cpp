@@ -71,7 +71,10 @@ public:
         auto sc = getGlobalServiceContext();
         auto tl = sc->getTransportLayerManager()->getDefaultEgressLayer();
         _reactor = tl->getReactor(transport::TransportLayer::kNewReactor);
-        _reactorThread = stdx::thread([&] { _reactor->run(); });
+        _reactorThread = stdx::thread([&] {
+            _reactor->run();
+            _reactor->drain();
+        });
 
         ConnectionPool::Options connPoolOptions;
         connPoolOptions.minConnections = 0;

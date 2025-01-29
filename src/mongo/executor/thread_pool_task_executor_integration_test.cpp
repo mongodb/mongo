@@ -99,8 +99,11 @@ public:
     std::shared_ptr<ThreadPoolTaskExecutor> makeExecutor(StringData name) {
         ConnectionPool::Options cpOptions{};
         cpOptions.minConnections = 0;
+
+        auto protocol = unittest::shouldUseGRPCEgress() ? transport::TransportProtocol::GRPC
+                                                        : transport::TransportProtocol::MongoRPC;
         std::shared_ptr<NetworkInterface> net =
-            makeNetworkInterface(name.toString(), nullptr, nullptr, std::move(cpOptions));
+            makeNetworkInterface(name.toString(), nullptr, nullptr, std::move(cpOptions), protocol);
 
         ThreadPool::Options tpOptions;
         tpOptions.threadNamePrefix = "TaskExecutorTestThreadPool-";

@@ -670,8 +670,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, LateCancel) {
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, ConnectionErrorDropsSingleConnection) {
-    FailPoint* failPoint =
-        globalFailPointRegistry().find("asioTransportLayerAsyncConnectReturnsConnectionError");
+    FailPoint* failPoint = globalFailPointRegistry().find("asyncConnectReturnsConnectionError");
     auto timesEntered = failPoint->setMode(FailPoint::nTimes, 1);
 
     auto cbh = makeCallbackHandle();

@@ -81,7 +81,8 @@ std::unique_ptr<transport::TransportLayer> createAsioTransportLayer(ServiceConte
 }
 
 ServiceContext::ConstructorActionRegisterer registerEgressTransportLayer{
-    "ConfigureEgressTransportLayer", [](ServiceContext* sc) {
+    "ConfigureEgressTransportLayer",
+    [](ServiceContext* sc) {
         invariant(!sc->getTransportLayerManager());
 
 #ifdef MONGO_CONFIG_GRPC
@@ -95,6 +96,12 @@ ServiceContext::ConstructorActionRegisterer registerEgressTransportLayer{
             std::make_unique<transport::TransportLayerManagerImpl>(std::move(tl)));
         uassertStatusOK(sc->getTransportLayerManager()->setup());
         uassertStatusOK(sc->getTransportLayerManager()->start());
+    },
+    [](ServiceContext* sc) {
+        auto tlm = sc->getTransportLayerManager();
+        if (tlm) {
+            tlm->shutdown();
+        }
     }};
 
 }  // namespace

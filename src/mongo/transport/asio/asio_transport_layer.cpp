@@ -103,7 +103,6 @@ MONGO_FAIL_POINT_DEFINE(asioTransportLayerAsyncConnectTimesOut);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerDelayConnection);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerHangBeforeAcceptCallback);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerHangDuringAcceptCallback);
-MONGO_FAIL_POINT_DEFINE(asioTransportLayerAsyncConnectReturnsConnectionError);
 
 #ifdef MONGO_CONFIG_SSL
 SSLConnectionContext::~SSLConnectionContext() = default;
@@ -722,9 +721,6 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
     Milliseconds timeout,
     std::shared_ptr<ConnectionMetrics> connectionMetrics,
     std::shared_ptr<const SSLConnectionContext> transientSSLContext) {
-    if (MONGO_unlikely(asioTransportLayerAsyncConnectReturnsConnectionError.shouldFail()))
-        return Status{ErrorCodes::ConnectionError, "Failing asyncConnect due to fail-point"};
-
     invariant(connectionMetrics);
     connectionMetrics->onConnectionStarted();
 

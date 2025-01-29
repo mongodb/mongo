@@ -95,6 +95,8 @@ auto& totalTimeForEgressConnectionAcquiredToWireMicros =
     *MetricBuilder<Counter64>{"network.totalTimeForEgressConnectionAcquiredToWireMicros"};
 }  // namespace
 
+MONGO_FAIL_POINT_DEFINE(asyncConnectReturnsConnectionError);
+
 Future<std::shared_ptr<AsyncDBClient>> AsyncDBClient::connect(
     const HostAndPort& peer,
     transport::ConnectSSLMode sslMode,
@@ -104,6 +106,9 @@ Future<std::shared_ptr<AsyncDBClient>> AsyncDBClient::connect(
     Milliseconds timeout,
     std::shared_ptr<ConnectionMetrics> connectionMetrics,
     std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext) {
+    if (MONGO_unlikely(asyncConnectReturnsConnectionError.shouldFail())) {
+        return Status{ErrorCodes::ConnectionError, "Failing asyncConnect due to fail-point"};
+    }
     return tl
         ->asyncConnect(peer,
                        sslMode,

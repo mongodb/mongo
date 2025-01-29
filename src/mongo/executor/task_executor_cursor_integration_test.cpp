@@ -79,7 +79,10 @@ public:
     TaskExecutorCursorFixture() = default;
 
     void setUp() override {
-        _ni = makeNetworkInterface("TaskExecutorCursorTest");
+        auto protocol = unittest::shouldUseGRPCEgress() ? transport::TransportProtocol::GRPC
+                                                        : transport::TransportProtocol::MongoRPC;
+        _ni = makeNetworkInterface(
+            "TaskExecutorCursorTest", nullptr, nullptr, ConnectionPool::Options(), protocol);
         auto tp = std::make_unique<NetworkInterfaceThreadPool>(_ni.get());
 
         _executor = ThreadPoolTaskExecutor::create(std::move(tp), _ni);
