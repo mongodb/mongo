@@ -103,7 +103,7 @@ mongo::StatusWith<mongo::SharedRestrictionDocument> mongo::parseAuthenticationRe
 }
 
 mongo::StatusWith<mongo::BSONArray> mongo::getRawAuthenticationRestrictions(
-    const BSONArray& arr) noexcept try {
+    const BSONArray& arr) try {
     BSONArrayBuilder builder;
 
     for (auto const& elem : arr) {

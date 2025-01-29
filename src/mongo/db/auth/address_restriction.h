@@ -187,7 +187,7 @@ StatusWith<SharedRestrictionDocument> parseAuthenticationRestriction(const BSONA
  * Parse and validate a BSONArray containing AuthenticationRestrictions
  * and return a new BSONArray representing a sanitized portion thereof.
  */
-StatusWith<BSONArray> getRawAuthenticationRestrictions(const BSONArray& arr) noexcept;
+StatusWith<BSONArray> getRawAuthenticationRestrictions(const BSONArray& arr);
 
 
 template <>

@@ -427,7 +427,7 @@ public:
     /**
      * Gets any set authentication restrictions.
      */
-    const RestrictionDocuments& getRestrictions() const& noexcept {
+    const RestrictionDocuments& getRestrictions() const& {
         return _restrictions;
     }
 
@@ -439,7 +439,7 @@ public:
     /**
      * Gets any set authentication restrictions.
      */
-    const RestrictionDocuments& getIndirectRestrictions() const& noexcept {
+    const RestrictionDocuments& getIndirectRestrictions() const& {
         return _indirectRestrictions;
     }
 
