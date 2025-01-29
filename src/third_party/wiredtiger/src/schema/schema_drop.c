@@ -8,6 +8,9 @@
 
 #include "wt_internal.h"
 
+#define WT_CONFLICT_BACKUP_MSG "the table is currently performing backup and cannot be dropped"
+#define WT_CONFLICT_DHANDLE_MSG "another thread is currently holding the data handle of the table"
+
 /*
  * __drop_file --
  *     Drop a file.
@@ -27,10 +30,15 @@ __drop_file(
     filename = uri;
     WT_PREFIX_SKIP_REQUIRED(session, filename, "file:");
 
-    WT_RET(__wti_schema_backup_check(session, filename));
+    if ((ret = __wti_schema_backup_check(session, filename)) == EBUSY)
+        WT_RET_SUB(session, ret, WT_CONFLICT_BACKUP, WT_CONFLICT_BACKUP_MSG);
+    WT_RET(ret);
+
     /* Close all btree handles associated with this file. */
     WT_WITH_HANDLE_LIST_WRITE_LOCK(
       session, ret = __wt_conn_dhandle_close_all(session, uri, true, force, check_visibility));
+    if (ret == EBUSY && session->err_info.err != EBUSY)
+        WT_RET_SUB(session, ret, WT_CONFLICT_DHANDLE, WT_CONFLICT_DHANDLE_MSG);
     WT_RET(ret);
 
     /* Remove the metadata entry (ignore missing items). */
@@ -124,7 +132,10 @@ __drop_table(
      * Temporarily getting the table exclusively serves the purpose of ensuring that cursors on the
      * table that are already open must at least be closed before this call proceeds.
      */
-    WT_ERR(__wt_schema_get_table_uri(session, uri, true, WT_DHANDLE_EXCLUSIVE, &table));
+    ret = __wt_schema_get_table_uri(session, uri, true, WT_DHANDLE_EXCLUSIVE, &table);
+    if (ret == EBUSY && session->err_info.err != EBUSY)
+        WT_ERR_SUB(session, ret, WT_CONFLICT_DHANDLE, WT_CONFLICT_DHANDLE_MSG);
+    WT_ERR(ret);
     WT_ERR(__wti_schema_release_table_gen(session, &table, true));
     WT_ERR(__wt_schema_get_table_uri(session, uri, true, 0, &table));
 
@@ -210,7 +221,10 @@ __drop_tiered(
 
     name = NULL;
     /* Get the tiered data handle. */
-    WT_RET(__wt_session_get_dhandle(session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
+    ret = __wt_session_get_dhandle(session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE);
+    if (ret == EBUSY && session->err_info.err != EBUSY)
+        WT_RET_SUB(session, ret, WT_CONFLICT_DHANDLE, WT_CONFLICT_DHANDLE_MSG);
+    WT_RET(ret);
     got_dhandle = true;
     tiered = (WT_TIERED *)session->dhandle;
     /*
@@ -235,6 +249,8 @@ __drop_tiered(
     got_dhandle = false;
     WT_WITH_HANDLE_LIST_WRITE_LOCK(
       session, ret = __wt_conn_dhandle_close_all(session, uri, true, force, check_visibility));
+    if (ret == EBUSY && session->err_info.err != EBUSY)
+        WT_ERR_SUB(session, ret, WT_CONFLICT_DHANDLE, WT_CONFLICT_DHANDLE_MSG);
     WT_ERR(ret);
 
     /*
@@ -255,6 +271,8 @@ __drop_tiered(
         WT_WITHOUT_DHANDLE(session,
           WT_WITH_HANDLE_LIST_WRITE_LOCK(
             session, ret = __wt_conn_dhandle_close_all(session, tier->name, true, force, false)));
+        if (ret == EBUSY && session->err_info.err != EBUSY)
+            WT_ERR_SUB(session, ret, WT_CONFLICT_DHANDLE, WT_CONFLICT_DHANDLE_MSG);
         WT_ERR(ret);
         WT_ERR(__wt_metadata_remove(session, tier->name));
         if (remove_files) {
@@ -272,6 +290,8 @@ __drop_tiered(
         WT_WITHOUT_DHANDLE(session,
           WT_WITH_HANDLE_LIST_WRITE_LOCK(
             session, ret = __wt_conn_dhandle_close_all(session, tier->name, true, force, false)));
+        if (ret == EBUSY && session->err_info.err != EBUSY)
+            WT_ERR_SUB(session, ret, WT_CONFLICT_DHANDLE, WT_CONFLICT_DHANDLE_MSG);
         WT_ERR(ret);
         WT_ERR(__wt_metadata_remove(session, tier->name));
     } else

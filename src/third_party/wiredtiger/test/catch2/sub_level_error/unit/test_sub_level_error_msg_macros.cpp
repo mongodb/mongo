@@ -8,11 +8,11 @@
 
 #include <catch2/catch.hpp>
 #include "wt_internal.h"
-#include "../wrappers/connection_wrapper.h"
-#include "../utils.h"
+#include "../../wrappers/connection_wrapper.h"
+#include "../utils_sub_level_error.h"
 
 /*
- * [wt_msg]: test_msg_macros.cpp
+ * [sub_level_error_msg_macros]: test_sub_level_error_msg_macros.cpp
  * Tests the macros for storing verbose information about the last error of the session.
  */
 
@@ -48,7 +48,10 @@ err:
     return (ret);
 }
 
-TEST_CASE("Test WT_RET_SUB, WT_ERR_SUB, WT_RET_MSG, WT_ERR_MSG", "[message_macros]")
+using namespace utils;
+
+TEST_CASE("Test WT_RET_SUB, WT_ERR_SUB, WT_RET_MSG, WT_ERR_MSG",
+  "[sub_level_error_msg_macros],[sub_level_error]")
 {
     connection_wrapper conn_wrapper = connection_wrapper(".", "create");
     WT_CONNECTION *conn = conn_wrapper.get_wt_connection();
@@ -65,8 +68,7 @@ TEST_CASE("Test WT_RET_SUB, WT_ERR_SUB, WT_RET_MSG, WT_ERR_MSG", "[message_macro
         const char *err_msg_content = "Some EINVAL error";
         REQUIRE(test_wt_ret_sub(session_impl, EINVAL, WT_BACKGROUND_COMPACT_ALREADY_RUNNING,
                   err_msg_content) == EINVAL);
-        utils::check_error_info(
-          err_info, EINVAL, WT_BACKGROUND_COMPACT_ALREADY_RUNNING, err_msg_content);
+        check_error_info(err_info, EINVAL, WT_BACKGROUND_COMPACT_ALREADY_RUNNING, err_msg_content);
     }
 
     SECTION(
@@ -75,21 +77,20 @@ TEST_CASE("Test WT_RET_SUB, WT_ERR_SUB, WT_RET_MSG, WT_ERR_MSG", "[message_macro
         const char *err_msg_content = "Some EINVAL error";
         REQUIRE(test_wt_err_sub(session_impl, EINVAL, WT_BACKGROUND_COMPACT_ALREADY_RUNNING,
                   err_msg_content) == EINVAL);
-        utils::check_error_info(
-          err_info, EINVAL, WT_BACKGROUND_COMPACT_ALREADY_RUNNING, err_msg_content);
+        check_error_info(err_info, EINVAL, WT_BACKGROUND_COMPACT_ALREADY_RUNNING, err_msg_content);
     }
 
     SECTION("Test WT_RET_MSG with EINVAL error")
     {
         const char *err_msg_content = "Some EINVAL error";
         REQUIRE(test_wt_ret_msg(session_impl, EINVAL, err_msg_content) == EINVAL);
-        utils::check_error_info(err_info, EINVAL, WT_NONE, err_msg_content);
+        check_error_info(err_info, EINVAL, WT_NONE, err_msg_content);
     }
 
     SECTION("Test WT_ERR_MSG with EINVAL error")
     {
         const char *err_msg_content = "Some EINVAL error";
         REQUIRE(test_wt_err_msg(session_impl, EINVAL, err_msg_content) == EINVAL);
-        utils::check_error_info(err_info, EINVAL, WT_NONE, err_msg_content);
+        check_error_info(err_info, EINVAL, WT_NONE, err_msg_content);
     }
 }

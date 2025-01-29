@@ -188,6 +188,8 @@ CONFIG configuration_list[] = {
 
 {"disk.mmap_all", "configure mmap operations (read and write)", C_BOOL, 5, 0, 0}
 
+{"eviction.evict_use_softptr", "use soft pointers instead of hard hazard pointers in eviction", C_BOOL, 20, 0, 0}
+
 /* Test format can only handle 32 tables so we use a maximum value of 32 here. */
 {"file_manager.close_handle_minimum", "number of handles open before the file manager will look for handles to close", 0x0, 0, 32, 32}
 

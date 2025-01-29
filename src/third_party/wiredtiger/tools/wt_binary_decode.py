@@ -32,7 +32,7 @@
 # see "wt dump" for that.  But this is standalone (doesn't require linkage with any WT
 # libraries), and may be useful as 1) a learning tool 2) quick way to hack/extend dumping.
 
-import codecs, io, os, sys, traceback, pprint
+import codecs, io, os, re, sys, traceback, pprint
 from py_common import binary_data, btree_format
 from dataclasses import dataclass
 import typing
@@ -467,8 +467,7 @@ def block_decode(p, b, opts):
     if pagehead.type == btree_format.PageType.WT_PAGE_INVALID:
         pass    # a blank page: TODO maybe should check that it's all zeros?
     elif pagehead.type == btree_format.PageType.WT_PAGE_BLOCK_MANAGER:
-        p.rint_v('? unimplemented decode for page type WT_PAGE_BLOCK_MANAGER')
-        p.rint_v(binary_to_pretty_string(payload_data))
+        extlist_decode(p, b_page, pagehead, blockhead, pagestats)
     elif pagehead.type == btree_format.PageType.WT_PAGE_COL_VAR:
         p.rint_v('? unimplemented decode for page type WT_PAGE_COLUMN_VARIABLE')
         p.rint_v(binary_to_pretty_string(payload_data))
@@ -555,6 +554,69 @@ def row_decode(p, b, pagehead, blockhead, pagestats):
         finally:
             p.end_cell()
 
+def extlist_decode(p, b, pagehead, blockhead, pagestats):
+    WT_BLOCK_EXTLIST_MAGIC = 71002       # from block.h
+    # Written by block_ext.c
+    okay = True
+    cellnum = -1
+    lastoff = 0
+    p.rint_v('extent list follows:')
+    while True:
+        cellnum += 1
+        cellpos = b.tell()
+        if cellpos >= pagehead.mem_size:
+            p.rint_v(f'** OVERFLOW memsize ** memsize={pagehead.mem_size}, position={cellpos}')
+            #return
+        p.begin_cell(cellnum)
+
+        try:
+            off = b.read_packed_uint64()
+            size = b.read_packed_uint64()
+            extra_stuff = ''
+            if cellnum == 0:
+                extra_stuff += '  # magic number'
+                if off != WT_BLOCK_EXTLIST_MAGIC or size != 0:
+                    extra_stuff = f'  # ERROR: magic number did not match expected value=' + \
+                        '{WT_BLOCK_EXTLIST_MAGIC}'
+                    okay = False
+            else:
+                if off < lastoff:
+                    extra_stuff = f'  # ERROR: list out of order'
+                    okay = False
+
+                # We expect sizes and positions to be multiples of
+                # this number, it is conservative.
+                multiple = 256
+                if off % multiple != 0:
+                    extra_stuff = f'  # ERROR: offset is not a multiple of {multiple}'
+                    okay = False
+                if off != 0 and size % multiple != 0:
+                    extra_stuff = f'  # ERROR: size is not a multiple of {multiple}'
+                    okay = False
+
+            # A zero offset is written as an end of list marker,
+            # in that case, the size is a version number.
+            # For version 0, this is truly the end of the list.
+            # For version 1, additional entries may be appended to this (avail) list.
+            #
+            # See __wti_block_extlist_write() in block_ext.c, and calls
+            # to that function in block_ckpt.c.
+            if off == 0:
+                extra_stuff += '  # end of list'
+                if size == 0:
+                    extra_stuff += ', version 0'
+                elif size == 1:
+                    extra_stuff += ', version 1,' + \
+                    ' any following entries are not yet in this (incomplete) checkpoint'
+                else:
+                    extra_stuff += f' -- ERROR unexpected size={size} has no meaning here'
+                    okay = False
+            p.rint_v(f'  {off}, {size}{extra_stuff}')
+        finally:
+            p.end_cell()
+        if off == 0 or not okay:
+            break
+
 def outfile_header(opts):
     if opts.output != None:
         fields = [
@@ -634,7 +696,9 @@ def encode_bytes(f):
     for line in lines:
         if ':' in line:
             (_, _, line) = line.rpartition(':')
-        nospace = line.replace(' ', '').replace('\n', '')
+        # Keep anything that looks like it could be hexadecimal,
+        # remove everything else.
+        nospace = re.sub(r'[^a-fA-F\d]', '', line)
         print('LINE (len={}): {}'.format(len(nospace), nospace))
         if len(nospace) > 0:
             print('first={}, last={}'.format(nospace[0], nospace[-1]))

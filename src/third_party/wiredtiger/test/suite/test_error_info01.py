@@ -26,17 +26,15 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import errno
-import time
-import wiredtiger
+import wiredtiger, time, errno
 from wttest import open_cursor
 from compact_util import compact_util
 
-# test_error_info.py
+# test_error_info01.py
 #   Test that the get_last_error() session API returns the last error to occur in the session.
-class test_error_info(compact_util):
+class test_error_info01(compact_util):
 
-    uri = "table:test_error_info.wt"
+    uri = "table:test_error_info01"
 
     def assert_error_equal(self, err_val, sub_level_err_val, err_msg_val):
         err, sub_level_err, err_msg = self.session.get_last_error()
@@ -75,7 +73,7 @@ class test_error_info(compact_util):
             cursor.set_key('key')
             cursor.set_value('value')
             self.assertEqual(cursor.update(), 0)
-        self.assertRaisesException(wiredtiger.WiredTigerError, lambda: self.session.drop(self.uri, None))
+        self.assertTrue(self.raisesBusy(lambda: self.session.drop(self.uri, None)), "was expecting drop call to fail with EBUSY")
 
     def api_call_with_ebusy_wt_dirty_data(self):
         """
@@ -91,7 +89,7 @@ class test_error_info(compact_util):
 
         # Give time for the oldest id to update before dropping the table.
         time.sleep(1)
-        self.assertRaisesException(wiredtiger.WiredTigerError, lambda: self.session.drop(self.uri, None))
+        self.assertTrue(self.raisesBusy(lambda: self.session.drop(self.uri, None)), "was expecting drop call to fail with EBUSY")
 
     def test_success(self):
         self.api_call_with_success()
@@ -145,3 +143,21 @@ class test_error_info(compact_util):
         self.test_ebusy_wt_uncommitted_data()
         self.test_ebusy_wt_dirty_data()
         self.test_ebusy_wt_dirty_data()
+
+    def test_conflict_backup(self):
+        """
+        Open a backup cursor on a new table, then attempt to drop the table.
+        """
+        self.session.create(self.uri, 'key_format=S,value_format=S')
+        cursor = self.session.open_cursor('backup:', None, None)
+        self.assertTrue(self.raisesBusy(lambda: self.session.drop(self.uri, None)), "was expecting drop call to fail with EBUSY")
+        self.assert_error_equal(errno.EBUSY, wiredtiger.WT_CONFLICT_BACKUP, "the table is currently performing backup and cannot be dropped")
+
+    def test_conflict_dhandle(self):
+        """
+        Open a cursor on a new table, then attempt to drop the table.
+        """
+        self.session.create(self.uri, 'key_format=S,value_format=S')
+        cursor = self.session.open_cursor(self.uri, None, None)
+        self.assertTrue(self.raisesBusy(lambda: self.session.drop(self.uri, None)), "was expecting drop call to fail with EBUSY")
+        self.assert_error_equal(errno.EBUSY, wiredtiger.WT_CONFLICT_DHANDLE, "another thread is currently holding the data handle of the table")

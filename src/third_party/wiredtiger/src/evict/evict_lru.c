@@ -2872,13 +2872,13 @@ __wti_evict_app_assist_worker(WT_SESSION_IMPL *session, bool busy, bool readonly
          * Additionally we don't return rollback which could confuse the caller.
          */
         if (__wt_op_timer_fired(session))
-            goto err;
+            break;
 
         /* Check if we have exceeded the global or the session timeout for waiting on the cache. */
         if (time_start != 0 && cache_max_wait_us != 0) {
             uint64_t time_stop = __wt_clock(session);
             if (session->cache_wait_us + WT_CLOCKDIFF_US(time_stop, time_start) > cache_max_wait_us)
-                goto err;
+                break;
         }
 
         /*
@@ -2898,28 +2898,23 @@ __wti_evict_app_assist_worker(WT_SESSION_IMPL *session, bool busy, bool readonly
         if (!__wt_evict_needed(session, busy, readonly, &pct_full) ||
           (pct_full < 100.0 &&
             (__wt_atomic_loadv64(&evict->eviction_progress) > initial_progress + max_progress)))
-            goto err;
+            break;
 
         if (!__evict_check_user_ok_with_eviction(session, busy))
-            /* At this point ret can only be 0, so it's a clean exit from the loop. */
-            goto err;
+            break;
 
         /* Evict a page. */
-        switch (ret = __evict_page(session, false)) {
-        case 0:
+        ret = __evict_page(session, false);
+        if (ret == 0) {
+            /* If the caller holds resources, we can stop after a successful eviction. */
             if (busy)
-                goto err;
-        /* FALLTHROUGH */
-        case EBUSY:
-            break; /* Continue the loop. */
-        case WT_NOTFOUND:
+                break;
+        } else if (ret == WT_NOTFOUND) {
             /* Allow the queue to re-populate before retrying. */
             __wt_cond_wait(session, conn->evict_threads.wait_cond, 10 * WT_THOUSAND, NULL);
             evict->app_waits++;
-            break; /* Continue the loop. */
-        default:
-            goto err;
-        }
+        } else if (ret != EBUSY)
+            WT_ERR(ret);
     }
 
 err:
@@ -2945,6 +2940,8 @@ err:
          */
         if (ret == 0 && cache_max_wait_us != 0 && session->cache_wait_us > cache_max_wait_us) {
             ret = __wt_txn_rollback_required(session, WT_TXN_ROLLBACK_REASON_CACHE_OVERFLOW);
+            WT_IGNORE_RET(__wt_session_set_last_error(
+              session, ret, WT_CACHE_OVERFLOW, "Cache capacity has overflown"));
             if (__wt_atomic_load32(&evict->evict_aggressive_score) > 0)
                 (void)__wt_atomic_subv32(&evict->evict_aggressive_score, 1);
             WT_STAT_CONN_INCR(session, eviction_timed_out_ops);

@@ -2695,6 +2695,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
 int
 __wt_txn_is_blocking(WT_SESSION_IMPL *session)
 {
+    WT_DECL_RET;
     WT_TXN *txn;
     WT_TXN_SHARED *txn_shared;
     uint64_t global_oldest;
@@ -2731,10 +2732,13 @@ __wt_txn_is_blocking(WT_SESSION_IMPL *session)
     /*
      * Check if either the transaction's ID or its pinned ID is equal to the oldest transaction ID.
      */
-    return (__wt_atomic_loadv64(&txn_shared->id) == global_oldest ||
-          __wt_atomic_loadv64(&txn_shared->pinned_id) == global_oldest ?
-        __wt_txn_rollback_required(session, WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION) :
-        0);
+    if (__wt_atomic_loadv64(&txn_shared->id) == global_oldest ||
+      __wt_atomic_loadv64(&txn_shared->pinned_id) == global_oldest) {
+        ret = __wt_txn_rollback_required(session, WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION);
+        WT_RET_SUB(
+          session, ret, WT_OLDEST_FOR_EVICTION, "Transaction has the oldest pinned transaction ID");
+    }
+    return (0);
 }
 
 /*
