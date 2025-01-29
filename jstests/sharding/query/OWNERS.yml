@@ -3,9 +3,18 @@ filters:
   - "*":
     approvers:
       - 10gen/query
+  - "bulk_write*":
+    approvers:
+      - 10gen/query-execution-router-write-exec
+  - "log_remote_op_wait*":
+    approvers:
+      - 10gen/query-execution-router-query-exec
   - "*plan_cache*":
     approvers:
       - 10gen/query-optimization-plan-cache
+  - "*target*":
+    approvers:
+      - 10gen/query-optimization-cluster-planning
   - "exact_shard_key_target.js":
     approvers:
       - 10gen/query-optimization-cluster-planning
@@ -21,22 +30,13 @@ filters:
   - "batch_write_command_sharded.js":
     approvers:
       - 10gen/query-execution-router-write-exec
-  - "bulk_write*":
-    approvers:
-      - 10gen/query-execution-router-write-exec
   - "clustered_coll_scan.js":
     approvers:
       - 10gen/query-execution
   - "is_not_primary_error_does_not_leak_shard_cursor.js":
     approvers:
       - 10gen/query-execution-client-cursor
-  - "log_remote_op_wait*":
-    approvers:
-      - 10gen/query-execution-router-query-exec
   - "lookup_from_config_cache_chunks.js":
-    approvers:
-      - 10gen/query-optimization-cluster-planning
-  - "*target*":
     approvers:
       - 10gen/query-optimization-cluster-planning
   - "stats.js":

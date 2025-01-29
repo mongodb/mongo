@@ -108,9 +108,6 @@ filters:
   - "grid.*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "*ns_targeter*":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "mongod_and_mongos_server_parameters.idl":
     approvers:
       - 10gen/server-catalog-and-routing

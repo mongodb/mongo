@@ -144,9 +144,6 @@ filters:
   - "cluster_set_user_write_block_mode_command.cpp":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "*shard_collection*":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "cluster_update_zone_key_range_cmd.cpp":
     approvers:
       - 10gen/server-catalog-and-routing

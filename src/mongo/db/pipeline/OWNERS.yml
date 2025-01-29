@@ -101,6 +101,9 @@ filters:
   - "make_js_function*":
     approvers:
       - 10gen/query-integration-javascript
+  - "*_processor*":
+    approvers:
+      - 10gen/query-execution-aggregation
   - "group_processor*":
     approvers:
       - 10gen/query-execution-aggregation
@@ -140,9 +143,6 @@ filters:
     approvers:
       - 10gen/query-optimization-heuristic-rewrite
   - "sequential_document_cache*":
-    approvers:
-      - 10gen/query-execution-aggregation
-  - "*_processor*":
     approvers:
       - 10gen/query-execution-aggregation
   - "tee_buffer*":

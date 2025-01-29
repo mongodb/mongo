@@ -42,9 +42,6 @@ filters:
   - "field_parser*":
     approvers:
       - 10gen/server-programmability
-  - "field_parser*":
-    approvers:
-      - 10gen/server-programmability
   - "generic_argument_util.*":
     approvers:
       - 10gen/server-programmability

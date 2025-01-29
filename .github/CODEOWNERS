@@ -764,8 +764,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/noPassthrough/network/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/oplog/OWNERS.yml
-/jstests/noPassthrough/oplog/**/check_for_oplog_cap_maintainer_thread.js @10gen/server-storage-execution @svc-auto-approve-bot
 /jstests/noPassthrough/oplog/**/* @10gen/server-replication @svc-auto-approve-bot
+/jstests/noPassthrough/oplog/**/check_for_oplog_cap_maintainer_thread.js @10gen/server-storage-execution @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/profile/OWNERS.yml
 /jstests/noPassthrough/profile/**/* @10gen/query-integration-observability @svc-auto-approve-bot
@@ -1029,18 +1029,18 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/sharding/query/OWNERS.yml
 /jstests/sharding/query/**/* @10gen/query @svc-auto-approve-bot
+/jstests/sharding/query/**/bulk_write* @10gen/query-execution-router-write-exec @svc-auto-approve-bot
+/jstests/sharding/query/**/log_remote_op_wait* @10gen/query-execution-router-query-exec @svc-auto-approve-bot
 /jstests/sharding/query/**/*plan_cache* @10gen/query-optimization-plan-cache @svc-auto-approve-bot
+/jstests/sharding/query/**/*target* @10gen/query-optimization-cluster-planning @svc-auto-approve-bot
 /jstests/sharding/query/**/exact_shard_key_target.js @10gen/query-optimization-cluster-planning @svc-auto-approve-bot
 /jstests/sharding/query/**/hidden_index.js @10gen/query-optimization-planner @svc-auto-approve-bot
 /jstests/sharding/query/**/sharded_profile.js @10gen/query-integration-observability @svc-auto-approve-bot
 /jstests/sharding/query/**/authwhere.js @10gen/query-integration-javascript @svc-auto-approve-bot
 /jstests/sharding/query/**/batch_write_command_sharded.js @10gen/query-execution-router-write-exec @svc-auto-approve-bot
-/jstests/sharding/query/**/bulk_write* @10gen/query-execution-router-write-exec @svc-auto-approve-bot
 /jstests/sharding/query/**/clustered_coll_scan.js @10gen/query-execution @svc-auto-approve-bot
 /jstests/sharding/query/**/is_not_primary_error_does_not_leak_shard_cursor.js @10gen/query-execution-client-cursor @svc-auto-approve-bot
-/jstests/sharding/query/**/log_remote_op_wait* @10gen/query-execution-router-query-exec @svc-auto-approve-bot
 /jstests/sharding/query/**/lookup_from_config_cache_chunks.js @10gen/query-optimization-cluster-planning @svc-auto-approve-bot
-/jstests/sharding/query/**/*target* @10gen/query-optimization-cluster-planning @svc-auto-approve-bot
 /jstests/sharding/query/**/stats.js @10gen/query-integration-observability @svc-auto-approve-bot
 /jstests/sharding/query/**/unowned_doc_filtering.js @10gen/query-execution-router-query-exec @svc-auto-approve-bot
 /jstests/sharding/query/**/update_delete_many_metrics.js @10gen/query-integration-observability @svc-auto-approve-bot
@@ -1145,7 +1145,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/client/**/scram_* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/client/**/sasl_* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/client/**/native_* @10gen/server-security @svc-auto-approve-bot
-/src/mongo/client/**/authenticate* @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/crypto/OWNERS.yml
 /src/mongo/crypto/**/* @10gen/server-security @svc-auto-approve-bot
@@ -1164,7 +1163,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/connection_health_metrics_parameter.idl @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/db/**/dbmessage* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/db/**/default_baton* @10gen/server-networking-and-observability @svc-auto-approve-bot
-/src/mongo/db/**/field_parser* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/field_parser* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/generic_argument_util.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/jsobj.* @10gen/server-programmability @svc-auto-approve-bot
@@ -1308,9 +1306,11 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/**/async_command_execution_test.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/commands/**/authentication_commands.* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/commands/**/buildinfo_common.* @10gen/server-programmability @svc-auto-approve-bot
+/src/mongo/db/commands/**/*cluster*parameter* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/commands/**/cluster_server_parameter_cmds.idl @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/commands/**/connection_status.* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/commands/**/cpuload.* @10gen/server-programmability @svc-auto-approve-bot
+/src/mongo/db/commands/**/create* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/commands/**/create_indexes* @10gen/server-index-builds @svc-auto-approve-bot
 /src/mongo/db/commands/**/db_command_test_fixture.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/commands/**/fail_point_cmd.* @10gen/server-programmability @svc-auto-approve-bot
@@ -1325,7 +1325,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/**/validate.cpp @10gen/server-validate @svc-auto-approve-bot
 /src/mongo/db/commands/**/vote*index_build* @10gen/server-index-builds @svc-auto-approve-bot
 /src/mongo/db/commands/**/rotate_certificates* @10gen/server-security @svc-auto-approve-bot
-/src/mongo/db/commands/**/create* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/commands/**/list* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/commands/**/rename* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/commands/**/set_cluster* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -1335,7 +1334,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/**/dbcheck* @10gen/server-dbcheck @svc-auto-approve-bot
 /src/mongo/db/commands/**/feature_compatibility* @10gen/server-replication @svc-auto-approve-bot
 /src/mongo/db/commands/**/oplog* @10gen/server-replication @svc-auto-approve-bot
-/src/mongo/db/commands/**/*cluster*parameter* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/commands/**/drop_index* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/commands/**/internal_rename* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/commands/**/lock_info* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -1654,6 +1652,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/granularity_rounder* @10gen/query-execution-aggregation @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/javascript_execution* @10gen/query-integration-javascript @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/make_js_function* @10gen/query-integration-javascript @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/*_processor* @10gen/query-execution-aggregation @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/group_processor* @10gen/query-execution-aggregation @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/lite_parsed* @10gen/query-optimization-parsers @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/split_pipeline* @10gen/query-optimization-cluster-planning @svc-auto-approve-bot
@@ -1667,7 +1666,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/sbe_pushdown* @10gen/query-execution-sbe @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/semantic_analysis* @10gen/query-optimization-heuristic-rewrite @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/sequential_document_cache* @10gen/query-execution-aggregation @svc-auto-approve-bot
-/src/mongo/db/pipeline/**/*_processor* @10gen/query-execution-aggregation @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/tee_buffer* @10gen/query-execution-aggregation @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/value.idl @10gen/query-execution-aggregation @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_coll_stats* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -1719,6 +1717,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/**/bind_input_params* @10gen/query-optimization-plan-cache @svc-auto-approve-bot
 /src/mongo/db/query/**/interval_evaluation_tree* @10gen/query-optimization-plan-cache @svc-auto-approve-bot
 /src/mongo/db/query/**/partitioned_cache.h @10gen/query-optimization-plan-cache @svc-auto-approve-bot
+/src/mongo/db/query/**/canonical_query* @10gen/query-optimization-logical-models @svc-auto-approve-bot
 /src/mongo/db/query/**/canonical_query_encoder* @10gen/query-optimization-plan-cache @svc-auto-approve-bot
 /src/mongo/db/query/**/plan_rank* @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
 /src/mongo/db/query/**/*.idl @10gen/query-optimization-parsers @svc-auto-approve-bot
@@ -1726,7 +1725,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/**/projection_parser* @10gen/query-optimization-parsers @svc-auto-approve-bot
 /src/mongo/db/query/**/hint_parser* @10gen/query-optimization-parsers @svc-auto-approve-bot
 /src/mongo/db/query/**/parsed* @10gen/query-optimization-parsers @svc-auto-approve-bot
-/src/mongo/db/query/**/canonical_query* @10gen/query-optimization-logical-models @svc-auto-approve-bot
 /src/mongo/db/query/**/canonical_distinct* @10gen/query-optimization-logical-models @svc-auto-approve-bot
 /src/mongo/db/query/**/projection_ast* @10gen/query-optimization-logical-models @svc-auto-approve-bot
 /src/mongo/db/query/**/projection_policies.h @10gen/query-optimization-logical-models @svc-auto-approve-bot
@@ -1840,12 +1838,12 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/repl/**/dbcheck* @10gen/server-dbcheck @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/s/OWNERS.yml
+/src/mongo/db/s/**/*migration* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/*active_migrations_registry* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/*analyze_shard_key* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/cleanup_orphaned_cmd.cpp @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/cluster_*cmd_d* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/chunk_move_write_concern_options* @10gen/server-cluster-scalability @svc-auto-approve-bot
-/src/mongo/db/s/**/*migration* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/*move_range* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/move_timing_helper* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/query_analysis* @10gen/server-cluster-scalability @svc-auto-approve-bot
@@ -1861,11 +1859,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/s/**/*txn* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/s/**/balancer_stats_registry* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/chunk_operation_precondition_checks* @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/src/mongo/db/s/**/clone_catalog_data_command.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/collection_* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*collmod* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*convert_to_capped* @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/src/mongo/db/s/**/*create* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*collection_creation* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/database_sharding_state* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/operation_sharding_state* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -1889,7 +1885,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/s/**/*logging* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*ddl* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*cluster_param* @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/src/mongo/db/s/**/*catalog_client* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*sharding_recovery* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*critical_section* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*drop* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -1941,7 +1936,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/s/**/sharding_statistics* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/sharding_util* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/sharding_write_router* @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/src/mongo/db/s/**/*structured_encryption_data_command* @10gen/server-catalog-and-routing @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/s/**/shardsvr_commit* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*structured_encryption_data_command* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/shardsvr_notify_sharding_event_command.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -2150,7 +2144,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/**/balancer_configuration* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/**/gossiped_routing_cache.idl @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/**/grid.* @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/src/mongo/s/**/*ns_targeter* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/**/mongod_and_mongos_server_parameters.idl @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/**/*ns_targeter* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/**/s_sharding_server_status.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -2227,7 +2220,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_set_cluster_parameter_cmd.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_set_feature_compatibility_version_cmd.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_set_user_write_block_mode_command.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/src/mongo/s/commands/**/*shard_collection* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_update_zone_key_range_cmd.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_validate_db_metadata_cmd* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/commands/**/flush_router_config_cmd.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot

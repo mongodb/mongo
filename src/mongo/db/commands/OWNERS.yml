@@ -9,6 +9,9 @@ filters:
   - "buildinfo_common.*":
     approvers:
       - 10gen/server-programmability
+  - "*cluster*parameter*":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "cluster_server_parameter_cmds.idl":
     approvers:
       - 10gen/server-security
@@ -18,6 +21,9 @@ filters:
   - "cpuload.*":
     approvers:
       - 10gen/server-programmability
+  - "create*":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "create_indexes*":
     approvers:
       - 10gen/server-index-builds
@@ -60,9 +66,6 @@ filters:
   - "rotate_certificates*":
     approvers:
       - 10gen/server-security
-  - "create*":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "list*":
     approvers:
       - 10gen/server-catalog-and-routing
@@ -90,9 +93,6 @@ filters:
   - "oplog*":
     approvers:
       - 10gen/server-replication
-  - "*cluster*parameter*":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "drop_index*":
     approvers:
       - 10gen/server-catalog-and-routing

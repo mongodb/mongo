@@ -74,6 +74,9 @@ filters:
   - "partitioned_cache.h":
     approvers:
       - 10gen/query-optimization-plan-cache
+  - "canonical_query*":
+    approvers:
+      - 10gen/query-optimization-logical-models
   - "canonical_query_encoder*":
     approvers:
       - 10gen/query-optimization-plan-cache
@@ -99,9 +102,6 @@ filters:
   - "parsed*":
     approvers:
       - 10gen/query-optimization-parsers
-  - "canonical_query*":
-    approvers:
-      - 10gen/query-optimization-logical-models
   - "canonical_distinct*":
     approvers:
       - 10gen/query-optimization-logical-models
