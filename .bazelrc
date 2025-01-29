@@ -400,6 +400,9 @@ common --define=MONGO_DISTMOD=""
 # Default if .git directory is not present
 common --define=GIT_COMMIT_HASH="nogitversion"
 
+# The version of Visual C++ to use
+common --define=MSVC_VERSION="14.3"
+
 # TODO(WT-12780): delete this once wiredtiger switches to /.bazelrc.evergreen.
 try-import %workspace%/.bazelrc.evergreen_engflow_creds
 

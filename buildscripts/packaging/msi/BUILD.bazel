@@ -1,0 +1,9 @@
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "msi_project_files",
+    srcs = select({
+        "@platforms//os:windows": glob(["*"]),
+        "//conditions:default": [],
+    }),
+)
