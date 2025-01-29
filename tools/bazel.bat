@@ -19,7 +19,7 @@ if not exist "%python%" (
     
     if %ERRORLEVEL% NEQ 0 (
         if "%CI%"=="" if "%MONGO_BAZEL_WRAPPER_FALLBACK%"=="" exit %ERRORLEVEL%
-        echo wrapper script failed to install python! falling back to normal bazel call...
+        echo wrapper script failed to install python! falling back to normal bazel call... 1>&2
         "%BAZEL_REAL%" %*
         exit %ERRORLEVEL%
     )
@@ -32,14 +32,19 @@ SET STARTTIME=%TIME%
 
 set "MONGO_BAZEL_WRAPPER_ARGS=%tmp%\bat~%RANDOM%.tmp"
 echo "" > %MONGO_BAZEL_WRAPPER_ARGS%
-%python% %REPO_ROOT%/bazel/wrapper_hook/wrapper_hook.py "%BAZEL_REAL%" %*
+%python% %REPO_ROOT%/bazel/wrapper_hook/wrapper_hook.py "%BAZEL_REAL%" %* 1>&2
 if %ERRORLEVEL% NEQ 0 (
     if "%CI%"=="" if "%MONGO_BAZEL_WRAPPER_FALLBACK%"=="" exit %ERRORLEVEL%
-    echo wrapper script failed! falling back to normal bazel call...
+    echo wrapper script failed! falling back to normal bazel call... 1>&2
     "%BAZEL_REAL%" %*
     exit %ERRORLEVEL%
 )
-for /f "Tokens=* Delims=" %%x in ( %MONGO_BAZEL_WRAPPER_ARGS% ) do set "new_args=!new_args!%%x"
+
+for /F "delims=" %%a in (%MONGO_BAZEL_WRAPPER_ARGS%) do (
+    set str="%%a"
+    call set str=!str: =^ !
+    set "new_args=!new_args! !str!"
+)
 del %MONGO_BAZEL_WRAPPER_ARGS%
 
 REM Final Calculations
@@ -64,9 +69,9 @@ IF %cc% lss 10 SET cc=0%cc%
 SET DURATION=%mm%m and %ss%.%cc%s
 
 if "%MONGO_BAZEL_WRAPPER_DEBUG%"=="1" ( 
-    ECHO [WRAPPER_HOOK_DEBUG]: wrapper hook script input args: %*
-    ECHO [WRAPPER_HOOK_DEBUG]: wrapper hook script new args: !new_args!
-    ECHO [WRAPPER_HOOK_DEBUG]: wrapper hook script took %DURATION%
+    ECHO [WRAPPER_HOOK_DEBUG]: wrapper hook script input args: %* 1>&2
+    ECHO [WRAPPER_HOOK_DEBUG]: wrapper hook script new args: !new_args! 1>&2
+    ECHO [WRAPPER_HOOK_DEBUG]: wrapper hook script took %DURATION% 1>&2
 )
 
 "%BAZEL_REAL%" !new_args!

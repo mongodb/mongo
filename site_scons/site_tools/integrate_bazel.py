@@ -10,7 +10,6 @@ import queue
 import shlex
 import shutil
 import signal
-import socket
 import stat
 import subprocess
 import sys
@@ -23,7 +22,6 @@ from io import StringIO
 from typing import Any, Dict, List, Set, Tuple
 
 import distro
-import git
 import psutil
 import requests
 import SCons
@@ -31,6 +29,7 @@ from retry import retry
 from retry.api import retry_call
 from SCons.Script import ARGUMENTS
 
+from bazel.wrapper_hook.developer_bes_keywords import write_workstation_bazelrc
 from buildscripts.install_bazel import install_bazel
 from buildscripts.util.read_config import read_config_file
 from evergreen.api import RetryingEvergreenApi
@@ -1207,7 +1206,7 @@ def prefetch_toolchain(env, version):
 def exists(env: SCons.Environment.Environment) -> bool:
     # === Bazelisk ===
 
-    write_workstation_bazelrc()
+    write_workstation_bazelrc(sys.argv)
     cleanup_gitinfo_bazelrc()
     env.AddMethod(prefetch_toolchain, "PrefetchToolchain")
     env.AddMethod(bazel_execroot, "BazelExecroot")
@@ -1279,67 +1278,6 @@ def cleanup_gitinfo_bazelrc():
                 os.remove(gitinfo_bazelrc_file)
             except:
                 pass
-
-
-def write_workstation_bazelrc():
-    if os.environ.get("CI") is None:
-        workstation_file = ".bazelrc.workstation"
-        existing_hash = ""
-        if os.path.exists(workstation_file):
-            with open(workstation_file) as f:
-                existing_hash = hashlib.md5(f.read().encode()).hexdigest()
-
-        try:
-            repo = git.Repo()
-        except Exception:
-            print(
-                "Unable to setup git repo, skipping workstation file generation. This will result in incomplete telemetry data being uploaded."
-            )
-            return
-
-        try:
-            status = "clean" if repo.head.commit.diff(None) is None else "modified"
-        except Exception:
-            status = "Unknown"
-
-        try:
-            hostname = socket.gethostname()
-        except Exception:
-            hostname = "Unknown"
-
-        try:
-            remote = repo.branches.master.repo.remote().url
-        except Exception:
-            try:
-                remote = repo.remotes[0].url
-            except Exception:
-                remote = "Unknown"
-
-        try:
-            branch = repo.active_branch.name
-        except Exception:
-            branch = "Unknown"
-
-        try:
-            commit = repo.commit("HEAD")
-        except Exception:
-            commit = "Unknown"
-
-        bazelrc_contents = f"""\
-# Generated file, do not modify
-common --bes_keywords=developerBuild=True
-common --bes_keywords=workstation={hostname}
-common --bes_keywords=engflow:BuildScmRemote={remote}
-common --bes_keywords=engflow:BuildScmBranch={branch}
-common --bes_keywords=engflow:BuildScmRevision={commit}
-common --bes_keywords=engflow:BuildScmStatus={status}
-    """
-
-        current_hash = hashlib.md5(bazelrc_contents.encode()).hexdigest()
-        if existing_hash != current_hash:
-            print(f"Generating new {workstation_file} file...")
-            with open(workstation_file, "w") as f:
-                f.write(bazelrc_contents)
 
 
 def setup_bazel_env_vars() -> None:

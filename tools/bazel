@@ -148,7 +148,7 @@ MONGO_BAZEL_WRAPPER_ARGS=$(mktemp)
 
 MONGO_BAZEL_WRAPPER_ARGS=$MONGO_BAZEL_WRAPPER_ARGS \
 MONGO_AUTOCOMPLETE_QUERY=$autocomplete_query \
-$python $REPO_ROOT/bazel/wrapper_hook/wrapper_hook.py $bazel_real "$@"
+>&2 $python $REPO_ROOT/bazel/wrapper_hook/wrapper_hook.py $bazel_real "$@"
 if [[ $? != 0 ]]; then
   if [[ ! -z "$CI" ]] || [[ $MONGO_BAZEL_WRAPPER_FALLBACK == 1 ]]; then
     >&2 echo "wrapper script failed! falling back to normal bazel call..."
@@ -157,21 +157,25 @@ if [[ $? != 0 ]]; then
     exit $? 
   fi
 fi
-new_args=$(<$MONGO_BAZEL_WRAPPER_ARGS)
+
+new_args=()
+while IFS= read -r line; do
+  new_args+=("$line")
+done < $MONGO_BAZEL_WRAPPER_ARGS
 
 if [[ $MONGO_BAZEL_WRAPPER_DEBUG == 1 ]] && [[ $autocomplete_query == 0 ]]; then
   wrapper_end_time="$(date -u +%s.%N)"
   runtime=$(bc <<< "$wrapper_end_time - $wrapper_start_time")
   runtime=$(printf "%0.3f" $runtime)
-  echo "[WRAPPER_HOOK_DEBUG]: wrapper hook script input args: $@"
-  echo "[WRAPPER_HOOK_DEBUG]: wrapper hook script new args: $new_args"
-  echo "[WRAPPER_HOOK_DEBUG]: wrapper hook script took $runtime seconds"
+  >&2 echo "[WRAPPER_HOOK_DEBUG]: wrapper hook script input args: $@"
+  >&2 echo "[WRAPPER_HOOK_DEBUG]: wrapper hook script new args: ${new_args[@]@Q}"
+  >&2 echo "[WRAPPER_HOOK_DEBUG]: wrapper hook script took $runtime seconds"
 fi
 
 if [[ $autocomplete_query == 1 ]]; then
   plus_targets=$(</tmp/mongo_autocomplete_plus_targets)
-  query_output=$("$bazel_real" $new_args) 
+  query_output=$("${new_args[@]@Q}") 
   echo $query_output $plus_targets | tr " " "\n"
 else
-  exec "$bazel_real" $new_args
+  exec "$bazel_real" "${new_args[@]}"
 fi

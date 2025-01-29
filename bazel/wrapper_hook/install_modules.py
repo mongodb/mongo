@@ -29,6 +29,36 @@ def get_deps_dirs(deps):
         yield f"{bazel_bin}/external/poetry/{dep}", dep
 
 
+def add_module_to_path(poetry_dir, modules_added):
+    for module in poetry_dir.iterdir():
+        for dist_info in module.iterdir():
+            if str(dist_info).endswith(".dist-info"):
+                dirname = dist_info.parent
+                module = dirname.name
+                if module not in modules_added:
+                    modules_added.add(module)
+                    sys.path.append(str(dirname))
+
+
+def setup_python_path():
+    tmp_dir = pathlib.Path(os.environ["Temp"] if platform.system() == "Windows" else "/tmp")
+    modules_added = set()
+
+    for out_dir in [
+        REPO_ROOT / "bazel-out",
+        tmp_dir / "compiledb-out",
+    ]:
+        if out_dir.exists():
+            for child in out_dir.iterdir():
+                poetry_dir = child / "bin" / "external" / "poetry"
+                if poetry_dir.exists():
+                    add_module_to_path(poetry_dir, modules_added)
+
+    poetry_dir = REPO_ROOT / "bazel-bin" / "external" / "poetry"
+    if poetry_dir.exists():
+        add_module_to_path(poetry_dir, modules_added)
+
+
 def search_for_modules(deps, deps_installed, lockfile_changed=False):
     deps_not_found = deps.copy()
     wrapper_debug(f"deps_installed: {deps_installed}")
@@ -46,7 +76,6 @@ def search_for_modules(deps, deps_installed, lockfile_changed=False):
                     wrapper_debug(f"found: {target_dir}")
                     deps_installed.append(dep)
                     deps_not_found.remove(dep)
-                    sys.path.append(target_dir)
                     break
         else:
             os.chmod(target_dir, 0o777)
@@ -76,7 +105,7 @@ def install_modules(bazel):
         with open(lockfile_hash_file, "w") as f:
             f.write(current_hash)
 
-    deps = ["retry"]
+    deps = ["retry", "gitpython"]
     deps_installed = []
     deps_needed = search_for_modules(
         deps, deps_installed, lockfile_changed=old_hash != current_hash
@@ -91,8 +120,9 @@ def install_modules(bazel):
 
     if need_to_install:
         subprocess.run(
-            [bazel, "build", "--config=local"] + ["@poetry//:install_" + dep for dep in deps_needed]
+            [bazel, "build", "--config=local"] + ["@poetry//:library_" + dep for dep in deps_needed]
         )
         deps_missing = search_for_modules(deps_needed, deps_installed)
         if deps_missing:
             raise Exception(f"Failed to install python deps {deps_missing}")
+    setup_python_path()

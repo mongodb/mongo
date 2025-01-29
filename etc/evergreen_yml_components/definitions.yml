@@ -1372,6 +1372,7 @@ functions:
         binary: bash
         env:
           evergreen_remote_exec: ${evergreen_remote_exec|off}
+          author_email: ${author_email}
         args:
           - "src/evergreen/scons_compile.sh"
     - command: expansions.update
@@ -1463,6 +1464,7 @@ functions:
       binary: bash
       env:
         evergreen_remote_exec: ${evergreen_remote_exec|off}
+        author_email: ${author_email}
       args:
         - "src/evergreen/bazel_compile.sh"
 
