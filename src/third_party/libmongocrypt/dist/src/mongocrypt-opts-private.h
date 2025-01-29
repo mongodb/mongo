@@ -118,10 +118,6 @@ typedef struct {
     bool use_need_mongo_collinfo_with_db_state;
     bool bypass_query_analysis;
 
-    // When creating new encrypted payloads,
-    // use V2 variants of the FLE2 datatypes.
-    bool use_fle2_v2;
-
     // Use the Queryable Encryption Range V2 protocol.
     bool use_range_v2;
 } _mongocrypt_opts_t;

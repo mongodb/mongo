@@ -80,6 +80,7 @@ extern "C" {
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bson_depth.h"
+#include "mongo/bson/bson_utf8.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -358,14 +359,15 @@ void toEncryptedBinDataPretyped(StringData field,
                                 EncryptedBinDataType dt,
                                 ConstDataRange cdr,
                                 BSONObjBuilder* builder) {
+    uassert(9784114, "Input buffer of encrypted data cannot be empty", cdr.length() > 0);
     auto dtAsNum = static_cast<uint8_t>(dt);
-    std::vector<uint8_t> buf(cdr.data(), cdr.data() + cdr.length());
-    uassert(9588900,
-            "Expected buffer to begin with type tag {}, but began with {}"_format(
-                dtAsNum, buf.empty() ? -1 : buf[0]),
-            !buf.empty() && buf[0] == dtAsNum);
+    auto firstByte = static_cast<uint8_t>(cdr.data()[0]);
+    uassert(
+        9588900,
+        "Expected buffer to begin with type tag {}, but began with {}"_format(dtAsNum, firstByte),
+        firstByte == dtAsNum);
 
-    builder->appendBinData(field, buf.size(), BinDataType::Encrypt, buf.data());
+    builder->appendBinData(field, cdr.length(), BinDataType::Encrypt, cdr.data());
 }
 
 std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedBinData(const BSONElement element) {
@@ -737,6 +739,14 @@ public:
         FLE2RangeInsertSpec spec,
         uint8_t sparsity,
         uint64_t contentionFactor);
+
+    // TODO: SERVER-99789 remove once placeholder to IUPv2 conversion is done entirely in
+    // libmongocrypt
+    static FLE2InsertUpdatePayloadV2 serializeInsertUpdatePayloadV2ForTextSearch(
+        FLEIndexKeyAndId indexKey,
+        FLEUserKeyAndId userKey,
+        const FLE2TextSearchInsertSpec& spec,
+        uint64_t contentionFactor);
 };
 
 FLE2InsertUpdatePayloadV2 EDCClientPayload::parseInsertUpdatePayloadV2(ConstDataRange cdr) {
@@ -968,6 +978,116 @@ FLE2InsertUpdatePayloadV2 EDCClientPayload::serializeInsertUpdatePayloadV2ForRan
 
     if (!edgeTokenSet.empty()) {
         iupayload.setEdgeTokenSet(edgeTokenSet);
+    }
+
+    return iupayload;
+}
+
+// TODO: SERVER-99789 remove once placeholder to IUPv2 conversion is done entirely in
+// libmongocrypt
+FLE2InsertUpdatePayloadV2 EDCClientPayload::serializeInsertUpdatePayloadV2ForTextSearch(
+    FLEIndexKeyAndId indexKey,
+    FLEUserKeyAndId userKey,
+    const FLE2TextSearchInsertSpec& spec,
+    uint64_t contentionFactor) {
+
+    auto obj = BSON("" << spec.getValue());
+    uassert(
+        9784100, "Text search insert/update value is not a valid UTF-8 string", isValidUTF8(obj));
+    auto element = obj.firstElement();
+    auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
+
+    auto collectionToken = CollectionsLevel1Token::deriveFrom(indexKey.key);
+    auto serverEncryptToken = ServerDataEncryptionLevel1Token::deriveFrom(indexKey.key);
+    auto serverDerivationToken = ServerTokenDerivationLevel1Token::deriveFrom(indexKey.key);
+
+    auto edcToken = EDCToken::deriveFrom(collectionToken);
+    auto escToken = ESCToken::deriveFrom(collectionToken);
+    auto ecocToken = ECOCToken::deriveFrom(collectionToken);
+
+    FLE2InsertUpdatePayloadV2 iupayload;
+    PrfBlock nullBlock;
+    // d, s, l, p are bogus data
+    iupayload.setEdcDerivedToken(EDCDerivedFromDataTokenAndContentionFactorToken(nullBlock));
+    iupayload.setEscDerivedToken(ESCDerivedFromDataTokenAndContentionFactorToken(nullBlock));
+    iupayload.setServerDerivedFromDataToken(ServerDerivedFromDataToken(nullBlock));
+    iupayload.setEncryptedTokens(
+        StateCollectionTokensV2(iupayload.getEscDerivedToken(), boost::none).encrypt(ecocToken));
+
+    // u, t, v, e, k
+    iupayload.setIndexKeyId(indexKey.keyId);
+    iupayload.setType(BSONType::String);
+
+    auto cipherText = uassertStatusOK(KeyIdAndValue::serialize(userKey, value));
+    iupayload.setValue(cipherText);
+
+    iupayload.setServerEncryptionToken(serverEncryptToken);
+    iupayload.setContentionFactor(contentionFactor);
+    iupayload.setTextSearchTokenSets(TextSearchTokenSets{{}, {}, {}, {}});
+
+    auto& tsts = iupayload.getTextSearchTokenSets().value();
+    {
+        auto& exact = tsts.getExactTokenSet();
+        exact.setEdcDerivedToken(
+            EDCTextExactDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+                EDCTextExactToken::deriveFrom(edcToken), value, contentionFactor));
+        exact.setEscDerivedToken(
+            ESCTextExactDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+                ESCTextExactToken::deriveFrom(escToken), value, contentionFactor));
+        exact.setServerDerivedFromDataToken(ServerTextExactDerivedFromDataToken::deriveFrom(
+            ServerTextExactToken::deriveFrom(serverDerivationToken), value));
+        exact.setEncryptedTokens(
+            StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
+                                        exact.getEscDerivedToken().asPrfBlock()),
+                                    boost::none)
+                .encrypt(ecocToken));
+    }
+    if (spec.getSubstringSpec().has_value()) {
+        tsts.getSubstringTokenSets().push_back({});
+        auto& ts = tsts.getSubstringTokenSets().back();
+        ts.setEdcDerivedToken(
+            EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+                EDCTextSubstringToken::deriveFrom(edcToken), value, contentionFactor));
+        ts.setEscDerivedToken(
+            ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+                ESCTextSubstringToken::deriveFrom(escToken), value, contentionFactor));
+        ts.setServerDerivedFromDataToken(ServerTextSubstringDerivedFromDataToken::deriveFrom(
+            ServerTextSubstringToken::deriveFrom(serverDerivationToken), value));
+        ts.setEncryptedTokens(
+            StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
+                                        ts.getEscDerivedToken().asPrfBlock()),
+                                    boost::none)
+                .encrypt(ecocToken));
+    }
+    if (spec.getSuffixSpec().has_value()) {
+        tsts.getSuffixTokenSets().push_back({});
+        auto& ts = tsts.getSuffixTokenSets().back();
+        ts.setEdcDerivedToken(EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+            EDCTextSuffixToken::deriveFrom(edcToken), value, contentionFactor));
+        ts.setEscDerivedToken(ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+            ESCTextSuffixToken::deriveFrom(escToken), value, contentionFactor));
+        ts.setServerDerivedFromDataToken(ServerTextSuffixDerivedFromDataToken::deriveFrom(
+            ServerTextSuffixToken::deriveFrom(serverDerivationToken), value));
+        ts.setEncryptedTokens(
+            StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
+                                        ts.getEscDerivedToken().asPrfBlock()),
+                                    boost::none)
+                .encrypt(ecocToken));
+    }
+    if (spec.getPrefixSpec().has_value()) {
+        tsts.getPrefixTokenSets().push_back({});
+        auto& ts = tsts.getPrefixTokenSets().back();
+        ts.setEdcDerivedToken(EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+            EDCTextPrefixToken::deriveFrom(edcToken), value, contentionFactor));
+        ts.setEscDerivedToken(ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+            ESCTextPrefixToken::deriveFrom(escToken), value, contentionFactor));
+        ts.setServerDerivedFromDataToken(ServerTextPrefixDerivedFromDataToken::deriveFrom(
+            ServerTextPrefixToken::deriveFrom(serverDerivationToken), value));
+        ts.setEncryptedTokens(
+            StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
+                                        ts.getEscDerivedToken().asPrfBlock()),
+                                    boost::none)
+                .encrypt(ecocToken));
     }
 
     return iupayload;
@@ -1252,6 +1372,21 @@ void convertToFLE2Payload(FLEKeyVault* keyVault,
             } else {
                 uasserted(6775303, "Unsupported Queryable Encryption placeholder type");
             }
+        } else if (ep.getAlgorithm() == Fle2AlgorithmInt::kTextSearch) {
+            if (ep.getType() == Fle2PlaceholderType::kInsert) {
+                IDLParserContext ctx("FLE2TextSearchInsertSpec");
+                auto textInsertSpec =
+                    FLE2TextSearchInsertSpec::parse(ctx, ep.getValue().getElement().Obj());
+
+                auto iupayload = EDCClientPayload::serializeInsertUpdatePayloadV2ForTextSearch(
+                    indexKey, userKey, textInsertSpec, contentionFactor(ep));
+                toEncryptedBinData(fieldNameToSerialize,
+                                   EncryptedBinDataType::kFLE2InsertUpdatePayloadV2,
+                                   iupayload,
+                                   builder);
+            } else {
+                uasserted(9784101, "Unsupported Queryable Encryption placeholder type");
+            }
         } else if (ep.getAlgorithm() == Fle2AlgorithmInt::kUnindexed) {
             uassert(6379102,
                     str::stream() << "Type '" << typeName(el.type())
@@ -1407,6 +1542,19 @@ void convertServerPayload(ConstDataRange cdr,
                 pTags->push_back({mblock.tag});
             }
 
+        } else if (payload->isTextSearchPayload()) {
+            auto tags = EDCServerCollection::generateTagsForTextSearch(*payload);
+            auto swEncrypted = FLE2IndexedTextEncryptedValue::fromUnencrypted(
+                                   payload->payload, tags, payload->counts)
+                                   .serialize();
+            uassertStatusOK(swEncrypted);
+            toEncryptedBinDataPretyped(fieldPath,
+                                       EncryptedBinDataType::kFLE2TextIndexedValue,
+                                       ConstDataRange(swEncrypted.getValue()),
+                                       builder);
+            for (auto& tag : tags) {
+                pTags->push_back({tag});
+            }
         } else {
             dassert(payload->counts.size() == 1);
 
@@ -1485,9 +1633,13 @@ uint64_t generateRandomContention(uint64_t cm) {
 size_t getEstimatedTagCount(const std::vector<EDCServerPayloadInfo>& serverPayload) {
     size_t total = 0;
     for (auto const& sp : serverPayload) {
-        total += 1 +
-            (sp.payload.getEdgeTokenSet().has_value() ? sp.payload.getEdgeTokenSet().get().size()
-                                                      : 0);
+        if (sp.isRangePayload()) {
+            total += 1 + sp.payload.getEdgeTokenSet().get().size();
+        } else if (sp.isTextSearchPayload()) {
+            total += sp.getTotalTextSearchTokenSetCount();
+        } else {
+            total += 1;
+        }
     }
     return total;
 }
@@ -2784,6 +2936,20 @@ StatusWith<FLE2TagAndEncryptedMetadataBlock> FLE2TagAndEncryptedMetadataBlock::d
         count, contentionFactor, swTag.getValue(), swZeros.getValue());
 }
 
+StatusWith<FLE2TagAndEncryptedMetadataBlock> FLE2TagAndEncryptedMetadataBlock::decryptAndParse(
+    ServerDerivedFromDataToken token, const FLE2TagAndEncryptedMetadataBlockView& blk) {
+    std::vector<uint8_t> buf;
+    buf.reserve(blk.encryptedCounts.length() + blk.encryptedZeros.length() + blk.tag.length());
+    std::copy(blk.encryptedCounts.data(),
+              blk.encryptedCounts.data() + blk.encryptedCounts.length(),
+              std::back_inserter(buf));
+    std::copy(blk.tag.data(), blk.tag.data() + blk.tag.length(), std::back_inserter(buf));
+    std::copy(blk.encryptedZeros.data(),
+              blk.encryptedZeros.data() + blk.encryptedZeros.length(),
+              std::back_inserter(buf));
+    return decryptAndParse(token, buf);
+}
+
 StatusWith<PrfBlock> FLE2TagAndEncryptedMetadataBlock::parseTag(ConstDataRange serializedBlock) {
     ConstDataRangeCursor blobCdrc(serializedBlock);
     auto st = blobCdrc.advanceNoThrow(sizeof(EncryptedCountersBlob));
@@ -3259,6 +3425,231 @@ StatusWith<std::vector<uint8_t>> FLE2IndexedRangeEncryptedValueV2::serialize(
     return serializedServerValue;
 }
 
+FLE2IndexedTextEncryptedValue::FLE2IndexedTextEncryptedValue()
+    : _value(mc_FLE2IndexedEncryptedValueV2_new()) {}
+
+FLE2IndexedTextEncryptedValue::FLE2IndexedTextEncryptedValue(ConstDataRange toParse)
+    : _value(mc_FLE2IndexedEncryptedValueV2_new()) {
+    auto buf = MongoCryptBuffer::borrow(toParse);
+    MongoCryptStatus status;
+    mc_FLE2IndexedEncryptedValueV2_parse(_value.get(), buf.get(), status);
+    uassertStatusOK(status.toStatus());
+    uassert(9784115,
+            "Expected buffer to begin with type tag {}, but began with {}"_format(kFLE2IEVTypeText,
+                                                                                  _value->type),
+            _value->type == kFLE2IEVTypeText);
+}
+
+FLE2IndexedTextEncryptedValue FLE2IndexedTextEncryptedValue::fromUnencrypted(
+    const FLE2InsertUpdatePayloadV2& payload,
+    const std::vector<PrfBlock>& tags,
+    const std::vector<uint64_t>& counters) {
+
+    uassert(9784102,
+            "Non-text search InsertUpdatePayload supplied for FLE2IndexedTextEncryptedValueV2",
+            payload.getTextSearchTokenSets().has_value());
+    uassert(9784103,
+            "InsertUpdatePayload has bad BSON type for FLE2IndexedTextEncryptedValueV2",
+            static_cast<BSONType>(payload.getType()) == BSONType::String);
+
+    auto& tsts = payload.getTextSearchTokenSets().value();
+
+    // Ensure the total tags will not overflow the 8-bit counter
+    uint8_t tagLimit = std::numeric_limits<uint8_t>::max() - 1;  // subtract one for exact match tag
+
+    uassert(9784104,
+            "InsertUpdatePayload substring token sets size is too large",
+            tsts.getSubstringTokenSets().size() <= tagLimit);
+    uint8_t substrTagCount = static_cast<uint8_t>(tsts.getSubstringTokenSets().size());
+    tagLimit -= substrTagCount;
+
+    uassert(9784105,
+            "InsertUpdatePayload suffix token sets size is too large",
+            tsts.getSuffixTokenSets().size() <= tagLimit);
+    uint8_t suffixTagCount = static_cast<uint8_t>(tsts.getSuffixTokenSets().size());
+    tagLimit -= suffixTagCount;
+
+    uassert(9784106,
+            "InsertUpdatePayload prefix token sets size is too large",
+            tsts.getPrefixTokenSets().size() <= tagLimit);
+    uint8_t totalTagCount = 1 + substrTagCount + suffixTagCount +
+        static_cast<uint8_t>(tsts.getPrefixTokenSets().size());
+
+    uassert(9784112,
+            "InsertUpdatePayload for text search must have at least one substring, suffix, or "
+            "prefix token set",
+            totalTagCount > 1);
+    uassert(9784113,
+            "FLE2IndexedTextEncryptedValueV2 tags length must equal the total number of text "
+            "search token sets",
+            tags.size() == totalTagCount);
+    uassert(9784107,
+            "FLE2IndexedTextEncryptedValueV2 counters length must equal the total number of text "
+            "search token sets",
+            counters.size() == totalTagCount);
+    auto clientEncryptedValue(FLEUtil::vectorFromCDR(payload.getValue()));
+    uassert(9784108,
+            "Invalid client encrypted value length for FLE2IndexedTextEncryptedValueV2",
+            !clientEncryptedValue.empty());
+
+    FLE2IndexedTextEncryptedValue value;
+    mc_FLE2IndexedEncryptedValueV2_t* iev = value._value.get();
+
+    iev->type = kFLE2IEVTypeText;
+    iev->fle_blob_subtype = static_cast<int8_t>(EncryptedBinDataType::kFLE2TextIndexedValue);
+    iev->bson_value_type = static_cast<BSONType>(payload.getType());
+    iev->edge_count = totalTagCount;
+    iev->substr_tag_count = substrTagCount;
+    iev->suffix_tag_count = suffixTagCount;
+
+    auto keyId = payload.getIndexKeyId().toCDR();
+
+    auto serverEncryptedValue = uassertStatusOK(encryptData(
+        payload.getServerEncryptionToken().toCDR(), ConstDataRange(clientEncryptedValue)));
+
+    if (!_mongocrypt_buffer_copy_from_data_and_size(
+            &iev->S_KeyId, reinterpret_cast<const uint8_t*>(keyId.data()), keyId.length())) {
+        uassertStatusOK(
+            Status(ErrorCodes::LibmongocryptError, "Unable to copy S_KeyId into buffer"));
+    }
+
+    if (!_mongocrypt_buffer_copy_from_data_and_size(
+            &iev->ServerEncryptedValue, serverEncryptedValue.data(), serverEncryptedValue.size())) {
+        uassertStatusOK(Status(ErrorCodes::LibmongocryptError,
+                               "Unable to copy ServerEncryptedValue into buffer"));
+    }
+
+    // Collect serverDerivedFromDataTokens from all text search token sets, flattened into a list.
+    // The order of addition to the list is important!
+    std::vector<PrfBlock> serverDerivedFromDataTokens;
+    serverDerivedFromDataTokens.reserve(totalTagCount);
+
+    serverDerivedFromDataTokens.push_back(
+        tsts.getExactTokenSet().getServerDerivedFromDataToken().asPrfBlock());
+    for (const auto& ts : tsts.getSubstringTokenSets()) {
+        serverDerivedFromDataTokens.push_back(ts.getServerDerivedFromDataToken().asPrfBlock());
+    }
+    for (const auto& ts : tsts.getSuffixTokenSets()) {
+        serverDerivedFromDataTokens.push_back(ts.getServerDerivedFromDataToken().asPrfBlock());
+    }
+    for (const auto& ts : tsts.getPrefixTokenSets()) {
+        serverDerivedFromDataTokens.push_back(ts.getServerDerivedFromDataToken().asPrfBlock());
+    }
+    dassert(totalTagCount == serverDerivedFromDataTokens.size());
+
+    iev->metadata = reinterpret_cast<mc_FLE2TagAndEncryptedMetadataBlock_t*>(
+        bson_malloc(totalTagCount * sizeof(mc_FLE2TagAndEncryptedMetadataBlock_t)));
+
+    MongoCryptStatus status;
+    for (size_t i = 0; i < totalTagCount; i++) {
+        FLE2TagAndEncryptedMetadataBlock mblock(
+            counters[i], payload.getContentionFactor(), tags[i]);
+
+        auto serverDataDerivedToken = ServerDerivedFromDataToken(serverDerivedFromDataTokens[i]);
+        auto serializedMetadata = uassertStatusOK(mblock.serialize(serverDataDerivedToken));
+
+        uassert(9784109,
+                "Serialized FLE2TagAndEncryptedMetadataBlock has incorrect length",
+                serializedMetadata.size() ==
+                    sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob));
+
+        MongoCryptBuffer metadata = MongoCryptBuffer::borrow(serializedMetadata);
+        if (!mc_FLE2TagAndEncryptedMetadataBlock_parse(&iev->metadata[i], metadata.get(), status)) {
+            uassertStatusOK(status.toStatus());
+        }
+    }
+
+    if (!mc_FLE2IndexedEncryptedValueV2_validate(iev, status)) {
+        uassertStatusOK(status.toStatus());
+    };
+    return value;
+}
+
+StatusWith<std::vector<uint8_t>> FLE2IndexedTextEncryptedValue::serialize() const {
+    if (!_cachedSerializedPayload) {
+        MongoCryptStatus status;
+        MongoCryptBuffer buf;
+        if (!mc_FLE2IndexedEncryptedValueV2_serialize(_value.get(), buf.get(), status)) {
+            return status.toStatus();
+        }
+        _cachedSerializedPayload = std::vector<uint8_t>(buf.data(), buf.data() + buf.size());
+    }
+
+    return *_cachedSerializedPayload;
+}
+
+UUID FLE2IndexedTextEncryptedValue::getKeyId() const {
+    return UUID::fromCDR(MongoCryptBuffer::borrow(&_value->S_KeyId).toCDR());
+}
+
+BSONType FLE2IndexedTextEncryptedValue::getBsonType() const {
+    return BSONType(_value->bson_value_type);
+}
+
+ConstDataRange FLE2IndexedTextEncryptedValue::getServerEncryptedValue() const {
+    return MongoCryptBuffer::borrow(&_value->ServerEncryptedValue).toCDR();
+}
+
+uint8_t FLE2IndexedTextEncryptedValue::getTagCount() const {
+    return _value->edge_count;
+}
+
+uint8_t FLE2IndexedTextEncryptedValue::getSubstringTagCount() const {
+    return _value->substr_tag_count;
+}
+
+uint8_t FLE2IndexedTextEncryptedValue::getSuffixTagCount() const {
+    return _value->suffix_tag_count;
+}
+
+uint8_t FLE2IndexedTextEncryptedValue::getPrefixTagCount() const {
+    auto otherTagCount = getSubstringTagCount() + getSuffixTagCount() + 1;
+    dassert(getTagCount() >= otherTagCount);
+    return getTagCount() - otherTagCount;
+}
+
+FLE2TagAndEncryptedMetadataBlockView FLE2IndexedTextEncryptedValue::getExactStringMetadataBlock()
+    const {
+    return {MongoCryptBuffer::borrow(&_value->metadata[0].encryptedCount).toCDR(),
+            MongoCryptBuffer::borrow(&_value->metadata[0].tag).toCDR(),
+            MongoCryptBuffer::borrow(&_value->metadata[0].encryptedZeros).toCDR()};
+}
+
+std::vector<FLE2TagAndEncryptedMetadataBlockView>
+FLE2IndexedTextEncryptedValue::getSubstringMetadataBlocks() const {
+    std::vector<FLE2TagAndEncryptedMetadataBlockView> res;
+    constexpr size_t offset = 1;
+    for (size_t i = offset; i < offset + getSubstringTagCount(); i++) {
+        res.push_back({MongoCryptBuffer::borrow(&_value->metadata[i].encryptedCount).toCDR(),
+                       MongoCryptBuffer::borrow(&_value->metadata[i].tag).toCDR(),
+                       MongoCryptBuffer::borrow(&_value->metadata[i].encryptedZeros).toCDR()});
+    }
+    return res;
+}
+
+std::vector<FLE2TagAndEncryptedMetadataBlockView>
+FLE2IndexedTextEncryptedValue::getSuffixMetadataBlocks() const {
+    std::vector<FLE2TagAndEncryptedMetadataBlockView> res;
+    const size_t offset = 1 + getSubstringTagCount();
+    for (size_t i = offset; i < offset + getSuffixTagCount(); i++) {
+        res.push_back({MongoCryptBuffer::borrow(&_value->metadata[i].encryptedCount).toCDR(),
+                       MongoCryptBuffer::borrow(&_value->metadata[i].tag).toCDR(),
+                       MongoCryptBuffer::borrow(&_value->metadata[i].encryptedZeros).toCDR()});
+    }
+    return res;
+}
+
+std::vector<FLE2TagAndEncryptedMetadataBlockView>
+FLE2IndexedTextEncryptedValue::getPrefixMetadataBlocks() const {
+    std::vector<FLE2TagAndEncryptedMetadataBlockView> res;
+    const size_t offset = 1 + getSubstringTagCount() + getSuffixTagCount();
+    for (size_t i = offset; i < offset + getPrefixTagCount(); i++) {
+        res.push_back({MongoCryptBuffer::borrow(&_value->metadata[i].encryptedCount).toCDR(),
+                       MongoCryptBuffer::borrow(&_value->metadata[i].tag).toCDR(),
+                       MongoCryptBuffer::borrow(&_value->metadata[i].encryptedZeros).toCDR()});
+    }
+    return res;
+}
 
 ESCDerivedFromDataTokenAndContentionFactorToken EDCServerPayloadInfo::getESCToken(
     ConstDataRange cdr) {
@@ -3360,6 +3751,46 @@ std::vector<PrfBlock> EDCServerCollection::generateTags(const EDCServerPayloadIn
         auto edcTwiceDerived =
             EDCTwiceDerivedToken::deriveFrom(edgeTokenSets[i].getEdcDerivedToken());
         tags.push_back(EDCServerCollection::generateTag(edcTwiceDerived, rangePayload.counts[i]));
+    }
+    return tags;
+}
+
+std::vector<PrfBlock> EDCServerCollection::generateTagsForTextSearch(
+    const EDCServerPayloadInfo& textPayload) {
+    auto totalTagCount = textPayload.getTotalTextSearchTokenSetCount();
+
+    uassert(9784110,
+            "InsertUpdatePayload must have a text search token set",
+            textPayload.isTextSearchPayload());
+    uassert(9784111,
+            "Mismatch between total text search token set count and counters lengths",
+            totalTagCount == textPayload.counts.size());
+
+    auto& tsts = textPayload.payload.getTextSearchTokenSets().value();
+
+    // Collect edcDerivedTokens from all text search token sets, flattened into a list
+    std::vector<PrfBlock> edcDerivedTokens;
+    edcDerivedTokens.reserve(totalTagCount);
+
+    edcDerivedTokens.push_back(tsts.getExactTokenSet().getEdcDerivedToken().asPrfBlock());
+    for (const auto& ts : tsts.getSubstringTokenSets()) {
+        edcDerivedTokens.push_back(ts.getEdcDerivedToken().asPrfBlock());
+    }
+    for (const auto& ts : tsts.getSuffixTokenSets()) {
+        edcDerivedTokens.push_back(ts.getEdcDerivedToken().asPrfBlock());
+    }
+    for (const auto& ts : tsts.getPrefixTokenSets()) {
+        edcDerivedTokens.push_back(ts.getEdcDerivedToken().asPrfBlock());
+    }
+    dassert(totalTagCount == edcDerivedTokens.size());
+
+    std::vector<PrfBlock> tags;
+    tags.reserve(totalTagCount);
+
+    for (size_t i = 0; i < totalTagCount; i++) {
+        auto edcTwiceDerived = EDCTwiceDerivedToken::deriveFrom(
+            EDCDerivedFromDataTokenAndContentionFactor(edcDerivedTokens[i]));
+        tags.push_back(EDCServerCollection::generateTag(edcTwiceDerived, textPayload.counts[i]));
     }
     return tags;
 }

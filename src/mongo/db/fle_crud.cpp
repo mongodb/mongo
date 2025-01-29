@@ -789,6 +789,13 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
 
 namespace {
 
+template <class T>
+FLEEdgePrfBlock toFLEEdgePrfBlock(const T& ts) {
+    FLEEdgePrfBlock blk;
+    blk.esc = ts.getEscDerivedToken().asPrfBlock();
+    return blk;
+}
+
 void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
                               const NamespaceString& edcNss,
                               std::vector<EDCServerPayloadInfo>& serverPayload,
@@ -802,7 +809,7 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
     const NamespaceString nssEsc =
         NamespaceStringUtil::deserialize(edcNss.dbName(), efc.getEscCollection().value());
 
-    uint32_t totalTokens = 0;
+    size_t totalTokens = 0;
 
     std::vector<std::vector<FLEEdgePrfBlock>> tokensSets;
     tokensSets.reserve(serverPayload.size());
@@ -813,29 +820,43 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
         if (payload.isRangePayload()) {
             const auto& edgeTokenSet = payload.payload.getEdgeTokenSet().get();
 
-            std::vector<FLEEdgePrfBlock> tokens;
+            tokensSets.push_back({});
+            auto& tokens = tokensSets.back();
             tokens.reserve(edgeTokenSet.size());
 
             for (const auto& et : edgeTokenSet) {
-                FLEEdgePrfBlock block;
-                block.esc = et.getEscDerivedToken().asPrfBlock();
-                tokens.push_back(block);
-                totalTokens++;
+                tokens.emplace_back(toFLEEdgePrfBlock(et));
             }
-
-            tokensSets.emplace_back(tokens);
+            totalTokens += edgeTokenSet.size();
         } else if (payload.isTextSearchPayload()) {
             uassert(9783803,
                     "Cannot insert an encrypted field with text search query type unless "
                     "featureFlagQETextSearchPreview is enabled",
                     gFeatureFlagQETextSearchPreview.isEnabledUseLastLTSFCVWhenUninitialized(
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-            // TODO: SERVER-97841 implement text search inserts
-            uasserted(9783804, "Cannot insert an encrypted field with text search query yet");
+
+            const auto& tsts = payload.payload.getTextSearchTokenSets().get();
+
+            tokensSets.push_back({});
+            auto& tokens = tokensSets.back();
+            size_t tokenCount = payload.getTotalTextSearchTokenSetCount();
+            tokens.reserve(tokenCount);
+
+            // The order of appending tokens below is important
+            tokens.emplace_back(toFLEEdgePrfBlock(tsts.getExactTokenSet()));
+            for (const auto& ts : tsts.getSubstringTokenSets()) {
+                tokens.emplace_back(toFLEEdgePrfBlock(ts));
+            }
+            for (const auto& ts : tsts.getSuffixTokenSets()) {
+                tokens.emplace_back(toFLEEdgePrfBlock(ts));
+            }
+            for (const auto& ts : tsts.getPrefixTokenSets()) {
+                tokens.emplace_back(toFLEEdgePrfBlock(ts));
+            }
+            dassert(tokens.size() == tokenCount);
+            totalTokens += tokenCount;
         } else {
-            FLEEdgePrfBlock block;
-            block.esc = payload.payload.getEscDerivedToken().asPrfBlock();
-            tokensSets.push_back({block});
+            tokensSets.push_back({toFLEEdgePrfBlock(payload.payload)});
             totalTokens++;
         }
     }
@@ -857,6 +878,8 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
                 "Mismatch in the number of expected counts for a token",
                 countInfos.size() == tokensSets[i].size());
 
+        // each countInfo is returned from getTags with the "count" resulting from emuBinary,
+        // the "tagTokenData" which is the "tag" token derived from the ESC data & cf token,
         for (auto const& countInfo : countInfos) {
             serverPayload[i].counts.push_back(countInfo.count);
 
@@ -875,13 +898,28 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
     ecocDocuments.reserve(totalTokens);
 
     for (auto& payload : serverPayload) {
-        const bool isRangePayload = payload.payload.getEdgeTokenSet().has_value();
-        if (isRangePayload) {
+        if (payload.isRangePayload()) {
             const auto& edgeTokenSet = payload.payload.getEdgeTokenSet().get();
 
             for (const auto& et : edgeTokenSet) {
                 ecocDocuments.push_back(
                     et.getEncryptedTokens().generateDocument(payload.fieldPathName));
+            }
+        } else if (payload.isTextSearchPayload()) {
+            const auto& tsts = payload.payload.getTextSearchTokenSets().get();
+            ecocDocuments.push_back(tsts.getExactTokenSet().getEncryptedTokens().generateDocument(
+                payload.fieldPathName));
+            for (const auto& ts : tsts.getSubstringTokenSets()) {
+                ecocDocuments.push_back(
+                    ts.getEncryptedTokens().generateDocument(payload.fieldPathName));
+            }
+            for (const auto& ts : tsts.getSuffixTokenSets()) {
+                ecocDocuments.push_back(
+                    ts.getEncryptedTokens().generateDocument(payload.fieldPathName));
+            }
+            for (const auto& ts : tsts.getPrefixTokenSets()) {
+                ecocDocuments.push_back(
+                    ts.getEncryptedTokens().generateDocument(payload.fieldPathName));
             }
         } else {
             ecocDocuments.push_back(

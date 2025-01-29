@@ -118,8 +118,6 @@ mongocrypt_t *mongocrypt_new(void) {
     crypt->status = mongocrypt_status_new();
     _mongocrypt_opts_init(&crypt->opts);
     _mongocrypt_log_init(&crypt->log);
-    // Default to using FLEv2 (aka QEv2)
-    crypt->opts.use_fle2_v2 = true;
     crypt->ctx_counter = 1;
     crypt->cache_oauth = mc_mapof_kmsid_to_token_new();
     crypt->csfle = (_mongo_crypt_v1_vtable){.okay = false};
@@ -147,13 +145,6 @@ mongocrypt_t *mongocrypt_new(void) {
             return false;                                                                                              \
         }                                                                                                              \
     }
-
-bool mongocrypt_setopt_fle2v2(mongocrypt_t *crypt, bool enable) {
-    ASSERT_MONGOCRYPT_PARAM_UNINIT(crypt);
-
-    crypt->opts.use_fle2_v2 = enable;
-    return true;
-}
 
 bool mongocrypt_setopt_use_range_v2(mongocrypt_t *crypt) {
     ASSERT_MONGOCRYPT_PARAM_UNINIT(crypt);

@@ -119,6 +119,61 @@ bool mc_FLE2RangeInsertSpec_parse(mc_FLE2RangeInsertSpec_t *out,
                                   bool use_range_v2,
                                   mongocrypt_status_t *status);
 
+// Note: For the substring/suffix/prefix insert specs, all lengths are in terms of number of UTF-8 codepoints, not
+// number of bytes.
+typedef struct {
+    // mlen is the max string length that can be indexed.
+    uint32_t mlen;
+    // lb is the lower bound on the length of substrings to be indexed.
+    uint32_t lb;
+    // ub is the upper bound on the length of substrings to be indexed.
+    uint32_t ub;
+} mc_FLE2SubstringInsertSpec_t;
+
+typedef struct {
+    // lb is the lower bound on the length of suffixes to be indexed.
+    uint32_t lb;
+    // ub is the upper bound on the length of suffixes to be indexed.
+    uint32_t ub;
+} mc_FLE2SuffixInsertSpec_t;
+
+typedef struct {
+    // lb is the lower bound on the length of prefixes to be indexed.
+    uint32_t lb;
+    // ub is the upper bound on the length of prefixes to be indexed.
+    uint32_t ub;
+} mc_FLE2PrefixInsertSpec_t;
+
+typedef struct {
+    // v is the value to encrypt.
+    const char *v;
+    // len is the byte length of v.
+    uint32_t len;
+
+    // substr is the spec for substring indexing.
+    struct {
+        mc_FLE2SubstringInsertSpec_t value;
+        bool set;
+    } substr;
+
+    // suffix is the spec for suffix indexing.
+    struct {
+        mc_FLE2SuffixInsertSpec_t value;
+        bool set;
+    } suffix;
+
+    // prefix is the spec for prefix indexing.
+    struct {
+        mc_FLE2PrefixInsertSpec_t value;
+        bool set;
+    } prefix;
+
+    // casef indicates if case folding is enabled.
+    bool casef;
+    // diacf indicates if diacritic folding is enabled.
+    bool diacf;
+} mc_FLE2TextSearchInsertSpec_t;
+
 /** FLE2EncryptionPlaceholder implements Encryption BinData (subtype 6)
  * sub-subtype 0, the intent-to-encrypt mapping. Contains a value to encrypt and
  * a description of how it should be encrypted.

@@ -540,6 +540,16 @@ bool _mongocrypt_buffer_from_string(_mongocrypt_buffer_t *buf, const char *str) 
     return true;
 }
 
+void _mongocrypt_buffer_from_data(_mongocrypt_buffer_t *buf, const uint8_t *data, uint32_t len) {
+    BSON_ASSERT_PARAM(buf);
+    BSON_ASSERT_PARAM(data);
+
+    _mongocrypt_buffer_init(buf);
+    buf->data = (uint8_t *)data;
+    buf->len = len;
+    buf->owned = false;
+}
+
 void _mongocrypt_buffer_copy_from_uint64_le(_mongocrypt_buffer_t *buf, uint64_t value) {
     uint64_t value_le = MONGOCRYPT_UINT64_TO_LE(value);
 

@@ -79,6 +79,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
 #include "mongo/shell/kms_gen.h"
@@ -221,6 +222,13 @@ int32_t getTestSeed() {
     return rnd->nextInt32();
 }
 
+enum TextSearchTypeFlags : std::uint32_t {
+    INDEX_NONE = 0,
+    INDEX_SUBSTRING = 1 << 0,
+    INDEX_SUFFIX = 1 << 1,
+    INDEX_PREFIX = 1 << 2,
+};
+
 class FleCrudTest : public ServiceContextMongoDTest {
 protected:
     void setUp() override;
@@ -237,7 +245,8 @@ protected:
     void doSingleInsert(int id,
                         BSONElement element,
                         Fle2AlgorithmInt alg,
-                        bool bypassDocumentValidation = false);
+                        bool bypassDocumentValidation = false,
+                        TextSearchTypeFlags textIndexType = TextSearchTypeFlags::INDEX_NONE);
     void doSingleInsert(int id, BSONObj obj, bool bypassDocumentValidation = false);
 
     void doSingleInsertWithContention(
@@ -268,6 +277,8 @@ protected:
     ESCTwiceDerivedTagToken getTestESCToken(BSONElement value);
     ESCTwiceDerivedTagToken getTestESCToken(BSONObj obj);
     ESCTwiceDerivedTagToken getTestESCToken(StringData name, StringData value);
+
+    ESCTwiceDerivedTagToken getTestESCTokenForTextSearch(BSONElement value, QueryTypeEnum type);
 
     void assertECOCDocumentCountByField(StringData fieldName, uint64_t expect);
 
@@ -389,6 +400,34 @@ ESCTwiceDerivedTagToken FleCrudTest::getTestESCToken(StringData name, StringData
     return ESCTwiceDerivedTagToken::deriveFrom(escContentionToken);
 }
 
+ESCTwiceDerivedTagToken FleCrudTest::getTestESCTokenForTextSearch(BSONElement element,
+                                                                  QueryTypeEnum type) {
+    auto c1token = CollectionsLevel1Token::deriveFrom(_keyVault.getIndexKeyById(indexKeyId).key);
+    auto escToken = ESCToken::deriveFrom(c1token);
+
+    PrfBlock escDataTokenBlk;
+
+    if (type == QueryTypeEnum::SubstringPreview) {
+        auto escTextToken = ESCTextSubstringToken::deriveFrom(escToken);
+        escDataTokenBlk = ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+                              escTextToken, toCDR(element), 0)
+                              .asPrfBlock();
+    } else if (type == QueryTypeEnum::SuffixPreview) {
+        auto escTextToken = ESCTextSuffixToken::deriveFrom(escToken);
+        escDataTokenBlk = ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+                              escTextToken, toCDR(element), 0)
+                              .asPrfBlock();
+    } else {
+        invariant(type == QueryTypeEnum::PrefixPreview);
+        auto escTextToken = ESCTextPrefixToken::deriveFrom(escToken);
+        escDataTokenBlk = ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+                              escTextToken, toCDR(element), 0)
+                              .asPrfBlock();
+    }
+    return ESCTwiceDerivedTagToken::deriveFrom(
+        ESCDerivedFromDataTokenAndContentionFactorToken{escDataTokenBlk});
+}
+
 void FleCrudTest::assertECOCDocumentCountByField(StringData fieldName, uint64_t expect) {
     auto query = BSON(EcocDocument::kFieldNameFieldName << fieldName);
     auto results = _queryImpl->findDocuments(_ecocNs, query);
@@ -415,7 +454,8 @@ std::vector<char> FleCrudTest::generatePlaceholder(UUID keyId, BSONElement value
 }
 
 EncryptedFieldConfig getTestEncryptedFieldConfig(
-    Fle2AlgorithmInt alg = Fle2AlgorithmInt::kEquality) {
+    Fle2AlgorithmInt alg = Fle2AlgorithmInt::kEquality,
+    TextSearchTypeFlags textIndexTypes = TextSearchTypeFlags::INDEX_NONE) {
 
     constexpr auto schemaV2 = R"({
     "escCollection": "enxcol_.coll.esc",
@@ -453,8 +493,83 @@ EncryptedFieldConfig getTestEncryptedFieldConfig(
     ]
 })";
 
+    constexpr auto textSearchSchema = R"({
+        "escCollection": "enxcol_.coll.esc",
+        "ecocCollection": "enxcol_.coll.ecoc",
+        "fields": [
+            {
+                "keyId": { "$uuid": "12345678-1234-9876-1234-123456789012" },
+                "path": "encrypted",
+                "bsonType": "string",
+                "queries": [ $SUBSTR $DELIM1 $SUFFIX $DELIM2 $PREFIX ]
+            }
+        ]
+    })";
+
+    constexpr auto textSearchSubstringSpec = R"({
+        "queryType": "substringPreview",
+        "strMaxLength": 1000,
+        "strMaxQueryLength": 100,
+        "strMinQueryLength": 10,
+        "caseSensitive": true,
+        "diacriticSensitive": true
+    })";
+    constexpr auto textSearchSuffixSpec = R"({
+        "queryType": "suffixPreview",
+        "strMaxQueryLength": 100,
+        "strMinQueryLength": 10,
+        "caseSensitive": true,
+        "diacriticSensitive": true
+    })";
+    constexpr auto textSearchPrefixSpec = R"({
+        "queryType": "prefixPreview",
+        "strMaxQueryLength": 100,
+        "strMinQueryLength": 10,
+        "caseSensitive": true,
+        "diacriticSensitive": true
+    })";
+
     if (alg == Fle2AlgorithmInt::kEquality) {
         return EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(schemaV2));
+    } else if (alg == Fle2AlgorithmInt::kTextSearch) {
+        auto replaceOrClear =
+            [](std::string& str, StringData key, StringData replacement, bool replaceCondition) {
+                size_t pos = 0;
+                if ((pos = str.find(key.data())) != std::string::npos) {
+                    if (replaceCondition) {
+                        str.replace(pos, key.length(), replacement.data());
+                    } else {
+                        str.replace(pos, key.length(), "");
+                    }
+                }
+            };
+
+        std::string json{textSearchSchema};
+        replaceOrClear(json,
+                       "$SUBSTR",
+                       textSearchSubstringSpec,
+                       (textIndexTypes & TextSearchTypeFlags::INDEX_SUBSTRING));
+        replaceOrClear(json,
+                       "$SUFFIX",
+                       textSearchSuffixSpec,
+                       (textIndexTypes & TextSearchTypeFlags::INDEX_SUFFIX));
+        replaceOrClear(json,
+                       "$PREFIX",
+                       textSearchPrefixSpec,
+                       (textIndexTypes & TextSearchTypeFlags::INDEX_PREFIX));
+        replaceOrClear(
+            json,
+            "$DELIM1",
+            ",",
+            (textIndexTypes & TextSearchTypeFlags::INDEX_SUBSTRING) &&
+                (textIndexTypes &
+                 (TextSearchTypeFlags::INDEX_SUFFIX | TextSearchTypeFlags::INDEX_PREFIX)));
+        replaceOrClear(json,
+                       "$DELIM2",
+                       ",",
+                       (textIndexTypes & TextSearchTypeFlags::INDEX_PREFIX) &&
+                           (textIndexTypes & TextSearchTypeFlags::INDEX_SUFFIX));
+        return EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(json));
     }
     return EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(rangeSchemaV2));
 }
@@ -551,10 +666,35 @@ BSONObj generateFLE2RangeInsertSpec(BSONElement value) {
     return specDoc;
 }
 
+BSONObj generateFLE2TextSearchInsertSpec(BSONElement value, TextSearchTypeFlags indexTypes) {
+    FLE2TextSearchInsertSpec spec;
+
+    spec.setValue(value.String());
+    spec.setCaseFold(false);
+    spec.setDiacriticFold(false);
+    const uint32_t mlen = 1000, max = 100, min = 10;
+    if (indexTypes & TextSearchTypeFlags::INDEX_SUBSTRING) {
+        spec.setSubstringSpec(FLE2SubstringInsertSpec(mlen, max, min));
+    }
+    if (indexTypes & TextSearchTypeFlags::INDEX_SUFFIX) {
+        spec.setSuffixSpec(FLE2SuffixInsertSpec(max, min));
+    }
+    if (indexTypes & TextSearchTypeFlags::INDEX_PREFIX) {
+        spec.setPrefixSpec(FLE2PrefixInsertSpec(max, min));
+    }
+
+    auto specDoc = BSON("s" << spec.toBSON());
+
+    return specDoc;
+}
+
 // Use different keys for index and user
-std::vector<char> generateSinglePlaceholder(BSONElement value,
-                                            Fle2AlgorithmInt alg = Fle2AlgorithmInt::kEquality,
-                                            int64_t cm = 0) {
+std::vector<char> generateSinglePlaceholder(
+    BSONElement value,
+    Fle2AlgorithmInt alg = Fle2AlgorithmInt::kEquality,
+    int64_t cm = 0,
+    TextSearchTypeFlags textIndexTypes = TextSearchTypeFlags::INDEX_NONE) {
+
     FLE2EncryptionPlaceholder ep;
     ep.setAlgorithm(alg);
     ep.setUserKeyId(userKeyId);
@@ -567,6 +707,9 @@ std::vector<char> generateSinglePlaceholder(BSONElement value,
         temp = generateFLE2RangeInsertSpec(value);
         ep.setValue(temp.firstElement());
         ep.setSparsity(1);
+    } else if (alg == Fle2AlgorithmInt::kTextSearch) {
+        temp = generateFLE2TextSearchInsertSpec(value, textIndexTypes);
+        ep.setValue(temp.firstElement());
     } else {
         ep.setValue(value);
     }
@@ -594,8 +737,10 @@ void FleCrudTest::testValidateTags(BSONObj obj) {
 void FleCrudTest::doSingleInsert(int id,
                                  BSONElement element,
                                  Fle2AlgorithmInt alg,
-                                 bool bypassDocumentValidation) {
-    auto buf = generateSinglePlaceholder(element, alg);
+                                 bool bypassDocumentValidation,
+                                 TextSearchTypeFlags textIndexTypes) {
+
+    auto buf = generateSinglePlaceholder(element, alg, 0 /*contention max*/, textIndexTypes);
     BSONObjBuilder builder;
     builder.append("_id", id);
     builder.append("counter", 1);
@@ -608,7 +753,7 @@ void FleCrudTest::doSingleInsert(int id,
 
     auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(result);
 
-    auto efc = getTestEncryptedFieldConfig(alg);
+    auto efc = getTestEncryptedFieldConfig(alg, textIndexTypes);
 
     uassertStatusOK(processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, result, false));
 }
@@ -805,6 +950,65 @@ TEST_F(FleCrudTest, InsertOneRange) {
     doSingleInsert(1, element, Fle2AlgorithmInt::kRange);
     assertDocumentCounts(1, 5, 5);
     assertECOCDocumentCountByField("encrypted", 5);
+}
+
+TEST_F(FleCrudTest, InsertOneTextSearch) {
+    RAIIServerParameterControllerForTest ffctrl("featureFlagQETextSearchPreview", true);
+
+    auto doc = BSON("encrypted"
+                    << "demonstration");
+    auto element = doc.firstElement();
+
+    // insert element as substring-indexed
+    doSingleInsert(
+        1, element, Fle2AlgorithmInt::kTextSearch, false, TextSearchTypeFlags::INDEX_SUBSTRING);
+
+    assertDocumentCounts(1, 2, 2);
+    assertECOCDocumentCountByField("encrypted", 2);
+    ASSERT_FALSE(
+        _queryImpl
+            ->getById(
+                _escNs,
+                ESCCollection::generateNonAnchorId(
+                    getTestESCTokenForTextSearch(element, QueryTypeEnum::SubstringPreview), 1))
+            .isEmpty());
+
+    // insert element as suffix-indexed
+    doSingleInsert(
+        2, element, Fle2AlgorithmInt::kTextSearch, false, TextSearchTypeFlags::INDEX_SUFFIX);
+
+    assertDocumentCounts(2, 4, 4);
+    assertECOCDocumentCountByField("encrypted", 4);
+    ASSERT_FALSE(
+        _queryImpl
+            ->getById(_escNs,
+                      ESCCollection::generateNonAnchorId(
+                          getTestESCTokenForTextSearch(element, QueryTypeEnum::SuffixPreview), 1))
+            .isEmpty());
+
+    // insert element as prefix-indexed
+    doSingleInsert(
+        3, element, Fle2AlgorithmInt::kTextSearch, false, TextSearchTypeFlags::INDEX_PREFIX);
+
+    assertDocumentCounts(3, 6, 6);
+    assertECOCDocumentCountByField("encrypted", 6);
+    ASSERT_FALSE(
+        _queryImpl
+            ->getById(_escNs,
+                      ESCCollection::generateNonAnchorId(
+                          getTestESCTokenForTextSearch(element, QueryTypeEnum::PrefixPreview), 1))
+            .isEmpty());
+
+    // insert element as suffix+prefix-indexed
+    doSingleInsert(4,
+                   element,
+                   Fle2AlgorithmInt::kTextSearch,
+                   false,
+                   static_cast<TextSearchTypeFlags>(TextSearchTypeFlags::INDEX_SUFFIX |
+                                                    TextSearchTypeFlags::INDEX_PREFIX));
+
+    assertDocumentCounts(4, 9, 9);
+    assertECOCDocumentCountByField("encrypted", 9);
 }
 
 // Insert two documents with same values

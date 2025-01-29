@@ -70,6 +70,7 @@ enums:
           kFLE2EqualityIndexedValueV2: 14
           kFLE2RangeIndexedValueV2: 15
           kFLE2UnindexedEncryptedValueV2: 16
+          kFLE2TextIndexedValue: 17
 
     FleVersion:
         description: "The version / type of field-level encryption in use."

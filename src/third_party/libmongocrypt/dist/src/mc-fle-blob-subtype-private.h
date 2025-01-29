@@ -42,7 +42,10 @@ typedef enum {
     MC_SUBTYPE_FLE2FindRangePayloadV2 = 13,
     MC_SUBTYPE_FLE2IndexedEqualityEncryptedValueV2 = 14,
     MC_SUBTYPE_FLE2IndexedRangeEncryptedValueV2 = 15,
-    MC_SUBTYPE_FLE2UnindexedEncryptedValueV2 = 16
+    MC_SUBTYPE_FLE2UnindexedEncryptedValueV2 = 16,
+
+    /* Text Search Subtypes */
+    MC_SUBTYPE_FLE2IndexedTextEncryptedValue = 17,
 } mc_fle_blob_subtype_t;
 
 #endif /* MC_FLE_BLOB_SUBTYPE_PRIVATE_H */

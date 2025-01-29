@@ -439,7 +439,8 @@ TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, MatchesOnlyFLE2ServerSubtypes) 
             i == static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValueV2) ||
             i == static_cast<uint8_t>(EncryptedBinDataType::kFLE2RangeIndexedValueV2) ||
             i == static_cast<uint8_t>(EncryptedBinDataType::kFLE2UnindexedEncryptedValue) ||
-            i == static_cast<uint8_t>(EncryptedBinDataType::kFLE2UnindexedEncryptedValueV2)) {
+            i == static_cast<uint8_t>(EncryptedBinDataType::kFLE2UnindexedEncryptedValueV2) ||
+            i == static_cast<uint8_t>(EncryptedBinDataType::kFLE2TextIndexedValue)) {
             ASSERT_TRUE(exec::matcher::matchesBSON(&expr, BSON("a" << binData)));
         } else {
             ASSERT_FALSE(exec::matcher::matchesBSON(&expr, BSON("a" << binData)));

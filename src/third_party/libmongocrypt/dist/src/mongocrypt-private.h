@@ -161,15 +161,4 @@ bool _mongocrypt_needs_credentials_for_provider(mongocrypt_t *crypt,
                                                 _mongocrypt_kms_provider_t provider,
                                                 const char *name);
 
-/**
- * Enable/disable the use of FLE2v2 payload types for write.
- *
- * @param[in] crypt The @ref mongocrypt_t object.
- * @param[in] enable Whether to enable use of FLE2v2 payloads.
- *
- * @returns A boolean indicating success. If false, an error status is set.
- * Retrieve it with @ref mongocrypt_status
- */
-bool mongocrypt_setopt_fle2v2(mongocrypt_t *crypt, bool enable);
-
 #endif /* MONGOCRYPT_PRIVATE_H */
