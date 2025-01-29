@@ -3,7 +3,9 @@
  * @tags: [
  *  assumes_balancer_off,
  *  does_not_support_stepdowns,
- *  uses_transactions
+ *  uses_transactions,
+ *  # This test performs explicit calls to shardCollection
+ *  assumes_unsharded_collection,
  * ]
  */
 import {

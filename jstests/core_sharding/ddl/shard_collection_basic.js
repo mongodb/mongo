@@ -1,5 +1,9 @@
 /**
  * Test shardCollection command behavior
+ * @tags: [
+ *  # This test performs explicit calls to shardCollection
+ *  assumes_unsharded_collection,
+ * ]
  */
 
 var kDbName = db.getName();

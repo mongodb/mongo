@@ -107,6 +107,7 @@ selector:
     - requires_capped
   roots:
     - jstests/core/**/*.js
+    - jstests/core_sharding/**/*.js
     - jstests/fle2/**/*.js
     - src/mongo/db/modules/*/jstests/fle2/**/*.js
 test_kind: js_test

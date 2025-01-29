@@ -4,6 +4,8 @@
  * @tags: [
  *   assumes_balancer_off,
  *   does_not_support_stepdowns,
+ *   # This test requires strict control over the tracking state of un/sharded collections.
+ *   assumes_unsharded_collection,
  *   requires_fcv_70,
  * ]
  */

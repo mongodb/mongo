@@ -6,6 +6,8 @@
  *  requires_2_or_more_shards,
  *  # movePrimary will fail if the destination shard steps down while cloning data.
  *  does_not_support_stepdowns,
+ *  # This test performs explicit calls to shardCollection
+ *  assumes_unsharded_collection,
  * ]
  */
 

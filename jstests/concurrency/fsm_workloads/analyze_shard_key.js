@@ -9,6 +9,8 @@
  *  resource_intensive,
  *  incompatible_with_concurrency_simultaneous,
  *  assumes_stable_shard_list,
+ *  # This test performs explicit calls to shardCollection
+ *  assumes_unsharded_collection,
  * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";

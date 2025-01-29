@@ -10,6 +10,8 @@
  *   # After succeeding, any subsequent attempt will fail
  *   # because the source namespace does not exist anymore.
  *   requires_non_retryable_commands,
+ *  # This test expects explicit control over the tracking state of unsharded collections
+ *  assumes_unsharded_collection,
  * ]
  */
 
