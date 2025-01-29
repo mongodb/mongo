@@ -368,29 +368,40 @@ std::vector<std::vector<RecordId>> scanIndexForDuplicates(OperationContext* opCt
     // in the format (Key, RID), and all RecordIDs are unique.
     auto indexCursor = accessMethod->newCursor(opCtx);
     boost::optional<KeyStringEntry> prevIndexEntry;
-    std::vector<std::vector<RecordId>> allDuplicateRecords;
-    std::vector<RecordId> recordsWithDuplicateKeys;
+    std::vector<std::vector<RecordId>> duplicateRecords;
+    std::vector<RecordId> curDuplicateRecords;
+    size_t duplicateRecordIdMemUsage{0};
+    size_t indexEntryCount{0};
 
-    size_t indexEntryCount = 0;
     Date_t lastLogTime = Date_t::now();
     for (auto indexEntry = indexCursor->nextKeyString(); indexEntry;
          indexEntry = indexCursor->nextKeyString()) {
         if (prevIndexEntry &&
             indexEntry->keyString.compareWithoutRecordId(prevIndexEntry->keyString,
                                                          indexEntry->loc.keyFormat()) == 0) {
-            if (recordsWithDuplicateKeys.empty()) {
-                recordsWithDuplicateKeys.push_back(std::move(prevIndexEntry->loc));
+            if (curDuplicateRecords.empty()) {
+                curDuplicateRecords.push_back(std::move(prevIndexEntry->loc));
+                duplicateRecordIdMemUsage += curDuplicateRecords.back().memUsage();
             }
-            recordsWithDuplicateKeys.push_back(std::move(indexEntry->loc));
+            curDuplicateRecords.push_back(std::move(indexEntry->loc));
+            duplicateRecordIdMemUsage += curDuplicateRecords.back().memUsage();
         } else {
-            if (!recordsWithDuplicateKeys.empty()) {
+            if (!curDuplicateRecords.empty()) {
                 // Adds the current group of violations with the same duplicate value.
-                allDuplicateRecords.push_back(std::move(recordsWithDuplicateKeys));
-                recordsWithDuplicateKeys.clear();
+                duplicateRecords.push_back(std::move(curDuplicateRecords));
+                curDuplicateRecords.clear();
             }
         }
         prevIndexEntry = indexEntry;
-        indexEntryCount += 1;
+        ++indexEntryCount;
+
+        // Return up to 16MB of RecordIds, to keep memory usage under control. Even a single
+        // duplicate RecordId causes the command to fail, but we try to return as many RecordIds as
+        // we safely can to help the user to diagnose the problem.
+        static constexpr int64_t kMaxDuplicateRecordIdMemUsage = BSONObjMaxUserSize;
+        if (duplicateRecordIdMemUsage >= kMaxDuplicateRecordIdMemUsage) {
+            break;
+        }
 
         // This was a rough heuristic that was found that 300 values with the index cursor would
         // take ~200 milliseconds with calling checkForInterrupt(). We made the checkForInterrupt()
@@ -407,20 +418,19 @@ std::vector<std::vector<RecordId>> scanIndexForDuplicates(OperationContext* opCt
             lastLogTime = now;
         }
     }
-    if (!recordsWithDuplicateKeys.empty()) {
-        allDuplicateRecords.push_back(std::move(recordsWithDuplicateKeys));
+    if (!curDuplicateRecords.empty()) {
+        duplicateRecords.push_back(std::move(curDuplicateRecords));
     }
-    return allDuplicateRecords;
+    return duplicateRecords;
 }
 
-Status buildConvertUniqueErrorStatus(
-    OperationContext* opCtx,
-    const Collection* collection,
-    const std::vector<std::vector<RecordId>>& allDuplicateRecords) {
+Status buildConvertUniqueErrorStatus(OperationContext* opCtx,
+                                     const Collection* collection,
+                                     const std::vector<std::vector<RecordId>>& duplicateRecords) {
     BSONArrayBuilder duplicateViolations;
     size_t violationsSize = 0;
 
-    for (const auto& recordsWithDuplicateKeys : allDuplicateRecords) {
+    for (const auto& recordsWithDuplicateKeys : duplicateRecords) {
         BSONArrayBuilder currViolatingIds;
         for (const auto& recordId : recordsWithDuplicateKeys) {
             auto doc = collection->docFor(opCtx, recordId).value();
