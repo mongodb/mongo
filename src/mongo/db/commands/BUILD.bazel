@@ -112,6 +112,15 @@ idl_generator(
 )
 
 idl_generator(
+    name = "shardsvr_resolve_view_command_gen",
+    src = "shardsvr_resolve_view_command.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
     name = "sessions_commands_gen",
     src = "sessions_commands.idl",
     deps = [
@@ -1104,6 +1113,7 @@ mongo_cc_library(
         "refresh_sessions_command.cpp",
         "rename_collection_common.cpp",
         "server_status_command.cpp",
+        "shardsvr_resolve_view_command.cpp",
         "shardsvr_run_search_index_command.cpp",
         "start_session_command.cpp",
         ":fle2_cleanup_gen",
@@ -1111,6 +1121,7 @@ mongo_cc_library(
         ":generic_gen",
         ":parameters_gen",
         ":sessions_commands_gen",
+        ":shardsvr_resolve_view_command_gen",
         ":shardsvr_run_search_index_command_gen",
     ],
     hdrs = [
@@ -1142,6 +1153,7 @@ mongo_cc_library(
         "//src/mongo/db/session:logical_session_id_helpers",
         "//src/mongo/db/stats:counters",
         "//src/mongo/db/transaction:transaction_api",
+        "//src/mongo/db/views:view_catalog_helpers",
         "//src/mongo/executor:async_multicaster",
         "//src/mongo/logv2:logv2_options",
         "//src/mongo/rpc:message",

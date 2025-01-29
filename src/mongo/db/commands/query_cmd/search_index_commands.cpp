@@ -47,48 +47,39 @@ namespace {
 template <typename CommandType>
 std::tuple<const UUID,
            const NamespaceString,
-           boost::optional<StringData>,
+           boost::optional<NamespaceString>,
            boost::optional<std::vector<BSONObj>>>
 retrieveCollectionUUIDAndResolveView(OperationContext* opCtx, CommandType& cmd) {
     const auto& currentOperationNss = cmd.getNamespace();
-    auto role = opCtx->getService()->role();
-    // TODO SERVER-93637 remove the separate logic for sharded vs unsharded once sharded
-    // views can support all search commands.
-    if (role.hasExclusively(ClusterRole::ShardServer)) {
-        // If the index management command is being run on a view, this call will return the
-        // underlying source collection UUID and ResolvedView. If not, it will just return a UUID.
-        auto collUUIDResolvedViewPair =
-            SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDAndResolveViewOrThrow(
-                opCtx, currentOperationNss);
-        // If the query is on a normal collection, the source collection will be the same as
-        // the current NS.
-        auto sourceCollectionNss = currentOperationNss;
-        boost::optional<StringData> viewNss;
-        auto collUUID = collUUIDResolvedViewPair.first;
-        boost::optional<std::vector<BSONObj>> viewPipeline;
-        if (auto resolvedView = collUUIDResolvedViewPair.second) {
-            uassert(ErrorCodes::QueryFeatureNotAllowed,
-                    "search index commands on views are not allowed in the current configuration. "
-                    "You may need to enable the "
-                    "correponding feature flag",
-                    feature_flags::gFeatureFlagMongotIndexedViews
-                        .isEnabledUseLatestFCVWhenUninitialized(
-                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-            // The request is on a view! Therefore, currentOperationNss refers to the view
-            // NS and the namespace on resolvedView refers to the underlying source collection.
-            sourceCollectionNss = resolvedView.value().getNamespace();
-            viewNss.emplace(currentOperationNss.coll());
-
-            viewPipeline.emplace(resolvedView.value().getPipeline());
-        }
-
-        return std::make_tuple(collUUID, sourceCollectionNss, viewNss, viewPipeline);
-    } else if (role.hasExclusively(ClusterRole::RouterServer)) {
-        auto collectionUUID = SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDOrThrow(
+    // If the index management command is being run on a view, this call will return the
+    // underlying source collection UUID and ResolvedView. If not, it will just return a UUID.
+    auto collUUIDResolvedViewPair =
+        SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDAndResolveViewOrThrow(
             opCtx, currentOperationNss);
-        // Run the search index command against the remote search index management server.
-        return std::make_tuple(collectionUUID, currentOperationNss, boost::none, boost::none);
+    // If the query is on a normal collection, the source collection will be the same as
+    // the current NS.
+    auto sourceCollectionNss = currentOperationNss;
+    boost::optional<NamespaceString> viewNss;
+    auto collUUID = collUUIDResolvedViewPair.first;
+    boost::optional<std::vector<BSONObj>> viewPipeline;
+    if (auto resolvedView = collUUIDResolvedViewPair.second) {
+        uassert(
+            ErrorCodes::QueryFeatureNotAllowed,
+            "search index commands on views are not allowed in the current configuration. "
+            "You may need to enable the "
+            "correponding feature flag",
+            feature_flags::gFeatureFlagMongotIndexedViews.isEnabledUseLatestFCVWhenUninitialized(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+        // The request is on a view! Therefore, currentOperationNss refers to the view
+        // NS and the namespace on resolvedView refers to the underlying source collection.
+        sourceCollectionNss = resolvedView.value().getNamespace();
+        viewNss.emplace(currentOperationNss);
+
+        viewPipeline.emplace(resolvedView.value().getPipeline());
     }
+
+    return std::make_tuple(collUUID, sourceCollectionNss, viewNss, viewPipeline);
+
     MONGO_UNREACHABLE;
 }
 
@@ -98,7 +89,7 @@ BSONObj retrieveSearchIndexManagerResponseHelper(OperationContext* opCtx, Comman
         retrieveCollectionUUIDAndResolveView(opCtx, cmd);
 
     search_index_testing_helper::_replicateSearchIndexCommandOnAllMongodsForTesting(
-        opCtx, resolvedNss, cmd.toBSON(), viewName);
+        opCtx, resolvedNss, cmd.toBSON(), viewName, viewPipeline);
 
     // Run the search index command against the remote search index management server.
     return getSearchIndexManagerResponse(
@@ -435,13 +426,8 @@ public:
                     "Cannot set both 'name' and 'id'.",
                     !(cmd.getName() && cmd.getId()));
 
-            const auto& nss = cmd.getNamespace();
-
-            auto collectionUUID =
-                SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDOrThrow(opCtx, nss);
-
             BSONObj manageSearchIndexResponse =
-                getSearchIndexManagerResponse(opCtx, nss, collectionUUID, cmd.toBSON());
+                retrieveSearchIndexManagerResponseHelper(opCtx, cmd);
 
             IDLParserContext ctx("ListSearchIndexesReply Parser");
             return ListSearchIndexesReply::parseOwned(ctx, std::move(manageSearchIndexResponse));

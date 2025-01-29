@@ -46,24 +46,10 @@ ServiceContext::ConstructorActionRegisterer SearchIndexProcessShardImplementatio
         }
     }};
 
-boost::optional<UUID> SearchIndexProcessShard::fetchCollectionUUID(OperationContext* opCtx,
-                                                                   const NamespaceString& nss) {
-    return CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, nss);
-}
-
-UUID SearchIndexProcessShard::fetchCollectionUUIDOrThrow(OperationContext* opCtx,
-                                                         const NamespaceString& nss) {
-    auto optUuid = fetchCollectionUUID(opCtx, nss);
-    uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Collection '" << nss.toStringForErrorMsg() << "' does not exist.",
-            optUuid);
-    return optUuid.get();
-}
 
 std::pair<boost::optional<UUID>, boost::optional<ResolvedView>>
 SearchIndexProcessShard::fetchCollectionUUIDAndResolveView(OperationContext* opCtx,
                                                            const NamespaceString& nss) {
-
     auto catalog = CollectionCatalog::get(opCtx);
     auto view = catalog->lookupView(opCtx, nss);
     if (!view) {

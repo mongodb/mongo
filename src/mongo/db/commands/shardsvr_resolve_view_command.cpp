@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include <boost/optional/optional.hpp>
 #include <memory>
 #include <string>
 
@@ -37,16 +38,16 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/shardsvr_run_search_index_command_gen.h"
+#include "mongo/db/commands/shardsvr_resolve_view_command_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/search/search_index_common.h"
-#include "mongo/db/query/search/search_index_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
@@ -54,18 +55,14 @@
 namespace mongo {
 namespace {
 
-/**
- * Test-only command for issueing search index commands on a shard (with optional view). Called from
- * search_index_testing_helper exclusively by routers.
- *
- * Requires the 'enableTestCommands' server parameter to be set. See docs/test_commands.md.
- *
- */
-class ShardSvrRunSearchIndexCommand : public TypedCommand<ShardSvrRunSearchIndexCommand> {
+
+class ShardSvrResolveViewCommand : public TypedCommand<ShardSvrResolveViewCommand> {
 public:
-    using Request = ShardsvrRunSearchIndex;
+    using Request = ShardsvrResolveView;
+    using Response = ShardsvrResolveViewReply;
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
+        return AllowedOnSecondary::kNever;
     }
 
     std::string help() const override {
@@ -82,33 +79,19 @@ public:
     public:
         using InvocationBase::InvocationBase;
 
-        void typedRun(OperationContext* opCtx) {
+        Response typedRun(OperationContext* opCtx) {
             auto cmd = request();
-            generic_argument_util::prepareRequestForSearchIndexManagerPassthrough(cmd);
-
-            // TODO SERVER-98535 remove and replace with better way to identify if mongot mock is
-            // running.
-            if (globalSearchIndexParams.host.empty()) {
-                return;
-            }
-
-            auto alreadyInformedMongot = cmd.getMongotAlreadyInformed();
-            if (globalSearchIndexParams.host == alreadyInformedMongot) {
-                // This mongod shares its mongot with a mongos that originally received the user's
-                // search index command. We therefore can return early as this mongod's mongot has
-                // already been issued the search index command.
-                return;
-            }
-
+            auto nss = cmd.getNss();
             auto catalog = CollectionCatalog::get(opCtx);
-            auto resolvedNamespace = cmd.getResolvedNss();
+            auto resolvedView = uassertStatusOK(
+                view_catalog_helpers::resolveView(opCtx, catalog, nss, boost::none));
+            Response res;
+            res.setResolvedView(resolvedView);
+            if (auto uuid = catalog->lookupUUIDByNSS(opCtx, resolvedView.getNamespace())) {
+                res.setCollectionUUID(catalog->lookupUUIDByNSS(opCtx, resolvedView.getNamespace()));
+            }
 
-            BSONObj manageSearchIndexResponse =
-                getSearchIndexManagerResponse(opCtx,
-                                              resolvedNamespace,
-                                              *catalog->lookupUUIDByNSS(opCtx, resolvedNamespace),
-                                              cmd.getUserCmd(),
-                                              cmd.getViewName());
+            return res;
         }
 
     private:
@@ -116,15 +99,22 @@ public:
             return false;
         }
 
-        // No auth needed because a test-only command it exclusively enabled via command line.
-        void doCheckAuthorization(OperationContext* opCtx) const override {}
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
+        }
 
         NamespaceString ns() const override {
             return NamespaceString(request().getDbName());
         }
     };
 };
-MONGO_REGISTER_COMMAND(ShardSvrRunSearchIndexCommand).testOnly().forShard();
+MONGO_REGISTER_COMMAND(ShardSvrResolveViewCommand).forShard();
 
 }  // namespace
 

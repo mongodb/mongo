@@ -104,23 +104,17 @@ DocumentSource::GetNextResult DocumentSourceListSearchIndexes::doGetNext() {
     // helper functions to retrieve the collectionUUID from either mongos or mongod depending on
     // where the request was sent, so we call those functions here.
     if (!_collectionUUID) {
-        // TODO SERVER-93637 remove the separate logic for sharded vs unsharded once sharded
-        // views can support all search commands.
-        if (pExpCtx->getMongoProcessInterface()->inShardedEnvironment(opCtx)) {
-            _collectionUUID = SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUID(
-                opCtx, pExpCtx->getNamespaceString());
-        } else {
-            // If the query is on a view, this call will return the
-            // underlying source collection UUID and ResolvedView. If not, it will just return a
-            // UUID.
-            boost::optional<ResolvedView> resolvedView;
-            std::tie(_collectionUUID, resolvedView) =
-                SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDAndResolveView(
-                    opCtx, pExpCtx->getNamespaceString());
 
-            if (resolvedView) {
-                _resolvedNamespace = resolvedView.value().getNamespace();
-            }
+        // If the query is on a view, this call will return the
+        // underlying source collection UUID and ResolvedView. If not, it will just return a
+        // UUID.
+        boost::optional<ResolvedView> resolvedView;
+        std::tie(_collectionUUID, resolvedView) =
+            SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDAndResolveView(
+                opCtx, pExpCtx->getNamespaceString());
+
+        if (resolvedView) {
+            _resolvedNamespace = resolvedView.value().getNamespace();
         }
     }
 
@@ -139,7 +133,6 @@ DocumentSource::GetNextResult DocumentSourceListSearchIndexes::doGetNext() {
     if (_searchIndexes.empty()) {
         BSONObjBuilder bob;
         bob.append(kStageName, _cmdObj);
-
         // Sends a manageSearchIndex command and returns a cursor with index information.
         BSONObj manageSearchIndexResponse = runSearchIndexCommand(
             opCtx,

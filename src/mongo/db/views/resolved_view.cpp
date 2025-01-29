@@ -161,6 +161,18 @@ std::shared_ptr<const ErrorExtraInfo> ResolvedView::parse(const BSONObj& cmdRepl
     return std::make_shared<ResolvedView>(fromBSON(cmdReply));
 }
 
+
+ResolvedView ResolvedView::parseFromBSON(const BSONElement& elem) {
+    uassert(936370, "resolvedView must be an object", elem.type() == BSONType::Object);
+    BSONObjBuilder localBuilder;
+    localBuilder.append("resolvedView", elem.Obj());
+    return fromBSON(localBuilder.done());
+}
+
+void ResolvedView::serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+    serialize(builder);
+}
+
 void ResolvedView::handleTimeseriesRewrites(std::vector<BSONObj>* resolvedPipeline) const {
     // Stages that are constrained to be the first stage of the pipeline ($collStats, $indexStats)
     // require special handling since $_internalUnpackBucket is the first stage.

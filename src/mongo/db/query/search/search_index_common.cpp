@@ -47,7 +47,7 @@ executor::RemoteCommandRequest createManageSearchIndexRemoteCommandRequest(
     const NamespaceString& nss,
     const UUID& uuid,
     const BSONObj& userCmd,
-    boost::optional<StringData> viewName = boost::none,
+    boost::optional<NamespaceString> viewName = boost::none,
     boost::optional<std::vector<BSONObj>> viewPipeline = boost::none) {
     // Fetch the search index management host and port.
     invariant(!globalSearchIndexParams.host.empty());
@@ -67,7 +67,7 @@ executor::RemoteCommandRequest createManageSearchIndexRemoteCommandRequest(
         // it.
         // TODO SERVER-98368: remove this line as the view name is passed through the `view` object
         // below.
-        manageSearchIndexRequest.setViewName(viewName);
+        manageSearchIndexRequest.setViewName(viewName->coll());
 
         SearchIndexRequestView view;
         // TODO SERVER-98368: get the name directly from `viewName` as it's no longer set on
@@ -82,7 +82,6 @@ executor::RemoteCommandRequest createManageSearchIndexRemoteCommandRequest(
 
         manageSearchIndexRequest.setView(view);
     }
-
     // Create a RemoteCommandRequest with the request and host-and-port.
     executor::RemoteCommandRequest remoteManageSearchIndexRequest(executor::RemoteCommandRequest(
         swHostAndPort.getValue(), nss.dbName(), manageSearchIndexRequest.toBSON(), opCtx));
@@ -95,7 +94,7 @@ BSONObj getSearchIndexManagerResponse(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       const UUID& uuid,
                                       const BSONObj& userCmd,
-                                      boost::optional<StringData> viewName,
+                                      boost::optional<NamespaceString> viewName,
                                       boost::optional<std::vector<BSONObj>> viewPipeline) {
     // Create the RemoteCommandRequest.
     auto request = createManageSearchIndexRemoteCommandRequest(
@@ -160,12 +159,8 @@ BSONObj runSearchIndexCommand(OperationContext* opCtx,
                               boost::optional<NamespaceString> viewNss) {
     throwIfNotRunningWithRemoteSearchIndexManagement();
 
-    BSONObj manageSearchIndexResponse = getSearchIndexManagerResponse(
-        opCtx,
-        nss,
-        collUUID,
-        cmdObj,
-        viewNss ? boost::make_optional(viewNss->coll()) : boost::none);
+    BSONObj manageSearchIndexResponse =
+        getSearchIndexManagerResponse(opCtx, nss, collUUID, cmdObj, viewNss);
 
     return manageSearchIndexResponse;
 }

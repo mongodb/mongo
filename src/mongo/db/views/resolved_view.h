@@ -106,6 +106,12 @@ public:
     void serialize(BSONObjBuilder* bob) const final;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
+    /*
+     * These methods support IDL parsing of ResolvedView.
+     */
+    static ResolvedView parseFromBSON(const BSONElement& elem);
+    void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
+
 private:
     NamespaceString _namespace;
     std::vector<BSONObj> _pipeline;

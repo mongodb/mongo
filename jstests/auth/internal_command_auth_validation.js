@@ -427,8 +427,12 @@ const internalCommandsMap = {
     _shardsvrRunSearchIndexCommand: {
         // test only comand. Bc this command is included in test_only_commands_list.js, this will be
         // skipped.
-        testname: "__shardsvrRunSearchIndexCommand",
-        command: {__shardsvrRunSearchIndexCommand: 1, hostAndPort: []},
+        testname: "_shardsvrRunSearchIndexCommand",
+        command: {_shardsvrRunSearchIndexCommand: 1, hostAndPort: []},
+    },
+    _shardsvrResolveView: {
+        testname: "_shardsvrResolveView",
+        command: {_shardsvrResolveView: 1, nss: ns},
     },
     _shardsvrBeginMigrationBlockingOperation: {
         testname: "_shardsvrBeginMigrationBlockingOperation",

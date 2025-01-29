@@ -100,7 +100,8 @@ inline void _replicateSearchIndexCommandOnAllMongodsForTesting(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const BSONObj& userCmd,
-    boost::optional<StringData> viewName) {
+    boost::optional<NamespaceString> viewName,
+    boost::optional<std::vector<BSONObj>> viewPipeline) {
 
     // This helper can only be called by routers for server testing with a real mongot (eg not tests
     // that use mongotmock).
@@ -116,7 +117,20 @@ inline void _replicateSearchIndexCommandOnAllMongodsForTesting(
                NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
     bob.append("userCmd", userCmd);
     if (viewName) {
-        bob.append("viewName", *viewName);
+        // The existing viewName field accepted by mongot is required until the view object format
+        // (below) is in the release binary of mongot. To protect existing Evergreen e2e tests from
+        // failing, we will continue to support viewName in our code until the mongot team
+        // officially deprecates it.
+        // TODO SERVER-98368: remove this line as the view name is passed through the `view` object
+        // below.
+        bob.append("viewName",
+                   NamespaceStringUtil::serialize(*viewName, SerializationContext::stateDefault()));
+        BSONObjBuilder subObj(bob.subobjStart("view"));
+        subObj.append(
+            "name",
+            NamespaceStringUtil::serialize(*viewName, SerializationContext::stateDefault()));
+        subObj.append("effectivePipeline", *viewPipeline);
+        subObj.done();
     }
     /*
      * Fetch the search index management host and port to forward the mongotAlreadyInformed

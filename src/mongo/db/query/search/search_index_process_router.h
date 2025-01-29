@@ -29,17 +29,15 @@
 
 #include "mongo/db/query/search/search_index_process_interface.h"
 
+
 namespace mongo {
 
 class SearchIndexProcessRouter : public SearchIndexProcessInterface {
 public:
-    boost::optional<UUID> fetchCollectionUUID(OperationContext* opCtx,
-                                              const NamespaceString& nss) override;
     std::pair<boost::optional<UUID>, boost::optional<ResolvedView>>
     fetchCollectionUUIDAndResolveView(OperationContext* opCtx, const NamespaceString& nss) override;
     std::pair<UUID, boost::optional<ResolvedView>> fetchCollectionUUIDAndResolveViewOrThrow(
         OperationContext* opCtx, const NamespaceString& nss) override;
-    UUID fetchCollectionUUIDOrThrow(OperationContext* opCtx, const NamespaceString& nss) override;
 };
 
 }  // namespace mongo
