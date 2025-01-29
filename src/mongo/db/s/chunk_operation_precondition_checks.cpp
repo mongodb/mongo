@@ -74,12 +74,14 @@ CollectionPlacementAndIndexInfo checkCollectionIdentity(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const boost::optional<OID>& expectedEpoch,
-    const boost::optional<Timestamp>& expectedTimestamp,
-    const CollectionPtr& collection,
-    const CollectionShardingRuntime& csr) {
+    const boost::optional<Timestamp>& expectedTimestamp) {
+    AutoGetCollection collection(opCtx, nss, MODE_IS);
+
     const auto shardId = ShardingState::get(opCtx)->shardId();
-    auto optMetadata = csr.getCurrentMetadataIfKnown();
-    auto optShardingIndexCatalogInfo = csr.getIndexes(opCtx);
+    const auto scopedCsr =
+        CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
+    auto optMetadata = scopedCsr->getCurrentMetadataIfKnown();
+    auto optShardingIndexCatalogInfo = scopedCsr->getIndexes(opCtx);
 
     uassert(StaleConfigInfo(nss,
                             ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
@@ -102,7 +104,8 @@ CollectionPlacementAndIndexInfo checkCollectionIdentity(
             collection);
 
     const auto placementVersion = metadata.getShardPlacementVersion();
-    const auto shardVersion = ShardVersionFactory::make(metadata, csr.getCollectionIndexes(opCtx));
+    const auto shardVersion =
+        ShardVersionFactory::make(metadata, scopedCsr->getCollectionIndexes(opCtx));
 
     uassert(StaleConfigInfo(nss,
                             ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
@@ -123,19 +126,6 @@ CollectionPlacementAndIndexInfo checkCollectionIdentity(
 
     return std::make_pair(metadata, optShardingIndexCatalogInfo);
 }
-
-CollectionPlacementAndIndexInfo checkCollectionIdentity(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const boost::optional<OID>& expectedEpoch,
-    const boost::optional<Timestamp>& expectedTimestamp) {
-    AutoGetCollection collection(opCtx, nss, MODE_IS);
-    const auto scopedCsr =
-        CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
-    return checkCollectionIdentity(
-        opCtx, nss, expectedEpoch, expectedTimestamp, *collection, *scopedCsr);
-}
-
 
 void checkShardKeyPattern(OperationContext* opCtx,
                           const NamespaceString& nss,

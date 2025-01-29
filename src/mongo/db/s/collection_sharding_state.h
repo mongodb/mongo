@@ -30,13 +30,13 @@
 #pragma once
 
 #include <memory>
-#include <shared_mutex>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -83,10 +83,6 @@ public:
      * scope.
      */
     class ScopedCollectionShardingState {
-        // This used to be a ResourceMutex, we use a shared_mutex instead to keep similar semantics.
-        using LockType = std::variant<std::shared_lock<std::shared_mutex>,   // NOLINT
-                                      std::unique_lock<std::shared_mutex>>;  // NOLINT
-
     public:
         ScopedCollectionShardingState(ScopedCollectionShardingState&&);
 
@@ -103,7 +99,7 @@ public:
         friend class CollectionShardingState;
         friend class CollectionShardingRuntime;
 
-        ScopedCollectionShardingState(LockType lock, CollectionShardingState* css);
+        ScopedCollectionShardingState(Lock::ResourceLock lock, CollectionShardingState* css);
 
         // Constructor without the ResourceLock.
         // Important: Only for use in non-shard servers!
@@ -112,7 +108,7 @@ public:
         static ScopedCollectionShardingState acquireScopedCollectionShardingState(
             OperationContext* opCtx, const NamespaceString& nss, LockMode mode);
 
-        boost::optional<LockType> _lock;
+        boost::optional<Lock::ResourceLock> _lock;
         CollectionShardingState* _css;
     };
     static ScopedCollectionShardingState assertCollectionLockedAndAcquire(
