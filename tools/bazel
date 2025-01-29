@@ -111,7 +111,7 @@ done
 
 cur_dir=$(basename $REPO_ROOT)
 bazel_python="$REPO_ROOT/bazel-$cur_dir/external/py_${os}_${ARCH}/dist/bin/python3"
-compdb_python="/tmp/compiledb-$cur_dir/external/py_${os}_${ARCH}/dist/bin/python3"
+compdb_python="$REPO_ROOT/.compiledb/compiledb-$cur_dir/external/py_${os}_${ARCH}/dist/bin/python3"
 python=$bazel_python
 if [ ! -f $python ]; then
   python=$compdb_python

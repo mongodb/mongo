@@ -282,6 +282,8 @@ buildozer
 .bazelrc.gitinfo
 .bazelrc.workstation
 .bazelrc.common_bes
+.bazelrc.compiledb
+.compiledb
 .bazelrc.xcode
 .bazelrc.bazelisk
 *.bazel_info_for_ninja.txt

@@ -47,17 +47,28 @@ def generate_compiledb(bazel_bin, persistent_compdb):
         info_proc = subprocess.run(
             [bazel_bin, "info", "output_base"], capture_output=True, text=True
         )
-        project_hash = pathlib.Path(info_proc.stdout.strip()).name
         output_base = pathlib.Path(info_proc.stdout.strip() + "_bazel_compiledb")
-        tmp_dir = os.environ["Temp"] if platform.system() == "Windows" else "/tmp"
-        symlink_prefix = pathlib.Path(tmp_dir) / f"{project_hash}_compiledb-"
+        os.makedirs(REPO_ROOT / ".compiledb", exist_ok=True)
+        symlink_prefix = REPO_ROOT / ".compiledb" / "compiledb-"
+
+    compiledb_bazelrc = []
+    compiledb_config = []
+    if (REPO_ROOT / ".bazelrc.compiledb").exists():
+        compiledb_bazelrc = ["--bazelrc=.bazelrc", "--bazelrc=.bazelrc.compiledb"]
+    else:
+        print(
+            "Using default compiledb config, create a '.bazelrc.compiledb' file to customize the compiledb config..."
+        )
+        compiledb_config = ["--config=dbg"]
+
     query_cmd = (
         [bazel_bin]
         + ([f"--output_base={output_base}"] if persistent_compdb else [])
+        + compiledb_bazelrc
         + ["aquery"]
         + ([f"--symlink_prefix={symlink_prefix}"] if persistent_compdb else [])
+        + compiledb_config
         + [
-            "--config=dbg",
             "--remote_executor=",
             "--remote_cache=",
             "--bes_backend=",
@@ -157,10 +168,11 @@ def generate_compiledb(bazel_bin, persistent_compdb):
     gen_source_cmd = (
         [bazel_bin]
         + ([f"--output_base={output_base}"] if persistent_compdb else [])
+        + compiledb_bazelrc
         + ["build"]
         + ([f"--symlink_prefix={symlink_prefix}"] if persistent_compdb else [])
+        + compiledb_config
         + [
-            "--config=dbg",
             f"--build_tag_filters=gen_source{',mongo-tidy-checks' if platform.system() != 'Windows' else ''}",
             "//src/...",
         ]
