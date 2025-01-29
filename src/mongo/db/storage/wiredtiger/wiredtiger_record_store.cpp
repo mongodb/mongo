@@ -281,15 +281,12 @@ public:
 
     bool restore(bool tolerateCappedRepositioning = true) final {
         // We can't use the CursorCache since this cursor needs a special config string.
-        WT_SESSION* session =
-            WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx))
-                ->getSession()
-                ->getSession();
+        WiredTigerSession* session =
+            WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx))->getSession();
 
         if (!_cursor) {
             auto status = wtRCToStatus(
-                session->open_cursor(session, _uri.c_str(), nullptr, _config.c_str(), &_cursor),
-                session);
+                session->open_cursor(_uri.c_str(), nullptr, _config.c_str(), &_cursor), *session);
             if (status == ErrorCodes::ObjectIsBusy) {
                 // This can happen if you try to open a cursor on the oplog table and a verify is
                 // currently running on it.
@@ -996,9 +993,8 @@ Status WiredTigerRecordStore::_truncate(OperationContext* opCtx) {
     }
     invariantWTOK(ret, start->session);
 
-    WT_SESSION* session = wtRu.getSession()->getSession();
-    invariantWTOK(WT_OP_CHECK(session->truncate(session, nullptr, start, nullptr, nullptr)),
-                  session);
+    WiredTigerSession* session = wtRu.getSession();
+    invariantWTOK(WT_OP_CHECK(session->truncate(nullptr, start, nullptr, nullptr)), *session);
     _changeNumRecordsAndDataSize(wtRu, -numRecords(), -dataSize());
 
     return Status::OK();
@@ -1039,9 +1035,8 @@ Status WiredTigerRecordStore::_rangeTruncate(OperationContext* opCtx,
         return endWrap.get();
     }();
 
-    WT_SESSION* session = wtRu.getSession()->getSession();
-    invariantWTOK(WT_OP_CHECK(session->truncate(session, nullptr, start, finish, nullptr)),
-                  session);
+    WiredTigerSession* session = wtRu.getSession();
+    invariantWTOK(WT_OP_CHECK(session->truncate(nullptr, start, finish, nullptr)), *session);
     _changeNumRecordsAndDataSize(wtRu, hintNumRecordsDiff, hintDataSizeDiff);
     return Status::OK();
 }
@@ -1458,17 +1453,15 @@ void WiredTigerRecordStore::Capped::_truncateAfter(
     auto key = makeCursorKey(firstRemovedId, _keyFormat);
     setKey(start, &key);
 
-    WT_SESSION* session = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))
-                              ->getSession()
-                              ->getSession();
-    invariantWTOK(session->truncate(session, nullptr, start, nullptr, nullptr), session);
+    WiredTigerSession* session =
+        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))->getSession();
+    invariantWTOK(session->truncate(nullptr, start, nullptr, nullptr), *session);
 
     _changeNumRecordsAndDataSize(ru, -recordsRemoved, -bytesRemoved);
 
     txn.commit();
 
     _handleTruncateAfter(*WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
-                         session,
                          lastKeptId,
                          firstRemovedId,
                          recordsRemoved,
@@ -1476,14 +1469,12 @@ void WiredTigerRecordStore::Capped::_truncateAfter(
 }
 
 void WiredTigerRecordStore::Capped::_handleTruncateAfter(WiredTigerRecoveryUnit&,
-                                                         WT_SESSION*,
                                                          const RecordId& lastKeptId,
                                                          const RecordId& firstRemovedId,
                                                          int64_t recordsRemoved,
                                                          int64_t bytesRemoved) {}
 
 void WiredTigerRecordStore::Oplog::_handleTruncateAfter(WiredTigerRecoveryUnit& ru,
-                                                        WT_SESSION* session,
                                                         const RecordId& lastKeptId,
                                                         const RecordId& firstRemovedId,
                                                         int64_t recordsRemoved,
@@ -1494,7 +1485,7 @@ void WiredTigerRecordStore::Oplog::_handleTruncateAfter(WiredTigerRecoveryUnit& 
 
     auto conn = ru.getConnection()->conn();
     auto durableTSConfigString = "durable_timestamp={:x}"_format(truncTs.asULL());
-    invariantWTOK(conn->set_timestamp(conn, durableTSConfigString.c_str()), session);
+    invariantWTOK(conn->set_timestamp(conn, durableTSConfigString.c_str()), *ru.getSession());
 
     _kvEngine->getOplogManager()->setOplogReadTimestamp(truncTs);
     LOGV2_DEBUG(22405, 1, "Truncation new read timestamp", "ts"_attr = truncTs);

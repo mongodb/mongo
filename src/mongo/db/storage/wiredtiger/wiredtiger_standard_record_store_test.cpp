@@ -141,8 +141,8 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
 
         {
             StorageWriteTransaction txn(ru);
-            WT_SESSION* s = ru.getSession()->getSession();
-            invariantWTOK(s->create(s, indexUri.c_str(), ""), s);
+            WiredTigerSession* s = ru.getSession();
+            invariantWTOK(s->create(indexUri.c_str(), ""), *s);
             txn.commit();
         }
 

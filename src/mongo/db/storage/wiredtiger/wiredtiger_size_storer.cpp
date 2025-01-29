@@ -62,9 +62,7 @@ WiredTigerSizeStorer::WiredTigerSizeStorer(WiredTigerConnection* conn,
                              ->getTableCreateConfig(_storageUri);
 
     WiredTigerSession session(_conn);
-    invariantWTOK(
-        session.getSession()->create(session.getSession(), _storageUri.c_str(), config.c_str()),
-        session.getSession());
+    invariantWTOK(session.create(_storageUri.c_str(), config.c_str()), session);
 }
 
 void WiredTigerSizeStorer::store(StringData uri, std::shared_ptr<SizeInfo> sizeInfo) {
@@ -214,8 +212,7 @@ void WiredTigerSizeStorer::flush(bool syncToDisk) {
             invariantWTOK(ret, cursor->session);
         }
         txnOpen.done();
-        invariantWTOK(session.getSession()->commit_transaction(session.getSession(), nullptr),
-                      session.getSession());
+        invariantWTOK(session.commit_transaction(nullptr), session);
         buffer.clear();
     }
 

@@ -777,8 +777,8 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
         StorageWriteTransaction txn(ru);
         WiredTigerRecoveryUnit* ru =
             checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()));
-        WT_SESSION* s = ru->getSession()->getSession();
-        invariantWTOK(s->create(s, uri.c_str(), config.c_str()), s);
+        WiredTigerSession* s = ru->getSession();
+        invariantWTOK(s->create(uri.c_str(), config.c_str()), *s);
         txn.commit();
     }
 

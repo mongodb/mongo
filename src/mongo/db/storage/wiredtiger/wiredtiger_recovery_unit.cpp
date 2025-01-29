@@ -150,7 +150,6 @@ void WiredTigerRecoveryUnit::prepareUnitOfWork() {
     invariant(!_prepareTimestamp.isNull());
 
     auto session = getSession();
-    WT_SESSION* s = session->getSession();
 
     LOGV2_DEBUG(22410,
                 1,
@@ -159,7 +158,7 @@ void WiredTigerRecoveryUnit::prepareUnitOfWork() {
 
     const std::string conf = "prepare_timestamp=" + unsignedHex(_prepareTimestamp.asULL());
     // Prepare the transaction.
-    invariantWTOK(s->prepare_transaction(s, conf.c_str()), s);
+    invariantWTOK(session->prepare_transaction(conf.c_str()), *session);
 }
 
 void WiredTigerRecoveryUnit::doCommitUnitOfWork() {
@@ -299,7 +298,6 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
         }
     }
 
-    WT_SESSION* s = _session->getSession();
     if (_timer) {
         const int transactionTime = _timer->millis();
         // `serverGlobalParams.slowMs` can be set to values <= 0. In those cases, give logging a
@@ -322,16 +320,17 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
             invariant(_readAtTimestamp.isNull() || _commitTimestamp >= _readAtTimestamp);
 
             if (MONGO_likely(!doUntimestampedWritesForIdempotencyTests.shouldFail())) {
-                s->timestamp_transaction_uint(s, WT_TS_TXN_TYPE_COMMIT, _commitTimestamp.asULL());
+                _session->timestamp_transaction_uint(WT_TS_TXN_TYPE_COMMIT,
+                                                     _commitTimestamp.asULL());
             }
             _isTimestamped = true;
         }
 
         if (!_durableTimestamp.isNull()) {
-            s->timestamp_transaction_uint(s, WT_TS_TXN_TYPE_DURABLE, _durableTimestamp.asULL());
+            _session->timestamp_transaction_uint(WT_TS_TXN_TYPE_DURABLE, _durableTimestamp.asULL());
         }
 
-        wtRet = s->commit_transaction(s, nullptr);
+        wtRet = _session->commit_transaction(nullptr);
 
         LOGV2_DEBUG(
             22412, 3, "WT commit_transaction", "snapshotId"_attr = getSnapshotId().toNumber());
@@ -345,7 +344,7 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
             config = "operation_timeout_ms=1,";
         }
 
-        wtRet = s->rollback_transaction(s, config);
+        wtRet = _session->rollback_transaction(config);
 
         LOGV2_DEBUG(
             22413, 3, "WT rollback_transaction", "snapshotId"_attr = getSnapshotId().toNumber());
@@ -364,7 +363,7 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
         }
         _isTimestamped = false;
     }
-    invariantWTOK(wtRet, s);
+    invariantWTOK(wtRet, *_session);
 
     invariant(!_lastTimestampSet || _commitTimestamp.isNull(),
               str::stream() << "Cannot have both a _lastTimestampSet and a "
@@ -669,9 +668,8 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp() {
 
 Timestamp WiredTigerRecoveryUnit::_getTransactionReadTimestamp() {
     char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
-    WT_SESSION* session = _session->getSession();
-    auto wtStatus = session->query_timestamp(session, buf, "get=read");
-    invariantWTOK(wtStatus, session);
+    auto wtStatus = _session->query_timestamp(buf, "get=read");
+    invariantWTOK(wtStatus, *_session);
     uint64_t read_timestamp;
     fassert(50949, NumberParser().base(16)(buf, &read_timestamp));
     return Timestamp(read_timestamp);
@@ -693,7 +691,6 @@ Status WiredTigerRecoveryUnit::setTimestamp(Timestamp timestamp) {
                 3,
                 "WT set timestamp of future write operations to {timestamp}",
                 "timestamp"_attr = timestamp);
-    WT_SESSION* session = _session->getSession();
     invariant(_inUnitOfWork(), toString(_getState()));
     invariant(_prepareTimestamp.isNull());
     invariant(_commitTimestamp.isNull(),
@@ -719,12 +716,11 @@ Status WiredTigerRecoveryUnit::setTimestamp(Timestamp timestamp) {
         return Status::OK();
     }
 
-    auto rc =
-        session->timestamp_transaction_uint(session, WT_TS_TXN_TYPE_COMMIT, timestamp.asULL());
+    auto rc = _session->timestamp_transaction_uint(WT_TS_TXN_TYPE_COMMIT, timestamp.asULL());
     if (rc == 0) {
         _isTimestamped = true;
     }
-    return wtRCToStatus(rc, session, "timestamp_transaction");
+    return wtRCToStatus(rc, *_session, "timestamp_transaction");
 }
 
 void WiredTigerRecoveryUnit::setCommitTimestamp(Timestamp timestamp) {

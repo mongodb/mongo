@@ -132,9 +132,8 @@ WiredTigerBulkLoadCursor::WiredTigerBulkLoadCursor(WiredTigerRecoveryUnit& ru,
 
     // The 'checkpoint_wait=false' option is set to prefer falling back on the "non-bulk" cursor
     // over waiting a potentially long time for a checkpoint.
-    WT_SESSION* sessionPtr = _session->getSession();
-    int err = sessionPtr->open_cursor(
-        sessionPtr, indexUri.c_str(), nullptr, "bulk,checkpoint_wait=false", &_cursor);
+    int err =
+        _session->open_cursor(indexUri.c_str(), nullptr, "bulk,checkpoint_wait=false", &_cursor);
     if (!err) {
         return;  // Success
     }
@@ -144,7 +143,6 @@ WiredTigerBulkLoadCursor::WiredTigerBulkLoadCursor(WiredTigerRecoveryUnit& ru,
                   "error"_attr = wiredtiger_strerror(err),
                   "index"_attr = indexUri);
 
-    invariantWTOK(sessionPtr->open_cursor(sessionPtr, indexUri.c_str(), nullptr, nullptr, &_cursor),
-                  sessionPtr);
+    invariantWTOK(_session->open_cursor(indexUri.c_str(), nullptr, nullptr, &_cursor), *_session);
 }
 }  // namespace mongo

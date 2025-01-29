@@ -127,8 +127,8 @@ protected:
     }
 
     void createSession(const char* config) {
-        WT_SESSION* wtSession = _ru->getSession()->getSession();
-        ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, getURI(), config), wtSession));
+        WiredTigerSession* wtSession = _ru->getSession();
+        ASSERT_OK(wtRCToStatus(wtSession->create(getURI(), config), *wtSession));
     }
 
 private:
@@ -304,8 +304,7 @@ TEST_F(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(none)");
     auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
     WiredTigerSession* session = ru->getSession();
-    WT_SESSION* wtSession = session->getSession();
-    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr), wtSession));
+    ASSERT_OK(wtRCToStatus(session->create("table:mytable", nullptr), *session));
     auto result = WiredTigerUtil::getStatisticsValue(
         *session, "statistics:table:mytable", "statistics=(fast)", WT_STAT_DSRC_BLOCK_SIZE);
     ASSERT_NOT_OK(result.getStatus());
@@ -316,8 +315,7 @@ TEST_F(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
     auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
     WiredTigerSession* session = ru->getSession();
-    WT_SESSION* wtSession = session->getSession();
-    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr), wtSession));
+    ASSERT_OK(wtRCToStatus(session->create("table:mytable", nullptr), *session));
     // Use connection statistics key which does not apply to a table.
     auto result = WiredTigerUtil::getStatisticsValue(
         *session, "statistics:table:mytable", "statistics=(fast)", WT_STAT_CONN_SESSION_OPEN);
@@ -329,8 +327,7 @@ TEST_F(WiredTigerUtilTest, GetStatisticsValueValidKey) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
     auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
     WiredTigerSession* session = ru->getSession();
-    WT_SESSION* wtSession = session->getSession();
-    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr), wtSession));
+    ASSERT_OK(wtRCToStatus(session->create("table:mytable", nullptr), *session));
     // Use connection statistics key which does not apply to a table.
     auto result = WiredTigerUtil::getStatisticsValue(
         *session, "statistics:table:mytable", "statistics=(fast)", WT_STAT_DSRC_BTREE_ENTRIES);
@@ -353,11 +350,10 @@ TEST_F(WiredTigerUtilTest, ParseAPIMessages) {
     // Create a session.
     auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
     WiredTigerSession* session = ru->getSession();
-    WT_SESSION* wtSession = session->getSession();
 
     // Perform simple WiredTiger operations while capturing the generated logs.
     startCapturingLogMessages();
-    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:ev_api", nullptr), wtSession));
+    ASSERT_OK(wtRCToStatus(session->create("table:ev_api", nullptr), *session));
     stopCapturingLogMessages();
 
     // Verify there is at least one message from WiredTiger and their content.

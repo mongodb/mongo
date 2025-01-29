@@ -106,8 +106,8 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
 
     {
         StorageWriteTransaction txn(*ru);
-        WT_SESSION* s = ru->getSession()->getSession();
-        invariantWTOK(s->create(s, uri.c_str(), config.c_str()), s);
+        WiredTigerSession* s = ru->getSession();
+        invariantWTOK(s->create(uri.c_str(), config.c_str()), *s);
         txn.commit();
     }
 
@@ -164,8 +164,8 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
 
     {
         StorageWriteTransaction txn(*ru);
-        WT_SESSION* s = ru->getSession()->getSession();
-        invariantWTOK(s->create(s, uri.c_str(), config.c_str()), s);
+        WiredTigerSession* s = ru->getSession();
+        invariantWTOK(s->create(uri.c_str(), config.c_str()), *s);
         txn.commit();
     }
 

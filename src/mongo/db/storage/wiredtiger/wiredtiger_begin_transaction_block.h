@@ -82,7 +82,6 @@ public:
 
 private:
     WiredTigerSession* _session;
-    WT_SESSION* _wt_session;
     bool _rollback = false;
 };
 

@@ -257,17 +257,14 @@ Status WiredTigerIndex::create(WiredTigerRecoveryUnit& ru,
                                const std::string& config) {
     // Don't use the session from the recovery unit: create should not be used in a transaction
     WiredTigerSession session(ru.getConnection());
-    WT_SESSION* s = session.getSession();
     LOGV2_DEBUG(
         51780, 1, "create uri: {uri} config: {config}", "uri"_attr = uri, "config"_attr = config);
-    return wtRCToStatus(s->create(s, uri.c_str(), config.c_str()), s);
+    return wtRCToStatus(session.create(uri.c_str(), config.c_str()), session);
 }
 
 Status WiredTigerIndex::Drop(WiredTigerRecoveryUnit& ru, const std::string& uri) {
     WiredTigerSession session(ru.getConnection());
-    WT_SESSION* s = session.getSession();
-
-    return wtRCToStatus(s->drop(s, uri.c_str(), nullptr), s);
+    return wtRCToStatus(session.drop(uri.c_str(), nullptr), session);
 }
 
 WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,

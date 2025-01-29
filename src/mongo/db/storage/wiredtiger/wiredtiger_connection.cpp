@@ -226,11 +226,10 @@ void WiredTigerConnection::_releaseSession(WiredTigerSession* session) {
     invariant(session->cursorsOut() == 0);
 
     {
-        WT_SESSION* ss = session->getSession();
         uint64_t range;
         // This checks that we are only caching idle sessions and not something which might hold
         // locks or otherwise prevent truncation.
-        invariantWTOK(ss->transaction_pinned_range(ss, &range), ss);
+        invariantWTOK(session->transaction_pinned_range(&range), *session);
         invariant(range == 0);
 
         // Release resources in the session we're about to cache.
@@ -241,7 +240,7 @@ void WiredTigerConnection::_releaseSession(WiredTigerSession* session) {
         }
 
         session->resetSessionConfiguration();
-        invariantWTOK(ss->reset(ss), ss);
+        invariantWTOK(session->reset(), *session);
     }
 
     // Set the time this session got idle at.

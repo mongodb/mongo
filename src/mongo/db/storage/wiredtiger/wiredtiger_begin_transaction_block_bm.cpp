@@ -76,9 +76,7 @@ public:
     WiredTigerTestHelper() {
         _ru = std::make_unique<WiredTigerRecoveryUnit>(&_connection, nullptr);
         _session = _ru->getSession();
-        auto wt_session = _session->getSession();
-        invariant(
-            wtRCToStatus(wt_session->create(wt_session, "table:mytable", nullptr), wt_session));
+        invariant(wtRCToStatus(_session->create("table:mytable", nullptr), *_session));
         _ru->abandonSnapshot();
     }
 

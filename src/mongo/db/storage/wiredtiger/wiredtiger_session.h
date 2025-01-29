@@ -118,8 +118,14 @@ public:
     WRAPPED_WT_SESSION_METHOD(get_rollback_reason)
     WRAPPED_WT_SESSION_METHOD(open_cursor)
     WRAPPED_WT_SESSION_METHOD(prepare_transaction)
+    WRAPPED_WT_SESSION_METHOD(query_timestamp)
+    WRAPPED_WT_SESSION_METHOD(reset)
     WRAPPED_WT_SESSION_METHOD(reconfigure)
+    WRAPPED_WT_SESSION_METHOD(rollback_transaction)
     WRAPPED_WT_SESSION_METHOD(salvage)
+    WRAPPED_WT_SESSION_METHOD(timestamp_transaction_uint)
+    WRAPPED_WT_SESSION_METHOD(transaction_pinned_range)
+    WRAPPED_WT_SESSION_METHOD(truncate)
     WRAPPED_WT_SESSION_METHOD(verify)
 #undef WRAPPED_WT_SESSION_METHOD
 
@@ -130,7 +136,6 @@ public:
      * into the cache by calling releaseCursor().
      */
     WT_CURSOR* getCachedCursor(uint64_t id, const std::string& config);
-
 
     /**
      * Create a new cursor and ignore the cache.

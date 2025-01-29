@@ -208,7 +208,7 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
 
 Status wtRCToStatus_slow(int retCode, WiredTigerSession& session, StringData prefix) {
     return session.with(
-        [&](WT_SESSION* s) { return wtRCToStatus_slow(retCode, session.getSession(), prefix); });
+        [retCode, prefix](WT_SESSION* s) { return wtRCToStatus_slow(retCode, s, prefix); });
 }
 
 }  // namespace mongo
