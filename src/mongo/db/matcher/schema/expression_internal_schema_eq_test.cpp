@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_eq.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -52,69 +53,71 @@ TEST(InternalSchemaEqMatchExpression, CorrectlyMatchesScalarElements) {
     BSONObj numberOperand = BSON("a" << 5);
 
     InternalSchemaEqMatchExpression eqNumberOperand("a"_sd, numberOperand["a"]);
-    ASSERT_TRUE(eqNumberOperand.matchesBSON(BSON("a" << 5.0)));
-    ASSERT_FALSE(eqNumberOperand.matchesBSON(BSON("a" << 6)));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&eqNumberOperand, BSON("a" << 5.0)));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&eqNumberOperand, BSON("a" << 6)));
 
     BSONObj stringOperand = BSON("a"
                                  << "str");
 
     InternalSchemaEqMatchExpression eqStringOperand("a"_sd, stringOperand["a"]);
-    ASSERT_TRUE(eqStringOperand.matchesBSON(BSON("a"
-                                                 << "str")));
-    ASSERT_FALSE(eqStringOperand.matchesBSON(BSON("a"
-                                                  << "string")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&eqStringOperand,
+                                           BSON("a"
+                                                << "str")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&eqStringOperand,
+                                            BSON("a"
+                                                 << "string")));
 }
 
 TEST(InternalSchemaEqMatchExpression, CorrectlyMatchesArrayElement) {
     BSONObj operand = BSON("a" << BSON_ARRAY("b" << 5));
 
     InternalSchemaEqMatchExpression eq("a"_sd, operand["a"]);
-    ASSERT_TRUE(eq.matchesBSON(BSON("a" << BSON_ARRAY("b" << 5))));
-    ASSERT_FALSE(eq.matchesBSON(BSON("a" << BSON_ARRAY(5 << "b"))));
-    ASSERT_FALSE(eq.matchesBSON(BSON("a" << BSON_ARRAY("b" << 5 << 5))));
-    ASSERT_FALSE(eq.matchesBSON(BSON("a" << BSON_ARRAY("b" << 6))));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY("b" << 5))));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(5 << "b"))));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY("b" << 5 << 5))));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY("b" << 6))));
 }
 
 TEST(InternalSchemaEqMatchExpression, CorrectlyMatchesNullElement) {
     BSONObj operand = BSON("a" << BSONNULL);
 
     InternalSchemaEqMatchExpression eq("a"_sd, operand["a"]);
-    ASSERT_TRUE(eq.matchesBSON(BSON("a" << BSONNULL)));
-    ASSERT_FALSE(eq.matchesBSON(BSON("a" << 4)));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSONNULL)));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("a" << 4)));
 }
 
 TEST(InternalSchemaEqMatchExpression, NullElementDoesNotMatchMissing) {
     BSONObj operand = BSON("a" << BSONNULL);
 
     InternalSchemaEqMatchExpression eq("a"_sd, operand["a"]);
-    ASSERT_FALSE(eq.matchesBSON(BSONObj()));
-    ASSERT_FALSE(eq.matchesBSON(BSON("b" << 4)));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSONObj()));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("b" << 4)));
 }
 
 TEST(InternalSchemaEqMatchExpression, NullElementDoesNotMatchUndefinedOrMissing) {
     BSONObj operand = BSON("a" << BSONNULL);
 
     InternalSchemaEqMatchExpression eq("a"_sd, operand["a"]);
-    ASSERT_FALSE(eq.matchesBSON(BSONObj()));
-    ASSERT_FALSE(eq.matchesBSON(fromjson("{a: undefined}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSONObj()));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, fromjson("{a: undefined}")));
 }
 
 TEST(InternalSchemaEqMatchExpression, DoesNotTraverseLeafArrays) {
     BSONObj operand = BSON("a" << 5);
     InternalSchemaEqMatchExpression eq("a"_sd, operand["a"]);
-    ASSERT_TRUE(eq.matchesBSON(BSON("a" << 5.0)));
-    ASSERT_FALSE(eq.matchesBSON(BSON("a" << BSON_ARRAY(5))));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << 5.0)));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(5))));
 }
 
 TEST(InternalSchemaEqMatchExpression, MatchesObjectsIndependentOfFieldOrder) {
     BSONObj operand = fromjson("{a: {b: 1, c: {d: 2, e: 3}}}");
 
     InternalSchemaEqMatchExpression eq("a"_sd, operand["a"]);
-    ASSERT_TRUE(eq.matchesBSON(fromjson("{a: {b: 1, c: {d: 2, e: 3}}}")));
-    ASSERT_TRUE(eq.matchesBSON(fromjson("{a: {c: {e: 3, d: 2}, b: 1}}")));
-    ASSERT_FALSE(eq.matchesBSON(fromjson("{a: {b: 1, c: {d: 2}, e: 3}}")));
-    ASSERT_FALSE(eq.matchesBSON(fromjson("{a: {b: 2, c: {d: 2}}}")));
-    ASSERT_FALSE(eq.matchesBSON(fromjson("{a: {b: 1}}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, fromjson("{a: {b: 1, c: {d: 2, e: 3}}}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, fromjson("{a: {c: {e: 3, d: 2}, b: 1}}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, fromjson("{a: {b: 1, c: {d: 2}, e: 3}}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, fromjson("{a: {b: 2, c: {d: 2}}}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, fromjson("{a: {b: 1}}")));
 }
 
 TEST(InternalSchemaEqMatchExpression, EquivalentReturnsCorrectResults) {

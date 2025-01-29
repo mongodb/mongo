@@ -37,6 +37,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/query/util/make_data_structure.h"
 
@@ -88,7 +89,7 @@ bool ElemMatchObjectMatchExpression::matchesArray(const BSONObj& anArray,
         BSONElement inner = i.next();
         if (!inner.isABSONObj())
             continue;
-        if (_sub->matchesBSON(inner.Obj(), nullptr)) {
+        if (exec::matcher::matchesBSON(_sub.get(), inner.Obj(), nullptr)) {
             if (details && details->needRecord()) {
                 details->setElemMatchKey(inner.fieldName());
             }

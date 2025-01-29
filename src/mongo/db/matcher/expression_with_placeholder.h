@@ -80,9 +80,7 @@ public:
      * field whose name is given by getPlaceholder(). If the placeholder name does not exist, then
      * the filter expression does not refer to any specific paths.
      */
-    bool matchesBSONElement(BSONElement elem, MatchDetails* details = nullptr) const {
-        return _filter->matchesBSONElement(elem, details);
-    }
+    bool matchesBSONElement(BSONElement elem, MatchDetails* details = nullptr) const;
 
     /**
      * If this object has a placeholder, returns a view of the placeholder as a StringData.

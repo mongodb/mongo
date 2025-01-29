@@ -33,6 +33,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -52,9 +53,9 @@ TEST(InternalSchemaMatchArrayIndexMatchExpression, RejectsNonArrays) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto expr = MatchExpressionParser::parse(filter, expCtx);
     ASSERT_OK(expr.getStatus());
-    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{foo: 'blah'}")));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{foo: 7}")));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{foo: {i: []}}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{foo: 'blah'}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{foo: 7}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{foo: {i: []}}")));
 }
 
 TEST(InternalSchemaMatchArrayIndexMatchExpression, MatchesArraysWithMatchingElement) {
@@ -64,15 +65,17 @@ TEST(InternalSchemaMatchArrayIndexMatchExpression, MatchesArraysWithMatchingElem
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto expr = MatchExpressionParser::parse(filter, expCtx);
     ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{foo: [[{bar: 7}], [{bar: 5}]]}")));
-    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{foo: [[{bar: [3, 5, 7]}], [{bar: 5}]]}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(),
+                                           fromjson("{foo: [[{bar: 7}], [{bar: 5}]]}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(),
+                                           fromjson("{foo: [[{bar: [3, 5, 7]}], [{bar: 5}]]}")));
 
     filter = fromjson(
         "{baz: {$_internalSchemaMatchArrayIndex:"
         "{index: 2, namePlaceholder: 'i', expression: {i: {$type: 'string'}}}}}");
     expr = MatchExpressionParser::parse(filter, expCtx);
     ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{baz: [0, 1, '2']}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{baz: [0, 1, '2']}")));
 }
 
 TEST(InternalSchemaMatchArrayIndexMatchExpression, DoesNotMatchArrayIfMatchingElementNotAtIndex) {
@@ -82,14 +85,16 @@ TEST(InternalSchemaMatchArrayIndexMatchExpression, DoesNotMatchArrayIfMatchingEl
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto expr = MatchExpressionParser::parse(filter, expCtx);
     ASSERT_OK(expr.getStatus());
-    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{foo: [33, 0, 1, 2]}")));
+    ASSERT_FALSE(
+        exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{foo: [33, 0, 1, 2]}")));
 
     filter = fromjson(
         "{foo: {$_internalSchemaMatchArrayIndex:"
         "{index: 1, namePlaceholder: 'i', expression: {i: {$lte: 7}}}}}");
     expr = MatchExpressionParser::parse(filter, expCtx);
     ASSERT_OK(expr.getStatus());
-    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{foo: [0, 99, 1, 2]}")));
+    ASSERT_FALSE(
+        exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{foo: [0, 99, 1, 2]}")));
 }
 
 TEST(InternalSchemaMatchArrayIndexMatchExpression, MatchesIfNotEnoughArrayElements) {
@@ -99,14 +104,15 @@ TEST(InternalSchemaMatchArrayIndexMatchExpression, MatchesIfNotEnoughArrayElemen
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto expr = MatchExpressionParser::parse(filter, expCtx);
     ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{foo: []}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{foo: []}")));
 
     filter = fromjson(
         "{foo: {$_internalSchemaMatchArrayIndex:"
         "{index: 4, namePlaceholder: 'i', expression: {i: 1}}}}");
     expr = MatchExpressionParser::parse(filter, expCtx);
     ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{foo: ['no', 'no', 'no', 'no']}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(),
+                                           fromjson("{foo: ['no', 'no', 'no', 'no']}")));
 }
 
 TEST(InternalSchemaMatchArrayIndexMatchExpression, EquivalentToClone) {

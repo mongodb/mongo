@@ -39,6 +39,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/match_details.h"
@@ -203,7 +204,8 @@ Document applyFindPositionalProjection(const Document& preImage,
     // recorded in the 'details' object.
     MatchDetails details;
     details.requestElemMatchKey();
-    auto stillMatchesExpression = matchExpr.matchesBSON(preImage.toBson(), &details);
+    auto stillMatchesExpression =
+        exec::matcher::matchesBSON(&matchExpr, preImage.toBson(), &details);
 
     // Since 'matchExpr' used with the positional projection is the very same selection filter
     // expression in the find command, the input document passed to this function should have
@@ -268,7 +270,7 @@ Value applyFindElemMatchProjection(const Document& input,
     // recorded in the 'details' object.
     MatchDetails details;
     details.requestElemMatchKey();
-    if (!matchExpr.matchesBSON(input.toBson(), &details)) {
+    if (!exec::matcher::matchesBSON(&matchExpr, input.toBson(), &details)) {
         return {};
     }
 

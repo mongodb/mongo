@@ -40,6 +40,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression_type.h"
@@ -61,10 +62,11 @@ TEST(MatchExpressionParserSchemaTest, MinItemsCorrectlyParsesIntegerArgument) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1))));
+    ASSERT(
+        exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2 << 3))));
 }
 
 TEST(MatchExpressionParserSchemaTest, MinItemsCorrectlyParsesLongArgument) {
@@ -73,10 +75,11 @@ TEST(MatchExpressionParserSchemaTest, MinItemsCorrectlyParsesLongArgument) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1))));
+    ASSERT(
+        exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2 << 3))));
 }
 
 TEST(MatchExpressionParserSchemaTest, MinItemsCorrectlyParsesDoubleArgumentAsInteger) {
@@ -85,10 +88,11 @@ TEST(MatchExpressionParserSchemaTest, MinItemsCorrectlyParsesDoubleArgumentAsInt
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1))));
+    ASSERT(
+        exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2 << 3))));
 }
 
 TEST(MatchExpressionParserSchemaTest, MinItemsCorrectlyParsesDecimalArgumentAsInteger) {
@@ -97,10 +101,11 @@ TEST(MatchExpressionParserSchemaTest, MinItemsCorrectlyParsesDecimalArgumentAsIn
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1))));
+    ASSERT(
+        exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2 << 3))));
 }
 
 TEST(MatchExpressionParserSchemaTest, MaxItemsCorrectlyParsesIntegerArgument) {
@@ -109,10 +114,11 @@ TEST(MatchExpressionParserSchemaTest, MaxItemsCorrectlyParsesIntegerArgument) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1))));
+    ASSERT(
+        !exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2 << 3))));
 }
 
 TEST(MatchExpressionParserSchemaTest, MaxItemsCorrectlyParsesLongArgument) {
@@ -121,10 +127,11 @@ TEST(MatchExpressionParserSchemaTest, MaxItemsCorrectlyParsesLongArgument) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1))));
+    ASSERT(
+        !exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2 << 3))));
 }
 
 
@@ -134,10 +141,11 @@ TEST(MatchExpressionParserSchemaTest, MaxItemsCorrectlyParsesDoubleArgumentAsInt
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1))));
+    ASSERT(
+        !exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2 << 3))));
 }
 
 TEST(MatchExpressionParserSchemaTest, MaxItemsCorrectlyParsesDecimalArgumentAsInteger) {
@@ -146,10 +154,11 @@ TEST(MatchExpressionParserSchemaTest, MaxItemsCorrectlyParsesDecimalArgumentAsIn
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1))));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON_ARRAY(1 << 2 << 3))));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1))));
+    ASSERT(
+        !exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2 << 3))));
 }
 
 TEST(MatchExpressionParserSchemaTest, UniqueItemsFailsToParseNonTrueArguments) {
@@ -178,13 +187,16 @@ TEST(MatchExpressionParserSchemaTest, UniqueItemsParsesTrueBooleanArgument) {
     auto expr = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(expr.getStatus());
 
-    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{x: 1}")));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{x: 'blah'}")));
-    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{x: []}")));
-    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{x: [0]}")));
-    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{x: ['7', null, [], {}, 7]}")));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{x: ['dup', 'dup', 7]}")));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{x: [{x: 1}, {x: 1}]}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: 1}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: 'blah'}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: []}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: [0]}")));
+    ASSERT_TRUE(
+        exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: ['7', null, [], {}, 7]}")));
+    ASSERT_FALSE(
+        exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: ['dup', 'dup', 7]}")));
+    ASSERT_FALSE(
+        exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: [{x: 1}, {x: 1}]}")));
 }
 
 TEST(MatchExpressionParserSchemaTest, ObjectMatchOnlyAcceptsAnObjectArgument) {
@@ -214,11 +226,12 @@ TEST(MatchExpressionParserSchemaTest, ObjectMatchCorrectlyParsesObjects) {
     auto result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT_FALSE(result.getValue()->matchesBSON(fromjson("{a: 1}")));
-    ASSERT_FALSE(result.getValue()->matchesBSON(fromjson("{a: {b: 'string'}}")));
-    ASSERT_FALSE(result.getValue()->matchesBSON(fromjson("{a: {b: -1}}")));
-    ASSERT_TRUE(result.getValue()->matchesBSON(fromjson("{a: {b: 1}}")));
-    ASSERT_FALSE(result.getValue()->matchesBSON(fromjson("{a: [{b: 0}]}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: 1}")));
+    ASSERT_FALSE(
+        exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: {b: 'string'}}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: {b: -1}}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: {b: 1}}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: [{b: 0}]}")));
 }
 
 TEST(MatchExpressionParserSchemaTest, ObjectMatchCorrectlyParsesNestedObjectMatch) {
@@ -232,13 +245,15 @@ TEST(MatchExpressionParserSchemaTest, ObjectMatchCorrectlyParsesNestedObjectMatc
     auto result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT_FALSE(result.getValue()->matchesBSON(fromjson("{a: 1}")));
-    ASSERT_FALSE(result.getValue()->matchesBSON(fromjson("{a: {b: {c: {}}}}")));
-    ASSERT_FALSE(result.getValue()->matchesBSON(fromjson("{a: {b: {c: 0}}}")));
-    ASSERT_TRUE(result.getValue()->matchesBSON(fromjson("{a: {b: {c: 'string'}}}")));
-    ASSERT_TRUE(result.getValue()->matchesBSON(fromjson("{a: {b: {c: 1}}}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: 1}")));
     ASSERT_FALSE(
-        result.getValue()->matchesBSON(fromjson("{a: [{b: 0}, {b: [{c: 0}, {c: 'string'}]}]}")));
+        exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: {b: {c: {}}}}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: {b: {c: 0}}}")));
+    ASSERT_TRUE(
+        exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: {b: {c: 'string'}}}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: {b: {c: 1}}}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(
+        result.getValue().get(), fromjson("{a: [{b: 0}, {b: [{c: 0}, {c: 'string'}]}]}")));
 }
 
 TEST(MatchExpressionParserSchemaTest, ObjectMatchSubExprRejectsPathlessOperators) {
@@ -260,12 +275,15 @@ TEST(MatchExpressionParserSchemaTest, MinLengthCorrectlyParsesIntegerArgument) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x"
-                                                << "a")));
-    ASSERT(result.getValue()->matchesBSON(BSON("x"
-                                               << "ab")));
-    ASSERT(result.getValue()->matchesBSON(BSON("x"
-                                               << "abc")));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x"
+                                            << "a")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x"
+                                           << "ab")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x"
+                                           << "abc")));
 }
 
 TEST(MatchExpressionParserSchemaTest, MinLengthCorrectlyParsesLongArgument) {
@@ -274,12 +292,15 @@ TEST(MatchExpressionParserSchemaTest, MinLengthCorrectlyParsesLongArgument) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x"
-                                                << "a")));
-    ASSERT(result.getValue()->matchesBSON(BSON("x"
-                                               << "ab")));
-    ASSERT(result.getValue()->matchesBSON(BSON("x"
-                                               << "abc")));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x"
+                                            << "a")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x"
+                                           << "ab")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x"
+                                           << "abc")));
 }
 
 TEST(MatchExpressionParserSchemaTest, MinLengthCorrectlyParsesDoubleArgumentAsInteger) {
@@ -288,12 +309,15 @@ TEST(MatchExpressionParserSchemaTest, MinLengthCorrectlyParsesDoubleArgumentAsIn
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x"
-                                                << "a")));
-    ASSERT(result.getValue()->matchesBSON(BSON("x"
-                                               << "ab")));
-    ASSERT(result.getValue()->matchesBSON(BSON("x"
-                                               << "abc")));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x"
+                                            << "a")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x"
+                                           << "ab")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x"
+                                           << "abc")));
 }
 
 TEST(MatchExpressionParserSchemaTest, MinLengthCorrectlyParsesDecimalArgumentAsInteger) {
@@ -302,12 +326,15 @@ TEST(MatchExpressionParserSchemaTest, MinLengthCorrectlyParsesDecimalArgumentAsI
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(!result.getValue()->matchesBSON(BSON("x"
-                                                << "a")));
-    ASSERT(result.getValue()->matchesBSON(BSON("x"
-                                               << "ab")));
-    ASSERT(result.getValue()->matchesBSON(BSON("x"
-                                               << "abc")));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x"
+                                            << "a")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x"
+                                           << "ab")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x"
+                                           << "abc")));
 }
 
 TEST(MatchExpressionParserSchemaTest, MinLengthFailsToParseNonIntegerArguments) {
@@ -344,12 +371,15 @@ TEST(MatchExpressionParserSchemaTest, MaxLengthCorrectlyParsesIntegerArgument) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(result.getValue()->matchesBSON(BSON("x"
-                                               << "a")));
-    ASSERT(result.getValue()->matchesBSON(BSON("x"
-                                               << "ab")));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x"
-                                                << "abc")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x"
+                                           << "a")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x"
+                                           << "ab")));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x"
+                                            << "abc")));
 }
 
 TEST(MatchExpressionParserSchemaTest, MaxLengthCorrectlyParsesLongArgument) {
@@ -358,12 +388,15 @@ TEST(MatchExpressionParserSchemaTest, MaxLengthCorrectlyParsesLongArgument) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(result.getValue()->matchesBSON(BSON("x"
-                                               << "a")));
-    ASSERT(result.getValue()->matchesBSON(BSON("x"
-                                               << "ab")));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x"
-                                                << "abc")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x"
+                                           << "a")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x"
+                                           << "ab")));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x"
+                                            << "abc")));
 }
 
 TEST(MatchExpressionParserSchemaTest, MaxLengthCorrectlyParsesDoubleArgumentAsInteger) {
@@ -372,12 +405,15 @@ TEST(MatchExpressionParserSchemaTest, MaxLengthCorrectlyParsesDoubleArgumentAsIn
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(result.getValue()->matchesBSON(BSON("x"
-                                               << "a")));
-    ASSERT(result.getValue()->matchesBSON(BSON("x"
-                                               << "ab")));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x"
-                                                << "abc")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x"
+                                           << "a")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x"
+                                           << "ab")));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x"
+                                            << "abc")));
 }
 
 TEST(MatchExpressionParserSchemaTest, MaxLengthorrectlyParsesDecimalArgumentAsInteger) {
@@ -386,12 +422,15 @@ TEST(MatchExpressionParserSchemaTest, MaxLengthorrectlyParsesDecimalArgumentAsIn
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(result.getStatus());
 
-    ASSERT(result.getValue()->matchesBSON(BSON("x"
-                                               << "a")));
-    ASSERT(result.getValue()->matchesBSON(BSON("x"
-                                               << "ab")));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x"
-                                                << "abc")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x"
+                                           << "a")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
+                                      BSON("x"
+                                           << "ab")));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
+                                       BSON("x"
+                                            << "abc")));
 }
 
 TEST(MatchExpressionParserSchemaTest, MaxLengthFailsToParseNonIntegerArguments) {
@@ -459,13 +498,14 @@ TEST(MatchExpressionParserSchemaTest, CondParsesThreeMatchExpresssions) {
     auto expr = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(expr.getStatus());
 
-    ASSERT_TRUE(expr.getValue()->matchesBSON(
-        fromjson("{climate: 'rainy', clothing: ['jacket', 'umbrella']}")));
-    ASSERT_TRUE(expr.getValue()->matchesBSON(
-        fromjson("{climate: 'sunny', clothing: ['shirt', 'shorts']}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(
+        expr.getValue().get(), fromjson("{climate: 'rainy', clothing: ['jacket', 'umbrella']}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(
+        expr.getValue().get(), fromjson("{climate: 'sunny', clothing: ['shirt', 'shorts']}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(),
+                                            fromjson("{climate: 'rainy', clothing: ['poncho']}")));
     ASSERT_FALSE(
-        expr.getValue()->matchesBSON(fromjson("{climate: 'rainy', clothing: ['poncho']}")));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{clothing: ['jacket']}")));
+        exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{clothing: ['jacket']}")));
 }
 
 TEST(MatchExpressionParserSchemaTest, MatchArrayIndexFailsToParseNonObjectArguments) {
@@ -539,9 +579,12 @@ TEST(MatchExpressionParserSchemaTest, MatchArrayIndexParsesSuccessfully) {
     auto matchArrayIndex = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(matchArrayIndex.getStatus());
 
-    ASSERT_TRUE(matchArrayIndex.getValue()->matchesBSON(fromjson("{foo: [-1, 0, 1]}")));
-    ASSERT_FALSE(matchArrayIndex.getValue()->matchesBSON(fromjson("{foo: [2, 'blah']}")));
-    ASSERT_FALSE(matchArrayIndex.getValue()->matchesBSON(fromjson("{foo: [{x: 'baz'}]}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(matchArrayIndex.getValue().get(),
+                                           fromjson("{foo: [-1, 0, 1]}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(matchArrayIndex.getValue().get(),
+                                            fromjson("{foo: [2, 'blah']}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(matchArrayIndex.getValue().get(),
+                                            fromjson("{foo: [{x: 'baz'}]}")));
 }
 
 TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, FailsToParseWithNegativeIndex) {
@@ -580,8 +623,10 @@ TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, ParsesCorreclyWithValid
     auto expr = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(expr.getStatus());
 
-    ASSERT_TRUE(expr.getValue()->matchesBSON(fromjson("{a: [5, 3, 3, 3, 3, 3]}")));
-    ASSERT_FALSE(expr.getValue()->matchesBSON(fromjson("{a: [3, 3, 3, 5, 3, 3]}")));
+    ASSERT_TRUE(
+        exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{a: [5, 3, 3, 3, 3, 3]}")));
+    ASSERT_FALSE(
+        exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{a: [3, 3, 3, 5, 3, 3]}")));
 }
 
 TEST(MatchExpressionParserSchemaTest, InternalTypeFailsToParseOnTypeMismatch) {
@@ -805,14 +850,17 @@ TEST(MatchExpressionParserSchemaTest, AllowedPropertiesParsesSuccessfully) {
     auto allowedProperties = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(allowedProperties.getStatus());
 
-    ASSERT_TRUE(allowedProperties.getValue()->matchesBSON(
-        fromjson("{phoneNumber: 123, address: 'earth'}")));
-    ASSERT_TRUE(allowedProperties.getValue()->matchesBSON(
-        fromjson("{phoneNumber: 3.14, workNumber: 456}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(allowedProperties.getValue().get(),
+                                           fromjson("{phoneNumber: 123, address: 'earth'}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(allowedProperties.getValue().get(),
+                                           fromjson("{phoneNumber: 3.14, workNumber: 456}")));
 
-    ASSERT_FALSE(allowedProperties.getValue()->matchesBSON(fromjson("{otherNumber: 'blah'}")));
-    ASSERT_FALSE(allowedProperties.getValue()->matchesBSON(fromjson("{phoneNumber: 'blah'}")));
-    ASSERT_FALSE(allowedProperties.getValue()->matchesBSON(fromjson("{other: 'blah'}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(allowedProperties.getValue().get(),
+                                            fromjson("{otherNumber: 'blah'}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(allowedProperties.getValue().get(),
+                                            fromjson("{phoneNumber: 'blah'}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(allowedProperties.getValue().get(),
+                                            fromjson("{other: 'blah'}")));
 }
 
 TEST(MatchExpressionParserSchemaTest, AllowedPropertiesAcceptsEmptyPropertiesAndPatternProperties) {
@@ -823,7 +871,7 @@ TEST(MatchExpressionParserSchemaTest, AllowedPropertiesAcceptsEmptyPropertiesAnd
     auto allowedProperties = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(allowedProperties.getStatus());
 
-    ASSERT_TRUE(allowedProperties.getValue()->matchesBSON(BSONObj()));
+    ASSERT_TRUE(exec::matcher::matchesBSON(allowedProperties.getValue().get(), BSONObj()));
 }
 
 TEST(MatchExpressionParserSchemaTest, AllowedPropertiesAcceptsEmptyOtherwiseExpression) {
@@ -834,7 +882,7 @@ TEST(MatchExpressionParserSchemaTest, AllowedPropertiesAcceptsEmptyOtherwiseExpr
     auto allowedProperties = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(allowedProperties.getStatus());
 
-    ASSERT_TRUE(allowedProperties.getValue()->matchesBSON(BSONObj()));
+    ASSERT_TRUE(exec::matcher::matchesBSON(allowedProperties.getValue().get(), BSONObj()));
 }
 
 TEST(MatchExpressionParserSchemaTest, EqParsesSuccessfully) {
@@ -843,9 +891,9 @@ TEST(MatchExpressionParserSchemaTest, EqParsesSuccessfully) {
     auto eqExpr = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(eqExpr.getStatus());
 
-    ASSERT_TRUE(eqExpr.getValue()->matchesBSON(fromjson("{foo: 1}")));
-    ASSERT_FALSE(eqExpr.getValue()->matchesBSON(fromjson("{foo: [1]}")));
-    ASSERT_FALSE(eqExpr.getValue()->matchesBSON(fromjson("{not_foo: 1}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(eqExpr.getValue().get(), fromjson("{foo: 1}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(eqExpr.getValue().get(), fromjson("{foo: [1]}")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(eqExpr.getValue().get(), fromjson("{not_foo: 1}")));
 }
 
 TEST(MatchExpressionParserSchemaTest, RootDocEqFailsToParseNonObjects) {
@@ -880,7 +928,7 @@ TEST(MatchExpressionParserSchemaTest, RootDocEqParsesSuccessfully) {
     auto eqExpr = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(eqExpr.getStatus());
 
-    ASSERT_TRUE(eqExpr.getValue()->matchesBSON(fromjson("{}")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(eqExpr.getValue().get(), fromjson("{}")));
 }
 
 }  // namespace

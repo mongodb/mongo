@@ -57,6 +57,7 @@
 #include "mongo/db/exec/geo_near.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/limit.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/exec/merge_sort.h"
 #include "mongo/db/exec/mock_stage.h"
 #include "mongo/db/exec/or.h"
@@ -462,7 +463,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                     invariant(!arrIt.more());
                     BSONObj doc = firstElt.embeddedObject();
 
-                    if (vsn->filter && !vsn->filter->matchesBSON(doc)) {
+                    if (vsn->filter && !exec::matcher::matchesBSON(vsn->filter.get(), doc)) {
                         mockStage->enqueueStateCode(PlanStage::NEED_TIME);
                     } else {
                         auto wsID = _ws->allocate();

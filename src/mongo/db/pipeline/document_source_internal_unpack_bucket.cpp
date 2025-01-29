@@ -52,6 +52,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -1020,7 +1021,8 @@ boost::optional<Document> DocumentSourceInternalUnpackBucket::getNextMatchingMea
         if (_eventFilter) {
             if (_unpackToBson) {
                 auto measure = _bucketUnpacker.getNextBson();
-                if (_bucketUnpacker.bucketMatchedQuery() || _eventFilter->matchesBSON(measure)) {
+                if (_bucketUnpacker.bucketMatchedQuery() ||
+                    exec::matcher::matchesBSON(_eventFilter.get(), measure)) {
                     return Document(measure);
                 }
             } else {
@@ -1032,7 +1034,7 @@ boost::optional<Document> DocumentSourceInternalUnpackBucket::getNextMatchingMea
                     : document_path_support::documentToBsonWithPaths(measure,
                                                                      _eventFilterDeps.fields);
                 if (_bucketUnpacker.bucketMatchedQuery() ||
-                    _eventFilter->matchesBSON(measureBson)) {
+                    exec::matcher::matchesBSON(_eventFilter.get(), measureBson)) {
                     return measure;
                 }
             }
@@ -1055,7 +1057,8 @@ DocumentSource::GetNextResult DocumentSourceInternalUnpackBucket::doGetNext() {
     auto nextResult = pSource->getNext();
     while (nextResult.isAdvanced()) {
         auto bucket = nextResult.getDocument().toBson();
-        auto bucketMatchedQuery = _wholeBucketFilter && _wholeBucketFilter->matchesBSON(bucket);
+        auto bucketMatchedQuery =
+            _wholeBucketFilter && exec::matcher::matchesBSON(_wholeBucketFilter.get(), bucket);
         _bucketUnpacker.reset(std::move(bucket), bucketMatchedQuery);
 
         uassert(5346509,

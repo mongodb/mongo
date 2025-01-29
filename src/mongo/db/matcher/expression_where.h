@@ -50,8 +50,6 @@ class WhereMatchExpression final : public WhereMatchExpressionBase {
 public:
     WhereMatchExpression(OperationContext* opCtx, WhereParams params, const DatabaseName& dbName);
 
-    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
-
     std::unique_ptr<MatchExpression> clone() const final;
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
@@ -76,11 +74,11 @@ public:
         _jsFunction = std::move(jsFunction);
     }
 
-private:
     void validateState() const {
         tassert(6403600, "JsFunction is unavailable", _jsFunction);
     }
 
+private:
     OperationContext* const _opCtx;
     std::unique_ptr<JsFunction> _jsFunction;
 };

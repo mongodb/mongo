@@ -31,7 +31,6 @@
 
 #include "mongo/db/hasher.h"
 #include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 
 namespace mongo {
 
@@ -74,18 +73,6 @@ public:
             clone->setTag(getTag()->clone());
         }
         return clone;
-    }
-
-    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const override {
-        // Sadly, we need to match EOO elements to null index keys, as a special case.
-        if (!dotted_path_support::extractElementAtPath(doc->toBSON(), path())) {
-            return BSONElementHasher::hash64(BSON("" << BSONNULL).firstElement(),
-                                             BSONElementHasher::DEFAULT_HASH_SEED) ==
-                _rhs.numberLong();
-        }
-
-        // Otherwise, we let this traversal work for us.
-        return PathMatchExpression::matches(doc, details);
     }
 
     StringData name() const final {

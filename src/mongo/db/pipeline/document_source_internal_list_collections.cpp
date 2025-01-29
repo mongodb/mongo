@@ -44,6 +44,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/list_collections_gen.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/document_source_coll_stats.h"
@@ -180,7 +181,8 @@ void DocumentSourceInternalListCollections::_buildCollectionsToReplyForDb(
 
     // Avoid computing a database that doesn't match the absorbed filter on the 'db' field.
     if (_absorbedMatch &&
-        !_absorbedMatch->getMatchExpression()->matchesBSON(BSON("db" << dbNameStr))) {
+        !exec::matcher::matchesBSON(_absorbedMatch->getMatchExpression(),
+                                    BSON("db" << dbNameStr))) {
         return;
     }
 
