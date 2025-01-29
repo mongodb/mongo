@@ -5,7 +5,8 @@
  * assumes_unsharded_collection,
  * requires_non_retryable_commands,
  * assumes_against_mongod_not_mongos,
- * requires_fcv_70
+ * requires_fcv_70,
+ * assumes_balancer_off,
  * ]
  */
 import {isFLE2ReplicationEnabled} from "jstests/fle2/libs/encrypted_client_util.js";

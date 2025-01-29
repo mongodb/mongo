@@ -6,15 +6,19 @@
  * requires_fcv_61,
  * ]
  */
+import {EncryptedClient, isEnterpriseShell} from "jstests/fle2/libs/encrypted_client_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTestWithAuth(conn, allowsRename, verifyFunction) {
-    const db = conn.getDB("test");
     const srcDbName = 'rename_encrypted_collection_src_db';
     const tgtDbName = 'rename_encrypted_collection_tgt_db';
-    const dbSrc = db.getSiblingDB(srcDbName);
-    const dbTgt = db.getSiblingDB(tgtDbName);
+
+    const srcDbClient = new EncryptedClient(conn, srcDbName);
+    const tgtDbClient = new EncryptedClient(conn, tgtDbName);
+
+    const dbSrc = srcDbClient.getDB();
+    const dbTgt = tgtDbClient.getDB();
 
     dbSrc.encrypted.drop();
     dbTgt.encrypted.drop();
@@ -33,12 +37,12 @@ function runTestWithAuth(conn, allowsRename, verifyFunction) {
     const srcEncryptedErrmsg = "Cannot rename an encrypted collection";
     const tgtEncryptedErrmsg = "Cannot rename to an existing encrypted collection";
 
-    assert.commandWorked(
-        dbSrc.createCollection("encrypted", {encryptedFields: sampleEncryptedFields}));
+    assert.commandWorked(srcDbClient.createEncryptionCollection(
+        "encrypted", {encryptedFields: sampleEncryptedFields}));
     assert.commandWorked(dbSrc.createCollection("unencrypted"));
 
-    assert.commandWorked(
-        dbTgt.createCollection("encrypted", {encryptedFields: sampleEncryptedFields}));
+    assert.commandWorked(tgtDbClient.createEncryptionCollection(
+        "encrypted", {encryptedFields: sampleEncryptedFields}));
 
     jsTestLog("Test renaming encrypted collection to another namespace is prohibited");
     verifyFunction(
@@ -95,6 +99,11 @@ function runTest(conn) {
         let res = assert.commandFailedWithCode(cmd, ErrorCodes.IllegalOperation, assertMsg);
         assert.eq(res.errmsg, errorMsg);
     });
+}
+
+if (!isEnterpriseShell()) {
+    jsTestLog("Skipping test as it requires the enterprise module");
+    quit();
 }
 
 jsTestLog("ReplicaSet: Testing fle2 collection rename");

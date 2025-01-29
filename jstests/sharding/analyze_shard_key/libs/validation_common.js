@@ -1,3 +1,4 @@
+import {EncryptedClient, isEnterpriseShell} from "jstests/fle2/libs/encrypted_client_util.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
 /*
@@ -17,19 +18,22 @@ export function ValidationTest(conn, _dbName) {
         listCollectionRes.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex");
 
     // Create an FLE collection.
-    const testFLECollName = "testFLEColl";
-    const sampleEncryptedFields = {
-        "fields": [
-            {
-                "path": "firstName",
-                "keyId": UUID("11d58b8a-0c6c-4d69-a0bd-70c6d9befae9"),
-                "bsonType": "string",
-                "queries": {"queryType": "equality"}  // allow single object or array
-            },
-        ]
-    };
-    assert.commandWorked(
-        db.createCollection(testFLECollName, {encryptedFields: sampleEncryptedFields}));
+    if (isEnterpriseShell()) {
+        const client = new EncryptedClient(conn, dbName);
+        const testFLECollName = "testFLEColl";
+        const sampleEncryptedFields = {
+            "fields": [
+                {
+                    "path": "firstName",
+                    "keyId": UUID("11d58b8a-0c6c-4d69-a0bd-70c6d9befae9"),
+                    "bsonType": "string",
+                    "queries": {"queryType": "equality"}  // allow single object or array
+                },
+            ]
+        };
+        assert.commandWorked(client.createEncryptionCollection(
+            testFLECollName, {encryptedFields: sampleEncryptedFields}));
+    }
 
     // Create a view.
     const testViewName = "testView";
@@ -70,12 +74,18 @@ export function ValidationTest(conn, _dbName) {
         {dbName: "admin", collName: "users"},
         // Cannot analyze a shard key or queries for a system collection.
         {dbName: dbName, collName: "system.profile"},
-        // Cannot analyze a shard key or queries for an FLE state collection.
-        {dbName: dbName, collName: "enxcol_.basic.esc"},
-        {dbName: dbName, collName: "enxcol_.basic.ecoc"},
-        // Cannot analyze a shard key or queries for a collection with FLE enabled.
-        {dbName: dbName, collName: "testFLEColl"},
-        {dbName: dbName, collName: testViewName, isView: true}
+        ...(
+            isEnterpriseShell()
+                ? [
+                    // Cannot analyze a shard key or queries for an FLE state collection.
+                    {dbName: dbName, collName: "enxcol_.basic.esc"},
+                    {dbName: dbName, collName: "enxcol_.basic.ecoc"},
+                    // Cannot analyze a shard key or queries for a collection with FLE enabled.
+                    {dbName: dbName, collName: "testFLEColl"},
+                    {dbName: dbName, collName: testViewName, isView: true}
+                  ]
+                : []
+        )
     ];
     const invalidShardKeyTestCases = [
         // Cannot analyze an empty shard key.

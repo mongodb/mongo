@@ -3,7 +3,8 @@
 /**
  * @tags: [
  * requires_fcv_80,
- * assumes_unsharded_collection
+ * assumes_unsharded_collection,
+ * assumes_balancer_off,
  * ]
  */
 let dbTest = db.getSiblingDB('create_range_encrypted_collection_db');

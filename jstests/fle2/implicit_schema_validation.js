@@ -4,7 +4,8 @@
  * @tags: [
  * assumes_unsharded_collection,
  * does_not_support_transactions,
- * requires_fcv_70
+ * requires_fcv_70,
+ * assumes_balancer_off,
  * ]
  */
 import {assertDocumentValidationFailure} from "jstests/libs/doc_validation_utils.js";

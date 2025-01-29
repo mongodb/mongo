@@ -46,9 +46,6 @@ selector:
     # support all timeseries/bucket namespace cases.
     - jstests/core/timeseries/ddl/timeseries_user_system_buckets.js
 
-    # TODO SERVER-89286 re-enable this test
-    - src/mongo/db/modules/enterprise/jstests/fle2/query/update_upsert.js
-
     # TODO: SERVER-85773 Reenable the following test once `cloneCollectionAsCapped` is supported on any shard
     - jstests/core/ddl/clone_collection_as_capped.js
 
