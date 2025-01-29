@@ -90,6 +90,197 @@
 			"redhat.vscode-yaml",
 			"streetsidesoftware.code-spell-checker",
 			"jasonnutter.vscode-codeowners",
+			"bazelbuild.vscode-bazel",
+			"rioj7.command-variable",
+			"augustocdias.tasks-shell-input"
+		]
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "launch",
+				"type": "cppdbg",
+				"request": "launch",
+				"program": "${workspaceFolder}/${input:runTargets}",
+				"args": [],
+				"stopAtEntry": false,
+				"cwd": "${workspaceFolder}",
+				"environment": [],
+				"externalConsole": false,
+				"MIMode": "gdb",
+				"setupCommands": [
+					{
+						"text": "set verbose",
+						"ignoreFailures": false
+					},
+					{
+						"text": "set directories ${workspaceFolder}",
+						"ignoreFailures": false
+					},
+					{
+						"text": "set debug-file-directory ${workspaceFolder}",
+						"ignoreFailures": false
+					},
+					{
+						"description": "Enable pretty-printing for gdb",
+						"text": "-enable-pretty-printing",
+						"ignoreFailures": false
+					},
+					{
+						"text": "source ${workspaceFolder}/buildscripts/gdb/mongo.py",
+						"ignoreFailures": false
+					},
+					{
+						"text": "source ${workspaceFolder}/buildscripts/gdb/optimizer_printers.py",
+						"ignoreFailures": false
+					},
+					{
+						"text": "source ${workspaceFolder}/buildscripts/gdb/mongo_printers.py",
+						"ignoreFailures": false
+					},
+					{
+						"text": "source ${workspaceFolder}/buildscripts/gdb/mongo_lock.py",
+						"ignoreFailures": false
+					},
+					{
+						"text": "source ${workspaceFolder}/buildscripts/gdb/wt_dump_table.py",
+						"ignoreFailures": false
+					},
+					{
+						"text": "source ${workspaceFolder}/src/third_party/immer/dist/tools/gdb_pretty_printers/autoload.py",
+						"ignoreFailures": false
+					},
+				],
+				"miDebuggerPath": "/opt/mongodbtoolchain/v4/bin/gdb",
+			},
+			{
+				"name": "attach",
+				"type": "cppdbg",
+				"request": "attach",
+				"program": "${workspaceFolder}/${input:runTargets}",
+				"processId": "${command:pickProcess}",
+				"MIMode": "gdb",
+				"setupCommands": [
+					{
+						"text": "set verbose",
+						"ignoreFailures": false
+					},
+					{
+						"text": "set directories ${workspaceFolder}",
+						"ignoreFailures": false
+					},
+					{
+						"text": "set debug-file-directory ${workspaceFolder}",
+						"ignoreFailures": false
+					},
+					{
+						"description": "Enable pretty-printing for gdb",
+						"text": "-enable-pretty-printing",
+						"ignoreFailures": false
+					},
+					{
+						"text": "source ${workspaceFolder}/buildscripts/gdb/mongo.py",
+						"ignoreFailures": false
+					},
+					{
+						"text": "source ${workspaceFolder}/buildscripts/gdb/optimizer_printers.py",
+						"ignoreFailures": false
+					},
+					{
+						"text": "source ${workspaceFolder}/buildscripts/gdb/mongo_printers.py",
+						"ignoreFailures": false
+					},
+					{
+						"text": "source ${workspaceFolder}/buildscripts/gdb/mongo_lock.py",
+						"ignoreFailures": false
+					},
+					{
+						"text": "source ${workspaceFolder}/buildscripts/gdb/wt_dump_table.py",
+						"ignoreFailures": false
+					},
+					{
+						"text": "source ${workspaceFolder}/src/third_party/immer/dist/tools/gdb_pretty_printers/autoload.py",
+						"ignoreFailures": false
+					},
+				],
+				"miDebuggerPath": "/opt/mongodbtoolchain/v4/bin/gdb",
+			},
+			{
+				"name": "coredump",
+				"type": "cppdbg",
+				"request": "launch",
+				"cwd": "${workspaceFolder}",
+				"program": "${workspaceFolder}/${input:runTargets}",
+				"args": [],
+				"MIMode": "gdb",
+				"miDebuggerPath": "/opt/mongodbtoolchain/v4/bin/gdb",
+				"setupCommands": [
+					{
+						"text": "set verbose",
+						"ignoreFailures": false
+					},
+					{
+						"text": "set directories ${workspaceFolder}",
+						"ignoreFailures": false
+					},
+					{
+						"text": "set debug-file-directory ${workspaceFolder}",
+						"ignoreFailures": false
+					},
+					{
+						"description": "Enable pretty-printing for gdb",
+						"text": "-enable-pretty-printing",
+						"ignoreFailures": false
+					},
+					{
+						"text": "source ${workspaceFolder}/buildscripts/gdb/mongo.py",
+						"ignoreFailures": false
+					},
+					{
+						"text": "source ${workspaceFolder}/buildscripts/gdb/optimizer_printers.py",
+						"ignoreFailures": false
+					},
+					{
+						"text": "source ${workspaceFolder}/buildscripts/gdb/mongo_printers.py",
+						"ignoreFailures": false
+					},
+					{
+						"text": "source ${workspaceFolder}/buildscripts/gdb/mongo_lock.py",
+						"ignoreFailures": false
+					},
+					{
+						"text": "source ${workspaceFolder}/buildscripts/gdb/wt_dump_table.py",
+						"ignoreFailures": false
+					},
+					{
+						"text": "source ${workspaceFolder}/src/third_party/immer/dist/tools/gdb_pretty_printers/autoload.py",
+						"ignoreFailures": false
+					},
+				],
+				"coreDumpPath": "${input:pickDumpFile}"
+			}
+		],
+		"inputs": [
+			{
+				"id": "pickDumpFile",
+				"type": "command",
+				"command": "extension.commandvariable.file.pickFile",
+				"args": {
+					"description": "Pick a core dump file",
+					"include": "*.core",
+					"cwd": "${workspaceFolder}"
+				}
+			},
+			{
+				"type": "command",
+				"id": "runTargets",
+				"command": "shellCommand.execute",
+				"args": {
+					"command": "bazel query 'attr(tags, \"mongo_binary\", //...)' union 'attr(tags, \"mongo_unittest\", //...)' | grep mongo | grep -v \"_with_debug\" | grep -v third_party | sed 's;//;bazel-bin/;g' | sed 's;:;/;g'",
+					"cwd": "${workspaceFolder}",
+				}
+			},
 		]
 	}
 }
