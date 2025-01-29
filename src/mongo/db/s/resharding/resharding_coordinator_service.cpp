@@ -29,6 +29,7 @@
 
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 
+#include "mongo/db/namespace_string.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include <absl/container/node_hash_map.h>
 #include <boost/cstdint.hpp>
@@ -340,39 +341,43 @@ ReshardingCoordinator::ReshardingCoordinator(
     _metrics->onStateTransition(boost::none, coordinatorDoc.getState());
 }
 
-void ReshardingCoordinator::installCoordinatorDoc(
-    OperationContext* opCtx, const ReshardingCoordinatorDocument& doc) noexcept {
+void ReshardingCoordinator::_installCoordinatorDoc(
+    const ReshardingCoordinatorDocument& doc) noexcept {
     invariant(doc.getReshardingUUID() == _coordinatorDoc.getReshardingUUID());
+    _coordinatorDoc = doc;
+}
+
+void ReshardingCoordinator::installCoordinatorDocOnStateTransition(
+    OperationContext* opCtx, const ReshardingCoordinatorDocument& doc) noexcept {
+    const auto previousState = _coordinatorDoc.getState();
+
+    _installCoordinatorDoc(doc);
 
     BSONObjBuilder bob;
-    bob.append("newState", CoordinatorState_serializer(doc.getState()));
-    bob.append("oldState", CoordinatorState_serializer(_coordinatorDoc.getState()));
-    bob.append(
-        "namespace",
-        NamespaceStringUtil::serialize(doc.getSourceNss(), SerializationContext::stateDefault()));
-    bob.append("collectionUUID", doc.getSourceUUID().toString());
-    bob.append("reshardingUUID", doc.getReshardingUUID().toString());
+    bob.append("newState", CoordinatorState_serializer(_coordinatorDoc.getState()));
+    bob.append("oldState", CoordinatorState_serializer(previousState));
+    bob.append("namespace",
+               NamespaceStringUtil::serialize(_coordinatorDoc.getSourceNss(),
+                                              SerializationContext::stateDefault()));
+    bob.append("collectionUUID", _coordinatorDoc.getSourceUUID().toString());
+    bob.append("reshardingUUID", _coordinatorDoc.getReshardingUUID().toString());
 
     LOGV2_INFO(5343001,
                "Transitioned resharding coordinator state",
-               "newState"_attr = CoordinatorState_serializer(doc.getState()),
-               "oldState"_attr = CoordinatorState_serializer(_coordinatorDoc.getState()),
-               logAttrs(doc.getSourceNss()),
-               "collectionUUID"_attr = doc.getSourceUUID(),
-               "reshardingUUID"_attr = doc.getReshardingUUID());
-
-    const auto previousState = _coordinatorDoc.getState();
-    _coordinatorDoc = doc;
+               "newState"_attr = CoordinatorState_serializer(_coordinatorDoc.getState()),
+               "oldState"_attr = CoordinatorState_serializer(previousState),
+               logAttrs(_coordinatorDoc.getSourceNss()),
+               "collectionUUID"_attr = _coordinatorDoc.getSourceUUID(),
+               "reshardingUUID"_attr = _coordinatorDoc.getReshardingUUID());
 
     _metrics->onStateTransition(previousState, _coordinatorDoc.getState());
 
     ShardingLogging::get(opCtx)->logChange(opCtx,
                                            "resharding.coordinator.transition",
-                                           doc.getSourceNss(),
+                                           _coordinatorDoc.getSourceNss(),
                                            bob.obj(),
                                            resharding::kMajorityWriteConcern);
 }
-
 void markCompleted(const Status& status, ReshardingMetrics* metrics) {
     if (status.isOK()) {
         metrics->onSuccess();
@@ -536,6 +541,9 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kCloning) {
                            _tellAllRecipientsToRefresh(executor);
                        }
+                   })
+                   .then([this, executor] {
+                       return _fetchAndPersistNumDocumentsToCloneFromDonors(executor);
                    })
                    .then([this, executor] { return _awaitAllRecipientsFinishedCloning(executor); })
                    .then([this, executor] {
@@ -1092,7 +1100,7 @@ void ReshardingCoordinator::_insertCoordDocAndChangeOrigCollEntry() {
     updatedCoordinatorDoc.setState(CoordinatorStateEnum::kInitializing);
     resharding::insertCoordDocAndChangeOrigCollEntry(
         opCtx.get(), _metrics.get(), updatedCoordinatorDoc);
-    installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
+    installCoordinatorDocOnStateTransition(opCtx.get(), updatedCoordinatorDoc);
 
     {
         // Note: don't put blocking or interruptible code in this block.
@@ -1169,7 +1177,7 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
                                                       std::move(zones),
                                                       std::move(indexVersion),
                                                       isUnsplittable);
-    installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
+    installCoordinatorDocOnStateTransition(opCtx.get(), updatedCoordinatorDoc);
 
     reshardingPauseCoordinatorAfterPreparingToDonate.pauseWhileSetAndNotCanceled(
         opCtx.get(), _ctHolder->getAbortToken());
@@ -1235,6 +1243,106 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllDonorsReadyToDonate(
         .then([this] { return _waitForMajority(_ctHolder->getAbortToken()); });
 }
 
+ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneFromDonors(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    // The exact numbers of documents to copy are only need for verification so don't fetch them if
+    // verification is not enabled
+    if (_coordinatorDoc.getState() > CoordinatorStateEnum::kCloning ||
+        !_metadata.getPerformVerification()) {
+        return ExecutorFuture<void>(**executor, Status::OK());
+    }
+
+    invariant(_coordinatorDoc.getCloneTimestamp());
+
+    LOGV2(9858100,
+          "Fetching the number of documents to copy from all donor shards.",
+          "reshardingUUID"_attr = _coordinatorDoc.getReshardingUUID());
+
+    return ExecutorFuture<void>(**executor).then([this, anchor = shared_from_this(), executor] {
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+        auto cri = uassertStatusOK(
+            RoutingInformationCache::get(opCtx.get())
+                ->getCollectionRoutingInfoAt(opCtx.get(),
+                                             _coordinatorDoc.getSourceNss(),
+                                             _coordinatorDoc.getCloneTimestamp().get()));
+
+        auto donorShards = _coordinatorDoc.getDonorShards();
+        stdx::unordered_map<int, ExecutorFuture<int64_t>> getDocumentsToCopyFutures;
+
+        auto donorShardsIndex = 0;
+        for (auto& shardEntry : donorShards) {
+            if (!shardEntry.getDocumentsToCopy()) {
+                auto shardId = shardEntry.getId();
+                auto shardVersion = cri.getShardVersion(shardId);
+                auto getDocumentsToCopyFuture =
+                    resharding::WithAutomaticRetry([this, executor, shardId, shardVersion] {
+                        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                        return _reshardingCoordinatorExternalState->getDocumentsToCopyFromShard(
+                            opCtx.get(),
+                            shardId,
+                            shardVersion,
+                            _coordinatorDoc.getSourceNss(),
+                            _coordinatorDoc.getCloneTimestamp().get());
+                    })
+                        .onTransientError([&shardEntry](const Status& status) {
+                            LOGV2(9858104,
+                                  "Resharding coordinator encountered transient error while "
+                                  "fetching the number of documents from donor shard.",
+                                  "shardId"_attr = shardEntry.getId(),
+                                  "error"_attr = status);
+                        })
+                        .onUnrecoverableError([](const Status& status) {})
+                        .until<StatusWith<int64_t>>(
+                            [](const StatusWith<int64_t> status) -> bool { return status.isOK(); })
+                        .withBackoffBetweenIterations(kExponentialBackoff)
+                        .on(**executor, _ctHolder->getAbortToken())
+                        .onCompletion([](StatusWith<int64_t> statusWith) -> Future<int64_t> {
+                            if (!statusWith.isOK()) {
+                                return Future<int64_t>::makeReady(statusWith.getStatus());
+                            }
+                            return Future<int64_t>::makeReady(statusWith.getValue());
+                        });
+
+
+                getDocumentsToCopyFutures.emplace(donorShardsIndex,
+                                                  std::move(getDocumentsToCopyFuture));
+            }
+            donorShardsIndex++;
+        }
+
+        for (const auto& [donorShardsIndex, future] : getDocumentsToCopyFutures) {
+            try {
+                const int64_t documentsToCopy = future.get();
+                donorShards[donorShardsIndex].setDocumentsToCopy(documentsToCopy);
+            } catch (const DBException& ex) {
+                LOGV2_ERROR(9858101,
+                            "Failed to fetch the number of documents to copy from donor shard.",
+                            "reshardingUUID"_attr = _coordinatorDoc.getReshardingUUID(),
+                            "shardId"_attr = donorShards[donorShardsIndex].getId());
+                return ex.toStatus();
+            }
+        }
+
+        auto updatedCoordinatorDoc = _coordinatorDoc;
+        updatedCoordinatorDoc.setDonorShards(donorShards);
+
+        resharding::executeMetadataChangesInTxn(
+            opCtx.get(), [&updatedCoordinatorDoc](OperationContext* opCtx, TxnNumber txnNumber) {
+                // Metrics are null because we are not transitioning state and do not want to write
+                // any metrics.
+                resharding::writeToCoordinatorStateNss(
+                    opCtx, nullptr, updatedCoordinatorDoc, txnNumber);
+            });
+        // We call _installCoordinatorDoc instead of installCoordinatorDocOnStateTransition because
+        // we do not to udpate any metrics or print any logs indicating we transitioned states.
+        _installCoordinatorDoc(updatedCoordinatorDoc);
+        LOGV2(9858106,
+              "Finished fetching the number of documents to copy from all donor shards.",
+              "reshardingUUID"_attr = _coordinatorDoc.getReshardingUUID());
+        return Status::OK();
+    });
+}
+
 ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedCloning(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kCloning) {
@@ -1245,10 +1353,17 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedCloning(
                _reshardingCoordinatorObserver->awaitAllRecipientsFinishedCloning(),
                _ctHolder->getAbortToken())
         .thenRunOn(**executor)
-        .then([this](const ReshardingCoordinatorDocument& coordinatorDocChangedOnDisk) {
+        .then([this](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
             if (_metadata.getPerformVerification() &&
                 MONGO_unlikely(reshardingPerformValidationAfterCloning.shouldFail())) {
                 auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                // Fetch the coordinator doc from disk since the 'coordinatorDocChangedOnDisk' above
+                // came from the OpObserver and may not reflect the latest version coordinator doc
+                // because the write to populate donor 'documentsToCopy' metrics (to be used for
+                // verification) may occur after all recipients have finished cloning and updated
+                // the coordinator doc.
+                coordinatorDocChangedOnDisk = resharding::getCoordinatorDoc(
+                    opCtx.get(), coordinatorDocChangedOnDisk.getReshardingUUID());
                 _reshardingCoordinatorExternalState->verifyClonedCollection(
                     opCtx.get(), coordinatorDocChangedOnDisk);
             }
@@ -1459,7 +1574,7 @@ void ReshardingCoordinator::_commit(const ReshardingCoordinatorDocument& coordin
                                             reshardedCollectionPlacement);
 
     // Update the in memory state
-    installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
+    installCoordinatorDocOnStateTransition(opCtx.get(), updatedCoordinatorDoc);
 }
 
 void ReshardingCoordinator::_generateOpEventOnCoordinatingShard(
@@ -1571,7 +1686,7 @@ void ReshardingCoordinator::_updateCoordinatorDocStateAndCatalogEntries(
         opCtx.get(), _metrics.get(), updatedCoordinatorDoc);
 
     // Update in-memory coordinator doc
-    installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
+    installCoordinatorDocOnStateTransition(opCtx.get(), updatedCoordinatorDoc);
 }
 
 void ReshardingCoordinator::_removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
@@ -1580,7 +1695,7 @@ void ReshardingCoordinator::_removeOrQuiesceCoordinatorDocAndRemoveReshardingFie
         opCtx, _metrics.get(), _coordinatorDoc, abortReason);
 
     // Update in-memory coordinator doc.
-    installCoordinatorDoc(opCtx, updatedCoordinatorDoc);
+    installCoordinatorDocOnStateTransition(opCtx, updatedCoordinatorDoc);
 }
 
 template <typename CommandType>

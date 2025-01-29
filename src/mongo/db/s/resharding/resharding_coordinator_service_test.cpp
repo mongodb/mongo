@@ -30,7 +30,6 @@
 #include <absl/container/node_hash_map.h>
 #include <boost/optional.hpp>
 #include <functional>
-#include <mutex>
 #include <string>
 
 #include <boost/move/utility_core.hpp>
@@ -41,12 +40,10 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/member_state.h"
@@ -71,9 +68,7 @@
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/database_version.h"
@@ -100,11 +95,17 @@ using OpObserverForTest = resharding_service_test_helpers::
 using PauseDuringStateTransitions =
     resharding_service_test_helpers::PauseDuringStateTransitions<CoordinatorStateEnum>;
 
+int64_t convertShardIdToLong(const ShardId& shardId) {
+    return static_cast<int64_t>(std::hash<std::string>{}(shardId.toString()));
+}
+
 class ExternalStateForTest : public ReshardingCoordinatorExternalState {
 public:
     struct Options {
         boost::optional<ErrorCodes::Error> verifyClonedErrorCode;
         boost::optional<ErrorCodes::Error> verifyFinalErrorCode;
+        boost::optional<ErrorCodes::Error> getDocumentsToCopyErrorCode;
+        boost::optional<int64_t> getDocumentsToCopyResponse;
     };
 
     ExternalStateForTest(Options options)
@@ -129,6 +130,21 @@ public:
         }
         return ParticipantShardsAndChunks(
             {coordinatorDoc.getDonorShards(), coordinatorDoc.getRecipientShards(), initialChunks});
+    }
+
+    StatusWith<int64_t> getDocumentsToCopyFromShard(OperationContext* opCtx,
+                                                    const ShardId& shardId,
+                                                    const ShardVersion& shardVersion,
+                                                    const NamespaceString& nss,
+                                                    const Timestamp& cloneTimestamp) override {
+        if (_options.getDocumentsToCopyErrorCode) {
+            uasserted(*_options.getDocumentsToCopyErrorCode, "Failing call to getDocumentsToCopy.");
+        }
+
+        if (_options.getDocumentsToCopyResponse) {
+            return StatusWith<int64_t>(*_options.getDocumentsToCopyResponse);
+        }
+        return StatusWith<int64_t>(convertShardIdToLong(shardId));
     }
 
     void verifyClonedCollection(OperationContext* opCtx,
@@ -1070,6 +1086,24 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
             coordinator->onOkayToEnterCritical();
         }
 
+        auto coordinatorDoc = getCoordinatorDoc(opCtx);
+        if (coordinatorDoc.getCommonReshardingMetadata().getPerformVerification() &&
+            coordinatorDoc.getState() >= CoordinatorStateEnum::kApplying) {
+            // The donor shards in the coordinator doc should have values for documentsToCopy if
+            // the state is greater than or equal to applying.
+            for (auto& shardEntry : coordinatorDoc.getDonorShards()) {
+                auto shardId = shardEntry.getId();
+                ASSERT_EQUALS(shardEntry.getDocumentsToCopy(), convertShardIdToLong(shardId));
+            }
+        }
+
+        if (!coordinatorDoc.getCommonReshardingMetadata().getPerformVerification() &&
+            coordinatorDoc.getState() >= CoordinatorStateEnum::kApplying) {
+            for (auto& donorShardEntry : coordinatorDoc.getDonorShards()) {
+                ASSERT_FALSE(donorShardEntry.getDocumentsToCopy().has_value());
+            }
+        }
+
         // 'done' state is never written to storage so don't wait for it.
         waitUntilCommittedCoordinatorDocReach(opCtx, state);
     }
@@ -1591,6 +1625,113 @@ TEST_F(ReshardingCoordinatorServiceFailFinalVerificationTest, CommitIfNotPerform
                                CoordinatorStateEnum::kBlockingWrites,
                                CoordinatorStateEnum::kCommitting},
                               reshardingOptions);
+}
+
+TEST_F(
+    ReshardingCoordinatorServiceTest,
+    CoordinatorDocDonorShardEntriesShouldHaveDocumentsToCopyIfStateGreaterThanOrEqualToApplying) {
+    auto reshardingOptions = makeDefaultReshardingOptions();
+    auto checkPersistentStates = [&] {
+        auto opCtx = operationContext();
+        auto coordinatorDoc = getCoordinatorDoc(opCtx);
+        if (coordinatorDoc.getState() >= CoordinatorStateEnum::kApplying) {
+            for (auto& donorShardEntry : coordinatorDoc.getDonorShards()) {
+                ASSERT_EQUALS(donorShardEntry.getDocumentsToCopy(),
+                              convertShardIdToLong(donorShardEntry.getId()));
+            }
+        }
+    };
+
+    auto transitionFunctions =
+        TransitionFunctionMap{{CoordinatorStateEnum::kCloning, checkPersistentStates},
+                              {CoordinatorStateEnum::kApplying, checkPersistentStates},
+                              {CoordinatorStateEnum::kBlockingWrites, checkPersistentStates},
+                              {CoordinatorStateEnum::kCommitting, checkPersistentStates}};
+    auto states = {CoordinatorStateEnum::kPreparingToDonate,
+                   CoordinatorStateEnum::kCloning,
+                   CoordinatorStateEnum::kApplying,
+                   CoordinatorStateEnum::kBlockingWrites,
+                   CoordinatorStateEnum::kCommitting};
+    runReshardingToCompletion(
+        transitionFunctions, nullptr /* stateTransitionsGuard */, states, reshardingOptions);
+}
+
+class ReshardingCoordinatorServiceNoVerificationGetDocumentsToCopy
+    : public ReshardingCoordinatorServiceTestBase {
+public:
+    ExternalStateForTest::Options getExternalStateOptions() const override {
+        return {.getDocumentsToCopyErrorCode = getDocumentsToCopyErrorCode};
+    }
+
+protected:
+    const ErrorCodes::Error getDocumentsToCopyErrorCode{9858108};
+};
+
+TEST_F(ReshardingCoordinatorServiceNoVerificationGetDocumentsToCopy,
+       CoordinatorDocDonorShardEntriesShouldNotHaveDocumentsToCopyIfPerformVerificationIsFalse) {
+    auto reshardingOptions = makeDefaultReshardingOptions();
+    reshardingOptions.performVerification = false;
+    auto checkPersistentStates = [&] {
+        auto opCtx = operationContext();
+        auto coordinatorDoc = getCoordinatorDoc(opCtx);
+        if (coordinatorDoc.getState() >= CoordinatorStateEnum::kApplying) {
+            for (auto& donorShardEntry : coordinatorDoc.getDonorShards()) {
+                ASSERT_FALSE(donorShardEntry.getDocumentsToCopy().has_value());
+            }
+        }
+    };
+
+    auto transitionFunctions =
+        TransitionFunctionMap{{CoordinatorStateEnum::kCloning, checkPersistentStates},
+                              {CoordinatorStateEnum::kApplying, checkPersistentStates},
+                              {CoordinatorStateEnum::kBlockingWrites, checkPersistentStates},
+                              {CoordinatorStateEnum::kCommitting, checkPersistentStates}};
+    auto states = {CoordinatorStateEnum::kPreparingToDonate,
+                   CoordinatorStateEnum::kCloning,
+                   CoordinatorStateEnum::kApplying,
+                   CoordinatorStateEnum::kBlockingWrites,
+                   CoordinatorStateEnum::kCommitting};
+    runReshardingToCompletion(
+        transitionFunctions, nullptr /* stateTransitionsGuard */, states, reshardingOptions);
+}
+
+class ReshardingCoordinatorServiceReturnZeroFromGetDocumentsToCopy
+    : public ReshardingCoordinatorServiceTestBase {
+public:
+    ExternalStateForTest::Options getExternalStateOptions() const override {
+        return {.getDocumentsToCopyResponse = getDocumentsToCopyResponse};
+    }
+
+protected:
+    const int64_t getDocumentsToCopyResponse = 0;
+};
+
+TEST_F(ReshardingCoordinatorServiceReturnZeroFromGetDocumentsToCopy,
+       CoordinatorDocDonorShardEntriesShouldHaveDocumentsToCopyEvenWithZeroDocuments) {
+    auto reshardingOptions = makeDefaultReshardingOptions();
+    auto checkPersistentStates = [&] {
+        auto opCtx = operationContext();
+        auto coordinatorDoc = getCoordinatorDoc(opCtx);
+        if (coordinatorDoc.getState() >= CoordinatorStateEnum::kApplying) {
+            for (auto& donorShardEntry : coordinatorDoc.getDonorShards()) {
+                ASSERT_TRUE(donorShardEntry.getDocumentsToCopy().has_value());
+                ASSERT_EQUALS(*donorShardEntry.getDocumentsToCopy(), (int64_t)0);
+            }
+        }
+    };
+
+    auto transitionFunctions =
+        TransitionFunctionMap{{CoordinatorStateEnum::kCloning, checkPersistentStates},
+                              {CoordinatorStateEnum::kApplying, checkPersistentStates},
+                              {CoordinatorStateEnum::kBlockingWrites, checkPersistentStates},
+                              {CoordinatorStateEnum::kCommitting, checkPersistentStates}};
+    auto states = {CoordinatorStateEnum::kPreparingToDonate,
+                   CoordinatorStateEnum::kCloning,
+                   CoordinatorStateEnum::kApplying,
+                   CoordinatorStateEnum::kBlockingWrites,
+                   CoordinatorStateEnum::kCommitting};
+    runReshardingToCompletion(
+        transitionFunctions, nullptr /* stateTransitionsGuard */, states, reshardingOptions);
 }
 
 }  // namespace

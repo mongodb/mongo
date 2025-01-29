@@ -480,5 +480,8 @@ inline Status validateReshardBlockingWritesO2FieldType(const std::string& value)
 
 Date_t getCurrentTime();
 
+ReshardingCoordinatorDocument getCoordinatorDoc(OperationContext* opCtx,
+                                                const UUID& reshardingUUID);
+
 }  // namespace resharding
 }  // namespace mongo

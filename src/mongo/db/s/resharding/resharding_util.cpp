@@ -643,5 +643,19 @@ Date_t getCurrentTime() {
     return svcCtx->getFastClockSource()->now();
 }
 
+ReshardingCoordinatorDocument getCoordinatorDoc(OperationContext* opCtx,
+                                                const UUID& reshardingUUID) {
+    DBDirectClient client(opCtx);
+
+    auto doc = client.findOne(
+        NamespaceString::kConfigReshardingOperationsNamespace,
+        BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName << reshardingUUID));
+    uassert(9858105,
+            str::stream() << "Could not find the coordinator document for the resharding operation "
+                          << reshardingUUID.toString(),
+            !doc.isEmpty());
+    return ReshardingCoordinatorDocument::parse(IDLParserContext("getCoordinatorDoc"), doc);
+}
+
 }  // namespace resharding
 }  // namespace mongo

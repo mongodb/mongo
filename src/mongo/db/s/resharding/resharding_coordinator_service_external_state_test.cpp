@@ -35,6 +35,7 @@
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/resharding/recipient_resume_document_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/s/shard_version_factory.h"
 #include "mongo/unittest/assert.h"
 
 
@@ -180,6 +181,32 @@ public:
         });
     }
 
+    auto mockDonorShardDocumentCountResponse(const std::vector<BSONObj>& responseDocuments,
+                                             const NamespaceString& nss) {
+        return launchAsync([&]() {
+            onCommand([&](const auto& request) -> StatusWith<BSONObj> {
+                auto parsedRequest = idl::parseCommandDocument<AggregateCommandRequest>(
+                    IDLParserContext("ReshardingCoordinatorExternalStateTest"),
+                    request.cmdObj.addFields(BSON("$db" << nss.db_forTest())));
+                ASSERT_EQUALS(parsedRequest.getNamespace(), nss);
+                ASSERT_BSONOBJ_EQ((*parsedRequest.getReadConcern()).toBSON()["readConcern"].Obj(),
+                                  BSON("level"
+                                       << "snapshot"
+                                       << "atClusterTime" << cloneTimestamp));
+                ASSERT_BSONOBJ_EQ((*parsedRequest.getUnwrappedReadPref())["$readPreference"].Obj(),
+                                  BSON("mode"
+                                       << "secondaryPreferred"));
+                ASSERT_BSONOBJ_EQ(*parsedRequest.getHint(), BSON("_id" << 1));
+                ASSERT_BSONOBJ_EQ(parsedRequest.getPipeline()[0],
+                                  BSON("$count"
+                                       << "count"));
+                ASSERT_EQUALS(*parsedRequest.getShardVersion(), shardVersion);
+                CursorResponse response(nss, 0 /* cursorId */, responseDocuments);
+                return response.toBSON(CursorResponse::ResponseType::InitialResponse);
+            });
+        });
+    }
+
 protected:
     const ShardId shardId0{"shard0"};
     const ShardId shardId1{"shard1"};
@@ -192,6 +219,12 @@ protected:
     const NamespaceString _tempNss =
         resharding::constructTemporaryReshardingNss(_sourceNss, _sourceUUID);
     const BSONObj _shardKey = BSON("skey" << 1);
+    const Timestamp cloneTimestamp = Timestamp(220, 220);
+
+    const ShardVersion shardVersion = ShardVersionFactory::make(
+        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(224, 224)},
+                     CollectionPlacement(10, 1)),
+        boost::optional<CollectionIndexes>(boost::none));
 };
 
 TEST_F(ReshardingCoordinatorServiceExternalStateTest, VerifyClonedCollectionSuccess_Basic) {
@@ -623,6 +656,43 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest,
     ASSERT_THROWS_CODE(externalState.verifyFinalCollection(operationContext(), coordinatorDoc),
                        DBException,
                        9929905);
+}
+
+TEST_F(ReshardingCoordinatorServiceExternalStateTest, GetDocumentsToCopyFromShard_SuccessBasic) {
+
+    BSONObjBuilder builder;
+    builder.append("count", 656);
+
+    std::vector<BSONObj> responseDocuments = {builder.obj()};
+
+    auto future = mockDonorShardDocumentCountResponse(responseDocuments, _sourceNss);
+
+    auto opCtx = operationContext();
+
+    ReshardingCoordinatorExternalStateImpl externalState;
+    StatusWith<int64_t> result = externalState.getDocumentsToCopyFromShard(
+        opCtx, shardId0, shardVersion, _sourceNss, cloneTimestamp);
+    ASSERT_TRUE(result.isOK());
+    ASSERT_EQUALS(result.getValue(), 656);
+    future.default_timed_get();
+}
+
+TEST_F(ReshardingCoordinatorServiceExternalStateTest,
+       GetDocumentsToCopyFromShard_SuccessNoDocuments) {
+
+    std::vector<BSONObj> responseDocuments = {};
+
+    auto future = mockDonorShardDocumentCountResponse(responseDocuments, _sourceNss);
+
+    auto opCtx = operationContext();
+
+    ReshardingCoordinatorExternalStateImpl externalState;
+
+    StatusWith<int64_t> result = externalState.getDocumentsToCopyFromShard(
+        opCtx, shardId0, shardVersion, _sourceNss, cloneTimestamp);
+    ASSERT_TRUE(result.isOK());
+    ASSERT_EQUALS(result.getValue(), 0);
+    future.default_timed_get();
 }
 
 }  // namespace

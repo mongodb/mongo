@@ -63,6 +63,12 @@ public:
     virtual ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
         OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) = 0;
 
+    virtual StatusWith<int64_t> getDocumentsToCopyFromShard(OperationContext* opCtx,
+                                                            const ShardId& shardId,
+                                                            const ShardVersion& shardVersion,
+                                                            const NamespaceString& nss,
+                                                            const Timestamp& cloneTimestamp) = 0;
+
     ChunkVersion calculateChunkVersionForInitialChunks(OperationContext* opCtx);
 
     boost::optional<CollectionIndexes> getCatalogIndexVersion(OperationContext* opCtx,
@@ -103,6 +109,12 @@ class ReshardingCoordinatorExternalStateImpl final : public ReshardingCoordinato
 public:
     ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
         OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) override;
+
+    StatusWith<int64_t> getDocumentsToCopyFromShard(OperationContext* opCtx,
+                                                    const ShardId& shardId,
+                                                    const ShardVersion& shardVersion,
+                                                    const NamespaceString& nss,
+                                                    const Timestamp& cloneTimestamp) override;
 
     void verifyClonedCollection(OperationContext* opCtx,
                                 const ReshardingCoordinatorDocument& coordinatorDoc) override;

@@ -222,11 +222,16 @@ public:
      */
     void abort(bool skipQuiescePeriod = false);
 
-    /**
-     * Replace in-memory representation of the CoordinatorDoc
+    /*
+     * Sets _coordinatorDoc equal to the supplied doc.
      */
-    void installCoordinatorDoc(OperationContext* opCtx,
-                               const ReshardingCoordinatorDocument& doc) noexcept;
+    void _installCoordinatorDoc(const ReshardingCoordinatorDocument& doc) noexcept;
+
+    /**
+     * Replace in-memory representation of the CoordinatorDoc and logs state transition.
+     */
+    void installCoordinatorDocOnStateTransition(OperationContext* opCtx,
+                                                const ReshardingCoordinatorDocument& doc) noexcept;
 
     CommonReshardingMetadata getMetadata() const {
         return _metadata;
@@ -381,6 +386,13 @@ private:
      * below a configurable threshold (i.e., `remainingReshardingOperationTimeThresholdMillis`).
      */
     void _startCommitMonitor(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    /**
+     * Fetches the number of documents to clone from all donor shards involved in resharding and
+     * persists the value for each donor shard entry in the coordinator state document.
+     */
+    ExecutorFuture<void> _fetchAndPersistNumDocumentsToCloneFromDonors(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
      * Waits on _reshardingCoordinatorObserver to notify that all recipients have finished

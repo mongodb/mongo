@@ -145,21 +145,30 @@ void assertNumDocsMatchedEqualsExpected(const BatchedCommandRequest& request,
             expected == numDocsMatched);
 }
 
-void appendShardEntriesToSetBuilder(const ReshardingCoordinatorDocument& coordinatorDoc,
-                                    BSONObjBuilder& setBuilder) {
+void appendDonorShardEntriesToSetBuilder(const ReshardingCoordinatorDocument& coordinatorDoc,
+                                         BSONObjBuilder& setBuilder) {
     BSONArrayBuilder donorShards(
         setBuilder.subarrayStart(ReshardingCoordinatorDocument::kDonorShardsFieldName));
     for (const auto& donorShard : coordinatorDoc.getDonorShards()) {
         donorShards.append(donorShard.toBSON());
     }
     donorShards.doneFast();
+}
 
+void appendRecipientShardEntriesToSetBuilder(const ReshardingCoordinatorDocument& coordinatorDoc,
+                                             BSONObjBuilder& setBuilder) {
     BSONArrayBuilder recipientShards(
         setBuilder.subarrayStart(ReshardingCoordinatorDocument::kRecipientShardsFieldName));
     for (const auto& recipientShard : coordinatorDoc.getRecipientShards()) {
         recipientShards.append(recipientShard.toBSON());
     }
     recipientShards.doneFast();
+}
+
+void appendShardEntriesToSetBuilder(const ReshardingCoordinatorDocument& coordinatorDoc,
+                                    BSONObjBuilder& setBuilder) {
+    appendDonorShardEntriesToSetBuilder(coordinatorDoc, setBuilder);
+    appendRecipientShardEntriesToSetBuilder(coordinatorDoc, setBuilder);
 }
 
 void unsetInitializingFields(BSONObjBuilder& updateBuilder) {
@@ -1012,6 +1021,13 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
                                 TxnNumber txnNumber) {
     Date_t timestamp = resharding::getCurrentTime();
     auto nextState = coordinatorDoc.getState();
+
+    // We only need to check one donorShardEntry for documentsToCopy because it will either be set
+    // on all entries or on none of them.
+    auto shouldUpdateDonorShardEntriesDocumentsToClone =
+        nextState == CoordinatorStateEnum::kCloning && !coordinatorDoc.getDonorShards().empty() &&
+        coordinatorDoc.getDonorShards().front().getDocumentsToCopy();
+
     BatchedCommandRequest request([&] {
         switch (nextState) {
             case CoordinatorStateEnum::kInitializing:
@@ -1083,6 +1099,13 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
                         setBuilder.doneFast();
                         unsetInitializingFields(updateBuilder);
                     }
+
+                    // If we are in the cloning state and at least one donor shard has data set for
+                    // documents to copy
+                    if (shouldUpdateDonorShardEntriesDocumentsToClone) {
+                        appendDonorShardEntriesToSetBuilder(coordinatorDoc, setBuilder);
+                        setBuilder.doneFast();
+                    }
                 }
 
                 return BatchedCommandRequest::buildUpdateOp(
@@ -1107,8 +1130,11 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
         assertNumDocsMatchedEqualsExpected(request, res, *expectedNumMatched);
     }
 
-    // When moving from quiescing to done, we don't have metrics available.
-    invariant(metrics || nextState == CoordinatorStateEnum::kDone);
+    // When moving from quiescing to done, we don't have metrics available, and when
+    // we are in the cloning state and are updating the donor shard entries we do not have metrics.
+    invariant(metrics ||
+              (nextState == CoordinatorStateEnum::kDone ||
+               shouldUpdateDonorShardEntriesDocumentsToClone));
     if (metrics) {
         setMeticsAfterWrite(metrics, nextState, timestamp);
     }
