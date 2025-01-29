@@ -135,6 +135,12 @@ filters:
   - "*transaction*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "*transaction_resources.h":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "*transaction_resources.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "*txn*":
     approvers:
       - 10gen/server-cluster-scalability

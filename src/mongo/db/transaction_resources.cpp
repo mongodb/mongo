@@ -179,6 +179,7 @@ void TransactionResources::releaseAllResourcesOnCommitOrAbort() noexcept {
     acquiredCollections.clear();
     acquiredViews.clear();
     yielded.reset();
+    catalogEpoch.reset();
 }
 
 void TransactionResources::assertNoAcquiredCollections() const {

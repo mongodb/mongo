@@ -396,6 +396,12 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
     invariant(txnResources.state != shard_role_details::TransactionResources::State::FAILED,
               "Cannot make a new acquisition in the FAILED state");
 
+    // Record the catalog epoch at the first acquisition. This is necessary to detect epoch changes
+    // among different catalog snapshots at every restore.
+    if (!txnResources.catalogEpoch) {
+        txnResources.catalogEpoch = catalog.getEpoch();
+    }
+
     auto currentAcquireCallNum = txnResources.increaseAcquireCollectionCallCount();
 
     for (auto& acquisitionRequest : sortedAcquisitionRequests) {
@@ -1501,6 +1507,18 @@ void restoreTransactionResourcesToOperationContext(
         auto requests = toNamespaceStringOrUUIDs(transactionResources.acquiredCollections);
         auto catalog = getConsistentCatalogAndSnapshot(opCtx, requests);
 
+        // The catalog epoch changes every time a replication rollback is performed. If a rollback
+        // occurs while the query is yielded, the query might be resumed on a earlier point in
+        // time which can lead to anomalies. To avoid potential issues, the query must be
+        // terminated.
+        tassert(9935000,
+                "Found a collection acquisition without catalog epoch",
+                transactionResources.catalogEpoch.has_value());
+        int64_t catalogEpochAtRestoreTime = catalog->getEpoch();
+        int64_t catalogEpochAtAcquisitionTime = *transactionResources.catalogEpoch;
+        uassert(ErrorCodes::QueryPlanKilled,
+                "The catalog was closed and reopened",
+                catalogEpochAtRestoreTime == catalogEpochAtAcquisitionTime);
         // Reacquire service snapshots. Will throw if placement concern can no longer be met.
         for (auto& acquiredCollection : transactionResources.acquiredCollections) {
             const auto& prerequisites = acquiredCollection.prerequisites;

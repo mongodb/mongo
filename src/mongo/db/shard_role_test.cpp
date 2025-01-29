@@ -155,6 +155,22 @@ protected:
         AcquisitionPrerequisites::OperationType operationType);
     void testRestoreFailsIfCollectionIsNowAView(
         AcquisitionPrerequisites::OperationType operationType);
+
+    // A replication rollback causes the collection catalog to close and re-open on a new snapshot.
+    void simulateReplicationRollbackEvent(OperationContext* opCtx) {
+        auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        const auto stableTimestamp =
+            repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime().getTimestamp();
+        storageEngine->setStableTimestamp(stableTimestamp);
+
+        auto newClient = opCtx->getServiceContext()->getService()->makeClient("AlternativeClient");
+        AlternativeClientRegion acr(newClient);
+        auto newOpCtx = acr->makeOperationContext();
+
+        Lock::GlobalLock globalLk(newOpCtx.get(), MODE_X);
+        auto catalogState = catalog::closeCatalog(newOpCtx.get());
+        catalog::openCatalog(newOpCtx.get(), catalogState, stableTimestamp);
+    }
 };
 
 void ShardRoleTest::setUp() {
@@ -946,21 +962,7 @@ TEST_F(ShardRoleTest, NoExceptionIsThrownWhenShardVersionUnshardedButStashedIsEq
     // Re-open the local catalog at its latest version, simulating a rollback event that has no
     // effects on the metadata of the unsharded collection (although it does force the creation of a
     // new instance for the "most recent collection snapshot" held by the catalog).
-    {
-        auto* storageEngine = getServiceContext()->getStorageEngine();
-        const auto stableTimestamp = repl::ReplicationCoordinator::get(operationContext())
-                                         ->getMyLastAppliedOpTime()
-                                         .getTimestamp();
-        storageEngine->setStableTimestamp(stableTimestamp);
-
-        auto newClient = getServiceContext()->getService()->makeClient("AlternativeClient");
-        AlternativeClientRegion acr(newClient);
-        auto newOpCtx = cc().makeOperationContext();
-
-        Lock::GlobalLock globalLk(newOpCtx.get(), MODE_X);
-        auto catalogState = catalog::closeCatalog(newOpCtx.get());
-        catalog::openCatalog(newOpCtx.get(), catalogState, stableTimestamp);
-    }
+    simulateReplicationRollbackEvent(operationContext());
 
     // The acquisition of the unsharded collection is expected to succeed, even though the stashed
     // snapshot points to a different object than the one kept by the catalog.
@@ -2554,6 +2556,57 @@ TEST_F(ShardRoleTest,
 
     testFn(true);   // with locks
     testFn(false);  // lock-free
+}
+
+TEST_F(ShardRoleTest, restoreKillsTransactionOnCatalogEpochChange) {
+    PlacementConcern placementConcern{{}, shardVersionShardedCollection1};
+
+    for (int i = 0; i < 2; i++) {
+        auto opCtx = operationContext();
+        // Test multiple acquisition type
+        const auto acquisition = [&]() {
+            switch (i) {
+                case 0: {
+                    return acquireCollection(opCtx,
+                                             {nssShardedCollection1,
+                                              placementConcern,
+                                              repl::ReadConcernArgs(),
+                                              AcquisitionPrerequisites::kWrite},
+                                             MODE_IX);
+                }
+                case 1: {
+                    return acquireCollectionMaybeLockFree(opCtx,
+                                                          {nssShardedCollection1,
+                                                           placementConcern,
+                                                           repl::ReadConcernArgs(),
+                                                           AcquisitionPrerequisites::kRead});
+                }
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        }();
+
+        // 1. Yield and restore the resources works as expected
+        auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx);
+
+        ASSERT_DOES_NOT_THROW(restoreTransactionResourcesToOperationContext(
+            opCtx, std::move(yieldedTransactionResources)));
+
+        // 2. A replication rollback event happening in between a yield and a restore will cause the
+        // query to terminate.
+        auto yieldedTransactionResources2 = yieldTransactionResourcesFromOperationContext(opCtx);
+        shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+
+        // Simulate a replication rollback event (which causes the collection catalog to close and
+        // re-open and the epoch to change)
+        simulateReplicationRollbackEvent(opCtx);
+
+        // Try to restore the resources should fail because the catalog epoch changed.
+        ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
+                               opCtx, std::move(yieldedTransactionResources2)),
+                           DBException,
+                           ErrorCodes::QueryPlanKilled);
+    }
 }
 
 }  // namespace

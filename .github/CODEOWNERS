@@ -1196,6 +1196,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/repair* @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/db/**/throw_hook* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/*transaction* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/db/**/*transaction_resources.h @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/db/**/*transaction_resources.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/**/*txn* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/db/**/dbdirectclient* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/service_entry_point* @10gen/server-programmability @svc-auto-approve-bot

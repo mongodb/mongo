@@ -411,6 +411,9 @@ struct TransactionResources {
     // number is used to identify acquisitions that share the same global/db locks.
     int currentAcquireCallCount = 0;
 
+    // The catalog epoch when the resources were first acquired.
+    boost::optional<int64_t> catalogEpoch;
+
     int increaseAcquireCollectionCallCount() {
         return currentAcquireCallCount++;
     }
