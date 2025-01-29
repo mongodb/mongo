@@ -1,6 +1,0 @@
-package(default_visibility = ["//visibility:public"])
-
-filegroup(
-    name = "license_files",
-    srcs = glob(["*"]),
-)

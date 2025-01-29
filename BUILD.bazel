@@ -139,8 +139,3 @@ mongo_install(
         "//src/mongo/db/modules/enterprise:dist-test",
     ],
 )
-
-mongo_install(
-    name = "compass",
-    srcs = ["//src/mongo/installer/compass:compass_files"],
-)
