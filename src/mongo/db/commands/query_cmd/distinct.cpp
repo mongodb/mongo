@@ -450,6 +450,17 @@ public:
         };
         auto nssOrUUID = CommandHelpers::parseNsOrUUID(dbName, originalCmdObj);
 
+        if (nssOrUUID.isNamespaceString()) {
+            initializeTracker(nssOrUUID.nss());
+        }
+        auto acquire = [&] {
+            return acquireCollectionOrViewMaybeLockFree(
+                opCtx,
+                CollectionOrViewAcquisitionRequest::fromOpCtx(
+                    opCtx, nssOrUUID, AcquisitionPrerequisites::kRead));
+        };
+        boost::optional<CollectionOrViewAcquisition> collectionOrView = acquire();
+
         auto cmdObj = [&] {
             if (OptionalBool::parseFromBSON(
                     originalCmdObj[DistinctCommandRequest::kRawDataFieldName])) {
@@ -467,6 +478,7 @@ public:
                         originalCmdObj));
                 if (isTimeseriesViewRequest) {
                     nssOrUUID = ns;
+                    collectionOrView = acquire();
 
                     // Rewrite the command object to use the buckets namespace.
                     BSONObjBuilder builder{originalCmdObj.objsize()};
@@ -483,15 +495,6 @@ public:
 
             return originalCmdObj;
         }();
-
-        if (nssOrUUID.isNamespaceString()) {
-            initializeTracker(nssOrUUID.nss());
-        }
-        const auto acquisitionRequest = CollectionOrViewAcquisitionRequest::fromOpCtx(
-            opCtx, nssOrUUID, AcquisitionPrerequisites::kRead);
-
-        boost::optional<CollectionOrViewAcquisition> collectionOrView =
-            acquireCollectionOrViewMaybeLockFree(opCtx, acquisitionRequest);
         const auto nss = collectionOrView->nss();
 
         if (!tracker) {
