@@ -371,12 +371,12 @@ public:
     };
     boost::optional<VectorSearchMetrics> vectorSearchMetrics = boost::none;
 
-    long long sortSpills{0};      // The total number of spills from sort stages
-    long long sortSpillBytes{0};  // The total number of bytes spilled from sort stages.
-    // The spilled storage size after compression might be different from the bytes spilled.
+    // The accumulated spilling statistics per stage type.
+    absl::flat_hash_map<PlanSummaryStats::SpillingStage, SpillingStats> spillingStatsPerStage;
     size_t sortTotalDataSizeBytes{0};  // The amount of data we've sorted in bytes
-    long long keysSorted{0};           // The number of keys that we've sorted.
-    long long collectionScans{0};      // The number of collection scans during query execution.
+
+    long long keysSorted{0};       // The number of keys that we've sorted.
+    long long collectionScans{0};  // The number of collection scans during query execution.
     long long collectionScansNonTailable{0};  // The number of non-tailable collection scans.
     std::set<std::string> indexesUsed;        // The indexes used during query execution.
 

@@ -918,6 +918,11 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
                     statsOut->collectionScansNonTailable++;
                 break;
             }
+            case STAGE_TEXT_OR: {
+                auto textOrStats = static_cast<const TextOrStats*>(stages[i]->getSpecificStats());
+                PlanSummaryStatsVisitor(*statsOut).visit(textOrStats);
+                break;
+            }
             default:
                 break;
         }

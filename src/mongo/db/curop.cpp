@@ -114,6 +114,73 @@ BSONObj serializeDollarDbInOpDescription(boost::optional<TenantId> tenantId,
                                          .firstElement());
     return newCmdObj;
 }
+
+template <typename AppendCallback>
+void addSingleSpillingStats(PlanSummaryStats::SpillingStage stage,
+                            const SpillingStats& stats,
+                            size_t sortTotalDataSizeBytes,
+                            const AppendCallback& appendCallback) {
+    // Attributes for logs don't support dynamically generated strings as attribute names, so we
+    // have to hard-code all attribute names.
+    switch (stage) {
+        case PlanSummaryStats::SpillingStage::GRAPH_LOOKUP:
+            appendCallback("graphLookupSpills", static_cast<long long>(stats.getSpills()));
+            appendCallback("graphLookupSpilledBytes",
+                           static_cast<long long>(stats.getSpilledBytes()));
+            appendCallback("graphLookupSpilledRecords",
+                           static_cast<long long>(stats.getSpilledRecords()));
+            appendCallback("graphLookupSpilledDataStorageSize",
+                           static_cast<long long>(stats.getSpilledDataStorageSize()));
+            return;
+        case PlanSummaryStats::SpillingStage::GROUP:
+            appendCallback("groupSpills", static_cast<long long>(stats.getSpills()));
+            appendCallback("groupSpilledBytes", static_cast<long long>(stats.getSpilledBytes()));
+            appendCallback("groupSpilledRecords",
+                           static_cast<long long>(stats.getSpilledRecords()));
+            appendCallback("groupSpilledDataStorageSize",
+                           static_cast<long long>(stats.getSpilledDataStorageSize()));
+            return;
+        case PlanSummaryStats::SpillingStage::SET_WINDOW_FIELDS:
+            appendCallback("setWindowFieldsSpills", static_cast<long long>(stats.getSpills()));
+            appendCallback("setWindowFieldsSpilledBytes",
+                           static_cast<long long>(stats.getSpilledBytes()));
+            appendCallback("setWindowFieldsSpilledRecords",
+                           static_cast<long long>(stats.getSpilledRecords()));
+            appendCallback("setWindowFieldsSpilledDataStorageSize",
+                           static_cast<long long>(stats.getSpilledDataStorageSize()));
+            return;
+        case PlanSummaryStats::SpillingStage::SORT:
+            appendCallback("sortSpills", static_cast<long long>(stats.getSpills()));
+            appendCallback("sortSpilledBytes", static_cast<long long>(stats.getSpilledBytes()));
+            appendCallback("sortSpilledRecords", static_cast<long long>(stats.getSpilledRecords()));
+            appendCallback("sortSpilledDataStorageSize",
+                           static_cast<long long>(stats.getSpilledDataStorageSize()));
+            // Extra sort-specific metric
+            appendCallback("sortTotalDataSizeBytes",
+                           static_cast<long long>(sortTotalDataSizeBytes));
+            return;
+        case PlanSummaryStats::SpillingStage::TEXT_OR:
+            appendCallback("textOrSpills", static_cast<long long>(stats.getSpills()));
+            appendCallback("textOrSpilledBytes", static_cast<long long>(stats.getSpilledBytes()));
+            appendCallback("textOrSpilledRecords",
+                           static_cast<long long>(stats.getSpilledRecords()));
+            appendCallback("textOrSpilledDataStorageSize",
+                           static_cast<long long>(stats.getSpilledDataStorageSize()));
+            return;
+    }
+    MONGO_UNREACHABLE_TASSERT(9851000);
+}
+
+template <typename AppendCallback>
+void addSpillingStats(const absl::flat_hash_map<PlanSummaryStats::SpillingStage, SpillingStats>&
+                          spillingStatsPerStage,
+                      size_t sortTotalDataSizeBytes,
+                      const AppendCallback& appendCallback) {
+    for (const auto& [stage, stats] : spillingStatsPerStage) {
+        addSingleSpillingStats(stage, stats, sortTotalDataSizeBytes, appendCallback);
+    }
+}
+
 }  // namespace
 
 /**
@@ -1257,12 +1324,9 @@ void OpDebug::report(OperationContext* opCtx,
     pAttrs->add("numYields", curop.numYields());
     OPDEBUG_TOATTR_HELP_OPTIONAL("nreturned", additiveMetrics.nreturned);
 
-    // Add sorter diagnostics only when spills occur.
-    if (sortSpills) {
-        pAttrs->add("sortSpills", sortSpills);
-        pAttrs->add("sortSpillBytes", sortSpillBytes);
-        pAttrs->add("sortTotalDataSizeBytes", sortTotalDataSizeBytes);
-    }
+    addSpillingStats(spillingStatsPerStage,
+                     sortTotalDataSizeBytes,
+                     [&](const auto& name, const auto& value) { pAttrs->add(name, value); });
 
     if (planCacheShapeHash) {
         // TODO SERVER-93305: Remove deprecated 'queryHash' usages.
@@ -1480,12 +1544,9 @@ void OpDebug::append(OperationContext* opCtx,
     b.appendNumber("numYield", curop.numYields());
     OPDEBUG_APPEND_OPTIONAL(b, "nreturned", additiveMetrics.nreturned);
 
-    // Add sorter diagnostics only when spills occur.
-    if (sortSpills) {
-        b.append("sortSpills", sortSpills);
-        b.append("sortSpillBytes", sortSpillBytes);
-        b.append("sortTotalDataSizeBytes", static_cast<long long>(sortTotalDataSizeBytes));
-    }
+    addSpillingStats(spillingStatsPerStage,
+                     sortTotalDataSizeBytes,
+                     [&](const auto& name, const auto& value) { b.append(name, value); });
 
     if (planCacheShapeHash) {
         // TODO SERVER-93305: Remove deprecated 'queryHash' usages.
@@ -2023,8 +2084,8 @@ void OpDebug::setPlanSummaryMetrics(PlanSummaryStats&& planSummaryStats) {
     *additiveMetrics.fromPlanCache =
         *additiveMetrics.fromPlanCache && planSummaryStats.fromPlanCache;
 
-    sortSpills = planSummaryStats.sortSpills;
-    sortSpillBytes = planSummaryStats.sortSpillBytes;
+    spillingStatsPerStage = std::move(planSummaryStats.spillingStatsPerStage);
+
     sortTotalDataSizeBytes = planSummaryStats.sortTotalDataSizeBytes;
     keysSorted = planSummaryStats.keysSorted;
     collectionScans = planSummaryStats.collectionScans;

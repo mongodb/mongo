@@ -52,29 +52,42 @@ public:
         _summary.totalKeysExamined += stats->keysExamined;
     }
     void visit(tree_walker::MaybeConstPtr<true, sbe::HashAggStats> stats) final {
-        _summary.usedDisk |= stats->spillingStats.getSpills() > 0;
-        _summary.totalSpillingStats.accumulate(stats->spillingStats);
+        if (stats->spillingStats.getSpills() > 0) {
+            _summary.usedDisk = true;
+            _summary.spillingStatsPerStage[PlanSummaryStats::SpillingStage::GROUP].accumulate(
+                stats->spillingStats);
+        }
     }
     void visit(tree_walker::MaybeConstPtr<true, sbe::WindowStats> stats) final {
-        _summary.usedDisk |= stats->spillingStats.getSpills() > 0;
-        _summary.totalSpillingStats.accumulate(stats->spillingStats);
+        if (stats->spillingStats.getSpills() > 0) {
+            _summary.usedDisk = true;
+            _summary.spillingStatsPerStage[PlanSummaryStats::SpillingStage::SET_WINDOW_FIELDS]
+                .accumulate(stats->spillingStats);
+        }
     }
     void visit(tree_walker::MaybeConstPtr<true, SortStats> stats) final {
         _summary.hasSortStage = true;
-        _summary.usedDisk |= stats->spillingStats.getSpills() > 0;
-        _summary.totalSpillingStats.accumulate(stats->spillingStats);
-        _summary.sortSpills += stats->spillingStats.getSpills();
-        _summary.sortSpillBytes += stats->spillingStats.getSpilledDataStorageSize();
+        if (stats->spillingStats.getSpills() > 0) {
+            _summary.usedDisk = true;
+            _summary.spillingStatsPerStage[PlanSummaryStats::SpillingStage::SORT].accumulate(
+                stats->spillingStats);
+        }
         _summary.sortTotalDataSizeBytes += stats->totalDataSizeBytes;
         _summary.keysSorted += stats->keysSorted;
     }
     void visit(tree_walker::MaybeConstPtr<true, GroupStats> stats) final {
-        _summary.usedDisk |= stats->spillingStats.getSpills() > 0;
-        _summary.totalSpillingStats.accumulate(stats->spillingStats);
+        if (stats->spillingStats.getSpills() > 0) {
+            _summary.usedDisk = true;
+            _summary.spillingStatsPerStage[PlanSummaryStats::SpillingStage::GROUP].accumulate(
+                stats->spillingStats);
+        }
     }
     void visit(tree_walker::MaybeConstPtr<true, TextOrStats> stats) final {
-        _summary.usedDisk |= stats->spillingStats.getSpills() > 0;
-        _summary.totalSpillingStats.accumulate(stats->spillingStats);
+        if (stats->spillingStats.getSpills() > 0) {
+            _summary.usedDisk = true;
+            _summary.spillingStatsPerStage[PlanSummaryStats::SpillingStage::TEXT_OR].accumulate(
+                stats->spillingStats);
+        }
     }
     void visit(tree_walker::MaybeConstPtr<true, DocumentSourceCursorStats> stats) final {
         accumulate(stats->planSummaryStats);
@@ -96,8 +109,12 @@ public:
         accumulate(stats->planSummaryStats);
     }
     void visit(tree_walker::MaybeConstPtr<true, DocumentSourceGraphLookupStats> stats) final {
-        _summary.usedDisk |= stats->spillingStats.getSpills() > 0;
-        _summary.totalSpillingStats.accumulate(stats->spillingStats);
+        if (stats->spillingStats.getSpills() > 0) {
+            _summary.usedDisk = true;
+            _summary.spillingStatsPerStage[PlanSummaryStats::SpillingStage::GRAPH_LOOKUP]
+                .accumulate(stats->spillingStats);
+        }
+
         accumulate(stats->planSummaryStats);
     }
 
@@ -120,13 +137,13 @@ private:
         _summary.collectionScansNonTailable += statsIn.collectionScansNonTailable;
         _summary.hasSortStage |= statsIn.hasSortStage;
         _summary.usedDisk |= statsIn.usedDisk;
-        _summary.sortSpills += statsIn.sortSpills;
-        _summary.sortSpillBytes += statsIn.sortSpillBytes;
         _summary.sortTotalDataSizeBytes += statsIn.sortTotalDataSizeBytes;
         _summary.keysSorted += statsIn.keysSorted;
         _summary.planFailed |= statsIn.planFailed;
         _summary.indexesUsed.insert(statsIn.indexesUsed.begin(), statsIn.indexesUsed.end());
-        _summary.totalSpillingStats.accumulate(statsIn.totalSpillingStats);
+        for (const auto& [stageName, spillingStats] : statsIn.spillingStatsPerStage) {
+            _summary.spillingStatsPerStage[stageName].accumulate(spillingStats);
+        }
     }
 
     /**
