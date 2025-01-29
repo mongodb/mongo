@@ -138,6 +138,29 @@ export class ShardedMagicRestoreTest {
 
         jsTestLog("Computed maxCheckpointTs: " + tojson(this.maxCheckpointTs));
 
+        // $backupCursorExtend expects that each node's lastApplied has reached the extendTo
+        // timestamp. In this case, the extendTo timestamp is the maxCheckpointTs. It's possible
+        // that no writes have happened some shards when we try to extend the cursor, so we should
+        // write no-ops until the lastApplied is at least the maxCheckpointTs. Most tests will
+        // return early, as they perform writes after the backup was opened.
+        assert.soon(() => {
+            const lastAppliedAtLeastMaxCheckpointTs = (magicRestoreTest) => {
+                const status = assert.commandWorked(
+                    magicRestoreTest.rst.getPrimary().adminCommand({replSetGetStatus: 1}));
+                const {optimes: {appliedOpTime}} = status;
+                return timestampCmp(appliedOpTime.ts, this.maxCheckpointTs) >= 0;
+            };
+
+            return this.magicRestoreTests.every((magicRestoreTest) => {
+                if (lastAppliedAtLeastMaxCheckpointTs(magicRestoreTest)) {
+                    return true;
+                }
+                assert.commandWorked(magicRestoreTest.rst.getPrimary().adminCommand(
+                    {appendOplogNote: 1, data: {"no-op to advance lastApplied": 1}}));
+                return lastAppliedAtLeastMaxCheckpointTs(magicRestoreTest);
+            });
+        });
+
         jsTestLog("Extending backup cursors");
         this.configRestoreTest.extendAndCloseBackup(
             this.configRestoreTest.backupSource, this.maxCheckpointTs, []);

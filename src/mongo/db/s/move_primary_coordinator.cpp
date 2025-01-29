@@ -99,6 +99,7 @@ using namespace fmt::literals;
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeCloningData);
+MONGO_FAIL_POINT_DEFINE(hangBeforeMovePrimaryCriticalSection);
 MONGO_FAIL_POINT_DEFINE(movePrimaryFailIfNeedToCloneMovableCollections);
 
 /**
@@ -297,6 +298,13 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                                          // from being processed.
                                          _performNoopRetryableWriteOnAllShardsAndConfigsvr(
                                              opCtx, getNewSession(opCtx), **executor);
+                                     }
+
+
+                                     if (MONGO_unlikely(
+                                             hangBeforeMovePrimaryCriticalSection.shouldFail())) {
+                                         LOGV2(9031700, "Hit hangBeforeMovePrimaryCriticalSection");
+                                         hangBeforeMovePrimaryCriticalSection.pauseWhileSet(opCtx);
                                      }
 
                                      blockReads(opCtx);
