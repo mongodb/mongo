@@ -4,7 +4,7 @@ description: |
 
 selector:
   roots:
-    - src/mongo/db/query/query_tester/tests/*/generated_tests/*/
+    - src/mongo/db/query/query_tester/tests/query-correctness-tests-*/generated_tests/*/
   exclude_files:
     - src/mongo/db/query/query_tester/tests/selfTests/
 executor:

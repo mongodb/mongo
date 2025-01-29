@@ -344,7 +344,7 @@ buildvariants:
       - name: .assigned_to_jira_team_server_query_execution .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
         distros:
           - amazon2-arm64-atlas-latest-large
-      - name: .assigned_to_jira_team_server_query_optimization !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
+      - name: .assigned_to_jira_team_server_query_optimization !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.query_correctness
       - name: .assigned_to_jira_team_server_query_optimization .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias
         distros:
           - amazon2-arm64-atlas-latest-large
@@ -360,6 +360,7 @@ buildvariants:
           - name: archive_dist_test
             variant: *amazon_linux2_arm64_static_compile_variant_name
       - name: .query_correctness
+        cron: "0 4 * * *" # From the ${project_nightly_cron} parameter
       - name: check_feature_flag_tags
       - name: check_for_todos
       - name: check_for_legacy_command_types
