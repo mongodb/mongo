@@ -206,6 +206,43 @@ buildvariants:
       - name: .fuzzer_deterministic
 
   - <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
+    name: enterprise-amazon-linux2-arm64-all-feature-flags-shards-authoritative
+    display_name: "*| Amazon Linux 2 arm64 Atlas Enterprise (all feature flags) shards authoritative"
+    tags: ["suggested"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    expansions:
+      <<: *amazon_linux2_arm64_dynamic_expansions
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      has_packages: false
+      jstestfuzz_num_generated_files: 40
+      jstestfuzz_concurrent_num_files: 10
+      target_resmoke_time: 10
+      max_sub_suites: 5
+      idle_timeout_factor: 1.5
+      exec_timeout_factor: 1.5
+      test_flags: >-
+        --runAllFeatureFlagTests
+        --additionalFeatureFlags "featureFlagShardAuthoritativeDbMetadata"
+        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment
+    tasks:
+      - name: search_end_to_end_sharded_cluster !.multiversion
+      - name: search_end_to_end_single_node !.multiversion
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
+        distros:
+          - amazon2-arm64-atlas-latest-large
+      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
+        distros:
+          - amazon2-arm64-atlas-latest-large
+      - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !fcv_upgrade_downgrade_sharding_jscore_passthrough_gen !fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
+      - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !fcv_upgrade_downgrade_sharding_jscore_passthrough_gen !fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
+        distros:
+          - amazon2-arm64-atlas-latest-large
+      - name: .fuzzer_deterministic !.multiversion
+
+  - <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
     name: enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers
     display_name: "*| Amazon Linux 2 arm64 Enterprise (all feature flags) Fuzzers"
     tags: ["suggested"]

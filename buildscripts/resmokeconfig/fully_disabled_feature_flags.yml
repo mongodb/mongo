@@ -18,3 +18,4 @@
 - featureFlagTrackUnshardedCollectionsUponCreation
 - featureFlagTSBucketingParametersUnchanged
 - featureFlagMongogProxyProcolSupport
+- featureFlagShardAuthoritativeDbMetadata
