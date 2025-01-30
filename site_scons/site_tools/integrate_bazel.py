@@ -1390,6 +1390,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         f'--js_engine={env.GetOption("js-engine")}',
         f'--use_sasl_client={env.GetOption("use-sasl-client") is not None}',
         f'--skip_archive={env.GetOption("skip-archive") != "off" and normalized_os == "linux"}',
+        "--bes_keywords=scons_invocation",
         "--define",
         f"MONGO_VERSION={mongo_version}",
         "--define",
