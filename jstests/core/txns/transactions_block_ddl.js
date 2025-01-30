@@ -4,7 +4,10 @@
 //   # The test runs commands that are not allowed with security token: endSession.
 //   not_allowed_with_signed_security_token,
 //   uses_rename,
-//   uses_transactions
+//   uses_transactions,
+//   # This test relies on mapOnEachShardNode, which forces a new connection to all
+//   # nodes. This function can race with initial sync and fail to open the conn.
+//   incompatible_with_initial_sync
 // ]
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
