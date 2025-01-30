@@ -757,6 +757,99 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     ASSERT(predicate.tightPredicate == nullptr);
 }
 
+TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
+       OptimizeDoesNotMapPredicatesOnComputedMetaField) {
+    auto pipeline = Pipeline::parse(
+        makeVector(
+            fromjson("{$_internalUnpackBucket: {exclude: [], timeField: 'time', metaField: "
+                     "'myMeta', computedMetaProjFields: ['myMeta'], bucketMaxSpanSeconds: 3600}}"),
+            fromjson("{$project: {computedMeta: {$concat: ['Computed: ', '$myMeta']}, time: "
+                     "1, meta: 1}}"),
+            fromjson("{$match: {myMeta: {$eq: 'value'}}}")),
+        getExpCtx());
+    auto& container = pipeline->getSources();
+
+    ASSERT_EQ(pipeline->getSources().size(), 3U);
+
+    auto matchStage = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+    auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                         ->createPredicatesOnBucketLevelField(matchStage->getMatchExpression());
+
+    ASSERT_EQ(predicate.loosePredicate, nullptr);
+    ASSERT_EQ(predicate.tightPredicate, nullptr);
+}
+
+TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
+       OptimizeDoesNotMapPredicatesOnExcludedMetaField) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: {exclude: ['myMeta'], timeField: 'time', "
+                            "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
+                   fromjson("{$match: {myMeta: {$eq: 'value'}}}")),
+        getExpCtx());
+    auto& container = pipeline->getSources();
+
+    ASSERT_EQ(pipeline->getSources().size(), 2U);
+
+    auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+    auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
+
+    ASSERT_EQ(predicate.loosePredicate, nullptr);
+    ASSERT_EQ(predicate.tightPredicate, nullptr);
+}
+
+TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsAndWithOneChild) {
+    // Validate that $and will get optimized out and predicates are populated correctly when we
+    // have an $and with one child expression.
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: "
+                            "'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
+                   fromjson("{$match: {$and: ["
+                            "{myMeta: {$gte: 1}}"
+                            "]}}")),
+        getExpCtx());
+    auto& container = pipeline->getSources();
+
+    ASSERT_EQ(container.size(), 2U);
+
+    auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+    auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
+
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
+                      fromjson("{meta: {$gte: 1}}"
+                               "]}"));
+    ASSERT_BSONOBJ_EQ(predicate.tightPredicate->serialize(),
+                      fromjson("{meta: {$gte: 1}}"
+                               "]}"));
+}
+
+TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsOrWithOneChild) {
+    // Validate that $or will get optimized out and predicates are populated correctly when we have
+    // an $or with one child expression.
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: "
+                            "'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
+                   fromjson("{$match: {$or: ["
+                            "{myMeta: {$gte: 1}}"
+                            "]}}")),
+        getExpCtx());
+    auto& container = pipeline->getSources();
+
+    ASSERT_EQ(container.size(), 2U);
+
+    auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+    auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
+
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
+                      fromjson("{meta: {$gte: 1}}"
+                               "]}"));
+    ASSERT_BSONOBJ_EQ(predicate.tightPredicate->serialize(),
+                      fromjson("{meta: {$gte: 1}}"
+                               "]}"));
+}
+
 TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePredicatesOnId) {
     auto date = Date_t::now();
     const auto dateMinusBucketSpan = date - Seconds{3600};
