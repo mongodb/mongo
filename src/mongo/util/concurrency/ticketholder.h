@@ -205,10 +205,13 @@ private:
     /**
      * Releases a ticket back into the ticket pool and updates queueing statistics. Tickets
      * issued for exempt operations do not get deposited back to the pool.
+     * This function must not throw.
      */
-    void _releaseTicketUpdateStats(Ticket& ticket) noexcept;
-
-    void _releaseNormalPriorityTicket(AdmissionContext* admCtx) noexcept;
+    void _releaseTicketUpdateStats(Ticket& ticket);
+    /**
+     * This function must not throw.
+     */
+    void _releaseNormalPriorityTicket(AdmissionContext* admCtx);
 
     boost::optional<Ticket> _tryAcquireNormalPriorityTicket(AdmissionContext* admCtx);
 
