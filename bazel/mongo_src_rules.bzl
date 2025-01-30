@@ -1248,19 +1248,14 @@ GCC_OR_CLANG_LINKFLAGS = select({
 })
 
 COMPRESS_DEBUG_COPTS = select({
-    # Disable debug compression in assembler by default unless using debug fission.
-    # Debug compression significantly reduces .o, .dwo, and .a sizes, and with
-    # fission enabled, the linker sees so little of the dwarf that decompression
-    # isn't a problem.
-    "//bazel/config:fission_enabled": [
+    # Debug compression significantly reduces .o, .dwo, and .a sizes
+    "//bazel/config:compress_debug_compile_enabled": [
         "-Wa,--compress-debug-sections",
     ],
-    "//bazel/config:linux_gcc": [
+    # explicitly disable compression if its not enabled or else not passing the flag
+    # by default still compresses on x86/x86_64 - nocompress is only a flag in gcc not clang
+    "//bazel/config:compress_debug_compile_disabled_linux_gcc": [
         "-Wa,--nocompress-debug-sections",
-    ],
-    # subsumes both of the two above - if both are true, we want compression
-    "//bazel/config:linux_gcc_fission": [
-        "-Wa,--compress-debug-sections",
     ],
     "//conditions:default": [],
 })

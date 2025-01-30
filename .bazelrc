@@ -97,6 +97,7 @@ common --flag_alias=js_engine=//bazel/config:js_engine
 common --flag_alias=use_sasl_client=//bazel/config:use_sasl_client
 common --flag_alias=enterprise_feature_all=//bazel/config:enterprise_feature_all
 common --flag_alias=link_timeout=//bazel/config:link_timeout
+common --flag_alias=compress_debug_compile=//bazel/config:compress_debug_compile
 
 common --flag_alias=dwarf_version=//bazel/config:dwarf_version
 common --flag_alias=http_client=//bazel/config:http_client
@@ -139,6 +140,7 @@ common --strip=never
 # To avoid the bazel warning about passing multiple configs
 common -c fastbuild
 common --fission=yes
+common --//bazel/config:compress_debug_compile=True
 common --//bazel/config:opt=off
 common --//bazel/config:dbg=True
 common --//bazel/config:dbg_level=1
@@ -163,6 +165,7 @@ common --enable_platform_specific_config=true
 --config=fastbuild
 common:fastbuild -c fastbuild
 common:fastbuild --fission=yes
+common:fastbuild --//bazel/config:compress_debug_compile=True
 common:fastbuild --//bazel/config:opt=off
 common:fastbuild --//bazel/config:dbg=True
 common:fastbuild --//bazel/config:dbg_level=1
@@ -184,6 +187,7 @@ common:fastbuild --enable_platform_specific_config=true
 --config=dbg
 common:dbg -c dbg
 common:dbg --fission=yes
+common:dbg --//bazel/config:compress_debug_compile=True
 common:dbg --//bazel/config:opt=off
 common:dbg --//bazel/config:dbg=True
 common:dbg --//bazel/config:dbg_level=2
@@ -228,6 +232,7 @@ common:dbg_tsan --enable_platform_specific_config=true
 --config=opt
 common:opt -c opt
 common:opt --fission=yes
+common:opt --//bazel/config:compress_debug_compile=True
 common:opt --//bazel/config:opt=on
 common:opt --//bazel/config:dbg=False
 common:opt --//bazel/config:dbg_level=2
@@ -285,9 +290,11 @@ common:windows --features=-dbg
 common:windows --features=-fastbuild
 common:windows --features=-dynamic_link_msvcrt
 
-# Only use fission on Linux
+# Only use fission and debug compression on Linux
 common:windows --fission=no
+common:windows --//bazel/config:compress_debug_compile=False
 common:macos --fission=no
+common:macos --//bazel/config:compress_debug_compile=False
 
 # Dynamic linking on Windows (DLL generation) is currently not supported.
 common:windows --//bazel/config:linkstatic=True

@@ -354,6 +354,20 @@ skip_archive = rule(
 )
 
 # =========
+# compress_debug_compile
+# =========
+
+compress_debug_compile_provider = provider(
+    doc = "Compress the debug sections outputted by the compiler.",
+    fields = ["enabled"],
+)
+
+compress_debug_compile = rule(
+    implementation = lambda ctx: compress_debug_compile_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
 # detect_odr_violations
 # =========
 

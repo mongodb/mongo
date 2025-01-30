@@ -9,6 +9,7 @@ load(
     "build_otel",
     "clang_tidy_toolchain_version",
     "compiler_type",
+    "compress_debug_compile",
     "dbg",
     "dbg_level",
     "debug_symbols",
@@ -2541,6 +2542,37 @@ selects.config_setting_group(
     match_all = [
         "@platforms//cpu:aarch64",
         ":linux_gcc_fission",
+    ],
+)
+
+# --------------------------------------
+# compress_debug_compile
+# --------------------------------------
+
+bool_flag(
+    name = "compress_debug_compile",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "compress_debug_compile_enabled",
+    flag_values = {
+        "//bazel/config:compress_debug_compile": "True",
+    },
+)
+
+config_setting(
+    name = "compress_debug_compile_disabled",
+    flag_values = {
+        "//bazel/config:compress_debug_compile": "False",
+    },
+)
+
+selects.config_setting_group(
+    name = "compress_debug_compile_disabled_linux_gcc",
+    match_all = [
+        ":linux_gcc",
+        ":compress_debug_compile_disabled",
     ],
 )
 
