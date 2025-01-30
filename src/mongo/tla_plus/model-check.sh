@@ -23,7 +23,7 @@ if ! [ -f "tla2tools.jar" ]; then
   exit 1
 fi
 
-TLA_FILE="MC$1.tla"
+TLA_FILE="MC$(echo $1 | sed 's/.*\///').tla"
 if ! [ -f "$1/$TLA_FILE" ]; then
   echo "$1/$TLA_FILE does not exist" >&2
   exit 1
@@ -37,4 +37,4 @@ fi
 
 cd "$1"
 # Defer liveness checks to the end with -lncheck, for speed.
-"$JAVA_BINARY" -XX:+UseParallelGC -Dtlc2.tool.fp.FPSet.impl=tlc2.tool.fp.OffHeapDiskFPSet -Dutil.ExecutionStatisticsCollector.id=10f53a1c957c11ea94a033245b683b65 -cp ../tla2tools.jar tlc2.TLC -lncheck final -workers auto "$TLA_FILE"
+"$JAVA_BINARY" -XX:+UseParallelGC -Dtlc2.tool.fp.FPSet.impl=tlc2.tool.fp.OffHeapDiskFPSet -Dutil.ExecutionStatisticsCollector.id=10f53a1c957c11ea94a033245b683b65 -cp ../../tla2tools.jar tlc2.TLC -lncheck final -workers auto "$TLA_FILE"
