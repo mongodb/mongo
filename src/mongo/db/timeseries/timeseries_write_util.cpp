@@ -240,16 +240,16 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucketWithReopening(
                             suitableBucket, [opCtx, bucketsColl](const BSONObj& bucketDoc) {
                                 return bucketsColl->checkValidation(opCtx, bucketDoc);
                             }};
-                    }
 
-                    if (!suitableBucket.isEmpty() &&
-                        !timeseries::isCompressedBucket(suitableBucket)) {
-                        uncompressedBucketId = extractBucketId(
-                            bucketCatalog, options, bucketsColl->uuid(), suitableBucket);
-                        return StatusWith<bucket_catalog::InsertResult>{
-                            bucket_catalog::InsertResult{
-                                std::in_place_type<bucket_catalog::ReopeningContext>,
-                                std::move(reopeningContext)}};
+
+                        if (!timeseries::isCompressedBucket(suitableBucket)) {
+                            uncompressedBucketId = extractBucketId(
+                                bucketCatalog, options, bucketsColl->uuid(), suitableBucket);
+                            return StatusWith<bucket_catalog::InsertResult>{
+                                bucket_catalog::InsertResult{
+                                    std::in_place_type<bucket_catalog::ReopeningContext>,
+                                    std::move(reopeningContext)}};
+                        }
                     }
 
                     return bucket_catalog::insertWithReopeningContext(

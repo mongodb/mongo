@@ -146,6 +146,8 @@ protected:
 
     Status _reopenBucket(const CollectionPtr& coll, const BSONObj& bucketDoc);
 
+    BSONObj _getCompressedBucketDoc(const BSONObj& bucketDoc);
+
     RolloverAction _rolloverAction(const std::shared_ptr<WriteBatch>& batch);
 
     void _testUseBucketSkipsConflictingBucket(std::function<void(BucketCatalog&, Bucket&)>);
@@ -410,6 +412,14 @@ void BucketCatalogTest::_testMeasurementSchema(
             }
         }
     }
+}
+
+BSONObj BucketCatalogTest::_getCompressedBucketDoc(const BSONObj& bucketDoc) {
+    CompressionResult compressionResult = compressBucket(bucketDoc,
+                                                         _timeField,
+                                                         _ns1,
+                                                         /*validateDecompression*/ true);
+    return compressionResult.compressedBucket.value();
 }
 
 Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj& bucketDoc) {
@@ -1225,30 +1235,31 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
                             "2":{"$date":"2022-06-06T15:34:30.000Z"}},
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
-
+    BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    ASSERT_OK(_reopenBucket(autoColl.getCollection(), compressedBucketDoc));
 
     {
         // Missing _id field.
-        BSONObj missingIdObj = bucketDoc.removeField("_id");
+        BSONObj missingIdObj = compressedBucketDoc.removeField("_id");
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), missingIdObj));
 
         // Bad _id type.
-        BSONObj badIdObj = bucketDoc.addFields(BSON("_id" << 123));
+        BSONObj badIdObj = compressedBucketDoc.addFields(BSON("_id" << 123));
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badIdObj));
     }
 
     {
         // Missing control field.
-        BSONObj missingControlObj = bucketDoc.removeField("control");
+        BSONObj missingControlObj = compressedBucketDoc.removeField("control");
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), missingControlObj));
 
         // Bad control type.
-        BSONObj badControlObj = bucketDoc.addFields(BSON("control" << BSONArray()));
+        BSONObj badControlObj = compressedBucketDoc.addFields(BSON("control" << BSONArray()));
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badControlObj));
 
         // Bad control.version type.
-        BSONObj badVersionObj = bucketDoc.addFields(BSON(
+        BSONObj badVersionObj = compressedBucketDoc.addFields(BSON(
             "control" << BSON("version" << BSONArray() << "min"
                                         << BSON("time" << BSON("$date"
                                                                << "2022-06-06T15:34:00.000Z"))
@@ -1258,14 +1269,14 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badVersionObj));
 
         // Bad control.min type.
-        BSONObj badMinObj = bucketDoc.addFields(BSON(
+        BSONObj badMinObj = compressedBucketDoc.addFields(BSON(
             "control" << BSON("version" << 1 << "min" << 123 << "max"
                                         << BSON("time" << BSON("$date"
                                                                << "2022-06-06T15:34:30.000Z")))));
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badMinObj));
 
         // Bad control.max type.
-        BSONObj badMaxObj = bucketDoc.addFields(
+        BSONObj badMaxObj = compressedBucketDoc.addFields(
             BSON("control" << BSON("version" << 1 << "min"
                                              << BSON("time" << BSON("$date"
                                                                     << "2022-06-06T15:34:00.000Z"))
@@ -1273,14 +1284,14 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badMaxObj));
 
         // Missing control.min.time.
-        BSONObj missingMinTimeObj = bucketDoc.addFields(BSON(
+        BSONObj missingMinTimeObj = compressedBucketDoc.addFields(BSON(
             "control" << BSON("version" << 1 << "min" << BSON("abc" << 1) << "max"
                                         << BSON("time" << BSON("$date"
                                                                << "2022-06-06T15:34:30.000Z")))));
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), missingMinTimeObj));
 
         // Missing control.max.time.
-        BSONObj missingMaxTimeObj = bucketDoc.addFields(
+        BSONObj missingMaxTimeObj = compressedBucketDoc.addFields(
             BSON("control" << BSON("version" << 1 << "min"
                                              << BSON("time" << BSON("$date"
                                                                     << "2022-06-06T15:34:00.000Z"))
@@ -1288,14 +1299,18 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), missingMaxTimeObj));
     }
 
-
     {
         // Missing data field.
-        BSONObj missingDataObj = bucketDoc.removeField("data");
+        BSONObj missingDataObj = compressedBucketDoc.removeField("data");
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), missingDataObj));
 
+        // Bad time field in the data field.
+        BSONObj badTimeFieldInDataFieldObj =
+            compressedBucketDoc.addFields(BSON("data" << BSON("time" << BSON("0" << 123))));
+        ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badTimeFieldInDataFieldObj));
+
         // Bad data type.
-        BSONObj badDataObj = bucketDoc.addFields(BSON("data" << 123));
+        BSONObj badDataObj = compressedBucketDoc.addFields(BSON("data" << 123));
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badDataObj));
     }
 }
@@ -1319,8 +1334,8 @@ TEST_F(BucketCatalogTest, ReopenMixedSchemaDataBucket) {
                     "x":{"0":1,"1":{"y":"z"},"2":"abc"}}})");
 
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
-
-    ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), bucketDoc));
+    BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
+    ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), compressedBucketDoc));
 
     auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
     ASSERT_EQ(1, stats->numBucketReopeningsFailed.load());
@@ -1341,7 +1356,8 @@ TEST_F(BucketCatalogTest, ReopenClosedBuckets) {
                             "2":{"$date":"2022-06-06T15:34:30.000Z"}},
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
-        ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), closedBucket));
+        BSONObj compressedClosedBucketDoc = _getCompressedBucketDoc(closedBucket);
+        ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), compressedClosedBucketDoc));
     }
 
     {
@@ -1356,7 +1372,8 @@ TEST_F(BucketCatalogTest, ReopenClosedBuckets) {
                             "2":{"$date":"2022-06-06T15:34:30.000Z"}},
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
-        ASSERT_OK(_reopenBucket(autoColl.getCollection(), openBucket));
+        BSONObj compressedOpenBucketDoc = _getCompressedBucketDoc(openBucket);
+        ASSERT_OK(_reopenBucket(autoColl.getCollection(), compressedOpenBucketDoc));
     }
 
     {
@@ -1370,7 +1387,8 @@ TEST_F(BucketCatalogTest, ReopenClosedBuckets) {
                             "2":{"$date":"2022-06-06T15:34:30.000Z"}},
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
-        ASSERT_OK(_reopenBucket(autoColl.getCollection(), openBucket));
+        BSONObj compressedOpenBucketDoc = _getCompressedBucketDoc(openBucket);
+        ASSERT_OK(_reopenBucket(autoColl.getCollection(), compressedOpenBucketDoc));
     }
 }
 
@@ -1388,7 +1406,8 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement
                     "b":{"0":1,"1":2,"2":3}}})");
 
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
-    Status status = _reopenBucket(autoColl.getCollection(), bucketDoc);
+    BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
+    Status status = _reopenBucket(autoColl.getCollection(), compressedBucketDoc);
     ASSERT_OK(status);
 
     // Insert a measurement that is compatible with the reopened bucket.
@@ -1429,13 +1448,7 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
                             "2":{"$date":"2022-06-06T15:34:30.000Z"}},
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
-
-    CompressionResult compressionResult = compressBucket(bucketDoc,
-                                                         _timeField,
-                                                         _ns1,
-                                                         /*validateDecompression*/ true);
-    const BSONObj& compressedBucketDoc = compressionResult.compressedBucket.value();
-
+    BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
     auto memUsageBefore = getMemoryUsage(*_bucketCatalog);
     Status status = _reopenBucket(autoColl.getCollection(), compressedBucketDoc);
@@ -1482,13 +1495,7 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
                             "2":{"$date":"2022-06-06T15:34:30.000Z"}},
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
-
-    CompressionResult compressionResult = compressBucket(bucketDoc,
-                                                         _timeField,
-                                                         _ns1,
-                                                         /*validateDecompression*/ true);
-    const BSONObj& compressedBucketDoc = compressionResult.compressedBucket.value();
-
+    BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
     auto memUsageBefore = getMemoryUsage(*_bucketCatalog);
     Status status = _reopenBucket(autoColl.getCollection(), compressedBucketDoc);

@@ -498,8 +498,6 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
         minTime,
         catalog.bucketStateRegistry);
 
-    const bool isCompressed = isCompressedBucket(bucketDoc);
-
     bucket->isReopened = true;
 
     // Initialize the remaining member variables from the bucket document.
@@ -528,15 +526,14 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
     const BSONObj& dataObj = bucketDoc.getObjectField(kBucketDataFieldName);
     const BSONElement timeColumnElem = dataObj.getField(options.getTimeField());
 
-    if (isCompressed && timeColumnElem.type() == BSONType::BinData) {
-        BSONColumn storage{timeColumnElem};
-        numMeasurements = storage.size();
-    } else if (timeColumnElem.isABSONObj()) {
-        numMeasurements = timeColumnElem.Obj().nFields();
-    } else {
+    // This check accounts for if a user performs a direct bucket write on the timeColumnElem and we
+    // attempt to rehydrate the bucket as part of query-based reopening.
+    if (timeColumnElem.type() != BSONType::BinData) {
         return {ErrorCodes::BadValue,
-                "Bucket data field is malformed (missing a valid time column)"};
+                "Bucket data field is malformed (time column is not compressed)"};
     }
+    BSONColumn storage{timeColumnElem};
+    numMeasurements = storage.size();
 
     bucket->bucketIsSortedByTime = controlField.getField(kBucketControlVersionFieldName).Number() ==
             kTimeseriesControlCompressedSortedVersion
@@ -545,32 +542,29 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
     bucket->numMeasurements = numMeasurements;
     bucket->numCommittedMeasurements = numMeasurements;
 
-    if (isCompressed) {
-        // Initialize BSONColumnBuilders from the compressed bucket data fields.
-        try {
-            bucket->measurementMap.initBuilders(dataObj, bucket->numCommittedMeasurements);
-        } catch (const DBException& ex) {
-            LOGV2_WARNING(
-                8830601,
-                "Failed to decompress bucket for time-series insert upon reopening, will retry "
-                "insert on a new bucket",
-                "error"_attr = ex,
-                "bucketId"_attr = bucket->bucketId.oid,
-                "collectionUUID"_attr = bucket->bucketId.collectionUUID);
+    // Initialize BSONColumnBuilders from the compressed bucket data fields.
+    try {
+        bucket->measurementMap.initBuilders(dataObj, bucket->numCommittedMeasurements);
+    } catch (const DBException& ex) {
+        LOGV2_WARNING(
+            8830601,
+            "Failed to decompress bucket for time-series insert upon reopening, will retry "
+            "insert on a new bucket",
+            "error"_attr = ex,
+            "bucketId"_attr = bucket->bucketId.oid,
+            "collectionUUID"_attr = bucket->bucketId.collectionUUID);
 
-            LOGV2_WARNING_OPTIONS(8852900,
-                                  logv2::LogTruncation::Disabled,
-                                  "Failed to decompress bucket for time-series insert upon "
-                                  "reopening, will retry insert on a new bucket",
-                                  "bucket"_attr =
-                                      base64::encode(bucketDoc.objdata(), bucketDoc.objsize()));
+        LOGV2_WARNING_OPTIONS(8852900,
+                              logv2::LogTruncation::Disabled,
+                              "Failed to decompress bucket for time-series insert upon "
+                              "reopening, will retry insert on a new bucket",
+                              "bucket"_attr =
+                                  base64::encode(bucketDoc.objdata(), bucketDoc.objsize()));
 
-            invariant(!TestingProctor::instance().isEnabled());
-            timeseries::bucket_catalog::freeze(catalog, bucketId);
-            return Status(
-                BucketCompressionFailure(collectionUUID, bucketId.oid, bucketId.keySignature),
-                ex.reason());
-        }
+        invariant(!TestingProctor::instance().isEnabled());
+        timeseries::bucket_catalog::freeze(catalog, bucketId);
+        return Status(BucketCompressionFailure(collectionUUID, bucketId.oid, bucketId.keySignature),
+                      ex.reason());
     }
 
     updateStatsOnError.dismiss();

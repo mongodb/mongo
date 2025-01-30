@@ -156,10 +156,10 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
                            const Date_t& time);
 
 /**
- * Given a bucket to reopen, performs validation and constructs the in-memory representation of the
- * bucket. If specified, 'expectedKey' is matched against the key extracted from the document to
- * validate that the bucket is expected (i.e. to help resolve hash collisions for archived buckets).
- * Does *not* hand ownership of the bucket to the catalog.
+ * Given a compressed bucket to reopen, performs validation and constructs the in-memory
+ * representation of the bucket. If specified, 'expectedKey' is matched against the key extracted
+ * from the document to validate that the bucket is expected (i.e. to help resolve hash collisions
+ * for archived buckets). Does *not* hand ownership of the bucket to the catalog.
  */
 StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
                                                          ExecutionStatsController& stats,
