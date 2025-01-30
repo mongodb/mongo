@@ -44,6 +44,16 @@ LINKER_LINKFLAGS = select(
     no_match_error = LINKER_ERROR_MESSAGE,
 )
 
+LINKSTATIC_ENABLED = select({
+    "@//bazel/config:linkstatic_enabled": True,
+    "@//conditions:default": False,
+})
+
+SHARED_ARCHIVE_ENABLED = select({
+    "@//bazel/config:shared_archive_enabled": True,
+    "@//conditions:default": False,
+})
+
 LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS] + LINKER_LINKFLAGS
 
 mongo_cc_toolchain_config(
@@ -74,6 +84,8 @@ mongo_cc_toolchain_config(
     },
     toolchain_identifier = "gcc_toolchain",
     verbose = True,
+    linkstatic = LINKSTATIC_ENABLED,
+    shared_archive = SHARED_ARCHIVE_ENABLED,
 )
 
 mongo_cc_toolchain_config(
@@ -109,6 +121,8 @@ mongo_cc_toolchain_config(
     },
     toolchain_identifier = "clang_toolchain",
     verbose = True,
+    linkstatic = LINKSTATIC_ENABLED,
+    shared_archive = SHARED_ARCHIVE_ENABLED,
 )
 
 cc_toolchain(

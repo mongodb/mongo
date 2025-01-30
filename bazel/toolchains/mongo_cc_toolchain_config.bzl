@@ -245,7 +245,7 @@ def _impl(ctx):
 
     supports_dynamic_linker_feature = feature(
         name = "supports_dynamic_linker",
-        enabled = True,
+        enabled = (not ctx.attr.linkstatic) or ctx.attr.shared_archive,
     )
 
     supports_start_end_lib_feature = feature(
@@ -414,9 +414,11 @@ def _impl(ctx):
         enabled = True,
     )
 
+    default_pic = (not ctx.attr.linkstatic) or ctx.attr.shared_archive
+
     pic_feature = feature(
         name = "pic",
-        enabled = True,
+        enabled = default_pic,
         flag_sets = [
             flag_set(
                 actions = [
@@ -437,7 +439,7 @@ def _impl(ctx):
 
     pie_feature = feature(
         name = "pie",
-        enabled = False,
+        enabled = not default_pic,
         flag_sets = [
             flag_set(
                 actions = [
@@ -883,6 +885,8 @@ mongo_cc_toolchain_config = rule(
         "tool_paths": attr.string_dict(mandatory = True),
         "toolchain_identifier": attr.string(mandatory = True),
         "verbose": attr.bool(mandatory = False),
+        "linkstatic": attr.bool(mandatory = True),
+        "shared_archive": attr.bool(mandatory = True),
     },
     provides = [CcToolchainConfigInfo],
 )

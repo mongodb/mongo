@@ -1848,7 +1848,7 @@ def mongo_cc_library(
         local_defines = MONGO_GLOBAL_DEFINES + visibility_support_defines + local_defines,
         defines = defines,
         includes = includes,
-        features = MONGO_GLOBAL_FEATURES + ["supports_pic", "pic"] + features,
+        features = MONGO_GLOBAL_FEATURES + features,
         target_compatible_with = select({
             "//bazel/config:shared_archive_enabled": [],
             "//conditions:default": ["@platforms//:incompatible"],
@@ -1879,11 +1879,7 @@ def mongo_cc_library(
         local_defines = MONGO_GLOBAL_DEFINES + local_defines,
         defines = defines,
         includes = includes,
-        features = MONGO_GLOBAL_FEATURES + SKIP_ARCHIVE_FEATURE + select({
-            "//bazel/config:linkstatic_disabled": ["supports_pic", "pic"],
-            "//bazel/config:shared_archive_enabled": ["supports_pic", "pic"],
-            "//conditions:default": ["-pic", "pie"],
-        }) + features,
+        features = MONGO_GLOBAL_FEATURES + SKIP_ARCHIVE_FEATURE + features,
         target_compatible_with = target_compatible_with + enterprise_compatible,
         additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
         exec_properties = exec_properties,
@@ -2555,6 +2551,7 @@ strip_deps = rule(
         "input": attr.label(
             providers = [CcInfo],
         ),
+        "linkstatic": attr.bool(),
     },
     provides = [CcInfo],
     toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
@@ -2606,12 +2603,12 @@ def mongo_cc_proto_library(
     native.cc_proto_library(
         name = name + "_raw",
         deps = deps,
-        tags = tags + ["gen_source"],
         **kwargs
     )
     strip_deps(
         name = name,
         input = name + "_raw",
+        tags = tags + ["gen_source"],
     )
 
 def mongo_cc_grpc_library(

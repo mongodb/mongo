@@ -118,6 +118,10 @@ cc_shared_library(
     name = "mongo_tidy_checks",
     additional_linker_inputs = [],
     dynamic_deps = [],
+    features = [
+        "-pie",
+        "pic",
+    ],
     tags = [
         "mongo-tidy-checks",
     ],
