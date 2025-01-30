@@ -366,6 +366,7 @@ export class MagicRestoreTest {
      */
     checkPostRestoreDbHashes(excludedCollections) {
         this.rst.nodes.forEach((node) => {
+            jsTestLog(`Checking dbhashes for node ${node.port}`);
             const pre = this.preRestoreDbHashes;
             const post = this._getDbHashes(node);
             // Check that all databases and collections hashed before the restore are the same on
