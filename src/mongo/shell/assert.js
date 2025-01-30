@@ -90,28 +90,74 @@ function _convertExceptionToReturnStatus(func, excMsg) {
     return safeFunc;
 }
 
+class AssertionError extends Error {
+    constructor(message, id, attr) {
+        super(message);
+        // Properties that are always present ('message' is managed by the parent class).
+        this._fixedProperties = {
+            t: {"$date": new Date().toISOString()},
+            s: "E",  // error
+            c: "js_test",
+            id,
+            ctx: TestData?.testName || "-"
+        };
+        // Property 'attr' can be empty.
+        this.attr = attr;
+    }
+    #serialize(fn, options) {
+        return fn.apply(this, [
+            {...this._fixedProperties, msg: this.message, ...(this.attr && {attr: this.attr})},
+            ...options
+        ]);
+    }
+    toString() {
+        return this.#serialize(JSON.stringify, []);
+    }
+    tojson() {
+        return this.#serialize(tojson, arguments);
+    }
+}
+
 assert = (function() {
     // Wrapping the helper function in an IIFE to avoid polluting the global namespace.
 
     function _processMsg(msg) {
         if (typeof msg === "function") {
-            return msg();
-        } else if (typeof msg === "object") {
-            return tojson(msg);
+            msg = msg();
         }
 
+        if (typeof msg === "object") {
+            msg = tojson(msg);
+        }
         return msg;
+    }
+
+    function _doassert(msg, prefix, attr, prefixOverride) {
+        if (TestData?.logFormat === "json") {
+            if (attr?.res) {
+                // Special handling for command reply a.k.a. 'res' parameters, as it might contain
+                // non-printable '_commandObj' and '_mongo' properties.
+                attr = {
+                    ...attr,
+                    ...(attr.res._commandObj && {originalCommand: attr.res._commandObj}),
+                    ...(attr.res._mongo && {connection: attr.res._mongo})
+                };
+            }
+            throw new AssertionError(
+                _buildAssertionMessage(msg, prefixOverride || prefix), 9928000, attr);
+        }
+        doassert(_buildAssertionMessage(msg, prefix), attr?.res);
     }
 
     function _validateAssertionMessage(msg) {
         if (msg) {
             if (typeof msg === "function") {
                 if (msg.length !== 0) {
-                    doassert("msg function cannot expect any parameters.");
+                    _doassert("msg function cannot expect any parameters.");
                 }
             } else if (typeof msg !== "string" && typeof msg !== "object") {
-                doassert("msg parameter must be a string, function or object. Found type: " +
-                         typeof (msg));
+                _doassert("msg parameter must be a string, function or object. Found type: " +
+                          typeof (msg));
             }
         }
     }
@@ -136,7 +182,7 @@ assert = (function() {
 
     var assert = function(b, msg) {
         if (arguments.length > 2) {
-            doassert("Too many parameters to assert().");
+            _doassert("Too many parameters to assert().");
         }
 
         _validateAssertionMessage(msg);
@@ -145,7 +191,7 @@ assert = (function() {
             return;
         }
 
-        doassert(_buildAssertionMessage(msg, "assert failed"));
+        _doassert(msg, "assert failed");
     };
 
     function _isEq(a, b) {
@@ -167,8 +213,8 @@ assert = (function() {
             return;
         }
 
-        doassert(_buildAssertionMessage(
-            msg, "[" + tojson(a) + "] != [" + tojson(b) + "] are not equal"));
+        _doassert(
+            msg, `[${tojson(a)}] != [${tojson(b)}] are not equal`, {a, b}, "assert.eq() failed");
     };
 
     function _isDocEq(a, b) {
@@ -187,10 +233,11 @@ assert = (function() {
             return;
         }
 
-        doassert(_buildAssertionMessage(msg,
-                                        "expected document " + tojson(expectedDoc) +
-                                            " and actual document " + tojson(actualDoc) +
-                                            " are not equal"));
+        _doassert(msg,
+                  "expected document " + tojson(expectedDoc) + " and actual document " +
+                      tojson(actualDoc) + " are not equal",
+                  {expectedDoc, actualDoc},
+                  "assert.docEq() failed");
     };
 
     /**
@@ -201,10 +248,11 @@ assert = (function() {
         _validateAssertionMessage(msg);
 
         const failAssertion = function() {
-            doassert(_buildAssertionMessage(msg,
-                                            "expected set " + tojson(expectedSet) +
-                                                " and actual set " + tojson(actualSet) +
-                                                " are not equal"));
+            _doassert(msg,
+                      "expected set " + tojson(expectedSet) + " and actual set " +
+                          tojson(actualSet) + " are not equal",
+                      {expectedSet: Array.from(expectedSet), actualSet: Array.from(actualSet)},
+                      "assert.setEq() failed");
         };
         if (expectedSet.size !== actualSet.size) {
             failAssertion();
@@ -226,7 +274,10 @@ assert = (function() {
         _validateAssertionMessage(msg);
 
         const failAssertion = function() {
-            doassert(_buildAssertionMessage(msg, tojson(aArr) + " != " + tojson(bArr)));
+            _doassert(msg,
+                      tojson(aArr) + " != " + tojson(bArr),
+                      {aArr, bArr, compareFn: compareFn.name},
+                      "assert.sameMembers() failed");
         };
 
         if (aArr.length !== bArr.length) {
@@ -259,7 +310,7 @@ assert = (function() {
         function fuzzyCompare(docA, docB) {
             return _fieldsClose(docA, docB, fuzzyFields, msg, places);
         }
-        return assert.sameMembers(aArr, bArr, null, fuzzyCompare);
+        return assert.sameMembers(aArr, bArr, msg, fuzzyCompare);
     };
 
     assert.neq = function(a, b, msg) {
@@ -269,14 +320,13 @@ assert = (function() {
             return;
         }
 
-        doassert(
-            _buildAssertionMessage(msg, "[" + tojson(a) + "] == [" + tojson(b) + "] are equal"));
+        _doassert(msg, `[${tojson(a)}] == [${tojson(b)}] are equal`, {a, b}, "assert.neq() failed");
     };
 
     assert.hasFields = function(result, arr, msg) {
         var count = 0;
         if (!Array.isArray(arr)) {
-            throw new Error("The second argument to assert.hasFields must be an array.");
+            _doassert("The second argument to assert.hasFields must be an array.");
         }
 
         for (var field in result) {
@@ -286,15 +336,17 @@ assert = (function() {
         }
 
         if (count != arr.length) {
-            doassert(_buildAssertionMessage(
-                msg, "Not all of the values from " + tojson(arr) + " were in " + tojson(result)));
+            _doassert(msg,
+                      "Not all of the values from " + tojson(arr) + " were in " + tojson(result),
+                      {result, arr},
+                      "assert.hasFields() failed");
         }
     };
 
     assert.contains = function(o, arr, msg) {
         var wasIn = false;
         if (!Array.isArray(arr)) {
-            throw new Error("The second argument to assert.contains must be an array.");
+            _doassert("The second argument to assert.contains() must be an array.");
         }
 
         for (var i = 0; i < arr.length; i++) {
@@ -305,19 +357,25 @@ assert = (function() {
         }
 
         if (!wasIn) {
-            doassert(_buildAssertionMessage(msg, tojson(o) + " was not in " + tojson(arr)));
+            _doassert(msg,
+                      tojson(o) + " was not in " + tojson(arr),
+                      {o, arr},
+                      "assert.contains() failed");
         }
     };
 
     assert.doesNotContain = function(o, arr, msg) {
         if (!Array.isArray(arr)) {
-            throw new Error("The second argument to assert.doesNotContain must be an array.");
+            _doassert("The second argument to assert.doesNotContain must be an array.");
         }
 
         for (var i = 0; i < arr.length; i++) {
             const isIn = arr[i] == o || ((arr[i] != null && o != null) && friendlyEqual(arr[i], o));
             if (isIn) {
-                doassert(_buildAssertionMessage(msg, tojson(o) + " is in " + tojson(arr)));
+                _doassert(msg,
+                          tojson(o) + " is in " + tojson(arr),
+                          {o, arr},
+                          "assert.doesNotContain() failed");
             }
         }
     };
@@ -325,10 +383,10 @@ assert = (function() {
     assert.containsPrefix = function(prefix, arr, msg) {
         var wasIn = false;
         if (typeof (prefix) !== "string") {
-            throw new Error("The first argument to containsPrefix must be a string.");
+            _doassert("The first argument to containsPrefix must be a string.");
         }
         if (!Array.isArray(arr)) {
-            throw new Error("The second argument to containsPrefix must be an array.");
+            _doassert("The second argument to containsPrefix must be an array.");
         }
 
         for (let i = 0; i < arr.length; i++) {
@@ -343,8 +401,10 @@ assert = (function() {
         }
 
         if (!wasIn) {
-            doassert(_buildAssertionMessage(
-                msg, tojson(prefix) + " was not a prefix in " + tojson(arr)));
+            _doassert(msg,
+                      tojson(prefix) + " was not a prefix in " + tojson(arr),
+                      {prefix, arr},
+                      "assert.containsPrefix() failed");
         }
     };
 
@@ -385,7 +445,7 @@ assert = (function() {
 
             const diff = (new Date()).getTime() - start.getTime();
             if (diff > timeout) {
-                msg = _buildAssertionMessage(msg, msgPrefix);
+                msg = _buildAssertionMessage(msg);
                 if (runHangAnalyzer) {
                     msg = msg +
                         " The hang analyzer is automatically called in assert.soon functions." +
@@ -395,7 +455,7 @@ assert = (function() {
                     print(msg + " Running hang analyzer from assert.soon.");
                     MongoRunner.runHangAnalyzer();
                 }
-                doassert(msg);
+                _doassert(msg, msgPrefix);
             } else {
                 sleep(interval);
             }
@@ -463,7 +523,7 @@ assert = (function() {
             print(msg + " Running hang analyzer from assert.retry.");
             MongoRunner.runHangAnalyzer();
         }
-        doassert(msg);
+        _doassert(msg, null, null, "assert.retry() failed");
     };
 
     /*
@@ -473,10 +533,11 @@ assert = (function() {
      * Throws an exception with message 'msg' after all attempts are used up. If no 'intervalMS'
      * argument is passed, it defaults to 0.
      */
-    assert.retryNoExcept = function(func, msg, num_attempts, intervalMS) {
+    assert.retryNoExcept = function(
+        func, msg, num_attempts, intervalMS, {runHangAnalyzer = true} = {}) {
         var safeFunc =
             _convertExceptionToReturnStatus(func, "assert.retryNoExcept caught exception");
-        assert.retry(safeFunc, msg, num_attempts, intervalMS);
+        assert.retry(safeFunc, msg, num_attempts, intervalMS, {runHangAnalyzer});
     };
 
     /**
@@ -518,7 +579,7 @@ assert = (function() {
         if (diff > timeout) {
             const msgPrefix =
                 "assert.time failed timeout " + timeout + "ms took " + diff + "ms : " + f + ", msg";
-            msg = _buildAssertionMessage(msg, msgPrefix);
+            msg = _buildAssertionMessage(msg);
             if (runHangAnalyzer) {
                 msg = msg +
                     " The hang analyzer is automatically called in assert.time functions. " +
@@ -528,19 +589,19 @@ assert = (function() {
                 print(msg + " Running hang analyzer from assert.time.");
                 MongoRunner.runHangAnalyzer();
             }
-            doassert(msg);
+            _doassert(msg, msgPrefix, {timeMS: diff, timeoutMS: timeout}, "assert.time() failed");
         }
         return res;
     };
 
     function assertThrowsHelper(func, params) {
         if (typeof func !== "function") {
-            throw new Error('1st argument must be a function');
+            _doassert('1st argument must be a function');
         }
 
         if (arguments.length >= 2 && !Array.isArray(params) &&
             Object.prototype.toString.call(params) !== "[object Arguments]") {
-            throw new Error("2nd argument must be an Array or Arguments object");
+            _doassert("2nd argument must be an Array or Arguments object");
         }
 
         let thisKeywordWasUsed = false;
@@ -576,9 +637,9 @@ assert = (function() {
         }
 
         if (thisKeywordWasUsed) {
-            doassert("Attempted to access 'this' during function call in" +
-                     " assert.throws/doesNotThrow. Instead, wrap the function argument in" +
-                     " another function.");
+            _doassert("Attempted to access 'this' during function call in" +
+                      " assert.throws/doesNotThrow. Instead, wrap the function argument in" +
+                      " another function.");
         }
 
         return {error: error, res: res};
@@ -592,7 +653,7 @@ assert = (function() {
         const {error} = assertThrowsHelper.apply(null, arguments);
 
         if (!error) {
-            doassert(_buildAssertionMessage(msg, "did not throw exception"));
+            _doassert(msg, "did not throw exception");
         }
 
         return error;
@@ -600,7 +661,7 @@ assert = (function() {
 
     assert.throwsWithCode = function(func, expectedCode, params, msg) {
         if (arguments.length < 2) {
-            throw new Error("assert.throwsWithCode expects at least 2 arguments");
+            _doassert("assert.throwsWithCode expects at least 2 arguments");
         }
         // Remove the 'code' parameter, and any undefined parameters, from the list of arguments.
         // Use .apply() to preserve the length of the 'arguments' object.
@@ -610,9 +671,10 @@ assert = (function() {
             expectedCode = [expectedCode];
         }
         if (!expectedCode.some((ec) => error.code == ec)) {
-            doassert(_buildAssertionMessage(
-                msg,
-                "[" + tojson(error.code) + "] != [" + tojson(expectedCode) + "] are not equal"));
+            _doassert(msg,
+                      `[${tojson(error.code)}] != [${tojson(expectedCode)}] are not equal`,
+                      {code: error.code, expectedCode},
+                      "assert.throwsWithCode() failed");
         }
         return error;
     };
@@ -625,7 +687,11 @@ assert = (function() {
         const {error, res} = assertThrowsHelper.apply(null, arguments);
 
         if (error) {
-            doassert(_buildAssertionMessage(msg, "threw unexpected exception: " + error));
+            const {code, message} = error;
+            _doassert(msg,
+                      "threw unexpected exception: " + error,
+                      {error: {...(code && {code}), ...(message && {message})}},
+                      "assert.doesNotThrow() failed");
         }
 
         return res;
@@ -633,10 +699,10 @@ assert = (function() {
 
     assert.dropExceptionsWithCode = function(func, dropCodes, onDrop) {
         if (typeof func !== "function") {
-            doassert('assert.dropExceptionsWithCode 1st argument must be a function');
+            _doassert('assert.dropExceptionsWithCode 1st argument must be a function');
         }
         if (typeof onDrop !== "function") {
-            doassert('assert.dropExceptionsWithCode 3rd argument must be a function');
+            _doassert('assert.dropExceptionsWithCode 3rd argument must be a function');
         }
         if (!Array.isArray(dropCodes)) {
             dropCodes = [dropCodes];
@@ -679,8 +745,10 @@ assert = (function() {
 
     function _validateCommandResponse(res, assertionName) {
         if (typeof res !== "object") {
-            doassert("unknown response type '" + typeof res + "' given to " + assertionName +
-                     ", res='" + res + "'");
+            _doassert(`unexpected result type given to assert.${assertionName}()`,
+                      `expected result type 'object', got '${typeof res}', res='${res}'`,
+                      {result: res, resultType: typeof res},
+                      "expected result type 'object'");
         }
     }
 
@@ -734,7 +802,7 @@ assert = (function() {
         _validateCommandResponse(res, "commandWorked");
 
         // Keep this as a function so we don't call tojson if not necessary.
-        const makeFailMsg = () => {
+        const makeFailPrefix = () => {
             let prefix = "command failed: " + tojson(res);
             if (typeof res._commandObj === "object" && res._commandObj !== null) {
                 prefix += " with original command request: " + tojson(res._commandObj);
@@ -742,7 +810,7 @@ assert = (function() {
             if (typeof res._mongo === "object" && res._mongo !== null) {
                 prefix += " on connection: " + res._mongo;
             }
-            return _buildAssertionMessage(msg, prefix);
+            return prefix;
         };
 
         if (_isWriteResultType(res)) {
@@ -754,7 +822,7 @@ assert = (function() {
             // A WriteCommandError implies ok:0.
             // Error objects may have a `code` property added (e.g.
             // DBCollection.prototype.mapReduce) without a `ok` property.
-            doassert(makeFailMsg(), res);
+            _doassert(msg, makeFailPrefix(), {res}, "command failed");
         } else if (res.hasOwnProperty("ok")) {
             // Handle raw command responses or cases like MapReduceResult which extend command
             // response.
@@ -763,15 +831,16 @@ assert = (function() {
                     ignoreWriteConcernErrors: ignoreWriteConcernErrors
                 })) {
                 _runHangAnalyzerForSpecificFailureTypes(res);
-                doassert(makeFailMsg(), res);
+                _doassert(msg, makeFailPrefix(), {res}, "command failed");
             }
         } else if (res.hasOwnProperty("acknowledged")) {
             // CRUD api functions return plain js objects with an acknowledged property.
             // no-op.
         } else {
-            doassert(_buildAssertionMessage(
-                         msg, "unknown type of result, cannot check ok: " + tojson(res)),
-                     res);
+            _doassert(msg,
+                      "unknown type of result, cannot check ok: " + tojson(res),
+                      res,
+                      "unknown type of result");
         }
         return res;
     }
@@ -787,17 +856,15 @@ assert = (function() {
         }
 
         // Keep this as a function so we don't call tojson if not necessary.
-        const makeFailMsg = () => {
-            return _buildAssertionMessage(
-                msg, "command worked when it should have failed: " + tojson(res));
+        const makeFailPrefix = () => {
+            return "command worked when it should have failed: " + tojson(res);
         };
 
-        const makeFailCodeMsg = () => {
+        const makeFailCodePrefix = () => {
             return (expectedCode !== assert._kAnyErrorCode)
-                ? _buildAssertionMessage(msg,
-                                         "command did not fail with any of the following codes " +
-                                             tojson(expectedCode) + " " + tojson(res))
-                : "";
+                ? "command did not fail with any of the following codes " + tojson(expectedCode) +
+                    " " + tojson(res)
+                : null;
         };
 
         if (_isWriteResultType(res)) {
@@ -809,14 +876,18 @@ assert = (function() {
             // DBCollection.prototype.mapReduce) without a `ok` property.
             if (expectedCode !== assert._kAnyErrorCode) {
                 if (!res.hasOwnProperty("code") || !expectedCode.includes(res.code)) {
-                    doassert(makeFailCodeMsg(), res);
+                    _doassert(msg,
+                              makeFailCodePrefix(),
+                              {res, expectedCode},
+                              "command did not fail with any of the following codes");
                 }
             }
         } else if (res.hasOwnProperty("ok")) {
             // Handle raw command responses or cases like MapReduceResult which extend command
             // response.
             if (_rawReplyOkAndNoWriteErrors(res)) {
-                doassert(makeFailMsg(), res);
+                _doassert(
+                    msg, makeFailPrefix(), {res}, "command worked when it should have failed");
             }
 
             if (expectedCode !== assert._kAnyErrorCode) {
@@ -831,16 +902,20 @@ assert = (function() {
 
                 if (!foundCode) {
                     _runHangAnalyzerForSpecificFailureTypes(res);
-                    doassert(makeFailCodeMsg(), res);
+                    _doassert(msg,
+                              makeFailCodePrefix(),
+                              {res, expectedCode},
+                              "command did not fail with any of the following codes");
                 }
             }
         } else if (res.hasOwnProperty("acknowledged")) {
             // CRUD api functions return plain js objects with an acknowledged property.
-            doassert(makeFailMsg(), res);
+            _doassert(msg, makeFailPrefix(), {res}, "command worked when it should have failed");
         } else {
-            doassert(_buildAssertionMessage(
-                         msg, "unknown type of result, cannot check error: " + tojson(res)),
-                     res);
+            _doassert(msg,
+                      "unknown type of result, cannot check error: " + tojson(res),
+                      {res},
+                      "unknown type of result");
         }
         return res;
     }
@@ -887,29 +962,29 @@ assert = (function() {
 
         if (res instanceof WriteResult) {
             if (res.hasWriteError()) {
-                errMsg = "write failed with error: " + tojson(res);
+                errMsg = "write failed with error";
             } else if (!ignoreWriteConcernErrors && res.hasWriteConcernError()) {
-                errMsg = "write concern failed with errors: " + tojson(res);
+                errMsg = "write concern failed with errors";
             }
         } else if (res instanceof BulkWriteResult) {
             // Can only happen with bulk inserts
             if (res.hasWriteErrors()) {
-                errMsg = "write failed with errors: " + tojson(res);
+                errMsg = "write failed with errors";
             } else if (!ignoreWriteConcernErrors && res.hasWriteConcernError()) {
-                errMsg = "write concern failed with errors: " + tojson(res);
+                errMsg = "write concern failed with errors";
             }
         } else if (res instanceof WriteCommandError || res instanceof WriteError ||
                    res instanceof BulkWriteError) {
-            errMsg = "write command failed: " + tojson(res);
+            errMsg = "write command failed";
         } else {
             if (!res || !res.ok) {
-                errMsg = "unknown type of write result, cannot check ok: " + tojson(res);
+                errMsg = "unknown type of write result, cannot check ok";
             }
         }
 
         if (errMsg) {
             _runHangAnalyzerForSpecificFailureTypes(res);
-            doassert(_buildAssertionMessage(msg, errMsg), res);
+            _doassert(msg, errMsg + ": " + tojson(res), {res}, errMsg);
         }
 
         return res;
@@ -923,7 +998,7 @@ assert = (function() {
     // the expectedCode array.
     assert.writeErrorWithCode = function(res, expectedCode, msg) {
         if (expectedCode === undefined) {
-            doassert("assert.writeErrorWithCode called with undefined error code");
+            _doassert("assert.writeErrorWithCode called with undefined error code");
         }
 
         var errMsg = null;
@@ -935,7 +1010,7 @@ assert = (function() {
             } else if (res.hasWriteConcernError()) {
                 writeErrorCodes.add(res.getWriteConcernError().code);
             } else {
-                errMsg = "no write error: " + tojson(res);
+                errMsg = "no write error";
             }
         } else if (res instanceof BulkWriteResult || res instanceof BulkWriteError) {
             // Can only happen with bulk inserts
@@ -945,7 +1020,7 @@ assert = (function() {
             } else if (res.hasWriteConcernError()) {
                 writeErrorCodes.add(res.getWriteConcernError().code);
             } else {
-                errMsg = "no write errors: " + tojson(res);
+                errMsg = "no write errors";
             }
         } else if (res instanceof WriteCommandError) {
             // Can only happen with bulk inserts
@@ -954,11 +1029,16 @@ assert = (function() {
             writeErrorCodes.add(res.code);
         } else {
             if (!res || res.ok) {
-                errMsg = "unknown type of write result, cannot check error: " + tojson(res);
+                errMsg = "unknown type of write result, cannot check error";
             }
         }
 
-        if (!errMsg && expectedCode !== assert._kAnyErrorCode) {
+        if (errMsg) {
+            _runHangAnalyzerForSpecificFailureTypes(res);
+            _doassert(msg, errMsg + ": " + tojson(res), {res}, errMsg);
+        }
+
+        if (expectedCode !== assert._kAnyErrorCode) {
             if (!Array.isArray(expectedCode)) {
                 expectedCode = [expectedCode];
             }
@@ -967,12 +1047,12 @@ assert = (function() {
                 errMsg = "found code(s) " + tojson(Array.from(writeErrorCodes)) +
                     " does not match any of the expected codes " + tojson(expectedCode) +
                     ". Original command response: " + tojson(res);
+                _runHangAnalyzerForSpecificFailureTypes(res);
+                _doassert(msg,
+                          errMsg,
+                          {res, expectedCode, writeErrorCodes: Array.from(writeErrorCodes)},
+                          "found code(s) does not match any of the expected codes");
             }
-        }
-
-        if (errMsg) {
-            _runHangAnalyzerForSpecificFailureTypes(res);
-            doassert(_buildAssertionMessage(msg, errMsg), res);
         }
 
         return res;
@@ -985,7 +1065,8 @@ assert = (function() {
             return;
         }
 
-        doassert("supposed to be null (" + (_processMsg(msg) || "") + ") was: " + tojson(what));
+        _doassert(
+            msg, "supposed to be null  was: " + tojson(what), {what}, "assert.isnull() failed");
     };
 
     function _shouldUseBsonWoCompare(a, b) {
@@ -1022,7 +1103,8 @@ assert = (function() {
             return;
         }
 
-        doassert(_buildAssertionMessage(msg, a + " is not " + description + " " + b));
+        _doassert(
+            msg, a + " is not " + description + " " + b, {a, b}, `assert ${description} failed`);
     }
 
     assert.lt = function(a, b, msg) {
@@ -1049,24 +1131,21 @@ assert = (function() {
         }, a, b, "greater than or eq", msg);
     };
 
-    assert.between = function(a, b, c, msg, inclusive) {
+    assert.between = function(a, b, c, msg, inclusive = true) {
         _validateAssertionMessage(msg);
 
         let compareFn = (a, b) => {
-            return a < b;
+            return inclusive ? a <= b : a < b;
         };
-
-        if ((inclusive == undefined || inclusive == true)) {
-            compareFn = (a, b) => {
-                return a <= b;
-            };
-        }
 
         if (_compare(compareFn, a, b) && _compare(compareFn, b, c)) {
             return;
         }
 
-        doassert(_buildAssertionMessage(msg, b + " is not between " + a + " and " + c));
+        _doassert(msg,
+                  b + " is not between " + a + " and " + c,
+                  {a, b, c, inclusive},
+                  "assert.between() failed");
     };
 
     assert.betweenIn = function(a, b, c, msg) {
@@ -1098,7 +1177,7 @@ assert = (function() {
     assert.close = function(a, b, msg, places = 4) {
         const [isClose, errMsg] = _isClose(a, b, places);
         if (!isClose) {
-            doassert(_buildAssertionMessage(msg, errMsg));
+            _doassert(msg, errMsg, {a, b, places}, "assert.close() failed");
         }
     };
 
@@ -1148,17 +1227,17 @@ assert = (function() {
 
         const msgPrefix = "" + a + " is not equal to " + b + " within " + deltaMS + " millis, " +
             "actual delta: " + actualDelta + " millis";
-        doassert(_buildAssertionMessage(msg, msgPrefix));
+
+        const forLog = (arg) => arg instanceof Date ? JSON.parse(JSON.stringify(arg)) : arg;
+        _doassert(
+            msg, msgPrefix, {a: forLog(a), b: forLog(b), deltaMS}, "assert.closeWithinMS() failed");
     };
 
     assert.includes = function(haystack, needle, msg) {
         if (!haystack.includes(needle)) {
-            var assertMsg = "string [" + haystack + "] does not include [" + needle + "]";
-            if (msg) {
-                assertMsg += ", " + msg;
-            }
+            var prefix = `string [${haystack}] does not include [${needle}]`;
 
-            doassert(assertMsg);
+            _doassert(msg, prefix, {haystack, needle}, "assert.includes() failed");
         }
     };
 

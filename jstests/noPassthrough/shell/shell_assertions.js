@@ -763,6 +763,381 @@ tests.push(function assertCallsHangAnalyzer() {
                       () => sleep(5), 'assert message', 1 /* we certainly take less than this */));
 });
 
+tests.push(function serializeAssertionErrorWithoutAttributes() {
+    let mongoAE = new AssertionError("Lorem ipsum", 9928000);
+    // Remove the non-deterministic timestamp.
+    delete mongoAE._fixedProperties.t;
+    const expectedObj =
+        {s: "E", c: "js_test", id: 9928000, ctx: "shell_assertions", msg: "Lorem ipsum"};
+    assert.eq(JSON.stringify(expectedObj), mongoAE.toString());
+    assert.eq(tojson(expectedObj, "", true), mongoAE.tojson("", true));
+});
+
+tests.push(function serializeAssertionErrorWithAttributes() {
+    let mongoAE = new AssertionError("Oops!", 9928000, {hello: "world"});
+    // Remove the non-deterministic timestamp.
+    delete mongoAE._fixedProperties.t;
+    const expectedObj = {
+        s: "E",
+        c: "js_test",
+        id: 9928000,
+        ctx: "shell_assertions",
+        msg: "Oops!",
+        attr: {hello: "world"}
+    };
+    assert.eq(JSON.stringify(expectedObj), mongoAE.toString());
+    assert.eq(tojson(expectedObj, "", true), mongoAE.tojson("", true));
+});
+
+function assertThrowsAssertionErrorWithJson(assertFailureTriggerFn, expectedJsonFields) {
+    const oldLogFormat = TestData.logFormat;
+    try {
+        TestData.logFormat = "json";
+        assertFailureTriggerFn();
+    } catch (e) {
+        const {t, ...jsonWithoutTimestamp} = assert.doesNotThrow(
+            JSON.parse, [e.toString()], `could not parse assertion error string '${e.toString()}'`);
+        assert.docEq(
+            {s: "E", c: "js_test", id: 9928000, ctx: "shell_assertions", ...expectedJsonFields},
+            jsonWithoutTimestamp,
+            "unexpected assertion error");
+    } finally {
+        TestData.logFormat = oldLogFormat;
+    }
+    // Call the 'assertFailureTriggerFn' second time to make sure it actually throws.
+    assert.throws(assertFailureTriggerFn, [], "assertFailureTriggerFn");
+}
+
+tests.push(function assertJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert(false, "lorem ipsum");
+    }, {msg: "assert failed : lorem ipsum"});
+});
+
+tests.push(function assertEqJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.eq(5, 2 + 2, "lorem ipsum");
+    }, {msg: "assert.eq() failed : lorem ipsum", attr: {a: 5, b: 4}});
+});
+
+tests.push(function assertDocEqJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.docEq({msg: "hello"}, {msg: "goodbye"}, "lorem ipsum");
+    }, {
+        msg: "assert.docEq() failed : lorem ipsum",
+        attr: {expectedDoc: {msg: "hello"}, actualDoc: {msg: "goodbye"}}
+    });
+});
+
+tests.push(function assertSetEqJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.setEq(new Set([1, 2, 3]), new Set([4, 5]), "lorem ipsum");
+    }, {
+        msg: "assert.setEq() failed : lorem ipsum",
+        attr: {expectedSet: [1, 2, 3], actualSet: [4, 5]}
+    });
+});
+
+tests.push(function assertSameMembersJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.sameMembers([1, 2], [1], "Oops!");
+    }, {
+        msg: "assert.sameMembers() failed : Oops!",
+        attr: {aArr: [1, 2], bArr: [1], compareFn: "_isDocEq"}
+    });
+});
+
+tests.push(function assertFuzzySameMembersJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.fuzzySameMembers([{soccer: 42}], [{score: 42000}], ["score"], "Oops!");
+    }, {
+        msg: "assert.sameMembers() failed : Oops!",
+        attr: {aArr: [{soccer: 42}], bArr: [{score: 42000}], compareFn: "fuzzyCompare"}
+    });
+});
+
+tests.push(function assertNeqJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.neq(42, 42, "Oops!");
+    }, {msg: "assert.neq() failed : Oops!", attr: {a: 42, b: 42}});
+});
+
+tests.push(function assertHasFieldsJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.hasFields({hello: "world"}, ["goodbye"], "Oops!");
+    }, {
+        msg: "assert.hasFields() failed : Oops!",
+        attr: {result: {hello: "world"}, arr: ["goodbye"]}
+    });
+});
+
+tests.push(function assertContainsJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.contains(3, [14, 15, 926], "Oops!");
+    }, {msg: "assert.contains() failed : Oops!", attr: {o: 3, arr: [14, 15, 926]}});
+});
+
+tests.push(function assertDoesNotContainJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.doesNotContain(3, [3, 23], "Oops!");
+    }, {msg: "assert.doesNotContain() failed : Oops!", attr: {o: 3, arr: [3, 23]}});
+});
+
+tests.push(function assertContainsPrefixJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.containsPrefix("hello", ["hell", "help"], "Oops!");
+    }, {
+        msg: "assert.containsPrefix() failed : Oops!",
+        attr: {prefix: "hello", arr: ["hell", "help"]}
+    });
+});
+
+tests.push(function assertSoonJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.soon(() => false, "Oops!", 20, 10, {runHangAnalyzer: false});
+    }, {msg: "assert.soon failed (timeout 20ms), msg : Oops!"});
+});
+
+tests.push(function assertSoonNoExceptJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.soonNoExcept(() => {
+            throw Error("disaster");
+        }, "Oops!", 20, 10, {runHangAnalyzer: false});
+    }, {msg: "assert.soon failed (timeout 20ms), msg : Oops!"});
+});
+
+tests.push(function assertRetryJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.retry(() => false, "Oops!", 2, 10, {runHangAnalyzer: false});
+    }, {msg: "assert.retry() failed : Oops!"});
+});
+
+tests.push(function assertRetryNoExceptJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.retryNoExcept(() => {
+            throw Error("disaster");
+        }, "Oops!", 2, 10, {runHangAnalyzer: false});
+    }, {msg: "assert.retry() failed : Oops!"});
+});
+
+tests.push(function assertTimeJsonFormat() {
+    const sleepTimeMS = 20, timeoutMS = 10;
+    const f = (() => {
+        sleep(sleepTimeMS);
+    });
+    assertThrowsAssertionErrorWithJson(() => {
+        try {
+            assert.time(f, "Oops!", timeoutMS, {runHangAnalyzer: false});
+        } catch (e) {
+            // Override the 'timeMS' to make the test deterministic.
+            e.attr.timeMS = sleepTimeMS;
+            throw e;
+        }
+    }, {msg: "assert.time() failed : Oops!", attr: {timeMS: sleepTimeMS, timeoutMS}});
+});
+
+tests.push(function assertThrowsJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.throws(() => true, [], "Oops!");
+    }, {msg: "did not throw exception : Oops!"});
+});
+
+tests.push(function assertThrowsWithCodeJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        const err = new Error("disaster");
+        err.code = 24;
+        assert.throwsWithCode(() => {
+            throw err;
+        }, 42, [], "Oops!");
+    }, {msg: "assert.throwsWithCode() failed : Oops!", attr: {code: 24, expectedCode: [42]}});
+});
+
+tests.push(function assertDoesNotThrowJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        const err = new Error("disaster");
+        assert.doesNotThrow(() => {
+            throw err;
+        }, [], "Oops!");
+    }, {msg: "assert.doesNotThrow() failed : Oops!", attr: {error: {message: "disaster"}}});
+});
+
+tests.push(function assertCommandWorkedWrongArgumentTypeJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.commandWorked("cmd", "Oops!");
+    }, {
+        msg: "expected result type 'object'" +
+            " : unexpected result type given to assert.commandWorked()",
+        attr: {result: "cmd", resultType: "string"}
+    });
+});
+
+tests.push(function assertCommandWorkedJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        const res = {
+            ok: 0,
+            code: ErrorCodes.BadValue,
+            codeName: ErrorCodeStrings[ErrorCodes.BadValue],
+            errmsg: "unexpected error",
+            _mongo: "connection to localhost:20000",
+            _commandObj: {hello: 1}
+        };
+        assert.commandWorked(res, "Oops!");
+    }, {
+        msg: "command failed : Oops!",
+        attr: {
+            res: {
+                ok: 0,
+                code: ErrorCodes.BadValue,
+                codeName: ErrorCodeStrings[ErrorCodes.BadValue],
+                errmsg: "unexpected error",
+                _mongo: "connection to localhost:20000",  // Will not be seen when 'res' is BSON.
+                _commandObj: {hello: 1}                   // Will not be seen when 'res' is BSON.
+            },
+            originalCommand: {hello: 1},
+            connection: "connection to localhost:20000"
+        }
+    });
+});
+
+tests.push(function assertCommandFailedJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        const res = {ok: 1, _mongo: "connection to localhost:20000", _commandObj: {hello: 1}};
+        assert.commandFailed(res, "Oops!");
+    }, {
+        msg: "command worked when it should have failed : Oops!",
+        attr: {
+            res: {
+                ok: 1,
+                _mongo: "connection to localhost:20000",  // Will not be seen when 'res' is BSON.
+                _commandObj: {hello: 1}                   // Will not be seen when 'res' is BSON.
+            },
+            originalCommand: {hello: 1},
+            connection: "connection to localhost:20000"
+        }
+    });
+});
+
+tests.push(function assertCommandFailedWithCodeJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        const res = {ok: 1, _mongo: "connection to localhost:20000", _commandObj: {hello: 1}};
+        assert.commandFailedWithCode(res, ErrorCodes.BadValue, "Oops!");
+    }, {
+        msg: "command worked when it should have failed : Oops!",
+        attr: {
+            res: {
+                ok: 1,
+                _mongo: "connection to localhost:20000",  // Will not be seen when 'res' is BSON.
+                _commandObj: {hello: 1}                   // Will not be seen when 'res' is BSON.
+            },
+            originalCommand: {hello: 1},
+            connection: "connection to localhost:20000"
+        }
+    });
+});
+
+tests.push(function assertCommandFailedWithWrongCodeJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        const res = {
+            ok: 0,
+            code: ErrorCodes.BadValue,
+            codeName: ErrorCodeStrings[ErrorCodes.BadValue],
+            errmsg: "unexpected error",
+            _mongo: "connection to localhost:20000",
+            _commandObj: {hello: 1}
+        };
+        assert.commandFailedWithCode(res, ErrorCodes.NetworkTimeout, "Oops!");
+    }, {
+        msg: "command did not fail with any of the following codes : Oops!",
+        attr: {
+            res: {
+                ok: 0,
+                code: ErrorCodes.BadValue,
+                codeName: ErrorCodeStrings[ErrorCodes.BadValue],
+                errmsg: "unexpected error",
+                _mongo: "connection to localhost:20000",  // Will not be seen when 'res' is BSON.
+                _commandObj: {hello: 1}                   // Will not be seen when 'res' is BSON.
+            },
+            expectedCode: [89],
+            originalCommand: {hello: 1},
+            connection: "connection to localhost:20000"
+        }
+    });
+});
+
+tests.push(function assertWriteOKJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        const res = {ok: 0};
+        assert.writeOK(res, "Oops!");
+    }, {msg: "unknown type of write result, cannot check ok : Oops!", attr: {res: {ok: 0}}});
+});
+
+tests.push(function assertWriteErrorJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        const res =
+            new WriteResult({nRemoved: 0, writeErrors: [], upserted: []}, 3, {w: "majority"});
+        assert.writeError(res, "Oops!");
+    }, {msg: "no write error : Oops!", attr: {res: {nRemoved: 0}}});
+});
+
+tests.push(function assertWriteErrorWithCodeJsonFormat() {
+    const writeError = {code: ErrorCodes.NetworkTimeout, errmsg: "Timeout!"};
+    assertThrowsAssertionErrorWithJson(() => {
+        const res = new WriteResult(
+            {nRemoved: 0, writeErrors: [writeError], upserted: []}, 3, {w: "majority"});
+        assert.writeErrorWithCode(res, ErrorCodes.BadValue, "Oops!");
+    }, {
+        msg: "found code(s) does not match any of the expected codes : Oops!",
+        attr: {
+            res: {nRemoved: 0},
+            expectedCode: [ErrorCodes.BadValue],
+            writeErrorCodes: [ErrorCodes.NetworkTimeout]
+        }
+    });
+});
+
+tests.push(function assertIsNullJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.isnull({ok: 1}, "Oops!");
+    }, {msg: "assert.isnull() failed : Oops!", attr: {what: {ok: 1}}});
+});
+
+tests.push(function assertLTJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.lt(41, 18, "Oops!");
+    }, {msg: "assert less than failed : Oops!", attr: {a: 41, b: 18}});
+});
+
+tests.push(function assertBetweenJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.between(1, 15, 10, "Oops!");
+    }, {msg: "assert.between() failed : Oops!", attr: {a: 1, b: 15, c: 10, inclusive: true}});
+});
+
+tests.push(function assertCloseJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.close(123.4567, 123.4678, "Oops!");
+    }, {msg: "assert.close() failed : Oops!", attr: {a: 123.4567, b: 123.4678, places: 4}});
+});
+
+tests.push(function assertCloseWithinMSJsonFormat() {
+    const dateForLog = (arg) => JSON.parse(JSON.stringify(arg));
+    const date1 = new Date();
+    sleep(10);
+    const date2 = new Date();
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.closeWithinMS(date1, date2, "Oops!", 1);
+    }, {
+        msg: "assert.closeWithinMS() failed : Oops!",
+        attr: {a: dateForLog(date1), b: dateForLog(date2), deltaMS: 1}
+    });
+});
+
+tests.push(function assertIncludesJsonFormat() {
+    assertThrowsAssertionErrorWithJson(() => {
+        assert.includes("farmacy", "ace", "Oops!");
+    }, {msg: "assert.includes() failed : Oops!", attr: {haystack: "farmacy", needle: "ace"}});
+});
+
 tests.push(function assertJsTestLogJsonFormat() {
     const oldTestData = TestData;
     const printOriginal = print;
