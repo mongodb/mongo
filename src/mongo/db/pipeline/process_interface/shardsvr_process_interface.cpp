@@ -395,7 +395,7 @@ void ShardServerProcessInterface::_createCollectionCommon(OperationContext* opCt
                                                           const DatabaseName& dbName,
                                                           const BSONObj& cmdObj,
                                                           boost::optional<ShardId> dataShard) {
-    cluster::createDatabase(opCtx, dbName);
+    cluster::createDatabase(opCtx, dbName, dataShard);
 
     // TODO (SERVER-77915): Remove the FCV check and keep only the 'else' branch
     if (!feature_flags::g80CollectionCreationPath.isEnabled(

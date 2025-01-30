@@ -81,7 +81,7 @@ function setup() {
  * Assert that executing a concurrent DDL operation and agg results in the aggregate failing and the
  * DDL operation succeeding, or the result is the same as if they had been run serially.
  */
-function assertSerializedOrError({desc, failpointName, setupFn, ddlFn}) {
+function assertSerializedOrError({desc, failpointName, setupFn, ddlFn, ignorePlacement}) {
     jsTestLog(desc);
     setupFn();
     const aggRes = execDuringOutAgg(st, sourceColl, targetColl, failpointName, ddlFn);
@@ -98,7 +98,7 @@ function assertSerializedOrError({desc, failpointName, setupFn, ddlFn}) {
 
     const collState = (dbName, collName) => {
         const coll = st.s.getDB(dbName).getCollection(collName);
-        return ({
+        let result = {
             exists: st.s.getDB(dbName).getCollectionInfos({name: collName}).length == 1,
             count: coll.countDocuments({}),
             docs: coll.find({}, {_id: 0}).sort({val: 1}).toArray(),
@@ -107,7 +107,11 @@ function assertSerializedOrError({desc, failpointName, setupFn, ddlFn}) {
                 shard1: st.shard1.getCollection(coll.getFullName()).countDocuments({}),
                 shard2: st.shard2.getCollection(coll.getFullName()).countDocuments({}),
             },
-        });
+        };
+        if (ignorePlacement) {
+            delete result.placement;
+        }
+        return result;
     };
     const summarizeState = () => ({
         targetColl: collState(targetDB.getName(), targetColl.getName()),
@@ -168,8 +172,7 @@ assert.commandWorked(assertSerializedOrError({
     }
 }));
 
-// TODO SERVER-97621 improve test harness to deal with placement issues when $out creates the db
-for (const targetDBExists of [true]) {
+for (const targetDBExists of [true, false]) {
     const targetDBDesc = ` and targetDB does${targetDBExists ? ' ' : ' not '}exist`;
     const maybeCreateTargetDB = () => {
         if (targetDBExists) {
@@ -177,6 +180,17 @@ for (const targetDBExists of [true]) {
                 {enableSharding: targetDB.getName(), primaryShard: st.shard1.shardName});
         }
     };
+
+    if (!targetDBExists) {
+        FixtureHelpers.runCommandOnAllShards({
+            db: sourceColl.getDB().getSiblingDB("admin"),
+            cmdObj: {
+                configureFailPoint: "outImplictlyCreateDBOnSpecificShard",
+                mode: "alwaysOn",
+                data: {shardId: st.shard1.shardName}
+            }
+        });
+    }
 
     assert.commandWorked(assertSerializedOrError({
         desc: "Concurrent $out and moveCollection on source" + targetDBDesc,
@@ -203,10 +217,6 @@ for (const targetDBExists of [true]) {
         }
     }));
 
-    // TODO SERVER-97621 Because this test drops the target database, it gets implicitly recreated
-    // by the $out on a random database, so we can't compare the placement. Unblock this test after
-    // we can predict where the placement of the implicitly created db is.
-    /*
     assert.commandWorked(assertSerializedOrError({
         desc: "Concurrent $out and dropDatabase on targetDB" + targetDBDesc,
         failpointName: "hangWhileBuildingDocumentSourceOutBatch",
@@ -216,9 +226,12 @@ for (const targetDBExists of [true]) {
         },
         ddlFn() {
             assert.commandWorked(targetDB.dropDatabase());
-        }
+        },
+        // Because of the dropDatabase on the targetDB the target collection is implicitly created
+        // on a random shard by the next insert from $out.
+        ignorePlacement: true
     }));
-    */
+
     assert.commandWorked(assertSerializedOrError({
         desc: "Concurrent $out and dropDatabase on sourceDB" + targetDBDesc,
         failpointName: "hangWhileBuildingDocumentSourceOutBatch",
