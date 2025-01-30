@@ -1199,6 +1199,18 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/gen_tasks_activate.sh"
+    # This command will never generate any tasks. However, it must be present here in the main body
+    # of the _gen task to ensure that Evergreen prioritizes the task higher in the task queue. The
+    # "generate resmoke tasks" function is responsible for activating the corresponding non _gen
+    # task and any delays in scheduling the _gen task will cascade to the non _gen task also. An
+    # approach of a no-op generate.tasks command is used instead of configuring task priorities
+    # because it leaves the policy of weighting the relative urgency across tasks in the queue as
+    # Evergreen's responsibility.
+    - command: generate.tasks
+      params:
+        optional: true
+        files:
+          - /dev/null
 
   # Used by generator
   "validate resmoke tests runtime":
