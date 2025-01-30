@@ -424,7 +424,7 @@ buildvariants:
         --release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --bolt
-        BAZEL_FLAGS="--linkopt=-Wl,--emit-relocs"
+        BAZEL_FLAGS="--linkopt=-Wl,--emit-relocs --local_resources=cpu=HOST_CPUS*.1"
     run_on:
       - amazon2-arm64-latest-xlarge
     tasks:
@@ -448,7 +448,7 @@ buildvariants:
         --release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --bolt
-        BAZEL_FLAGS="--linkopt=-Wl,--emit-relocs"
+        BAZEL_FLAGS="--linkopt=-Wl,--emit-relocs --local_resources=cpu=HOST_CPUS*.1"
     run_on:
       - amazon2023.3-arm64-xlarge
     tasks:
