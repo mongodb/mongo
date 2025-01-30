@@ -3,8 +3,6 @@
  * @tags: [
  *   # Requires stable collection placement
  *   assumes_balancer_off,
- *   # TODO SERVER-97716 Review this exclusion tag
- *   multiversion_incompatible,
  *   requires_2_or_more_shards,
  *   # It uses rename command that is not retriable.
  *   # After succeeding, any subsequent attempt will fail
