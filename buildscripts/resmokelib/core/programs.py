@@ -299,6 +299,9 @@ def mongo_shell_program(
 
             test_data[opt_name] = config.CONFIG_FUZZER_ENCRYPTION_OPTS[opt_name]
 
+    if config.LOG_FORMAT:
+        test_data["logFormat"] = config.LOG_FORMAT
+
     if config.SHELL_TLS_ENABLED:
         test_data["shellTlsEnabled"] = True
 

@@ -569,6 +569,7 @@ be invoked as either:
         _config.SUITE_FILES = _config.SUITE_FILES.split(",")
     _config.TAG_FILES = config.pop("tag_files")
     _config.USER_FRIENDLY_OUTPUT = config.pop("user_friendly_output")
+    _config.LOG_FORMAT = config.pop("log_format")
     _config.SANITY_CHECK = config.pop("sanity_check")
 
     # Internal testing options.
