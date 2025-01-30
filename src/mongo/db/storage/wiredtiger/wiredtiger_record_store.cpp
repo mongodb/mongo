@@ -1067,7 +1067,7 @@ StatusWith<int64_t> WiredTigerRecordStore::_compact(OperationContext* opCtx,
     }
     const std::string uri(getURI());
     int ret = s->compact(uri.c_str(), config.str().c_str());
-    Status status = wtRCToStatus(ret, s->getSession());
+    Status status = wtRCToStatus(ret, *s);
 
     // We may get ErrorCodes::AlreadyInitialized when we try to reconfigure background compaction
     // while it is already running.

@@ -89,12 +89,6 @@ public:
 
     ~WiredTigerSession();
 
-    // TODO(SERVER-98126): Remove these 3 ways of directly-accessing the session.
-
-    WT_SESSION* getSession() const {
-        return _session;
-    }
-
     // Safe accessor for the internal session
     template <typename Functor>
     auto with(Functor functor) {
@@ -116,6 +110,7 @@ public:
     WRAPPED_WT_SESSION_METHOD(drop)
     WRAPPED_WT_SESSION_METHOD(get_last_error)
     WRAPPED_WT_SESSION_METHOD(get_rollback_reason)
+    WRAPPED_WT_SESSION_METHOD(log_flush)
     WRAPPED_WT_SESSION_METHOD(open_cursor)
     WRAPPED_WT_SESSION_METHOD(prepare_transaction)
     WRAPPED_WT_SESSION_METHOD(query_timestamp)

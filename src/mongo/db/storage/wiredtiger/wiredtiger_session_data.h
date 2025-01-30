@@ -44,8 +44,10 @@ public:
      * Allows WT operations running on this 'session' access to the MDB layer 'interruptible'.
      */
     SessionDataRAII(WiredTigerSession* session, Interruptible* interruptible) : _session(session) {
-        invariant(!_session->getSession()->app_private);
-        _session->getSession()->app_private = interruptible;
+        _session->with([&](WT_SESSION* s) {
+            invariant(!s->app_private);
+            s->app_private = interruptible;
+        });
     }
 
     /**
@@ -53,7 +55,7 @@ public:
      * returned to the WiredTigerConnection.
      */
     ~SessionDataRAII() {
-        _session->getSession()->app_private = nullptr;
+        _session->with([&](WT_SESSION* s) { s->app_private = nullptr; });
     }
 
 private:

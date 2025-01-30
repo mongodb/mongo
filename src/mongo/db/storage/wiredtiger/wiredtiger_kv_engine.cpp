@@ -998,10 +998,9 @@ Status WiredTigerKVEngine::beginBackup() {
     // This cursor will be freed by the backupSession being closed as the session is uncached
     auto session = std::make_unique<WiredTigerSession>(_connection.get());
     WT_CURSOR* c = nullptr;
-    WT_SESSION* s = session->getSession();
-    int ret = WT_OP_CHECK(s->open_cursor(s, "backup:", nullptr, nullptr, &c));
+    int ret = WT_OP_CHECK(session->open_cursor("backup:", nullptr, nullptr, &c));
     if (ret != 0) {
-        return wtRCToStatus(ret, s);
+        return wtRCToStatus(ret, *session);
     }
     _backupSession = std::move(session);
     return Status::OK();
@@ -1027,12 +1026,11 @@ Status WiredTigerKVEngine::disableIncrementalBackup() {
 
     auto sessionRaii = std::make_unique<WiredTigerSession>(_connection.get());
     WT_CURSOR* cursor = nullptr;
-    WT_SESSION* session = sessionRaii->getSession();
     int wtRet =
-        session->open_cursor(session, "backup:", nullptr, "incremental=(force_stop=true)", &cursor);
+        sessionRaii->open_cursor("backup:", nullptr, "incremental=(force_stop=true)", &cursor);
     if (wtRet != 0) {
         LOGV2_ERROR(22360, "Could not open a backup cursor to disable incremental backups");
-        return wtRCToStatus(wtRet, session);
+        return wtRCToStatus(wtRet, *sessionRaii);
     }
 
     return Status::OK();
@@ -1068,7 +1066,7 @@ std::deque<std::string> getUniqueFiles(const std::vector<std::string>& files,
 class StreamingCursorImpl : public StorageEngine::StreamingCursor {
 public:
     StreamingCursorImpl() = delete;
-    explicit StreamingCursorImpl(WT_SESSION* session,
+    explicit StreamingCursorImpl(WiredTigerSession* session,
                                  std::string path,
                                  StorageEngine::BackupOptions options,
                                  WiredTigerBackup* wtBackup)
@@ -1164,7 +1162,7 @@ public:
         }
 
         if (wtRet && wtRet != WT_NOTFOUND && backupBlocks.size() != batchSize) {
-            return wtRCToStatus(wtRet, _session);
+            return wtRCToStatus(wtRet, *_session);
         }
 
         return backupBlocks;
@@ -1199,7 +1197,7 @@ private:
             do {
                 LOGV2_DEBUG(9538604, 2, "Opening duplicate backup cursor", "config"_attr = config);
                 wtRet = _session->open_cursor(
-                    _session, nullptr, _wtBackup->cursor, config.c_str(), &_wtBackup->dupCursor);
+                    nullptr, _wtBackup->cursor, config.c_str(), &_wtBackup->dupCursor);
 
                 if (wtRet == EBUSY) {
                     logAndBackoff(8927900,
@@ -1209,7 +1207,7 @@ private:
                                   "Opening duplicate backup cursor returned EBUSY, retrying",
                                   "config"_attr = config);
                 } else if (wtRet != 0) {
-                    return wtRCToStatus(wtRet, _session);
+                    return wtRCToStatus(wtRet, *_session);
                 }
             } while (wtRet == EBUSY);
             fileUnchangedFlag = true;
@@ -1258,7 +1256,7 @@ private:
         if (wtRet != 0) {
             if (wtRet != WT_NOTFOUND ||
                 (wtRet = (_wtBackup->dupCursor)->close(_wtBackup->dupCursor)) != 0) {
-                return wtRCToStatus(wtRet, _session);
+                return wtRCToStatus(wtRet, *_session);
             }
             _wtBackup->dupCursor = nullptr;
             (_wtBackup->wtBackupDupCursorCV).notify_one();
@@ -1267,7 +1265,7 @@ private:
         return Status::OK();
     }
 
-    WT_SESSION* _session;
+    WiredTigerSession* _session;
     std::string _path;
     stdx::unordered_map<std::string, std::pair<NamespaceString, UUID>> _identsToNsAndUUID;
     WiredTigerBackup* _wtBackup;  // '_wtBackup' is an out parameter.
@@ -1312,12 +1310,11 @@ WiredTigerKVEngine::beginNonBlockingBackup(const StorageEngine::BackupOptions& o
     // This cursor will be freed by the backupSession being closed as the session is uncached
     auto sessionRaii = std::make_unique<WiredTigerSession>(_connection.get());
     WT_CURSOR* cursor = nullptr;
-    WT_SESSION* session = sessionRaii->getSession();
     const std::string config = ss.str();
-    int wtRet = session->open_cursor(session, "backup:", nullptr, config.c_str(), &cursor);
+    int wtRet = sessionRaii->open_cursor("backup:", nullptr, config.c_str(), &cursor);
     if (wtRet != 0) {
         boost::filesystem::remove(getOngoingBackupPath());
-        return wtRCToStatus(wtRet, session);
+        return wtRCToStatus(wtRet, *sessionRaii);
     }
 
     // A nullptr indicates that no duplicate cursor is open during an incremental backup.
@@ -1328,7 +1325,7 @@ WiredTigerKVEngine::beginNonBlockingBackup(const StorageEngine::BackupOptions& o
     invariant(_wtBackup.logFilePathsSeenByGetNextBatch.empty());
 
     auto streamingCursor =
-        std::make_unique<StreamingCursorImpl>(session, _path, options, &_wtBackup);
+        std::make_unique<StreamingCursorImpl>(sessionRaii.get(), _path, options, &_wtBackup);
 
     pinOplogGuard.dismiss();
     _backupSession = std::move(sessionRaii);
@@ -1368,11 +1365,10 @@ StatusWith<std::deque<std::string>> WiredTigerKVEngine::extendBackupCursor() {
     // The "target=(\"log:\")" configuration string for the cursor will ensure that we only see the
     // log files when iterating on the cursor.
     WT_CURSOR* cursor = nullptr;
-    WT_SESSION* session = _backupSession->getSession();
     int wtRet =
-        session->open_cursor(session, nullptr, _wtBackup.cursor, "target=(\"log:\")", &cursor);
+        _backupSession->open_cursor(nullptr, _wtBackup.cursor, "target=(\"log:\")", &cursor);
     if (wtRet != 0) {
-        return wtRCToStatus(wtRet, session);
+        return wtRCToStatus(wtRet, *_backupSession);
     }
 
     const char* filename;
@@ -1387,12 +1383,12 @@ StatusWith<std::deque<std::string>> WiredTigerKVEngine::extendBackupCursor() {
     }
 
     if (wtRet != WT_NOTFOUND) {
-        return wtRCToStatus(wtRet, session);
+        return wtRCToStatus(wtRet, *_backupSession);
     }
 
     wtRet = cursor->close(cursor);
     if (wtRet != 0) {
-        return wtRCToStatus(wtRet, session);
+        return wtRCToStatus(wtRet, *_backupSession);
     }
 
     // Once all the backup cursors have been opened on a sharded cluster, we need to ensure that the
@@ -1472,7 +1468,6 @@ Status WiredTigerKVEngine::createRecordStore(const NamespaceString& nss,
     std::string config = result.getValue();
 
     string uri = _uri(ident);
-    WT_SESSION* s = session.getSession();
     LOGV2_DEBUG(22331,
                 2,
                 "WiredTigerKVEngine::createRecordStore ns: {namespace} uri: {uri} config: {config}",
@@ -1480,7 +1475,7 @@ Status WiredTigerKVEngine::createRecordStore(const NamespaceString& nss,
                 "uri"_attr = uri,
                 "config"_attr = config);
     auto ensuredIdent = _ensureIdentPath(ident);
-    return wtRCToStatus(s->create(s, uri.c_str(), config.c_str()), s);
+    return wtRCToStatus(session.create(uri.c_str(), config.c_str()), session);
 }
 
 Status WiredTigerKVEngine::importRecordStore(StringData ident,
@@ -1492,7 +1487,6 @@ Status WiredTigerKVEngine::importRecordStore(StringData ident,
         WiredTigerUtil::generateImportString(ident, storageMetadata, importOptions));
 
     string uri = _uri(ident);
-    WT_SESSION* s = session.getSession();
     LOGV2_DEBUG(5095102,
                 2,
                 "WiredTigerKVEngine::importRecordStore",
@@ -1500,7 +1494,7 @@ Status WiredTigerKVEngine::importRecordStore(StringData ident,
                 "config"_attr = config);
 
     auto ensuredIdent = _ensureIdentPath(ident);
-    return wtRCToStatus(s->create(s, uri.c_str(), config.c_str()), s);
+    return wtRCToStatus(session.create(uri.c_str(), config.c_str()), session);
 }
 
 Status WiredTigerKVEngine::recoverOrphanedIdent(const NamespaceString& nss,
@@ -1561,10 +1555,9 @@ Status WiredTigerKVEngine::recoverOrphanedIdent(const NamespaceString& nss,
     auto start = Date_t::now();
     LOGV2(22335, "Salvaging ident", "ident"_attr = ident);
 
-    WiredTigerSession sessionWrapper(_connection.get());
-    WT_SESSION* session = sessionWrapper.getSession();
-    status = wtRCToStatus(
-        session->salvage(session, _uri(ident).c_str(), nullptr), session, "Salvage failed: ");
+    WiredTigerSession session(_connection.get());
+    status =
+        wtRCToStatus(session.salvage(_uri(ident).c_str(), nullptr), session, "Salvage failed: ");
     LOGV2(4795907, "Salvage complete", "duration"_attr = Date_t::now() - start);
     if (status.isOK()) {
         return {ErrorCodes::DataModifiedByRepair,
@@ -1576,7 +1569,7 @@ Status WiredTigerKVEngine::recoverOrphanedIdent(const NamespaceString& nss,
                   "error"_attr = status.reason());
 
     //  If the data is unsalvageable, we should completely rebuild the ident.
-    return _rebuildIdent(sessionWrapper, _uri(ident).c_str());
+    return _rebuildIdent(session, _uri(ident).c_str());
 #endif
 }
 
@@ -1781,7 +1774,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getTemporaryRecordStore(Operati
 std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
                                                                           StringData ident,
                                                                           KeyFormat keyFormat) {
-    WiredTigerSession wtSession(_connection.get());
+    WiredTigerSession session(_connection.get());
 
     // We don't log writes to temporary record stores.
     const bool isLogged = false;
@@ -1798,7 +1791,6 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     std::string config = swConfig.getValue();
 
     std::string uri = _uri(ident);
-    WT_SESSION* session = wtSession.getSession();
     LOGV2_DEBUG(22337,
                 2,
                 "WiredTigerKVEngine::makeTemporaryRecordStore",
@@ -1806,8 +1798,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
                 "config"_attr = config);
     {
         auto ensuredIdent = _ensureIdentPath(ident);
-        uassertStatusOK(
-            wtRCToStatus(session->create(session, uri.c_str(), config.c_str()), session));
+        uassertStatusOK(wtRCToStatus(session.create(uri.c_str(), config.c_str()), session));
     }
 
     return getTemporaryRecordStore(opCtx, ident, keyFormat);
@@ -1869,8 +1860,7 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
 
     WiredTigerSession session(_connection.get());
 
-    int ret =
-        session.getSession()->drop(session.getSession(), uri.c_str(), "checkpoint_wait=false");
+    int ret = session.drop(uri.c_str(), "checkpoint_wait=false");
     LOGV2_DEBUG(22338, 1, "WT drop", "uri"_attr = uri, "ret"_attr = ret);
 
     if (ret == EBUSY || MONGO_unlikely(WTDropEBUSY.shouldFail())) {
@@ -1896,7 +1886,7 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
         return Status::OK();
     }
 
-    invariantWTOK(ret, session.getSession());
+    invariantWTOK(ret, session);
     return Status::OK();
 }
 
@@ -1929,7 +1919,7 @@ void WiredTigerKVEngine::dropIdentForImport(Interruptible& interruptible,
 
         ++attempt;
 
-        ret = session.getSession()->drop(session.getSession(), uri.c_str(), config.c_str());
+        ret = session.drop(uri.c_str(), config.c_str());
         logAndBackoff(5114600,
                       ::mongo::logv2::LogComponent::kStorage,
                       logv2::LogSeverity::Debug(1),
@@ -1943,7 +1933,7 @@ void WiredTigerKVEngine::dropIdentForImport(Interruptible& interruptible,
         // If the ident doesn't exist then it has already been dropped.
         return;
     }
-    invariantWTOK(ret, session.getSession());
+    invariantWTOK(ret, session);
 }
 
 bool WiredTigerKVEngine::supportsDirectoryPerDB() const {
@@ -2826,15 +2816,13 @@ void WiredTigerKVEngine::waitUntilDurable(OperationContext* opCtx,
     }
 
     // Flush the journal.
-    invariantWTOK(_waitUntilDurableSession->getSession()->log_flush(
-                      _waitUntilDurableSession->getSession(), "sync=on"),
-                  _waitUntilDurableSession->getSession());
+    invariantWTOK(_waitUntilDurableSession->log_flush("sync=on"), *_waitUntilDurableSession);
     LOGV2_DEBUG(22419, 4, "flushed journal");
 
     // The session is reset periodically so that WT doesn't consider it a rogue session and log
     // about it. The session doesn't actually pin any resources that need to be released.
     if (_timeSinceLastDurabilitySessionReset.millis() > (5 * 60 * 1000 /* 5 minutes */)) {
-        _waitUntilDurableSession->getSession()->reset(_waitUntilDurableSession->getSession());
+        _waitUntilDurableSession->reset();
         _timeSinceLastDurabilitySessionReset.reset();
     }
 
