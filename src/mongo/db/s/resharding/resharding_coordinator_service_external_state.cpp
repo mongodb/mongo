@@ -114,9 +114,14 @@ std::map<ShardId, int64_t> getDocumentsCopied(OperationContext* opCtx,
     pipeline.push_back(
         BSON("$match" << BSON((ReshardingRecipientResumeData::kIdFieldName + "." +
                                ReshardingRecipientResumeDataId::kReshardingUUIDFieldName)
-                              << reshardingUUID.toBSON())));
+                              << reshardingUUID)));
+
     AggregateCommandRequest aggRequest(NamespaceString::kRecipientReshardingResumeDataNamespace,
                                        pipeline);
+    aggRequest.setWriteConcern(WriteConcernOptions());
+    aggRequest.setReadConcern(repl::ReadConcernArgs::kMajority);
+    aggRequest.setUnwrappedReadPref(BSON(
+        "$readPreference" << ReadPreferenceSetting{ReadPreference::PrimaryOnly}.toInnerBSON()));
 
     for (const auto& recipientShardId : recipientShardIds) {
         auto recipientShard =
@@ -423,8 +428,8 @@ void ReshardingCoordinatorExternalStateImpl::verifyClonedCollection(
 
         uassert(9929901,
                 str::stream() << "The number of documents to copy from the donor shard '"
-                              << donorShardId.toString() << " is " << donorDocsToCopy
-                              << "' but the number of documents copied is " << donorDocsCopied,
+                              << donorShardId.toString() << "' is " << donorDocsToCopy
+                              << " but the number of documents copied is " << donorDocsCopied,
                 donorDocsToCopy == donorDocsCopied);
     }
 

@@ -872,8 +872,6 @@ public:
 
     RAIIServerParameterControllerForTest serverParamController{
         "reshardingMinimumOperationDurationMillis", 0};
-    FailPointEnableBlock _performVerificationAfterCloning{
-        "reshardingPerformValidationAfterCloning"};
     FailPointEnableBlock _performVerificationAfterApplying{
         "reshardingPerformValidationAfterApplying"};
 

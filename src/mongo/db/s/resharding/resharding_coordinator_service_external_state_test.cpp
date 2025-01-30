@@ -170,11 +170,30 @@ public:
                 auto recipientDocsCopied = recipientIter->second;
 
                 onCommand([&](const auto& request) {
+                    auto nss = NamespaceString::kRecipientReshardingResumeDataNamespace;
+
+                    auto aggRequest = AggregateCommandRequest::parse(
+                        IDLParserContext("mockRecipientCloningMetricsResponses"),
+                        request.cmdObj.addFields(BSON("$db" << nss.db_forTest())));
+                    ASSERT_EQ(aggRequest.getNamespace(), nss);
+                    auto pipeline = aggRequest.getPipeline();
+                    ASSERT_EQ(pipeline.size(), 1);
+                    ASSERT_BSONOBJ_EQ(
+                        pipeline[0],
+                        BSON("$match"
+                             << BSON((ReshardingRecipientResumeData::kIdFieldName + "." +
+                                      ReshardingRecipientResumeDataId::kReshardingUUIDFieldName)
+                                     << reshardingUUID)));
+                    ASSERT_BSONOBJ_EQ(aggRequest.getReadConcern()->toBSON(),
+                                      repl::ReadConcernArgs::kMajority.toBSON());
+                    ASSERT_BSONOBJ_EQ(
+                        *aggRequest.getUnwrappedReadPref(),
+                        BSON("$readPreference"
+                             << ReadPreferenceSetting{ReadPreference::PrimaryOnly}.toInnerBSON()));
+
                     std::vector<BSONObj> docs =
                         makeRecipientResumeDataDocuments(reshardingUUID, recipientDocsCopied);
-                    CursorResponse response(NamespaceString::kConfigReshardingOperationsNamespace,
-                                            0 /* cursorId */,
-                                            docs);
+                    CursorResponse response(nss, 0 /* cursorId */, docs);
                     return response.toBSON(CursorResponse::ResponseType::InitialResponse);
                 });
             }
