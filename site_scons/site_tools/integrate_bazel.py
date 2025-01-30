@@ -1400,6 +1400,18 @@ def generate(env: SCons.Environment.Environment) -> None:
         "--fission=no",
     ]
 
+    if normalized_os == "linux" and os.environ.get("CI") is None:
+        print("""
+    -------- ANNOUNCEMENT -------- 
+    The SCons interface will soon be deprecated on the master branch, please try
+    your workflow with Bazel directly by visiting https://wiki.corp.mongodb.com/display/HGTC/Building+with+Bazel
+
+    If your workflow does not work with Bazel now, please post in #ask-devprod-build with details.
+              
+    Build concurrency is now limited to 100 jobs, please switch over to calling Bazel directly to get full concurrency!
+    ------------------------------""")
+        bazel_internal_flags += ["--jobs=100"]
+
     # Timeout linking at 8 minutes to retry with a lower concurrency.
     if os.environ.get("CI") is not None:
         bazel_internal_flags += [
