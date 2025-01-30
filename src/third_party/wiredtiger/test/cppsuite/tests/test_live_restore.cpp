@@ -338,13 +338,10 @@ run_restore(const std::string &home, const std::string &source, const int64_t th
     const std::string conn_config = CONNECTION_CREATE +
       ",live_restore=(enabled=true,read_size=2MB,threads_max=" + std::to_string(thread_count) +
       ",path=\"" + source + "\"),cache_size=5GB," + verbose_string +
-      ",statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=true)";
+      ",statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=true,path=journal)";
 
     /* Create connection. */
-    if (first)
-        connection_manager::instance().create(conn_config, home);
-    else
-        connection_manager::instance().reopen(conn_config, home);
+    connection_manager::instance().create(conn_config, home, true);
 
     auto crud_session = connection_manager::instance().create_session();
     if (recovery)
@@ -355,7 +352,7 @@ run_restore(const std::string &home, const std::string &source, const int64_t th
         raise(SIGKILL);
 
     // Loop until the state stat is complete!
-    if (thread_count > 0 || (background_thread_mode && !first)) {
+    if (thread_count > 0 || background_thread_mode) {
         logger::log_msg(LOG_INFO, "Waiting for background data transfer to complete...");
         while (true) {
             auto stat_cursor = crud_session.open_scoped_cursor("statistics:");
@@ -486,22 +483,18 @@ main(int argc, char *argv[])
     logger::log_msg(LOG_INFO, "Home path: " + home_path);
 
     if (!recovery) {
-        // Delete any existing source dir.
-        testutil_recreate_dir(SOURCE_PATH);
+        // Delete any existing source dir and home path.
         logger::log_msg(LOG_INFO, "Source path: " + std::string(SOURCE_PATH));
-        // Recreate the home directory on startup every time.
-        testutil_recreate_dir(home_path.c_str());
+        testutil_recreate_dir(SOURCE_PATH);
+        testutil_remove(home_path.c_str());
     } else {
         // Assuming this run is following a -d "death" run then the previous home path will be the
         // source path.
         testutil_remove(SOURCE_PATH);
-        testutil_move(HOME_PATH, SOURCE_PATH);
-        testutil_recreate_dir(HOME_PATH);
+        testutil_move(home_path.c_str(), SOURCE_PATH);
     }
 
-    bool first = recovery == false;
     /* When setting up the database we don't want to wait for the background threads to complete. */
-    bool background_thread_mode_enabled = (!first && background_thread_debug_mode);
     int death_it = -1;
     if (death_mode) {
         death_it = random_generator::instance().generate_integer(0, (int)it_count - 1);
@@ -510,12 +503,9 @@ main(int argc, char *argv[])
     for (int i = 0; i < it_count; i++) {
         logger::log_msg(LOG_INFO, "!!!! Beginning iteration: " + std::to_string(i) + " !!!!");
         run_restore(home_path, SOURCE_PATH, thread_count, coll_count, op_count,
-          background_thread_mode_enabled, verbose_level, first, i == death_it, recovery);
+          background_thread_debug_mode, verbose_level, i == 0, i == death_it, recovery);
         testutil_remove(SOURCE_PATH);
-        testutil_move(HOME_PATH, SOURCE_PATH);
-        testutil_recreate_dir(HOME_PATH);
-        first = false;
-        background_thread_mode_enabled = background_thread_debug_mode;
+        testutil_move(home_path.c_str(), SOURCE_PATH);
     }
 
     return (0);

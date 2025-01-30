@@ -60,8 +60,12 @@ int
 __wt_filename_construct(WT_SESSION_IMPL *session, const char *path, const char *file_prefix,
   uintmax_t id_1, uint32_t id_2, WT_ITEM *buf)
 {
+    /*
+     * Don't concatenate to the buffer when a path is given. Callers providing a path may be in a
+     * loop and concatenation won't work in that case.
+     */
     if (path != NULL && path[0] != '\0')
-        WT_RET(__wt_buf_catfmt(session, buf, "%s%s", path, __wt_path_separator()));
+        WT_RET(__wt_buf_fmt(session, buf, "%s%s", path, __wt_path_separator()));
     WT_RET(__wt_buf_catfmt(session, buf, "%s", file_prefix));
     if (id_1 != UINTMAX_MAX)
         WT_RET(__wt_buf_catfmt(session, buf, ".%010" PRIuMAX, id_1));

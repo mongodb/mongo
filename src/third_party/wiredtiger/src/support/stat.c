@@ -1365,11 +1365,19 @@ static const char *const __stats_connection_desc[] = {
   "block-manager: blocks read",
   "block-manager: blocks written",
   "block-manager: bytes read",
+  "block-manager: bytes read for internal pages",
+  "block-manager: bytes read for internal pages before decompression and decryption",
+  "block-manager: bytes read for leaf pages",
+  "block-manager: bytes read for leaf pages before decompression and decryption",
   "block-manager: bytes read via memory map API",
   "block-manager: bytes read via system call API",
   "block-manager: bytes written",
   "block-manager: bytes written by compaction",
   "block-manager: bytes written for checkpoint",
+  "block-manager: bytes written for internal pages after compression and encryption",
+  "block-manager: bytes written for internal pages before compression and encryption",
+  "block-manager: bytes written for leaf pages after compression and encryption",
+  "block-manager: bytes written for leaf pages before compression and encryption",
   "block-manager: bytes written via memory map API",
   "block-manager: bytes written via system call API",
   "block-manager: mapped blocks read",
@@ -2141,11 +2149,19 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->block_read = 0;
     stats->block_write = 0;
     stats->block_byte_read = 0;
+    stats->block_byte_read_intl = 0;
+    stats->block_byte_read_intl_disk = 0;
+    stats->block_byte_read_leaf = 0;
+    stats->block_byte_read_leaf_disk = 0;
     stats->block_byte_read_mmap = 0;
     stats->block_byte_read_syscall = 0;
     stats->block_byte_write = 0;
     stats->block_byte_write_compact = 0;
     stats->block_byte_write_checkpoint = 0;
+    stats->block_byte_write_intl_disk = 0;
+    stats->block_byte_write_intl = 0;
+    stats->block_byte_write_leaf_disk = 0;
+    stats->block_byte_write_leaf = 0;
     stats->block_byte_write_mmap = 0;
     stats->block_byte_write_syscall = 0;
     stats->block_map_read = 0;
@@ -2870,11 +2886,19 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->block_read += WT_STAT_CONN_READ(from, block_read);
     to->block_write += WT_STAT_CONN_READ(from, block_write);
     to->block_byte_read += WT_STAT_CONN_READ(from, block_byte_read);
+    to->block_byte_read_intl += WT_STAT_CONN_READ(from, block_byte_read_intl);
+    to->block_byte_read_intl_disk += WT_STAT_CONN_READ(from, block_byte_read_intl_disk);
+    to->block_byte_read_leaf += WT_STAT_CONN_READ(from, block_byte_read_leaf);
+    to->block_byte_read_leaf_disk += WT_STAT_CONN_READ(from, block_byte_read_leaf_disk);
     to->block_byte_read_mmap += WT_STAT_CONN_READ(from, block_byte_read_mmap);
     to->block_byte_read_syscall += WT_STAT_CONN_READ(from, block_byte_read_syscall);
     to->block_byte_write += WT_STAT_CONN_READ(from, block_byte_write);
     to->block_byte_write_compact += WT_STAT_CONN_READ(from, block_byte_write_compact);
     to->block_byte_write_checkpoint += WT_STAT_CONN_READ(from, block_byte_write_checkpoint);
+    to->block_byte_write_intl_disk += WT_STAT_CONN_READ(from, block_byte_write_intl_disk);
+    to->block_byte_write_intl += WT_STAT_CONN_READ(from, block_byte_write_intl);
+    to->block_byte_write_leaf_disk += WT_STAT_CONN_READ(from, block_byte_write_leaf_disk);
+    to->block_byte_write_leaf += WT_STAT_CONN_READ(from, block_byte_write_leaf);
     to->block_byte_write_mmap += WT_STAT_CONN_READ(from, block_byte_write_mmap);
     to->block_byte_write_syscall += WT_STAT_CONN_READ(from, block_byte_write_syscall);
     to->block_map_read += WT_STAT_CONN_READ(from, block_map_read);

@@ -8,7 +8,17 @@
 
 #pragma once
 
-#define WTI_LIVE_RESTORE_FS_TOMBSTONE_SUFFIX ".deleted"
+/*
+ * Stop files are created in the file system to indicate that the source directory should never be
+ * used for the filename indicated.
+ *
+ * For example "foo.wt" would have a stop file "foo.wt.stop", this could mean a number of things:
+ *  - The file foo.wt may have completed migration.
+ *  - It may have been removed, in this case we create a stop file in case the same name "foo.wt" is
+ *    recreated.
+ *  - It may have been renamed, again we create a stop file in case it is recreated.
+ */
+#define WTI_LIVE_RESTORE_STOP_FILE_SUFFIX ".stop"
 
 /*
  * WTI_OFFSET_END returns the last byte used by a range (inclusive). i.e. if we have an offset=0 and
@@ -44,7 +54,7 @@ struct __wti_live_restore_file_handle {
         WT_FILE_HANDLE *fh;
         bool complete;
 
-        /* We need to get back to the file system when checking for tombstone files. */
+        /* We need to get back to the file system when checking for stop files. */
         WTI_LIVE_RESTORE_FS *back_pointer;
 
         /*
@@ -94,6 +104,7 @@ struct __wti_live_restore_fs {
     WT_FILE_SYSTEM *os_file_system; /* The storage file system. */
     WTI_LIVE_RESTORE_FS_LAYER destination;
     WTI_LIVE_RESTORE_FS_LAYER source;
+    bool finished;
 
     uint8_t background_threads_max;
     size_t read_size;
@@ -128,6 +139,8 @@ struct __wti_live_restore_server {
 
 /* DO NOT EDIT: automatically built by prototypes.py: BEGIN */
 
+extern int __wti_live_restore_cleanup_stop_files(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_live_restore_fs_fill_holes(WT_FILE_HANDLE *fh, WT_SESSION *wt_session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 

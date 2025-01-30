@@ -30,6 +30,7 @@ __live_restore_worker_check(WT_SESSION_IMPL *session)
 static int
 __live_restore_worker_stop(WT_SESSION_IMPL *session, WT_THREAD *ctx)
 {
+    WT_DECL_RET;
     WT_UNUSED(ctx);
     WTI_LIVE_RESTORE_SERVER *server = S2C(session)->live_restore_server;
 
@@ -42,6 +43,7 @@ __live_restore_worker_stop(WT_SESSION_IMPL *session, WT_THREAD *ctx)
          * complete.
          */
         if (TAILQ_EMPTY(&server->work_queue)) {
+            WT_ERR(__wti_live_restore_cleanup_stop_files(session));
             uint64_t time_diff_ms;
             WT_STAT_CONN_SET(session, live_restore_state, WT_LIVE_RESTORE_COMPLETE);
             __wt_timer_evaluate_ms(session, &server->start_timer, &time_diff_ms);
@@ -57,9 +59,11 @@ __live_restore_worker_stop(WT_SESSION_IMPL *session, WT_THREAD *ctx)
             WT_ASSERT_ALWAYS(session, TAILQ_EMPTY(&server->work_queue),
               "All background migration threads have finished but there is still work to do!");
     }
+
+err:
     __wt_spin_unlock(session, &server->queue_lock);
 
-    return (0);
+    return (ret);
 }
 
 /*
