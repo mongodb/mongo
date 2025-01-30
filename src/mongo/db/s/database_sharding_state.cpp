@@ -284,17 +284,25 @@ void DatabaseShardingState::assertIsPrimaryShardForDb(OperationContext* opCtx) c
             primaryShardId == thisShardId);
 }
 
-void DatabaseShardingState::setDbInfo(OperationContext* opCtx, const DatabaseType& dbInfo) {
+void DatabaseShardingState::setDbInfo(OperationContext* opCtx,
+                                      const DatabaseType& dbInfo,
+                                      bool useDssForTesting) {
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(_dbName, MODE_IX));
 
     LOGV2(7286900,
           "Setting this node's cached database info",
           logAttrs(_dbName),
           "dbVersion"_attr = dbInfo.getVersion());
-    _dbInfo.emplace(dbInfo);
+
+    if (useDssForTesting)
+        _dbInfo_forTesting.emplace(dbInfo);
+    else
+        _dbInfo.emplace(dbInfo);
 }
 
-void DatabaseShardingState::clearDbInfo(OperationContext* opCtx, bool cancelOngoingRefresh) {
+void DatabaseShardingState::clearDbInfo(OperationContext* opCtx,
+                                        bool cancelOngoingRefresh,
+                                        bool useDssForTesting) {
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(_dbName, MODE_IX));
 
     if (cancelOngoingRefresh) {
@@ -302,11 +310,20 @@ void DatabaseShardingState::clearDbInfo(OperationContext* opCtx, bool cancelOngo
     }
 
     LOGV2(7286901, "Clearing this node's cached database info", logAttrs(_dbName));
-    _dbInfo = boost::none;
+
+    if (useDssForTesting)
+        _dbInfo_forTesting = boost::none;
+    else
+        _dbInfo = boost::none;
 }
 
-boost::optional<DatabaseVersion> DatabaseShardingState::getDbVersion(
-    OperationContext* opCtx) const {
+boost::optional<DatabaseVersion> DatabaseShardingState::getDbVersion(OperationContext* opCtx,
+                                                                     bool useDssForTesting) const {
+    if (useDssForTesting)
+        return _dbInfo_forTesting
+            ? boost::optional<DatabaseVersion>(_dbInfo_forTesting->getVersion())
+            : boost::none;
+
     return _dbInfo ? boost::optional<DatabaseVersion>(_dbInfo->getVersion()) : boost::none;
 }
 
