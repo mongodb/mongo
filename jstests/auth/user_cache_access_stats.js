@@ -9,20 +9,54 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-function hasCommandLogEntry(conn, id, command, attributes, count) {
+const slowLogID = 51803;
+
+function hasCommandLogEntry(conn, command, attributes, count) {
     let expectedLog = {command: command};
     if (Object.keys(attributes).length > 0) {
         expectedLog = Object.assign({}, expectedLog, attributes);
     }
-    checkLog.containsRelaxedJson(conn, id, expectedLog, count);
+    checkLog.containsRelaxedJson(conn, slowLogID, expectedLog, count);
 }
 
-function hasNoCommandLogEntry(conn, id, command, attributes) {
+function hasNoCommandLogEntry(conn, command, attributes) {
     let expectedLog = {command: command};
     if (Object.keys(attributes).length > 0) {
         expectedLog = Object.assign({}, expectedLog, attributes);
     }
-    checkLog.containsRelaxedJson(conn, id, expectedLog, 0);
+    checkLog.containsRelaxedJson(conn, slowLogID, expectedLog, 0);
+}
+
+/**
+ * Check userCacheWaitTimeMicros, durationMillis and workingMillis of the matched command log.
+ * @param {*} conn Connection object to a server.
+ * @param {*} command Command object for filtering the logs with "command" field.
+ * @param {*} userCacheAttrs User cache attributes for filtering the logs.
+ */
+function checkSlowLogTimeFieldsWithUserCacheAttrs(conn, command, userCacheAttrs) {
+    let expectedLog = {command: command};
+    if (Object.keys(userCacheAttrs).length > 0) {
+        expectedLog = Object.assign({}, expectedLog, userCacheAttrs);
+    }
+
+    let messagesOrig = checkLog.getFilteredLogMessages(conn, slowLogID, expectedLog, null, true);
+    assert.eq(messagesOrig.length,
+              1,
+              "We should get one matched slow log with filter :" + tojson(expectedLog));
+
+    let message = messagesOrig[0];
+    assert(message.attr.authorization.hasOwnProperty("userCacheWaitTimeMicros"));
+    let userCacheWaitTimeMillis =
+        Math.floor(message.attr.authorization.userCacheWaitTimeMicros / 1000);
+    let durationMillis = message.attr.durationMillis;
+    let workingMillis = message.attr.workingMillis;
+
+    assert.gte(durationMillis,
+               userCacheWaitTimeMillis,
+               "durationMillis should cover the wait time of accessing user cache.");
+    assert.gte(durationMillis,
+               userCacheWaitTimeMillis + workingMillis,
+               "durationMillis should also cover workingMillis");
 }
 
 function runTest(conn, mode) {
@@ -42,8 +76,7 @@ function runTest(conn, mode) {
     // Check that authenticating as admin results in the expected log lines with the user cache
     // acquisition stats.
     const waitTimeRegex = new RegExp('^[1-9][0-9]{6,}$', 'i');
-    const logID = 51803;
-    let expectedIsMasterCommandLog = {isMaster: 1.0};
+    // let expectedIsMasterCommandLog = {isMaster: 1.0};
     let expectedCommandWithUserCacheAttrs = {
         authorization: {
             startedUserCacheAcquisitionAttempts: 1,
@@ -51,8 +84,6 @@ function runTest(conn, mode) {
             userCacheWaitTimeMicros: waitTimeRegex,
         },
     };
-    hasCommandLogEntry(
-        conn, logID, expectedIsMasterCommandLog, expectedCommandWithUserCacheAttrs, 1);
 
     // Set logging level to 1 so that all operations are logged upon completion.
     assert.commandWorked(adminDB.runCommand({setParameter: 1, logLevel: 1}));
@@ -102,20 +133,20 @@ function runTest(conn, mode) {
             userCacheWaitTimeMicros: 0,
         },
     };
-    hasCommandLogEntry(conn, logID, expectedInsertCommandLog, {}, 1);
-    hasNoCommandLogEntry(
-        conn, logID, expectedInsertCommandLog, unexpectedCommandWithoutUserCacheAttrs);
+    hasCommandLogEntry(conn, expectedInsertCommandLog, {}, 1);
+    hasNoCommandLogEntry(conn, expectedInsertCommandLog, unexpectedCommandWithoutUserCacheAttrs);
 
     // Check that there's a log for the successful find command that does NOT contain authorization
     // stats (since it didn't access the user cache).
     let expectedFindCommandLog = {find: "coll"};
-    hasCommandLogEntry(conn, logID, expectedFindCommandLog, {}, 2);
-    hasNoCommandLogEntry(
-        conn, logID, expectedFindCommandLog, unexpectedCommandWithoutUserCacheAttrs);
+    hasCommandLogEntry(conn, expectedFindCommandLog, {}, 2);
+    hasNoCommandLogEntry(conn, expectedFindCommandLog, unexpectedCommandWithoutUserCacheAttrs);
 
     // Check that there's a log for the successful find command that had to access to the user
     // cache.
-    hasCommandLogEntry(conn, logID, expectedFindCommandLog, expectedCommandWithUserCacheAttrs);
+    hasCommandLogEntry(conn, expectedFindCommandLog, expectedCommandWithUserCacheAttrs);
+    checkSlowLogTimeFieldsWithUserCacheAttrs(
+        conn, expectedFindCommandLog, expectedCommandWithUserCacheAttrs);
 
     // Check that there is also a document for the successful find command with authorization stats
     // in system.profile when profiling is enabled on standalones.

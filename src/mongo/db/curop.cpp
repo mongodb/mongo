@@ -1447,9 +1447,8 @@ void OpDebug::report(OperationContext* opCtx,
     pAttrs->add("workingMillis", workingTimeMillis.count());
 
     // durationMillis should always be present for any operation
-    pAttrs->add(
-        "durationMillis",
-        durationCount<Milliseconds>(additiveMetrics.executionTime.value_or(Microseconds{0})));
+    pAttrs->add("durationMillis",
+                durationCount<Milliseconds>(CurOp::get(opCtx)->elapsedTimeTotal()));
 }
 
 void OpDebug::reportStorageStats(logv2::DynamicAttributes* pAttrs) const {
@@ -1988,14 +1987,10 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     // the profiler (OpDebug::append) and the log file (OpDebug::report), so for the profile filter
     // we support both names.
     addIfNeeded("millis", [](auto field, auto args, auto& b) {
-        b.appendNumber(field,
-                       durationCount<Milliseconds>(
-                           args.op.additiveMetrics.executionTime.value_or(Microseconds{0})));
+        b.appendNumber(field, durationCount<Milliseconds>(args.curop.elapsedTimeTotal()));
     });
     addIfNeeded("durationMillis", [](auto field, auto args, auto& b) {
-        b.appendNumber(field,
-                       durationCount<Milliseconds>(
-                           args.op.additiveMetrics.executionTime.value_or(Microseconds{0})));
+        b.appendNumber(field, durationCount<Milliseconds>(args.curop.elapsedTimeTotal()));
     });
 
     addIfNeeded("workingMillis", [](auto field, auto args, auto& b) {

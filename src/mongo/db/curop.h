@@ -879,7 +879,7 @@ public:
      *
      * If this op has not yet been started, returns 0.
      */
-    Microseconds elapsedTimeTotal() {
+    Microseconds elapsedTimeTotal() const {
         auto start = _start.load();
         if (start == 0) {
             return Microseconds{0};

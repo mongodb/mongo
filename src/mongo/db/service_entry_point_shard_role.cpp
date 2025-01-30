@@ -1642,7 +1642,6 @@ void ExecCommandDatabase::_initiateCommand() {
     }
 
     if (MONGO_unlikely(genericArgs.getHelp().value_or(false))) {
-        CurOp::get(opCtx)->ensureStarted();
         // We disable not-primary-error tracker for help requests due to SERVER-11492, because
         // config servers use help requests to determine which commands are database writes, and so
         // must be forwarded to all config servers.
@@ -1869,8 +1868,6 @@ void ExecCommandDatabase::_initiateCommand() {
         status != ErrorCodes::InterruptedDueToReplStateChange) {
         uassertStatusOK(status);
     }
-
-    CurOp::get(opCtx)->ensureStarted();
 
     command->incrementCommandsExecuted();
 }
@@ -2298,6 +2295,8 @@ DbResponse receivedCommands(HandleRequest::ExecutionContext& execContext) {
 void HandleRequest::startOperation() {
     auto opCtx = executionContext.getOpCtx();
     auto& client = executionContext.client();
+
+    CurOp::get(opCtx)->ensureStarted();
 
     if (client.isInDirectClient()) {
         if (!opCtx->getLogicalSessionId() || !opCtx->getTxnNumber()) {

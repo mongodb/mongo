@@ -284,6 +284,20 @@ OID AuthorizationRouterImpl::getCacheGeneration() {
 namespace {
 MONGO_FAIL_POINT_DEFINE(authUserCacheBypass);
 MONGO_FAIL_POINT_DEFINE(authUserCacheSleep);
+
+struct CurOpPauseGuard {
+    explicit CurOpPauseGuard(CurOp* curOp) : curOp{curOp} {
+        if (curOp && curOp->isStarted()) {
+            curOp->pauseTimer();
+        }
+    }
+    ~CurOpPauseGuard() {
+        if (curOp && curOp->isPaused()) {
+            curOp->resumeTimer();
+        }
+    }
+    CurOp* curOp;
+};
 }  // namespace
 
 StatusWith<UserHandle> AuthorizationRouterImpl::acquireUser(
@@ -317,6 +331,7 @@ StatusWith<UserHandle> AuthorizationRouterImpl::acquireUser(
     // second of delay is added via the failpoint for testing.
     UserAcquisitionStatsHandle userAcquisitionStatsHandle = UserAcquisitionStatsHandle(
         userAcquisitionStats.get(), opCtx->getServiceContext()->getTickSource(), kCache);
+    CurOpPauseGuard curOpPauseGuard{CurOp::get(opCtx)};
     if (authUserCacheSleep.shouldFail()) {
         sleepsecs(1);
     }
