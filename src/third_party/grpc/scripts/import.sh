@@ -7,7 +7,7 @@ IFS=$'\n\t'
 set -vx
 
 NAME=grpc
-REVISION="v1.59.5"
+REVISION="v1.59.5-bazel-gen-mod"
 VERSION="1.59.5"
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/grpc

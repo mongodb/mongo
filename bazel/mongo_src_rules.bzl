@@ -2627,6 +2627,17 @@ def mongo_cc_grpc_library(
         no_undefined_ref_DO_NOT_USE = True,
         **kwargs):
     codegen_grpc_target = "_" + name + "_grpc_codegen"
+
+    # TODO(SERVER-100148): Re-enable sandboxing on protobuf compilation
+    # once we can rely on //external:grpc_cpp_plugin.
+    #
+    # TSAN is currently being applied to protoc which is failing to run
+    # under Bazel's sandbox due to the system call to disable ASLR
+    # failing.
+    #
+    # To workaround this issue, disable the sandbox only when compiling
+    # protobufs, since we don't care about threading issues in the
+    # proto compiler itself.
     generate_cc(
         name = codegen_grpc_target,
         srcs = srcs,
@@ -2634,6 +2645,10 @@ def mongo_cc_grpc_library(
         well_known_protos = well_known_protos,
         generate_mocks = generate_mocks,
         tags = tags + ["gen_source"],
+        disable_sandbox = select({
+            "//bazel/config:tsan_enabled": True,
+            "//conditions:default": False,
+        }),
         **kwargs
     )
 
