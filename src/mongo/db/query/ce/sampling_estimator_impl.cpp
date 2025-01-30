@@ -432,13 +432,26 @@ CardinalityEstimate SamplingEstimatorImpl::estimateCardinality(const MatchExpres
 }
 
 std::vector<CardinalityEstimate> SamplingEstimatorImpl::estimateCardinality(
-    const std::vector<MatchExpression*>& expressions) const {
-    std::vector<CardinalityEstimate> estimates;
-    for (auto& expr : expressions) {
-        estimates.push_back(estimateCardinality(expr));
+    const std::vector<const MatchExpression*>& expressions) const {
+    // Experiment showed that this batch process performs better than calling
+    // 'estimateCardinality(const MatchExpression* expr)' over and over.
+    std::vector<double> estimates(expressions.size(), 0);
+    for (const auto& doc : _sample) {
+        for (size_t i = 0; i < expressions.size(); i++) {
+            if (exec::matcher::matchesBSON(expressions[i], doc, nullptr)) {
+                estimates[i] += 1;
+            }
+        }
     }
 
-    return estimates;
+    std::vector<CardinalityEstimate> estimatesCard;
+    for (auto card : estimates) {
+        double estimate = (card * getCollCard()) / _sampleSize;
+        estimatesCard.push_back(
+            CardinalityEstimate{CardinalityType{estimate}, EstimationSource::Sampling});
+    }
+
+    return estimatesCard;
 }
 
 CardinalityEstimate SamplingEstimatorImpl::estimateKeysScanned(const IndexBounds& bounds) const {
@@ -457,6 +470,28 @@ CardinalityEstimate SamplingEstimatorImpl::estimateKeysScanned(const IndexBounds
                 "interval"_attr = bounds.toString(false),
                 "estimate"_attr = estimate);
     return estimate;
+}
+
+std::vector<CardinalityEstimate> SamplingEstimatorImpl::estimateKeysScanned(
+    const std::vector<const IndexBounds*>& bounds) const {
+    std::vector<CardinalityEstimate> estimates;
+    for (size_t i = 0; i < bounds.size(); i++) {
+        estimates.push_back(estimateKeysScanned(*bounds[i]));
+    }
+    return estimates;
+}
+
+std::vector<CardinalityEstimate> SamplingEstimatorImpl::estimateRIDs(
+    const std::vector<const IndexBounds*>& bounds,
+    const std::vector<const MatchExpression*>& expressions) const {
+    std::vector<CardinalityEstimate> estimates;
+    tassert(9942301,
+            "bounds and expressions should have equal size.",
+            expressions.size() == bounds.size());
+    for (size_t i = 0; i < bounds.size(); i++) {
+        estimates.push_back(estimateRIDs(*bounds[i], expressions[i]));
+    }
+    return estimates;
 }
 
 CardinalityEstimate SamplingEstimatorImpl::estimateRIDs(const IndexBounds& bounds,

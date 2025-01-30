@@ -85,7 +85,7 @@ public:
      * MEs against the sample.
      */
     std::vector<CardinalityEstimate> estimateCardinality(
-        const std::vector<MatchExpression*>& expr) const override;
+        const std::vector<const MatchExpression*>& expr) const override;
 
     /**
      * Estimates the number of keys scanned for the given IndexBounds. This function extracts all
@@ -93,6 +93,9 @@ public:
      * evaluating the index keys against the given IndexBounds.
      */
     CardinalityEstimate estimateKeysScanned(const IndexBounds& bounds) const override;
+
+    std::vector<CardinalityEstimate> estimateKeysScanned(
+        const std::vector<const IndexBounds*>& bounds) const override;
 
     /**
      * Estimate the number of RIDs which 'bounds' will return. Similar to 'estimateKeysScanned(..)',
@@ -103,6 +106,10 @@ public:
      */
     CardinalityEstimate estimateRIDs(const IndexBounds& bounds,
                                      const MatchExpression* expr) const override;
+
+    std::vector<CardinalityEstimate> estimateRIDs(
+        const std::vector<const IndexBounds*>& bounds,
+        const std::vector<const MatchExpression*>& expressions) const override;
 
     /*
      * Generates a sample using a random cursor. The caller can call this function to draw a sample
