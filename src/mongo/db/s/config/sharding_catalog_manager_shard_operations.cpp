@@ -1461,11 +1461,29 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         clusterCardinalityParameterLock.lock();
         shardMembershipLock.lock();
 
-        _addShardInTransaction(
-            opCtx, shardType, std::move(dbNamesStatus.getValue()), std::move(collList));
+        {
+            // Execute the transaction with a local write concern to make sure `stopMonitorGuard` is
+            // dimissed only when the transaction really fails.
+            const auto originalWC = opCtx->getWriteConcern();
+            ScopeGuard resetWCGuard([&] { opCtx->setWriteConcern(originalWC); });
+            opCtx->setWriteConcern(ShardingCatalogClient::kLocalWriteConcern);
+
+            _addShardInTransaction(
+                opCtx, shardType, std::move(dbNamesStatus.getValue()), std::move(collList));
+        }
         // Once the transaction has committed, we must immediately dismiss the guard to avoid
         // incorrectly removing the RSM after persisting the shard addition.
         stopMonitoringGuard.dismiss();
+
+        // Wait for majority can only be done after dismissing the `stopMonitoringGuard`.
+        if (opCtx->getWriteConcern().isMajority()) {
+            WaitForMajorityService::get(opCtx->getServiceContext())
+                .waitUntilMajorityForWrite(
+                    repl::ReplicationCoordinator::get(opCtx->getServiceContext())
+                        ->getMyLastAppliedOpTime(),
+                    opCtx->getCancellationToken())
+                .get();
+        }
 
         // Record in changelog
         BSONObjBuilder shardDetails;
