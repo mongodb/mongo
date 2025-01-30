@@ -1570,6 +1570,10 @@ tasks:
         vars:
           # We do this because otherwise the task will OOM on TSAN variants. The "requires_large_host_tsan" tag doesn't work for non-gen tasks.
           use_large_distro: "true"
+          # We need to set the jobs factor to less than 1 because otherwise resmoke will parallize
+          # based on the CPU count and so the memory available per job will remain roughly the same
+          # as when the task is run on small distro.
+          resmoke_jobs_factor: 0.3
 
   - <<: *benchmark_template
     name: benchmarks_sharding
