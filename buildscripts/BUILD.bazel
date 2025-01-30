@@ -7,12 +7,52 @@ exports_files([
 
 py_binary(
     name = "codeowners",
-    srcs = ["codeowners_generate.py"],
+    srcs = [
+        "codeowners_generate.py",
+        "download_codeowners_validator.py",
+        "validate_codeowners.py",
+    ],
     main = "codeowners_generate.py",
     visibility = ["//visibility:public"],
     deps = [
         dependency(
             "pyyaml",
+            group = "core",
+        ),
+        dependency(
+            "typer",
+            group = "core",
+        ),
+    ],
+)
+
+py_binary(
+    name = "download_codeowners_validator",
+    srcs = ["download_codeowners_validator.py"],
+    main = "download_codeowners_validator.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "typer",
+            group = "core",
+        ),
+    ],
+)
+
+py_binary(
+    name = "validate_codeowners",
+    srcs = [
+        "download_codeowners_validator.py",
+        "validate_codeowners.py",
+    ],
+    data = [
+        "//.github:CODEOWNERS",
+    ],
+    main = "validate_codeowners.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "typer",
             group = "core",
         ),
     ],

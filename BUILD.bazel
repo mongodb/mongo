@@ -11,6 +11,7 @@ exports_files([
     "pyproject.toml",
     "poetry.lock",
     "symbols.orderfile",
+    "codeowners-validator",
 ])
 
 npm_link_all_packages(name = "node_modules")
