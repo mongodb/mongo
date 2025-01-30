@@ -121,13 +121,6 @@ void WiredTigerConnection::notifyPreparedUnitOfWorkHasCommittedOrAborted() {
 }
 
 
-void WiredTigerConnection::closeAllCursors(const std::string& uri) {
-    stdx::lock_guard<stdx::mutex> lock(_cacheLock);
-    for (SessionCache::iterator i = _sessions.begin(); i != _sessions.end(); i++) {
-        (*i)->closeAllCursors(uri);
-    }
-}
-
 size_t WiredTigerConnection::getIdleSessionsCount() {
     stdx::lock_guard<stdx::mutex> lock(_cacheLock);
     return _sessions.size();
@@ -235,9 +228,8 @@ void WiredTigerConnection::_releaseSession(WiredTigerSession* session) {
         // Release resources in the session we're about to cache.
         // If we are using hybrid caching, then close cursors now and let them
         // be cached at the WiredTiger level.
-        if (gWiredTigerCursorCacheSize.load() < 0) {
-            session->closeAllCursors("");
-        }
+        session->closeAllCursors("");
+        invariant(session->cachedCursors() == 0);
 
         session->resetSessionConfiguration();
         invariantWTOK(session->reset(), *session);

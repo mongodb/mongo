@@ -113,12 +113,6 @@ public:
     void closeAll();
 
     /**
-     * Closes all cached cursors matching the uri.  If the uri is empty,
-     * all cached cursors are closed.
-     */
-    void closeAllCursors(const std::string& uri);
-
-    /**
      * Transitions the cache to shutting down mode. Any already released sessions are freed and
      * any sessions released subsequently are leaked. Must be called while holding the global
      * lock in exclusive mode to avoid races with getSession.

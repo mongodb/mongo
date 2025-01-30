@@ -761,7 +761,6 @@ int WiredTigerUtil::verifyTable(WiredTigerRecoveryUnit& ru,
     // Try to close as much as possible to avoid EBUSY errors.
     ru.getSession()->closeAllCursors(uri);
     WiredTigerConnection* connection = ru.getConnection();
-    connection->closeAllCursors(uri);
 
     // Open a new session with custom error handlers.
     const char* sessionConfig = nullptr;
@@ -870,7 +869,6 @@ Status WiredTigerUtil::setTableLogging(WiredTigerRecoveryUnit& ru,
     // Try to close as much as possible to avoid EBUSY errors.
     ru.getSession()->closeAllCursors(uri);
     WiredTigerConnection* connection = ru.getConnection();
-    connection->closeAllCursors(uri);
 
     // This method uses the WiredTiger config parser to see if the table is in the expected logging
     // state. Only attempt to alter the table when a change is needed. This avoids grabbing heavy
