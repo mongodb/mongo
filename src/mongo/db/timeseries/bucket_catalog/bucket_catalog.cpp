@@ -380,52 +380,48 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
     if (rehydratedBucket.isOK()) {
         hangTimeseriesInsertBeforeReopeningBucket.pauseWhileSet();
 
-        StatusWith<std::reference_wrapper<Bucket>> swBucket{ErrorCodes::BadValue, ""};
         auto existingIt = stripe.openBucketsById.find(rehydratedBucket.getValue()->bucketId);
-        if (existingIt != stripe.openBucketsById.end()) {
-            // First let's check the existing bucket if we have one.
-            Bucket* existingBucket = existingIt->second.get();
-            swBucket = internal::reuseExistingBucket(catalog,
-                                                     stripe,
-                                                     stripeLock,
-                                                     insertContext.stats,
-                                                     insertContext.key,
-                                                     *existingBucket,
-                                                     reopeningContext.catalogEra);
-        } else {
-            // No existing bucket to use, go ahead and try to reopen our rehydrated bucket.
-            swBucket = internal::reopenBucket(catalog,
-                                              stripe,
-                                              stripeLock,
-                                              insertContext.stats,
-                                              insertContext.key,
-                                              std::move(rehydratedBucket.getValue()),
-                                              reopeningContext.catalogEra);
-        }
+        if (existingIt == stripe.openBucketsById.end()) {
+            // No existing bucket matches this one, go ahead and try to reopen our rehydrated
+            // bucket.
+            auto swBucket = internal::reopenBucket(catalog,
+                                                   stripe,
+                                                   stripeLock,
+                                                   insertContext.stats,
+                                                   insertContext.key,
+                                                   std::move(rehydratedBucket.getValue()),
+                                                   reopeningContext.catalogEra);
 
-        if (swBucket.isOK()) {
-            Bucket& bucket = swBucket.getValue().get();
-            auto insertionResult = insertIntoBucket(catalog,
-                                                    stripe,
-                                                    stripeLock,
-                                                    doc,
-                                                    opId,
-                                                    internal::AllowBucketCreation::kYes,
-                                                    insertContext,
-                                                    bucket,
-                                                    time,
-                                                    storageCacheSizeBytes,
-                                                    comparator);
-            auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
-            invariant(batch);
-            return SuccessfulInsertion{std::move(*batch)};
-        } else {
-            insertContext.stats.incNumBucketReopeningsFailed();
-            if (swBucket.getStatus().code() == ErrorCodes::WriteConflict) {
-                return swBucket.getStatus();
+            if (swBucket.isOK()) {
+                // We reopened the bucket successfully. Now we'll use it directly as an optimization
+                // to bypass normal bucket selection.
+                Bucket& reopenedBucket = swBucket.getValue().get();
+                auto insertionResult = insertIntoBucket(catalog,
+                                                        stripe,
+                                                        stripeLock,
+                                                        doc,
+                                                        opId,
+                                                        internal::AllowBucketCreation::kYes,
+                                                        insertContext,
+                                                        reopenedBucket,
+                                                        time,
+                                                        storageCacheSizeBytes,
+                                                        comparator);
+                auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
+                invariant(batch);
+                return SuccessfulInsertion{std::move(*batch)};
+            } else {
+                insertContext.stats.incNumBucketReopeningsFailed();
+                if (swBucket.getStatus().code() == ErrorCodes::WriteConflict) {
+                    return swBucket.getStatus();
+                }
+                // If we had a different type of error, then we should fall through to normal bucket
+                // selection/allocation.
             }
-            // If we had a different type of error, then we should fall through and proceed to open
-            // a new bucket.
+        } else {
+            // We tried to reopen a bucket we already had open. Record the metric and then fall
+            // through to normal bucket selection/allocation.
+            insertContext.stats.incNumDuplicateBucketsReopened();
         }
     }
 

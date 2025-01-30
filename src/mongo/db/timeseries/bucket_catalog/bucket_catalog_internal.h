@@ -183,20 +183,6 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(BucketCatalog& catalog,
                                                         std::uint64_t targetEra);
 
 /**
- * Check to see if 'insert' can use existing bucket rather than reopening a candidate bucket. If
- * true, chances are the caller raced with another thread to reopen the same bucket, but if false,
- * there might be another bucket that had been cleared, or that has the same _id in a different
- * namespace.
- */
-StatusWith<std::reference_wrapper<Bucket>> reuseExistingBucket(BucketCatalog& catalog,
-                                                               Stripe& stripe,
-                                                               WithLock stripeLock,
-                                                               ExecutionStatsController& stats,
-                                                               const BucketKey& key,
-                                                               Bucket& existingBucket,
-                                                               std::uint64_t targetEra);
-
-/**
  * Given an already-selected 'bucket', inserts 'doc' to the bucket if possible. If not, and 'mode'
  * is set to 'kYes', we will create a new bucket and insert into that bucket. If `existingBucket`
  * was selected via `useAlternateBucket`, then the previous bucket returned by `useBucket` should be
