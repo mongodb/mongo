@@ -76,6 +76,12 @@ TEST(HeuristicEstimate, ModExpression) {
     ASSERT_EQ(heuristicLeafMatchExpressionSel(expr.get(), makeCard(100)), makeSel(0.2));
 }
 
+TEST(HeuristicEstimate, ModNegativeDivisorExpression) {
+    BSONObj query = fromjson("{a: {$mod: [-5, 2]}}");
+    auto expr = parse(query);
+    ASSERT_EQ(heuristicLeafMatchExpressionSel(expr.get(), makeCard(100)), makeSel(0.2));
+}
+
 TEST(HeuristicEstimate, ExistsExpression) {
     // Note: {$exists: false} is parsed as {$not: {$exists: true}}
     BSONObj query = fromjson("{a: {$exists: true}}");

@@ -147,7 +147,8 @@ SelectivityEstimate heuristicLeafMatchExpressionSel(const MatchExpression* expr,
         case MatchExpression::MatchType::MOD: {
             // Assume that the results of mod are equally likely.
             auto modExpr = static_cast<const ModMatchExpression*>(expr);
-            return {SelectivityType{1.0 / modExpr->getDivisor()}, EstimationSource::Heuristics};
+            return {SelectivityType{1.0 / std::abs(modExpr->getDivisor())},
+                    EstimationSource::Heuristics};
         }
         case MatchExpression::MatchType::EXISTS: {
             return kExistsSel;
