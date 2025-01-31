@@ -108,8 +108,6 @@ public:
 
         // Force subsequent uses of the namespace to refresh the filtering metadata so they can
         // synchronize with any work happening on the primary (e.g., migration critical section).
-        // TODO (SERVER-71444): Fix to be interruptible or document exception.
-        UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
         auto scopedCss =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, _nss);
         if (_droppingCollection)
@@ -294,8 +292,6 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                             DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
                             lockDbIfNotPrimary.emplace(opCtx, insertedNss.dbName(), MODE_IX);
                         }
-                        // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                        UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
                         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
                             opCtx, insertedNss.dbName());
                         scopedDss->enterCriticalSectionCatchUpPhase(opCtx, reason);
@@ -322,8 +318,6 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                                     auto_get_collection::ViewMode::kViewsPermitted));
                         }
 
-                        // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                        UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
                         auto scopedCsr =
                             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                                 opCtx, insertedNss);
@@ -500,8 +494,6 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
                         lockDbIfNotPrimary.emplace(opCtx, updatedNss.dbName(), MODE_IX);
                     }
 
-                    // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
                     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
                         opCtx, updatedNss.dbName());
                     scopedDss->enterCriticalSectionCommitPhase(opCtx, reason);
@@ -528,8 +520,6 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
                                 auto_get_collection::ViewMode::kViewsPermitted));
                     }
 
-                    // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
                     auto scopedCsr =
                         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                             opCtx, updatedNss);
@@ -787,8 +777,6 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                         lockDbIfNotPrimary.emplace(opCtx, deletedNss.dbName(), MODE_IX);
                     }
 
-                    // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
                     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
                         opCtx, deletedNss.dbName());
 
@@ -822,8 +810,6 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                                 auto_get_collection::ViewMode::kViewsPermitted));
                     }
 
-                    // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
                     auto scopedCsr =
                         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                             opCtx, deletedNss);

@@ -112,10 +112,12 @@ protected:
         bool justCreated = false;
         auto databaseHolder = DatabaseHolder::get(operationContext());
         auto db = databaseHolder->openDb(operationContext(), kTestNss.dbName(), &justCreated);
-        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
-            operationContext(), kTestNss.dbName());
-        scopedDss->setDbInfo(operationContext(),
-                             DatabaseType{kTestNss.dbName(), ShardId("this"), dbVersion1});
+        {
+            auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
+                operationContext(), kTestNss.dbName());
+            scopedDss->setDbInfo(operationContext(),
+                                 DatabaseType{kTestNss.dbName(), ShardId("this"), dbVersion1});
+        }
         ASSERT_TRUE(db);
         ASSERT_TRUE(justCreated);
 

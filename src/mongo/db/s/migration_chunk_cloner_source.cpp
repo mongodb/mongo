@@ -238,8 +238,6 @@ void LogTransactionOperationsForShardingHandler::commit(OperationContext* opCtx,
         const auto& nss = stmt.getNss();
         auto opCtx = cc().getOperationContext();
 
-        // TODO (SERVER-71444): Fix to be interruptible or document exception.
-        UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
         const auto scopedCss =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
 
@@ -1520,8 +1518,6 @@ LogInsertForShardingHandler::LogInsertForShardingHandler(NamespaceString nss,
     : _nss(std::move(nss)), _doc(doc.getOwned()), _opTime(std::move(opTime)) {}
 
 void LogInsertForShardingHandler::commit(OperationContext* opCtx, boost::optional<Timestamp>) {
-    // TODO (SERVER-71444): Fix to be interruptible or document exception.
-    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
     const auto scopedCss =
         CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, _nss);
 
@@ -1540,8 +1536,6 @@ LogUpdateForShardingHandler::LogUpdateForShardingHandler(NamespaceString nss,
       _opTime(std::move(opTime)) {}
 
 void LogUpdateForShardingHandler::commit(OperationContext* opCtx, boost::optional<Timestamp>) {
-    // TODO (SERVER-71444): Fix to be interruptible or document exception.
-    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
     const auto scopedCss =
         CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, _nss);
 
@@ -1556,8 +1550,6 @@ LogDeleteForShardingHandler::LogDeleteForShardingHandler(NamespaceString nss,
     : _nss(std::move(nss)), _documentKey(std::move(documentKey)), _opTime(std::move(opTime)) {}
 
 void LogDeleteForShardingHandler::commit(OperationContext* opCtx, boost::optional<Timestamp>) {
-    // TODO (SERVER-71444): Fix to be interruptible or document exception.
-    UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
     const auto scopedCss =
         CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, _nss);
 
@@ -1573,9 +1565,6 @@ LogRetryableApplyOpsForShardingHandler::LogRetryableApplyOpsForShardingHandler(
 void LogRetryableApplyOpsForShardingHandler::commit(OperationContext* opCtx,
                                                     boost::optional<Timestamp>) {
     for (const auto& nss : _namespaces) {
-        // TODO (SERVER-71444): Fix to be interruptible or document exception.
-        UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
-
         // For vectored inserts an applyOps entry will only affect a single namespace that is still
         // under a WUOW, so we should be holding an IX lock on it. Other affected namespaces should
         // be skipped since they were handled already in one of LogInsertForShardingHandler,

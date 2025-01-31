@@ -286,7 +286,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss());
 
         auto [metadata, indexInfo] = checkCollectionIdentity(
-            _opCtx, nss(), _args.getEpoch(), _args.getCollectionTimestamp());
+            _opCtx, nss(), _args.getEpoch(), _args.getCollectionTimestamp(), *autoColl, *scopedCsr);
 
         UUID collectionUUID = autoColl.getCollection()->uuid();
 
@@ -829,7 +829,7 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
     invariant(_state != kDone);
 
     auto cloneDriver = [&]() {
-        // Unregister from the collection's sharding state and exit the migration critical section.
+        // Unregister from the collection's sharding state.
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
         UninterruptibleLockGuard noInterrupt(_opCtx);  // NOLINT.
         AutoGetCollection autoColl(_opCtx, nss(), MODE_IX);
@@ -839,10 +839,11 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
         if (_state != kCreated) {
             invariant(_cloneDriver);
         }
-
-        _critSec.reset();
         return std::move(_cloneDriver);
     }();
+
+    // Exit the migration critical section.
+    _critSec.reset();
 
     if (_state == kCriticalSection || _state == kCloneCompleted || _state == kCommittingOnConfig) {
         LOGV2_DEBUG_OPTIONS(4817403,

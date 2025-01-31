@@ -78,11 +78,9 @@ public:
 
     struct DSSAndLock {
         DSSAndLock(const DatabaseName& dbName)
-            : dssMutex("DSSMutex::" +
-                       DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault())),
-              dss(std::make_unique<DatabaseShardingState>(dbName)) {}
+            : dss(std::make_unique<DatabaseShardingState>(dbName)) {}
 
-        const Lock::ResourceMutex dssMutex;
+        std::shared_mutex dssMutex;  // NOLINT
         std::unique_ptr<DatabaseShardingState> dss;
     };
 
@@ -161,12 +159,12 @@ void checkPlacementConflictTimestamp(const boost::optional<LogicalTime> atCluste
 DatabaseShardingState::DatabaseShardingState(const DatabaseName& dbName) : _dbName(dbName) {}
 
 DatabaseShardingState::ScopedExclusiveDatabaseShardingState::ScopedExclusiveDatabaseShardingState(
-    Lock::ResourceLock lock, DatabaseShardingState* dss)
+    std::unique_lock<std::shared_mutex> lock, DatabaseShardingState* dss)  // NOLINT
     : _lock(std::move(lock)), _dss(dss) {}
 
 DatabaseShardingState::ScopedSharedDatabaseShardingState::ScopedSharedDatabaseShardingState(
-    Lock::ResourceLock lock, DatabaseShardingState* dss)
-    : DatabaseShardingState::ScopedExclusiveDatabaseShardingState(std::move(lock), dss) {}
+    std::shared_lock<std::shared_mutex> lock, DatabaseShardingState* dss)  // NOLINT
+    : _lock(std::move(lock)), _dss(dss) {}
 
 DatabaseShardingState::ScopedExclusiveDatabaseShardingState DatabaseShardingState::acquireExclusive(
     OperationContext* opCtx, const DatabaseName& dbName) {
@@ -174,12 +172,11 @@ DatabaseShardingState::ScopedExclusiveDatabaseShardingState DatabaseShardingStat
     DatabaseShardingStateMap::DSSAndLock* dssAndLock =
         DatabaseShardingStateMap::get(opCtx->getServiceContext()).getOrCreate(dbName);
 
-    // First lock the RESOURCE_MUTEX associated to this dbName to guarantee stability of the
+    // First lock the shared_mutex associated to this dbName to guarantee stability of the
     // DatabaseShardingState pointer. After that, it is safe to get and store the
-    // DatabaseShadingState*, as long as the RESOURCE_MUTEX is kept locked.
-    Lock::ResourceLock lock(opCtx, dssAndLock->dssMutex.getRid(), MODE_X);
-
-    return ScopedExclusiveDatabaseShardingState(std::move(lock), dssAndLock->dss.get());
+    // DatabaseShadingState*, as long as the shared_mutex is kept locked.
+    return ScopedExclusiveDatabaseShardingState(std::unique_lock(dssAndLock->dssMutex),
+                                                dssAndLock->dss.get());
 }
 
 DatabaseShardingState::ScopedSharedDatabaseShardingState DatabaseShardingState::acquireShared(
@@ -188,12 +185,11 @@ DatabaseShardingState::ScopedSharedDatabaseShardingState DatabaseShardingState::
     DatabaseShardingStateMap::DSSAndLock* dssAndLock =
         DatabaseShardingStateMap::get(opCtx->getServiceContext()).getOrCreate(dbName);
 
-    // First lock the RESOURCE_MUTEX associated to this dbName to guarantee stability of the
+    // First lock the shared_mutex associated to this dbName to guarantee stability of the
     // DatabaseShardingState pointer. After that, it is safe to get and store the
-    // DatabaseShadingState*, as long as the RESOURCE_MUTEX is kept locked.
-    Lock::ResourceLock lock(opCtx, dssAndLock->dssMutex.getRid(), MODE_IS);
-
-    return ScopedSharedDatabaseShardingState(std::move(lock), dssAndLock->dss.get());
+    // DatabaseShadingState*, as long as the shared_mutex is kept locked.
+    return ScopedSharedDatabaseShardingState(std::shared_lock(dssAndLock->dssMutex),  // NOLINT
+                                             dssAndLock->dss.get());
 }
 
 DatabaseShardingState::ScopedExclusiveDatabaseShardingState

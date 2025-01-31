@@ -65,3 +65,9 @@ deadlock:mongo::(anonymous namespace)::SSLManagerOpenSSL::SSLManagerOpenSSL
 race:S2Loop::FindVertex
 race:S2EdgeIndex::IncrementQueryCount
 race:S2RegionCoverer::NewCandidate
+
+# TODO SERVER-99702 We have a case of lock inversion between ShardingWriteRouter and 
+# assertNoMovePrimaryInProgress. ShardingWriteRouter holds a CSS lock during its lifetime, and with
+# this lock taken we then acquire a DSS lock. Meanwhile, assertNoMovePrimaryInProgress takes a DSS
+# lock then a CSS lock, conflicting with the previous lock acquisition order.
+deadlock:mongo::(anonymous namespace)::assertNoMovePrimaryInProgress

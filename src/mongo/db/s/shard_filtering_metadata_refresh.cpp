@@ -623,9 +623,6 @@ Status FilteringMetadataCache::_refreshDbMetadata(OperationContext* opCtx,
                                                   const DatabaseName& dbName,
                                                   CancellationToken cancellationToken) {
     ScopeGuard resetRefreshFutureOnError([&] {
-        // TODO (SERVER-71444): Fix to be interruptible or document exception.
-        // Can be uninterruptible because the work done under it can never block.
-        UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
         auto scopedDss = DatabaseShardingState::acquireExclusive(opCtx, dbName);
         scopedDss->resetDbMetadataRefreshFuture();
     });
@@ -841,9 +838,6 @@ SharedSemiFuture<void> FilteringMetadataCache::_recoverRefreshCollectionPlacemen
             boost::optional<CollectionMetadata> currentMetadataToInstall;
 
             ScopeGuard resetRefreshFutureOnError([&] {
-                // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                // Can be uninterruptible because the work done under it can never block
-                UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
                 auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
                 scopedCsr->resetPlacementVersionRecoverRefreshFuture();
             });

@@ -30,7 +30,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/sharding_index_catalog_cache.h"
 
 namespace mongo {
@@ -44,6 +43,9 @@ namespace mongo {
  * according to that metadata, and that the expected epoch and timestamp match what is present in
  * the CSR. Returns the collection metadata and index info.
  *
+ * This function takes the CSR lock and acquires a reference to the collection. Use the version
+ * below if you already have both.
+ *
  * Throws StaleShardVersion otherwise.
  */
 CollectionPlacementAndIndexInfo checkCollectionIdentity(
@@ -51,6 +53,17 @@ CollectionPlacementAndIndexInfo checkCollectionIdentity(
     const NamespaceString& nss,
     const boost::optional<OID>& expectedEpoch,
     const boost::optional<Timestamp>& expectedTimestamp);
+
+/**
+ * Same as above, but accepts the CSR and Collection references instead of acquiring them.
+ */
+CollectionPlacementAndIndexInfo checkCollectionIdentity(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const boost::optional<OID>& expectedEpoch,
+    const boost::optional<Timestamp>& expectedTimestamp,
+    const CollectionPtr& collection,
+    const CollectionShardingRuntime& csr);
 
 /**
  * Checks that the chunk range matches the shard key pattern in the metadata.
