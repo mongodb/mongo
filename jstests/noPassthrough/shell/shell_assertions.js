@@ -1138,50 +1138,90 @@ tests.push(function assertIncludesJsonFormat() {
     }, {msg: "assert.includes() failed : Oops!", attr: {haystack: "farmacy", needle: "ace"}});
 });
 
-tests.push(function assertJsTestLogJsonFormat() {
-    const oldTestData = TestData;
-    const printOriginal = print;
-    // In case an exception is thrown, revert the original print and TestData states.
-    try {
-        // Override the TestData object.
-        TestData = {logFormat: "json", testName: "shell_assertions"};
-        // Override the print function.
-        print = msg => {
-            print.console.push(msg);
-        };
+const jsTestLogUtils = {
+    setup: (test) => {
+        const oldTestData = TestData;
+        const printOriginal = print;
+        // In case an exception is thrown, revert the original print and TestData states.
+        try {
+            // Override the TestData object.
+            TestData = {...TestData, logFormat: "json"};
+            // Override the print function.
+            print = msg => {
+                print.console.push(msg);
+            };
+            print.console = [];
+            test();
+        } finally {
+            // Reset state.
+            print = printOriginal;
+            TestData = oldTestData;
+        }
+    },
+    getCapturedJSONOutput: (loggingFn) => {
+        loggingFn();
+        // Assert we only print once.
+        assert.eq(1, print.console.length);
+        let printedJson = JSON.parse(print.console[0]);
+        delete printedJson["t"];
+        // Reset the console
         print.console = [];
-        // Assert the new format prints valid JSON.
-        jsTestLog("test message", {attr: {key1: "val1", key2: "val2"}, id: 87});
-        const expectedResult = {
-            "s": "i",
+        return printedJson;
+    }
+};
+
+tests.push(function assertJsTestLogJsonFormat() {
+    const extraArgs = {attr: {hello: "world", foo: "bar"}, id: 87};
+    jsTestLogUtils.setup(() => {
+        const printedJson =
+            jsTestLogUtils.getCapturedJSONOutput(() => jsTestLog("test message", extraArgs));
+        const expectedJson = {
+            "s": "I",
             "c": "js_test",
             "ctx": "shell_assertions",
             "msg": "test message",
-            "attr": {key1: "val1", key2: "val2"},
-            "id": 87,
+            "attr": extraArgs.attr,
+            "id": extraArgs.id,
         };
-        // Assert we only print once.
-        assert.eq(1, print.console.length);
-        let actualResult = JSON.parse(print.console[0]);
-        // Delete the timestamp field.
-        delete actualResult["t"];
-        assert.docEq(expectedResult, actualResult, "expected a different log format");
+        assert.docEq(expectedJson, printedJson, "expected a different log format");
 
-        print.console = [];
         // Assert the legacy format works as before.
         TestData.logFormat = "legacy";
-        jsTestLog("test message legacy", {attr: {key1: "val1", key2: "val2"}, id: 87});
+        jsTestLog("test message legacy", extraArgs);
         assert.eq(1, print.console.length);
         const expectedLegacyResult =
             ["----", "test message legacy", "----"].map(s => `[jsTest] ${s}`);
         assert.eq(`\n\n${expectedLegacyResult.join("\n")}\n\n`,
                   print.console,
                   "expected a different log format when legacy mode is on");
-    } finally {
-        // Reset state.
-        print = printOriginal;
-        TestData = oldTestData;
-    }
+    });
+});
+
+tests.push(function assertLogSeverities() {
+    const severities = {"I": "info", "D": "debug", "W": "warning", "E": "error"};
+    const extraArgs = {attr: {hello: "world", foo: "bar"}, id: 87};
+    jsTestLogUtils.setup(() => {
+        for (const [severity, logFnName] of Object.entries(severities)) {
+            const printedJson = jsTestLogUtils.getCapturedJSONOutput(
+                () => jsTest.log[logFnName]("test message", extraArgs));
+            const expectedJson = {
+                "s": severity,
+                "c": "js_test",
+                "ctx": "shell_assertions",
+                "msg": "test message",
+                "attr": extraArgs.attr,
+                "id": extraArgs.id,
+            };
+            assert.docEq(expectedJson, printedJson, "expected a different log to be printed");
+        }
+        // Assert default logging uses the info severity and that extra arguments are ignored.
+        const testMsg = "info is default.";
+        const printedLogInfo = jsTestLogUtils.getCapturedJSONOutput(
+            () => jsTest.log(testMsg, {...extraArgs, nonUsefulProp: "some value"}));
+        const printedLogDefault =
+            jsTestLogUtils.getCapturedJSONOutput(() => jsTest.log.info(testMsg, extraArgs));
+        assert.docEq(printedLogInfo, printedLogDefault, "Expected default log severity to be info");
+    });
 });
 
 /* main */
