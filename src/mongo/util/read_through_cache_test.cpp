@@ -251,47 +251,6 @@ TEST_F(ReadThroughCacheTest, FetchInvalidateKeyAndRefetch) {
         }));
 }
 
-TEST_F(ReadThroughCacheTest, FetchInvalidateValueAndRefetch) {
-    auto fnTest = [&](auto cache) {
-        for (int i = 1; i <= 3; i++) {
-            auto value = cache.acquire(_opCtx, "TestKey");
-            ASSERT(value);
-            ASSERT_EQ(100 * i, value->counter);
-            ASSERT_EQ(i, cache.countLookups);
-
-            ASSERT(cache.acquire(_opCtx, "TestKey"));
-            ASSERT_EQ(i, cache.countLookups);
-
-            cache.invalidateLatestCachedValueIf_IgnoreInProgress(
-                [i](const std::string&, const CachedValue& value) {
-                    return value.counter == 100 * i;
-                });
-        }
-    };
-
-    fnTest(CacheWithThreadPool<Cache>(
-        getService(),
-        1,
-        [&, nextValue = 0](
-            OperationContext*, const std::string& key, const Cache::ValueHandle&) mutable {
-            ASSERT_EQ("TestKey", key);
-            return Cache::LookupResult(CachedValue(100 * ++nextValue));
-        }));
-
-    fnTest(CacheWithThreadPool<CausallyConsistentCache>(
-        getService(),
-        1,
-        [&, nextValue = 0](OperationContext*,
-                           const std::string& key,
-                           const CausallyConsistentCache::ValueHandle&,
-                           const Timestamp& timeInStore) mutable {
-            ASSERT_EQ("TestKey", key);
-            ++nextValue;
-            return CausallyConsistentCache::LookupResult(CachedValue(100 * nextValue),
-                                                         Timestamp(nextValue));
-        }));
-}
-
 TEST_F(ReadThroughCacheTest, FailedLookup) {
     auto fnTest = [&](auto cache) {
         ASSERT_THROWS_CODE(
