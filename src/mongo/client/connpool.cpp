@@ -66,6 +66,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/socket_exception.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 
@@ -716,8 +717,8 @@ void DBConnectionPool::taskDoWork() {
 
     for (size_t i = 0; i < toDelete.size(); i++) {
         try {
+            ScopeGuard cleanup([&] { delete toDelete[i]; });
             onDestroy(toDelete[i]);
-            delete toDelete[i];
         } catch (...) {
             // we don't care if there was a socket error
         }
