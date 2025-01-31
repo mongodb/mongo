@@ -201,7 +201,7 @@ public:
     void postSetUp() {}
 
     BSONObj scheduleResponse(StatusWith<BSONObj> response) {
-        int32_t responseToId;
+        int32_t responseToId = -1;
         BSONObj cmdObjReceived;
         auto pf = makePromiseFuture<void>();
         expectSinkMessage([&](Message m) {
