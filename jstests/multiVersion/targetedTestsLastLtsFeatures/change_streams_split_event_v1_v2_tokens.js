@@ -64,11 +64,13 @@ st.shardColl(testColl, {shard: 1} /* shard key */, {shard: 2} /* split at */);
 assert.commandWorked(testColl.insertMany([
     {_id: "a", shard: 1, largeField: ""},
     {_id: "b", shard: 2, largeField: ""},
-    {_id: "c", shard: 2, largeField: ""}
+    {_id: "c", shard: 2, largeField: ""},
+    {_id: "d", shard: 1, largeField: ""}
 ]));
 expectedEvents.push({operationType: "insert", documentKey: {_id: "a"}},
                     {operationType: "insert", documentKey: {_id: "b"}},
-                    {operationType: "insert", documentKey: {_id: "c"}});
+                    {operationType: "insert", documentKey: {_id: "c"}},
+                    {operationType: "insert", documentKey: {_id: "d"}});
 
 // This high watermark token will be at the same clusterTime as the subsequent update event that
 // needs to be split.
@@ -102,7 +104,17 @@ assert.commandWorked(
 
 // Produces no events on v5.0.
 assert.commandWorked(st.s.adminCommand(
-    {reshardCollection: testColl.getFullName(), key: {_id: 1}, numInitialChunks: 1}));
+    {reshardCollection: testColl.getFullName(), key: {_id: 1}, numInitialChunks: 2}));
+
+// Ensure that both shards contain a single document.
+function assertSingleDocOnTestCollection(shard) {
+    const docsOnShard = shard.getDB(testDB.getName())[testColl.getName()].find().toArray();
+    assert.eq(1,
+              docsOnShard.length,
+              `Expected a single document on shard ${shard}, received: ${tojson(docsOnShard)}`);
+}
+assertSingleDocOnTestCollection(st.shard0);
+assertSingleDocOnTestCollection(st.shard1);
 
 // Produces no events on v5.0.
 assert.commandWorked(testColl.dropIndex({largeField: 1}));
