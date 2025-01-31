@@ -4,3 +4,4 @@
 */1727963727765/**/*.results
 tests/*
 !tests/selfTests/
+!tests/manual_tests

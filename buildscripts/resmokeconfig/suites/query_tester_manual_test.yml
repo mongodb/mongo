@@ -1,0 +1,18 @@
+test_kind: query_tester_server_test
+description: |
+  This suite will run manual (handwritten) tests on the mongo server using query_tester's mongotest binary.
+
+selector:
+  roots:
+    # All the directories located inside manual_tests will be treated as a test case
+    # These test dirs should contain .test files, .coll files the corresponding .results files.
+    - src/mongo/db/query/query_tester/tests/manual_tests/*/
+executor:
+  config:
+    # False in this case since manual tests are baked into the mongo repo.
+    wait_for_files: False
+  hooks:
+    - class: CleanEveryN
+      n: 1
+  fixture:
+    class: MongoDFixture

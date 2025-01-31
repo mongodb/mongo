@@ -1864,6 +1864,20 @@ tasks:
           suite: query_correctness_generated_test
           should_shuffle: false
 
+  - <<: *task_template
+    name: query_correctness_manual_test
+    tags:
+      [
+        "assigned_to_jira_team_server_query_optimization",
+        "experimental",
+        "query_correctness",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_tester_manual_test
+
   ################################################
   #           Query Integration tasks            #
   ################################################
