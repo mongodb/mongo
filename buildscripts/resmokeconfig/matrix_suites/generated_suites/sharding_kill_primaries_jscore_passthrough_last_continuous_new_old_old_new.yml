@@ -92,7 +92,6 @@ selector:
     - jstests/core/**/geo_update_btree2.js
     - jstests/core/**/index9.js
     - jstests/core/**/queryoptimizera.js
-    - jstests/core/**/stages*.js
     - jstests/core/**/startup_log.js
     - jstests/core/**/query/top/top.js
     - jstests/core/**/geo_2d_explain.js

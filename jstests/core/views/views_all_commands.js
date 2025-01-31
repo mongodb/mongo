@@ -718,7 +718,6 @@ let viewsCommandTests = {
         },
         expectFailure: true,
     },
-    stageDebug: {skip: isAnInternalCommand},
     startRecordingTraffic: {skip: isUnrelated},
     startSession: {skip: isAnInternalCommand},
     stopRecordingTraffic: {skip: isUnrelated},

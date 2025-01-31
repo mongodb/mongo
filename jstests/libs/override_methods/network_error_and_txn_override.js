@@ -161,7 +161,6 @@ const kNonFailoverTolerantCommands = new Set([
     "planCacheSetFilter",
     "profile",       // Not replicated, so can't tolerate failovers.
     "setParameter",  // Not replicated, so can't tolerate failovers.
-    "stageDebug",
     "startSession",  // Sessions are flushed to disk asynchronously.
 ]);
 

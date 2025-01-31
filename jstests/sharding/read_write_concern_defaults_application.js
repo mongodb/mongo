@@ -773,7 +773,6 @@ let testCases = {
     split: {skip: "does not accept read or write concern"},
     splitChunk: {skip: "does not accept read or write concern"},
     splitVector: {skip: "internal command"},
-    stageDebug: {skip: "does not accept read or write concern"},
     startRecordingTraffic: {skip: "does not accept read or write concern"},
     startSession: {skip: "does not accept read or write concern"},
     stopRecordingTraffic: {skip: "does not accept read or write concern"},

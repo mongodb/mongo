@@ -1602,7 +1602,6 @@ mongo_cc_library(
         "//src/mongo/db/catalog:database_holder",
         "//src/mongo/db/catalog:index_key_validate",
         "//src/mongo/db/commands/query_cmd:map_reduce_agg",
-        "//src/mongo/db/exec:stagedebug_cmd",
         "//src/mongo/db/index_builds:index_builds_coordinator",
         "//src/mongo/db/pipeline",
         "//src/mongo/db/pipeline/process_interface:mongo_process_interface",

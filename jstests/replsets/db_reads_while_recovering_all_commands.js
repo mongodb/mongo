@@ -422,7 +422,6 @@ const allCommands = {
     sleep: {skip: isNotAUserDataRead},
     splitChunk: {skip: isPrimaryOnly},
     splitVector: {skip: isPrimaryOnly},
-    stageDebug: {skip: isPrimaryOnly},
     startRecordingTraffic: {skip: isNotAUserDataRead},
     startSession: {skip: isNotAUserDataRead},
     stopRecordingTraffic: {skip: isNotAUserDataRead},

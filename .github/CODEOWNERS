@@ -482,9 +482,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/core/replicate_record_ids/OWNERS.yml
 /jstests/core/replicate_record_ids/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot
 
-# The following patterns are parsed from ./jstests/core/stage_debug/OWNERS.yml
-/jstests/core/stage_debug/**/* @10gen/query @svc-auto-approve-bot
-
 # The following patterns are parsed from ./jstests/core/timeseries/OWNERS.yml
 /jstests/core/timeseries/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
 

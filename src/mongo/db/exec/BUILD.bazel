@@ -142,18 +142,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "stagedebug_cmd",
-    srcs = [
-        "stagedebug_cmd.cpp",
-    ],
-    deps = [
-        "//src/mongo/db:query_exec",
-        "//src/mongo/db/commands:test_commands_enabled",
-        "//src/mongo/db/index:index_access_method",
-    ],
-)
-
-mongo_cc_library(
     name = "query_shard_server_test_fixture",
     srcs = [
         "query_shard_server_test_fixture.cpp",

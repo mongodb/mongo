@@ -20,7 +20,6 @@ selector:
     - jstests/core/**/geo_update_btree2.js # notablescan.
     - jstests/core/**/index9.js # "local" database.
     - jstests/core/**/queryoptimizera.js # "local" database.
-    - jstests/core/**/stages*.js # stageDebug.
     - jstests/core/**/startup_log.js # "local" database.
     - jstests/core/**/query/top/top.js # top.
     # The following tests fail because mongos behaves differently from mongod when testing certain
