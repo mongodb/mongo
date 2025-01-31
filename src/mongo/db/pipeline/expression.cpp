@@ -4224,15 +4224,8 @@ const char* ExpressionCurrentDate::getOpName() const {
     return "$currentDate";
 }
 
-MONGO_FAIL_POINT_DEFINE(sleepBeforeCurrentDateEvaluation);
-
 Value ExpressionCurrentDate::evaluate(const Document& root, Variables* variables) const {
-    if (MONGO_unlikely(sleepBeforeCurrentDateEvaluation.shouldFail())) {
-        sleepBeforeCurrentDateEvaluation.execute(
-            [&](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });
-    }
-
-    return Value(Date_t::now());
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 intrusive_ptr<Expression> ExpressionCurrentDate::optimize() {

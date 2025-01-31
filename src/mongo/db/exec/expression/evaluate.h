@@ -129,6 +129,7 @@ Value evaluate(const ExpressionIsoWeekYear& expr, const Document& root, Variable
 Value evaluate(const ExpressionIsoDayOfWeek& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionIsoWeek& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionYear& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionCurrentDate& expr, const Document& root, Variables* variables);
 
 Value evaluate(const ExpressionArray& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionArrayElemAt& expr, const Document& root, Variables* variables);
