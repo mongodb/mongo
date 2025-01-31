@@ -157,6 +157,13 @@ patch_aliases:
     description: "Runs all $search, $vectorSearch tests"
     variant: ".*"
     task: "^.*search*"
+  - alias: required-and-mongot-e2e-tests
+    description: >
+      This alias selects all tasks in all required variants and all tasks in variants that use a real mongot.
+      Once more e2e tests have been contributed and thus our coverage is better, this alias can be refined
+      to only select tests that use a real mongot.
+    variant_tags: ["required", "mongot_e2e"]
+    task: ".*"
   - alias: codecoverage
     description: "Run tests and report code coverage"
     variant: ".*-coverage"

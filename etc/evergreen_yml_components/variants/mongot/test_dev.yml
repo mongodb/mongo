@@ -50,7 +50,7 @@ buildvariants:
   # and is not configured with any downstream project triggers on 10gen/mongot.
   - name: amazon-linux-2023-x86-mongot-integration-patchable
     display_name: "AL2023 x86 mongot integration tasks"
-    tags: []
+    tags: ["mongot_e2e"]
     patch_only: true
     run_on:
       - amazon2023.3-small
@@ -113,7 +113,7 @@ buildvariants:
   # and is not configured with any downstream project triggers on 10gen/mongot.
   - name: amazon2023-arm64-mongot-integration-patchable
     display_name: "AL2023 arm64 mongot integration tasks"
-    tags: []
+    tags: ["mongot_e2e"]
     patch_only: true
     run_on:
       - amazon2023.3-arm64-small
@@ -169,7 +169,7 @@ buildvariants:
   # and is not configured with any downstream project triggers on 10gen/mongot.
   - name: amazon-linux2-arm64-mongot-integration-patchable
     display_name: "AL2 arm64 mongot integration tasks"
-    tags: []
+    tags: ["mongot_e2e"]
     patch_only: true
     run_on:
       - amazon2-arm64-latest-small
@@ -230,7 +230,7 @@ buildvariants:
   # and is not configured with any downstream project triggers on 10gen/mongot
   - name: amazon2-x86-mongot-integration-patchable
     display_name: "AL2 x86 mongot integration tasks"
-    tags: []
+    tags: ["mongot_e2e"]
     cron: "0 */4 * * *" # Run these tasks every 4 hours
     run_on:
       - amazon2-latest-large
