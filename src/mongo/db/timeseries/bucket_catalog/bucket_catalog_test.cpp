@@ -170,6 +170,8 @@ protected:
     UUID _uuid1 = UUID::gen();
     UUID _uuid2 = UUID::gen();
     UUID _uuid3 = UUID::gen();
+
+    BSONObj _measurement = BSON(_timeField << Date_t::now() << _metaField << 1);
 };
 
 class BucketCatalogWithoutMetadataTest : public BucketCatalogTest {
@@ -2159,6 +2161,145 @@ TEST_F(BucketCatalogTest, UseBucketSkipsFrozenBucket) {
     _testUseBucketSkipsConflictingBucket([](BucketCatalog& catalog, Bucket& bucket) {
         freezeBucket(catalog.bucketStateRegistry, bucket.bucketId);
     });
+}
+
+TEST_F(BucketCatalogTest, FindOpenBucketEmptyCatalog) {
+    auto dummyBucketKey =
+        BucketKey(_uuid1,
+                  BucketMetadata(getTrackingContext(_bucketCatalog->trackingContexts,
+                                                    TrackingScope::kOpenBucketsByKey),
+                                 BSONElement{},
+                                 boost::none));
+
+    ASSERT(_bucketCatalog->stripes[0]->openBucketsByKey.empty());
+    ASSERT_EQ(
+        nullptr,
+        internal::findOpenBucket(
+            *_bucketCatalog, *_bucketCatalog->stripes[0], WithLock::withoutLock(), dummyBucketKey));
+}
+
+TEST_F(BucketCatalogTest, FindOpenBucketReturnsBucket) {
+    auto swResult =
+        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
+    ASSERT_OK(swResult);
+    auto& [insertCtx, time] = swResult.getValue();
+
+    Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
+                                              *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                              WithLock::withoutLock(),
+                                              insertCtx,
+                                              time,
+                                              nullptr);
+
+    ASSERT_EQ(&bucket,
+              internal::findOpenBucket(*_bucketCatalog,
+                                       *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                       WithLock::withoutLock(),
+                                       insertCtx.key));
+}
+
+TEST_F(BucketCatalogTest, CheckBucketInsertEligibilityWithBucketWithDirectWrite) {
+    auto swResult =
+        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
+    ASSERT_OK(swResult);
+    auto& [insertCtx, time] = swResult.getValue();
+
+    Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
+                                              *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                              WithLock::withoutLock(),
+                                              insertCtx,
+                                              time,
+                                              nullptr);
+
+    directWriteStart(_bucketCatalog->bucketStateRegistry, bucket.bucketId);
+
+    // Ineligible for inserts. Remove from 'openBucketsByKey'.
+    ASSERT(!internal::checkBucketInsertEligibility(*_bucketCatalog,
+                                                   *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                                   WithLock::withoutLock(),
+                                                   &bucket));
+    ASSERT(_bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.empty());
+}
+
+TEST_F(BucketCatalogTest, CheckBucketInsertEligibilityWithClearedBucket) {
+    auto swResult =
+        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
+    ASSERT_OK(swResult);
+    auto& [insertCtx, time] = swResult.getValue();
+
+    Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
+                                              *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                              WithLock::withoutLock(),
+                                              insertCtx,
+                                              time,
+                                              nullptr);
+
+    clear(*_bucketCatalog, bucket.bucketId.collectionUUID);
+
+    // Ineligible for inserts. Remove from 'openBucketsByKey'.
+    ASSERT(!internal::checkBucketInsertEligibility(*_bucketCatalog,
+                                                   *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                                   WithLock::withoutLock(),
+                                                   &bucket));
+    ASSERT(_bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.empty());
+}
+
+TEST_F(BucketCatalogTest, CheckBucketInsertEligibilityWithFrozenBucket) {
+    auto swResult =
+        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
+    ASSERT_OK(swResult);
+    auto& [insertCtx, time] = swResult.getValue();
+
+    Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
+                                              *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                              WithLock::withoutLock(),
+                                              insertCtx,
+                                              time,
+                                              nullptr);
+
+    freezeBucket(_bucketCatalog->bucketStateRegistry, bucket.bucketId);
+
+    // Ineligible for inserts. Remove from 'openBucketsByKey'.
+    ASSERT(!internal::checkBucketInsertEligibility(*_bucketCatalog,
+                                                   *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                                   WithLock::withoutLock(),
+                                                   &bucket));
+    ASSERT(_bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.empty());
+}
+
+TEST_F(BucketCatalogTest, CheckBucketInsertEligibilityWithRolledOverBucket) {
+    auto swResult =
+        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), _measurement);
+    ASSERT_OK(swResult);
+    auto& [insertCtx, time] = swResult.getValue();
+
+    Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
+                                              *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                              WithLock::withoutLock(),
+                                              insertCtx,
+                                              time,
+                                              nullptr);
+    // Ineligible for inserts. Do not remove from 'openBucketsByKey'.
+    bucket.rolloverAction = RolloverAction::kArchive;
+    ASSERT(!internal::checkBucketInsertEligibility(*_bucketCatalog,
+                                                   *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                                   WithLock::withoutLock(),
+                                                   &bucket));
+    ASSERT_EQ(1, _bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.size());
+
+    bucket.rolloverAction = RolloverAction::kSoftClose;
+    ASSERT(!internal::checkBucketInsertEligibility(*_bucketCatalog,
+                                                   *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                                   WithLock::withoutLock(),
+                                                   &bucket));
+    ASSERT_EQ(1, _bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.size());
+
+    bucket.rolloverAction = RolloverAction::kHardClose;
+    ASSERT(!internal::checkBucketInsertEligibility(*_bucketCatalog,
+                                                   *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                                   WithLock::withoutLock(),
+                                                   &bucket));
+    ASSERT_EQ(1, _bucketCatalog->stripes[insertCtx.stripeNumber]->openBucketsByKey.size());
 }
 
 TEST_F(BucketCatalogTest, UseAlternateBucketSkipsBucketWithDirectWrite) {

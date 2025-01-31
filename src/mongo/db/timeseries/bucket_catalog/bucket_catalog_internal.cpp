@@ -319,6 +319,54 @@ Bucket* useBucketAndChangePreparedState(BucketStateRegistry& registry,
     return nullptr;
 }
 
+Bucket* findOpenBucket(BucketCatalog& catalog,
+                       Stripe& stripe,
+                       WithLock stripeLock,
+                       const BucketKey& bucketKey) {
+    if (const auto& it = stripe.openBucketsByKey.find(bucketKey);
+        it != stripe.openBucketsByKey.end()) {
+        const auto& openBucketSet = it->second;
+        for (Bucket* openBucket : openBucketSet) {
+            return openBucket;
+        }
+    }
+    return nullptr;
+}
+
+bool checkBucketInsertEligibility(BucketCatalog& catalog,
+                                  Stripe& stripe,
+                                  WithLock stripeLock,
+                                  Bucket* bucket) {
+    if (bucket->rolloverAction != RolloverAction::kNone) {
+        return false;
+    }
+
+    auto state = materializeAndGetBucketState(catalog.bucketStateRegistry, bucket);
+    if (!state) {
+        // If state is missing, it was already aborted and is just waiting to be cleaned up after
+        // the prepared batch is resolved.
+        invariant(bucket->preparedBatch);
+        return false;
+    }
+
+    if (conflictsWithInsertions(state.value())) {
+        // Clean up buckets ineligible for inserts.
+        ExecutionStatsController statsStorage =
+            getExecutionStats(catalog, bucket->bucketId.collectionUUID);
+        abort(catalog,
+              stripe,
+              stripeLock,
+              *bucket,
+              statsStorage,
+              /*batch=*/nullptr,
+              getTimeseriesBucketClearedError(bucket->bucketId.oid));
+        return false;
+    }
+
+    markBucketNotIdle(stripe, stripeLock, *bucket);
+    return true;
+}
+
 Bucket* useBucket(BucketCatalog& catalog,
                   Stripe& stripe,
                   WithLock stripeLock,

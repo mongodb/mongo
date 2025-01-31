@@ -146,6 +146,25 @@ Bucket* useBucket(BucketCatalog& catalog,
                   const StringDataComparator* comparator);
 
 /**
+ * Retrieve an open bucket from 'stripe' given a bucket key.
+ */
+Bucket* findOpenBucket(BucketCatalog& catalog,
+                       Stripe& stripe,
+                       WithLock stripeLock,
+                       const BucketKey& bucketKey);
+
+/**
+ * Check if a given bucket is eligible for new inserts.
+ * Return true if the bucket can accept new inserts. Mark the bucket not idle.
+ * Return false if the bucket is rolled over or has a state that conflicts with inserts. Clean up
+ * the bucket from the catalog.
+ */
+bool checkBucketInsertEligibility(BucketCatalog& catalog,
+                                  Stripe& stripe,
+                                  WithLock stripeLock,
+                                  Bucket* bucket);
+
+/**
  * Retrieve a previously closed bucket for write use if one exists in the catalog. Considers buckets
  * that are pending closure or archival but which are still eligible to receive new measurements.
  */
