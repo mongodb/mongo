@@ -1,7 +1,7 @@
 // Confirms expected index use when performing a match with a $expr statement.
 // @tags: [
 //   assumes_read_concern_local,
-//   requires_fcv_63,
+//   requires_fcv_81,
 //   # TODO SERVER-32311: re-enable test in balancer suites when the relative issue is solved.
 //   assumes_balancer_off,
 //   requires_getmore,
@@ -167,9 +167,11 @@ confirmExpectedExprExecution({$eq: ["$c.d", 1]}, {nReturned: 1, expectedIndex: {
 confirmExpectedExprExecution({$gt: ["$c.d", 0]}, {nReturned: 1, expectedIndex: {"c.d": 1}});
 confirmExpectedExprExecution({$lt: ["$c.d", 0]}, {nReturned: 22, expectedIndex: {"c.d": 1}});
 
-// $in, $ne, and $cmp are not expected to use an index. This is because we
-// have not yet implemented a rewrite of these operators to indexable MatchExpression.
-confirmExpectedExprExecution({$in: ["$x", [1, 3]]}, {nReturned: 2});
+// $in is expected to use an index (supported in SERVER-32549).
+confirmExpectedExprExecution({$in: ["$x", [1, 3]]}, {nReturned: 2, expectedIndex: {x: 1, y: 1}});
+
+// $ne and $cmp are not expected to use an index. This is because we have not yet implemented a
+// rewrite of these operators to indexable MatchExpression.
 confirmExpectedExprExecution({$cmp: ["$x", 1]}, {nReturned: 22});
 confirmExpectedExprExecution({$ne: ["$x", 1]}, {nReturned: 22});
 

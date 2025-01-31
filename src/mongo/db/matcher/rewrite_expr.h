@@ -129,6 +129,10 @@ private:
     std::unique_ptr<MatchExpression> _buildComparisonMatchExpression(
         ExpressionCompare::CmpOp comparisonOp, BSONElement fieldAndValue);
 
+    // Returns rewritten MatchExpression or null unique_ptr if not rewritable.
+    std::unique_ptr<MatchExpression> _rewriteInExpression(
+        const boost::intrusive_ptr<ExpressionIn>& expr);
+
     std::vector<BSONObj> _matchExprElemStorage;
     const CollatorInterface* _collator;
     bool _allSubExpressionsRewritten = true;

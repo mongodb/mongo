@@ -82,6 +82,7 @@ selector:
     - jstests/core/query/distinct/distinct_sbe_compatibility.js
     - jstests/core/query/exists/existsa.js
     - jstests/core/query/explain/**/*.js
+    - jstests/core/query/expr/expr_in_index_use.js
     - jstests/core/query/expr/expr_index_use.js
     - jstests/core/query/idhack.js
     - jstests/core/query/index_deduplication.js
