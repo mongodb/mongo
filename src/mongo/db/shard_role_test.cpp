@@ -1769,7 +1769,11 @@ void ShardRoleTest::testRestoreFailsIfCollectionRenamed(
 
     // Rename the collection.
     {
-        DBDirectClient client(operationContext());
+        auto newClient = getService()->makeClient("AlternativeClient");
+        AlternativeClientRegion acr(newClient);
+        auto newOpCtxHolder = acr->makeOperationContext();
+
+        DBDirectClient client(newOpCtxHolder.get());
         BSONObj info;
         ASSERT_TRUE(client.runCommand(
             DatabaseName::kAdmin,

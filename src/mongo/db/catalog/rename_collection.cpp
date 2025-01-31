@@ -351,22 +351,12 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
     invariant(source.isEqualDb(target));
     DisableDocumentValidation validationDisabler(opCtx);
 
-    AutoGetDb autoDb(opCtx, source.dbName(), MODE_IX);
-
-    boost::optional<Lock::CollectionLock> sourceLock;
-    boost::optional<Lock::CollectionLock> targetLock;
-    // To prevent deadlock, always lock system.views collection in the end because concurrent
-    // view-related operations always lock system.views in the end.
-    if (!source.isSystemDotViews() &&
-        (target.isSystemDotViews() ||
-         ResourceId(RESOURCE_COLLECTION, source) < ResourceId(RESOURCE_COLLECTION, target))) {
-        // To prevent deadlock, always lock source and target in ascending resourceId order.
-        sourceLock.emplace(opCtx, source, MODE_X);
-        targetLock.emplace(opCtx, target, MODE_X);
-    } else {
-        targetLock.emplace(opCtx, target, MODE_X);
-        sourceLock.emplace(opCtx, source, MODE_X);
-    }
+    CollectionOrViewAcquisitionRequests acquisitionRequests = {
+        CollectionOrViewAcquisitionRequest::fromOpCtx(
+            opCtx, source, AcquisitionPrerequisites::OperationType::kWrite),
+        CollectionOrViewAcquisitionRequest::fromOpCtx(
+            opCtx, target, AcquisitionPrerequisites::OperationType::kWrite)};
+    auto acquisitions = acquireCollectionsOrViews(opCtx, acquisitionRequests, LockMode::MODE_X);
 
     auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, source.dbName());
     auto catalog = CollectionCatalog::get(opCtx);

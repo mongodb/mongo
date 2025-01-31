@@ -230,10 +230,16 @@ ResolvedNamespaceOrViewAcquisitionRequests resolveNamespaceOrViewAcquisitionRequ
     }
 
     // Sort them in ascending ResourceId order since that is the canonical lock ordering used across
-    // the server.
+    // the server. However always lock system.views collection in the end because concurrent
+    // view-related operations always lock system.views in the end.
     std::sort(resolvedAcquisitionRequests.begin(),
               resolvedAcquisitionRequests.end(),
-              [](auto& lhs, auto& rhs) { return lhs.resourceId < rhs.resourceId; });
+              [](auto& lhs, auto& rhs) {
+                  return lhs.prerequisites.nss.isSystemDotViews() ==
+                          rhs.prerequisites.nss.isSystemDotViews()
+                      ? lhs.resourceId < rhs.resourceId
+                      : rhs.prerequisites.nss.isSystemDotViews();
+              });
     return resolvedAcquisitionRequests;
 }
 

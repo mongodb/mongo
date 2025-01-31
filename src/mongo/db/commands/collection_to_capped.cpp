@@ -39,17 +39,16 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog_raii.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/collection_crud/capped_utils.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
@@ -134,11 +133,12 @@ public:
         NamespaceString fromNs(NamespaceStringUtil::deserialize(dbName, from));
         NamespaceString toNs(NamespaceStringUtil::deserialize(dbName, to));
 
-        // TODO SERVER-99148: These locks are potentially not taken in ResourceId order. We disable
-        // the checks here as a temporary fix while we wait.
-        DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
-        AutoGetCollection autoColl(opCtx, fromNs, MODE_X);
-        Lock::CollectionLock collLock(opCtx, toNs, MODE_X);
+        CollectionAcquisitionRequests acquisitionRequests = {
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, fromNs, AcquisitionPrerequisites::OperationType::kWrite),
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, toNs, AcquisitionPrerequisites::OperationType::kWrite)};
+        auto acquisitions = acquireCollections(opCtx, acquisitionRequests, LockMode::MODE_X);
 
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, toNs)) {
             uasserted(ErrorCodes::NotWritablePrimary,
@@ -146,11 +146,10 @@ public:
                                     << to << " (as capped)");
         }
 
-        Database* const db = autoColl.getDb();
-        if (!db) {
-            uasserted(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "database " << dbName.toStringForErrorMsg() << " not found");
-        }
+        auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, dbName);
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "database " << dbName.toStringForErrorMsg() << " not found",
+                db);
 
         cloneCollectionAsCapped(opCtx, db, fromNs, toNs, size, temp);
         return true;
