@@ -181,3 +181,8 @@ feature_flags:
     cpp_varname: feature_flags::gProhibitNonEmptyReplicaSetOnAddShard
     default: false
     shouldBeFCVGated: true
+  featureFlagTerminateSecondaryReadsUponRangeDeletion:
+    description: "Feature flag to enable the termination of secondary reads due to range deletions."
+    cpp_varname: feature_flags::gTerminateSecondaryReadsUponRangeDeletion
+    default: false
+    shouldBeFCVGated: false
