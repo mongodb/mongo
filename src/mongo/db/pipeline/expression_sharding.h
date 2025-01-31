@@ -35,13 +35,11 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
@@ -126,6 +124,7 @@ public:
 class ExpressionInternalIndexKey final : public Expression {
 public:
     static constexpr const char* const opName = "$_internalIndexKey";
+    static constexpr auto kIndexSpecKeyField = "key"_sd;
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement bsonExpr,
@@ -153,10 +152,17 @@ public:
         return visitor->visit(this);
     }
 
+    const Expression* getDoc() const {
+        return _doc.get();
+    }
+
+    const Expression* getSpec() const {
+        return _spec.get();
+    }
+
 private:
     constexpr static auto kDocField = "doc"_sd;
     constexpr static auto kSpecField = "spec"_sd;
-    constexpr static auto kIndexSpecKeyField = "key"_sd;
 
     boost::intrusive_ptr<Expression> _doc;
     boost::intrusive_ptr<Expression> _spec;

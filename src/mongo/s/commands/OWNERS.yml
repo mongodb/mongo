@@ -99,9 +99,6 @@ filters:
   - "*placement_history*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "sharding_expressions*":
-    approvers:
-      - 10gen/query-integration-staff-leads
   - "cluster_query_without_shard_key_cmd.cpp":
     approvers:
       - 10gen/query-execution-router-write-exec

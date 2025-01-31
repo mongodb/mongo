@@ -2658,6 +2658,22 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "sharding_expressions",
+    srcs = [
+        "//src/mongo/db/exec/expression:evaluate_sharding.cpp",
+        "//src/mongo/db/pipeline:expression_sharding.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db/exec/expression:evaluate_sharding.h",
+        "//src/mongo/db/pipeline:expression_sharding.h",
+    ],
+    deps = [
+        "//src/mongo/db/catalog:index_key_validate",
+        "//src/mongo/s:grid",
+    ],
+)
+
+mongo_cc_library(
     name = "mirror_maestro",
     srcs = [
         "mirror_maestro.cpp",

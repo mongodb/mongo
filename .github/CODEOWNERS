@@ -2206,7 +2206,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_refine_collection_shard_key_cmd.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_remove_* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/commands/**/*placement_history* @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/src/mongo/s/commands/**/sharding_expressions* @10gen/query-integration-staff-leads @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_query_without_shard_key_cmd.cpp @10gen/query-execution-router-write-exec @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_write_without_shard_key_cmd.cpp @10gen/query-execution-router-write-exec @svc-auto-approve-bot
 /src/mongo/s/commands/**/*balanc* @10gen/server-catalog-and-routing @svc-auto-approve-bot

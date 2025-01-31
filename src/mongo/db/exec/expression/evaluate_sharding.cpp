@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,34 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/s/commands/sharding_expressions.h"
-
-#include <boost/container/flat_set.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
-#include <memory>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/expression/evaluate_sharding.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/ordering.h"
-#include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/index_key_validate.h"
-#include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/fts/fts_spec.h"
-#include "mongo/db/hasher.h"
 #include "mongo/db/index/2d_common.h"
 #include "mongo/db/index/2d_key_generator.h"
 #include "mongo/db/index/btree_key_generator.h"
@@ -69,27 +45,93 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/variables.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/record_id.h"
 #include "mongo/db/shard_id.h"
-#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/shard_version.h"
-#include "mongo/s/stale_exception.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/namespace_string_util.h"
-#include "mongo/util/shared_buffer_fragment.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
+
+namespace exec::expression {
+
+Value evaluate(const ExpressionInternalOwningShard& expr,
+               const Document& root,
+               Variables* variables) {
+    uassert(6868600,
+            "$_internalOwningShard is currently not supported on mongos",
+            !serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
+
+    auto expCtx = expr.getExpressionContext();
+
+    Value input = expr.getChildren()[0]->evaluate(root, variables);
+    if (input.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    const auto& opName = expr.getOpName();
+    uassert(9567000,
+            str::stream() << opName << " supports an object as its argument",
+            input.getType() == BSONType::Object);
+
+    // Retrieve the values from the incoming document.
+    Value nsUnchecked = input["ns"_sd];
+    Value shardVersionUnchecked = input["shardVersion"_sd];
+    Value shardKeyValUnchecked = input["shardKeyVal"_sd];
+
+    uassert(9567001,
+            str::stream() << opName << " requires 'ns' argument to be an string",
+            nsUnchecked.getType() == BSONType::String);
+    NamespaceString ns(NamespaceStringUtil::deserialize(expCtx->getNamespaceString().tenantId(),
+                                                        nsUnchecked.getStringData(),
+                                                        expCtx->getSerializationContext()));
+
+    uassert(9567002,
+            str::stream() << opName << " requires 'shardVersion' argument to be an object",
+            shardVersionUnchecked.getType() == BSONType::Object);
+    const auto shardVersionObj = shardVersionUnchecked.getDocument().toBson();
+    const auto shardVersion = ShardVersion::parse(BSON("" << shardVersionObj).firstElement());
+
+    uassert(9567003,
+            str::stream() << opName << " requires 'shardKeyVal' argument to be an object",
+            shardKeyValUnchecked.getType() == BSONType::Object);
+    const auto shardKeyVal = shardKeyValUnchecked.getDocument().toBson();
+
+    // Get the 'chunkManager' from the catalog cache.
+    auto opCtx = expCtx->getOperationContext();
+    const auto catalogCache = Grid::get(opCtx)->catalogCache();
+    uassert(6868602,
+            "$_internalOwningShard expression only makes sense in sharded environment",
+            catalogCache);
+
+    // Setting 'allowLocks' to true when evaluating on mongod, as otherwise an invariant is thrown.
+    // We can safely set it to true as there is no risk of deadlock, because the code still throws
+    // when a refresh would actually need to take place.
+    const auto cri =
+        uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, ns, true /* allowLocks */));
+
+    // Advances the version in the cache if the chunk manager is not yet available or its version is
+    // stale.
+    if (!cri.cm.hasRoutingTable() ||
+        cri.cm.getVersion().isOlderThan(shardVersion.placementVersion())) {
+        catalogCache->onStaleCollectionVersion(ns, boost::none /* wanted */);
+
+        uasserted(ShardCannotRefreshDueToLocksHeldInfo(ns),
+                  str::stream()
+                      << "Routing information for collection " << ns.toStringForErrorMsg()
+                      << " is currently stale and needs to be refreshed from the config server");
+    }
+
+    // Retrieve the shard id for the given shard key value.
+    std::set<ShardId> shardIds;
+    cri.cm.getShardIdsForRange(shardKeyVal, shardKeyVal, &shardIds);
+    uassert(6868601, "The value should belong to exactly one ShardId", shardIds.size() == 1);
+    const auto shardId = *(shardIds.begin());
+    return Value(shardId.toString());
+}
+
 namespace {
 
 /**
@@ -397,165 +439,26 @@ private:
 
 }  // namespace
 
-Value ExpressionInternalOwningShard::evaluate(const Document& root, Variables* variables) const {
-    uassert(6868600,
-            "$_internalOwningShard is currently not supported on mongos",
-            !serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
-
-    auto expCtx = getExpressionContext();
-
-    Value input = _children[0]->evaluate(root, variables);
-    if (input.nullish()) {
-        return Value(BSONNULL);
-    }
-
-    uassert(9567000,
-            str::stream() << opName << " supports an object as its argument",
-            input.getType() == BSONType::Object);
-
-    // Retrieve the values from the incoming document.
-    Value nsUnchecked = input["ns"_sd];
-    Value shardVersionUnchecked = input["shardVersion"_sd];
-    Value shardKeyValUnchecked = input["shardKeyVal"_sd];
-
-    uassert(9567001,
-            str::stream() << opName << " requires 'ns' argument to be an string",
-            nsUnchecked.getType() == BSONType::String);
-    NamespaceString ns(NamespaceStringUtil::deserialize(expCtx->getNamespaceString().tenantId(),
-                                                        nsUnchecked.getStringData(),
-                                                        expCtx->getSerializationContext()));
-
-    uassert(9567002,
-            str::stream() << opName << " requires 'shardVersion' argument to be an object",
-            shardVersionUnchecked.getType() == BSONType::Object);
-    const auto shardVersionObj = shardVersionUnchecked.getDocument().toBson();
-    const auto shardVersion = ShardVersion::parse(BSON("" << shardVersionObj).firstElement());
-
-    uassert(9567003,
-            str::stream() << opName << " requires 'shardKeyVal' argument to be an object",
-            shardKeyValUnchecked.getType() == BSONType::Object);
-    const auto shardKeyVal = shardKeyValUnchecked.getDocument().toBson();
-
-    // Get the 'chunkManager' from the catalog cache.
-    auto opCtx = expCtx->getOperationContext();
-    const auto catalogCache = Grid::get(opCtx)->catalogCache();
-    uassert(6868602,
-            "$_internalOwningShard expression only makes sense in sharded environment",
-            catalogCache);
-
-    // Setting 'allowLocks' to true when evaluating on mongod, as otherwise an invariant is thrown.
-    // We can safely set it to true as there is no risk of deadlock, because the code still throws
-    // when a refresh would actually need to take place.
-    const auto cri =
-        uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, ns, true /* allowLocks */));
-
-    // Advances the version in the cache if the chunk manager is not yet available or its version is
-    // stale.
-    if (!cri.cm.hasRoutingTable() ||
-        cri.cm.getVersion().isOlderThan(shardVersion.placementVersion())) {
-        catalogCache->onStaleCollectionVersion(ns, boost::none /* wanted */);
-
-        uasserted(ShardCannotRefreshDueToLocksHeldInfo(ns),
-                  str::stream()
-                      << "Routing information for collection " << ns.toStringForErrorMsg()
-                      << " is currently stale and needs to be refreshed from the config server");
-    }
-
-    // Retrieve the shard id for the given shard key value.
-    std::set<ShardId> shardIds;
-    cri.cm.getShardIdsForRange(shardKeyVal, shardKeyVal, &shardIds);
-    uassert(6868601, "The value should belong to exactly one ShardId", shardIds.size() == 1);
-    const auto shardId = *(shardIds.begin());
-    return Value(shardId.toString());
-}
-
-boost::intrusive_ptr<Expression> ExpressionInternalIndexKey::parse(ExpressionContext* expCtx,
-                                                                   BSONElement bsonExpr,
-                                                                   const VariablesParseState& vps) {
-    uassert(6868506,
-            str::stream() << opName << " supports an object as its argument",
-            bsonExpr.type() == BSONType::Object);
-
-    BSONElement docElement;
-    BSONElement specElement;
-
-    for (auto&& bsonArgs : bsonExpr.embeddedObject()) {
-        if (bsonArgs.fieldNameStringData() == kDocField) {
-            docElement = bsonArgs;
-        } else if (bsonArgs.fieldNameStringData() == kSpecField) {
-            uassert(6868507,
-                    str::stream() << opName << " requires 'spec' argument to be an object",
-                    bsonArgs.type() == BSONType::Object);
-            specElement = bsonArgs;
-        } else {
-            uasserted(6868508,
-                      str::stream() << "Unknown argument: " << bsonArgs.fieldNameStringData()
-                                    << "found while parsing" << opName);
-        }
-    }
-
-    uassert(6868509,
-            str::stream() << opName << " requires both 'doc' and 'spec' arguments",
-            !docElement.eoo() && !specElement.eoo());
-
-    return new ExpressionInternalIndexKey(expCtx,
-                                          parseOperand(expCtx, docElement, vps),
-                                          ExpressionConstant::create(expCtx, Value{specElement}));
-}
-
-ExpressionInternalIndexKey::ExpressionInternalIndexKey(ExpressionContext* expCtx,
-                                                       boost::intrusive_ptr<Expression> doc,
-                                                       boost::intrusive_ptr<Expression> spec)
-    : Expression(expCtx, {std::move(doc), std::move(spec)}),
-      _doc(_children[0]),
-      _spec(_children[1]) {
-    expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
-}
-
-boost::intrusive_ptr<Expression> ExpressionInternalIndexKey::optimize() {
-    invariant(_doc);
-    invariant(_spec);
-
-    _doc = _doc->optimize();
-    _spec = _spec->optimize();
-    return this;
-}
-
-Value ExpressionInternalIndexKey::serialize(const SerializationOptions& options) const {
-    invariant(_doc);
-    invariant(_spec);
-
-    auto specExprConstant = dynamic_cast<ExpressionConstant*>(_spec.get());
-    tassert(7250400, "Failed to dynamic cast the 'spec' to 'ExpressionConstant'", specExprConstant);
-
-    // The 'spec' is always treated as a constant so do not call '_spec->serialize()' which would
-    // wrap the value in an unnecessary '$const' object.
-    return Value(DOC(opName << DOC(kDocField << _doc->serialize(options) << kSpecField
-                                             << specExprConstant->getValue())));
-}
-
-Value ExpressionInternalIndexKey::evaluate(const Document& root, Variables* variables) const {
+Value evaluate(const ExpressionInternalIndexKey& expr, const Document& root, Variables* variables) {
     uassert(6868510,
-            str::stream() << opName << " is currently not supported on mongos",
+            str::stream() << expr.getOpName() << " is currently not supported on mongos",
             !serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
 
-    auto docObj = _doc->evaluate(root, variables).getDocument().toBson();
-    auto specObj = _spec->evaluate(root, variables).getDocument().toBson();
+    auto docObj = expr.getDoc()->evaluate(root, variables).getDocument().toBson();
+    auto specObj = expr.getSpec()->evaluate(root, variables).getDocument().toBson();
 
     // Parse and validate the index spec and then create the index descriptor object from it.
     auto indexSpec = index_key_validate::parseAndValidateIndexSpecs(
-        getExpressionContext()->getOperationContext(), specObj);
-    BSONObj keyPattern = indexSpec.getObjectField(kIndexSpecKeyField);
+        expr.getExpressionContext()->getOperationContext(), specObj);
+    BSONObj keyPattern = indexSpec.getObjectField(ExpressionInternalIndexKey::kIndexSpecKeyField);
     auto indexDescriptor =
         std::make_unique<IndexDescriptor>(IndexNames::findPluginName(keyPattern), indexSpec);
 
     IndexKeysObjectsGenerator indexKeysObjectsGenerator(
-        getExpressionContext(), docObj, indexDescriptor.get());
+        expr.getExpressionContext(), docObj, indexDescriptor.get());
 
     return indexKeysObjectsGenerator.generateKeys();
 }
 
-REGISTER_STABLE_EXPRESSION(_internalOwningShard, ExpressionInternalOwningShard::parse);
-REGISTER_STABLE_EXPRESSION(_internalIndexKey, ExpressionInternalIndexKey::parse);
-
+}  // namespace exec::expression
 }  // namespace mongo

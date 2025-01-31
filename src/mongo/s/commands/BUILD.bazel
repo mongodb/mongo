@@ -55,14 +55,11 @@ mongo_cc_library(
     srcs = [
         "flush_router_config_cmd.cpp",
         "get_shard_map_cmd.cpp",
-        "sharding_expressions.cpp",
-    ],
-    hdrs = [
-        "sharding_expressions.h",
     ],
     deps = [
         "//src/mongo/db:commands",
         "//src/mongo/db:shard_role_api",
+        "//src/mongo/db:sharding_expressions",
         "//src/mongo/db/catalog:index_key_validate",
         "//src/mongo/db/fts:base_fts",
         "//src/mongo/db/index:expression_params",
