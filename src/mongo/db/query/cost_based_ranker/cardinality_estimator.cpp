@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/cost_based_ranker/cardinality_estimator.h"
 
+#include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/query/ce/histogram_estimator.h"
 #include "mongo/db/query/cost_based_ranker/heuristic_estimator.h"
 #include "mongo/db/query/index_bounds_builder.h"
@@ -57,13 +58,12 @@ CardinalityEstimator::CardinalityEstimator(const CollectionInfo& collInfo,
                 _samplingEstimator != nullptr);
     }
     for (auto&& indexEntry : _collInfo.indexes) {
-        if (!indexEntry.multikey) {
-            continue;
-        }
         for (auto&& indexedPath : indexEntry.keyPattern) {
             auto path = indexedPath.fieldNameStringData();
             if (indexEntry.pathHasMultikeyComponent(path)) {
                 _multikeyPaths.insert(path);
+            } else {
+                _nonMultikeyPaths.insert(path);
             }
         }
     }
@@ -249,7 +249,7 @@ bool isSargableExpr(const MatchExpression* node) {
         return isSargableLeaf(child);
     }
     if (nodeType == MatchExpression::MatchExpression::ELEM_MATCH_VALUE) {
-        bool isSargable = false;
+        bool isSargable = true;
         for (size_t i = 0; i < node->numChildren(); ++i) {
             isSargable &= isSargableLeaf(node->getChild(i));
         }
@@ -258,9 +258,11 @@ bool isSargableExpr(const MatchExpression* node) {
     return false;
 }
 
-StringData getPath(const MatchExpression* node) {
+StringData CardinalityEstimator::getPath(const MatchExpression* node) {
     if (node->matchType() == MatchExpression::NOT) {
         return getPath(node->getChild(0));
+    } else if (!_elemMatchPathStack.empty()) {
+        return _elemMatchPathStack.top();
     }
     return node->path();
 }
@@ -334,6 +336,13 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
             break;
         case MatchExpression::NOR:
             ceRes = estimate(static_cast<const NorMatchExpression*>(node), isFilterRoot);
+            break;
+        case MatchExpression::ELEM_MATCH_VALUE:
+            ceRes = estimate(static_cast<const ElemMatchValueMatchExpression*>(node), isFilterRoot);
+            break;
+        case MatchExpression::ELEM_MATCH_OBJECT:
+            ceRes =
+                estimate(static_cast<const ElemMatchObjectMatchExpression*>(node), isFilterRoot);
             break;
         default:
             MONGO_UNIMPLEMENTED_TASSERT(9586708);
@@ -856,6 +865,53 @@ CEResult CardinalityEstimator::estimate(const NorMatchExpression* node, bool isF
         addRootNodeSel(res);
     }
     return res;
+}
+
+CEResult CardinalityEstimator::estimate(const ElemMatchValueMatchExpression* node,
+                                        bool isFilterRoot) {
+    // Check if we have metadata about this field from the catalog. If the field is non-multikey, we
+    // can immediately return a 0 result.
+    if (_nonMultikeyPaths.contains(node->path())) {
+        return zeroCE;
+    }
+
+    // Sampling and histogram handle this case higher up.
+    tassert(9808601,
+            "direct estimatation of $elemMatch is currently on supported for heuristicCE",
+            _rankerMode == QueryPlanRankerModeEnum::kHeuristicCE);
+
+    size_t selOffset = _conjSels.size();
+
+    // Ensure the original '_inputCard' and '_elemMatchPathStack' are restored at the end of this
+    // function.
+    auto originalCard = _inputCard;
+    ScopeGuard restore([&] {
+        _inputCard = originalCard;
+        _elemMatchPathStack.pop();
+        popSelectivities(selOffset);
+    });
+
+    // Change '_inputCard' to represent the number of unwound array elements. All child
+    // selectivities should be calculated relative to this cardinality, allowing us to model the
+    // semantics of $elemMatch.
+    _inputCard = _inputCard * kAverageElementsPerArray;
+    _elemMatchPathStack.push(node->path());
+
+    for (size_t i = 0; i < node->numChildren(); i++) {
+        auto ceRes = estimate(node->getChild(i), false);
+        if (!ceRes.isOK()) {
+            return ceRes;
+        }
+        // Calculate the selectivity relative to number of unwound values.
+        SelectivityEstimate sel = ceRes.getValue() / _inputCard;
+        _conjSels.emplace_back(sel);
+    }
+
+    // Calculate selectivity relative to the original cardinality.
+    auto sel = conjCard(selOffset, originalCard);
+    // The implict 'isArray' predicate of $elemMatch is independent from the selectivity of its
+    // children, so it can be combined by multiplication.
+    return sel * kIsArraySel;
 }
 
 /*

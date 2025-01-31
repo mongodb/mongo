@@ -80,9 +80,11 @@ CEResult getPlanCE(const QuerySolution& plan,
                    QueryPlanRankerModeEnum ceMode);
 
 CardinalityEstimate getPlanHeuristicCE(const QuerySolution& plan, double collCard);
+CardinalityEstimate getPlanHeuristicCE(const QuerySolution& plan, const CollectionInfo& collInfo);
 
 CardinalityEstimate getPlanHistogramCE(const QuerySolution& plan, const CollectionInfo& collInfo);
 
+std::unique_ptr<stats::CollectionStatistics> makeCollStats(double collCard);
 std::unique_ptr<stats::CollectionStatistics> makeCollStatsWithHistograms(
     const std::vector<std::string>& histFields, double collCard);
 

@@ -433,5 +433,46 @@ TEST(CardinalityEstimator, NorWithEqGreaterEstiamteThanNorWithInequality) {
     ASSERT_GT(eqEst, inEqEst);
 }
 
+TEST(CardinalityEstimator, ElemMatchNonMultiKey) {
+    BSONObj elemMatchQuery = fromjson("{a: {$elemMatch: {$gt: 5, $lt: 10}}}");
+    auto elemMatchPlan = makeCollScanPlan(parse(elemMatchQuery));
+    auto index = buildSimpleIndexEntry({"a"});
+    auto collInfo = buildCollectionInfo({index}, makeCollStats(1000.0));
+    CardinalityEstimate est = getPlanHeuristicCE(*elemMatchPlan, collInfo);
+    ASSERT_EQ(est, zeroCE);
+}
+
+TEST(CardinalityEstimator, ElemMatchMultikeyComparedToAndNonMultikey) {
+    CardinalityEstimate elemMatchEst{zeroCE};
+    CardinalityEstimate andEst{zeroCE};
+    {
+        BSONObj elemMatchQuery = fromjson("{a: {$elemMatch: {$gt: 5, $lt: 10}}}");
+        auto elemMatchPlan = makeCollScanPlan(parse(elemMatchQuery));
+        auto index = buildMultikeyIndexEntry({"a"}, "a");
+        auto collInfo = buildCollectionInfo({index}, makeCollStats(1000.0));
+        elemMatchEst = getPlanHeuristicCE(*elemMatchPlan, collInfo);
+    }
+    {
+        BSONObj andQuery = fromjson("{a: {$gt: 5, $lt: 10}}");
+        auto andPlan = makeCollScanPlan(parse(andQuery));
+        auto index = buildSimpleIndexEntry({"a"});
+        auto collInfo = buildCollectionInfo({index}, makeCollStats(1000.0));
+        andEst = getPlanHeuristicCE(*andPlan, collInfo);
+    }
+    ASSERT_LT(elemMatchEst, andEst);
+}
+
+TEST(CardinalityEstimator, NestedElemMatchMoreSelectiveThanSingle) {
+    BSONObj elemMatchQuery = fromjson("{a: {$elemMatch: {$gt: 5, $lt: 10}}}");
+    BSONObj nestedElemMatchQuery = fromjson("{a: {$elemMatch: {$elemMatch: {$gt: 5, $lt: 10}}}}");
+    auto elemMatchPlan = makeCollScanPlan(parse(elemMatchQuery));
+    auto nestedElemMatchPlan = makeCollScanPlan(parse(nestedElemMatchQuery));
+    auto index = buildMultikeyIndexEntry({"a"}, "a");
+    auto collInfo = buildCollectionInfo({index}, makeCollStats(1000.0));
+    auto elemMatchEst = getPlanHeuristicCE(*elemMatchPlan, collInfo);
+    auto nestedElemMatchEst = getPlanHeuristicCE(*nestedElemMatchPlan, collInfo);
+    ASSERT_GT(elemMatchEst, nestedElemMatchEst);
+}
+
 }  // unnamed namespace
 }  // namespace mongo::cost_based_ranker

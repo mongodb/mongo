@@ -100,6 +100,7 @@ private:
     CEResult estimate(const AndMatchExpression* node);
     CEResult estimate(const OrMatchExpression* node, bool isFilterRoot);
     CEResult estimate(const NorMatchExpression* node, bool isFilterRoot);
+    CEResult estimate(const ElemMatchValueMatchExpression* node, bool isFilterRoot);
 
     // Intervals
     CEResult estimate(const IndexBounds* node);
@@ -182,6 +183,10 @@ private:
         _conjSels.erase(_conjSels.end() - oldSize, _conjSels.end());
     }
 
+    // Get the path of the given node. This function consults the '_elemMatchPathStack' to check if
+    // this node is under an $elemMatch, if so it will return that path.
+    StringData getPath(const MatchExpression* node);
+
     const CardinalityEstimate _collCard;
 
     // The input cardinality of the last complete conjunction. This conjunction may consist of a
@@ -215,6 +220,16 @@ private:
     // may be multikey but not reflected in this set because there may not be an index over the
     // field.
     StringDataSet _multikeyPaths;
+
+    // Set with the paths we know are non-multikey deduced from the catalog. Like '_multikeyPaths',
+    // a field may be non-multikey but not reflected in this set because there are no indexes over
+    // the field.
+    StringDataSet _nonMultikeyPaths;
+
+    // Keep track of the path associated with the current node in $elemMatch contexts. For example,
+    // ElemMatchValueMatchExpression may have a child which looks like GTMatchExpression with an
+    // empty path.
+    std::stack<StringData> _elemMatchPathStack;
 };
 
 }  // namespace mongo::cost_based_ranker

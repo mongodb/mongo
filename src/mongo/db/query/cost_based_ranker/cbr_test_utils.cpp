@@ -205,9 +205,12 @@ CEResult getPlanCE(const QuerySolution& plan,
 }
 
 CardinalityEstimate getPlanHeuristicCE(const QuerySolution& plan, double collCard) {
-    const auto ceRes = getPlanCE(plan,
-                                 buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard)),
-                                 QueryPlanRankerModeEnum::kHeuristicCE);
+    return getPlanHeuristicCE(plan,
+                              buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard)));
+}
+
+CardinalityEstimate getPlanHeuristicCE(const QuerySolution& plan, const CollectionInfo& collInfo) {
+    const auto ceRes = getPlanCE(plan, collInfo, QueryPlanRankerModeEnum::kHeuristicCE);
     ASSERT(ceRes.isOK());
     return ceRes.getValue();
 }
@@ -216,6 +219,10 @@ CardinalityEstimate getPlanHistogramCE(const QuerySolution& plan, const Collecti
     const auto ceRes = getPlanCE(plan, collInfo, QueryPlanRankerModeEnum::kHistogramCE);
     ASSERT(ceRes.isOK());
     return ceRes.getValue();
+}
+
+std::unique_ptr<stats::CollectionStatistics> makeCollStats(double collCard) {
+    return makeCollStatsWithHistograms({}, collCard);
 }
 
 std::unique_ptr<stats::CollectionStatistics> makeCollStatsWithHistograms(

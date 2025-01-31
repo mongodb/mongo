@@ -31,13 +31,16 @@
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/cost_based_ranker/estimates.h"
-#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/interval.h"
 
 namespace mongo::cost_based_ranker {
 
 constexpr double kEqualityScalingFactor = 0.5;
 constexpr double kTextSearchScalingFactor = 0.4;
 constexpr double kDefaultScalingFactor = 0.3;
+constexpr double kAverageElementsPerArray = 7;
+const SelectivityEstimate kIsArraySel =
+    SelectivityEstimate{SelectivityType{0.9}, EstimationSource::Heuristics};
 const SelectivityEstimate kExistsSel{SelectivityType{0.9}, EstimationSource::Heuristics};
 const SelectivityEstimate oneSelHeuristic{SelectivityType{1}, EstimationSource::Heuristics};
 const SelectivityEstimate zeroSelHeuristic{SelectivityType{0}, EstimationSource::Heuristics};
