@@ -241,6 +241,11 @@ void convertToCapped(OperationContext* opCtx,
     auto dbname = ns.dbName();
     StringData shortSource = ns.coll();
 
+    // TODO SERVER-100043: We disable lock runtime ordering checks since a subsequent rename as part
+    // of oplog replication might take the locks in opposite order if the ResourceId of the
+    // namespaces happens to dictate so.
+    DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
+
     AutoGetCollection coll(opCtx, ns, MODE_X);
     CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, ns)->checkShardVersionOrThrow(
         opCtx);
