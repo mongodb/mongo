@@ -365,5 +365,86 @@ TEST(ResolvedViewTest, SerializeOutputCanBeReparsed) {
                       BSON("locale"
                            << "fr_CA"));
 }
+
+TEST(ResolvedViewTest, ParseFromBSONCorrectly) {
+    BSONObj searchStage = BSON("$search" << BSON("text"
+                                                 << "foo"));
+    BSONObj matchStage = BSON("$match" << BSON("x" << 1));
+    BSONArray pipeline = BSON_ARRAY(searchStage << matchStage);
+
+    BSONObj cmdResponse = BSON("resolvedView" << BSON("ns" << backingNss.ns_forTest() << "pipeline"
+                                                           << pipeline << "collation"
+                                                           << BSON("locale"
+                                                                   << "fil")));
+    BSONElement elem = cmdResponse.getField("resolvedView");
+
+    std::vector<BSONObj> expectedPipeline{searchStage, matchStage};
+    const ResolvedView result = ResolvedView::parseFromBSON(elem);
+    ASSERT_EQ(result.getNamespace(), backingNss);
+    ASSERT(std::equal(expectedPipeline.begin(),
+                      expectedPipeline.end(),
+                      result.getPipeline().begin(),
+                      SimpleBSONObjComparator::kInstance.makeEqualTo()));
+    ASSERT_BSONOBJ_EQ(result.getDefaultCollation(),
+                      BSON("locale"
+                           << "fil"));
+}
+
+TEST(ResolvedViewTest, ParseFromBSONFailsIfNotAnObject) {
+    BSONObj cmdResponse = BSON("resolvedView"
+                               << "ThisIsNotAnObject");
+    BSONElement elem = cmdResponse.getField("resolvedView");
+
+    ASSERT_THROWS_CODE(ResolvedView::parseFromBSON(elem), AssertionException, 936370);
+}
+
+TEST(ResolvedViewTest, ParseFromBSONFailsIfEmptyObject) {
+    BSONObj cmdResponse = BSON("resolvedView" << BSONObj());
+    BSONElement elem = cmdResponse.getField("resolvedView");
+
+    ASSERT_THROWS_CODE(ResolvedView::parseFromBSON(elem), AssertionException, 40249);
+}
+
+TEST(ResolvedViewTest, SerializeToBSONCorrectly) {
+    const ResolvedView resolvedView{backingNss,
+                                    std::vector<BSONObj>{BSON("$search" << BSON("text"
+                                                                                << "foo")),
+                                                         BSON("$match" << BSON("x" << 1))},
+                                    BSON("locale"
+                                         << "fil")};
+    BSONObjBuilder bob;
+    resolvedView.serializeToBSON("resolvedView", &bob);
+    ASSERT_BSONOBJ_EQ(bob.obj(), fromjson(R"({
+        resolvedView: {
+            ns: 'testdb.testcoll',
+            pipeline: [{$search: {text: "foo"}}, {$match: {x: 1}}],
+            collation: {locale: 'fil'}
+        }
+    })"));
+}
+
+TEST(ResolvedViewTest, IDLParserRoundtrip) {
+    BSONObj searchStage = BSON("$search" << BSON("text"
+                                                 << "foo"));
+    BSONObj matchStage = BSON("$match" << BSON("x" << 1));
+    BSONArray pipeline = BSON_ARRAY(searchStage << matchStage);
+
+    BSONObj cmdResponse = BSON("resolvedView" << BSON("ns" << backingNss.ns_forTest() << "pipeline"
+                                                           << pipeline << "collation"
+                                                           << BSON("locale"
+                                                                   << "fil")));
+    BSONElement elem = cmdResponse.getField("resolvedView");
+    const ResolvedView fromObj = ResolvedView::parseFromBSON(elem);
+
+    BSONObjBuilder toObj;
+    fromObj.serializeToBSON("resolvedView", &toObj);
+    ASSERT_BSONOBJ_EQ(toObj.obj(), fromjson(R"({
+        resolvedView: {
+            ns: 'testdb.testcoll',
+            pipeline: [{$search: {text: "foo"}}, {$match: {x: 1}}],
+            collation: {locale: 'fil'}
+        }
+    })"));
+}
 }  // namespace
 }  // namespace mongo
