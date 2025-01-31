@@ -97,6 +97,12 @@ export class ShardedMagicRestoreTest {
         this.magicRestoreTests.forEach((magicRestoreTest) => {
             magicRestoreTest.takeCheckpointAndOpenBackup();
         });
+        // It's possible the config server may not have any oplog entries after the backup
+        // checkpoint timestamp. In our PIT restore test helpers, we expect there to always be
+        // entries after the backup. To allow that constraint to hold and make our testing stronger,
+        // perform a no-op.
+        assert.commandWorked(this.configRestoreTest.rst.getPrimary().adminCommand(
+            {appendOplogNote: 1, data: {msg: "no-op"}}));
     }
 
     /**
