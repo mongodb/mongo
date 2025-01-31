@@ -137,7 +137,8 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalListCollections::doOpt
             _absorbedMatch = std::move(matchRelatedToDb);
         } else {
             // We have already absorbed a $match. We need to join it.
-            _absorbedMatch->joinMatchWith(std::move(matchRelatedToDb), "$and"_sd);
+            _absorbedMatch->joinMatchWith(std::move(matchRelatedToDb),
+                                          MatchExpression::MatchType::AND);
         }
     }
 

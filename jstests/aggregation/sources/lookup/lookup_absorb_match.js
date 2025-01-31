@@ -505,3 +505,65 @@ result = testDB.animals
 expected =
     [{_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}}];
 assert.eq(result, expected);
+
+// TEST_17: Regression test for SERVER-99121. This depends on our current behavior where we optimize
+// the pipeline twice during the lifetime of the aggregation. The first time we optimize the
+// pipeline we absorb the first $match into the $lookup (but not the second since it contains a
+// predicate on a field - 'z' - that's not prefixed by the $unwind's field). During the first
+// optimization we also recognize that the predicate on 'z' can be optimized away. This means that
+// during the second optimization we can safely absorb the second $match into the $lookup.
+result = testDB.animals
+                 .aggregate([
+                     {
+                         $lookup: {
+                             from: "locations",
+                             localField: "locationId",
+                             foreignField: "_id",
+                             as: "location"
+                         }
+                     },
+                     {$unwind: "$location"},
+                     {$match: {"location.coordinates": 25.0}},
+                     {$match: {
+                        $or: [
+                            {"location.extra.breeds": {$regex: "terrier"}},
+                            {"z": {$in: []}}
+                        ]
+                        }
+                     },
+                     {$project: {"location.extra": false, "colors": false}},
+                 ])
+                 .toArray();
+expected =
+    [{_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}}];
+assert.eq(result, expected);
+
+// TEST_18: Similar to test 17, but with more $match stages to absorb.
+result = testDB.animals
+                 .aggregate([
+                     {
+                         $lookup: {
+                             from: "locations",
+                             localField: "locationId",
+                             foreignField: "_id",
+                             as: "location"
+                         }
+                     },
+                     {$unwind: "$location"},
+                     {$match: {"location.coordinates": 25.0}},
+                     {$match: {
+                        $or: [
+                            {"location.extra.breeds": {$regex: "terrier"}},
+                            {"z": {$in: []}}
+                        ]
+                        }
+                     },
+                     {$match: {"location.anotherField": {$exists: false}}},
+                     {$match: {"location.coordinates": {$lt: 90}}},
+                     {$match: {"location._id": {$in: ["doghouse", "hello"]}}},
+                     {$project: {"location.extra": false, "colors": false}},
+                 ])
+                 .toArray();
+expected =
+    [{_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}}];
+assert.eq(result, expected);

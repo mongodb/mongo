@@ -1054,8 +1054,8 @@ Pipeline::SourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
     if (!_matchSrc) {
         _matchSrc = nextMatch;
     } else {
-        // We have already absorbed a $match. We need to join it with 'dependent'.
-        _matchSrc->joinMatchWith(nextMatch, "$and"_sd);
+        // We have already absorbed a $match. We need to join it with the next one.
+        _matchSrc->joinMatchWith(nextMatch, MatchExpression::MatchType::AND);
     }
 
     // Remove the original $match.

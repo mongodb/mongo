@@ -142,7 +142,8 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalAllCollectionStats::do
             _absorbedMatch = std::move(splitMatch.second);
         } else {
             // We have already absorbed a $match. We need to join it with splitMatch.second.
-            _absorbedMatch->joinMatchWith(std::move(splitMatch.second), "$and"_sd);
+            _absorbedMatch->joinMatchWith(std::move(splitMatch.second),
+                                          MatchExpression::MatchType::AND);
         }
     }
 

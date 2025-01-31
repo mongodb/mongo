@@ -112,7 +112,7 @@ void DocumentSourceMatch::rebuild(BSONObj predicate) {
 
 void DocumentSourceMatch::rebuild(BSONObj predicate, std::unique_ptr<MatchExpression> expr) {
     invariant(predicate.isOwned());
-    _predicate = std::move(predicate);
+    _backingBsonForPredicate = std::move(predicate);
     _isTextQuery = containsTextOperator(*expr);
     DepsTracker dependencies =
         DepsTracker(_isTextQuery ? DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore
@@ -185,7 +185,7 @@ Pipeline::SourceContainer::iterator DocumentSourceMatch::doOptimizeAt(
         invariant(!nextMatch->_isTextQuery);
 
         // Merge 'nextMatch' into this stage.
-        joinMatchWith(nextMatch, "$and"_sd);
+        joinMatchWith(nextMatch, MatchExpression::MatchType::AND);
 
         // Erase 'nextMatch'.
         container->erase(std::next(itr));
@@ -433,39 +433,49 @@ bool DocumentSourceMatch::isTextQuery(const BSONObj& query) {
 }
 
 void DocumentSourceMatch::joinMatchWith(intrusive_ptr<DocumentSourceMatch> other,
-                                        StringData joinPred) {
-    invariant(joinPred == "$and"_sd || joinPred == "$or"_sd,
-              str::stream() << "joinPred must be '$and' or '$or', was " << joinPred);
+                                        MatchExpression::MatchType joinPred) {
+    tassert(9912100,
+            "joinPred must be MatchExpression::MatchType::AND or MatchExpression::MatchType::OR",
+            joinPred == MatchExpression::MatchType::AND ||
+                joinPred == MatchExpression::MatchType::OR);
+    std::unique_ptr<ListOfMatchExpression> combinedME;
+    if (joinPred == MatchExpression::MatchType::AND) {
+        combinedME = std::make_unique<AndMatchExpression>();
+    } else {
+        combinedME = std::make_unique<OrMatchExpression>();
+    }
 
-    BSONObjBuilder bob;
-    BSONArrayBuilder arrBob(bob.subarrayStart(joinPred));
+    auto addPredicates = [&](std::unique_ptr<MatchExpression> matchExpr) {
+        const MatchExpression::MatchType type = matchExpr->matchType();
 
-    auto addPredicates = [&](const auto& predicates) {
-        if (predicates.isEmpty()) {
-            arrBob.append(predicates);
-        }
+        // If the top level MatchExpression has no children (e.g. {} or {a: 1}) or its MatchType
+        // doesn't match 'joinPred', just add it as a child to the new list of predicates.
+        if (matchExpr->numChildren() == 0 || type != joinPred) {
+            combinedME->add(std::move(matchExpr));
+        } else {
+            for (size_t i = 0; i < matchExpr->numChildren(); i++) {
+                const auto child = matchExpr->getChild(i);
 
-        for (auto&& pred : predicates) {
-            // For 'joinPred' == $and: If 'pred' is an $and, add its children directly to the new
-            // top-level $and to avoid nesting $and's. For 'joinPred' == $or: If 'pred' is a $or,
-            // add its children directly to the new top-level $or to avoid nesting $or's. Otherwise,
-            // add 'pred' itself as a child.
-            if (pred.fieldNameStringData() == joinPred) {
-                for (auto& child : pred.Array()) {
-                    arrBob.append(child);
+                // For 'joinPred' == AND: If 'child' is an AndMatchExpression, add its
+                // children directly to the new top-level $and to avoid nesting $and's. For
+                // 'joinPred' == OR: If 'child' is a OrMatchExpression, add its children
+                // directly to the new top-level $or to avoid nesting $or's. Otherwise, add
+                // 'child' itself.
+                if (child->numChildren() == 0 || child->matchType() != joinPred) {
+                    combinedME->add(child->clone());
+                } else {
+                    for (size_t j = 0; j < child->numChildren(); j++) {
+                        combinedME->add(child->getChild(j)->clone());
+                    }
                 }
-            } else {
-                BSONObjBuilder childBob(arrBob.subobjStart());
-                childBob.append(pred);
             }
         }
     };
 
-    addPredicates(_predicate);
-    addPredicates(other->_predicate);
+    addPredicates(std::move(std::move(_matchProcessor->getExpression())));
+    addPredicates(std::move(std::move(other->_matchProcessor->getExpression())));
 
-    arrBob.doneFast();
-    rebuild(bob.obj());
+    rebuild(combinedME->serialize());
 }
 
 pair<intrusive_ptr<DocumentSourceMatch>, intrusive_ptr<DocumentSourceMatch>>
@@ -519,37 +529,39 @@ DocumentSourceMatch::splitSourceByFunc(const OrderedPathSet& fields,
 }
 
 boost::intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::descendMatchOnPath(
-    MatchExpression* matchExpr,
+    const MatchExpression* matchExpr,
     const std::string& descendOn,
     const intrusive_ptr<ExpressionContext>& expCtx) {
-    expression::mapOver(matchExpr, [&descendOn](MatchExpression* node, std::string path) -> void {
-        // Cannot call this method on a $match including a $elemMatch.
-        tassert(9224700,
-                "The given match expression has a node that represents a partial path.",
-                !MatchExpression::isInternalNodeWithPath(node->matchType()));
-        // Only leaf and array match expressions have a path.
-        if (node->getCategory() != MatchExpression::MatchCategory::kLeaf &&
-            node->getCategory() != MatchExpression::MatchCategory::kArrayMatching) {
-            return;
-        }
+    std::unique_ptr<MatchExpression> meCopy = matchExpr->clone();
+    expression::mapOver(
+        meCopy.get(), [&descendOn](MatchExpression* node, std::string path) -> void {
+            // Cannot call this method on a $match including a $elemMatch.
+            tassert(9224700,
+                    "The given match expression has a node that represents a partial path.",
+                    !MatchExpression::isInternalNodeWithPath(node->matchType()));
+            // Only leaf and array match expressions have a path.
+            if (node->getCategory() != MatchExpression::MatchCategory::kLeaf &&
+                node->getCategory() != MatchExpression::MatchCategory::kArrayMatching) {
+                return;
+            }
 
-        auto leafPath = node->path();
-        tassert(9224701,
-                str::stream() << "Expected '" << redact(descendOn) << "' to be a prefix of '"
-                              << redact(leafPath) << "', but it is not.",
-                expression::isPathPrefixOf(descendOn, leafPath));
+            auto leafPath = node->path();
+            tassert(9224701,
+                    str::stream() << "Expected '" << redact(descendOn) << "' to be a prefix of '"
+                                  << redact(leafPath) << "', but it is not.",
+                    expression::isPathPrefixOf(descendOn, leafPath));
 
-        auto newPath = leafPath.substr(descendOn.size() + 1);
-        if (node->getCategory() == MatchExpression::MatchCategory::kLeaf) {
-            auto leafNode = static_cast<LeafMatchExpression*>(node);
-            leafNode->setPath(newPath);
-        } else if (node->getCategory() == MatchExpression::MatchCategory::kArrayMatching) {
-            auto arrayNode = static_cast<ArrayMatchingMatchExpression*>(node);
-            arrayNode->setPath(newPath);
-        }
-    });
+            auto newPath = leafPath.substr(descendOn.size() + 1);
+            if (node->getCategory() == MatchExpression::MatchCategory::kLeaf) {
+                auto leafNode = static_cast<LeafMatchExpression*>(node);
+                leafNode->setPath(newPath);
+            } else if (node->getCategory() == MatchExpression::MatchCategory::kArrayMatching) {
+                auto arrayNode = static_cast<ArrayMatchingMatchExpression*>(node);
+                arrayNode->setPath(newPath);
+            }
+        });
 
-    return new DocumentSourceMatch(matchExpr->serialize(), expCtx);
+    return new DocumentSourceMatch(meCopy->serialize(), expCtx);
 }
 
 std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
@@ -602,7 +614,7 @@ bool DocumentSourceMatch::hasQuery() const {
 }
 
 BSONObj DocumentSourceMatch::getQuery() const {
-    return _predicate;
+    return _backingBsonForPredicate;
 }
 
 DepsTracker::State DocumentSourceMatch::getDependencies(DepsTracker* deps) const {

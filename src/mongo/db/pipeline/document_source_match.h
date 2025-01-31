@@ -94,7 +94,7 @@ public:
      * 'path', for example: {'path': {$elemMatch: {'subfield': 3}}}
      */
     static boost::intrusive_ptr<DocumentSourceMatch> descendMatchOnPath(
-        MatchExpression* matchExpr,
+        const MatchExpression* matchExpr,
         const std::string& path,
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
@@ -170,10 +170,12 @@ public:
 
     /**
      * Combines the filter in this $match with the filter of 'other' using a specified join
-     * predicate, updating this match in place. Currently, the join predicate can be "$and" or
-     * "$or".
+     * predicate, updating this match in place. This uses the stages' 'MatchExpression's, as those
+     * are kept up to date during any optimizations. Currently, the join predicate can only be
+     * either 'MatchExpression::MatchType::AND' or 'MatchExpression::MatchType::OR'.
      */
-    void joinMatchWith(boost::intrusive_ptr<DocumentSourceMatch> other, StringData joinPred);
+    void joinMatchWith(boost::intrusive_ptr<DocumentSourceMatch> other,
+                       MatchExpression::MatchType joinPred);
 
 
     bool hasQuery() const override;
@@ -243,7 +245,7 @@ protected:
     GetNextResult doGetNext() override;
 
     const BSONObj& getPredicate() const {
-        return _predicate;
+        return _backingBsonForPredicate;
     }
 
 private:
@@ -256,7 +258,10 @@ private:
                       const StringMap<std::string>& renames,
                       expression::ShouldSplitExprFunc func) &&;
 
-    BSONObj _predicate;
+    // The original BSON that this DocumentSourceMatch was built with (note that a call to 'rebuild'
+    // changes this). This value does NOT change during optimization of this $match stage, only the
+    // MatchExpression stored in the '_matchProcessor' does.
+    BSONObj _backingBsonForPredicate;
     bool _isTextQuery{false};
     boost::optional<MatchProcessor> _matchProcessor;
     SbeCompatibility _sbeCompatibility{SbeCompatibility::notCompatible};
