@@ -2241,6 +2241,27 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads) {
     }
 }
 
+TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads_EmptySubstringSuffixPrefixSets) {
+    // test all of substring+suffix+prefix token sets empty
+    auto doc = BSON("sample"
+                    << "ssssssssss");
+    EDCServerPayloadInfo payload;
+    auto& iupayload = payload.payload = generateTestIUPV2ForTextSearch(doc.firstElement());
+    payload.counts = std::vector<uint64_t>(1);
+
+    std::vector<PrfBlock> tags = EDCServerCollection::generateTagsForTextSearch(payload);
+    ASSERT_EQ(tags.size(), 1);
+
+    auto serverPayload =
+        FLE2IndexedTextEncryptedValue::fromUnencrypted(iupayload, tags, payload.counts);
+    auto buf = uassertStatusOK(serverPayload.serialize());
+    FLE2IndexedTextEncryptedValue parsed(buf);
+    ASSERT_EQ(parsed.getTagCount(), 1);
+    ASSERT_EQ(parsed.getSubstringTagCount(), 0);
+    ASSERT_EQ(parsed.getSuffixTagCount(), 0);
+    ASSERT_EQ(parsed.getPrefixTagCount(), 0);
+}
+
 TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads_InvalidArgs) {
     auto doc = BSON("sample"
                     << "ssssssssss");
@@ -2272,17 +2293,6 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads_InvalidArgs) {
             DBException,
             9784107);
         payload.counts.pop_back();
-    }
-
-    // test all of substring+suffix+prefix token sets empty
-    {
-        auto tmpSets = iupayload.getTextSearchTokenSets()->getSubstringTokenSets();
-        iupayload.getTextSearchTokenSets()->setSubstringTokenSets({});
-        ASSERT_THROWS_CODE(
-            FLE2IndexedTextEncryptedValue::fromUnencrypted(iupayload, tags, payload.counts),
-            DBException,
-            9784112);
-        iupayload.getTextSearchTokenSets()->setSubstringTokenSets(std::move(tmpSets));
     }
 
     // test tags vector has wrong size

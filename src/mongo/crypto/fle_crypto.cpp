@@ -3475,10 +3475,6 @@ FLE2IndexedTextEncryptedValue FLE2IndexedTextEncryptedValue::fromUnencrypted(
     uint8_t totalTagCount = 1 + substrTagCount + suffixTagCount +
         static_cast<uint8_t>(tsts.getPrefixTokenSets().size());
 
-    uassert(9784112,
-            "InsertUpdatePayload for text search must have at least one substring, suffix, or "
-            "prefix token set",
-            totalTagCount > 1);
     uassert(9784113,
             "FLE2IndexedTextEncryptedValueV2 tags length must equal the total number of text "
             "search token sets",
