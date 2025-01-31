@@ -2192,7 +2192,7 @@ Value ExpressionInternalRawSortKey::serialize(const SerializationOptions& option
 }
 
 Value ExpressionInternalRawSortKey::evaluate(const Document& root, Variables* variables) const {
-    return root.metadata().getSortKey();
+    return exec::expression::evaluate(*this, root, variables);
 }
 
 /* ----------------------- ExpressionMod ---------------------------- */
