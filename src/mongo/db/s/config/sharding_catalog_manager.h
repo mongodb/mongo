@@ -58,6 +58,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/s/remove_shard_draining_progress_gen.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_cache.h"
@@ -111,38 +112,20 @@ StatusWith<boost::optional<ShardType>> checkIfShardExists(
     const boost::optional<StringData>& proposedShardName,
     ShardingCatalogClient& localCatalogClient);
 
+/**
+ * Given the shard draining state, returns the message that should be included as part of the remove
+ * shard response.
+ */
+std::string getRemoveShardMessage(const ShardDrainingStateEnum& status);
+
 }  // namespace topology_change_helpers
 
-struct RemoveShardProgress {
-    /**
-     * Used to indicate to the caller of the removeShard method whether draining of chunks for
-     * a particular shard has started, is ongoing, or has been completed. When removing a catalog
-     * shard, there is a new state when waiting for range deletions of all moved away chunks and any
-     * in progress drops of user collections. Removing other shards will skip this state.
-     */
-    enum DrainingShardStatus {
-        STARTED,
-        ONGOING,
-        PENDING_DATA_CLEANUP,
-        COMPLETED,
-    };
-
-    /**
-     * Used to indicate to the caller of the removeShard method the remaining amount of chunks,
-     * jumbo chunks and databases within the shard
-     */
-    struct DrainingShardUsage {
-        long long totalChunks;
-        long long shardedChunks;
-        long long totalCollections;
-        long long databases;
-        long long jumboChunks;
-    };
-
-    DrainingShardStatus status;
-    boost::optional<DrainingShardUsage> remainingCounts;
-    boost::optional<long long> pendingRangeDeletions;
-    boost::optional<NamespaceString> firstNonEmptyCollection;
+struct DrainingShardUsage {
+    RemainingCounts removeShardCounts;
+    // This is a failsafe check to be sure we do not accidentally remove a shard which has chunks
+    // left, sharded or otherwise. It is not reported to the user and thus not included in
+    // RemainingCounts.
+    long long totalChunks;
 };
 
 /**
@@ -644,6 +627,14 @@ public:
                                    BSONObjBuilder& result,
                                    RemoveShardProgress shardDrainingStatus,
                                    ShardId shardId);
+
+    /**
+     * Appends db and coll information on the status of shard draining to the passed in result
+     * BSONObjBuilder
+     */
+    void appendDBAndCollDrainingInfo(OperationContext* opCtx,
+                                     BSONObjBuilder& result,
+                                     ShardId shardId);
 
     /**
      * Only used for unit-tests, clears a previously-created catalog manager from the specified

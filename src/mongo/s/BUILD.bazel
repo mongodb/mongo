@@ -68,14 +68,6 @@ idl_generator(
     ],
 )
 
-idl_generator(
-    name = "remove_shard_gen",
-    src = "remove_shard.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-    ],
-)
-
 mongo_cc_library(
     name = "sharding_helpers",
     srcs = [
@@ -464,7 +456,6 @@ mongo_cc_library(
         "error_status_gen",
         "mongod_and_mongos_server_parameters_gen",
         "refresh_query_analyzer_configuration_cmd_gen",
-        "remove_shard_gen",
         "shard_cannot_refresh_due_to_locks_held_exception.cpp",
         "shard_key_pattern.cpp",
         "shard_version_factory.cpp",
@@ -559,6 +550,7 @@ mongo_cc_library(
         "//src/mongo/db:index_commands_idl",
         "//src/mongo/db:metadata_consistency_types_idl",
         "//src/mongo/db:mongohasher",
+        "//src/mongo/db/s:remove_shard_draining_progress_idl",
         "//src/mongo/rpc:command_status",
         "//src/mongo/db:server_feature_flags",
         ":add_shard_idl",

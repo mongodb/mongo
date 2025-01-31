@@ -34,6 +34,7 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/s/sharding_types.idl"
+    - "mongo/db/s/remove_shard_draining_progress.idl"
 
 structs:
     RemoveShardRequestBase:
@@ -47,6 +48,34 @@ structs:
                 optional: true
                 validator:
                     callback: "ShardId::validate"
+
+    RemoveShardResponse:
+        description: "Response of the removeShard command."
+        strict: false
+        is_command_reply: true
+        chained_structs:
+            RemoveShardProgress: removeShardDrainingProgress
+        inline_chained_structs: true
+        fields:
+            msg:
+                type: string
+                description: "Message describing shard draining status."
+            shard:
+                type: string
+                description: "The ID of the shard being removed."
+                optional: true
+            dbsToMove:
+                type: array<string>
+                description: "Remaining databases left to move."
+                optional: true
+            note:
+                type: string
+                description: "Additional notes."
+                optional: true
+            collectionsToMove:
+                type: array<string>
+                description: "Remaining unsharded collections left to move."
+                optional: true
 
 commands:
     removeShard:

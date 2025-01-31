@@ -31,7 +31,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/s/remove_shard.idl"
+    - "mongo/s/request_types/remove_shard.idl"
             
 commands:
     transitionToDedicatedConfigServer:

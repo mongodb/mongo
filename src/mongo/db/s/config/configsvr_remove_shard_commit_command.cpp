@@ -28,7 +28,7 @@
  */
 
 #include "mongo/db/s/remove_shard_commit_coordinator.h"
-#include "mongo/s/remove_shard_gen.h"
+#include "mongo/db/s/remove_shard_draining_progress_gen.h"
 #include "mongo/s/request_types/remove_shard_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 
@@ -92,18 +92,26 @@ public:
             const auto& drainingStatus = [&]() -> RemoveShardProgress {
                 try {
                     auto drainingStatus = removeShardCommitCoordinator->getResult(opCtx);
+                    return drainingStatus;
                 } catch (const ExceptionFor<ErrorCodes::ChunkRangeCleanupPending>&) {
-                    return {RemoveShardProgress::PENDING_DATA_CLEANUP,
-                            boost::none,
-                            topology_change_helpers::getRangeDeletionCount(opCtx)};
+                    RemoveShardProgress progress(ShardDrainingStateEnum::kPendingDataCleanup);
+                    progress.setPendingRangeDeletions(
+                        topology_change_helpers::getRangeDeletionCount(opCtx));
+                    return progress;
                 }
-                return {RemoveShardProgress::COMPLETED,
-                        boost::optional<RemoveShardProgress::DrainingShardUsage>(boost::none)};
             }();
 
-            BSONObjBuilder result;
-            ShardingCatalogManager::get(opCtx)->appendShardDrainingStatus(
-                opCtx, result, drainingStatus, shardId);
+            RemoveShardResponse response(
+                topology_change_helpers::getRemoveShardMessage(drainingStatus.getState()));
+            response.setRemoveShardDrainingProgress(drainingStatus);
+            response.setShard(StringData(shardId));
+
+            // We need to manually create the bson for the dbs and collections to move because we
+            // may need to truncate the list for it to serialize as a bson.
+            BSONObj responseObj = response.toBSON();
+            BSONObjBuilder result(responseObj);
+
+            ShardingCatalogManager::get(opCtx)->appendDBAndCollDrainingInfo(opCtx, result, shardId);
 
             return Response::parse(IDLParserContext("ConfigsvrRemoveShardCommitCommand"),
                                    result.obj());
@@ -133,8 +141,7 @@ public:
     }
 
     std::string help() const override {
-        return "Test command to allow calling the RemoveShardCommitCoordinator while it is "
-               "under "
+        return "Test command to allow calling the RemoveShardCommitCoordinator while it is under "
                "development.";
     }
 

@@ -186,14 +186,14 @@ TEST_F(RemoveShardTest, RemoveShardAnotherShardDraining) {
 
     auto result = ShardingCatalogManager::get(operationContext())
                       ->removeShard(operationContext(), shard1.getName());
-    ASSERT_EQUALS(RemoveShardProgress::STARTED, result.status);
-    ASSERT_EQUALS(false, result.remainingCounts.has_value());
+    ASSERT_EQUALS(ShardDrainingStateEnum::kStarted, result.getState());
+    ASSERT_EQUALS(false, result.getRemaining().has_value());
     ASSERT_TRUE(isDraining(shard1.getName()));
 
     auto result2 = ShardingCatalogManager::get(operationContext())
                        ->removeShard(operationContext(), shard2.getName());
-    ASSERT_EQUALS(RemoveShardProgress::STARTED, result2.status);
-    ASSERT_EQUALS(false, result2.remainingCounts.has_value());
+    ASSERT_EQUALS(ShardDrainingStateEnum::kStarted, result2.getState());
+    ASSERT_EQUALS(false, result2.getRemaining().has_value());
     ASSERT_TRUE(isDraining(shard2.getName()));
 }
 
@@ -228,8 +228,8 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
 
     auto result = ShardingCatalogManager::get(operationContext())
                       ->removeShard(operationContext(), shard1.getName());
-    ASSERT_EQUALS(RemoveShardProgress::STARTED, result.status);
-    ASSERT_EQUALS(false, result.remainingCounts.has_value());
+    ASSERT_EQUALS(ShardDrainingStateEnum::kStarted, result.getState());
+    ASSERT_EQUALS(false, result.getRemaining().has_value());
     ASSERT_TRUE(isDraining(shard1.getName()));
 }
 
@@ -272,18 +272,18 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemaining) {
 
     auto startedResult = ShardingCatalogManager::get(operationContext())
                              ->removeShard(operationContext(), shard1.getName());
-    ASSERT_EQUALS(RemoveShardProgress::STARTED, startedResult.status);
-    ASSERT_EQUALS(false, startedResult.remainingCounts.has_value());
+    ASSERT_EQUALS(ShardDrainingStateEnum::kStarted, startedResult.getState());
+    ASSERT_EQUALS(false, startedResult.getRemaining().has_value());
     ASSERT_TRUE(isDraining(shard1.getName()));
 
     auto ongoingResult = ShardingCatalogManager::get(operationContext())
                              ->removeShard(operationContext(), shard1.getName());
-    ASSERT_EQUALS(RemoveShardProgress::ONGOING, ongoingResult.status);
-    ASSERT_EQUALS(true, ongoingResult.remainingCounts.has_value());
-    ASSERT_EQUALS(3, ongoingResult.remainingCounts->totalChunks);
-    ASSERT_EQUALS(0, ongoingResult.remainingCounts->totalCollections);
-    ASSERT_EQUALS(1, ongoingResult.remainingCounts->jumboChunks);
-    ASSERT_EQUALS(1, ongoingResult.remainingCounts->databases);
+    ASSERT_EQUALS(ShardDrainingStateEnum::kOngoing, ongoingResult.getState());
+    ASSERT_EQUALS(true, ongoingResult.getRemaining().has_value());
+    ASSERT_EQUALS(3, ongoingResult.getRemaining()->getChunks());
+    ASSERT_EQUALS(0, ongoingResult.getRemaining()->getCollectionsToMove());
+    ASSERT_EQUALS(1, ongoingResult.getRemaining()->getJumboChunks());
+    ASSERT_EQUALS(1, ongoingResult.getRemaining()->getDbs());
     ASSERT_TRUE(isDraining(shard1.getName()));
 }
 
@@ -305,18 +305,18 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingDatabasesRemaining) {
 
     auto startedResult = ShardingCatalogManager::get(operationContext())
                              ->removeShard(operationContext(), shard1.getName());
-    ASSERT_EQUALS(RemoveShardProgress::STARTED, startedResult.status);
-    ASSERT_EQUALS(false, startedResult.remainingCounts.has_value());
+    ASSERT_EQUALS(ShardDrainingStateEnum::kStarted, startedResult.getState());
+    ASSERT_EQUALS(false, startedResult.getRemaining().has_value());
     ASSERT_TRUE(isDraining(shard1.getName()));
 
     auto ongoingResult = ShardingCatalogManager::get(operationContext())
                              ->removeShard(operationContext(), shard1.getName());
-    ASSERT_EQUALS(RemoveShardProgress::ONGOING, ongoingResult.status);
-    ASSERT_EQUALS(true, ongoingResult.remainingCounts.has_value());
-    ASSERT_EQUALS(0, ongoingResult.remainingCounts->totalChunks);
-    ASSERT_EQUALS(0, ongoingResult.remainingCounts->totalCollections);
-    ASSERT_EQUALS(0, ongoingResult.remainingCounts->jumboChunks);
-    ASSERT_EQUALS(1, ongoingResult.remainingCounts->databases);
+    ASSERT_EQUALS(ShardDrainingStateEnum::kOngoing, ongoingResult.getState());
+    ASSERT_EQUALS(true, ongoingResult.getRemaining().has_value());
+    ASSERT_EQUALS(0, ongoingResult.getRemaining()->getChunks());
+    ASSERT_EQUALS(0, ongoingResult.getRemaining()->getCollectionsToMove());
+    ASSERT_EQUALS(0, ongoingResult.getRemaining()->getJumboChunks());
+    ASSERT_EQUALS(1, ongoingResult.getRemaining()->getDbs());
     ASSERT_TRUE(isDraining(shard1.getName()));
 }
 
@@ -359,18 +359,18 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
 
     auto startedResult = ShardingCatalogManager::get(operationContext())
                              ->removeShard(operationContext(), shard1.getName());
-    ASSERT_EQUALS(RemoveShardProgress::STARTED, startedResult.status);
-    ASSERT_EQUALS(false, startedResult.remainingCounts.has_value());
+    ASSERT_EQUALS(ShardDrainingStateEnum::kStarted, startedResult.getState());
+    ASSERT_EQUALS(false, startedResult.getRemaining().has_value());
     ASSERT_TRUE(isDraining(shard1.getName()));
 
     auto ongoingResult = ShardingCatalogManager::get(operationContext())
                              ->removeShard(operationContext(), shard1.getName());
-    ASSERT_EQUALS(RemoveShardProgress::ONGOING, ongoingResult.status);
-    ASSERT_EQUALS(true, ongoingResult.remainingCounts.has_value());
-    ASSERT_EQUALS(3, ongoingResult.remainingCounts->totalChunks);
-    ASSERT_EQUALS(0, ongoingResult.remainingCounts->totalCollections);
-    ASSERT_EQUALS(0, ongoingResult.remainingCounts->jumboChunks);
-    ASSERT_EQUALS(0, ongoingResult.remainingCounts->databases);
+    ASSERT_EQUALS(ShardDrainingStateEnum::kOngoing, ongoingResult.getState());
+    ASSERT_EQUALS(true, ongoingResult.getRemaining().has_value());
+    ASSERT_EQUALS(3, ongoingResult.getRemaining()->getChunks());
+    ASSERT_EQUALS(0, ongoingResult.getRemaining()->getCollectionsToMove());
+    ASSERT_EQUALS(0, ongoingResult.getRemaining()->getJumboChunks());
+    ASSERT_EQUALS(0, ongoingResult.getRemaining()->getDbs());
     ASSERT_TRUE(isDraining(shard1.getName()));
 
     // Mock the operation during which the chunks are moved to the other shard.
@@ -384,8 +384,8 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
 
     auto completedResult = ShardingCatalogManager::get(operationContext())
                                ->removeShard(operationContext(), shard1.getName());
-    ASSERT_EQUALS(RemoveShardProgress::COMPLETED, completedResult.status);
-    ASSERT_EQUALS(false, startedResult.remainingCounts.has_value());
+    ASSERT_EQUALS(ShardDrainingStateEnum::kCompleted, completedResult.getState());
+    ASSERT_EQUALS(false, startedResult.getRemaining().has_value());
 
     // Now make sure that the shard no longer exists on config.
     auto response = assertGet(shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
@@ -445,18 +445,18 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemainingMaxBSONSize) {
 
     auto startedResult = ShardingCatalogManager::get(operationContext())
                              ->removeShard(operationContext(), shard1.getName());
-    ASSERT_EQUALS(RemoveShardProgress::STARTED, startedResult.status);
-    ASSERT_EQUALS(false, startedResult.remainingCounts.has_value());
+    ASSERT_EQUALS(ShardDrainingStateEnum::kStarted, startedResult.getState());
+    ASSERT_EQUALS(false, startedResult.getRemaining().has_value());
     ASSERT_TRUE(isDraining(shard1.getName()));
 
     auto ongoingResult = ShardingCatalogManager::get(operationContext())
                              ->removeShard(operationContext(), shard1.getName());
-    ASSERT_EQUALS(RemoveShardProgress::ONGOING, ongoingResult.status);
-    ASSERT_EQUALS(true, ongoingResult.remainingCounts.has_value());
-    ASSERT_EQUALS(3, ongoingResult.remainingCounts->totalChunks);
-    ASSERT_EQUALS(0, ongoingResult.remainingCounts->totalCollections);
-    ASSERT_EQUALS(1, ongoingResult.remainingCounts->jumboChunks);
-    ASSERT_EQUALS(100, ongoingResult.remainingCounts->databases);
+    ASSERT_EQUALS(ShardDrainingStateEnum::kOngoing, ongoingResult.getState());
+    ASSERT_EQUALS(true, ongoingResult.getRemaining().has_value());
+    ASSERT_EQUALS(3, ongoingResult.getRemaining()->getChunks());
+    ASSERT_EQUALS(0, ongoingResult.getRemaining()->getCollectionsToMove());
+    ASSERT_EQUALS(1, ongoingResult.getRemaining()->getJumboChunks());
+    ASSERT_EQUALS(100, ongoingResult.getRemaining()->getDbs());
     ASSERT_TRUE(isDraining(shard1.getName()));
 
     BSONObjBuilder result;
@@ -474,12 +474,12 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemainingMaxBSONSize) {
 
     ongoingResult = ShardingCatalogManager::get(operationContext())
                         ->removeShard(operationContext(), shard1.getName());
-    ASSERT_EQUALS(RemoveShardProgress::ONGOING, ongoingResult.status);
-    ASSERT_EQUALS(true, ongoingResult.remainingCounts.has_value());
-    ASSERT_EQUALS(3, ongoingResult.remainingCounts->totalChunks);
-    ASSERT_EQUALS(0, ongoingResult.remainingCounts->totalCollections);
-    ASSERT_EQUALS(1, ongoingResult.remainingCounts->jumboChunks);
-    ASSERT_EQUALS(200, ongoingResult.remainingCounts->databases);
+    ASSERT_EQUALS(ShardDrainingStateEnum::kOngoing, ongoingResult.getState());
+    ASSERT_EQUALS(true, ongoingResult.getRemaining().has_value());
+    ASSERT_EQUALS(3, ongoingResult.getRemaining()->getChunks());
+    ASSERT_EQUALS(0, ongoingResult.getRemaining()->getCollectionsToMove());
+    ASSERT_EQUALS(1, ongoingResult.getRemaining()->getJumboChunks());
+    ASSERT_EQUALS(200, ongoingResult.getRemaining()->getDbs());
     ASSERT_TRUE(isDraining(shard1.getName()));
 
     BSONObjBuilder resultTruncated;

@@ -60,25 +60,13 @@ structs:
                 description: "Number of jumbo chunks remaining on the shard being removed."
                 type: long
 
-    RemoveShardResponse:
-        description: "Response of the removeShard command."
+    RemoveShardProgress:
+        description: "Remove shard draining progress"
         strict: false
-        is_command_reply: true
         fields:
-            msg:
-                type: string
-                description: "Message describing shard draining status."
             state:
                 type: ShardDrainingState
                 description: "State of shard draining on the shard being removed."
-            shard:
-                type: string
-                description: "The ID of the shard being removed."
-                optional: true
-            dbsToMove:
-                type: array<string>
-                description: "Remaining databases left to move."
-                optional: true
             remaining:
                 type: RemainingCounts
                 description: "Number of chunks, unsharded collections, dbs, and jumbo chunks remaining on the shard being removed."
@@ -90,12 +78,4 @@ structs:
             firstNonEmptyCollection:
                 type: namespacestring
                 description: "First non empty collection found on the shard being removed."
-                optional: true
-            note:
-                type: string
-                description: "Additional notes."
-                optional: true
-            collectionsToMove:
-                type: array<string>
-                description: "Remaining unsharded collections left to move."
-                optional: true
+                optional: true     

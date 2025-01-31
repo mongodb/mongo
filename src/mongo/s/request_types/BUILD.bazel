@@ -243,6 +243,7 @@ idl_generator(
     src = "remove_shard.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/s:remove_shard_draining_progress_gen",
         "//src/mongo/idl:generic_argument_gen",
         "//src/mongo/s:sharding_types_gen",
     ],
@@ -311,9 +312,9 @@ idl_generator(
     name = "transition_to_dedicated_config_server_gen",
     src = "transition_to_dedicated_config_server.idl",
     deps = [
+        ":remove_shard_gen",
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/idl:generic_argument_gen",
-        "//src/mongo/s:remove_shard_gen",
     ],
 )
 

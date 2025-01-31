@@ -103,6 +103,7 @@
 #include "mongo/db/s/add_shard_util.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/s/remove_shard_draining_progress_gen.h"
 #include "mongo/db/s/replica_set_endpoint_feature_flag.h"
 #include "mongo/db/s/sharding_config_server_parameters_gen.h"
 #include "mongo/db/s/sharding_ddl_util.h"
@@ -143,7 +144,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/remove_shard_gen.h"
 #include "mongo/s/request_types/add_shard_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/request_types/shardsvr_join_ddl_coordinators_request_gen.h"
@@ -682,6 +682,21 @@ StatusWith<boost::optional<ShardType>> checkIfShardExists(
     }
 
     return {boost::none};
+}
+
+std::string getRemoveShardMessage(const ShardDrainingStateEnum& status) {
+    switch (status) {
+        case ShardDrainingStateEnum::kStarted:
+            return "draining started successfully";
+        case ShardDrainingStateEnum::kOngoing:
+            return "draining ongoing";
+        case ShardDrainingStateEnum::kPendingDataCleanup:
+            return "waiting for data to be cleaned up";
+        case ShardDrainingStateEnum::kCompleted:
+            return "removeshard completed successfully";
+        default:
+            MONGO_UNREACHABLE;
+    }
 }
 
 }  // namespace topology_change_helpers
@@ -1560,8 +1575,10 @@ boost::optional<RemoveShardProgress> checkCollectionsAreEmpty(
 
         if (!autoColl->isEmpty(opCtx)) {
             LOGV2(9022300, "removeShard: found non-empty local collection", logAttrs(nss));
-            RemoveShardProgress progress{
-                RemoveShardProgress::PENDING_DATA_CLEANUP, boost::none, 0, nss};
+            RemoveShardProgress progress(ShardDrainingStateEnum::kPendingDataCleanup);
+            progress.setFirstNonEmptyCollection(nss);
+            progress.setPendingRangeDeletions(
+                0);  // Set this to 0 so that it is serialized in the response
             return {progress};
         }
     }
@@ -1662,8 +1679,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                        ShardingCatalogClient::kLocalWriteConcern),
                                    "error starting removeShard");
 
-        return {RemoveShardProgress::STARTED,
-                boost::optional<RemoveShardProgress::DrainingShardUsage>(boost::none)};
+        return {ShardDrainingStateEnum::kStarted};
     }
 
     shardMembershipLock.unlock();
@@ -1673,7 +1689,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
 
     // Draining has already started, now figure out how many chunks and databases are still on the
     // shard.
-    const auto getDrainingProgress = [&]() -> RemoveShardProgress::DrainingShardUsage {
+    const auto getDrainingProgress = [&]() -> DrainingShardUsage {
         const auto totalChunkCount = uassertStatusOK(_runCountCommandOnConfig(
             opCtx, NamespaceString::kConfigsvrChunksNamespace, BSON(ChunkType::shard(shardName))));
 
@@ -1693,11 +1709,9 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                      NamespaceString::kConfigsvrChunksNamespace,
                                      BSON(ChunkType::shard(shardName) << ChunkType::jumbo(true))));
 
-        return {totalChunkCount,
-                shardedChunkCount,
-                unshardedCollectionsCount,
-                databaseCount,
-                jumboCount};
+        return {RemainingCounts(
+                    shardedChunkCount, unshardedCollectionsCount, databaseCount, jumboCount),
+                totalChunkCount};
     };
 
     auto drainingProgress = getDrainingProgress();
@@ -1707,18 +1721,21 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // shard is not removed. For example the number of unsharded collections might be inaccurate due
     // to $listClusterCatalog potentially returning an incorrect list of shards during concurrent
     // DDL operations.
-    if (drainingProgress.totalChunks > 0 || drainingProgress.shardedChunks > 0 ||
-        drainingProgress.totalCollections > 0 || drainingProgress.databases > 0) {
+    if (drainingProgress.removeShardCounts.getChunks() > 0 ||
+        drainingProgress.removeShardCounts.getCollectionsToMove() > 0 ||
+        drainingProgress.removeShardCounts.getDbs() > 0 || drainingProgress.totalChunks > 0) {
         // Still more draining to do
         LOGV2(21946,
               "removeShard: draining",
               "chunkCount"_attr = drainingProgress.totalChunks,
-              "shardedChunkCount"_attr = drainingProgress.shardedChunks,
-              "unshardedCollectionsCount"_attr = drainingProgress.totalCollections,
-              "databaseCount"_attr = drainingProgress.databases,
-              "jumboCount"_attr = drainingProgress.jumboChunks);
-
-        return {RemoveShardProgress::ONGOING, drainingProgress, boost::none};
+              "shardedChunkCount"_attr = drainingProgress.removeShardCounts.getChunks(),
+              "unshardedCollectionsCount"_attr =
+                  drainingProgress.removeShardCounts.getCollectionsToMove(),
+              "databaseCount"_attr = drainingProgress.removeShardCounts.getDbs(),
+              "jumboCount"_attr = drainingProgress.removeShardCounts.getJumboChunks());
+        RemoveShardProgress progress(ShardDrainingStateEnum::kOngoing);
+        progress.setRemaining(drainingProgress.removeShardCounts);
+        return progress;
     }
 
     if (shardId == ShardId::kConfigServerId) {
@@ -1732,7 +1749,9 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
             LOGV2(7564600,
                   "removeShard: waiting for range deletions",
                   "pendingRangeDeletions"_attr = pendingRangeDeletions);
-            return {RemoveShardProgress::PENDING_DATA_CLEANUP, boost::none, pendingRangeDeletions};
+            RemoveShardProgress progress(ShardDrainingStateEnum::kPendingDataCleanup);
+            progress.setPendingRangeDeletions(pendingRangeDeletions);
+            return progress;
         }
     }
 
@@ -1754,18 +1773,21 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // shard is not removed. For example the number of unsharded collections might be inaccurate due
     // to $listClusterCatalog potentially returning an incorrect list of shards during concurrent
     // DDL operations.
-    if (drainingProgress.totalChunks > 0 || drainingProgress.shardedChunks > 0 ||
-        drainingProgress.totalCollections > 0 || drainingProgress.databases > 0) {
+    if (drainingProgress.removeShardCounts.getChunks() > 0 ||
+        drainingProgress.removeShardCounts.getCollectionsToMove() > 0 ||
+        drainingProgress.removeShardCounts.getDbs() > 0 || drainingProgress.totalChunks > 0) {
         // Still more draining to do
         LOGV2(5687909,
               "removeShard: more draining to do after having blocked DDLCoordinators",
               "chunkCount"_attr = drainingProgress.totalChunks,
-              "shardedChunkCount"_attr = drainingProgress.shardedChunks,
-              "unshardedCollectionsCount"_attr = drainingProgress.totalCollections,
-              "databaseCount"_attr = drainingProgress.databases,
-              "jumboCount"_attr = drainingProgress.jumboChunks);
-
-        return {RemoveShardProgress::ONGOING, drainingProgress, boost::none};
+              "shardedChunkCount"_attr = drainingProgress.removeShardCounts.getChunks(),
+              "unshardedCollectionsCount"_attr =
+                  drainingProgress.removeShardCounts.getCollectionsToMove(),
+              "databaseCount"_attr = drainingProgress.removeShardCounts.getDbs(),
+              "jumboCount"_attr = drainingProgress.removeShardCounts.getJumboChunks());
+        RemoveShardProgress progress(ShardDrainingStateEnum::kOngoing);
+        progress.setRemaining(drainingProgress.removeShardCounts);
+        return progress;
     }
 
     if (shardId == ShardId::kConfigServerId) {
@@ -1901,14 +1923,12 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     uassertStatusOK(_updateClusterCardinalityParameterAfterRemoveShardIfNeeded(
         clusterCardinalityParameterLock, opCtx));
 
-    return {RemoveShardProgress::COMPLETED,
-            boost::optional<RemoveShardProgress::DrainingShardUsage>(boost::none)};
+    return RemoveShardProgress(ShardDrainingStateEnum::kCompleted);
 }
 
-void ShardingCatalogManager::appendShardDrainingStatus(OperationContext* opCtx,
-                                                       BSONObjBuilder& result,
-                                                       RemoveShardProgress shardDrainingStatus,
-                                                       ShardId shardId) {
+void ShardingCatalogManager::appendDBAndCollDrainingInfo(OperationContext* opCtx,
+                                                         BSONObjBuilder& result,
+                                                         ShardId shardId) {
     const auto databases =
         uassertStatusOK(_localCatalogClient->getDatabasesForShard(opCtx, shardId));
 
@@ -1917,114 +1937,81 @@ void ShardingCatalogManager::appendShardDrainingStatus(OperationContext* opCtx,
     // Get BSONObj containing:
     // 1) note about moving or dropping databases in a shard
     // 2) list of databases (excluding 'local' database) that need to be moved
-    const auto dbAndCollectionInfo = [&] {
-        std::vector<DatabaseName> userDatabases;
-        for (const auto& dbName : databases) {
-            if (!dbName.isLocalDB()) {
-                userDatabases.push_back(dbName);
-            }
+    std::vector<DatabaseName> userDatabases;
+    for (const auto& dbName : databases) {
+        if (!dbName.isLocalDB()) {
+            userDatabases.push_back(dbName);
         }
+    }
 
-        BSONObjBuilder dbInfoBuilder;
-        if (!userDatabases.empty() || !collections.empty()) {
-            dbInfoBuilder.append("note",
-                                 "you need to call moveCollection for collectionsToMove and "
-                                 "afterwards movePrimary for the dbsToMove");
+    if (!userDatabases.empty() || !collections.empty()) {
+        result.append("note",
+                      "you need to call moveCollection for collectionsToMove and "
+                      "afterwards movePrimary for the dbsToMove");
+    }
+
+    // Note the `dbsToMove` field could be excluded if we have no user database to move but we
+    // enforce it for backcompatibilty.
+    BSONArrayBuilder dbs(result.subarrayStart("dbsToMove"));
+    bool canAppendToDoc = true;
+    // The dbsToMove and collectionsToMove arrays will be truncated accordingly if they exceed
+    // the 16MB BSON limitation. The offset for calculation is set to 10K to reserve place for
+    // other attributes.
+    int reservationOffsetBytes = 10 * 1024 + dbs.len();
+
+    const auto maxUserSize = std::invoke([&] {
+        if (auto failpoint = changeBSONObjMaxUserSize.scoped();
+            MONGO_unlikely(failpoint.isActive())) {
+            return failpoint.getData()["maxUserSize"].Int();
+        } else {
+            return BSONObjMaxUserSize;
         }
+    });
 
-        // Note the `dbsToMove` field could be excluded if we have no user database to move but we
-        // enforce it for backcompatibilty.
-        BSONArrayBuilder dbs(dbInfoBuilder.subarrayStart("dbsToMove"));
-        bool canAppendToDoc = true;
-        // The dbsToMove and collectionsToMove arrays will be truncated accordingly if they exceed
-        // the 16MB BSON limitation. The offset for calculation is set to 10K to reserve place for
-        // other attributes.
-        int reservationOffsetBytes = 10 * 1024 + dbs.len();
+    for (const auto& dbName : userDatabases) {
+        canAppendToDoc = appendToArrayIfRoom(
+            reservationOffsetBytes,
+            dbs,
+            DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault()),
+            maxUserSize);
+        if (!canAppendToDoc)
+            break;
+    }
+    dbs.doneFast();
+    reservationOffsetBytes += dbs.len();
 
-        const auto maxUserSize = std::invoke([&] {
-            if (auto failpoint = changeBSONObjMaxUserSize.scoped();
-                MONGO_unlikely(failpoint.isActive())) {
-                return failpoint.getData()["maxUserSize"].Int();
-            } else {
-                return BSONObjMaxUserSize;
-            }
-        });
-
-        for (const auto& dbName : userDatabases) {
-            canAppendToDoc = appendToArrayIfRoom(
-                reservationOffsetBytes,
-                dbs,
-                DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault()),
-                maxUserSize);
+    BSONArrayBuilder collectionsToMove(result.subarrayStart("collectionsToMove"));
+    if (canAppendToDoc) {
+        for (const auto& collectionName : collections) {
+            canAppendToDoc =
+                appendToArrayIfRoom(reservationOffsetBytes,
+                                    collectionsToMove,
+                                    NamespaceStringUtil::serialize(
+                                        collectionName, SerializationContext::stateDefault()),
+                                    maxUserSize);
             if (!canAppendToDoc)
                 break;
         }
-        dbs.doneFast();
-        reservationOffsetBytes += dbs.len();
-
-        BSONArrayBuilder collectionsToMove(dbInfoBuilder.subarrayStart("collectionsToMove"));
-        if (canAppendToDoc) {
-            for (const auto& collectionName : collections) {
-                canAppendToDoc =
-                    appendToArrayIfRoom(reservationOffsetBytes,
-                                        collectionsToMove,
-                                        NamespaceStringUtil::serialize(
-                                            collectionName, SerializationContext::stateDefault()),
-                                        maxUserSize);
-                if (!canAppendToDoc)
-                    break;
-            }
-        }
-        collectionsToMove.doneFast();
-        if (!canAppendToDoc) {
-            dbInfoBuilder.appendElements(BSON("truncated" << true));
-        }
-
-        return dbInfoBuilder.obj();
-    }();
-
-    switch (shardDrainingStatus.status) {
-        case RemoveShardProgress::STARTED:
-            result.append("msg", "draining started successfully");
-            result.append("state", ShardDrainingState_serializer(ShardDrainingStateEnum::kStarted));
-            result.append("shard", shardId);
-            result.appendElements(dbAndCollectionInfo);
-            break;
-        case RemoveShardProgress::ONGOING: {
-            const auto& remainingCounts = shardDrainingStatus.remainingCounts;
-            result.append("msg", "draining ongoing");
-            result.append("state", ShardDrainingState_serializer(ShardDrainingStateEnum::kOngoing));
-            result.append("remaining",
-                          BSON("chunks" << remainingCounts->shardedChunks << "collectionsToMove"
-                                        << remainingCounts->totalCollections << "dbs"
-                                        << remainingCounts->databases << "jumboChunks"
-                                        << remainingCounts->jumboChunks));
-            result.appendElements(dbAndCollectionInfo);
-            break;
-        }
-        case RemoveShardProgress::PENDING_DATA_CLEANUP: {
-            result.append("msg", "waiting for data to be cleaned up");
-            result.append(
-                "state",
-                ShardDrainingState_serializer(ShardDrainingStateEnum::kPendingDataCleanup));
-            result.append("pendingRangeDeletions", *shardDrainingStatus.pendingRangeDeletions);
-            if (shardDrainingStatus.firstNonEmptyCollection) {
-                // We only check for non-empty collections if there are no pending range deletions,
-                // so only include it if it's set to avoid reporting false negatives.
-                result.append(
-                    "firstNonEmptyCollection",
-                    NamespaceStringUtil::serialize(*shardDrainingStatus.firstNonEmptyCollection,
-                                                   SerializationContext::stateDefault()));
-            }
-            break;
-        }
-        case RemoveShardProgress::COMPLETED:
-            result.append("msg", "removeshard completed successfully");
-            result.append("state",
-                          ShardDrainingState_serializer(ShardDrainingStateEnum::kCompleted));
-            result.append("shard", shardId);
-            break;
     }
+    collectionsToMove.doneFast();
+    if (!canAppendToDoc) {
+        result.appendElements(BSON("truncated" << true));
+    }
+}
+
+void ShardingCatalogManager::appendShardDrainingStatus(OperationContext* opCtx,
+                                                       BSONObjBuilder& result,
+                                                       RemoveShardProgress shardDrainingStatus,
+                                                       ShardId shardId) {
+    const auto& state = shardDrainingStatus.getState();
+    if (state == ShardDrainingStateEnum::kStarted || state == ShardDrainingStateEnum::kOngoing) {
+        appendDBAndCollDrainingInfo(opCtx, result, shardId);
+    }
+    if (state == ShardDrainingStateEnum::kStarted || state == ShardDrainingStateEnum::kCompleted) {
+        result.append("shard", shardId);
+    }
+    result.append("msg", topology_change_helpers::getRemoveShardMessage(state));
+    shardDrainingStatus.serialize(&result);
 }
 
 Lock::SharedLock ShardingCatalogManager::enterStableTopologyRegion(OperationContext* opCtx) {
