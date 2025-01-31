@@ -102,9 +102,11 @@ Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const
     if (_groupProcessor.doingMerge()) {
         insides[kDoingMergeSpecField] = opts.serializeLiteral(true);
     } else if (pExpCtx->isFeatureFlagShardFilteringDistinctScanEnabled() &&
-               !_groupProcessor.willBeMerged()) {
-        // Only serialize this flag when it is set to false & we are not already merging -
-        // otherwise, mongod must infer from the expression context what to do.
+               !_groupProcessor.willBeMerged() &&
+               opts.literalPolicy == LiteralSerializationPolicy::kUnchanged) {
+        // Only serialize this flag when it is set to false & we are not already merging & this is
+        // not being used for query settings - otherwise, mongod must infer from the expression
+        // context what to do.
         insides[kWillBeMergedSpecField] = opts.serializeLiteral(_groupProcessor.willBeMerged());
     }
 

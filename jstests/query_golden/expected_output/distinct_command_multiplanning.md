@@ -7,6 +7,7 @@
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "DB842DD74C3C0E5452DDFEFE378E4176931DE3305E57FD7A484744F79A33A80C",
 	"rejectedPlans" : [
 		[
 			{
@@ -116,6 +117,7 @@
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "B30F9C427FBD57B85A0E86D6BAA04F5B82BC4F8A53389259D6F4B7D4D47FB479",
 	"rejectedPlans" : [
 		[
 			{
@@ -183,6 +185,7 @@
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "DB842DD74C3C0E5452DDFEFE378E4176931DE3305E57FD7A484744F79A33A80C",
 	"rejectedPlans" : [
 		[
 			{
@@ -296,6 +299,7 @@
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "FA3B4605574715FF2B1F31E2F74B29E3CBFD1BAD04A99C1024D81BE22FDBCEDF",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -342,6 +346,7 @@
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "FA3B4605574715FF2B1F31E2F74B29E3CBFD1BAD04A99C1024D81BE22FDBCEDF",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -390,6 +395,7 @@
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "B30F9C427FBD57B85A0E86D6BAA04F5B82BC4F8A53389259D6F4B7D4D47FB479",
 	"rejectedPlans" : [
 		[
 			{
@@ -516,6 +522,7 @@
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "BDD4EBB6F530210B9E1E7FFC66CEF96E312531E73BAD8F5CF2AB8D388756E9E3",
 	"rejectedPlans" : [
 		[
 			{
@@ -1541,6 +1548,7 @@
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "261552A4264D745A84443394C21486B6A31CB041E7EE160C2461119A15C43CC9",
 	"rejectedPlans" : [
 		[
 			{
@@ -1656,6 +1664,7 @@
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "261552A4264D745A84443394C21486B6A31CB041E7EE160C2461119A15C43CC9",
 	"rejectedPlans" : [
 		[
 			{
@@ -1861,6 +1870,7 @@
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "BDD4EBB6F530210B9E1E7FFC66CEF96E312531E73BAD8F5CF2AB8D388756E9E3",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -1910,6 +1920,7 @@
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "261552A4264D745A84443394C21486B6A31CB041E7EE160C2461119A15C43CC9",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -1953,6 +1964,7 @@
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "261552A4264D745A84443394C21486B6A31CB041E7EE160C2461119A15C43CC9",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -1986,6 +1998,7 @@
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "261552A4264D745A84443394C21486B6A31CB041E7EE160C2461119A15C43CC9",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{

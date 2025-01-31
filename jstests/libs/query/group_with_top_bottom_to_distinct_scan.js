@@ -17,7 +17,23 @@ import {
     removeIndex,
 } from "jstests/libs/query/group_to_distinct_scan_utils.js";
 
-export function runGroupWithTopBottomToDistinctScanTests(database) {
+export function runGroupWithTopBottomToDistinctScanTests(database, queryHashes) {
+    // TODO SERVER-100039: replace this with passthrough suite for validating query hashes.
+    let i = 0;
+    function assertPipelineResultsAndExplainAndQueryHash(test) {
+        const {pipeline, expectedOutput, validateExplain, options} = test;
+        assertPipelineResultsAndExplain({
+            pipeline,
+            expectedOutput,
+            validateExplain: (explain) => {
+                validateExplain(explain);
+                assert.eq(explain.queryShapeHash, queryHashes[i]);
+                i++;
+            },
+            options
+        });
+    }
+
     /**
      * The tests below should only pass once distinct scan for $top and $bottom accumulators is
      * achieved.
@@ -25,7 +41,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
 
     // Verifies that a $group pipeline can use DISTINCT_SCAN when the sort within a $top accumulator
     // is available from an index.
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$group: {_id: "$a", accum: {$top: {output: "$b", sortBy: {a: 1, b: 1}}}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}],
         validateExplain: (explain) =>
@@ -34,7 +50,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
 
     // Verifies that a $group pipeline can use DISTINCT_SCAN when the sort within a $bottom
     // accumulator is available from an index.
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$group: {_id: "$a", accum: {$bottom: {output: "$b", sortBy: {a: 1, b: 1}}}}}],
         expectedOutput: [{_id: null, accum: 1}, {_id: 1, accum: 3}, {_id: 2, accum: 2}],
         validateExplain: (explain) =>
@@ -45,7 +61,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     // Verifies that a $group pipeline can use DISTINCT_SCAN when sorting by fields with dotted
     // paths.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{
             $group:
                 {_id: "$foo.a", accum: {$top: {sortBy: {"foo.a": 1, "foo.b": 1}, output: "$foo.b"}}}
@@ -60,7 +76,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
             assertPlanUsesDistinctScan(database, explain, {"foo.a": 1, "foo.b": 1}),
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{
             $group: {
                 _id: "$foo.a",
@@ -76,7 +92,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     //
     // Verifies that we _do not_ attempt to use a DISTINCT_SCAN on a multikey dotted-path field.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$sort: {"mkFoo.a": 1, "mkFoo.b": 1}},
             {$group: {_id: "$mkFoo.a", accum: {$first: "$mkFoo.b"}}}
@@ -94,7 +110,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     // Verifies that we use a DISTINCT_SCAN to satisfy a sort on a multikey field if the bounds
     // are [minKey, maxKey].
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline:
             [{$group: {_id: "$aa", accum: {$top: {sortBy: {aa: 1, mkB: 1}, output: "$mkB"}}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: [1, 3]}, {_id: 2, accum: []}],
@@ -103,7 +119,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
         }
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline:
             [{$group: {_id: "$aa", accum: {$top: {sortBy: {aa: -1, mkB: -1}, output: "$mkB"}}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: [1, 3]}, {_id: 2, accum: []}],
@@ -112,7 +128,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
         }
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline:
             [{$group: {_id: "$aa", accum: {$bottom: {sortBy: {aa: -1, mkB: -1}, output: "$mkB"}}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 2}, {_id: 2, accum: []}],
@@ -123,7 +139,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     // Verifies that with dotted paths we use a DISTINCT_SCAN to satisfy a sort on a multikey field
     // if the bounds are [minKey, maxKey].
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{
             $group: {
                 _id: "$foo.a",
@@ -141,7 +157,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
         },
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{
             $group: {
                 _id: "$foo.a",
@@ -161,7 +177,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     // Verifies that we _do not_ attempt a DISTINCT_SCAN to satisfy a sort on a multikey field if
     // the bounds are not [minKey, maxKey].
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$match: {mkB: {$ne: 9999}}},
             {$group: {_id: "$aa", accum: {$top: {sortBy: {aa: 1, mkB: 1}, output: "$mkB"}}}}
@@ -170,7 +186,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
         validateExplain: assertPlanDoesNotUseDistinctScan,
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$match: {mkB: {$gt: -5}}},
             {$group: {_id: "$aa", accum: {$top: {sortBy: {aa: 1, mkB: 1}, output: "$mkB"}}}}
@@ -180,7 +196,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     });
 
     // Repeats above tests for $last.
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$match: {mkB: {$ne: 9999}}},
             {$group: {_id: "$aa", accum: {$bottom: {sortBy: {aa: 1, mkB: 1}, output: "$mkB"}}}}
@@ -189,7 +205,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
         validateExplain: assertPlanDoesNotUseDistinctScan,
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$match: {mkB: {$gt: -5}}},
             {$group: {_id: "$aa", accum: {$bottom: {sortBy: {aa: 1, mkB: 1}, output: "$mkB"}}}}
@@ -202,7 +218,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     // Verifies that with dotted paths we _do not_ attempt a DISTINCT_SCAN to satisfy a sort on a
     // multikey field if the bounds are not [minKey, maxKey].
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$match: {"mkFoo.b": {$ne: 20000}}},
             {
@@ -221,7 +237,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
         validateExplain: assertPlanDoesNotUseDistinctScan,
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$match: {"mkFoo.b": {$ne: 20000}}},
             {
@@ -254,7 +270,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     // Verifies that a $group pipeline can use DISTINCT_SCAN even when there is a $top accumulator
     // that accesses a multikey field.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$group: {_id: "$aa", accum: {$top: {sortBy: {aa: 1, bb: 1}, output: "$mkB"}}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: [1, 3]}, {_id: 2, accum: []}],
         validateExplain: (explain) =>
@@ -265,7 +281,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     // Verifies that a $group pipeline can use DISTINCT_SCAN when there is a $bottom accumulator
     // that accesses a multikey field, provided that field is not part of the index.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline:
             [{$group: {_id: "$aa", accum: {$bottom: {sortBy: {aa: 1, bb: 1}, output: "$mkB"}}}}],
         expectedOutput: [{_id: 1, accum: 2}, {_id: 2, accum: []}, {_id: null, accum: null}],
@@ -277,7 +293,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     // Verifies that a $group pipeline can use DISTINCT_SCAN even when there is a $top accumulator
     // that includes an expression.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{
             $group:
                 {_id: "$a", accum: {$top: {sortBy: {a: 1, b: 1}, output: {$add: ["$b", "$c"]}}}}
@@ -291,7 +307,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     // Verifies that a $group pipeline can use DISTINCT_SCAN even when there is a $bottom
     // accumulator that includes an expression.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {
                 $group: {
@@ -314,14 +330,14 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     // Verifies that a $group can use a DISTINCT_SCAN even when the requested sort is the reverse of
     // the index's sort.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$group: {_id: "$a", accum: {$top: {sortBy: {a: -1, b: -1}, output: "$b"}}}}],
         expectedOutput: [{_id: null, accum: 1}, {_id: 1, accum: 3}, {_id: 2, accum: 2}],
         validateExplain: (explain) =>
             assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$group: {_id: "$a", accum: {$bottom: {sortBy: {a: -1, b: -1}, output: "$b"}}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}],
         validateExplain: (explain) =>
@@ -332,7 +348,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     // Verifies that a $group pipeline _does not_ use DISTINCT_SCAN when there are both $top and
     // $bottom accumulators.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{
             $group: {
                 _id: "$a",
@@ -347,7 +363,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     //
     // Verifies that a $group pipeline with multiple $top accumulators uses DISTINCT_SCAN.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{
             $group: {
                 _id: "$a",
@@ -360,7 +376,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
             assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{
             $group: {
                 _id: "$a",
@@ -377,7 +393,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     //
     // Verifies that a $group pipeline with multiple $bottom accumulators uses DISTINCT_SCAN.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{
             $group: {
                 _id: "$a",
@@ -391,7 +407,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
             assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{
             $group: {
                 _id: "$a",
@@ -409,7 +425,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     // Verifies that a $group with mixed accumulators out of $top/$bottom/$first/$last _does not_
     // use DISTINCT_SCAN.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{
             $group: {
                 _id: "$a",
@@ -421,7 +437,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
         validateExplain: (explain) => assertPlanUsesCollScan(explain, {a: 1, b: 1, c: 1}),
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$sort: {a: -1, b: -1}},
             {
@@ -436,7 +452,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
         validateExplain: (explain) => assertPlanUsesIndexScan(explain, {a: 1, b: 1, c: 1}),
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$sort: {a: -1, b: -1}},
             {
@@ -448,7 +464,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
         validateExplain: (explain) => assertPlanUsesIndexScan(explain, {a: 1, b: 1, c: 1}),
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$sort: {a: -1, b: -1}},
             {
@@ -463,7 +479,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
         validateExplain: (explain) => assertPlanUsesIndexScan(explain, {a: 1, b: 1, c: 1}),
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$sort: {a: -1, b: -1}},
             {
@@ -478,7 +494,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
         validateExplain: (explain) => assertPlanUsesIndexScan(explain, {a: 1, b: 1, c: 1}),
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline:
             [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", f: {$first: "$b"}, l: {$last: "$b"}}}],
         expectedOutput: [{_id: null, f: 1, l: null}, {_id: 1, f: 3, l: 1}, {_id: 2, f: 2, l: 2}],
@@ -489,13 +505,13 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     // Verifies that a $group pipeline _does not_ use DISTINCT_SCAN when documents are not sorted by
     // the field used for grouping.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$group: {_id: "$a", accum: {$top: {sortBy: {b: 1}, output: "$b"}}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}],
         validateExplain: assertPlanDoesNotUseDistinctScan,
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$group: {_id: "$a", accum: {$bottom: {sortBy: {b: -1}, output: "$b"}}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}],
         validateExplain: assertPlanDoesNotUseDistinctScan,
@@ -505,7 +521,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     // Verifies that a $group pipeline with a $top accumulator can use DISTINCT_SCAN, even when the
     // group _id field is a singleton object instead of a fieldPath.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$group: {_id: {v: "$a"}, accum: {$top: {sortBy: {a: 1, b: 1}, output: "$b"}}}}],
         expectedOutput:
             [{_id: {v: null}, accum: null}, {_id: {v: 1}, accum: 1}, {_id: {v: 2}, accum: 2}],
@@ -517,7 +533,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     // Verifies that a $group pipeline with a $bottom accumulator can use DISTINCT_SCAN, even when
     // the group _id field is a singleton object instead of a fieldPath.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline:
             [{$group: {_id: {v: "$a"}, accum: {$bottom: {sortBy: {a: 1, b: 1}, output: "$b"}}}}],
         expectedOutput:
@@ -538,7 +554,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     //
     // Verifies that a $group pipeline uses a collection scan.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$group: {_id: "$str", accum: {$top: {sortBy: {str: 1, d: 1}, output: "$d"}}}}],
         expectedOutput: [
             {_id: null, accum: null},
@@ -550,7 +566,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
         validateExplain: assertPlanUsesCollScan,
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline:
             [{$group: {_id: "$str", accum: {$bottom: {sortBy: {str: 1, d: 1}, output: "$d"}}}}],
         expectedOutput: [
@@ -566,7 +582,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     //
     // Verifies that a collated $group pipeline with a $top accumulator uses a collection scan.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         // Uses $toLower on the group-by string key to produce a stable results. This converts _id:
         // null
         // to _id: "".
@@ -582,7 +598,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     //
     // Verifies that a collated $group pipeline with a $bottom accumulator uses a collection scan.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         // Uses $toLower on the group-by string key to produce a stable results. This converts _id:
         // null
         // to _id: "".
@@ -604,7 +620,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     //
     // Verifies that a $group pipeline uses a DISTINCT_SCAN.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$group: {_id: "$str", accum: {$top: {sortBy: {str: 1, d: 1}, output: "$d"}}}}],
         expectedOutput: [
             {_id: null, accum: null},
@@ -616,7 +632,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
         validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {str: 1, d: 1}),
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline:
             [{$group: {_id: "$str", accum: {$bottom: {sortBy: {str: 1, d: 1}, output: "$d"}}}}],
         expectedOutput: [
@@ -633,7 +649,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     // Verifies that a $group that use a collation and includes a $top accumulators _does not_ scan
     // the index, which is not aware of the collation.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         // Uses $toLower on the group-by string key to produce a stable results. This converts _id:
         // null
         // to _id: "".
@@ -650,7 +666,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     // Verifies that a $group that use a collation and includes a $last accumulators _does not_ scan
     // the index, which is not aware of the collation.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         // Uses $toLower on the group-by string key to produce a stable results. This converts _id:
         // null
         // to _id: "".
@@ -674,7 +690,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     // Verifies that a $group pipeline with no collation _does not_ scan the index, which does have
     // a collation.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$group: {_id: "$str", accum: {$top: {sortBy: {str: 1, d: 1}, output: "$d"}}}}],
         expectedOutput: [
             {_id: null, accum: null},
@@ -686,7 +702,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
         validateExplain: assertPlanUsesCollScan
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline:
             [{$group: {_id: "$str", accum: {$bottom: {sortBy: {str: 1, d: 1}, output: "$d"}}}}],
         expectedOutput: [
@@ -703,7 +719,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     // Verifies that a $group pipeline that uses a collation and includes a $top accumulator uses a
     // DISTINCT_SCAN, which uses a matching collation.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         // Uses $toLower on the group-by string key to produce a stable results. This converts _id:
         // null
         // to _id: "".
@@ -720,7 +736,7 @@ export function runGroupWithTopBottomToDistinctScanTests(database) {
     // Verifies that a $group pipeline that uses a collation and includes a $bottom accumulator uses
     // a DISTINCT_SCAN, which uses a matching collation.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         // Uses $toLower on the group-by string key to produce a stable results. This converts _id:
         // null
         // to _id: "".

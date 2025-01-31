@@ -333,6 +333,8 @@ export function formatExplainRoot(explain) {
         res.stages = formatPipeline(explain.stages);
     }
 
+    addIfPresent("queryShapeHash", explain, res);
+
     return res;
 }
 

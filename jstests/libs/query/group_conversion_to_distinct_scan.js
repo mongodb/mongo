@@ -21,7 +21,24 @@ import {
     removeIndex,
 } from "jstests/libs/query/group_to_distinct_scan_utils.js";
 
-export function runGroupConversionToDistinctScanTests(database, isSharded = false) {
+export function runGroupConversionToDistinctScanTests(database, queryHashes, isSharded = false) {
+    // TODO SERVER-100039: replace this with passthrough suite.
+    let i = 0;
+    function assertPipelineResultsAndExplainAndQueryHash(test) {
+        const {pipeline, expectedOutput, validateExplain, options, hint} = test;
+        assertPipelineResultsAndExplain({
+            pipeline,
+            expectedOutput,
+            validateExplain: (explain) => {
+                validateExplain(explain);
+                assert.eq(explain.queryShapeHash, queryHashes[i]);
+                i++;
+            },
+            options,
+            hint
+        });
+    }
+
     // When not grouping or filtering on the shard key field, the $group part of the query will be
     // executed on mongos so the DISTINCT_SCAN optimization is not applicable.
     const assertPlanUsesDistinctScanOnlyOnStandalone = isSharded
@@ -32,7 +49,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $sort-$group pipeline can use DISTINCT_SCAN when the sort is available from an
     // index.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {a: 1}}, {$group: {_id: "$a"}}],
         expectedOutput: [{_id: null}, {_id: 1}, {_id: 2}],
         validateExplain: (explain) =>
@@ -48,7 +65,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         const expectedOutput = [{_id: null}, {_id: 1}, {_id: 2}];
         const keyPattern = {a: 1, b: 1, c: 1};
 
-        assertPipelineResultsAndExplain({
+        assertPipelineResultsAndExplainAndQueryHash({
             pipeline,
             expectedOutput,
             validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, keyPattern),
@@ -57,7 +74,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         //
         // Verify that a $group pipeline with a $natural hint does not use DISTINCT_SCAN.
         //
-        assertPipelineResultsAndExplain({
+        assertPipelineResultsAndExplainAndQueryHash({
             pipeline,
             expectedOutput,
             hint: {$natural: 1},
@@ -67,7 +84,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         //
         // Verify that a $group pipeline with a pertinent hint as string does use DISTINCT_SCAN.
         //
-        assertPipelineResultsAndExplain({
+        assertPipelineResultsAndExplainAndQueryHash({
             pipeline,
             expectedOutput,
             hint: "a_1_b_1_c_1",
@@ -77,7 +94,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         //
         // Verify that a $group pipeline with a pertinent hint as an object does use DISTINCT_SCAN.
         //
-        assertPipelineResultsAndExplain({
+        assertPipelineResultsAndExplainAndQueryHash({
             pipeline,
             expectedOutput,
             hint: {a: 1, b: 1, c: 1},
@@ -87,7 +104,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         //
         // Verify that a $group pipeline with a non-pertinent hint does not use DISTINCT_SCAN.
         //
-        assertPipelineResultsAndExplain({
+        assertPipelineResultsAndExplainAndQueryHash({
             pipeline,
             expectedOutput,
             hint: {_id: 1},
@@ -104,7 +121,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
             indexes: ["a_1_b_1_c_1"]
         }));
 
-        assertPipelineResultsAndExplain({
+        assertPipelineResultsAndExplainAndQueryHash({
             pipeline,
             expectedOutput,
             validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, keyPattern),
@@ -116,7 +133,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         // When distinct multiplanning is enabled, we favour the potential solution derived
         // from the hint against the distinct scan, so we expect a collection scan.
         //
-        assertPipelineResultsAndExplain({
+        assertPipelineResultsAndExplainAndQueryHash({
             pipeline,
             expectedOutput,
             hint: {$natural: 1},
@@ -132,7 +149,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         // Verify that a $group pipeline with an index filter and non-pertinent hint uses
         // DISTINCT_SCAN.
         //
-        assertPipelineResultsAndExplain({
+        assertPipelineResultsAndExplainAndQueryHash({
             pipeline,
             expectedOutput,
             hint: {_id: 1},
@@ -146,7 +163,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     //
     // Verify that a $sort-$group pipeline _does not_ use a DISTINCT_SCAN on a multikey field.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {mkA: 1}}, {$group: {_id: "$mkA"}}],
         expectedOutput: [{_id: null}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: [2, 3, 4]}],
         validateExplain: assertPlanDoesNotUseDistinctScan,
@@ -156,7 +173,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $sort-$group pipeline can use DISTINCT_SCAN when the sort is available from an
     // index and there are $first accumulators.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}],
         validateExplain: (explain) =>
@@ -167,7 +184,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $sort-$group pipeline can use DISTINCT_SCAN when the sort is available from an
     // index and there are $last accumulators.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}],
         validateExplain: (explain) =>
@@ -178,7 +195,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $sort-$group pipeline can use DISTINCT_SCAN when a $first accumulator needs the
     // entire document.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline:
             [{$sort: {a: -1, b: -1, c: -1}}, {$group: {_id: "$a", accum: {$first: "$$ROOT"}}}],
         expectedOutput: [
@@ -194,7 +211,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $sort-$group pipeline can use DISTINCT_SCAN when a $last accumulator needs the
     // entire document.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {a: 1, b: 1, c: 1}}, {$group: {_id: "$a", accum: {$last: "$$ROOT"}}}],
         expectedOutput: [
             {_id: null, accum: {_id: 6, a: null, b: 1, c: 1.5}},
@@ -209,7 +226,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $sort-$group pipeline can use DISTINCT_SCAN when sorting and grouping by fields
     // with dotted paths.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$sort: {"foo.a": 1, "foo.b": 1}},
             {$group: {_id: "$foo.a", accum: {$first: "$foo.b"}}}
@@ -224,7 +241,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
             assertPlanUsesDistinctScanOnlyOnStandalone(explain, {"foo.a": 1, "foo.b": 1}),
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$sort: {"foo.a": 1, "foo.b": 1}},
             {$group: {_id: "$foo.a", accum: {$last: "$foo.b"}}}
@@ -239,7 +256,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $group pipeline can use DISTINCT_SCAN to group on a dotted path field, even
     // when the user does not specify a sort.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$group: {_id: "$foo.a"}}],
         expectedOutput: [{_id: null}, {_id: 1}, {_id: 2}, {_id: 3}],
         validateExplain: (explain, keyPattern) =>
@@ -247,7 +264,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     });
 
     // Verify that we _do not_ attempt to use a DISTINCT_SCAN on a multikey field.
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$group: {_id: "$mkA"}}],
         expectedOutput: [{_id: null}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: [2, 3, 4]}],
         validateExplain: assertPlanDoesNotUseDistinctScan,
@@ -255,7 +272,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
 
     // Verify that we may not use a DISTINCT_SCAN on a dotted field when the last component
     // is not multikey, but an intermediate component is.
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$group: {_id: "$mkFoo.a"}}],
         expectedOutput: [
             {_id: null},
@@ -270,7 +287,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that we _do not_ attempt to use a DISTINCT_SCAN on a multikey dotted-path field when
     // a sort is present.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$sort: {"mkFoo.a": 1, "mkFoo.b": 1}},
             {$group: {_id: "$mkFoo.a", accum: {$first: "$mkFoo.b"}}}
@@ -284,7 +301,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         validateExplain: assertPlanDoesNotUseDistinctScan,
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$sort: {"mkFoo.a": 1, "mkFoo.b": 1}},
             {$group: {_id: "$mkFoo.a", accum: {$last: "$mkFoo.b"}}}
@@ -302,21 +319,21 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that we use a DISTINCT_SCAN to satisfy a sort on a multikey field if the bounds
     // are [minKey, maxKey].
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {aa: 1, mkB: 1}}, {$group: {_id: "$aa", accum: {$first: "$mkB"}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: [1, 3]}, {_id: 2, accum: []}],
         validateExplain: (explain) => {
             assertPlanUsesDistinctScanOnlyOnStandalone(explain, {aa: 1, mkB: 1, c: 1}, true);
         }
     });
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {aa: -1, mkB: -1}}, {$group: {_id: "$aa", accum: {$first: "$mkB"}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: [1, 3]}, {_id: 2, accum: []}],
         validateExplain: (explain) => {
             assertPlanUsesDistinctScanOnlyOnStandalone(explain, {aa: 1, mkB: 1, c: 1}, true);
         }
     });
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {aa: -1, mkB: -1}}, {$group: {_id: "$aa", accum: {$last: "$mkB"}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 2}, {_id: 2, accum: []}],
         validateExplain: assertPlanDoesNotUseDistinctScan
@@ -326,7 +343,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that we _do not_ attempt a DISTINCT_SCAN because "mkB" is multikey, and we don't use
     // DISTINCT_SCAN for a compound group key.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {aa: 1, mkB: 1}}, {$group: {_id: {aa: "$aa", mkB: "$mkB"}}}],
         expectedOutput: [
             {_id: {aa: 1, mkB: [1, 3]}},
@@ -341,7 +358,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that with dotted paths we use a DISTINCT_SCAN to satisfy a sort on a multikey field if
     // the bounds are [minKey, maxKey].
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$sort: {"foo.a": 1, "mkFoo.b": 1}},
             {$group: {_id: "$foo.a", accum: {$first: "$mkFoo.b"}}}
@@ -357,7 +374,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         },
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$sort: {"foo.a": 1, "mkFoo.b": -1}},
             {$group: {_id: "$foo.a", accum: {$last: "$mkFoo.b"}}}
@@ -375,7 +392,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that we _do not_ attempt a DISTINCT_SCAN to satisfy a sort on a multikey field if
     // the bounds are not [minKey, maxKey].
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$match: {mkB: {$ne: 9999}}},
             {$sort: {aa: 1, mkB: 1}},
@@ -385,7 +402,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         validateExplain: assertPlanDoesNotUseDistinctScan,
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$match: {mkB: {$gt: -5}}},
             {$sort: {aa: 1, mkB: 1}},
@@ -397,7 +414,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
 
     // Repeat above tests for $last.
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$match: {mkB: {$ne: 9999}}},
             {$sort: {aa: 1, mkB: 1}},
@@ -407,7 +424,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         validateExplain: assertPlanDoesNotUseDistinctScan,
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$match: {mkB: {$gt: -5}}},
             {$sort: {aa: 1, mkB: 1}},
@@ -421,7 +438,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that with dotted paths we _do not_ attempt a DISTINCT_SCAN to satisfy a sort on a
     // multikey field if the bounds are not [minKey, maxKey].
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$match: {"mkFoo.b": {$ne: 20000}}},
             {$sort: {"foo.a": 1, "mkFoo.b": 1}},
@@ -436,7 +453,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         validateExplain: assertPlanDoesNotUseDistinctScan,
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$match: {"mkFoo.b": {$ne: 20000}}},
             {$sort: {"foo.a": 1, "mkFoo.b": -1}},
@@ -461,7 +478,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     //
     removeIndex({"foo.a": 1, "foo.b": 1});
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {"foo.a": 1}}, {$group: {_id: "$foo.a"}}],
         expectedOutput: [{_id: null}, {_id: 1}, {_id: 2}, {_id: 3}],
         validateExplain: (explain) =>
@@ -472,7 +489,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $sort-$group pipeline can use DISTINCT_SCAN even when there is a $first
     // accumulator that accesses a multikey field.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {aa: 1, bb: 1}}, {$group: {_id: "$aa", accum: {$first: "$mkB"}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: [1, 3]}, {_id: 2, accum: []}],
         validateExplain: (explain) =>
@@ -483,7 +500,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $sort-$group pipeline can use DISTINCT_SCAN when there is a $last
     // accumulator that accesses a multikey field, provided that field is not part of the index.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {aa: 1, bb: 1}}, {$group: {_id: "$aa", accum: {$last: "$mkB"}}}],
         expectedOutput: [{_id: 1, accum: 2}, {_id: 2, accum: []}, {_id: null, accum: null}],
         validateExplain: (explain) =>
@@ -494,7 +511,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $sort-$group pipeline can use DISTINCT_SCAN even when there is a $first
     // accumulator that includes an expression.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline:
             [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$first: {$add: ["$b", "$c"]}}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 2}, {_id: 2, accum: 4}],
@@ -506,7 +523,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $sort-$group pipeline can use DISTINCT_SCAN even when there is a $last
     // accumulator that includes an expression.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$sort: {a: 1, b: 1}},
             {$group: {_id: "$a", accum: {$last: {$add: ["$b", "$c"]}}}},
@@ -526,7 +543,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // field that is not the first field in a compound index, so long as the previous fields are
     // scanned with equality bounds (i.e., are point queries).
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$match: {a: 1}}, {$sort: {b: 1}}, {$group: {_id: "$b"}}],
         expectedOutput: [{_id: 1}, {_id: 2}, {_id: 3}],
         validateExplain: (explain) =>
@@ -538,7 +555,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // query planner does not need to infer the availability of a sort on {b: 1} based on the
     // equality bounds for the 'a field.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$match: {a: 1}}, {$sort: {a: 1, b: 1}}, {$group: {_id: "$b"}}],
         expectedOutput: [{_id: 1}, {_id: 2}, {_id: 3}],
         validateExplain: (explain) =>
@@ -548,7 +565,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     //
     // Same as the previous case but with no user-specified sort.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$match: {a: 1}}, {$group: {_id: "$b"}}],
         expectedOutput: [{_id: 1}, {_id: 2}, {_id: 3}],
         validateExplain: (explain) =>
@@ -559,7 +576,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $match-$sort-$group pipeline _does not_ use a DISTINCT_SCAN to sort and group
     // on the second field of an index when there is no equality match on the first field.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {a: 1, b: 1}}, {$group: {_id: "$b"}}],
         expectedOutput: [{_id: null}, {_id: 1}, {_id: 2}, {_id: 3}],
         validateExplain: assertPlanDoesNotUseDistinctScan,
@@ -574,7 +591,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // would incorrectly list three groups. DISTINCT_SCAN won't work here, because we have to
     // examine each document in order to determine which groups get filtered out by the $limit.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$match: {a: 1}}, {$sort: {a: 1, b: 1}}, {$limit: 3}, {$group: {_id: "$b"}}],
         expectedOutput: [{_id: 1}, {_id: 2}],
         validateExplain: assertPlanDoesNotUseDistinctScan,
@@ -584,7 +601,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that an additional $project stage does not lead to incorrect results (although it will
     // preclude the use of the DISTINCT_SCAN optimization).
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$match: {a: 1}},
             {$project: {a: 1, b: 1}},
@@ -599,14 +616,14 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $sort-$group can use a DISTINCT_SCAN even when the requested sort is the
     // reverse of the index's sort.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}],
         expectedOutput: [{_id: null, accum: 1}, {_id: 1, accum: 3}, {_id: 2, accum: 2}],
         validateExplain: (explain) =>
             assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}],
         validateExplain: (explain) =>
@@ -617,7 +634,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $sort-$group pipeline _does not_ use DISTINCT_SCAN when there are
     // non-$first/$last accumulators.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {a: 1}}, {$group: {_id: "$a", accum: {$sum: "$b"}}}],
         expectedOutput: [{_id: null, accum: 2}, {_id: 1, accum: 8}, {_id: 2, accum: 2}],
         validateExplain: (explain) => assertPlanUsesIndexScan(explain, {a: 1, b: 1, c: 1}),
@@ -627,7 +644,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $sort-$group pipeline _does not_ use DISTINCT_SCAN when there are both $first
     // and $last accumulators.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline:
             [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", f: {$first: "$b"}, l: {$last: "$b"}}}],
         expectedOutput: [{_id: null, f: 1, l: null}, {_id: 1, f: 3, l: 1}, {_id: 2, f: 2, l: 2}],
@@ -637,7 +654,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     //
     // Verify that a $sort-$group pipeline with multiple $first accumulators uses DISTINCT_SCAN.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$sort: {a: -1, b: -1}},
             {$group: {_id: "$a", f1: {$first: "$b"}, f2: {$first: "$b"}}}
@@ -647,7 +664,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
             assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$sort: {a: -1, b: -1, c: -1}},
             {$group: {_id: "$a", fb: {$first: "$b"}, fc: {$first: "$c"}}}
@@ -661,7 +678,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     //
     // Verify that a $sort-$group pipeline with multiple $last accumulators uses DISTINCT_SCAN.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline:
             [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", l1: {$last: "$b"}, l2: {$last: "$b"}}}],
         expectedOutput:
@@ -670,7 +687,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
             assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$sort: {a: -1, b: -1, c: -1}},
             {$group: {_id: "$a", lb: {$last: "$b"}, lc: {$last: "$c"}}}
@@ -685,13 +702,13 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $sort-$group pipeline _does not_ use DISTINCT_SCAN when documents are not
     // sorted by the field used for grouping.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {b: 1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}],
         validateExplain: assertPlanDoesNotUseDistinctScan,
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {b: -1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}],
         validateExplain: assertPlanDoesNotUseDistinctScan,
@@ -702,7 +719,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // not provide equality (point query) bounds for each field before the grouped-by field in the
     // index.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$match: {a: {$gt: 0}}}, {$sort: {b: 1}}, {$group: {_id: "$b"}}],
         expectedOutput: [{_id: 1}, {_id: 2}, {_id: 3}],
         validateExplain: assertPlanDoesNotUseDistinctScan,
@@ -712,7 +729,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $sort-$group pipeline with a $first accumulator can use DISTINCT_SCAN, even
     // when the group _id field is a singleton object instead of a fieldPath.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {a: 1, b: 1}}, {$group: {_id: {v: "$a"}, accum: {$first: "$b"}}}],
         expectedOutput:
             [{_id: {v: null}, accum: null}, {_id: {v: 1}, accum: 1}, {_id: {v: 2}, accum: 2}],
@@ -724,7 +741,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $sort-$group pipeline with a $last accumulator can use DISTINCT_SCAN, even when
     // the group _id field is a singleton object instead of a fieldPath.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {a: 1, b: 1}}, {$group: {_id: {v: "$a"}, accum: {$last: "$b"}}}],
         expectedOutput:
             [{_id: {v: null}, accum: 1}, {_id: {v: 1}, accum: 3}, {_id: {v: 2}, accum: 2}],
@@ -744,7 +761,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     //
     // Verify that a $group on an unindexed field uses a collection scan.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$group: {_id: "$str"}}],
         expectedOutput: [{_id: null}, {_id: "FoO"}, {_id: "bAr"}, {_id: "bar"}, {_id: "foo"}],
         validateExplain: assertPlanUsesCollScan,
@@ -753,7 +770,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     //
     // Verify that a collated $group on an unindexed field uses a collection scan.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str"}}],
         expectedOutput: [{_id: null}, {_id: "bAr"}, {_id: "foo"}],
         validateExplain: assertPlanUsesCollScan,
@@ -763,7 +780,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     //
     // Verify that a $sort-$group pipeline uses a collection scan.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str", accum: {$first: "$d"}}}],
         expectedOutput: [
             {_id: null, accum: null},
@@ -775,7 +792,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         validateExplain: assertPlanUsesCollScan,
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str", accum: {$last: "$d"}}}],
         expectedOutput: [
             {_id: null, accum: null},
@@ -791,7 +808,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a collated $sort-$group pipeline with a $first accumulator uses a collection
     // scan.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str", accum: {$first: "$d"}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: "bAr", accum: 3}, {_id: "foo", accum: 1}],
         validateExplain: assertPlanUsesCollScan,
@@ -802,7 +819,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a collated $sort-$group pipeline with a $last accumulator uses a collection
     // scan.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str", accum: {$last: "$d"}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: "bAr", accum: 4}, {_id: "foo", accum: 2}],
         validateExplain: assertPlanUsesCollScan,
@@ -818,7 +835,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     //
     // Verify that a $group uses a DISTINCT_SCAN.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$group: {_id: "$str"}}],
         expectedOutput: [{_id: null}, {_id: "FoO"}, {_id: "bAr"}, {_id: "bar"}, {_id: "foo"}],
         validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {str: 1, d: 1}),
@@ -833,7 +850,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // tie-breaking {d: 1} component of the sort forces a specific decision for this aggregation,
     // making this test more reliable.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str"}}],
         expectedOutput: [{_id: null}, {_id: "bAr"}, {_id: "foo"}],
         validateExplain: assertPlanUsesCollScan,
@@ -843,7 +860,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     //
     // Verify that a $sort-$group pipeline uses a DISTINCT_SCAN.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str", accum: {$first: "$d"}}}],
         expectedOutput: [
             {_id: null, accum: null},
@@ -856,7 +873,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
             assertPlanUsesDistinctScanOnlyOnStandalone(explain, {str: 1, d: 1}),
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str", accum: {$last: "$d"}}}],
         expectedOutput: [
             {_id: null, accum: null},
@@ -873,7 +890,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $sort-$group that use a collation and includes a $first accumulators  _does
     // not_ scan the index, which is not aware of the collation.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str", accum: {$first: "$d"}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: "bAr", accum: 3}, {_id: "foo", accum: 1}],
         validateExplain: assertPlanUsesCollScan,
@@ -884,7 +901,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $sort-$group that use a collation and includes a $last accumulators  _does
     // not_ scan the index, which is not aware of the collation.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {str: 1, d: -1}}, {$group: {_id: "$str", accum: {$first: "$d"}}}],
         expectedOutput: [{_id: "bar", accum: 4}, {_id: "FoO", accum: 2}, {_id: null, accum: null}],
         validateExplain: assertPlanUsesCollScan,
@@ -902,7 +919,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $group with no collation _does not_ scan the index, which does have a
     // collation.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$group: {_id: "$str"}}],
         expectedOutput: [{_id: null}, {_id: "FoO"}, {_id: "bAr"}, {_id: "bar"}, {_id: "foo"}],
         validateExplain: assertPlanUsesCollScan,
@@ -917,7 +934,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // tie-breaking {d: 1} component of the sort forces a specific decision for this aggregation,
     // making this test more reliable.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str"}}],
         expectedOutput: [{_id: null}, {_id: "bAr"}, {_id: "foo"}],
         validateExplain: (explain) =>
@@ -929,7 +946,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $sort-$group pipeline with no collation _does not_ scan the index, which does
     // have a collation.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str", accum: {$first: "$d"}}}],
         expectedOutput: [
             {_id: null, accum: null},
@@ -941,7 +958,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         validateExplain: assertPlanUsesCollScan
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str", accum: {$last: "$d"}}}],
         expectedOutput: [
             {_id: null, accum: null},
@@ -957,7 +974,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // Verify that a $sort-$group pipeline that uses a collation and includes a $first accumulator
     // uses a DISTINCT_SCAN, which uses a matching collation.
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str", accum: {$first: "$d"}}}],
         expectedOutput: [{_id: null, accum: null}, {_id: "bAr", accum: 3}, {_id: "foo", accum: 1}],
         validateExplain: (explain) =>
@@ -971,7 +988,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
     // are treated the same by this collation, it is equally valid to have either as the _id. For
     // that reason, we project _id to lowercase in the output. This converts _id: null to _id: "".
     //
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$sort: {str: 1, d: 1}},
             {$group: {_id: "$str", accum: {$last: "$d"}}},
@@ -994,7 +1011,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         }
         expectedResult.push(resultDocument);
     }
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$sort: {_id: 1}},
             {
@@ -1006,7 +1023,7 @@ export function runGroupConversionToDistinctScanTests(database, isSharded = fals
         validateExplain: (explain) => assertPlanUsesDistinctScanOnlyOnStandalone(explain, {_id: 1})
     });
 
-    assertPipelineResultsAndExplain({
+    assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$sort: {_id: 1}},
             {

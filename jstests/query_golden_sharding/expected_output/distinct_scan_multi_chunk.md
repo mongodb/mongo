@@ -12,6 +12,7 @@
 			"stage" : "SHARD_MERGE"
 		}
 	],
+	"queryShapeHash" : "3E08037AA6B94982B95D1C3F310D7433C831031FBDB14536694772A401A17D74",
 	"shardsPart" : {
 		"distinct_scan_multi_chunk-rs0" : {
 			"rejectedPlans" : [ ],
@@ -98,6 +99,7 @@
 			"stage" : "SINGLE_SHARD"
 		}
 	],
+	"queryShapeHash" : "A2E645EFCABA07A7713DE47195294FD5ED89805F90755BAC5ADCA9B0947C08DF",
 	"shardsPart" : {
 		"distinct_scan_multi_chunk-rs0" : {
 			"rejectedPlans" : [
@@ -187,6 +189,7 @@
 			"stage" : "SHARD_MERGE"
 		}
 	],
+	"queryShapeHash" : "43D52AF789A031277DF7B982642BE63DBB84C9CE559EB19640726F46AA869583",
 	"shardsPart" : {
 		"distinct_scan_multi_chunk-rs0" : {
 			"rejectedPlans" : [ ],
@@ -239,6 +242,7 @@
 			"stage" : "SHARD_MERGE"
 		}
 	],
+	"queryShapeHash" : "6AB45EB405ECDE6720DF6CAD435646D923D1F8FCE3A84612897860568A573EE0",
 	"shardsPart" : {
 		"distinct_scan_multi_chunk-rs0" : {
 			"rejectedPlans" : [
@@ -399,6 +403,7 @@
 			"stage" : "SHARD_MERGE"
 		}
 	],
+	"queryShapeHash" : "D437E367ECCB57701D4D444B3FF1FAB555B549A3B5A481475316B57F608844DE",
 	"shardsPart" : {
 		"distinct_scan_multi_chunk-rs0" : {
 			"rejectedPlans" : [ ],
@@ -452,6 +457,7 @@
 			"stage" : "SHARD_MERGE"
 		}
 	],
+	"queryShapeHash" : "76589B37FD0034DB3F63DE75126FA9683C91007FD7E3F90AFB08CA47547D2C9C",
 	"shardsPart" : {
 		"distinct_scan_multi_chunk-rs0" : {
 			"rejectedPlans" : [ ],
@@ -524,6 +530,7 @@
 			"stage" : "SINGLE_SHARD"
 		}
 	],
+	"queryShapeHash" : "11E9FD43BEA7007683708274AD27F956E40C807F879CFB1BB5CC41CAF86F58DA",
 	"shardsPart" : {
 		"distinct_scan_multi_chunk-rs0" : {
 			"rejectedPlans" : [
@@ -607,6 +614,7 @@
 			"stage" : "SHARD_MERGE"
 		}
 	],
+	"queryShapeHash" : "F0FD51D26411738DE1ED291F14A2EA9CE2CEF16E084ED9785E571A512836BE69",
 	"shardsPart" : {
 		"distinct_scan_multi_chunk-rs0" : {
 			"rejectedPlans" : [ ],
@@ -679,6 +687,7 @@
 			"stage" : "SHARD_MERGE"
 		}
 	],
+	"queryShapeHash" : "C91CD944B07E20759F4D5348287AC796BD0B4E425C510B4B51BE6B7754452FA5",
 	"shardsPart" : {
 		"distinct_scan_multi_chunk-rs0" : {
 			"rejectedPlans" : [
@@ -833,6 +842,7 @@
 			"stage" : "SHARD_MERGE"
 		}
 	],
+	"queryShapeHash" : "7BCA6CC865058F39C39D3453DDD00D395E7B73C05C89AACDD69F0C8701EFC32D",
 	"shardsPart" : {
 		"distinct_scan_multi_chunk-rs0" : {
 			"rejectedPlans" : [ ],
@@ -1052,6 +1062,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "41D6076CE91480FEDA0B8CBC0403514B32425BE236EEBA8ED8C4435088424054",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -1236,6 +1247,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "D526F3E48F0AE31181590C35FA90DCAB8224F1F2A29CECF95D85025B33AA4D71",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -1422,6 +1434,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "7C9773F8C7BD4F3B581B9BC0B0FD907E76910635FA84BC315AD51A2D2CE11CE0",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -1608,6 +1621,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "1D9A7FB5CF92475B04CBDA7BB9CBC8F81D8C39343891021433F252F5AB94A0BF",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -1794,6 +1808,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "B49952E5169C08D3CC5ACF2469FD5FD04D2885EB94754119AB1D891390C547EE",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -2059,6 +2074,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "E14F75AAE6D3C1BFF4E041287502BA20D47E556668DA73200F4A8D3D59D50F5A",
 	"shardsPart" : [
 		{
 			"$match" : {
@@ -2247,6 +2263,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "5789B22F27C1DFFE9FF3628C7A5B627E1481FCB23CD594F48C258156FAAA481E",
 	"shardsPart" : [
 		{
 			"$match" : {
@@ -2522,6 +2539,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "1D978C7CE47AF02D59F282514EFBA5AB7D64E2F885B7AD0F2CAE2989A0D7F3A7",
 	"shardsPart" : [
 		{
 			"$match" : {
@@ -2803,6 +2821,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "C25420C4B1C67C657F7E0F38F3F6EAB622134BB6217F4CFE3822B2C41EC9DFE7",
 	"shardsPart" : [
 		{
 			"$match" : {
@@ -3002,6 +3021,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "78E350AB796669698B14B659C4EBB5EC859A547DA50CD77D3B550C3D1E582350",
 	"shardsPart" : [
 		{
 			"$match" : {
@@ -3201,6 +3221,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "C647799A58142640EFBD2B258811A0B5B850ECF002D27D837422C8CD6A2D089E",
 	"shardsPart" : [
 		{
 			"$match" : {
@@ -3413,6 +3434,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "2805DB062A4586FC4A54ACE2C7C26C85396392D72B3A9F1007EACD616E3A3F89",
 	"shardsPart" : [
 		{
 			"$sort" : {
@@ -3625,6 +3647,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "7B814C7C1F9A222ACE5CA59BF7EF6B5EE7322BA91944DB4B2974726F17E6F1BC",
 	"shardsPart" : [
 		{
 			"$sort" : {
@@ -3836,6 +3859,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "D81AE22806B899E31B2E594EA88419E4D4A138E8FD95B78B66B666EA1922EF65",
 	"shardsPart" : [
 		{
 			"$sort" : {
@@ -4048,6 +4072,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "8AF395DE463AF073D422703077131CBBFA819B0517444DA5E081456E673E00A8",
 	"shardsPart" : [
 		{
 			"$sort" : {
@@ -4315,6 +4340,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "5F07638683238D8DC101347AC201D65CB865932937ADF7DB93B807E76249955C",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -4579,6 +4605,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "E70DD5CA002009ED2F9DB267BD3A17BD4D09D2D0747942D8F174A0185249E056",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -4843,6 +4870,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "2803CB698B2A4FBB38FD03CADC3B87EED812D28A2B7CF78ADB4502C70AAC71AE",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -5107,6 +5135,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "D3F7A60442C0FBEF8122DA9DEABBCF0D42E222E7C0FCA7381959777F31B96B63",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -5307,6 +5336,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "FF36D9A7D66416B12BE7971000254B0E63CB73E8D898CA814AA96F97AABD676D",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -5507,6 +5537,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "13E2A2D1619930F4D954A2E616C921190A8C7470C6CE67F22D482C858D0A7C62",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -5708,6 +5739,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "BEDCF013BB5367C37F261BF19FEE57640ABCA96F4767ED983AB66E309EE8685D",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -5908,6 +5940,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "8206D6BA91FE4D5680F2F393592494F4C5BF6E3F607894C92F7B6DB1FFE4DB1A",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -6066,6 +6099,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "90AE8A328542D80007D96B602F1966370A1FE6A3395A0B180B086D02255C98E9",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -6222,6 +6256,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "D68448A8B1AD04D258FECDA8E44EFB3C2871AE502EE095A767428FB834736448",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -6379,6 +6414,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "1E2C9158B1B301CFC113AE9AB389722D71F9DAB4F5392383824F6A278B2CBB44",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -6535,6 +6571,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "60DAC46FE5F99F3931B4178B8104C9D18AFF25B7E06DEC8F2446A685E526EAA9",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -6791,6 +6828,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "7124EDE702422295D4AA8AF2AC99CB8DFB3E13FDB02223FED8C55E2386A13BCA",
 	"shardsPart" : [
 		{
 			"$sort" : {
@@ -7047,6 +7085,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "B08B5BE38981C61B18C61C0831F62D2B8EC1B31A26F1D5477245D5863EFDFEBA",
 	"shardsPart" : [
 		{
 			"$sort" : {
@@ -7303,6 +7342,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "62A01372FA73C780549AEBB77546A4AFBC225B6684C1F5E65789284A0D3DD883",
 	"shardsPart" : [
 		{
 			"$sort" : {
@@ -7559,6 +7599,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "BB300CA5A5B9B2EC92C87EF40194F06A729BBC6E024BF77382F7533B676D3DB4",
 	"shardsPart" : [
 		{
 			"$sort" : {
@@ -7747,6 +7788,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "F673F86519CB56C7DF885FD9DD95312791D4AED2CDDB99144BED02479E57B166",
 	"shardsPart" : [
 		{
 			"$sort" : {
@@ -7935,6 +7977,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "6F2E5B6AA07F8E4E17C532B8EB785C32B6C76102FA637E104A844234D3C51C13",
 	"shardsPart" : [
 		{
 			"$sort" : {
@@ -8125,6 +8168,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "8199A1165EB52A74F63A0E14BB6AA321837D6BC83295C271FB3D64E141BC0D4A",
 	"shardsPart" : [
 		{
 			"$sort" : {
@@ -8315,6 +8359,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "CFD857DF6E9F02E673748FCA92FB07E1CFB8FE1C647FB71BAFCD1D35084DDC16",
 	"shardsPart" : [
 		{
 			"$sort" : {
@@ -8480,6 +8525,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "93A5D1A7DCA2A7663975FD6AF7BB90FCAD7B3CF564ECD31CE96B32A78E5D4C8C",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -8636,6 +8682,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "78B2D5A49A22E7389F35323938117A780499ABBCB86EDE4ED3E0B823878AE6FB",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -8927,6 +8974,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "2378EB067EF041608B21915FF68CC21C92818AAE311CCEA873C02C02FB13D396",
 	"shardsPart" : [
 		{
 			"$match" : {
@@ -9235,6 +9283,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "A0D64445DE8B50BC8EC335B3C0063A02D0C2A9B22F8484230FBB846960F14E3A",
 	"shardsPart" : [
 		{
 			"$match" : {
@@ -9422,6 +9471,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "70A4727A901E80E03246A8C7E6B0CC4A2225AFE7BA4B911C44FC89EDED220F90",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -9590,6 +9640,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "B898E74AFF183BDEAB7B15A77737DE426E623C0BDF502748A491605625BBB129",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -9840,6 +9891,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "F107F47CC9A005147AA53BCCF4CDD151C52D9CC5F6E477CB3055559EA43E34CE",
 	"shardsPart" : [
 		{
 			"$match" : {
@@ -10104,6 +10156,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "6296BF1C8BAA694AFA0FC369C9332341DFA7C4684065F7DE6E6D74B91377C294",
 	"shardsPart" : [
 		{
 			"$match" : {
@@ -10147,6 +10200,7 @@
 			"stage" : "SHARD_MERGE"
 		}
 	],
+	"queryShapeHash" : "76589B37FD0034DB3F63DE75126FA9683C91007FD7E3F90AFB08CA47547D2C9C",
 	"shardsPart" : {
 		"distinct_scan_multi_chunk-rs0" : {
 			"rejectedPlans" : [ ],
@@ -10221,6 +10275,7 @@
 			"stage" : "SINGLE_SHARD"
 		}
 	],
+	"queryShapeHash" : "D09D4099F96FD44670F88482048901DC90312693A0FD1BAC8A9149A0F1D7EFDE",
 	"shardsPart" : {
 		"distinct_scan_multi_chunk-rs0" : {
 			"rejectedPlans" : [
@@ -10310,6 +10365,7 @@
 			"stage" : "SHARD_MERGE"
 		}
 	],
+	"queryShapeHash" : "3E1D797E43038CA8E7628D34718426F514D9B987522E955DD91EA31987B2C949",
 	"shardsPart" : {
 		"distinct_scan_multi_chunk-rs0" : {
 			"rejectedPlans" : [
