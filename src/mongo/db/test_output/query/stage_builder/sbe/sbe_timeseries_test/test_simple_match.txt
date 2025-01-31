@@ -1,0 +1,9 @@
+# Golden test output of SbeTimeseriesTest/TestSimpleMatch
+[4] project [s12 = makeBsonObj(MakeObjSpec([a, tag], Closed, RetNothing, 0), s11)] 
+[3] filter {((s10 > Date(1740329258692)) ?: false)} 
+[2] project [s11 = newBsonObj("_id", s8, "a", s9, "tag", s3, "time", s10)] 
+[2] block_to_row blocks[s5, s6, s7] row[s8, s9, s10] s4 
+[2] ts_bucket_to_cellblock s2 pathReqs[s5 = ProjectPath(Get(_id)/Id), s6 = ProjectPath(Get(a)/Id), s7 = ProjectPath(Get(time)/Id)] bitmap = s4 
+[1] project [s3 = getField(s2, "meta")] 
+[1] project [s2 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"_id" : bsonObjectId("649f0704230f18da067519c4"), "control" : {"version" : 1}, "meta" : "A", "data" : {"_id" : {"0" : 0, "1" : 1}, "a" : {"0" : 9, "1" : 0}, "time" : {"0" : Date(1736786829512), "1" : Date(1740329229512)}}}], [{"_id" : bsonObjectId("649f0704c3d83a4c3fe91689"), "control" : {"version" : 1}, "meta" : "B", "data" : {"time" : {"0" : Date(1740329258692), "1" : Date(1740329267918)}, "_id" : {"0" : 3, "1" : 4}, "a" : {"0" : 100, "1" : 101}}}]]} 

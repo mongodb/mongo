@@ -1,0 +1,20 @@
+# Golden test output of SbeTimeseriesTest/TestGroupAvg
+[4] project [s25 = makeBsonObj(MakeObjSpec([average = Add(0)], Closed, NewObj, 0), s24, s23)] 
+[3] project [s23 = 
+    if (s22 == 0ll) 
+    then null 
+    else (doubleDoubleSumFinalize(s21) / s22) 
+] 
+[3] block_to_row blocks[s15, s18, s19] row[s20, s21, s22] s8 
+[3] block_group bitset = s8 [s15] [s18 = valueBlockAggDoubleDoubleSum(s12, s10), s19 = valueBlockAggSum(s12, s11)] [s18 = aggDoubleDoubleSum(s10), s19 = sum(s11)] [s16, s17] [s10, s11] spillSlots[s13, s14] mergingExprs[aggMergeDoubleDoubleSums(s13), sum(s14)] 
+[3] project [s15 = null, s16 = cellFoldValues_P(cellBlockGetFlatValuesBlock(s5), s5), s17 = 
+    let [
+        l8.0 = valueBlockLogicalOr(valueBlockFillEmpty(valueBlockTypeMatch(cellFoldValues_P(cellBlockGetFlatValuesBlock(s5), s5), 1088), true), valueBlockLogicalNot(valueBlockTypeMatch(cellFoldValues_P(cellBlockGetFlatValuesBlock(s5), s5), 851970))) 
+    ] 
+    in valueBlockCombine(valueBlockNewFill(0ll, valueBlockSize(l8.0)), valueBlockNewFill(1ll, valueBlockSize(valueBlockLogicalNot(l8.0))), l8.0) 
+] 
+[2] filter {!(valueBlockNone(s8, true))} 
+[2] project [s8 = valueBlockLogicalAnd(s3, cellFoldValues_F(valueBlockFillEmpty(valueBlockGtScalar(cellBlockGetFlatValuesBlock(s7), 0), false), s7))] 
+[2] ts_bucket_to_cellblock s2 pathReqs[s4 = ProjectPath(Get(_id)/Id), s5 = ProjectPath(Get(a)/Id), s6 = ProjectPath(Get(time)/Id), s7 = FilterPath(Get(a)/Traverse/Id)] bitmap = s3 
+[1] project [s2 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"_id" : bsonObjectId("649f0704230f18da067519c4"), "control" : {"version" : 1}, "meta" : "A", "data" : {"_id" : {"0" : 0, "1" : 1}, "a" : {"0" : 9, "1" : 0}, "time" : {"0" : Date(1736786829512), "1" : Date(1740329229512)}}}], [{"_id" : bsonObjectId("649f0704c3d83a4c3fe91689"), "control" : {"version" : 1}, "meta" : "B", "data" : {"time" : {"0" : Date(1740329258692), "1" : Date(1740329267918)}, "_id" : {"0" : 3, "1" : 4}, "a" : {"0" : 100, "1" : 101}}}]]} 

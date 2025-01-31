@@ -148,7 +148,8 @@ protected:
     std::string replaceUuid(std::string input, UUID uuid);
     void insertDocuments(const std::vector<BSONObj>& docs);
     void createCollection(const std::vector<BSONObj>& docs,
-                          boost::optional<BSONObj> indexKeyPattern);
+                          boost::optional<BSONObj> indexKeyPattern,
+                          CollectionOptions options = {});
     void runTest(std::unique_ptr<QuerySolutionNode> root,
                  const mongo::BSONArray& expectedValue,
                  BuildPlanStageParam param = {});

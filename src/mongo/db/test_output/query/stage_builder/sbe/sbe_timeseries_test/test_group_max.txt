@@ -1,0 +1,14 @@
+# Golden test output of SbeTimeseriesTest/TestGroupMax
+[5] sort [s22] [asc] [s21] 9223372036854775807ll 
+[5] project [s22 = getSortKeyAsc(s19)] 
+[4] project [s21 = makeBsonObj(MakeObjSpec([max = Add(0)], Closed, NewObj, 0), s20, s19)] 
+[3] project [s19 = (s18 ?: null)] 
+[3] block_to_row blocks[s14, s16] row[s17, s18] s9 
+[3] block_group bitset = s9 [s14] [s16 = valueBlockAggMax(s12, s11)] [s16 = max(s11)] [s15] [s11] spillSlots[s13] mergingExprs[max(fillType(s13, 1088, Nothing))] 
+[3] project [s14 = (s3 ?: null), s15 = valueBlockFillType(cellFoldValues_P(cellBlockGetFlatValuesBlock(s6), s6), 1088, Nothing)] 
+[2] filter {!(valueBlockNone(s9, true))} 
+[2] project [s9 = valueBlockLogicalAnd(s4, cellFoldValues_F(valueBlockFillEmpty(valueBlockGtScalar(cellBlockGetFlatValuesBlock(s8), Date(1737650858692)), false), s8))] 
+[2] ts_bucket_to_cellblock s2 pathReqs[s5 = ProjectPath(Get(_id)/Id), s6 = ProjectPath(Get(a)/Id), s7 = ProjectPath(Get(time)/Id), s8 = FilterPath(Get(time)/Traverse/Id)] bitmap = s4 
+[1] project [s3 = getField(s2, "meta")] 
+[1] project [s2 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"_id" : bsonObjectId("649f0704230f18da067519c4"), "control" : {"version" : 1}, "meta" : "A", "data" : {"_id" : {"0" : 0, "1" : 1}, "a" : {"0" : 9, "1" : 0}, "time" : {"0" : Date(1736786829512), "1" : Date(1740329229512)}}}], [{"_id" : bsonObjectId("649f0704c3d83a4c3fe91689"), "control" : {"version" : 1}, "meta" : "B", "data" : {"time" : {"0" : Date(1740329258692), "1" : Date(1740329267918)}, "_id" : {"0" : 3, "1" : 4}, "a" : {"0" : 100, "1" : 101}}}]]} 

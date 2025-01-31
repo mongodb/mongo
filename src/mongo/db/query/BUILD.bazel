@@ -799,6 +799,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/stage_builder/sbe/tests:sbe_builder_test.cpp",
         "//src/mongo/db/query/stage_builder/sbe/tests:sbe_builder_test_fixture.cpp",
         "//src/mongo/db/query/stage_builder/sbe/tests:sbe_builder_test_fixture.h",
+        "//src/mongo/db/query/stage_builder/sbe/tests:sbe_builder_ts_test.cpp",
         "//src/mongo/db/query/stage_builder/sbe/tests:shard_filter_test.cpp",
         "//src/mongo/db/query/stage_builder/sbe/tests:type_checker_test.cpp",
         "//src/mongo/db/query/stage_builder/sbe/tests:value_lifetime_test.cpp",
@@ -816,6 +817,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/test_output/query/stage_builder/sbe/golden_gen_filtern_test:test_data",
         "//src/mongo/db/test_output/query/stage_builder/sbe/golden_sbe_stage_builder_test:test_data",
         "//src/mongo/db/test_output/query/stage_builder/sbe/s_b_e_set_window_fields_test:test_data",
+        "//src/mongo/db/test_output/query/stage_builder/sbe/sbe_timeseries_test:test_data",
         "//src/mongo/db/test_output/query/stage_builder/sbe/search_sbe_stage_builder_test:test_data",
     ],
     tags = [

@@ -120,7 +120,8 @@ SbeStageBuilderTestFixture::buildPlanStage(std::unique_ptr<QuerySolution> queryS
 }
 
 void GoldenSbeStageBuilderTestFixture::createCollection(const std::vector<BSONObj>& docs,
-                                                        boost::optional<BSONObj> indexKeyPattern) {
+                                                        boost::optional<BSONObj> indexKeyPattern,
+                                                        CollectionOptions options) {
     ASSERT_FALSE(_collInitialized) << "collection has been initialized";
     _collInitialized = true;
     // Create collection and index
