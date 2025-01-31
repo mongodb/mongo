@@ -210,6 +210,13 @@ function testReturnKey() {
     assert.commandWorked(coll.dropIndexes());
 }
 
+function testSortKeyGenerator() {
+    assert.commandWorked(coll.createIndex({a: 1}));
+    const explain = coll.find({}, {a: {$meta: "sortKey"}}).sort({a: 1}).explain();
+    getAllPlans(explain).forEach(assertPlanNotCosted);
+    assert.commandWorked(coll.dropIndexes());
+}
+
 try {
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "heuristicCE"}));
 
@@ -225,6 +232,7 @@ try {
     testClusteredIndex();
     testMinMaxIndexScan();
     testReturnKey();
+    testSortKeyGenerator();
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
