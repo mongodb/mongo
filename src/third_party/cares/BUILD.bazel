@@ -99,6 +99,14 @@ mongo_cc_library(
             "platform/linux_x86_64/build/include/*.h",
             "platform/linux_x86_64/install/include/*.h",
         ]),
+        "@platforms//cpu:s390x": glob([
+            "platform/linux_s390x/build/include/*.h",
+            "platform/linux_s390x/install/include/*.h",
+        ]),
+        "@platforms//cpu:ppc": glob([
+            "platform/linux_ppc64le/build/include/*.h",
+            "platform/linux_ppc64le/install/include/*.h",
+        ]),
         "//conditions:default": [],
     }),
     copts = select({
@@ -111,6 +119,12 @@ mongo_cc_library(
         ],
         "@platforms//cpu:x86_64": [
             "-Isrc/third_party/cares/platform/linux_x86_64/build/include",
+        ],
+        "@platforms//cpu:s390x": [
+            "-Isrc/third_party/cares/platform/linux_s390x/build/include",
+        ],
+        "@platforms//cpu:ppc": [
+            "-Isrc/third_party/cares/platform/linux_ppc64le/build/include",
         ],
         "//conditions:default": [],
     }) + select({
@@ -127,6 +141,12 @@ mongo_cc_library(
         "@platforms//cpu:x86_64": [
             "platform/linux_x86_64/install/include",
         ],
+        "@platforms//cpu:s390x": [
+            "platform/linux_s390x/install/include",
+        ],
+        "@platforms//cpu:ppc": [
+            "platform/linux_ppc64le/install/include",
+        ],
         "//conditions:default": [],
     }),
     local_defines = [
@@ -141,8 +161,7 @@ mongo_cc_library(
         "//conditions:default": [],
     }),
     target_compatible_with = select({
-        "//bazel/config:linux_aarch64": [],
-        "//bazel/config:linux_x86_64": [],
+        "@platforms//os:linux": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
 )

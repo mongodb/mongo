@@ -476,7 +476,9 @@ def mongo_shell_program(
         if config.SHELL_TLS_CERTIFICATE_KEY_FILE:
             kwargs["tlsCertificateKeyFile"] = config.SHELL_TLS_CERTIFICATE_KEY_FILE
 
-    if config.SHELL_GRPC:
+    # mongotmock testing with gRPC requires that the shell establish a connection with mongotmock
+    # over gRPC.
+    if config.SHELL_GRPC or mongod_set_parameters.get("useGrpcForSearch"):
         args.append("--gRPC")
 
     if connection_string is not None:

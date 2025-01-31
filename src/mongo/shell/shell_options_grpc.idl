@@ -41,7 +41,6 @@ configs:
   "gRPC":
     description: "Enable gRPC support (disabled by default)"
     arg_vartype: Switch
-    requires: tls
     conflicts: [ "tls.CRLFile", "tls.disabledProtocols", "tls.FIPSMode", "tls.tlsCertificateKeyFilePassword" ]
 
   "gRPCAuthToken":

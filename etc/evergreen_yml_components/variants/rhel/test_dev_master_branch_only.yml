@@ -257,7 +257,6 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
-        ENABLE_GRPC_BUILD=1
       compile_variant: *linux-x86-dynamic-grpc
       clang_tidy_toolchain: v4
       large_distro_name: rhel8.8-xlarge
@@ -903,7 +902,6 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
         --link-model=dynamic
-        ENABLE_GRPC_BUILD=1
       compile_variant: enterprise-rhel-8-arm64-grpc-toolchain-v5
       scons_cache_scope: shared
     tasks:

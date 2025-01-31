@@ -51,7 +51,7 @@ public:
         return HostAndPort("localhost", 1234);
     }
 
-    virtual void setUp() override {
+    void setUp() override {
         _reactor = std::make_shared<GRPCReactor>();
         _ioThread = stdx::thread([&]() {
             _reactor->run();
@@ -59,7 +59,7 @@ public:
         });
     }
 
-    virtual void tearDown() override {
+    void tearDown() override {
         _reactor->stop();
         _ioThread.join();
     }

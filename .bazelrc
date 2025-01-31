@@ -78,7 +78,6 @@ common --flag_alias=use_disable_ref_track=//bazel/config:use_disable_ref_track
 common --flag_alias=use_wiredtiger=//bazel/config:use_wiredtiger
 common --flag_alias=use_glibcxx_debug=//bazel/config:use_glibcxx_debug
 common --flag_alias=use_tracing_profiler=//bazel/config:use_tracing_profiler
-common --flag_alias=build_grpc=//bazel/config:build_grpc
 common --flag_alias=build_otel=//bazel/config:build_otel
 common --flag_alias=use_libcxx=//bazel/config:use_libcxx
 common --flag_alias=detect_odr_violations=//bazel/config:detect_odr_violations

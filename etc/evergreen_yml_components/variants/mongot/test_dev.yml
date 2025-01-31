@@ -285,7 +285,6 @@ buildvariants:
         MONGO_DISTMOD=amazon2023
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        ENABLE_GRPC_BUILD=1
       compile_variant: *al2023-arm64-search-with-grpc
       build_mongot: true
     tasks:
@@ -312,7 +311,6 @@ buildvariants:
         MONGO_DISTMOD=amazon2023
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-        ENABLE_GRPC_BUILD=1
       compile_variant: *al2023-x86-search-with-grpc
       build_mongot: true
     tasks:

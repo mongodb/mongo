@@ -95,7 +95,8 @@ public:
         std::shared_ptr<const SSLConnectionContext> transientSSLContext) override;
 
 #ifdef MONGO_CONFIG_SSL
-    Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager, bool asyncOCSPStaple) {
+    Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
+                              bool asyncOCSPStaple) override {
         MONGO_UNIMPLEMENTED;
     };
 #endif

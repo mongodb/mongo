@@ -12,7 +12,7 @@ rule_dir = os.path.dirname(args.output)
 with open(args.input) as f:
     content = f.read()
 
-content = content.replace("@MONGO_BUILD_DIR@", f"{rule_dir}/src/mongo")
+content = content.replace("@MONGO_BUILD_DIR@", f"{rule_dir}/src/mongo/(?!.*\\.pb\\.h)")
 content = content.replace("@MONGO_BRACKET_BUILD_DIR@", f"{rule_dir}/src/mongo")
 if args.warnings_as_errors:
     content += 'WarningsAsErrors: "*"\n'
