@@ -89,13 +89,25 @@ export class ProxyProtocolServer {
      * Get the proxy server port used to connect to the egress port provided.
      */
     getServerPort() {
-        const args = ["ss", "-nt", `dst 127.0.0.1:${this.egress_port}`];
+        let args = ["ss", "-nt", `dst 127.0.0.1:${this.egress_port}`];
         clearRawMongoProgramOutput();
         _startMongoProgram({args: args});
 
         sleep(1000);
 
-        const output = rawMongoProgramOutput(".*");
+        let output = rawMongoProgramOutput(".*");
+
+        // Some variants like UBI 8 do not have ss installed
+        if (output.match("(?:not found|No such file or directory)")) {
+            args = ["netstat", "-nt"];
+            clearRawMongoProgramOutput();
+            _startMongoProgram({args: args});
+
+            sleep(1000);
+
+            output = rawMongoProgramOutput(".*");
+        }
+
         const regexMatch = `127.0.0.1:(\\d+)\\s+127.0.0.1:${this.egress_port}`;
         const match = output.match(regexMatch);
         if (!match) {
