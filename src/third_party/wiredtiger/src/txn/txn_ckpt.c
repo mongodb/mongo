@@ -918,8 +918,10 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     WT_STAT_CONN_SET(session, txn_checkpoint_scrub_target, 0);
 
     /* Tell logging that we have started a database checkpoint. */
-    if (full && logging)
+    if (full && logging) {
         WT_ERR(__wt_txn_checkpoint_log(session, full, WT_TXN_LOG_CKPT_START, NULL));
+        WT_ERR(__wt_log_system_backup_id(session));
+    }
 
     /* Add a ten second wait to simulate checkpoint slowness. */
     tsp.tv_sec = 10;
@@ -1005,8 +1007,10 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ERR(__checkpoint_apply_to_dhandles(session, cfg, __wt_checkpoint_sync));
 
     /* Sync the history store file. */
-    if (F_ISSET(hs_dhandle, WT_DHANDLE_OPEN))
+    if (F_ISSET(hs_dhandle, WT_DHANDLE_OPEN)) {
         WT_WITH_DHANDLE(session, hs_dhandle, ret = __wt_checkpoint_sync(session, NULL));
+        WT_ERR(ret);
+    }
 
     time_stop_fsync = __wt_clock(session);
     fsync_duration_usecs = WT_CLOCKDIFF_US(time_stop_fsync, time_start_fsync);

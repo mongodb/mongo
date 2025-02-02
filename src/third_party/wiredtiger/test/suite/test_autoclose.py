@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wttest
+import sys, wttest
 
 # test_autoclose
 class test_autoclose(wttest.WiredTigerTestCase):
@@ -36,6 +36,9 @@ class test_autoclose(wttest.WiredTigerTestCase):
     handles are also closed.
     """
     uri = 'table:test_autoclose'
+    # Note: SWIG generates a TypeError instead of a RuntimeError for several cases.
+    # The same error on all platforms would be better.
+    expected_exception = TypeError if sys.platform.startswith('darwin') else RuntimeError
 
     def create_table(self):
         self.session.create(self.uri,
@@ -57,7 +60,7 @@ class test_autoclose(wttest.WiredTigerTestCase):
         inscursor = self.open_cursor()
         inscursor['key1'] = 'value1'
         inscursor.close()
-        self.assertRaisesHavingMessage(RuntimeError,
+        self.assertRaisesHavingMessage(self.expected_exception,
                                        lambda: inscursor.next(),
                                        '/wt_cursor.* is None/')
         self.drop_table()
@@ -72,7 +75,7 @@ class test_autoclose(wttest.WiredTigerTestCase):
         inscursor = self.open_cursor()
         inscursor['key1'] = 'value1'
         self.session.close()
-        self.assertRaisesHavingMessage(RuntimeError,
+        self.assertRaisesHavingMessage(self.expected_exception,
                                        lambda: inscursor.next(),
                                        '/wt_cursor.* is None/')
         self.close_conn()
@@ -86,7 +89,7 @@ class test_autoclose(wttest.WiredTigerTestCase):
         inscursor = self.open_cursor()
         inscursor['key1'] = 'value1'
         self.close_conn()
-        self.assertRaisesHavingMessage(RuntimeError,
+        self.assertRaisesHavingMessage(self.expected_exception,
                                        lambda: inscursor.next(),
                                        '/wt_cursor.* is None/')
 
@@ -117,14 +120,12 @@ class test_autoclose(wttest.WiredTigerTestCase):
         inscursor2 = self.session.open_cursor(None, inscursor, None)
         inscursor.compare(inscursor2)
 
-        # Note: SWIG generates a TypeError in this case.
-        # A RuntimeError to match the other cases would be better.
         inscursor2.close()
         self.assertRaises(TypeError,
                           lambda: inscursor.compare(inscursor2))
 
         inscursor2 = None
-        self.assertRaisesHavingMessage(RuntimeError,
+        self.assertRaisesHavingMessage(self.expected_exception,
                                        lambda: inscursor.compare(inscursor2),
                                        '/wt_cursor.* is None/')
 
@@ -133,7 +134,7 @@ class test_autoclose(wttest.WiredTigerTestCase):
         Use a session handle after it is explicitly closed.
         """
         self.session.close()
-        self.assertRaisesHavingMessage(RuntimeError,
+        self.assertRaisesHavingMessage(self.expected_exception,
                                        lambda: self.create_table(),
                                        '/wt_session.* is None/')
         self.close_conn()
@@ -143,7 +144,7 @@ class test_autoclose(wttest.WiredTigerTestCase):
         Use a session handle after the connection is closed.
         """
         self.close_conn()
-        self.assertRaisesHavingMessage(RuntimeError,
+        self.assertRaisesHavingMessage(self.expected_exception,
                                        lambda: self.create_table(),
                                        '/wt_session.* is None/')
 
@@ -153,7 +154,7 @@ class test_autoclose(wttest.WiredTigerTestCase):
         """
         conn = self.conn
         self.close_conn()
-        self.assertRaisesHavingMessage(RuntimeError,
+        self.assertRaisesHavingMessage(self.expected_exception,
                                        lambda: conn.open_session(None),
                                        '/wt_connection.* is None/')
 
