@@ -98,6 +98,8 @@ selector:
     - jstests/core/**/geo_s2explain.js
     - jstests/core/**/geo_s2sparse.js
     - jstests/core/**/operation_latency_histogram.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
     - jstests/core/txns/**/*.js
     - jstests/core/**/operation_latency_histogram.js
     - jstests/core/**/profile2.js

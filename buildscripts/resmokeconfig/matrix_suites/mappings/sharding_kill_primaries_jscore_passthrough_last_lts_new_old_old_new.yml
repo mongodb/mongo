@@ -9,3 +9,6 @@ overrides:
 extends:
   - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_with_any_tags"
   - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files_base"
+
+excludes:
+  - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files_fle"
