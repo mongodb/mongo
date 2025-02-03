@@ -85,6 +85,9 @@ filters:
   - "index_catalog*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "index_catalog_entry_helpers*":
+    approvers:
+      - 10gen/query-execution-write-exec
   - "index_signature_test.cpp":
     approvers:
       - 10gen/server-catalog-and-routing

@@ -91,7 +91,7 @@
 #include "mongo/db/profile_collection.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
@@ -842,8 +842,10 @@ UpdateResult performUpdate(OperationContext* opCtx,
     auto&& explainer = exec->getPlanExplainer();
     explainer.getSummaryStats(&summaryStats);
     if (collection.exists()) {
-        CollectionQueryInfo::get(collection.getCollectionPtr())
-            .notifyOfQuery(opCtx, collection.getCollectionPtr(), summaryStats);
+        CollectionIndexUsageTrackerDecoration::get(collection.getCollectionPtr().get())
+            .recordCollectionIndexUsage(summaryStats.collectionScans,
+                                        summaryStats.collectionScansNonTailable,
+                                        summaryStats.indexesUsed);
     }
     auto updateResult = exec->getUpdateResult();
 
@@ -962,7 +964,10 @@ long long performDelete(OperationContext* opCtx,
     PlanSummaryStats summaryStats;
     exec->getPlanExplainer().getSummaryStats(&summaryStats);
     if (const auto& coll = collectionPtr) {
-        CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, summaryStats);
+        CollectionIndexUsageTrackerDecoration::get(coll.get())
+            .recordCollectionIndexUsage(summaryStats.collectionScans,
+                                        summaryStats.collectionScansNonTailable,
+                                        summaryStats.indexesUsed);
     }
     curOp->debug().setPlanSummaryMetrics(std::move(summaryStats));
 
@@ -1284,7 +1289,9 @@ static SingleWriteResult performSingleUpdateOpNoRetry(OperationContext* opCtx,
     auto&& explainer = exec->getPlanExplainer();
     explainer.getSummaryStats(&summary);
     if (const auto& coll = collection.getCollectionPtr()) {
-        CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, summary);
+        CollectionIndexUsageTrackerDecoration::get(coll.get())
+            .recordCollectionIndexUsage(
+                summary.collectionScans, summary.collectionScansNonTailable, summary.indexesUsed);
     }
 
     if (curOp.shouldDBProfile()) {
@@ -1880,7 +1887,9 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     auto&& explainer = exec->getPlanExplainer();
     explainer.getSummaryStats(&summary);
     if (const auto& coll = collection.getCollectionPtr()) {
-        CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, summary);
+        CollectionIndexUsageTrackerDecoration::get(coll.get())
+            .recordCollectionIndexUsage(
+                summary.collectionScans, summary.collectionScansNonTailable, summary.indexesUsed);
     }
     curOp.debug().setPlanSummaryMetrics(std::move(summary));
 

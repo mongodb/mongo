@@ -67,7 +67,7 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
 #include "mongo/db/query/client_cursor/collect_query_stats_mongod.h"
-#include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
@@ -410,7 +410,10 @@ public:
             PlanSummaryStats summaryStats;
             exec.getPlanExplainer().getSummaryStats(&summaryStats);
             if (collection) {
-                CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);
+                CollectionIndexUsageTrackerDecoration::get(collection.get())
+                    .recordCollectionIndexUsage(summaryStats.collectionScans,
+                                                summaryStats.collectionScansNonTailable,
+                                                summaryStats.indexesUsed);
             }
             curOp->debug().setPlanSummaryMetrics(std::move(summaryStats));
             curOp->setEndOfOpMetrics(kNReturned);

@@ -19,10 +19,7 @@ filters:
       - 10gen/query-execution-index-access-stats
   - "collection_query_info*":
     approvers:
-      # TODO SERVER-96045: This is currently owned by query because the plan cache part is a query
-      # optimization component, while the update and stats tracking components are owned by query
-      # execution. As such, this can be split between the two teams once these files are split up.
-      - 10gen/query
+      - 10gen/query-optimization-plan-cache
   - "eof_node_type*":
     approvers:
       - 10gen/query-optimization

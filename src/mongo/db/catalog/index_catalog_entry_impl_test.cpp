@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,40 +27,13 @@
  *    it in the license file.
  */
 
-#include <string>
-
-#include <boost/move/utility_core.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/ordering.h"
-#include "mongo/crypto/encryption_fields_gen.h"
-#include "mongo/db/catalog/clustered_collection_options_gen.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/catalog/catalog_test_fixture.h"
+#include "mongo/db/catalog/index_catalog_entry_helpers.h"
 #include "mongo/db/index/wildcard_access_method.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
-#include "mongo/db/storage/ident.h"
-#include "mongo/db/storage/key_string/key_string.h"
-#include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo {
+
 namespace {
 
 class IndexCatalogEntryMock : public IndexCatalogEntry {
@@ -195,7 +168,9 @@ std::unique_ptr<IndexDescriptor> makeIndexDescriptor(StringData indexName,
     return std::make_unique<IndexDescriptor>(accessMethodName, std::move(indexSpec));
 }
 
-TEST(CollectionQueryInfoTest, computeUpdateIndexDataForCompoundWildcardIndex) {
+}  // namespace
+
+TEST(IndexCatalogEntryTest, computeUpdateIndexDataForCompoundWildcardIndex) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test"_sd);
     CollectionOptions collOptions{};
     DevNullKVEngine engine{};
@@ -211,7 +186,7 @@ TEST(CollectionQueryInfoTest, computeUpdateIndexDataForCompoundWildcardIndex) {
 
     WildcardAccessMethod accessMethod{&indexCatalogEntry, std::move(sortedDataInterface)};
     UpdateIndexData outData{};
-    CollectionQueryInfo::computeUpdateIndexData(&indexCatalogEntry, &accessMethod, &outData);
+    index_catalog_helpers::computeUpdateIndexData(&indexCatalogEntry, &accessMethod, &outData);
 
     // Asserting that expected fields are included.
     ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"a"_sd}));
@@ -224,7 +199,7 @@ TEST(CollectionQueryInfoTest, computeUpdateIndexDataForCompoundWildcardIndex) {
     ASSERT_FALSE(outData.mightBeIndexed(FieldRef{"$**"_sd}));
 }
 
-TEST(CollectionQueryInfoTest, computeUpdateIndexDataForCompoundWildcardIndex_ExcludeCase) {
+TEST(IndexCatalogEntryTest, computeUpdateIndexDataForCompoundWildcardIndex_ExcludeCase) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test"_sd);
     CollectionOptions collOptions{};
     DevNullKVEngine engine{};
@@ -240,7 +215,7 @@ TEST(CollectionQueryInfoTest, computeUpdateIndexDataForCompoundWildcardIndex_Exc
 
     WildcardAccessMethod accessMethod{&indexCatalogEntry, std::move(sortedDataInterface)};
     UpdateIndexData outData{};
-    CollectionQueryInfo::computeUpdateIndexData(&indexCatalogEntry, &accessMethod, &outData);
+    index_catalog_helpers::computeUpdateIndexData(&indexCatalogEntry, &accessMethod, &outData);
 
     // When wildcardProjection has exclusion, everything is "indexed", since we don't know for sure,
     // which fields are indexed.
@@ -251,5 +226,4 @@ TEST(CollectionQueryInfoTest, computeUpdateIndexDataForCompoundWildcardIndex_Exc
     ASSERT_TRUE(outData.mightBeIndexed(FieldRef{"_id"_sd}));
 }
 
-}  // namespace
 }  // namespace mongo

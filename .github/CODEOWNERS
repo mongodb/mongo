@@ -1280,6 +1280,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/catalog/**/collection_yield_restore* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/catalog/**/historical_catalogid_tracker* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/catalog/**/index_catalog* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/db/catalog/**/index_catalog_entry_helpers* @10gen/query-execution-write-exec @svc-auto-approve-bot
 /src/mongo/db/catalog/**/index_signature_test.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/catalog/**/list_indexes* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/catalog/**/snapshot_helper* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -1697,7 +1698,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-integration-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
 /src/mongo/db/query/**/analyze* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/collection_index_usage_tracker* @10gen/query-execution-index-access-stats @svc-auto-approve-bot
-/src/mongo/db/query/**/collection_query_info* @10gen/query @svc-auto-approve-bot
+/src/mongo/db/query/**/collection_query_info* @10gen/query-optimization-plan-cache @svc-auto-approve-bot
 /src/mongo/db/query/**/eof_node_type* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/explain* @10gen/query-optimization-explain @svc-auto-approve-bot
 /src/mongo/db/query/**/expression_walker* @10gen/query-optimization-logical-models @svc-auto-approve-bot

@@ -112,6 +112,19 @@ void CollectionIndexUsageTracker::unregisterIndex(StringData indexName) {
     _indexUsageStatsMap.erase(it);
 }
 
+void CollectionIndexUsageTracker::recordCollectionIndexUsage(
+    long long collectionScans,
+    long long collectionScansNonTailable,
+    const std::set<std::string>& indexesUsed) const {
+    recordCollectionScans(collectionScans);
+    recordCollectionScansNonTailable(collectionScansNonTailable);
+
+    // Record indexes used to fulfill query.
+    for (auto it = indexesUsed.begin(); it != indexesUsed.end(); ++it) {
+        recordIndexAccess(*it);
+    }
+}
+
 const CollectionIndexUsageTracker::CollectionIndexUsageMap&
 CollectionIndexUsageTracker::getUsageStats() const {
     return _indexUsageStatsMap;

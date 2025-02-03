@@ -74,7 +74,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/client_cursor/collect_query_stats_mongod.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_command.h"
@@ -629,7 +629,9 @@ public:
         auto&& explainer = executor->getPlanExplainer();
         explainer.getSummaryStats(&stats);
         if (collection) {
-            CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, stats);
+            CollectionIndexUsageTrackerDecoration::get(collection.get())
+                .recordCollectionIndexUsage(
+                    stats.collectionScans, stats.collectionScansNonTailable, stats.indexesUsed);
         }
 
         curOp->debug().setPlanSummaryMetrics(std::move(stats));

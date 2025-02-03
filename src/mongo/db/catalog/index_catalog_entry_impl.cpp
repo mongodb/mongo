@@ -47,6 +47,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog_entry_helpers.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -149,7 +150,7 @@ IndexCatalogEntryImpl::~IndexCatalogEntryImpl() = default;
 void IndexCatalogEntryImpl::setAccessMethod(std::unique_ptr<IndexAccessMethod> accessMethod) {
     invariant(!_shared->_accessMethod);
     _shared->_accessMethod = std::move(accessMethod);
-    CollectionQueryInfo::computeUpdateIndexData(
+    index_catalog_helpers::computeUpdateIndexData(
         this, _shared->_accessMethod.get(), &_shared->_indexedPaths);
 }
 

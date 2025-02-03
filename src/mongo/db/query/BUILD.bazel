@@ -710,7 +710,6 @@ mongo_cc_unit_test(
         "canonical_query_test.cpp",
         "canonical_query_test_util.cpp",
         "canonical_query_test_util.h",
-        "collection_query_info_test.cpp",
         "count_command_test.cpp",
         "field_effects_test.cpp",
         "field_set_test.cpp",

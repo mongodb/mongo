@@ -85,7 +85,7 @@
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_common.h"
@@ -544,8 +544,11 @@ void executeUntilFirstBatch(const AggExState& aggExState,
             maybePinnedCursor ? maybePinnedCursor->getCursor()->getExecutor() : execs[0].get();
         const auto& planExplainer = exec->getPlanExplainer();
         if (const auto& coll = aggCatalogState.getPrimaryCollection()) {
-            CollectionQueryInfo::get(coll).notifyOfQuery(
-                coll, CurOp::get(aggExState.getOpCtx())->debug());
+            auto& debugInfo = CurOp::get(aggExState.getOpCtx())->debug();
+            CollectionIndexUsageTrackerDecoration::get(coll.get())
+                .recordCollectionIndexUsage(debugInfo.collectionScans,
+                                            debugInfo.collectionScansNonTailable,
+                                            debugInfo.indexesUsed);
         }
         // For SBE pushed down pipelines, we may need to report stats saved for secondary
         // collections separately.
@@ -554,8 +557,10 @@ void executeUntilFirstBatch(const AggExState& aggExState,
             if (coll) {
                 PlanSummaryStats secondaryStats;
                 planExplainer.getSecondarySummaryStats(secondaryNss, &secondaryStats);
-                CollectionQueryInfo::get(coll).notifyOfQuery(
-                    aggExState.getOpCtx(), coll, secondaryStats);
+                CollectionIndexUsageTrackerDecoration::get(coll.get())
+                    .recordCollectionIndexUsage(secondaryStats.collectionScans,
+                                                secondaryStats.collectionScansNonTailable,
+                                                secondaryStats.indexesUsed);
             }
         }
     }

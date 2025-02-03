@@ -170,6 +170,13 @@ public:
     void recordCollectionScans(unsigned long long collectionScans) const;
     void recordCollectionScansNonTailable(unsigned long long collectionScansNonTailable) const;
 
+    /**
+     * Helper method to notify all metrics of a collection in a single call.
+     */
+    void recordCollectionIndexUsage(long long collectionScans,
+                                    long long collectionScansNonTailable,
+                                    const std::set<std::string>& indexesUsed) const;
+
 private:
     // Maps index name to index usage statistics.
     CollectionIndexUsageMap _indexUsageStatsMap;

@@ -45,7 +45,7 @@
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/initialize_auto_get_helper.h"
-#include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_common.h"
@@ -421,15 +421,18 @@ DocumentSourceCursor::DocumentSourceCursor(
 
     if (collections.hasMainCollection()) {
         const auto& coll = collections.getMainCollection();
-        CollectionQueryInfo::get(coll).notifyOfQuery(
-            pExpCtx->getOperationContext(), coll, _stats.planSummaryStats);
+        CollectionIndexUsageTrackerDecoration::get(coll.get())
+            .recordCollectionIndexUsage(_stats.planSummaryStats.collectionScans,
+                                        _stats.planSummaryStats.collectionScansNonTailable,
+                                        _stats.planSummaryStats.indexesUsed);
     }
     for (auto& [nss, coll] : collections.getSecondaryCollections()) {
         if (coll) {
             PlanSummaryStats stats;
             explainer.getSecondarySummaryStats(nss, &stats);
-            CollectionQueryInfo::get(coll).notifyOfQuery(
-                pExpCtx->getOperationContext(), coll, stats);
+            CollectionIndexUsageTrackerDecoration::get(coll.get())
+                .recordCollectionIndexUsage(
+                    stats.collectionScans, stats.collectionScansNonTailable, stats.indexesUsed);
         }
     }
 
