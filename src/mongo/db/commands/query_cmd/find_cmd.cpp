@@ -121,6 +121,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_stats.h"
+#include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
@@ -677,6 +678,17 @@ public:
 
             boost::optional<CollectionOrViewAcquisition> collectionOrView =
                 acquireCollectionOrViewMaybeLockFree(opCtx, acquisitionRequest);
+            if (_cmdRequest->getRawData()) {
+                auto [isTimeseriesViewRequest, translatedNs] =
+                    timeseries::isTimeseriesViewRequest(opCtx, *_cmdRequest);
+                if (isTimeseriesViewRequest) {
+                    _cmdRequest->setNss(translatedNs);
+                    collectionOrView = acquireCollectionOrViewMaybeLockFree(
+                        opCtx,
+                        CollectionOrViewAcquisitionRequest::fromOpCtx(
+                            opCtx, translatedNs, AcquisitionPrerequisites::kRead));
+                }
+            }
             const NamespaceString nss = collectionOrView->nss();
 
             // It is cheaper to raise the profiling level here, now that a CollectionCatalog

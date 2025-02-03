@@ -267,7 +267,8 @@ DBCollection.prototype.find = function(filter, projection, limit, skip, batchSiz
     return cursor;
 };
 
-DBCollection.prototype.findOne = function(filter, projection, options, readConcern, collation) {
+DBCollection.prototype.findOne = function(
+    filter, projection, options, readConcern, collation, rawData) {
     var cursor =
         this.find(filter, projection, -1 /* limit */, 0 /* skip*/, 0 /* batchSize */, options);
 
@@ -277,6 +278,10 @@ DBCollection.prototype.findOne = function(filter, projection, options, readConce
 
     if (collation) {
         cursor = cursor.collation(collation);
+    }
+
+    if (rawData) {
+        cursor = cursor.rawData();
     }
 
     if (!cursor.hasNext())

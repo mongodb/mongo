@@ -97,13 +97,26 @@ crudTest(() => {
 
 // find()
 crudTest(() => {
-    assert.eq(bucketsColl.find().length(), 2);
-    assert.eq(bucketsColl.find({"control.count": 2}).length(), 1);
+    // TODO (SERVER-100232): Run this test case when going through a mongos or the collection is
+    // sharded/unsplittable.
+    if (FixtureHelpers.isMongos(db) || FixtureHelpers.isSharded(bucketsColl) ||
+        FixtureHelpers.isUnsplittable(bucketsColl)) {
+        return;
+    }
+    assert.eq(coll.find().rawData().length(), 2);
+    assert.eq(coll.find({"control.count": 2}).rawData().length(), 1);
 });
 
 // findOne()
 crudTest(() => {
-    const retrievedBucket = bucketsColl.findOne({"control.count": 2});
+    // TODO (SERVER-100232): Run this test case when going through a mongos or the collection is
+    // sharded/unsplittable.
+    if (FixtureHelpers.isMongos(db) || FixtureHelpers.isSharded(bucketsColl) ||
+        FixtureHelpers.isUnsplittable(bucketsColl)) {
+        return;
+    }
+    const retrievedBucket =
+        coll.findOne({"control.count": 2}, null, null, null, null, true /* rawData */);
     assert.eq(retrievedBucket.control.count, 2);
     assert.eq(retrievedBucket.meta, "1");
 });
