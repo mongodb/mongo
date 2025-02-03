@@ -26,11 +26,15 @@ Symmetry == Permutations(Shards) \union Permutations(NameSpaces) \union Permutat
 (* Counterexamples.                                                                               *)
 (**************************************************************************************************)
 
-\* Produces a counterexample trace where SIN happens
-BaitSIN == 
+BaitResponseStatus(status) == 
     ~ \E t \in Txns, stm \in Stmts: 
         /\ HasResponse(response[t][stm])
-        /\ \E rsp \in response[t][stm]: rsp.status = SNAPSHOT_INCOMPATIBLE
+        /\ \E rsp \in response[t][stm]: rsp.status = status
+
+\* Produces a counterexample trace where SNAPSHOT_INCOMPATIBLE happens
+BaitStaleDatabaseVersion == BaitResponseStatus(STALE_DB_VERSION)
+BaitStaleShardVersion == BaitResponseStatus(STALE_SHARD_VERSION)
+BaitSnapshotIncompatible == BaitResponseStatus(SNAPSHOT_INCOMPATIBLE)
 
 \* Produces a counterexample trace where everything goes perfect, all txn committed
 BaitHappyPath ==

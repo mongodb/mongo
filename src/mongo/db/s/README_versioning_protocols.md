@@ -52,7 +52,7 @@ The protocol is the same when using a `databaseVersion`, the only difference is 
 A database version is represented as DBV<U, T, Mod> and consists of three elements:
 
 1. **U** (the uuid) : a unique identifier to distinguish different instances of the database. The UUID remains unchanged for the lifetime of the database, changing when the database is dropped and recreated.
-2. **T** (the timestamp) : a new unique identifier introduced in version 5.0 which also remains unchanged for the lifetime of a database. The difference between the uuid and timestamp is that timestamps are comparable, allowing for ordering database versions in which the UUID/Timestamp do not match.
+2. **T** (the timestamp) : a unique identifier introduced in version 5.0. The difference between the uuid and timestamp is that timestamps are comparable, allowing for ordering database versions in which the UUID/Timestamp do not match. Like the UUID, the timestamp changes when the database is dropped and recreated, but unlike the UUID, the timestamp also changes the database changes its primary shard.
 3. **M** (last modified) : an integer incremented when the database changes its primary shard.
 
 ## Shard Version

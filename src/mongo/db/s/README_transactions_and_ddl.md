@@ -59,30 +59,53 @@ protocol to forbid the anomalies above.
 
 For readConcern: "snapshot" transactions, only the collection generation anomaly is applicable.
 
-The protocol is as follows:
+On the first statement, the router chooses an `atClusterTime` (i.e., it selects its latest known
+`VectorClock::clusterTime`), unless the transaction specifies one.
 
-1. On the first statement, the router chooses an `atClusterTime` (i.e., it selects its latest known
-   `VectorClock::clusterTime`), unless the transaction specifies one.
+For **tracked** collections, the protocol is as follows:
+
 1. The router forwards statements using its latest routing table, but interprets it as of
    `atClusterTime` by consulting the [chunk ownership history](https://github.com/mongodb/mongo/blob/6afc3207668d5dca4e7168bdb089f74bc299ef06/src/mongo/s/catalog/type_chunk.h#L295-L296).
 1. The targeted shard checks the attached placement version. All the following conditions must be
    met for the request to be considered valid:
    1. It must match the current (latest) placement version for this shard.
-   1. The received `atClusterTime` must not be earlier than the placement version's [timestamp field](https://github.com/mongodb/mongo/blob/8a79395deff895f18b8878ff4567c9fb309a7c64/src/mongo/db/s/README_versioning_protocols.md#shard-version) known by the shard.
+   1. The received `atClusterTime` must not be earlier than the latest placement version's [timestamp field](https://github.com/mongodb/mongo/blob/8a79395deff895f18b8878ff4567c9fb309a7c64/src/mongo/db/s/README_versioning_protocols.md#shard-version) known by the shard.
       This field represents the commit timestamp of the latest collection generation operation
       (e.g. shardCollection, renameCollection, etc) on this sharded collection.
-   1. If the placement version is UNSHARDED, the collection in the snapshot must be the same
-      incarnation (same UUID) as in the latest CollectionCatalog.
 
 Notes:
 
-- (3.i) ensures that the routing table used by the router (including its history) is not stale. This
+- (2.i) ensures that the routing table used by the router (including its history) is not stale. This
   is part of the placement versioning protocol.
-- (3.ii) ensures that the collection did not undergo any collection generation change at a timestamp
+- (2.ii) ensures that the collection did not undergo any collection generation change at a timestamp
   later than `atClusterTime`, which would make the current routing/filtering metadata invalid to be used
   with the point-in-time storage snapshot. This proscribes the collection generation anomaly.
-- (3.iii) ensures that the collection incarnation anomaly is detected by the primary shard after a
-  sharded collection is reincarnated as unsharded (by definition, ShardVersion::UNSHARDED always conforms with 3.ii).
+
+For **untracked** collections, the protocol is as follows:
+
+1. The router forwards statements using the latest database version, and targets its primary shard.
+   ShardVersion::UNSHARDED is attached in addition to the DatabaseVersion.
+1. The targeted shard checks the attached metadata. All the following conditions must be
+   met for the request to be considered valid:
+   1. The received database version must match the current (latest) database version.
+   1. The received `atClusterTime` must not be earlier than the latest database version's [timestamp field](https://github.com/10gen/mongo/blob/eeef1763cb0ff77757bb60eabb8ad1233c990786/src/mongo/db/s/README_versioning_protocols.md#database-version) known by the shard.
+      This field represents the commit timestamp of the latest reincarnation (drop/create) or movePrimary operation for this database.
+   1. The received placement version is UNSHARDED, and the shard checks the latest version matches.
+   1. The collection in the snapshot must be the same incarnation (same UUID) as in the latest CollectionCatalog.
+
+Notes:
+
+- (2.i) ensures that the router's database primary shard knowledge is not stale. This is part of the
+  database versioning protocol.
+- (2.ii) ensures that the database did not undergo any reincarnation at a timestamp later than
+  `atClusterTime`. The router always routes requests for untracked collections based on the latest
+  database primary shard knowledge, but this decision might not be valid at the specified cluster time.
+  E.g. if the shard was not the primary shard for the database at that point in time.
+- (2.iii) ensures that the collection generation anomaly is detected for cases where an untracked
+  collection becomes tracked. There will be a mismatch between the attached ShardVersion::UNSHARDED
+  and the actual placement version on the shard.
+- (2.iv) ensures that the collection incarnation anomaly is detected by the primary shard after a
+  sharded collection is reincarnated as unsharded (by definition, ShardVersion::UNSHARDED always conforms with 2.ii).
 
 ## Transactions with readConcern="local" or "majority"
 
@@ -90,11 +113,11 @@ This protocol is more complex, because with read concern levels weaker than "sna
 participant shard can open their read snapshot at different timestamps, and the router is unaware
 of the timestamp they chose. Both data placement and collection generation anomalies apply.
 
-The protocol is as follows:
+On the first statement, the router chooses a `placementConflictTime` (i.e., it selects its latest known
+`VectorClock::clusterTime`) at the beginning of the transaction and uses the same `placementConflictTime` for all statements.
 
-1. On the first statement, the router chooses a `placementConflictTime` (i.e., it selects its latest known
-   `VectorClock::clusterTime`) at the beginning of the transaction and uses the same
-   `placementConflictTime` for all statements.
+For **tracked** collections, the protocol is as follows:
+
 1. For each statement, the router uses the latest routing table (considers the latest version).
 1. For each statement, the router sends the command to the targeted shard. It attaches the placement
    version as usual, and additionally attaches the selected `placementConflictTime`. It also
@@ -108,28 +131,18 @@ The protocol is as follows:
       etc) on this collection.
    1. `placementConflictTime` must not be earlier than the latest _incoming_ migration commit timestamp on this
       shard for this collection.
-   1. If the placement version is UNSHARDED, the collection in the snapshot must be the same
-      incarnation (same UUID) as in the latest CollectionCatalog.
-
-A formal specification of the placement versioning protocol and the protocol avoiding the data
-placement anomaly is available [here](/src/mongo/tla_plus/TxnsMoveRange).
-
-A formal specification of the protocol avoiding the collection generation and collection incarnation
-anomalies is available [here](/src/mongo/tla_plus/TxnsCollectionIncarnation).
 
 Notes:
 
-- (5.i) ensures that the routing table used by the router is not stale. This is part of the placement
+- (4.i) ensures that the routing table used by the router is not stale. This is part of the placement
   versioning protocol.
-- (5.ii) ensures that the collection did not undergo any collection generation change at a timestamp
+- (4.ii) ensures that the collection did not undergo any collection generation change at a timestamp
   later than `placementConflictTime`, which would make the current routing/filtering metadata
   invalid to be used with the open snapshot. This proscribes the collection generation anomaly.
-- (5.iii) ensures no migration committed since `placementConflictTime`. This proscribes the data
+- (4.iii) ensures no migration committed since `placementConflictTime`. This proscribes the data
   placement anomaly.
-- (5.iv) ensures that the collection incarnation anomaly is detected by the primary shard after a
-  sharded collection is reincarnated unsharded.
-- The `afterClusterTime` selected at (3) imposes a lower bound for each shard's snapshot read
-  timestamp. The (5.i) and (5.ii) assertions check that the metadata/placement has not changed since
+- The `afterClusterTime` selected at (2) imposes a lower bound for each shard's snapshot read
+  timestamp. The (4.i) and (4.ii) assertions check that the metadata/placement has not changed since
   that lower bound, therefore guaranteeing that the assertions are valid for whatever timestamp could
   have been ultimately selected. The lower bound imposed by `afterClusterTime` is necessary because
   there is otherwise no guarantee that the shard would open a snapshot that is at least inclusive of
@@ -143,3 +156,38 @@ Notes:
 - By design, it is not possible for a router to cache routing information accounting for the
   latest migration, without having gossiped in a clusterTime that is at least as recent as that
   migration's commit timestamp.
+
+For **untracked** collections, the protocol is as follows:
+
+1. For each statement, the router uses the latest database version.
+1. For each statement, the router sends the command to the database primary shard. It attaches the database
+   version as usual, and additionally attaches the selected `placementConflictTime`. It also
+   attaches an `afterClusterTime` = `placementConflictTime`, and ShardVersion::UNSHARDED.
+1. The targeted shard will open its storage snapshot with a timestamp at least `afterClusterTime`.
+1. The targeted shard checks the attached metadata. All the following conditions must be
+   met for the request to be considered valid:
+   1. The received database version must match the current (latest) database version.
+   1. `placementConflictTime` must not be earlier than the database version's [timestamp field](https://github.com/10gen/mongo/blob/eeef1763cb0ff77757bb60eabb8ad1233c990786/src/mongo/db/s/README_versioning_protocols.md#database-version).
+      This field represents the commit timestamp of the latest reincarnation (drop/create) or movePrimary operation for this database.
+   1. The received placement version is UNSHARDED, and the shard checks the latest version matches.
+   1. The collection in the snapshot must be the same incarnation (same UUID) as in the latest CollectionCatalog.
+
+Notes:
+
+- (4.i) ensures that the database version used by the router is not stale. This is part of the database
+  versioning protocol.
+- (4.ii) ensures that the database did not undergo any reincarnation at a timestamp later than
+  `placementConflictTime`. The router always routes requests for untracked collections based on the latest
+  database primary shard knowledge, but this decision might not be valid at for snapshots opened at
+  a timestamp before the reincarnation.
+- (4.iii) ensures that the collection generation anomaly is detected for cases where an untracked
+  collection becomes tracked. There will be a mismatch between the attached ShardVersion::UNSHARDED
+  and the actual placement version on the shard.
+- (4.iv) ensures that the collection incarnation anomaly is detected by the primary shard after a
+  sharded collection is reincarnated unsharded.
+
+A formal specification of the placement versioning protocol and the protocol avoiding the data
+placement anomaly is available [here](/src/mongo/tla_plus/TxnsMoveRange).
+
+A formal specification of the protocol avoiding the collection generation and collection incarnation
+anomalies is available [here](/src/mongo/tla_plus/TxnsCollectionIncarnation).
