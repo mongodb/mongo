@@ -332,6 +332,13 @@ BSONObj repairIndexSpec(const NamespaceString& ns,
                           "indexSpec"_attr = redact(indexSpec));
             builder->appendNumber(fieldName,
                                   durationCount<Seconds>(kExpireAfterSecondsForInactiveTTLIndex));
+        } else if (IndexDescriptor::k2dIndexBitsFieldName == fieldName) {
+            // The bits index option might've been stored as a double in the catalog which is
+            // incorrect considering this field represent the number of precision bits of a 2d
+            // index. This can cause migrations to fail when comparing indexes from source and
+            // destination shards, due to the usage of listIndexes, which makes an internal coercion
+            // to int when parsing the indexes options.
+            builder->appendNumber(fieldName, indexSpecElem.safeNumberInt());
         } else {
             builder->append(indexSpecElem);
         }
