@@ -945,9 +945,9 @@ buildvariants:
         distros:
           - rhel8.8-medium
 
-  - name: rhel8-debug-aubsan-lite-all-feature-flags-toolchain-v5
+  - name: rhel8-debug-aubsan-all-feature-flags-toolchain-v5
     display_name: "Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags) (v5 toolchain)"
-    tags: []
+    tags: ["forbid_tasks_tagged_with_experimental"]
     run_on:
       - rhel8.8-large
     depends_on:
@@ -968,7 +968,21 @@ buildvariants:
       test_flags: >-
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_aubsan
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
     tasks:
-      - name: jsCore
-      - name: jsCore_txns
-      - name: jsCore_wildcard_indexes
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-large
+      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-large
+      - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-large
+      - name: .non_deterministic !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .non_deterministic .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-large
