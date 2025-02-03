@@ -2664,6 +2664,7 @@ Execution Engine: classic
 Execution Engine: classic
 ```json
 {
+	"queryShapeHash" : "21F6214B6C43364932E4F080EE15EC928B6E9D700B589DCCE93E7A6C4EC49AF9",
 	"stages" : [
 		{
 			"$cursor" : {
@@ -3186,6 +3187,7 @@ Execution Engine: classic
 Execution Engine: sbe
 ```json
 {
+	"queryShapeHash" : "37B43CA1C0FB317B870BD1F790EEE6BE0FAB2E3DB93AAAAA13D461B03C16CD3E",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -3275,6 +3277,7 @@ Execution Engine: sbe
 Execution Engine: sbe
 ```json
 {
+	"queryShapeHash" : "13408003B588C1FFA53B8CC9AAFF93761264435C32A58746E3A15A8CE35F69C3",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -3370,6 +3373,7 @@ Execution Engine: sbe
 Execution Engine: sbe
 ```json
 {
+	"queryShapeHash" : "432A9158ED655AA2E6C4C6E8438340542521688D117A8153DB867FEF488650F5",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{

@@ -699,6 +699,7 @@
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "E97E5CB50AE854BA26AD1CBDBFC96D330F0DC8EEC557435EE1F9120CDDBC61EC",
 	"rejectedPlans" : [
 		[
 			{
@@ -1239,6 +1240,7 @@
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "EA1833ADA541F05B87DFD1FE7853A0F0198B7E8B0BC033E4AB8D5637FE766E32",
 	"rejectedPlans" : [
 		[
 			{
@@ -1385,6 +1387,7 @@
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "9940887E433A7A6E1B528E40AD9BFF7C3ECB6766FFB0668B9E3DA520D40F21A8",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -1471,6 +1474,7 @@
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "3BE8FF017DB0BC6A12A9DDF77664266F51915FB48B8328E61FD22C477BFE763E",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -1796,6 +1800,7 @@
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "0B13AF8F3D7C270576519140DC51094A14E7E8F2ABA9CA2D71F43B57117B3BDB",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
