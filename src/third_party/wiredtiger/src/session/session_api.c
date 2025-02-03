@@ -427,13 +427,59 @@ __wt_session_close_internal(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __session_config_int --
+ *     Configure basic flags and values on the session. Tested via a unit test.
+ */
+static int
+__session_config_int(WT_SESSION_IMPL *session, const char *config)
+{
+    WT_CONFIG_ITEM cval;
+    WT_DECL_RET;
+
+    if ((ret = __wt_config_getones(session, config, "ignore_cache_size", &cval)) == 0) {
+        if (cval.val)
+            F_SET(session, WT_SESSION_IGNORE_CACHE_SIZE);
+        else
+            F_CLR(session, WT_SESSION_IGNORE_CACHE_SIZE);
+    }
+    WT_RET_NOTFOUND_OK(ret);
+
+    if ((ret = __wt_config_getones(session, config, "cache_cursors", &cval)) == 0) {
+        if (cval.val)
+            F_SET(session, WT_SESSION_CACHE_CURSORS);
+        else {
+            F_CLR(session, WT_SESSION_CACHE_CURSORS);
+            WT_RET(__session_close_cached_cursors(session));
+        }
+    }
+    WT_RET_NOTFOUND_OK(ret);
+
+    /*
+     * There is a session debug configuration which can be set to evict pages as they are released
+     * and no longer needed.
+     */
+    if ((ret = __wt_config_getones(session, config, "debug.release_evict_page", &cval)) == 0) {
+        if (cval.val)
+            F_SET(session, WT_SESSION_DEBUG_RELEASE_EVICT);
+        else
+            F_CLR(session, WT_SESSION_DEBUG_RELEASE_EVICT);
+    }
+    WT_RET_NOTFOUND_OK(ret);
+
+    if ((ret = __wt_config_getones(session, config, "cache_max_wait_ms", &cval)) == 0)
+        session->cache_max_wait_us = (uint64_t)(cval.val * WT_THOUSAND);
+    WT_RET_NOTFOUND_OK(ret);
+
+    return (0);
+}
+
+/*
  * __session_reconfigure --
  *     WT_SESSION->reconfigure method.
  */
 static int
 __session_reconfigure(WT_SESSION *wt_session, const char *config)
 {
-    WT_CONFIG_ITEM cval;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
 
@@ -451,44 +497,8 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
      */
     WT_ERR(__wt_txn_reconfigure(session, config));
 
-    ret = __wt_config_getones(session, config, "ignore_cache_size", &cval);
-    if (ret == 0) {
-        if (cval.val)
-            F_SET(session, WT_SESSION_IGNORE_CACHE_SIZE);
-        else
-            F_CLR(session, WT_SESSION_IGNORE_CACHE_SIZE);
-    }
-    WT_ERR_NOTFOUND_OK(ret, false);
+    WT_ERR(__session_config_int(session, config));
 
-    ret = __wt_config_getones(session, config, "cache_cursors", &cval);
-    if (ret == 0) {
-        if (cval.val)
-            F_SET(session, WT_SESSION_CACHE_CURSORS);
-        else {
-            F_CLR(session, WT_SESSION_CACHE_CURSORS);
-            WT_ERR(__session_close_cached_cursors(session));
-        }
-    }
-
-    /*
-     * There is a session debug configuration which can be set to evict pages as they are released
-     * and no longer needed.
-     */
-    if ((ret = __wt_config_getones(session, config, "debug.release_evict_page", &cval)) == 0) {
-        if (cval.val)
-            F_SET(session, WT_SESSION_DEBUG_RELEASE_EVICT);
-        else
-            F_CLR(session, WT_SESSION_DEBUG_RELEASE_EVICT);
-    }
-
-    WT_ERR_NOTFOUND_OK(ret, false);
-
-    ret = __wt_config_getones(session, config, "cache_max_wait_ms", &cval);
-    if (ret == 0 && cval.val)
-        session->cache_max_wait_us = (uint64_t)(cval.val * WT_THOUSAND);
-    WT_ERR_NOTFOUND_OK(ret, false);
-
-    WT_ERR_NOTFOUND_OK(ret, false);
 err:
     API_END_RET_NOTFOUND_MAP(session, ret);
 }
@@ -2688,3 +2698,11 @@ __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name, bool open
     *sessionp = session;
     return (0);
 }
+
+#ifdef HAVE_UNITTEST
+int
+__ut_session_config_int(WT_SESSION_IMPL *session, const char *config)
+{
+    return (__session_config_int(session, config));
+}
+#endif
