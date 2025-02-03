@@ -113,6 +113,10 @@ struct ResolvedNamespace {
     std::vector<BSONObj> pipeline;
     boost::optional<UUID> uuid = boost::none;
     bool involvedNamespaceIsAView = false;
+    // TODO (SERVER-100170): Add a LiteParsedPipeline member. We often need this information when
+    // resolving views and currently recompute the object every time it's requested. Once added, go
+    // through the rest of the codebase to ensure that we aren't unnecessarily creating a
+    // LiteParsedPipeline object when it's already being stored here.
 };
 
 enum class ExpressionContextCollationMatchesDefault { kYes, kNo };

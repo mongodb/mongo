@@ -84,6 +84,12 @@ DocumentSourceSearchMeta::distributedPlanLogic() {
 }
 
 std::unique_ptr<executor::TaskExecutorCursor> DocumentSourceSearchMeta::establishCursor() {
+    if (pExpCtx->getViewNSForMongotIndexedView()) {
+        // This function will throw if the view violates validation rules for supporting
+        // mongot-indexed views.
+        search_helpers::validateViewPipeline(pExpCtx);
+    }
+
     // TODO SERVER-94875 We should be able to remove any cursor establishment logic from
     // DocumentSourceSearchMeta if we establish the cursors during search_helper
     // pipeline preparation instead.

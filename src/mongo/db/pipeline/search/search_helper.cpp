@@ -40,6 +40,7 @@
 #include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/pipeline/search/document_source_list_search_indexes.h"
@@ -612,6 +613,38 @@ std::unique_ptr<RemoteExplainVector> getSearchRemoteExplains(
         return explainMap;
     }
     return nullptr;
+}
+
+
+void validateViewPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    // mongot stages cannot run on a view involving other namespaces. This can occur when the view's
+    // pipeline contains $lookup, $unionWith, another mongot stage, etc. For safety, this error will
+    // throw even when these stages involve the same collection that the mongot stage is running on.
+    tassert(9475800,
+            str::stream() << "validateViewPipeline must be called while a search operation is "
+                             "operating on a view",
+            expCtx->getViewNSForMongotIndexedView());
+
+    ResolvedNamespace resolvedNamespace =
+        expCtx->getResolvedNamespace(expCtx->getViewNSForMongotIndexedView().get());
+    LiteParsedPipeline lpp(resolvedNamespace.ns, resolvedNamespace.pipeline);
+    if (!lpp.getInvolvedNamespaces().empty()) {
+        if (lpp.hasSearchStage()) {
+            uassert(
+                9475801,
+                str::stream()
+                    << "mongot stages cannot be executed on a view if the view's pipeline includes "
+                       "other mongot stages ($search, $vectorSearch, $rankFusion, etc.)",
+                false);
+        } else {
+            uassert(
+                9475802,
+                str::stream()
+                    << "mongot stages cannot be executed on a view if the view's  pipeline "
+                       "includes stages that involve other namespaces ($lookup, $unionWith, etc.)",
+                false);
+        }
+    }
 }
 }  // namespace search_helpers
 }  // namespace mongo

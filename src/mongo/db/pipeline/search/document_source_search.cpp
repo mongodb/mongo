@@ -102,6 +102,12 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
 }
 
 std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
+    if (pExpCtx->getViewNSForMongotIndexedView()) {
+        // This function will throw if the view violates validation rules for supporting
+        // mongot-indexed views.
+        search_helpers::validateViewPipeline(pExpCtx);
+    }
+
     auto executor =
         executor::getMongotTaskExecutor(pExpCtx->getOperationContext()->getServiceContext());
     std::list<intrusive_ptr<DocumentSource>> desugaredPipeline;

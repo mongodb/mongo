@@ -256,6 +256,12 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::createFromB
 
 
 std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::desugar() {
+    if (pExpCtx->getViewNSForMongotIndexedView()) {
+        // This function will throw if the view violates validation rules for supporting
+        // mongot-indexed views.
+        search_helpers::validateViewPipeline(pExpCtx);
+    }
+
     auto executor =
         executor::getMongotTaskExecutor(pExpCtx->getOperationContext()->getServiceContext());
 

@@ -90,6 +90,10 @@ public:
                                            bool bypassDocumentValidation) const final {
             return requiredPrivilegesBasic(isMongos, bypassDocumentValidation);
         };
+
+        bool isSearchStage() const final {
+            return true;
+        }
     };
 
     static StageConstraints constraints() {
