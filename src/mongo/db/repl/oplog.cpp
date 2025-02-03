@@ -31,6 +31,7 @@
 
 #include <absl/container/node_hash_map.h>
 #include <algorithm>
+#include <array>
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -1472,8 +1473,9 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         "Cannot apply an array insert with applyOps",
                         !opCtx->writesAreReplicated());
 
-                std::vector<InsertStatement> insertObjs;
                 const auto insertOps = opOrGroupedInserts.getGroupedInserts();
+                std::vector<InsertStatement> insertObjs;
+                insertObjs.reserve(insertOps.size());
                 WriteUnitOfWork wuow(opCtx);
                 for (const auto& iOp : insertOps) {
                     invariant(iOp->getTerm());
@@ -2111,14 +2113,14 @@ Status applyCommand_inlock(OperationContext* opCtx,
     // for each collection dropped. 'applyOps' and 'commitTransaction' will try to apply each
     // individual operation, and those will be caught then if they are a problem. 'abortTransaction'
     // won't ever change the server configuration collection.
-    std::vector<std::string> allowlistedOps{"dropDatabase",
-                                            "applyOps",
-                                            "dbCheck",
-                                            "commitTransaction",
-                                            "abortTransaction",
-                                            "startIndexBuild",
-                                            "commitIndexBuild",
-                                            "abortIndexBuild"};
+    constexpr std::array<StringData, 8> allowlistedOps{"dropDatabase",
+                                                       "applyOps",
+                                                       "dbCheck",
+                                                       "commitTransaction",
+                                                       "abortTransaction",
+                                                       "startIndexBuild",
+                                                       "commitIndexBuild",
+                                                       "abortIndexBuild"};
     if ((mode == OplogApplication::Mode::kInitialSync) &&
         (std::find(allowlistedOps.begin(), allowlistedOps.end(), o.firstElementFieldName()) ==
          allowlistedOps.end()) &&
