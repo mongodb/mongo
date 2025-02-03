@@ -74,7 +74,8 @@
 			"./buildscripts/idl/idl_schema.yml": [
 				"*.idl"
 			],
-		}
+		},
+		"C_Cpp.intelliSenseEngine": "disabled",
 	},
 	"extensions": {
 		"recommendations": [
@@ -92,7 +93,8 @@
 			"jasonnutter.vscode-codeowners",
 			"bazelbuild.vscode-bazel",
 			"rioj7.command-variable",
-			"augustocdias.tasks-shell-input"
+			"augustocdias.tasks-shell-input",
+			"ms-vscode.cpptools"
 		]
 	},
 	"launch": {
