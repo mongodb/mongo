@@ -1015,5 +1015,123 @@ TEST_F(WiredTigerUtilTest, GetLastErrorFromLatestAPICall) {
     ASSERT_EQUALS("last API call was successful"_sd, StringData(err_msg));
 }
 
+TEST_F(WiredTigerUtilTest, CursorWriteConflict) {
+    WiredTigerEventHandler eventHandler;
+    const std::string connection_cfg = "json_output=[error,message],verbose=[compact]";
+
+    WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
+
+    WiredTigerSession session1 = harnessHelper.openSession();
+    WiredTigerSession session2 = harnessHelper.openSession();
+
+    const std::string uri = "table:cursor_write_conflict";
+    ASSERT_OK(wtRCToStatus(session1.create(uri.c_str(), "key_format=S,value_format=S"), session1));
+
+    // Session 1 uses cursor 1 to create an entry in the table.
+    WT_CURSOR* cursor1;
+    ASSERT_EQ(0, session1.begin_transaction("ignore_prepare=false"));
+    ASSERT_EQ(0, session1.open_cursor(uri.c_str(), nullptr, nullptr, &cursor1));
+    cursor1->set_key(cursor1, "abc");
+    cursor1->set_value(cursor1, "test");
+    ASSERT_EQ(0, cursor1->insert(cursor1));
+    ASSERT_EQ(0, session1.commit_transaction(nullptr));
+    ASSERT_EQ(0, cursor1->close(cursor1));
+
+    // Session 1 opens a transaction with cursor1 but does not commit it to yield an error.
+    WT_CURSOR* cursor2;
+    ASSERT_EQ(0, session1.begin_transaction("ignore_prepare=false"));
+    ASSERT_EQ(0, session1.open_cursor(uri.c_str(), nullptr, nullptr, &cursor2));
+
+    cursor2->set_key(cursor2, "abc");
+    cursor2->set_value(cursor2, "test");
+    ASSERT_EQ(0, cursor2->update(cursor2));
+
+    // Session 2 opens a separate transaction with cursor 2 and try write to the same key.
+    WT_CURSOR* cursor3;
+    ASSERT_EQ(0, session2.begin_transaction("ignore_prepare=false"));
+    ASSERT_EQ(0, session2.open_cursor(uri.c_str(), nullptr, nullptr, &cursor3));
+
+    cursor3->set_key(cursor3, "abc");
+    cursor3->set_value(cursor3, "test");
+
+    // We should get WT_ROLLBACK here because the other transaction has not been committed.
+    ASSERT_EQ(WT_ROLLBACK, cursor3->update(cursor3));
+
+    // Check that the sub-level error codes from this case is correct.
+    int err, sub_level_err;
+    const char* err_msg;
+    session2.get_last_error(&err, &sub_level_err, &err_msg);
+
+    ASSERT_EQUALS(WT_ROLLBACK, err);
+    ASSERT_EQUALS(WT_WRITE_CONFLICT, sub_level_err);
+    ASSERT_EQUALS("Write conflict between concurrent operations"_sd, StringData(err_msg));
+}
+
+TEST_F(WiredTigerUtilTest, CursorOldestForEviction) {
+    // This test depends on sleeping to recreate the error, so we sleep for tryCount seconds the
+    // test and retry if it fails, up till kRetryLimit seconds.
+    int tryCount = 1;
+    const int kRetryLimit = 5;
+    do {
+        WiredTigerEventHandler eventHandler;
+
+        // Configure to have extremely low cache to force eviction.
+        const std::string connection_cfg =
+            "json_output=[error,message],verbose=[compact],cache_size=1MB";
+
+        WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
+        auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
+
+        WiredTigerSession wtSession = harnessHelper.openSession();
+
+        const std::string uri = "table:oldest_for_eviction";
+
+        ASSERT_OK(
+            wtRCToStatus(wtSession.create(uri.c_str(), "key_format=S,value_format=S"), wtSession));
+
+        // Start a new transaction and insert a record too large for cache.
+        WT_CURSOR* cursor;
+        ASSERT_EQ(0, wtSession.begin_transaction("ignore_prepare=false"));
+        ASSERT_EQ(0, wtSession.open_cursor(uri.c_str(), nullptr, nullptr, &cursor));
+        cursor->set_key(cursor, "dummy_key_1");
+        std::string s1(1024 * 1000, 'a');
+        cursor->set_value(cursor, s1.c_str());
+        ASSERT_EQ(0, cursor->update(cursor));
+
+        // Let WT's accounting catch up after the large insertion by sleeping for an increasing
+        // amount of time based on how many times we've retried.
+        sleepsecs(tryCount);
+
+        // In the same transaction, try and insert a new record that would require evicting the
+        // previous record trying to be inserted in this same transaction.
+        cursor->set_key(cursor, "dummy_key_2");
+        std::string s2(1024, 'b');
+        cursor->set_value(cursor, s2.c_str());
+
+        // We should get WT_ROLLBACK in this case because the cache has been configured to be
+        // only 1MB, and is not large enough to fit both values. We might not get WT_ROLLBACK if we
+        // didn't sleep for long enough, so retry with a longer sleep if needed.
+        int ret = cursor->update(cursor);
+        if (ret != WT_ROLLBACK) {
+            tryCount++;
+            continue;
+        }
+
+        // Check that the sub-level error codes from this case is correct.
+        int err, sub_level_err;
+        const char* err_msg;
+        wtSession.get_last_error(&err, &sub_level_err, &err_msg);
+
+        ASSERT_EQUALS(WT_ROLLBACK, err);
+        ASSERT_EQUALS(WT_OLDEST_FOR_EVICTION, sub_level_err);
+        ASSERT_EQUALS("Transaction has the oldest pinned transaction ID"_sd, StringData(err_msg));
+        break;
+    } while (tryCount <= kRetryLimit);
+
+    // If we tried more times than the limit, then we were not able to successfully recreate the
+    // error and should fail.
+    ASSERT(tryCount <= kRetryLimit);
+}
+
 }  // namespace
 }  // namespace mongo

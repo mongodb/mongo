@@ -1256,12 +1256,20 @@ RecordId WiredTigerRecordStore::getLargestKey(OperationContext* opCtx) const {
         // Force the caller to rollback its transaction if we can't make progress with eviction.
         // TODO (SERVER-63620): Convert this to a different error code that is distinguishable from
         // a true write conflict.
-        auto rollbackReason = sessRaii.get_rollback_reason();
-        rollbackReason = rollbackReason ? rollbackReason : "undefined";
+        int err, sub_level_err;
+        const char* err_msg;
+        sessRaii.get_last_error(&err, &sub_level_err, &err_msg);
+        LOGV2_DEBUG(9979800,
+                    2,
+                    "WiredTigerRecordStore: rolling back change to numRecords and dataSize",
+                    "err"_attr = err,
+                    "sub_level_err"_attr = sub_level_err,
+                    "err_msg"_attr = err_msg);
+
         throwWriteConflictException(
-            fmt::format("Rollback ocurred while performing initial write to '{}'. Reason: '{}'",
+            fmt::format("Rollback occurred while performing initial write to '{}'. Reason: '{}'",
                         uuid() ? uuid()->toString() : std::string{},
-                        rollbackReason));
+                        err_msg));
     } else if (ret != WT_NOTFOUND) {
         if (ret == ENOTSUP) {
             auto creationMetadata = WiredTigerUtil::getMetadataCreate(sessRaii, _uri).getValue();

@@ -35,11 +35,6 @@
 #include "mongo/util/assert_util.h"
 
 // From src/third_party/wiredtiger/src/include/txn.h
-#define WT_TXN_ROLLBACK_REASON_CACHE_OVERFLOW "transaction rolled back because of cache overflow"
-
-#define WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION \
-    "oldest pinned transaction ID rolled back for eviction"
-
 #define WT_TXN_ROLLBACK_REASON_TOO_LARGE_FOR_CACHE \
     "transaction is too large and will not fit in the storage engine cache"
 
@@ -48,7 +43,7 @@ namespace mongo {
 class WiredTigerSession;
 
 bool txnExceededCacheThreshold(int64_t txnDirtyBytes, int64_t cacheDirtyBytes, double threshold);
-bool rollbackReasonWasCachePressure(const char* reason);
+bool rollbackReasonWasCachePressure(int sub_level_err);
 void throwCachePressureExceptionIfAppropriate(bool txnTooLargeEnabled,
                                               bool temporarilyUnavailableEnabled,
                                               bool cacheIsInsufficientForTransaction,
@@ -61,7 +56,8 @@ void throwAppropriateException(bool txnTooLargeEnabled,
                                double cacheThreshold,
                                const char* reason,
                                StringData prefix,
-                               int retCode);
+                               int retCode,
+                               int sub_level_err);
 Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix);
 Status wtRCToStatus_slow(int retCode, WiredTigerSession& session, StringData prefix);
 
