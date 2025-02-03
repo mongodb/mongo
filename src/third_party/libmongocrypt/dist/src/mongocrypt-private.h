@@ -142,7 +142,8 @@ typedef enum {
 typedef enum {
     MONGOCRYPT_FLE2_ALGORITHM_UNINDEXED = 1,
     MONGOCRYPT_FLE2_ALGORITHM_EQUALITY = 2,
-    MONGOCRYPT_FLE2_ALGORITHM_RANGE = 3
+    MONGOCRYPT_FLE2_ALGORITHM_RANGE = 3,
+    MONGOCRYPT_FLE2_ALGORITHM_TEXT_SEARCH = 4
 } mongocrypt_fle2_encryption_algorithm_t;
 
 bool _mongocrypt_validate_and_copy_string(const char *in, int32_t in_len, char **out) MONGOCRYPT_WARN_UNUSED_RESULT;

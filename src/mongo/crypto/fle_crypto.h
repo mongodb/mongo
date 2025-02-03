@@ -529,6 +529,24 @@ public:
                                          FLEKeyVault* keyVault,
                                          const ContentionFactorFn& contentionFactor);
 
+    /**
+     * Given the original command, the output of query analysis, and a schema map,
+     * this generates a client-side payload that is sent to the server.
+     * The cryptdResult object parameter is expected to have the fields:
+     * {
+     *     "hasEncryptionPlaceholders" : bool
+     *     "schemaRequiresEncryption" : bool
+     *     "result" : BSON object
+     * } where "result" is the command object containing intent-to-encrypt markings.
+     * The encryptedFieldConfigMap parameter is an object mapping namespace strings to
+     * EncryptedFieldConfigs.
+     */
+    static BSONObj transformPlaceholders(const BSONObj& originalCmd,
+                                         const BSONObj& cryptdResult,
+                                         const BSONObj& encryptedFieldConfigMap,
+                                         FLEKeyVault* keyVault,
+                                         StringData dbName);
+
 
     /**
      * For every encrypted field path in the EncryptedFieldConfig, this generates

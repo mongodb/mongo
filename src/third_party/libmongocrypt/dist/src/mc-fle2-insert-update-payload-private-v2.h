@@ -25,6 +25,31 @@
 #include "mongocrypt-private.h"
 #include "mongocrypt.h"
 
+#define DEF_TEXT_SEARCH_TOKEN_SET(Type)                                                                                \
+    typedef struct {                                                                                                   \
+        _mongocrypt_buffer_t edcDerivedToken;                                                                          \
+        _mongocrypt_buffer_t escDerivedToken;                                                                          \
+        _mongocrypt_buffer_t serverDerivedFromDataToken;                                                               \
+        _mongocrypt_buffer_t encryptedTokens;                                                                          \
+    } mc_Text##Type##TokenSet_t;                                                                                       \
+    void mc_Text##Type##TokenSet_init(mc_Text##Type##TokenSet_t *);                                                    \
+    void mc_Text##Type##TokenSet_cleanup(mc_Text##Type##TokenSet_t *)
+
+DEF_TEXT_SEARCH_TOKEN_SET(Exact);
+DEF_TEXT_SEARCH_TOKEN_SET(Substring);
+DEF_TEXT_SEARCH_TOKEN_SET(Suffix);
+DEF_TEXT_SEARCH_TOKEN_SET(Prefix);
+
+typedef struct {
+    mc_TextExactTokenSet_t exact; // e
+    mc_array_t substringArray;    // s
+    mc_array_t suffixArray;       // u
+    mc_array_t prefixArray;       // p
+} mc_TextSearchTokenSets_t;
+
+void mc_TextSearchTokenSets_init(mc_TextSearchTokenSets_t *);
+void mc_TextSearchTokenSets_cleanup(mc_TextSearchTokenSets_t *);
+
 /**
  * FLE2InsertUpdatePayloadV2 represents an FLE2 payload of an indexed field to
  * insert or update. It is created client side.
@@ -83,6 +108,12 @@ typedef struct {
     mc_optional_int32_t trimFactor;                  // tf
     bson_value_t indexMin;                           // mn
     bson_value_t indexMax;                           // mx
+
+    struct {
+        mc_TextSearchTokenSets_t tsts;
+        bool set;
+    } textSearchTokenSets; // b
+
     _mongocrypt_buffer_t plaintext;
     _mongocrypt_buffer_t userKeyId;
 } mc_FLE2InsertUpdatePayloadV2_t;
@@ -129,6 +160,8 @@ bool mc_FLE2InsertUpdatePayloadV2_serialize(const mc_FLE2InsertUpdatePayloadV2_t
 bool mc_FLE2InsertUpdatePayloadV2_serializeForRange(const mc_FLE2InsertUpdatePayloadV2_t *payload,
                                                     bson_t *out,
                                                     bool use_range_v2);
+
+bool mc_FLE2InsertUpdatePayloadV2_serializeForTextSearch(const mc_FLE2InsertUpdatePayloadV2_t *payload, bson_t *out);
 
 void mc_FLE2InsertUpdatePayloadV2_cleanup(mc_FLE2InsertUpdatePayloadV2_t *payload);
 

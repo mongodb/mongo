@@ -163,6 +163,7 @@ mongo_cc_library(
     defines = [
         "KMS_MSG_STATIC",
         "MONGOCRYPT_STATIC_DEFINE",
+        "MONGOCRYPT_INTELDFP",
     ],
     includes = [
         "dist/kms-message/src",

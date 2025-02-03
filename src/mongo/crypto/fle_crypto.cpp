@@ -85,6 +85,7 @@ extern "C" {
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
@@ -105,6 +106,7 @@ extern "C" {
 #include "mongo/db/basic_types.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -1742,6 +1744,100 @@ UniqueMongoCrypt createMongoCrypt() {
     return crypt;
 }
 
+BSONObj runStateMachineForEncryption(mongocrypt_ctx_t* ctx,
+                                     FLEKeyVault* keyVault,
+                                     const BSONObj& cryptdResult,
+                                     StringData dbName) {
+    bool done = false;
+    BSONObj result;
+    StringData errorContext = "encryptionStateMachine"_sd;
+
+    while (!done) {
+        switch (mongocrypt_ctx_state(ctx)) {
+            case MONGOCRYPT_CTX_NEED_MONGO_MARKINGS: {
+                MongoCryptBinary opbin = MongoCryptBinary::create();
+                if (!mongocrypt_ctx_mongo_op(ctx, opbin)) {
+                    errorContext = "mongocrypt_ctx_mongo_op failed"_sd;
+                    break;
+                }
+
+                BSONObj opobj = opbin.toBSON();
+
+                bool feedOk = false;
+                StringData opCmdName(opobj.firstElementFieldName());
+                uassert(7132300,
+                        "Invalid command obtained from mongocrypt_ctx_mongo_op",
+                        !opCmdName.empty());
+                if (opCmdName.equalCaseInsensitive("isMaster")) {
+                    BSONObjBuilder bob;
+                    auto wireSpec = WireSpec::getWireSpec(getGlobalServiceContext()).get();
+                    bob.append("maxWireVersion", wireSpec->incomingExternalClient.maxWireVersion);
+                    bob.append("minWireVersion", wireSpec->incomingExternalClient.minWireVersion);
+                    auto reply = bob.done();
+                    auto feed = MongoCryptBinary::createFromBSONObj(reply);
+                    feedOk = mongocrypt_ctx_mongo_feed(ctx, feed);
+                } else {
+                    auto feed = MongoCryptBinary::createFromBSONObj(cryptdResult);
+                    feedOk = mongocrypt_ctx_mongo_feed(ctx, feed);
+                }
+
+                if (!feedOk) {
+                    errorContext = "mongocrypt_ctx_mongo_feed failed"_sd;
+                } else if (!mongocrypt_ctx_mongo_done(ctx)) {
+                    errorContext = "mongocrypt_ctx_mongo_done failed"_sd;
+                }
+                break;
+            }
+            case MONGOCRYPT_CTX_NEED_MONGO_KEYS: {
+                getKeys(ctx, keyVault);
+                break;
+            }
+            case MONGOCRYPT_CTX_READY: {
+                MongoCryptBinary output = MongoCryptBinary::create();
+                if (!mongocrypt_ctx_finalize(ctx, output)) {
+                    errorContext = "mongocrypt_ctx_finalize failed"_sd;
+                    break;
+                }
+                result = output.toBSON().getOwned();
+                LOGV2_DEBUG(7132305,
+                            1,
+                            "Final command after transforming placeholders with libmongocrypt",
+                            "cmd"_attr = result);
+                break;
+            }
+            case MONGOCRYPT_CTX_DONE: {
+                done = true;
+                break;
+            }
+            case MONGOCRYPT_CTX_ERROR: {
+                MongoCryptStatus status;
+                mongocrypt_ctx_status(ctx, status);
+                uassertStatusOK(status.toStatus().withContext(errorContext));
+                break;
+            }
+            case MONGOCRYPT_CTX_NEED_MONGO_COLLINFO: {
+                // We don't expect these states to be reached because mongocrypt_t was already given
+                // the encryptedfield config map via mongocrypt_setopt_encrypted_field_config_map().
+                uasserted(7132301, "MONGOCRYPT_CTX_NEED_MONGO_COLLINFO not supported");
+                break;
+            }
+            case MONGOCRYPT_CTX_NEED_KMS: {
+                // This state is responsible for decrypting data keys encrypted by a KMS. This is
+                // not needed for local kms keys
+                uasserted(7132302, "MONGOCRYPT_CTX_NEED_KMS not supported");
+                break;
+            }
+            case MONGOCRYPT_CTX_NEED_KMS_CREDENTIALS:
+                // We don't handle KMS credentials
+                [[fallthrough]];
+            default:
+                uasserted(7132303, "unsupported state machine state");
+                break;
+        }
+    }
+    return result;
+}
+
 BSONObj runStateMachineForDecryption(mongocrypt_ctx_t* ctx, FLEKeyVault* keyVault) {
     mongocrypt_ctx_state_t state;
     bool done = false;
@@ -2171,6 +2267,52 @@ BSONObj FLEClientCrypto::transformPlaceholders(const BSONObj& obj,
         });
 
     return ret;
+}
+
+BSONObj FLEClientCrypto::transformPlaceholders(const BSONObj& originalCmd,
+                                               const BSONObj& cryptdResult,
+                                               const BSONObj& encryptedFieldConfigMap,
+                                               FLEKeyVault* keyVault,
+                                               StringData dbName) {
+    auto crypt = createMongoCrypt();
+    LOGV2_DEBUG(7132304,
+                1,
+                "Transforming placeholders with libmongocrypt",
+                "originalCmd"_attr = originalCmd,
+                "cryptdResult"_attr = cryptdResult);
+
+    auto uassertMongoCryptStatusOK = [](mongocrypt_t* crypt, bool result, StringData context) {
+        if (!result) {
+            MongoCryptStatus status;
+            mongocrypt_status(crypt, status);
+            uassertStatusOK(status.toStatus().withContext(context));
+        }
+    };
+
+    {
+        SymmetricKey& key = keyVault->getKMSLocalKey();
+        auto binary =
+            MongoCryptBinary::createFromCDR(ConstDataRange(key.getKey(), key.getKeySize()));
+        auto efcMap = MongoCryptBinary::createFromBSONObj(encryptedFieldConfigMap);
+        uassertMongoCryptStatusOK(crypt.get(),
+                                  mongocrypt_setopt_kms_provider_local(crypt.get(), binary),
+                                  "mongocrypt_setopt_kms_provider_local failed");
+        uassertMongoCryptStatusOK(crypt.get(),
+                                  mongocrypt_setopt_encrypted_field_config_map(crypt.get(), efcMap),
+                                  "mongocrypt_setopt_encrypted_field_config_map failed");
+    }
+
+    uassertMongoCryptStatusOK(crypt.get(), mongocrypt_init(crypt.get()), "mongocrypt_init failed");
+
+    auto cmdBin = MongoCryptBinary::createFromBSONObj(originalCmd);
+    UniqueMongoCryptCtx ctx(mongocrypt_ctx_new(crypt.get()));
+    if (!mongocrypt_ctx_encrypt_init(ctx.get(), dbName.data(), dbName.length(), cmdBin)) {
+        MongoCryptStatus status;
+        mongocrypt_ctx_status(ctx.get(), status);
+        uassertStatusOK(status.toStatus().withContext("mongocrypt_ctx_encrypt_init failed"));
+    }
+
+    return runStateMachineForEncryption(ctx.get(), keyVault, cryptdResult, dbName);
 }
 
 BSONObj FLEClientCrypto::generateCompactionTokens(const EncryptedFieldConfig& cfg,

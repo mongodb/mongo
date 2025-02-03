@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "bson/bson.h"
 #include "mc-fle-blob-subtype-private.h"
 #include "mc-fle2-encryption-placeholder-private.h"
 #include "mc-fle2-find-equality-payload-private-v2.h"
@@ -271,6 +272,118 @@ DERIVE_TOKEN_IMPL(ESC)
 
 #undef DERIVE_TOKEN_IMPL
 
+/**
+ * Calculates:
+ * E?CToken = HMAC(collectionLevel1Token, n)
+ * E?CText<T>Token = HMAC(E?CToken, t)
+ * E?CText<T>DerivedFromDataTokenAndContentionFactorToken = HMAC(HMAC(E?CText<T>Token, v) cf)
+ *
+ * E?C = EDC|ESC
+ * n = 1 for EDC, 2 for ESC
+ * <T> = Exact|Substring|Suffix|Prefix
+ * t = 1 for Exact, 2 for Substring, 3 for Suffix, 4 for Prefix
+ * cf = contentionFactor
+ *
+ * E?CText<T>DerivedFromDataTokenAndContentionFactorToken is saved to out.
+ * Note that {out} is initialized even on failure.
+ */
+#define DERIVE_TEXT_SEARCH_TOKEN_IMPL(Name, Type)                                                                      \
+    static bool _fle2_derive_##Name##Text##Type##_token(_mongocrypt_crypto_t *crypto,                                  \
+                                                        _mongocrypt_buffer_t *out,                                     \
+                                                        const mc_CollectionsLevel1Token_t *level1Token,                \
+                                                        const _mongocrypt_buffer_t *value,                             \
+                                                        int64_t contentionFactor,                                      \
+                                                        mongocrypt_status_t *status) {                                 \
+        BSON_ASSERT_PARAM(crypto);                                                                                     \
+        BSON_ASSERT_PARAM(out);                                                                                        \
+        BSON_ASSERT_PARAM(level1Token);                                                                                \
+        BSON_ASSERT_PARAM(value);                                                                                      \
+        BSON_ASSERT(contentionFactor >= 0);                                                                            \
+                                                                                                                       \
+        _mongocrypt_buffer_init(out);                                                                                  \
+                                                                                                                       \
+        mc_##Name##Token_t *token = mc_##Name##Token_new(crypto, level1Token, status);                                 \
+        if (!token) {                                                                                                  \
+            return false;                                                                                              \
+        }                                                                                                              \
+        mc_##Name##Text##Type##Token_t *textToken = mc_##Name##Text##Type##Token_new(crypto, token, status);           \
+        mc_##Name##Token_destroy(token);                                                                               \
+        if (!textToken) {                                                                                              \
+            return false;                                                                                              \
+        }                                                                                                              \
+        mc_##Name##Text##Type##DerivedFromDataTokenAndContentionFactorToken_t *fromDataAndContentionFactor =           \
+            mc_##Name##Text##Type##DerivedFromDataTokenAndContentionFactorToken_new(crypto,                            \
+                                                                                    textToken,                         \
+                                                                                    value,                             \
+                                                                                    (uint64_t)contentionFactor,        \
+                                                                                    status);                           \
+        mc_##Name##Text##Type##Token_destroy(textToken);                                                               \
+        if (!fromDataAndContentionFactor) {                                                                            \
+            return false;                                                                                              \
+        }                                                                                                              \
+        _mongocrypt_buffer_copy_to(                                                                                    \
+            mc_##Name##Text##Type##DerivedFromDataTokenAndContentionFactorToken_get(fromDataAndContentionFactor),      \
+            out);                                                                                                      \
+        mc_##Name##Text##Type##DerivedFromDataTokenAndContentionFactorToken_destroy(fromDataAndContentionFactor);      \
+        return true;                                                                                                   \
+    }
+
+DERIVE_TEXT_SEARCH_TOKEN_IMPL(EDC, Exact)
+DERIVE_TEXT_SEARCH_TOKEN_IMPL(ESC, Exact)
+DERIVE_TEXT_SEARCH_TOKEN_IMPL(EDC, Substring)
+DERIVE_TEXT_SEARCH_TOKEN_IMPL(ESC, Substring)
+DERIVE_TEXT_SEARCH_TOKEN_IMPL(EDC, Suffix)
+DERIVE_TEXT_SEARCH_TOKEN_IMPL(ESC, Suffix)
+DERIVE_TEXT_SEARCH_TOKEN_IMPL(EDC, Prefix)
+DERIVE_TEXT_SEARCH_TOKEN_IMPL(ESC, Prefix)
+#undef DERIVE_TEXT_SEARCH_TOKEN_IMPL
+
+/**
+ * Calculates:
+ * ServerText<T>Token = HMAC(collectionLevel1Token, t)
+ * ServerText<T>DerivedFromDataToken = HMAC(ServerText<T>Token, v)
+ *
+ * <T> = Exact|Substring|Suffix|Prefix
+ * t = 1 for Exact, 2 for Substring, 3 for Suffix, 4 for Prefix
+ *
+ * ServerText<T>DerivedFromDataToken is saved to out.
+ * Note that {out} is initialized even on failure.
+ */
+#define DERIVE_TEXT_SEARCH_SERVER_DERIVED_FROM_DATA_TOKEN_IMPL(Type)                                                   \
+    static bool _fle2_derive_serverText##Type##DerivedFromDataToken(                                                   \
+        _mongocrypt_crypto_t *crypto,                                                                                  \
+        _mongocrypt_buffer_t *out,                                                                                     \
+        const mc_ServerTokenDerivationLevel1Token_t *level1Token,                                                      \
+        const _mongocrypt_buffer_t *value,                                                                             \
+        mongocrypt_status_t *status) {                                                                                 \
+        BSON_ASSERT_PARAM(crypto);                                                                                     \
+        BSON_ASSERT_PARAM(out);                                                                                        \
+        BSON_ASSERT_PARAM(level1Token);                                                                                \
+        BSON_ASSERT_PARAM(value);                                                                                      \
+        BSON_ASSERT_PARAM(status);                                                                                     \
+                                                                                                                       \
+        _mongocrypt_buffer_init(out);                                                                                  \
+        mc_ServerText##Type##Token_t *token = mc_ServerText##Type##Token_new(crypto, level1Token, status);             \
+        if (!token) {                                                                                                  \
+            return false;                                                                                              \
+        }                                                                                                              \
+        mc_ServerText##Type##DerivedFromDataToken_t *dataToken =                                                       \
+            mc_ServerText##Type##DerivedFromDataToken_new(crypto, token, value, status);                               \
+        mc_ServerText##Type##Token_destroy(token);                                                                     \
+        if (!dataToken) {                                                                                              \
+            return false;                                                                                              \
+        }                                                                                                              \
+        _mongocrypt_buffer_copy_to(mc_ServerText##Type##DerivedFromDataToken_get(dataToken), out);                     \
+        mc_ServerText##Type##DerivedFromDataToken_destroy(dataToken);                                                  \
+        return true;                                                                                                   \
+    }
+
+DERIVE_TEXT_SEARCH_SERVER_DERIVED_FROM_DATA_TOKEN_IMPL(Exact)
+DERIVE_TEXT_SEARCH_SERVER_DERIVED_FROM_DATA_TOKEN_IMPL(Substring)
+DERIVE_TEXT_SEARCH_SERVER_DERIVED_FROM_DATA_TOKEN_IMPL(Suffix)
+DERIVE_TEXT_SEARCH_SERVER_DERIVED_FROM_DATA_TOKEN_IMPL(Prefix)
+#undef DERIVE_TEXT_SEARCH_SERVER_DERIVED_FROM_DATA_TOKEN_IMPL
+
 static bool _fle2_derive_serverDerivedFromDataToken(_mongocrypt_crypto_t *crypto,
                                                     _mongocrypt_buffer_t *out,
                                                     const mc_ServerTokenDerivationLevel1Token_t *level1Token,
@@ -513,7 +626,6 @@ static bool _mongocrypt_fle2_placeholder_common(_mongocrypt_key_broker_t *kb,
     BSON_ASSERT_PARAM(value);
 
     _mongocrypt_crypto_t *crypto = kb->crypt->crypto;
-    _mongocrypt_buffer_t indexKey = {0};
     *ret = (_FLE2EncryptedPayloadCommon_t){{0}};
 
     if (!_get_tokenKey(kb, indexKeyId, &ret->tokenKey, status)) {
@@ -566,12 +678,10 @@ static bool _mongocrypt_fle2_placeholder_common(_mongocrypt_key_broker_t *kb,
         goto fail;
     }
 
-    _mongocrypt_buffer_cleanup(&indexKey);
     return true;
 
 fail:
     _FLE2EncryptedPayloadCommon_cleanup(ret);
-    _mongocrypt_buffer_cleanup(&indexKey);
     return false;
 }
 
@@ -944,6 +1054,327 @@ fail:
 }
 
 /**
+ * Sets up a mc_Text<T>TokenSet_t type by generating its member tokens:
+ * - edcDerivedToken = HMAC(HMAC(HMAC(EDCToken, t), v), cf)
+ * - escDerivedToken = HMAC(HMAC(HMAC(ESCToken, t), v), cf)
+ * - serverDerivedFromDataToken = HMAC(HMAC(ServerLevel1Token, t), v)
+ * and the encrypted token:
+ * - encryptedTokens = EncryptCTR(ECOCToken, escDerivedToken)
+ *
+ * <T> = Exact|Substring|Suffix|Prefix
+ * t = 1 for Exact, 2 for Substring, 3 for Suffix, 4 for Prefix
+ * cf = contentionFactor
+ * EDC/ESC/ECOCToken are derived from {collLevel1Token}
+ */
+#define GENERATE_TEXT_SEARCH_TOKEN_SET_FOR_TYPE_IMPL(Type)                                                             \
+    static bool _fle2_generate_Text##Type##TokenSet(_mongocrypt_key_broker_t *kb,                                      \
+                                                    mc_Text##Type##TokenSet_t *out,                                    \
+                                                    const _mongocrypt_buffer_t *value,                                 \
+                                                    int64_t contentionFactor,                                          \
+                                                    const mc_CollectionsLevel1Token_t *collLevel1Token,                \
+                                                    const mc_ServerTokenDerivationLevel1Token_t *serverLevel1Token,    \
+                                                    mongocrypt_status_t *status) {                                     \
+        BSON_ASSERT_PARAM(kb);                                                                                         \
+        BSON_ASSERT_PARAM(kb->crypt);                                                                                  \
+        BSON_ASSERT_PARAM(out);                                                                                        \
+        BSON_ASSERT_PARAM(value);                                                                                      \
+        BSON_ASSERT_PARAM(collLevel1Token);                                                                            \
+        BSON_ASSERT_PARAM(serverLevel1Token);                                                                          \
+                                                                                                                       \
+        if (!_fle2_derive_EDCText##Type##_token(kb->crypt->crypto,                                                     \
+                                                &out->edcDerivedToken,                                                 \
+                                                collLevel1Token,                                                       \
+                                                value,                                                                 \
+                                                contentionFactor,                                                      \
+                                                status)) {                                                             \
+            return false;                                                                                              \
+        }                                                                                                              \
+        if (!_fle2_derive_ESCText##Type##_token(kb->crypt->crypto,                                                     \
+                                                &out->escDerivedToken,                                                 \
+                                                collLevel1Token,                                                       \
+                                                value,                                                                 \
+                                                contentionFactor,                                                      \
+                                                status)) {                                                             \
+            return false;                                                                                              \
+        }                                                                                                              \
+        if (!_fle2_derive_serverText##Type##DerivedFromDataToken(kb->crypt->crypto,                                    \
+                                                                 &out->serverDerivedFromDataToken,                     \
+                                                                 serverLevel1Token,                                    \
+                                                                 value,                                                \
+                                                                 status)) {                                            \
+            return false;                                                                                              \
+        }                                                                                                              \
+        if (!_fle2_derive_encrypted_token(kb->crypt->crypto,                                                           \
+                                          &out->encryptedTokens,                                                       \
+                                          false,                                                                       \
+                                          collLevel1Token,                                                             \
+                                          &out->escDerivedToken,                                                       \
+                                          NULL,                                                                        \
+                                          (mc_optional_bool_t){0},                                                     \
+                                          status)) {                                                                   \
+            return false;                                                                                              \
+        }                                                                                                              \
+        return true;                                                                                                   \
+    }
+GENERATE_TEXT_SEARCH_TOKEN_SET_FOR_TYPE_IMPL(Exact);
+GENERATE_TEXT_SEARCH_TOKEN_SET_FOR_TYPE_IMPL(Substring)
+GENERATE_TEXT_SEARCH_TOKEN_SET_FOR_TYPE_IMPL(Suffix)
+GENERATE_TEXT_SEARCH_TOKEN_SET_FOR_TYPE_IMPL(Prefix)
+#undef GENERATE_TEXT_SEARCH_TOKEN_SET_FOR_TYPE_IMPL
+
+static bool _fle2_generate_TextSearchTokenSets(_mongocrypt_key_broker_t *kb,
+                                               mc_FLE2InsertUpdatePayloadV2_t *payload,
+                                               const _mongocrypt_buffer_t *indexKeyId,
+                                               const mc_FLE2TextSearchInsertSpec_t *spec,
+                                               const _mongocrypt_buffer_t *value,
+                                               int64_t contentionFactor,
+                                               mongocrypt_status_t *status) {
+    BSON_ASSERT_PARAM(kb);
+    BSON_ASSERT_PARAM(payload);
+    BSON_ASSERT_PARAM(indexKeyId);
+    BSON_ASSERT_PARAM(spec);
+    BSON_ASSERT_PARAM(value);
+
+    _mongocrypt_crypto_t *crypto = kb->crypt->crypto;
+    mc_TextSearchTokenSets_t *tsts = &payload->textSearchTokenSets.tsts;
+    _FLE2EncryptedPayloadCommon_t common = {{0}};
+    bool res = false;
+
+    // TODO MONGOCRYPT-759 implement case folding; for now let foldedValue be a copy of value.
+    _mongocrypt_buffer_t foldedValue = {0};
+    _mongocrypt_buffer_init(&foldedValue);
+    _mongocrypt_buffer_copy_to(value, &foldedValue);
+
+    // TODO MONGOCRYPT-762 do StrEncode here to get substring sets to encode
+
+    // Start the token derivations
+    if (!_get_tokenKey(kb, indexKeyId, &common.tokenKey, status)) {
+        goto fail;
+    }
+
+    common.collectionsLevel1Token = mc_CollectionsLevel1Token_new(crypto, &common.tokenKey, status);
+    if (!common.collectionsLevel1Token) {
+        CLIENT_ERR("unable to derive collectionLevel1Token");
+        goto fail;
+    }
+
+    common.serverTokenDerivationLevel1Token = mc_ServerTokenDerivationLevel1Token_new(crypto, &common.tokenKey, status);
+    if (!common.serverTokenDerivationLevel1Token) {
+        CLIENT_ERR("unable to derive serverTokenDerivationLevel1Token");
+        goto fail;
+    }
+
+    if (!_fle2_generate_TextExactTokenSet(kb,
+                                          &tsts->exact,
+                                          &foldedValue,
+                                          contentionFactor,
+                                          common.collectionsLevel1Token,
+                                          common.serverTokenDerivationLevel1Token,
+                                          status)) {
+        goto fail;
+    }
+
+    if (spec->substr.set) {
+        // TODO MONGOCRYPT-762 iterate on StrEncode substrings set
+        mc_TextSubstringTokenSet_t substrSet = {{0}};
+        mc_TextSubstringTokenSet_init(&substrSet);
+
+        if (!_fle2_generate_TextSubstringTokenSet(kb,
+                                                  &substrSet,
+                                                  &foldedValue,
+                                                  contentionFactor,
+                                                  common.collectionsLevel1Token,
+                                                  common.serverTokenDerivationLevel1Token,
+                                                  status)) {
+            mc_TextSubstringTokenSet_cleanup(&substrSet);
+            goto fail;
+        }
+        _mc_array_append_val(&tsts->substringArray, substrSet);
+    }
+    if (spec->suffix.set) {
+        // TODO MONGOCRYPT-762 iterate on StrEncode suffixes set
+        mc_TextSuffixTokenSet_t suffixSet = {{0}};
+        mc_TextSuffixTokenSet_init(&suffixSet);
+
+        if (!_fle2_generate_TextSuffixTokenSet(kb,
+                                               &suffixSet,
+                                               &foldedValue,
+                                               contentionFactor,
+                                               common.collectionsLevel1Token,
+                                               common.serverTokenDerivationLevel1Token,
+                                               status)) {
+            mc_TextSuffixTokenSet_cleanup(&suffixSet);
+            goto fail;
+        }
+        _mc_array_append_val(&tsts->suffixArray, suffixSet);
+    }
+    if (spec->prefix.set) {
+        // TODO MONGOCRYPT-762 iterate on StrEncode suffixes set
+        mc_TextPrefixTokenSet_t prefixSet = {{0}};
+        mc_TextPrefixTokenSet_init(&prefixSet);
+
+        if (!_fle2_generate_TextPrefixTokenSet(kb,
+                                               &prefixSet,
+                                               &foldedValue,
+                                               contentionFactor,
+                                               common.collectionsLevel1Token,
+                                               common.serverTokenDerivationLevel1Token,
+                                               status)) {
+            mc_TextPrefixTokenSet_cleanup(&prefixSet);
+            goto fail;
+        }
+        _mc_array_append_val(&tsts->prefixArray, prefixSet);
+    }
+    payload->textSearchTokenSets.set = true;
+    res = true;
+fail:
+    _FLE2EncryptedPayloadCommon_cleanup(&common);
+    _mongocrypt_buffer_cleanup(&foldedValue);
+    return res;
+}
+
+/**
+ * Payload subtype 11: FLE2InsertUpdatePayloadV2 for text search inserts/updates
+ *
+ * {v: value, u: indexKeyId, t: valueType, k: contentionFactor, e: serverToken,
+ *  b: { e: {d: EDC_exact, s: ESC_exact, l: svrDFDToken_exact, p: encToken_exact},
+ *       s: [{d: EDC_substr, s: ESC_substr, l: svrDFDToken_substr, p: encToken_substr}, ...]
+ *       u: [{d: EDC_suffix, s: ESC_suffix, l: svrDFDToken_suffix, p: encToken_suffix}, ...]
+ *       p: [{d: EDC_prefix, s: ESC_prefix, l: svrDFDToken_prefix, p: encToken_prefix}, ...]
+ *     },
+ *  d: bogusToken, s: bogusToken, l: bogusToken, p: bogusCiphertext
+ * }
+ */
+static bool _mongocrypt_fle2_placeholder_to_insert_update_ciphertextForTextSearch(_mongocrypt_key_broker_t *kb,
+                                                                                  _mongocrypt_marking_t *marking,
+                                                                                  _mongocrypt_ciphertext_t *ciphertext,
+                                                                                  mongocrypt_status_t *status) {
+    BSON_ASSERT_PARAM(kb);
+    BSON_ASSERT_PARAM(marking);
+    BSON_ASSERT_PARAM(ciphertext);
+    BSON_ASSERT(kb->crypt);
+    BSON_ASSERT(marking->type == MONGOCRYPT_MARKING_FLE2_ENCRYPTION);
+
+    mc_FLE2EncryptionPlaceholder_t *placeholder = &marking->fle2;
+    BSON_ASSERT(placeholder->type == MONGOCRYPT_FLE2_PLACEHOLDER_TYPE_INSERT);
+    BSON_ASSERT(placeholder->algorithm == MONGOCRYPT_FLE2_ALGORITHM_TEXT_SEARCH);
+
+    _FLE2EncryptedPayloadCommon_t common = {{0}};
+    mc_FLE2InsertUpdatePayloadV2_t payload;
+    mc_FLE2InsertUpdatePayloadV2_init(&payload);
+
+    _mongocrypt_buffer_t value = {0};
+    bool res = false;
+
+    mc_FLE2TextSearchInsertSpec_t insertSpec;
+    if (!mc_FLE2TextSearchInsertSpec_parse(&insertSpec, &placeholder->v_iter, status)) {
+        goto fail;
+    }
+
+    // t
+    payload.valueType = BSON_TYPE_UTF8;
+
+    // k
+    payload.contentionFactor = 0;
+    if (placeholder->maxContentionFactor > 0) {
+        /* Choose a random contentionFactor in the inclusive range [0,
+         * placeholder->maxContentionFactor] */
+        if (!_mongocrypt_random_int64(kb->crypt->crypto,
+                                      placeholder->maxContentionFactor + 1,
+                                      &payload.contentionFactor,
+                                      status)) {
+            goto fail;
+        }
+    }
+
+    // u
+    _mongocrypt_buffer_copy_to(&placeholder->index_key_id, &payload.indexKeyId);
+
+    _mongocrypt_buffer_from_iter(&value, &insertSpec.v_iter);
+    if (!_mongocrypt_fle2_placeholder_common(kb,
+                                             &common,
+                                             &placeholder->index_key_id,
+                                             &value,
+                                             true, /* derive tokens using contentionFactor */
+                                             payload.contentionFactor,
+                                             status)) {
+        goto fail;
+    }
+
+    // (d, s, l) are never used for text search, so just set these to bogus buffers of
+    // correct length.
+    BSON_ASSERT(_mongocrypt_buffer_steal_from_data_and_size(&payload.edcDerivedToken,
+                                                            bson_malloc0(MONGOCRYPT_HMAC_SHA256_LEN),
+                                                            MONGOCRYPT_HMAC_SHA256_LEN));
+    _mongocrypt_buffer_copy_to(&payload.edcDerivedToken, &payload.escDerivedToken);
+    _mongocrypt_buffer_copy_to(&payload.edcDerivedToken, &payload.serverDerivedFromDataToken);
+
+    // p := EncryptCTR(ECOCToken, ESCDerivedFromDataTokenAndContentionFactor)
+    // Since p is never used for text search, this just sets p to a bogus ciphertext of
+    // the correct length.
+    if (!_fle2_derive_encrypted_token(kb->crypt->crypto,
+                                      &payload.encryptedTokens,
+                                      false,
+                                      common.collectionsLevel1Token,
+                                      &payload.escDerivedToken, // bogus
+                                      NULL,                     // unused in FLE2v2
+                                      (mc_optional_bool_t){0},
+                                      status)) {
+        goto fail;
+    }
+
+    // v := UserKeyId + EncryptCBCAEAD(UserKey, value)
+    {
+        _mongocrypt_buffer_t ciphertext = {0};
+        if (!_fle2_placeholder_aes_aead_encrypt(kb,
+                                                _mcFLE2v2AEADAlgorithm(),
+                                                &ciphertext,
+                                                &placeholder->user_key_id,
+                                                &value,
+                                                status)) {
+            goto fail;
+        }
+        const _mongocrypt_buffer_t v[2] = {placeholder->user_key_id, ciphertext};
+        const bool ok = _mongocrypt_buffer_concat(&payload.value, v, 2);
+        _mongocrypt_buffer_cleanup(&ciphertext);
+        if (!ok) {
+            goto fail;
+        }
+    }
+    // e := ServerDataEncryptionLevel1Token
+    _mongocrypt_buffer_copy_to(mc_ServerDataEncryptionLevel1Token_get(common.serverDataEncryptionLevel1Token),
+                               &payload.serverEncryptionToken);
+
+    // b
+    if (!_fle2_generate_TextSearchTokenSets(kb,
+                                            &payload,
+                                            &placeholder->index_key_id,
+                                            &insertSpec,
+                                            &value,
+                                            payload.contentionFactor,
+                                            status)) {
+        goto fail;
+    }
+
+    {
+        bson_t out;
+        bson_init(&out);
+        mc_FLE2InsertUpdatePayloadV2_serializeForTextSearch(&payload, &out);
+        _mongocrypt_buffer_steal_from_bson(&ciphertext->data, &out);
+    }
+    // Do not set ciphertext->original_bson_type and ciphertext->key_id. They are
+    // not used for FLE2InsertUpdatePayloadV2.
+    ciphertext->blob_subtype = MC_SUBTYPE_FLE2InsertUpdatePayloadV2;
+
+    res = true;
+fail:
+    mc_FLE2InsertUpdatePayloadV2_cleanup(&payload);
+    _mongocrypt_buffer_cleanup(&value);
+    _FLE2EncryptedPayloadCommon_cleanup(&common);
+    return res;
+}
+
+/**
  * Payload subtype 12: FLE2FindEqualityPayloadV2
  *
  * {d: EDC, s: ESC, l: serverDerivedFromDataToken, cm: maxContentionFactor}
@@ -1310,6 +1741,15 @@ fail:
     return res;
 }
 
+static bool _mongocrypt_fle2_placeholder_to_find_ciphertextForTextSearch(_mongocrypt_key_broker_t *kb,
+                                                                         _mongocrypt_marking_t *marking,
+                                                                         _mongocrypt_ciphertext_t *ciphertext,
+                                                                         mongocrypt_status_t *status) {
+    // TODO MONGOCRYPT-761 implement find support for text search fields
+    CLIENT_ERR("Text search find is not yet supported");
+    return false;
+}
+
 static bool _mongocrypt_fle2_placeholder_to_FLE2UnindexedEncryptedValue(_mongocrypt_key_broker_t *kb,
                                                                         _mongocrypt_marking_t *marking,
                                                                         _mongocrypt_ciphertext_t *ciphertext,
@@ -1520,6 +1960,17 @@ bool _mongocrypt_marking_to_ciphertext(void *ctx,
                 return _mongocrypt_fle2_placeholder_to_insert_update_ciphertext(kb, marking, ciphertext, status);
             case MONGOCRYPT_FLE2_PLACEHOLDER_TYPE_FIND:
                 return _mongocrypt_fle2_placeholder_to_find_ciphertext(kb, marking, ciphertext, status);
+            default: CLIENT_ERR("unexpected fle2 type: %d", (int)marking->fle2.type); return false;
+            }
+        case MONGOCRYPT_FLE2_ALGORITHM_TEXT_SEARCH:
+            switch (marking->fle2.type) {
+            case MONGOCRYPT_FLE2_PLACEHOLDER_TYPE_INSERT:
+                return _mongocrypt_fle2_placeholder_to_insert_update_ciphertextForTextSearch(kb,
+                                                                                             marking,
+                                                                                             ciphertext,
+                                                                                             status);
+            case MONGOCRYPT_FLE2_PLACEHOLDER_TYPE_FIND:
+                return _mongocrypt_fle2_placeholder_to_find_ciphertextForTextSearch(kb, marking, ciphertext, status);
             default: CLIENT_ERR("unexpected fle2 type: %d", (int)marking->fle2.type); return false;
             }
         default: CLIENT_ERR("unexpected algorithm: %d", (int)marking->algorithm); return false;

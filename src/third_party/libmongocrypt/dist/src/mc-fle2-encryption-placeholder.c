@@ -20,6 +20,8 @@
 
 #include "mc-fle2-encryption-placeholder-private.h"
 #include "mongocrypt-buffer-private.h"
+#include "mongocrypt-private.h"
+#include "mongocrypt-util-private.h" // mc_bson_type_to_string
 #include "mongocrypt.h"
 
 #define CLIENT_ERR_PREFIXED_HELPER(Prefix, ErrorString, ...) CLIENT_ERR(Prefix ": " ErrorString, ##__VA_ARGS__)
@@ -43,6 +45,22 @@
         CLIENT_ERR_PREFIXED("Missing field '" #Name "' in placeholder");                                               \
         goto fail;                                                                                                     \
     }
+
+// Common logic for parsing int32 greater than zero
+#define IF_FIELD_INT32_GT0_PARSE(Name, Dest, Iter)                                                                     \
+    IF_FIELD(Name) {                                                                                                   \
+        if (!BSON_ITER_HOLDS_INT32(&Iter)) {                                                                           \
+            CLIENT_ERR_PREFIXED("'" #Name "' must be an int32");                                                       \
+            goto fail;                                                                                                 \
+        }                                                                                                              \
+        int32_t val = bson_iter_int32(&Iter);                                                                          \
+        if (val <= 0) {                                                                                                \
+            CLIENT_ERR_PREFIXED("'" #Name "' must be greater than zero");                                              \
+            goto fail;                                                                                                 \
+        }                                                                                                              \
+        Dest = (uint32_t)val;                                                                                          \
+    }                                                                                                                  \
+    END_IF_FIELD
 
 void mc_FLE2EncryptionPlaceholder_init(mc_FLE2EncryptionPlaceholder_t *placeholder) {
     memset(placeholder, 0, sizeof(mc_FLE2EncryptionPlaceholder_t));
@@ -94,7 +112,7 @@ bool mc_FLE2EncryptionPlaceholder_parse(mc_FLE2EncryptionPlaceholder_t *out,
             }
             algorithm = bson_iter_int32(&iter);
             if (algorithm != MONGOCRYPT_FLE2_ALGORITHM_UNINDEXED && algorithm != MONGOCRYPT_FLE2_ALGORITHM_EQUALITY
-                && algorithm != MONGOCRYPT_FLE2_ALGORITHM_RANGE) {
+                && algorithm != MONGOCRYPT_FLE2_ALGORITHM_RANGE && algorithm != MONGOCRYPT_FLE2_ALGORITHM_TEXT_SEARCH) {
                 CLIENT_ERR_PREFIXED("invalid algorithm value: %d", algorithm);
                 goto fail;
             }
@@ -484,6 +502,213 @@ bool mc_FLE2RangeInsertSpec_parse(mc_FLE2RangeInsertSpec_t *out,
         return false;
     }
 
+    return true;
+
+fail:
+    return false;
+}
+
+#undef ERROR_PREFIX
+
+#define ERROR_PREFIX "Error parsing FLE2SubstringInsertSpec"
+
+static bool mc_FLE2SubstringInsertSpec_parse(mc_FLE2SubstringInsertSpec_t *out,
+                                             const bson_iter_t *in,
+                                             mongocrypt_status_t *status) {
+    bson_iter_t iter;
+    bool has_mlen = false, has_ub = false, has_lb = false;
+    BSON_ASSERT_PARAM(out);
+    BSON_ASSERT_PARAM(in);
+
+    iter = *in;
+
+    if (!BSON_ITER_HOLDS_DOCUMENT(&iter)) {
+        CLIENT_ERR_PREFIXED("must be an iterator to a document");
+        return false;
+    }
+    bson_iter_recurse(&iter, &iter);
+    while (bson_iter_next(&iter)) {
+        const char *field = bson_iter_key(&iter);
+        BSON_ASSERT(field);
+        IF_FIELD_INT32_GT0_PARSE(mlen, out->mlen, iter);
+        IF_FIELD_INT32_GT0_PARSE(ub, out->ub, iter);
+        IF_FIELD_INT32_GT0_PARSE(lb, out->lb, iter);
+    }
+    CHECK_HAS(mlen)
+    CHECK_HAS(ub)
+    CHECK_HAS(lb)
+    if (out->ub < out->lb) {
+        CLIENT_ERR_PREFIXED("upper bound cannot be less than the lower bound");
+        goto fail;
+    }
+    if (out->mlen < out->ub) {
+        CLIENT_ERR_PREFIXED("maximum indexed length cannot be less than the upper bound");
+        goto fail;
+    }
+    return true;
+fail:
+    return false;
+}
+
+#undef ERROR_PREFIX
+
+#define ERROR_PREFIX "Error parsing FLE2SuffixInsertSpec"
+
+static bool
+mc_FLE2SuffixInsertSpec_parse(mc_FLE2SuffixInsertSpec_t *out, const bson_iter_t *in, mongocrypt_status_t *status) {
+    bson_iter_t iter;
+    bool has_ub = false, has_lb = false;
+
+    BSON_ASSERT_PARAM(out);
+    BSON_ASSERT_PARAM(in);
+
+    iter = *in;
+
+    if (!BSON_ITER_HOLDS_DOCUMENT(&iter)) {
+        CLIENT_ERR_PREFIXED("must be an iterator to a document");
+        return false;
+    }
+    bson_iter_recurse(&iter, &iter);
+    while (bson_iter_next(&iter)) {
+        const char *field = bson_iter_key(&iter);
+        BSON_ASSERT(field);
+        IF_FIELD_INT32_GT0_PARSE(ub, out->ub, iter);
+        IF_FIELD_INT32_GT0_PARSE(lb, out->lb, iter);
+    }
+    CHECK_HAS(ub)
+    CHECK_HAS(lb)
+    if (out->ub < out->lb) {
+        CLIENT_ERR_PREFIXED("upper bound cannot be less than the lower bound");
+        goto fail;
+    }
+    return true;
+fail:
+    return false;
+}
+
+#undef ERROR_PREFIX
+
+#define ERROR_PREFIX "Error parsing FLE2PrefixInsertSpec"
+
+static bool
+mc_FLE2PrefixInsertSpec_parse(mc_FLE2PrefixInsertSpec_t *out, const bson_iter_t *in, mongocrypt_status_t *status) {
+    bson_iter_t iter;
+    bool has_ub = false, has_lb = false;
+    BSON_ASSERT_PARAM(out);
+    BSON_ASSERT_PARAM(in);
+
+    iter = *in;
+
+    if (!BSON_ITER_HOLDS_DOCUMENT(&iter)) {
+        CLIENT_ERR_PREFIXED("must be an iterator to a document");
+        return false;
+    }
+    bson_iter_recurse(&iter, &iter);
+    while (bson_iter_next(&iter)) {
+        const char *field = bson_iter_key(&iter);
+        BSON_ASSERT(field);
+        IF_FIELD_INT32_GT0_PARSE(ub, out->ub, iter);
+        IF_FIELD_INT32_GT0_PARSE(lb, out->lb, iter);
+    }
+    CHECK_HAS(ub)
+    CHECK_HAS(lb)
+    if (out->ub < out->lb) {
+        CLIENT_ERR_PREFIXED("upper bound cannot be less than the lower bound");
+        goto fail;
+    }
+    return true;
+fail:
+    return false;
+}
+
+#undef ERROR_PREFIX
+
+#define ERROR_PREFIX "Error parsing FLE2TextSearchInsertSpec"
+
+bool mc_FLE2TextSearchInsertSpec_parse(mc_FLE2TextSearchInsertSpec_t *out,
+                                       const bson_iter_t *in,
+                                       mongocrypt_status_t *status) {
+    BSON_ASSERT_PARAM(out);
+    BSON_ASSERT_PARAM(in);
+
+    *out = (mc_FLE2TextSearchInsertSpec_t){{0}};
+
+    bson_iter_t iter = *in;
+    bool has_v = false, has_casef = false, has_diacf = false;
+    bool has_substr = false, has_suffix = false, has_prefix = false;
+
+    if (!BSON_ITER_HOLDS_DOCUMENT(&iter)) {
+        CLIENT_ERR_PREFIXED("must be an iterator to a document");
+        return false;
+    }
+    bson_iter_recurse(&iter, &iter);
+
+    while (bson_iter_next(&iter)) {
+        const char *field = bson_iter_key(&iter);
+        BSON_ASSERT(field);
+
+        IF_FIELD(v) {
+            out->v = bson_iter_utf8(&iter, &out->len);
+            if (!out->v) {
+                CLIENT_ERR_PREFIXED("unsupported BSON type: %s for text search",
+                                    mc_bson_type_to_string(bson_iter_type(&iter)));
+                goto fail;
+            }
+            out->v_iter = iter;
+        }
+        END_IF_FIELD
+
+        IF_FIELD(casef) {
+            if (!BSON_ITER_HOLDS_BOOL(&iter)) {
+                CLIENT_ERR_PREFIXED("'casef' must be a bool");
+                goto fail;
+            }
+            out->casef = bson_iter_bool(&iter);
+        }
+        END_IF_FIELD
+
+        IF_FIELD(diacf) {
+            if (!BSON_ITER_HOLDS_BOOL(&iter)) {
+                CLIENT_ERR_PREFIXED("'diacf' must be a bool");
+                goto fail;
+            }
+            out->diacf = bson_iter_bool(&iter);
+        }
+        END_IF_FIELD
+
+        IF_FIELD(substr) {
+            if (!mc_FLE2SubstringInsertSpec_parse(&out->substr.value, &iter, status)) {
+                goto fail;
+            }
+            out->substr.set = true;
+        }
+        END_IF_FIELD
+
+        IF_FIELD(suffix) {
+            if (!mc_FLE2SuffixInsertSpec_parse(&out->suffix.value, &iter, status)) {
+                goto fail;
+            }
+            out->suffix.set = true;
+        }
+        END_IF_FIELD
+
+        IF_FIELD(prefix) {
+            if (!mc_FLE2PrefixInsertSpec_parse(&out->prefix.value, &iter, status)) {
+                goto fail;
+            }
+            out->prefix.set = true;
+        }
+        END_IF_FIELD
+    }
+
+    CHECK_HAS(v)
+    CHECK_HAS(casef)
+    CHECK_HAS(diacf)
+    // one of substr/suffix/prefix must be set
+    if (!(has_substr || has_suffix || has_prefix)) {
+        CLIENT_ERR_PREFIXED("Must have a substring, suffix, or prefix index specification");
+        goto fail;
+    }
     return true;
 
 fail:
