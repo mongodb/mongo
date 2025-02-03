@@ -18,7 +18,7 @@ selector:
     # QueryExecutorStats assertions are hardcoded for single-node results
     - jstests/aggregation/sources/lookup/lookup_query_stats.js
     # failed on: The aggregate should always use the view on 'testDB', not an empty collection on 'siblingDB'
-    - jstests/aggregation/view_resolution_namespace_collision.js
+    - jstests/aggregation/views/view_resolution_namespace_collision.js
 
   exclude_with_any_tags:
     # This passthrough uses the `simulate_atlas_proxy` override, which some tests are incompatible with.

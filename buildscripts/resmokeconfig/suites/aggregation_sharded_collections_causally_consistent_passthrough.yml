@@ -9,7 +9,7 @@ selector:
     - jstests/aggregation/data/*.js
     # This test makes assertions about whether aggregations will need to spill to disk, which assumes
     # all the data is located on a single shard.
-    - jstests/aggregation/spill_to_disk.js
+    - jstests/aggregation/exec/spill_to_disk.js
     # This test modifies internal parameter on primary node. In order for this test to run
     # successfully in this passthrough, it would need to run setParameter on every shardsvr in the
     # cluster.

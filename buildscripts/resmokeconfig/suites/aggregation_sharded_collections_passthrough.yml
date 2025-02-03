@@ -8,7 +8,7 @@ selector:
     - jstests/aggregation/data/*.js
     # This test makes assertions about whether aggregations will need to spill to disk, which assumes
     # all the data is located on a single shard.
-    - jstests/aggregation/spill_to_disk.js
+    - jstests/aggregation/exec/spill_to_disk.js
     # TODO SERVER-32311: These tests use getAggPlanStage(), which can't handle sharded explain output.
     - jstests/aggregation/optimization/match_swapping_renamed_fields.js
     - jstests/aggregation/optimization/use_query_project_and_sort.js

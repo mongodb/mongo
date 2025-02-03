@@ -56,7 +56,7 @@ selector:
 
     # TODO: Remove after fixing SERVER-78201: the following received command without explicit readConcern.
     - jstests/aggregation/sources/densify/internal_parse.js
-    - jstests/aggregation/api_version_stage_allowance_checks.js
+    - jstests/aggregation/parsing/api_version_stage_allowance_checks.js
 
     # TODO (SERVER-78200): The tests below sometimes hang when they run concurrently with a setFCV command.
     - src/mongo/db/modules/*/jstests/fle/fle_admin_e2e.js

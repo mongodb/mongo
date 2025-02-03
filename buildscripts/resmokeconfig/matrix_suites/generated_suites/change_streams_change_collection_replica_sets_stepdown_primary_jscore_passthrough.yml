@@ -109,7 +109,7 @@ selector:
     - jstests/aggregation/explain/explain_writing_aggs.js
     - jstests/core/administrative/builtin_roles_external.js
     - jstests/aggregation/sources/lookup/lookup_query_stats.js
-    - jstests/aggregation/view_resolution_namespace_collision.js
+    - jstests/aggregation/views/view_resolution_namespace_collision.js
     - jstests/core/txns/**/*.js
     - jstests/core/**/operation_latency_histogram.js
     - jstests/core/**/profile2.js

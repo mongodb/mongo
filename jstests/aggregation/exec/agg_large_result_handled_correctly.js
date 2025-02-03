@@ -4,7 +4,7 @@ const t = db[jsTestName()];
 t.drop();
 
 // first 63MB
-for (var i = 0; i < 63; i++) {
+for (let i = 0; i < 63; i++) {
     assert.commandWorked(t.insert({a: new Array(1024 * 1024 + 1).join('a')}));
 }
 

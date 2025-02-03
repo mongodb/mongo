@@ -54,7 +54,7 @@
       # TODO SERVER-96338: Investigate why 'accumulator_js_size_limits' is failling on PQS suites.
       - jstests/aggregation/accumulators/accumulator_js_size_limits.js
       # Test which overcomes the imposed 16Mb query settings limit making the 'setQuerySettings' command fail.
-      - jstests/aggregation/query_limits_test.js
+      - jstests/aggregation/exec/query_limits_test.js
       # Test which asserts on the number of execution metrics. The additional commands emitted by
       # this suite might cause the test to fail.
       - jstests/aggregation/sources/geonear/geonear_hint.js

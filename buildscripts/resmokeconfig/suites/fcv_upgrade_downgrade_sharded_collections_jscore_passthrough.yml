@@ -66,7 +66,7 @@ selector:
 
     # TODO: Remove after fixing SERVER-78201: the following received command without explicit readConcern.
     - jstests/aggregation/sources/densify/internal_parse.js
-    - jstests/aggregation/api_version_stage_allowance_checks.js
+    - jstests/aggregation/parsing/api_version_stage_allowance_checks.js
 
     # TODO (SERVER-78200): The tests below sometimes hang when they run concurrently with a setFCV command.
     - src/mongo/db/modules/*/jstests/fle/fle_admin_e2e.js
@@ -193,7 +193,7 @@ selector:
     # Queryable encryption tests create internal transactions which are expected to fail.
     - jstests/core/query/queryable_encryption/*.js
     # TODO (SERVER-77910): Find out why spill_to_disk.js fails to spill to disk after FCV down.
-    - jstests/aggregation/spill_to_disk.js
+    - jstests/aggregation/exec/spill_to_disk.js
     # TODO (SERVER-32311): These tests use getAggPlanStage(), which can't handle sharded explain output.
     - jstests/aggregation/optimization/match_swapping_renamed_fields.js
     - jstests/aggregation/optimization/use_query_project_and_sort.js

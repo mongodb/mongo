@@ -53,7 +53,7 @@ selector:
     - jstests/aggregation/expressions/ifnull.js
     - jstests/aggregation/sources/facet/facet_memory_consumption.js
     - jstests/aggregation/expressions/strlen.js
-    - jstests/aggregation/agg_cursor.js
+    - jstests/aggregation/exec/agg_cursor.js
     - jstests/aggregation/expressions/binarySize.js
     - jstests/aggregation/expressions/divide.js
     - jstests/aggregation/sources/merge/mode_fail_insert.js
@@ -73,18 +73,18 @@ selector:
     - jstests/aggregation/expressions/regex.js
     - jstests/aggregation/expressions/objectToArray.js
     - jstests/aggregation/expressions/concat_arrays2.js
-    - jstests/aggregation/aggregation_with_uuids.js
+    - jstests/aggregation/parsing/aggregation_with_uuids.js
     - jstests/aggregation/sources/collStats/count.js
     - jstests/aggregation/expressions/size.js
     - jstests/aggregation/sources/graphLookup/error.js
     - jstests/aggregation/sources/match/text_search_requires_index.js
     - jstests/aggregation/sources/lookup/lookup_contains_text.js
     - jstests/aggregation/expressions/switch_errors.js
-    - jstests/aggregation/spill_to_disk.js
+    - jstests/aggregation/exec/spill_to_disk.js
     - jstests/aggregation/expressions/internal_js_emit.js
     - jstests/aggregation/sources/unionWith/unionWith.js
     - jstests/aggregation/sources/merge/on_fields_validation.js
-    - jstests/aggregation/agg_split_large_objs_across_batches.js
+    - jstests/aggregation/exec/agg_split_large_objs_across_batches.js
     - jstests/aggregation/expressions/range.js
     - jstests/aggregation/sources/setWindowFields/concat_arrays.js
     - jstests/aggregation/accumulators/concat_arrays.js
@@ -96,7 +96,7 @@ selector:
     - jstests/aggregation/expressions/current_date.js
 
     # These tests run larger aggregations that can take a long time and can repeatedly get interrupted by config transitions.
-    - jstests/aggregation/query_limits_test.js
+    - jstests/aggregation/exec/query_limits_test.js
     - jstests/aggregation/accumulators/accumulator_js_size_limits.js
     - jstests/aggregation/accumulators/min_n_max_n.js
 

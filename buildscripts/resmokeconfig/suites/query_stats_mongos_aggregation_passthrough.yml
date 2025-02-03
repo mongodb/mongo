@@ -20,7 +20,7 @@ selector:
     - jstests/aggregation/accumulators/internal_js_reduce_with_scope.js
     - jstests/aggregation/expressions/internal_js_emit_with_scope.js
     # Based on SERVER-81917
-    - jstests/aggregation/query_limits_test.js
+    - jstests/aggregation/exec/query_limits_test.js
     # $unionWith explain output does not check whether the collection is sharded in a sharded
     # cluster.
     - jstests/aggregation/sources/unionWith/unionWith_explain.js

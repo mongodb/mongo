@@ -1,3 +1,8 @@
+/**
+ * Basic tests for aggregation pipelines.
+ *
+ * TODO SERVER-86037: Split this file into logical groups of tests and modernize them.
+ */
 // Loads data into the namespace 'aggdb.articles'.
 import "jstests/aggregation/data/articles.js";
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
