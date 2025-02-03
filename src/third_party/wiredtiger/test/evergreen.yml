@@ -5306,9 +5306,13 @@ buildvariants:
     # Exclude wt12015_backup_corruption for ASan builds. It creates false positives when it deliberately kills processes that invoke corruption.
     ctest_extra_args: -E "wt12015_backup_corruption"
   tasks:
-    - name: ".pull_request !.pull_request_compilers !.model_checking !.python !.tiered_unittest !csuite-wt12015-backup-corruption-test"
+    - name: ".pull_request !.pull_request_compilers !.python !.tiered_unittest !csuite-wt12015-backup-corruption-test"
     - name: examples-c-test
     - name: format-asan-smoke-test
+    - name: model-test-long
+      batchtime: 1440 # once a day
+    - name: model-test-long-random-config
+      batchtime: 1440 # once a day
     - name: live-restore-long
 
 - name: ubuntu2004-tsan

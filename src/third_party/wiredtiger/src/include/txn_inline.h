@@ -1931,8 +1931,8 @@ __txn_modify_block(
 
         WT_STAT_CONN_DSRC_INCR(session, txn_update_conflict);
         ret = __wt_txn_rollback_required(session, WT_TXN_ROLLBACK_REASON_CONFLICT);
-        WT_IGNORE_RET(__wt_session_set_last_error(
-          session, ret, WT_WRITE_CONFLICT, "Write conflict between concurrent operations"));
+        __wt_session_set_last_error(
+          session, ret, WT_WRITE_CONFLICT, "Write conflict between concurrent operations");
     }
 
     /*

@@ -57,6 +57,21 @@ public:
     }
 
     /*
+     * kv_database::~kv_database --
+     *     Destroy the database.
+     */
+    inline ~kv_database()
+    {
+        /*
+         * Clear the contents of the database to prevent memory leaks. We need to do this, because
+         * if we still have any active transactions at this point, an active transaction would
+         * reference updates, and updates reference their transactions. This circular dependency
+         * would then prevent shared pointers from cleaning up the memory correctly.
+         */
+        clear();
+    }
+
+    /*
      * kv_database::create_checkpoint --
      *     Create a checkpoint. Throw an exception if the name is not unique.
      */
@@ -270,6 +285,18 @@ protected:
      *     Create a transaction snapshot. Do not lock, because the caller already has a lock.
      */
     kv_transaction_snapshot_ptr txn_snapshot_nolock(txn_id_t do_not_exclude = k_txn_none);
+
+    /*
+     * kv_database::clear --
+     *     Clear the contents of the database.
+     */
+    inline void
+    clear()
+    {
+        std::lock_guard lock_guard1(_tables_lock);
+        std::lock_guard lock_guard2(_transactions_lock);
+        clear_nolock();
+    }
 
     /*
      * kv_database::clear_nolock --

@@ -394,15 +394,14 @@ testutil_delete_old_backups(int retain)
  *     TODO: Add a comment describing this function.
  */
 void
-testutil_create_backup_directory(const char *home)
+testutil_create_backup_directory(const char *home, uint64_t id, bool check)
 {
-    char buf[512];
+    char buf[PATH_MAX];
 
-    testutil_snprintf(buf, sizeof(buf), "%s" DIR_DELIM_STR "BACKUP", home);
-    testutil_remove(buf);
-    testutil_mkdir(buf);
-
-    testutil_snprintf(buf, sizeof(buf), "%s" DIR_DELIM_STR "BACKUP.copy", home);
+    if (!check)
+        testutil_snprintf(buf, sizeof(buf), "%s" DIR_DELIM_STR "BACKUP", home);
+    else
+        testutil_snprintf(buf, sizeof(buf), "%s" DIR_DELIM_STR "CHECK.%" PRIu64, home, id);
     testutil_remove(buf);
     testutil_mkdir(buf);
 }
@@ -414,22 +413,8 @@ testutil_create_backup_directory(const char *home)
 void
 testutil_copy_file(WT_SESSION *session, const char *name)
 {
-    size_t len;
-    char *first, *second;
+    char buf[PATH_MAX];
 
-    len = strlen("BACKUP") + strlen(name) + 10;
-    first = dmalloc(len);
-    testutil_snprintf(first, len, "BACKUP/%s", name);
-    testutil_check(__wt_copy_and_sync(session, name, first));
-
-    /*
-     * Save another copy of the original file to make debugging recovery errors easier.
-     */
-    len = strlen("BACKUP.copy") + strlen(name) + 10;
-    second = dmalloc(len);
-    testutil_snprintf(second, len, "BACKUP.copy/%s", name);
-    testutil_check(__wt_copy_and_sync(session, first, second));
-
-    free(first);
-    free(second);
+    testutil_snprintf(buf, sizeof(buf), "BACKUP/%s", name);
+    testutil_check(__wt_copy_and_sync(session, name, buf));
 }

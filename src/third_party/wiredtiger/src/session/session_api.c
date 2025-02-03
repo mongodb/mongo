@@ -2498,7 +2498,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
     F_SET(session_ret, WT_SESSION_SAVE_ERRORS);
     session_ret->err_info.err_msg = NULL;
     WT_ERR(__wt_buf_initsize(session, &(session_ret->err_info.err_msg_buf), 128));
-    WT_ERR(__wt_session_set_last_error(session_ret, 0, WT_NONE, WT_ERROR_INFO_EMPTY));
+    __wt_session_set_last_error(session_ret, 0, WT_NONE, WT_ERROR_INFO_EMPTY);
 
     /*
      * Release write to ensure structure fields are set before any other thread will consider the

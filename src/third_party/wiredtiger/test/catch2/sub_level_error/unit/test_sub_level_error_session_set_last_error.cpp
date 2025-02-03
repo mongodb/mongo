@@ -32,41 +32,64 @@ TEST_CASE("Session set last error - test storing verbose info about the last err
 
     SECTION("Test with NULL session")
     {
-        REQUIRE(__wt_session_set_last_error(NULL, 0, WT_NONE, WT_ERROR_INFO_EMPTY) == 0);
+        // Check that function can handle a NULL session without aborting.
+        __wt_session_set_last_error(NULL, 0, WT_NONE, WT_ERROR_INFO_EMPTY);
     }
 
     SECTION("Test with initial values")
     {
         const char *err_msg_content = WT_ERROR_INFO_EMPTY;
-        REQUIRE(__wt_session_set_last_error(session_impl, 0, WT_NONE, err_msg_content) == 0);
+        __wt_session_set_last_error(session_impl, 0, WT_NONE, err_msg_content);
         check_error_info(err_info, 0, WT_NONE, err_msg_content);
     }
 
     SECTION("Test with EINVAL error")
     {
         const char *err_msg_content = "Some EINVAL error";
-        REQUIRE(__wt_session_set_last_error(session_impl, EINVAL,
-                  WT_BACKGROUND_COMPACT_ALREADY_RUNNING, err_msg_content) == 0);
+        __wt_session_set_last_error(
+          session_impl, EINVAL, WT_BACKGROUND_COMPACT_ALREADY_RUNNING, err_msg_content);
         check_error_info(err_info, EINVAL, WT_BACKGROUND_COMPACT_ALREADY_RUNNING, err_msg_content);
+    }
+
+    SECTION("Test overwriting/resetting the error message")
+    {
+        const char *err_msg_content = "error";
+        __wt_session_set_last_error(session_impl, EINVAL, WT_NONE, err_msg_content);
+        check_error_info(err_info, EINVAL, WT_NONE, err_msg_content);
+
+        // The error message should not be overwritten.
+        __wt_session_set_last_error(session_impl, EBUSY, WT_CONFLICT_BACKUP, "new error");
+        check_error_info(err_info, EINVAL, WT_NONE, err_msg_content);
+
+        // The error message should be reset.
+        __wt_session_set_last_error(session_impl, 0, WT_NONE, NULL);
+        check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
     }
 
     SECTION("Test with multiple errors (varying err/sub_level_err/err_msg)")
     {
         const char *err_msg_content_EINVAL = "Some EINVAL error";
         const char *err_msg_content_EBUSY = "Some EBUSY error";
-        REQUIRE(__wt_session_set_last_error(session_impl, 0, WT_NONE, WT_ERROR_INFO_EMPTY) == 0);
+        __wt_session_set_last_error(session_impl, 0, WT_NONE, WT_ERROR_INFO_EMPTY);
         check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_EMPTY);
-        REQUIRE(__wt_session_set_last_error(session_impl, EINVAL,
-                  WT_BACKGROUND_COMPACT_ALREADY_RUNNING, err_msg_content_EINVAL) == 0);
+        __wt_session_set_last_error(
+          session_impl, EINVAL, WT_BACKGROUND_COMPACT_ALREADY_RUNNING, err_msg_content_EINVAL);
         check_error_info(
           err_info, EINVAL, WT_BACKGROUND_COMPACT_ALREADY_RUNNING, err_msg_content_EINVAL);
-        REQUIRE(__wt_session_set_last_error(
-                  session_impl, EBUSY, WT_UNCOMMITTED_DATA, err_msg_content_EBUSY) == 0);
+
+        // Reset error.
+        __wt_session_set_last_error(session_impl, 0, WT_NONE, NULL);
+
+        __wt_session_set_last_error(
+          session_impl, EBUSY, WT_UNCOMMITTED_DATA, err_msg_content_EBUSY);
         check_error_info(err_info, EBUSY, WT_UNCOMMITTED_DATA, err_msg_content_EBUSY);
-        REQUIRE(__wt_session_set_last_error(
-                  session_impl, EBUSY, WT_DIRTY_DATA, err_msg_content_EBUSY) == 0);
+
+        // Reset error.
+        __wt_session_set_last_error(session_impl, 0, WT_NONE, NULL);
+
+        __wt_session_set_last_error(session_impl, EBUSY, WT_DIRTY_DATA, err_msg_content_EBUSY);
         check_error_info(err_info, EBUSY, WT_DIRTY_DATA, err_msg_content_EBUSY);
-        REQUIRE(__wt_session_set_last_error(session_impl, 0, WT_NONE, NULL) == 0);
+        __wt_session_set_last_error(session_impl, 0, WT_NONE, NULL);
         check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
     }
 
@@ -74,7 +97,7 @@ TEST_CASE("Session set last error - test storing verbose info about the last err
     {
         std::string err_msg_string(1024, 'a');
         const char *err_msg_content = err_msg_string.c_str();
-        REQUIRE(__wt_session_set_last_error(session_impl, EINVAL, WT_NONE, err_msg_content) == 0);
+        __wt_session_set_last_error(session_impl, EINVAL, WT_NONE, err_msg_content);
         check_error_info(err_info, EINVAL, WT_NONE, err_msg_content);
     }
 }

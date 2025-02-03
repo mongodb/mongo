@@ -139,7 +139,7 @@ err:
  * __wt_session_set_last_error --
  *     Stores information about the last error to occur during this session.
  */
-int
+void
 __wt_session_set_last_error(
   WT_SESSION_IMPL *session, int err, int sub_level_err, const char *fmt, ...)
 {
@@ -150,7 +150,13 @@ __wt_session_set_last_error(
      * struct is being initialized. If the session is NULL, there is nothing to update.
      */
     if (session == NULL || !F_ISSET(session, WT_SESSION_SAVE_ERRORS))
-        return (0);
+        return;
+
+    /* Only update if the err_info struct has not been previously set in the current API call, or
+     * if the err_info struct is being reset.
+     */
+    if (session->err_info.err != 0 && err != 0)
+        return;
 
     /* Validate the incoming sub level error code. */
     WT_ASSERT(session, __wt_is_valid_sub_level_error(sub_level_err));
@@ -178,6 +184,8 @@ __wt_session_set_last_error(
         err_info->err_msg = err_info->err_msg_buf.data;
     }
 
+    return;
+
 err:
-    return (ret);
+    WT_ASSERT_ALWAYS(session, false, "Error encountered when formatting into a scratch buffer");
 }

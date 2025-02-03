@@ -40,6 +40,7 @@ const WT_NAME_FLAG __wt_stress_types[] = {
   {"history_store_checkpoint_delay", WT_TIMING_STRESS_HS_CHECKPOINT_DELAY},
   {"history_store_search", WT_TIMING_STRESS_HS_SEARCH},
   {"history_store_sweep_race", WT_TIMING_STRESS_HS_SWEEP},
+  {"open_index_slow", WT_TIMING_STRESS_OPEN_INDEX_SLOW},
   {"prefetch_1", WT_TIMING_STRESS_PREFETCH_1}, {"prefetch_2", WT_TIMING_STRESS_PREFETCH_2},
   {"prefetch_3", WT_TIMING_STRESS_PREFETCH_3}, {"prefix_compare", WT_TIMING_STRESS_PREFIX_COMPARE},
   {"prepare_checkpoint_delay", WT_TIMING_STRESS_PREPARE_CHECKPOINT_DELAY},

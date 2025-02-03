@@ -27,8 +27,7 @@ api_call_with_error(
 
     ret = err;
     if (err != 0 && err_msg_content != NULL)
-        WT_IGNORE_RET(
-          __wt_session_set_last_error(session_impl, err, sub_level_err, err_msg_content));
+        __wt_session_set_last_error(session_impl, err, sub_level_err, err_msg_content);
 err:
     API_END_RET(session_impl, ret);
 }
@@ -49,8 +48,7 @@ txn_api_call_with_error(
 
     ret = err;
     if (err != 0 && err_msg_content != NULL)
-        WT_IGNORE_RET(
-          __wt_session_set_last_error(session_impl, err, sub_level_err, err_msg_content));
+        __wt_session_set_last_error(session_impl, err, sub_level_err, err_msg_content);
 err:
     TXN_API_END(session_impl, ret, false);
     return (ret);

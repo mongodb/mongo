@@ -2150,15 +2150,23 @@ __evict_walk_prepare(WT_SESSION_IMPL *session, uint32_t *walk_flagsp)
     switch (btree->evict_start_type) {
     case WT_EVICT_WALK_NEXT:
         /* Each time when evict_ref is null, alternate between linear and random walk */
-        if (btree->evict_ref == NULL && (++btree->linear_walk_restarts) & 1)
-            /* Alternate with rand_prev so that the start of the tree is visited more often */
-            goto rand_prev;
+        if (btree->evict_ref == NULL && (++btree->linear_walk_restarts) & 1) {
+            if (S2C(session)->evict->use_npos_in_pass)
+                /* Alternate with rand_prev so that the start of the tree is visited more often */
+                goto rand_prev;
+            else
+                goto rand_next;
+        }
         break;
     case WT_EVICT_WALK_PREV:
         /* Each time when evict_ref is null, alternate between linear and random walk */
-        if (btree->evict_ref == NULL && (++btree->linear_walk_restarts) & 1)
-            /* Alternate with rand_next so that the end of the tree is visited more often */
-            goto rand_next;
+        if (btree->evict_ref == NULL && (++btree->linear_walk_restarts) & 1) {
+            if (S2C(session)->evict->use_npos_in_pass)
+                /* Alternate with rand_next so that the end of the tree is visited more often */
+                goto rand_next;
+            else
+                goto rand_prev;
+        }
         FLD_SET(*walk_flagsp, WT_READ_PREV);
         break;
     case WT_EVICT_WALK_RAND_PREV:
@@ -2940,8 +2948,8 @@ err:
          */
         if (ret == 0 && cache_max_wait_us != 0 && session->cache_wait_us > cache_max_wait_us) {
             ret = __wt_txn_rollback_required(session, WT_TXN_ROLLBACK_REASON_CACHE_OVERFLOW);
-            WT_IGNORE_RET(__wt_session_set_last_error(
-              session, ret, WT_CACHE_OVERFLOW, "Cache capacity has overflown"));
+            __wt_session_set_last_error(
+              session, ret, WT_CACHE_OVERFLOW, "Cache capacity has overflown");
             if (__wt_atomic_load32(&evict->evict_aggressive_score) > 0)
                 (void)__wt_atomic_subv32(&evict->evict_aggressive_score, 1);
             WT_STAT_CONN_INCR(session, eviction_timed_out_ops);

@@ -171,6 +171,9 @@ TEST_CASE("Test functions for error handling in rollback workflows",
         check_error_info(err_info, WT_ROLLBACK, WT_OLDEST_FOR_EVICTION,
           "Transaction has the oldest pinned transaction ID");
 
+        // Reset error.
+        __wt_session_set_last_error(session_impl, 0, WT_NONE, NULL);
+
         // Set transaction's ID to be equal to the oldest transaction ID.
         txn_shared->id = S2C(session)->txn_global.oldest_id;
         CHECK(__wt_txn_is_blocking(session_impl) == WT_ROLLBACK);

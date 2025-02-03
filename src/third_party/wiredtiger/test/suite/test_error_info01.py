@@ -28,19 +28,14 @@
 
 import wiredtiger, time, errno
 from wttest import open_cursor
+from error_info_util import error_info_util
 from compact_util import compact_util
 
 # test_error_info01.py
 #   Test that the get_last_error() session API returns the last error to occur in the session.
-class test_error_info01(compact_util):
+class test_error_info01(error_info_util, compact_util):
 
     uri = "table:test_error_info01"
-
-    def assert_error_equal(self, err_val, sub_level_err_val, err_msg_val):
-        err, sub_level_err, err_msg = self.session.get_last_error()
-        self.assertEqual(err, err_val)
-        self.assertEqual(sub_level_err, sub_level_err_val)
-        self.assertEqual(err_msg, err_msg_val)
 
     def api_call_with_success(self):
         """
@@ -143,21 +138,3 @@ class test_error_info01(compact_util):
         self.test_ebusy_wt_uncommitted_data()
         self.test_ebusy_wt_dirty_data()
         self.test_ebusy_wt_dirty_data()
-
-    def test_conflict_backup(self):
-        """
-        Open a backup cursor on a new table, then attempt to drop the table.
-        """
-        self.session.create(self.uri, 'key_format=S,value_format=S')
-        cursor = self.session.open_cursor('backup:', None, None)
-        self.assertTrue(self.raisesBusy(lambda: self.session.drop(self.uri, None)), "was expecting drop call to fail with EBUSY")
-        self.assert_error_equal(errno.EBUSY, wiredtiger.WT_CONFLICT_BACKUP, "the table is currently performing backup and cannot be dropped")
-
-    def test_conflict_dhandle(self):
-        """
-        Open a cursor on a new table, then attempt to drop the table.
-        """
-        self.session.create(self.uri, 'key_format=S,value_format=S')
-        cursor = self.session.open_cursor(self.uri, None, None)
-        self.assertTrue(self.raisesBusy(lambda: self.session.drop(self.uri, None)), "was expecting drop call to fail with EBUSY")
-        self.assert_error_equal(errno.EBUSY, wiredtiger.WT_CONFLICT_DHANDLE, "another thread is currently holding the data handle of the table")

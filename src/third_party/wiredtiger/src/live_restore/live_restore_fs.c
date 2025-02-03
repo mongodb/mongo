@@ -1607,10 +1607,14 @@ __live_restore_fs_size(
     if (!exist)
         WT_RET_MSG(session, ENOENT, "Live restore cannot find: %s", name);
 
-    /* The file will always exist in the destination. This the is authoritative file size. */
-    WT_ASSERT(session, which == WTI_LIVE_RESTORE_FS_LAYER_DESTINATION);
-    WT_RET(__live_restore_fs_backing_filename(
-      &lr_fs->destination, session, lr_fs->destination.home, name, &path));
+    /* Get the file size from the destination if possible, otherwise fallback to the source. */
+    if (which == WTI_LIVE_RESTORE_FS_LAYER_DESTINATION)
+        WT_RET(__live_restore_fs_backing_filename(
+          &lr_fs->destination, session, lr_fs->destination.home, name, &path));
+    else
+        WT_RET(__live_restore_fs_backing_filename(
+          &lr_fs->source, session, lr_fs->destination.home, name, &path));
+
     ret = lr_fs->os_file_system->fs_size(lr_fs->os_file_system, wt_session, path, sizep);
 
     __wt_free(session, path);

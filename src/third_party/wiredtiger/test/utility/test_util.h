@@ -542,7 +542,7 @@ void testutil_copy_data_opt(const char *, const char *);
 void testutil_copy_ext(const char *, const char *, const WT_FILE_COPY_OPTS *opts);
 void testutil_copy_file(WT_SESSION *, const char *);
 void testutil_copy_if_exists(WT_SESSION *, const char *);
-void testutil_create_backup_directory(const char *);
+void testutil_create_backup_directory(const char *, uint64_t, bool);
 void testutil_deduce_build_dir(TEST_OPTS *opts);
 void testutil_delete_old_backups(int);
 bool testutil_exists(const char *, const char *);
