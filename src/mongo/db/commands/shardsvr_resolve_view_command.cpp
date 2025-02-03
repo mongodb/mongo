@@ -66,7 +66,7 @@ public:
     }
 
     std::string help() const override {
-        return "allows shards to run search index command issued by a mongos with resolved view "
+        return "resolves views as to allow shards to run search index command issued by a mongos "
                "info";
     }
 

@@ -109,6 +109,7 @@ public:
     /*
      * These methods support IDL parsing of ResolvedView.
      */
+    // TODO SERVER-100177 add unit tests for both methods.
     static ResolvedView parseFromBSON(const BSONElement& elem);
     void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
 

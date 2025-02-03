@@ -5,6 +5,7 @@
  * index.
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 
 const testDb = db.getSiblingDB(jsTestName());
@@ -107,162 +108,175 @@ createSearchIndex(officePotentialView, {
     definition: {"mappings": {"dynamic": true}, "fields": {"office_potential": {"type": "string"}}}
 });
 
-// Queries to be ran on the maxNestedViewIndex.
-let maxNestedViewTestQueries = [
-    // Basic existence query on tags.
-    {
-        searchQuery: {$search: {index: "maxNestedViewIndex", exists: {path: "nested_tags"}}},
-        validateFn: (results) => {
-            assert(results.length == 5, "Existence query should return 5 results");
+// TODO SERVER-96384 the below aggregations should always run once we support queries on sharded,
+// mongot-indexed views.
+if (!FixtureHelpers.isSharded(coll)) {
+    // Queries to be ran on the maxNestedViewIndex.
+    let maxNestedViewTestQueries = [
+        // Basic existence query on tags.
+        {
+            searchQuery: {$search: {index: "maxNestedViewIndex", exists: {path: "nested_tags"}}},
+            validateFn: (results) => {
+                assert(results.length == 5, "Existence query should return 5 results");
 
-            for (let i = 0; i < results.length; ++i) {
-                assert(results[i].nested_tags, "Results should have nested_tags");
-                assert(results[i].nested_tags.length > 1, "Tags should be nested");
-                assert(results[i].dependent_transformation == 35,
-                       "Dependent transformation should have a value of 35.");
-            }
-        }
-    },
-    // Search for specific nested tag that should exist on all documents.
-    {
-        searchQuery: {
-            $search: {index: "maxNestedViewIndex", text: {query: "level_18", path: "nested_tags"}}
-        },
-        validateFn: (results) => {
-            assert(results.length == 5, "Deepest level tag search should return 5 results");
-
-            for (let i = 0; i < results.length; ++i) {
-                assert(results[i].nested_tags.includes("level_18"),
-                       "Deepest level tag should be present");
-                assert(results[i].dependent_transformation == 35,
-                       "Dependent transformation should have a value of 35.");
-            }
-        }
-    },
-    // Search for specific nested category that should exist on some documents.
-    {
-        searchQuery: {
-            $search: {
-                index: "maxNestedViewIndex",
-                text: {query: "large_level_18", path: "nested_category"}
+                for (let i = 0; i < results.length; ++i) {
+                    assert(results[i].nested_tags, "Results should have nested_tags");
+                    assert(results[i].nested_tags.length > 1, "Tags should be nested");
+                    assert(results[i].dependent_transformation == 35,
+                           "Dependent transformation should have a value of 35.");
+                }
             }
         },
-        validateFn: (results) => {
-            assert(results.length == 2, "Search for large_level_18 should return 2 documents");
+        // Search for specific nested tag that should exist on all documents.
+        {
+            searchQuery: {
+                $search:
+                    {index: "maxNestedViewIndex", text: {query: "level_18", path: "nested_tags"}}
+            },
+            validateFn: (results) => {
+                assert(results.length == 5, "Deepest level tag search should return 5 results");
 
-            for (let i = 0; i < results.length; ++i) {
-                assert(results[i].nested_category == "large_level_18",
-                       "Nested category should be large_level_18");
-                assert(results[i].dependent_transformation == 35,
-                       "Dependent transformation should have a value of 35.");
-            }
-        }
-    },
-    // Search for specific category that should exist on some documents.
-    {
-        searchQuery:
-            {$search: {index: "maxNestedViewIndex", text: {query: "medium", path: "category"}}},
-        validateFn: (results) => {
-            assert(results.length == 2, "Category medium should be present in 2 results");
-
-            // Ensure that the deepest field still exists on these results.
-            for (let i = 0; i < results.length; ++i) {
-                assert(results[i].nested_tags.includes("level_18"),
-                       "Deepest level tag should be present");
-                assert(results[i].dependent_transformation == 35,
-                       "Dependent transformation should have a value of 35.");
-            }
-        }
-    },
-];
-
-// Queries to be ran on the officePotentialViewIndex.
-let officePotentialViewTestQueries = [
-    {
-        searchQuery: {
-            $search:
-                {index: "officePotentialViewIndex", text: {query: "high", path: "office_potential"}}
-        },
-        validateFn: (results) => {
-            assert(results.length == 1, "High office potential should only be present in 1 result");
-
-            // Check all results with high office potential (just one at the moment).
-            for (let i = 0; i < results.length; ++i) {
-                assert(results[i].office_potential == "high", "Office potential should be high");
-                assert(results[i].nested_tags.includes("tech"), "Nested tags should include tech");
-                assert(results[i].nested_category == "large_level_17",
-                       "Nested category should be large_level_17");
-            }
-        }
-    },
-    {
-        searchQuery: {
-            $search: {
-                index: "officePotentialViewIndex",
-                text: {query: "medium", path: "office_potential"}
+                for (let i = 0; i < results.length; ++i) {
+                    assert(results[i].nested_tags.includes("level_18"),
+                           "Deepest level tag should be present");
+                    assert(results[i].dependent_transformation == 35,
+                           "Dependent transformation should have a value of 35.");
+                }
             }
         },
-        validateFn: (results) => {
-            assert(results.length == 1,
-                   "Medium office potential should only be present in 1 result");
+        // Search for specific nested category that should exist on some documents.
+        {
+            searchQuery: {
+                $search: {
+                    index: "maxNestedViewIndex",
+                    text: {query: "large_level_18", path: "nested_category"}
+                }
+            },
+            validateFn: (results) => {
+                assert(results.length == 2, "Search for large_level_18 should return 2 documents");
 
-            // Check all results with medium office potential (just one at the moment).
-            for (let i = 0; i < results.length; ++i) {
-                assert(results[i].office_potential == "medium",
-                       "Office potential should be medium");
-                assert(results[i].nested_tags.includes("tech"), "Nested tags should include tech");
-                assert(results[i].nested_category == "medium_level_17",
-                       "Nested category should be medium_level_17");
-            }
-        }
-    },
-    {
-        searchQuery: {
-            $search: {
-                index: "officePotentialViewIndex",
-                text: {query: "emerging", path: "office_potential"}
+                for (let i = 0; i < results.length; ++i) {
+                    assert(results[i].nested_category == "large_level_18",
+                           "Nested category should be large_level_18");
+                    assert(results[i].dependent_transformation == 35,
+                           "Dependent transformation should have a value of 35.");
+                }
             }
         },
-        validateFn: (results) => {
-            assert(results.length == 1,
-                   "Emerging office potential should only be present in 1 result");
+        // Search for specific category that should exist on some documents.
+        {
+            searchQuery:
+                {$search: {index: "maxNestedViewIndex", text: {query: "medium", path: "category"}}},
+            validateFn: (results) => {
+                assert(results.length == 2, "Category medium should be present in 2 results");
 
-            // Check all results with emerging office potential (just one at the moment).
-            for (let i = 0; i < results.length; ++i) {
-                assert(results[i].office_potential == "emerging",
-                       "Office potential should be emerging");
-                assert(results[i].nested_category == "large_level_17",
-                       "Nested category should be large_level_17");
+                // Ensure that the deepest field still exists on these results.
+                for (let i = 0; i < results.length; ++i) {
+                    assert(results[i].nested_tags.includes("level_18"),
+                           "Deepest level tag should be present");
+                    assert(results[i].dependent_transformation == 35,
+                           "Dependent transformation should have a value of 35.");
+                }
             }
-        }
-    },
-    {
-        searchQuery: {
-            $search:
-                {index: "officePotentialViewIndex", text: {query: "low", path: "office_potential"}}
         },
-        validateFn: (results) => {
-            assert(results.length == 2, "Low office potential should only be present in 2 results");
+    ];
 
-            // Check all results with low office potentials.
-            for (let i = 0; i < results.length; ++i) {
-                assert(results[i].office_potential == "low", "Office potential should be low");
+    // Queries to be ran on the officePotentialViewIndex.
+    let officePotentialViewTestQueries = [
+        {
+            searchQuery: {
+                $search: {
+                    index: "officePotentialViewIndex",
+                    text: {query: "high", path: "office_potential"}
+                }
+            },
+            validateFn: (results) => {
+                assert(results.length == 1,
+                       "High office potential should only be present in 1 result");
+
+                // Check all results with high office potential (just one at the moment).
+                for (let i = 0; i < results.length; ++i) {
+                    assert(results[i].office_potential == "high",
+                           "Office potential should be high");
+                    assert(results[i].nested_tags.includes("tech"),
+                           "Nested tags should include tech");
+                    assert(results[i].nested_category == "large_level_17",
+                           "Nested category should be large_level_17");
+                }
             }
-        }
-    },
-];
+        },
+        {
+            searchQuery: {
+                $search: {
+                    index: "officePotentialViewIndex",
+                    text: {query: "medium", path: "office_potential"}
+                }
+            },
+            validateFn: (results) => {
+                assert(results.length == 1,
+                       "Medium office potential should only be present in 1 result");
 
-// Run and validate each test query for both views.
-maxNestedViewTestQueries.forEach(({searchQuery, validateFn}) => {
-    let results = maxNestedView.aggregate([searchQuery]).toArray();
-    validateFn(results);
-});
+                // Check all results with medium office potential (just one at the moment).
+                for (let i = 0; i < results.length; ++i) {
+                    assert(results[i].office_potential == "medium",
+                           "Office potential should be medium");
+                    assert(results[i].nested_tags.includes("tech"),
+                           "Nested tags should include tech");
+                    assert(results[i].nested_category == "medium_level_17",
+                           "Nested category should be medium_level_17");
+                }
+            }
+        },
+        {
+            searchQuery: {
+                $search: {
+                    index: "officePotentialViewIndex",
+                    text: {query: "emerging", path: "office_potential"}
+                }
+            },
+            validateFn: (results) => {
+                assert(results.length == 1,
+                       "Emerging office potential should only be present in 1 result");
 
-officePotentialViewTestQueries.forEach(({searchQuery, validateFn}) => {
-    let results = officePotentialView.aggregate([searchQuery]).toArray();
-    validateFn(results);
-});
+                // Check all results with emerging office potential (just one at the moment).
+                for (let i = 0; i < results.length; ++i) {
+                    assert(results[i].office_potential == "emerging",
+                           "Office potential should be emerging");
+                    assert(results[i].nested_category == "large_level_17",
+                           "Nested category should be large_level_17");
+                }
+            }
+        },
+        {
+            searchQuery: {
+                $search: {
+                    index: "officePotentialViewIndex",
+                    text: {query: "low", path: "office_potential"}
+                }
+            },
+            validateFn: (results) => {
+                assert(results.length == 2,
+                       "Low office potential should only be present in 2 results");
 
+                // Check all results with low office potentials.
+                for (let i = 0; i < results.length; ++i) {
+                    assert(results[i].office_potential == "low", "Office potential should be low");
+                }
+            }
+        },
+    ];
+
+    // Run and validate each test query for both views.
+    maxNestedViewTestQueries.forEach(({searchQuery, validateFn}) => {
+        let results = maxNestedView.aggregate([searchQuery]).toArray();
+        validateFn(results);
+    });
+
+    officePotentialViewTestQueries.forEach(({searchQuery, validateFn}) => {
+        let results = officePotentialView.aggregate([searchQuery]).toArray();
+        validateFn(results);
+    });
+}
 // Clean up search indexes.
 dropSearchIndex(maxNestedView, {name: "maxNestedViewIndex"});
 dropSearchIndex(officePotentialView, {name: "officePotentialViewIndex"});

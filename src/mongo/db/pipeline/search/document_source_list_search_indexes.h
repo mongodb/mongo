@@ -28,6 +28,8 @@
  */
 
 #pragma once
+
+#include <boost/optional/optional.hpp>
 #include <queue>
 
 #include "mongo/bson/bsonobj.h"
@@ -117,12 +119,18 @@ private:
     BSONObj _cmdObj;
     std::queue<BSONObj> _searchIndexes;
     bool _eof = false;
-
-    // Cache the collection UUID to avoid retrieving the collection UUID for each 'doGetNext' call.
+    // Cache the collection UUID to avoid retrieving the collection UUID for each 'doGetNext'
+    // call.
     boost::optional<UUID> _collectionUUID;
-    // Cache the underlying source collection name, which is necessary for supporting running search
-    // queries on views, to avoid retrieving on each getNext.
+    // Cache the underlying source collection name, which is necessary for supporting running
+    // search queries on views, to avoid retrieving on each getNext.
     boost::optional<NamespaceString> _resolvedNamespace;
+    // For other mongot aggregations, the document source can retrieve the viewName off of the
+    // expression context. However, $listSearchIndexes is unique mongos sends the request
+    // directly to its mongot without resolving the view on the primary shard. Given this
+    // information is not otherwise accessible for sharded views, we cache the viewName to avoid
+    // retrieving on each getNext.
+    boost::optional<NamespaceString> _viewName;
 };
 
 }  // namespace mongo

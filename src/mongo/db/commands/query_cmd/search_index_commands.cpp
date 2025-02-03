@@ -49,7 +49,7 @@ std::tuple<const UUID,
            const NamespaceString,
            boost::optional<NamespaceString>,
            boost::optional<std::vector<BSONObj>>>
-retrieveCollectionUUIDAndResolveView(OperationContext* opCtx, CommandType& cmd) {
+retrieveCollectionUUIDAndResolveViewOrThrow(OperationContext* opCtx, CommandType& cmd) {
     const auto& currentOperationNss = cmd.getNamespace();
     // If the index management command is being run on a view, this call will return the
     // underlying source collection UUID and ResolvedView. If not, it will just return a UUID.
@@ -86,7 +86,7 @@ retrieveCollectionUUIDAndResolveView(OperationContext* opCtx, CommandType& cmd) 
 template <typename CommandType>
 BSONObj retrieveSearchIndexManagerResponseHelper(OperationContext* opCtx, CommandType& cmd) {
     const auto [collUUID, resolvedNss, viewName, viewPipeline] =
-        retrieveCollectionUUIDAndResolveView(opCtx, cmd);
+        retrieveCollectionUUIDAndResolveViewOrThrow(opCtx, cmd);
 
     search_index_testing_helper::_replicateSearchIndexCommandOnAllMongodsForTesting(
         opCtx, resolvedNss, cmd.toBSON(), viewName, viewPipeline);

@@ -31,8 +31,55 @@
 
 #include "mongo/db/query/search/search_index_common.h"
 #include "mongo/db/query/search/search_index_process_interface.h"
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
+
+namespace {
+// Whereas create/update/drop search index commands throw if the collection doesn't exist,
+// $listSearchIndexes just returns 0 documents.
+std::tuple<boost::optional<UUID>, const NamespaceString, boost::optional<NamespaceString>>
+retrieveCollectionUUIDAndResolveView(const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
+    auto* opCtx = pExpCtx->getOperationContext();
+    // TLDR: on mongod, pass the viewName saved to expCtx. On mongos, pass the NSS saved to
+    // expCtx.
+    // On mongod, pExpCtx->getNamespaceString() represents the resolved namespace (the
+    // underlying namespace). To correctly identify if the
+    // query is being run on a view, we need to pass the nss the user is running their original
+    // query against. However, on mongod, pExpCtx->getNamespaceString() already represents the
+    // resolved nss (eg the underlying source collection nss). Thus if we are on mongod, we
+    // should pass the view NS saved to the expression context. On mongos, $listSearchIndexes
+    // queries are never resolved thus there is no view NS on the expression context. Luckily,
+    // because these queries are never resolved, pExpCtx->getNamespaceString() still represents
+    // the view nss.
+    auto currentOperationNss =
+        pExpCtx->getViewNSForMongotIndexedView().value_or(pExpCtx->getNamespaceString());
+    auto collUUIDResolvedViewPair =
+        SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDAndResolveView(
+            opCtx, currentOperationNss);
+    // If the query is on a normal collection, the source collection will be the same as
+    // the current NS.
+    auto sourceCollectionNss = currentOperationNss;
+    boost::optional<NamespaceString> viewNss;
+    boost::optional<UUID> collUUID = collUUIDResolvedViewPair.first;
+    if (auto resolvedView = collUUIDResolvedViewPair.second) {
+        uassert(
+            ErrorCodes::QueryFeatureNotAllowed,
+            "search index commands on views are not allowed in the current configuration. "
+            "You may need to enable the "
+            "correponding feature flag",
+            feature_flags::gFeatureFlagMongotIndexedViews.isEnabledUseLatestFCVWhenUninitialized(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+        // The request is on a view! Therefore, currentOperationNss refers to the view
+        // NS and the namespace on resolvedView refers to the underlying source collection.
+        sourceCollectionNss = resolvedView.value().getNamespace();
+        viewNss.emplace(currentOperationNss);
+    }
+
+    return std::make_tuple(collUUID, sourceCollectionNss, viewNss);
+}
+}  // namespace
+
 
 REGISTER_DOCUMENT_SOURCE(listSearchIndexes,
                          DocumentSourceListSearchIndexes::LiteParsedListSearchIndexes::parse,
@@ -98,24 +145,12 @@ StageConstraints DocumentSourceListSearchIndexes::constraints(
 
 DocumentSource::GetNextResult DocumentSourceListSearchIndexes::doGetNext() {
     auto* opCtx = pExpCtx->getOperationContext();
-    // Cache the collectionUUID for subsequent 'doGetNext' calls. We cannot use 'pExpCtx->getUUID()'
-    // like other aggregation stages, because this stage can run directly on mongos.
-    // 'pExpCtx->getUUID()' will always be null on mongos. The search index commands already has
-    // helper functions to retrieve the collectionUUID from either mongos or mongod depending on
-    // where the request was sent, so we call those functions here.
+    // Cache the collectionUUID for subsequent 'doGetNext' calls on _searchIndexCommandInfo struct.
+    // We cannot use 'pExpCtx->getUUID()' like other aggregation stages, because this stage can run
+    // directly on mongos. 'pExpCtx->getUUID()' will always be null on mongos.
     if (!_collectionUUID) {
-
-        // If the query is on a view, this call will return the
-        // underlying source collection UUID and ResolvedView. If not, it will just return a
-        // UUID.
-        boost::optional<ResolvedView> resolvedView;
-        std::tie(_collectionUUID, resolvedView) =
-            SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDAndResolveView(
-                opCtx, pExpCtx->getNamespaceString());
-
-        if (resolvedView) {
-            _resolvedNamespace = resolvedView.value().getNamespace();
-        }
+        std::tie(_collectionUUID, _resolvedNamespace, _viewName) =
+            retrieveCollectionUUIDAndResolveView(pExpCtx);
     }
 
     // Return EOF if the collection requested does not exist.
@@ -135,11 +170,7 @@ DocumentSource::GetNextResult DocumentSourceListSearchIndexes::doGetNext() {
         bob.append(kStageName, _cmdObj);
         // Sends a manageSearchIndex command and returns a cursor with index information.
         BSONObj manageSearchIndexResponse = runSearchIndexCommand(
-            opCtx,
-            _resolvedNamespace ? *_resolvedNamespace : pExpCtx->getNamespaceString(),
-            bob.done(),
-            *_collectionUUID,
-            pExpCtx->getViewNSForMongotIndexedView());
+            opCtx, *_resolvedNamespace, bob.done(), *_collectionUUID, _viewName);
 
         /**
          * 'mangeSearchIndex' returns a cursor with the following fields:
