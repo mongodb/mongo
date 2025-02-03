@@ -1506,7 +1506,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfMisnamedWeight) {
 
     ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
-                       9967400);
+                       9967500);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfExtraWeight) {

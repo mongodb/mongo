@@ -95,10 +95,10 @@ runTest({}, [6, 4, 1, 5, 2, 3, 8, 9, 10, 12, 13, 14, 11, 7, 15]);
 // Now test that improperly specified weights fail as expected.
 // More weights than pipelines.
 runTestExpectError({vector: 0.1, search: 0.2, a: 0.3}, 9460301);
-// Single non-existant pipeline.
-runTestExpectError({a: 0.1}, 9967400);
-// One existant, and one non-existant pipeline.
-runTestExpectError({vector: 0.1, a: 0.2}, 9967400);
+// Single non-existent pipeline.
+runTestExpectError({a: 0.1}, 9967500);
+// One existent, and one non-existent pipeline.
+runTestExpectError({vector: 0.1, a: 0.2}, 9967500);
 // Non-numeric weight
 runTestExpectError({vector: 0.1, search: "0.2"}, 13118);
 // Negative weight
