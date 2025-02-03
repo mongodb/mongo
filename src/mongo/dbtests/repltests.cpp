@@ -295,7 +295,10 @@ protected:
                 for (auto& stmt : stmts) {
                     ops.push_back(ApplierOperation(&stmt));
                 }
-                shard_role_details::releaseAndReplaceRecoveryUnit(&_opCtx);
+                {
+                    ClientLock clientLock(_opCtx.getClient());
+                    shard_role_details::releaseAndReplaceRecoveryUnit(&_opCtx, clientLock);
+                }
                 uassertStatusOK(
                     OplogApplierUtils::applyOplogBatchCommon(&_opCtx,
                                                              &ops,

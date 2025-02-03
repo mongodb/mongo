@@ -319,7 +319,7 @@ inline void handleReshardingCriticalSectionMetrics(OperationContext* opCtx,
 // execution, we must reset the locker state.
 inline void resetLockerState(OperationContext* opCtx) noexcept {
     // It is necessary to lock the client to change the Locker on the OperationContext.
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    ClientLock lk(opCtx->getClient());
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     shard_role_details::swapLocker(opCtx, std::make_unique<Locker>(opCtx->getServiceContext()), lk);
 }

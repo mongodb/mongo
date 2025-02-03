@@ -1302,9 +1302,9 @@ TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* o
     wuow.release();
 
     // We must lock the Client to change the Locker on the OperationContext.
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    ClientLock lk(opCtx->getClient());
     // Save the RecoveryUnit from the new transaction and replace it with an empty one.
-    _recoveryUnit = shard_role_details::releaseAndReplaceRecoveryUnit(opCtx);
+    _recoveryUnit = shard_role_details::releaseAndReplaceRecoveryUnit(opCtx, lk);
     // The recovery unit is detached from the OperationContext, but keep the OperationContext in the
     // case we need to run rollback handlers.
     if (_recoveryUnit) {
@@ -1372,7 +1372,7 @@ TransactionParticipant::TxnResources::TxnResources(ClientLock& clientLock,
     invariant(!(stashStyle == StashStyle::kSecondary &&
                 shard_role_details::getLocker(opCtx)->hasMaxLockTimeout()));
 
-    _recoveryUnit = shard_role_details::releaseAndReplaceRecoveryUnit(opCtx);
+    _recoveryUnit = shard_role_details::releaseAndReplaceRecoveryUnit(opCtx, clientLock);
     // The recovery unit is detached from the OperationContext, but keep the OperationContext in the
     // case we need to run rollback handlers.
     if (_recoveryUnit) {
@@ -1446,7 +1446,7 @@ void TransactionParticipant::TxnResources::release(OperationContext* opCtx) {
     shard_role_details::getLocker(opCtx)->updateThreadIdToCurrentThread();
 
     auto oldState = shard_role_details::setRecoveryUnit(
-        opCtx, std::move(_recoveryUnit), WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        opCtx, std::move(_recoveryUnit), WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork, lk);
     invariant(oldState == WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
               str::stream() << "RecoveryUnit state was " << oldState);
 
@@ -1484,8 +1484,8 @@ TransactionParticipant::SideTransactionBlock::SideTransactionBlock(OperationCont
     // Release recovery unit, saving the recovery unit off to the side, keeping open the storage
     // transaction.
     {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        _recoveryUnit = shard_role_details::releaseAndReplaceRecoveryUnit(_opCtx);
+        ClientLock clientLock(_opCtx->getClient());
+        _recoveryUnit = shard_role_details::releaseAndReplaceRecoveryUnit(_opCtx, clientLock);
     }
 }
 
@@ -1499,9 +1499,12 @@ TransactionParticipant::SideTransactionBlock::~SideTransactionBlock() {
 
     // Restore recovery unit.
     {
-        stdx::lock_guard<Client> lk(*_opCtx->getClient());
+        ClientLock lk(_opCtx->getClient());
         auto oldState = shard_role_details::setRecoveryUnit(
-            _opCtx, std::move(_recoveryUnit), WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+            _opCtx,
+            std::move(_recoveryUnit),
+            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
+            lk);
         invariant(oldState == WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
                   str::stream() << "RecoveryUnit state was " << oldState);
     }
@@ -2208,7 +2211,8 @@ void TransactionParticipant::Participant::_commitStorageTransaction(OperationCon
             opCtx,
             std::unique_ptr<RecoveryUnit>(
                 opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit()),
-            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
+            clientLock);
     }
 
 
@@ -2618,7 +2622,8 @@ void TransactionParticipant::Participant::_cleanUpTxnResourceOnOpCtx(
             opCtx,
             std::unique_ptr<RecoveryUnit>(
                 opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit()),
-            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
+            clientLock);
     }
 
 

@@ -228,12 +228,12 @@ void makeLockerOnOperationContext(OperationContext* opCtx);
 
 /**
  * Swaps the locker, releasing the old locker to the caller.
- * The Client lock is going to be acquired by this function.
+ * The client lock is going to be acquired by this function.
  */
 std::unique_ptr<Locker> swapLocker(OperationContext* opCtx, std::unique_ptr<Locker> newLocker);
 std::unique_ptr<Locker> swapLocker(OperationContext* opCtx,
                                    std::unique_ptr<Locker> newLocker,
-                                   WithLock lk);
+                                   ClientLock& clientLock);
 
 /**
  * Get the RecoveryUnit for the given opCtx. Caller DOES NOT own pointer.
@@ -250,10 +250,10 @@ inline const RecoveryUnit* getRecoveryUnit(const OperationContext* opCtx) {
 /**
  * Returns the RecoveryUnit (same return value as recoveryUnit()) but the caller takes
  * ownership of the returned RecoveryUnit, and the OperationContext instance relinquishes
- * ownership. Sets the RecoveryUnit to NULL.
+ * ownership. Sets the RecoveryUnit to NULL. Requires holding the client lock.
  */
 // TODO (SERVER-77213): Move implementation to .cpp file
-std::unique_ptr<RecoveryUnit> releaseRecoveryUnit(OperationContext* opCtx);
+std::unique_ptr<RecoveryUnit> releaseRecoveryUnit(OperationContext* opCtx, ClientLock& clientLock);
 
 /*
  * Sets up a new, inactive RecoveryUnit in the OperationContext. Destroys any previous recovery
@@ -261,24 +261,31 @@ std::unique_ptr<RecoveryUnit> releaseRecoveryUnit(OperationContext* opCtx);
  */
 // TODO (SERVER-77213): Move implementation to .cpp file
 inline void replaceRecoveryUnit(OperationContext* opCtx) {
-    opCtx->replaceRecoveryUnit_DO_NOT_USE();
+    ClientLock lk(opCtx->getClient());
+    opCtx->replaceRecoveryUnit_DO_NOT_USE(lk);
 }
 
 /*
  * Similar to replaceRecoveryUnit(), but returns the previous recovery unit like
- * releaseRecoveryUnit().
+ * releaseRecoveryUnit(). Requires holding the client lock.
  */
-std::unique_ptr<RecoveryUnit> releaseAndReplaceRecoveryUnit(OperationContext* opCtx);
+std::unique_ptr<RecoveryUnit> releaseAndReplaceRecoveryUnit(OperationContext* opCtx,
+                                                            ClientLock& clientLock);
 
 /**
  * Associates the OperatingContext with a different RecoveryUnit for getMore or
  * subtransactions, see RecoveryUnitSwap. The new state is passed and the old state is
  * returned separately even though the state logically belongs to the RecoveryUnit,
- * as it is managed by the OperationContext.
+ * as it is managed by the OperationContext. The client lock is going to be acquired by this
+ * function.
  */
 WriteUnitOfWork::RecoveryUnitState setRecoveryUnit(OperationContext* opCtx,
                                                    std::unique_ptr<RecoveryUnit> unit,
                                                    WriteUnitOfWork::RecoveryUnitState state);
+WriteUnitOfWork::RecoveryUnitState setRecoveryUnit(OperationContext* opCtx,
+                                                   std::unique_ptr<RecoveryUnit> unit,
+                                                   WriteUnitOfWork::RecoveryUnitState state,
+                                                   ClientLock& clientLock);
 
 WriteUnitOfWork* getWriteUnitOfWork(OperationContext* opCtx);
 

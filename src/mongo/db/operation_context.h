@@ -163,7 +163,7 @@ public:
     // Returns the RecoveryUnit (same return value as recoveryUnit()) but the caller takes
     // ownership of the returned RecoveryUnit, and the OperationContext instance relinquishes
     // ownership. Sets the RecoveryUnit to NULL.
-    std::unique_ptr<RecoveryUnit> releaseRecoveryUnit_DO_NOT_USE();
+    std::unique_ptr<RecoveryUnit> releaseRecoveryUnit_DO_NOT_USE(ClientLock&);
 
     // TODO (SERVER-77213): The RecoveryUnit ownership is being moved to the TransactionResources.
     // Do not add any new usages to these methods as they will go away and will be folded as an
@@ -171,7 +171,7 @@ public:
     //
     // Sets up a new, inactive RecoveryUnit in the OperationContext. Destroys any previous recovery
     // unit and executes its rollback handlers.
-    void replaceRecoveryUnit_DO_NOT_USE();
+    void replaceRecoveryUnit_DO_NOT_USE(ClientLock& clientLock);
 
     // TODO (SERVER-77213): The RecoveryUnit ownership is being moved to the TransactionResources.
     // Do not add any new usages to these methods as they will go away and will be folded as an
@@ -179,7 +179,7 @@ public:
     //
     // Similar to replaceRecoveryUnit(), but returns the previous recovery unit like
     // releaseRecoveryUnit().
-    std::unique_ptr<RecoveryUnit> releaseAndReplaceRecoveryUnit_DO_NOT_USE();
+    std::unique_ptr<RecoveryUnit> releaseAndReplaceRecoveryUnit_DO_NOT_USE(ClientLock& clientLock);
 
 
     // TODO (SERVER-77213): The RecoveryUnit ownership is being moved to the TransactionResources.
@@ -191,7 +191,7 @@ public:
     // returned separately even though the state logically belongs to the RecoveryUnit,
     // as it is managed by the OperationContext.
     WriteUnitOfWork::RecoveryUnitState setRecoveryUnit_DO_NOT_USE(
-        std::unique_ptr<RecoveryUnit> unit, WriteUnitOfWork::RecoveryUnitState state);
+        std::unique_ptr<RecoveryUnit> unit, WriteUnitOfWork::RecoveryUnitState state, ClientLock&);
 
     // TODO (SERVER-77213): The locker ownership is being moved to the TransactionResources. Do not
     // add any new usages to these methods as they will go away and will be folded as an
@@ -204,7 +204,7 @@ public:
     }
     void setLockState_DO_NOT_USE(std::unique_ptr<Locker> locker);
     std::unique_ptr<Locker> swapLockState_DO_NOT_USE(std::unique_ptr<Locker> locker,
-                                                     WithLock clientLock);
+                                                     ClientLock& clientLock);
 
     /**
      * Returns Status::OK() unless this operation is in a killed state.

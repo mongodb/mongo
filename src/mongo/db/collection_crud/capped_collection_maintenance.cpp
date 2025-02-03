@@ -67,13 +67,15 @@ namespace {
 class CappedDeleteSideTxn {
 public:
     CappedDeleteSideTxn(OperationContext* opCtx, const CollectionPtr& collection) : _opCtx(opCtx) {
-        _originalRecoveryUnit = shard_role_details::releaseRecoveryUnit(_opCtx).release();
+        ClientLock lk(opCtx->getClient());
+        _originalRecoveryUnit = shard_role_details::releaseRecoveryUnit(_opCtx, lk).release();
         invariant(_originalRecoveryUnit);
         _originalRecoveryUnitState = shard_role_details::setRecoveryUnit(
             _opCtx,
             std::unique_ptr<RecoveryUnit>(
                 _opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit()),
-            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
+            lk);
 
         if (collection->usesCappedSnapshots()) {
             // As is required by the API, we need to establish the capped visibility snapshot for

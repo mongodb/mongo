@@ -354,7 +354,9 @@ void ClientCursorPin::unstashResourcesOntoOperationContext() {
 void ClientCursorPin::stashResourcesFromOperationContext() {
     // Move the recovery unit from the operation context onto the cursor and create a new RU for
     // the current OperationContext.
-    _cursor->stashRecoveryUnit(shard_role_details::releaseAndReplaceRecoveryUnit(_opCtx));
+    ClientLock clientLock(_opCtx->getClient());
+    _cursor->stashRecoveryUnit(
+        shard_role_details::releaseAndReplaceRecoveryUnit(_opCtx, clientLock));
 }
 
 namespace {
