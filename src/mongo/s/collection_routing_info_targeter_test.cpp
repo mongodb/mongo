@@ -350,7 +350,7 @@ void CollectionRoutingInfoTargeterTest::
     res = criTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}}"));
     ASSERT_EQUALS(res.shardName, "1");
 
-    res = criTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}}, c: 5}"));
+    res = criTargeter.targetInsert(operationContext(), fromjson("{a: {b: 0}, c: 5}"));
     ASSERT_EQUALS(res.shardName, "1");
 }
 

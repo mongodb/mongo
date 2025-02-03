@@ -156,7 +156,7 @@ TEST_F(ChunkManagerTest, FindIntersectingWithConstantHashedPrefixAndVaryingRange
                           BSON("a.b" << hashedValueOfZero << "c.d" << -100));
 
 
-    checkChunkRangeForDoc("{a: {b: 0}}, c: 5}",
+    checkChunkRangeForDoc("{a: {b: 0}, c: 5}",
                           cri.cm,
                           BSON("a.b" << hashedValueOfZero << "c.d" << BSONNULL),
                           BSON("a.b" << hashedValueOfZero << "c.d" << -100));
