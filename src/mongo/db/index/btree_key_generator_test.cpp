@@ -292,7 +292,7 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromSecondLevelArray) {
 
 TEST(BtreeKeyGeneratorTest, GetKeysFromParallelArraysBasic) {
     BSONObj keyPattern = fromjson("{'a': 1, 'b': 1}");
-    BSONObj genKeysFrom = fromjson("{a: [1, 2, 3], b: [1, 2, 3]}}");
+    BSONObj genKeysFrom = fromjson("{a: [1, 2, 3], b: [1, 2, 3]}");
     KeyStringSet expectedKeys;
     MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
     ASSERT_THROWS(testKeygen(keyPattern,

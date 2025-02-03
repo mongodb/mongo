@@ -133,7 +133,7 @@ TEST(InternalSchemaCondMatchExpressionTest, AppliesToSubobjectsViaObjectMatch) {
     ASSERT_FALSE(exec::matcher::matchesBSON(
         &objMatch, fromjson("{name: 'dave', team: 'server', subteam: 'query'}")));
     ASSERT_FALSE(exec::matcher::matchesBSON(
-        &objMatch, fromjson("{name: 'mateo', interests: ['perl', 'python']}}")));
+        &objMatch, fromjson("{name: 'mateo', interests: ['perl', 'python']}")));
     ASSERT_FALSE(exec::matcher::matchesBSON(
         &objMatch, fromjson("{name: 'lucas', job: {team: 'competitor', subteam: 'query'}}")));
     ASSERT_FALSE(exec::matcher::matchesBSON(

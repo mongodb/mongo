@@ -601,16 +601,16 @@ TEST_F(BucketAutoTests, FailsWithNonOrInvalidExpressionGroupBy) {
     spec = fromjson("{$bucketAuto : {groupBy : '', buckets : 1}}");
     ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40239);
 
-    spec = fromjson("{$bucketAuto : {groupBy : {}}, buckets : 1}}");
+    spec = fromjson("{$bucketAuto : {groupBy : {}}, buckets : 1}");
     ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40239);
 
-    spec = fromjson("{$bucketAuto : {groupBy : '$'}, buckets : 1}}");
+    spec = fromjson("{$bucketAuto : {groupBy : '$'}, buckets : 1}");
     ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40239);
 
-    spec = fromjson("{$bucketAuto : {groupBy : []}, buckets : 1}}");
+    spec = fromjson("{$bucketAuto : {groupBy : []}, buckets : 1}");
     ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40239);
 
-    spec = fromjson("{$bucketAuto : {groupBy : null}, buckets : 1}}");
+    spec = fromjson("{$bucketAuto : {groupBy : null}, buckets : 1}");
     ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40239);
 }
 

@@ -491,7 +491,7 @@ TEST(PlanCacheIndexabilityTest, DiscriminatorForCollationIndicatesWhenCollations
                   parseMatchExpression(fromjson("{a: {$in: ['abc', 'xyz']}}"), expCtx).get()));
     ASSERT_EQ(true,
               disc.isMatchCompatibleWithIndex(
-                  parseMatchExpression(fromjson("{a: {$_internalExprEq: 'abc'}}}"), expCtx).get()));
+                  parseMatchExpression(fromjson("{a: {$_internalExprEq: 'abc'}}"), expCtx).get()));
 
     // Expression is not a ComparisonMatchExpression, InternalExprEqMatchExpression or
     // InMatchExpression.

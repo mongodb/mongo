@@ -219,11 +219,11 @@ TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlyReversesComplexNesting)
     BSONObj dataObj = fromjson(
         "{ '' : [{'a': 'ha', 'b': 2},"
         "'bar',"
-        "{'c': 2, 'd': 'ah', 'e': 'abc', 'f': ['cba', 'xyz']}]})");
+        "{'c': 2, 'd': 'ah', 'e': 'abc', 'f': ['cba', 'xyz']}]}");
     BSONObj expected = fromjson(
         "{ '' : [{'a': 'ah', 'b': 2},"
         "'rab',"
-        "{'c': 2, 'd': 'ha', 'e': 'cba', 'f': ['abc', 'zyx']}]})");
+        "{'c': 2, 'd': 'ha', 'e': 'cba', 'f': ['abc', 'zyx']}]}");
 
     BSONObjBuilder out;
     CollationIndexKey::collationAwareIndexKeyAppend(dataObj.firstElement(), &collator, &out);
@@ -235,11 +235,11 @@ TEST(CollationIndexKeyTest, KeyStringAppendCorrectlyReversesComplexNesting) {
     BSONObj dataObj = fromjson(
         "{ '' : [{'a': 'ha', 'b': 2},"
         "'bar',"
-        "{'c': 2, 'd': 'ah', 'e': 'abc', 'f': ['cba', 'xyz']}]})");
+        "{'c': 2, 'd': 'ah', 'e': 'abc', 'f': ['cba', 'xyz']}]}");
     BSONObj expected = fromjson(
         "{ '' : [{'a': 'ah', 'b': 2},"
         "'rab',"
-        "{'c': 2, 'd': 'ha', 'e': 'cba', 'f': ['abc', 'zyx']}]})");
+        "{'c': 2, 'd': 'ha', 'e': 'cba', 'f': ['abc', 'zyx']}]}");
     assertKeyStringCollatorOutput(collator, dataObj, expected);
 }
 

@@ -559,16 +559,16 @@ TEST(MatchExpressionParserTest, SampleRateMatchingBehaviorStats) {
 TEST(MatchExpressionParserTest, SampleRateFailureCases) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
-    auto result = MatchExpressionParser::parse(fromjson("{$sampleRate: -0.25}}"), expCtx);
+    auto result = MatchExpressionParser::parse(fromjson("{$sampleRate: -0.25}"), expCtx);
     ASSERT_NOT_OK(result.getStatus());
 
-    result = MatchExpressionParser::parse(fromjson("{$sampleRate: 2.5}}"), expCtx);
+    result = MatchExpressionParser::parse(fromjson("{$sampleRate: 2.5}"), expCtx);
     ASSERT_NOT_OK(result.getStatus());
 
-    result = MatchExpressionParser::parse(fromjson("{$sampleRate: 2}}"), expCtx);
+    result = MatchExpressionParser::parse(fromjson("{$sampleRate: 2}"), expCtx);
     ASSERT_NOT_OK(result.getStatus());
 
-    result = MatchExpressionParser::parse(fromjson("{$sampleRate: -2}}"), expCtx);
+    result = MatchExpressionParser::parse(fromjson("{$sampleRate: -2}"), expCtx);
     ASSERT_NOT_OK(result.getStatus());
 
     result = MatchExpressionParser::parse(fromjson("{$sampleRate: {$const: 0.25}}"), expCtx);

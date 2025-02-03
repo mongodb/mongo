@@ -112,7 +112,7 @@ TEST(JSONSchemaParserEncryptTest, TopLevelEncryptTranslatesCorrectly) {
 
 TEST(JSONSchemaParserEncryptTest, NestedEncryptTranslatesCorrectly) {
     BSONObj schema =
-        fromjson("{properties: {a: {type: 'object', properties: {b: {encrypt: {}}}}}}}");
+        fromjson("{properties: {a: {type: 'object', properties: {b: {encrypt: {}}}}}}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));

@@ -647,7 +647,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldExtractPartOfProjectOnRootField) {
 
 TEST(ExclusionProjectionExecutionTest, ShouldExtractPartOfProjectOnSubfields) {
     auto exclusion =
-        makeExclusionProjectionWithDefaultPolicies(fromjson("{'x.y': 0, 'x.z': 0, 'c.d': 0}}"));
+        makeExclusionProjectionWithDefaultPolicies(fromjson("{'x.y': 0, 'x.z': 0, 'c.d': 0}"));
 
     auto [extractedProj, allExtracted] = exclusion->extractProjectOnFieldAndRename("x", "w");
 

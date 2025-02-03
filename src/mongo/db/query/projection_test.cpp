@@ -213,8 +213,8 @@ TEST(QueryProjectionTest, ValidPositionalOperatorProjections) {
     createFindProjection("{'a.b.c': 1}", "{'a.b.c.$': 1}");
     createFindProjection("{'a.b.c': 1}", "{'a.e.f.$': 1}");
     createFindProjection("{a: {b: 1}}", "{'a.$': 1}");
-    createFindProjection("{a: 1, b: 1}}", "{'a.$': 1}");
-    createFindProjection("{a: 1, b: 1}}", "{'b.$': 1}");
+    createFindProjection("{a: 1, b: 1}", "{'a.$': 1}");
+    createFindProjection("{a: 1, b: 1}", "{'b.$': 1}");
     createFindProjection("{$and: [{a: 1}, {b: 1}]}", "{'a.$': 1}");
     createFindProjection("{$and: [{a: 1}, {b: 1}]}", "{'b.$': 1}");
     createFindProjection("{$or: [{a: 1}, {b: 1}]}", "{'a.$': 1}");

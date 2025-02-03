@@ -1103,7 +1103,7 @@ TEST(MatchExpressionParserLeafTest, TypeBadString) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: null}}"), expCtx).getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: true}}"), expCtx).getStatus());
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: {}}}}"), expCtx).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: {}}}"), expCtx).getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(
                       fromjson("{a: {$type: ObjectId('000000000000000000000000')}}"), expCtx)
                       .getStatus());

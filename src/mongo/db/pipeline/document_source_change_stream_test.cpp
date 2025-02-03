@@ -895,7 +895,6 @@ TEST_F(ChangeStreamStageTest, TransformDeltaOplogSubArrayDiff) {
         "           u0: 1,"
         "           u1: {a: 1}},"
         "   sarrField2: {a: true, l: 20}"
-        "   }"
         "}");
 
     runUpdateV2OplogTest(diff,

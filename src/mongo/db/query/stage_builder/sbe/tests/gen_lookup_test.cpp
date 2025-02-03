@@ -777,7 +777,7 @@ TEST_F(LookupStageBuilderTest, ThreeComponentAsPathExtendingExistingObjectOnTwoL
 }
 
 TEST_F(LookupStageBuilderTest, ThreeComponentAsPathReplacingSingleValueInExistingObject) {
-    insertDocuments({fromjson("{_id: 0, one: {a: 1, two: {b: 2, three: 3}}}}")},
+    insertDocuments({fromjson("{_id: 0, one: {a: 1, two: {b: 2, three: 3}}}")},
                     {fromjson("{_id: 0}")});
 
     assertReturnedDocuments("_id",

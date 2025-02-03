@@ -366,7 +366,7 @@ TEST_FLE_REWRITE_AGG(TopLevel_Not,
                      "{$not: [{$eq: ['$ssn', {$const: {encrypt: 2}}]}]}",
                      "{$not: [{$gt: ['$ssn', {$const: 2}]}]}")
 
-TEST_FLE_REWRITE_MATCH(TopLevel_Neq, "{ssn: {$ne: {encrypt: 5}}}", "{ssn: {$not: {$gt: 5}}}}");
+TEST_FLE_REWRITE_MATCH(TopLevel_Neq, "{ssn: {$ne: {encrypt: 5}}}", "{ssn: {$not: {$gt: 5}}}");
 
 TEST_FLE_REWRITE_MATCH(
     NestedConjunction,

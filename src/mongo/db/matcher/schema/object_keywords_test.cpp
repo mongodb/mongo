@@ -462,25 +462,25 @@ TEST(JSONSchemaObjectKeywordTest, FailsToParseIfBsonTypeArrayContainsUnknownAlia
 }
 
 TEST(JSONSchemaObjectKeywordTest, CanTranslateTopLevelTypeArrayWithoutObject) {
-    BSONObj schema = fromjson("{type: ['number', 'string']}}}");
+    BSONObj schema = fromjson("{type: ['number', 'string']}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_SERIALIZES_TO(result.getValue(), BSON(AlwaysFalseMatchExpression::kName << 1));
 }
 
 TEST(JSONSchemaObjectKeywordTest, CanTranslateTopLevelBsonTypeArrayWithoutObject) {
-    BSONObj schema = fromjson("{bsonType: ['number', 'string']}}}");
+    BSONObj schema = fromjson("{bsonType: ['number', 'string']}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_SERIALIZES_TO(result.getValue(), BSON(AlwaysFalseMatchExpression::kName << 1));
 }
 
 TEST(JSONSchemaObjectKeywordTest, CanTranslateTopLevelTypeArrayWithObject) {
-    BSONObj schema = fromjson("{type: ['number', 'object']}}}");
+    BSONObj schema = fromjson("{type: ['number', 'object']}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_SERIALIZES_TO(result.getValue(), fromjson("{}"));
 }
 
 TEST(JSONSchemaObjectKeywordTest, CanTranslateTopLevelBsonTypeArrayWithObject) {
-    BSONObj schema = fromjson("{bsonType: ['number', 'object']}}}");
+    BSONObj schema = fromjson("{bsonType: ['number', 'object']}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_SERIALIZES_TO(result.getValue(), fromjson("{}"));
 }
@@ -776,7 +776,7 @@ TEST(JSONSchemaObjectKeywordTest, TopLevelPatternPropertiesTranslatesCorrectly) 
 }
 
 TEST(JSONSchemaObjectKeywordTest, TopLevelAdditionalPropertiesFalseTranslatesCorrectly) {
-    BSONObj schema = fromjson("{additionalProperties: false}}");
+    BSONObj schema = fromjson("{additionalProperties: false}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
@@ -791,7 +791,7 @@ TEST(JSONSchemaObjectKeywordTest, TopLevelAdditionalPropertiesFalseTranslatesCor
 }
 
 TEST(JSONSchemaObjectKeywordTest, TopLevelAdditionalPropertiesTrueTranslatesCorrectly) {
-    BSONObj schema = fromjson("{additionalProperties: true}}");
+    BSONObj schema = fromjson("{additionalProperties: true}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
     auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));

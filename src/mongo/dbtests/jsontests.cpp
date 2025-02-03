@@ -833,7 +833,7 @@ TEST(FromJsonTest, DBRefTest) {
          B().append("a", B().append("$ref", "ns").append("$id", OID()).obj()).obj()},
         // DbName
         {R"({ "a" : { "$ref" : "ns", "$id" : "000000000000000000000000", )"
-         R"("$db" : "dbname" } }))",
+         R"("$db" : "dbname" } })",
          B().append("a",
                     B().append("$ref", "ns")
                         .append("$id", "000000000000000000000000")

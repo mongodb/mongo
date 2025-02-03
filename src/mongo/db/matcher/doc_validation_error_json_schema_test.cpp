@@ -68,7 +68,7 @@ TEST(JSONSchemaValidation, BasicJsonSchemaWithTitleAndDescription) {
 
 // properties
 TEST(JSONSchemaValidation, BasicProperties) {
-    BSONObj query = fromjson("{'$jsonSchema': {'properties': {'a': {'minimum': 1}}}}}");
+    BSONObj query = fromjson("{'$jsonSchema': {'properties': {'a': {'minimum': 1}}}}");
     BSONObj document = fromjson("{a: 0}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema',"
@@ -255,7 +255,7 @@ TEST(JSONSchemaValidation, MaximumRequiredWithTypeAndScalarFailedMaximum) {
 
 TEST(JSONSchemaValidation, ExclusiveMinimum) {
     BSONObj query = fromjson(
-        "{'$jsonSchema': {'properties': {'a': {'minimum': 1, 'exclusiveMinimum': true}}}}}");
+        "{'$jsonSchema': {'properties': {'a': {'minimum': 1, 'exclusiveMinimum': true}}}}");
     BSONObj document = fromjson("{a: 1}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema',"
@@ -273,19 +273,19 @@ TEST(JSONSchemaValidation, ExclusiveMinimum) {
 TEST(JSONSchemaValidation, ExclusiveMinimumInverted) {
     BSONObj query = fromjson(
         "{'$jsonSchema': {'not': {'properties': {'a': {'minimum': 1, 'exclusiveMinimum': "
-        "true}}}}}}");
+        "true}}}}}");
     BSONObj document = fromjson("{a: 2}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema',"
         "      'schemaRulesNotSatisfied': ["
-        "       {'operatorName': 'not', 'reason': 'child expression matched'}]}]}]}");
+        "       {'operatorName': 'not', 'reason': 'child expression matched'}]}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
 TEST(JSONSchemaValidation, ExclusiveMinimumInvertedTypeMismatch) {
     BSONObj query = fromjson(
         "{'$jsonSchema': {'not': {'properties': {'a': {'minimum': 1, 'exclusiveMinimum': "
-        "true}}}}}}");
+        "true}}}}}");
     BSONObj document = fromjson("{a: 'foo'}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
@@ -296,7 +296,7 @@ TEST(JSONSchemaValidation, ExclusiveMinimumInvertedTypeMismatch) {
 TEST(JSONSchemaValidation, ExclusiveMinimumInvertedMissingField) {
     BSONObj query = fromjson(
         "{'$jsonSchema': {'not': {'properties': {'a': {'minimum': 1, 'exclusiveMinimum': "
-        "true}}}}}}");
+        "true}}}}}");
     BSONObj document = fromjson("{b: 100}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
@@ -316,7 +316,7 @@ TEST(JSONSchemaValidation, MinimumAtTopLevelHasNoEffect) {
 
 TEST(JSONSchemaValidation, ExclusiveMaximum) {
     BSONObj query = fromjson(
-        "{'$jsonSchema': {'properties': {'a': {'maximum': 1, 'exclusiveMaximum': true}}}}}");
+        "{'$jsonSchema': {'properties': {'a': {'maximum': 1, 'exclusiveMaximum': true}}}}");
     BSONObj document = fromjson("{a: 1}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema',"
@@ -352,12 +352,12 @@ TEST(JSONSchemaValidation, MaximumTypeNumberWithEmptyArray) {
 TEST(JSONSchemaValidation, ExclusiveMaximumInverted) {
     BSONObj query = fromjson(
         "{'$jsonSchema': {'not': {'properties': {'a': {'maximum': 1, 'exclusiveMaximum': "
-        "true}}}}}}");
+        "true}}}}}");
     BSONObj document = fromjson("{a: 0}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema',"
         "      'schemaRulesNotSatisfied': ["
-        "       {'operatorName': 'not', 'reason': 'child expression matched'}]}]}]}");
+        "       {'operatorName': 'not', 'reason': 'child expression matched'}]}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -376,7 +376,7 @@ TEST(JSONSchemaValidation, NestedProperties) {
         "{'$jsonSchema': {"
         "   'properties': {"
         "       'a': {'properties': "
-        "           {'b': {'minimum': 1}}}}}}}}");
+        "           {'b': {'minimum': 1}}}}}}");
     BSONObj document = fromjson("{'a': {'b': 0}}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema',"
@@ -401,7 +401,7 @@ TEST(JSONSchemaValidation, NestedPropertiesMultipleFailingClauses) {
         "{'$jsonSchema': {"
         "   'properties': {"
         "       'a': {'properties': "
-        "           {'b': {'minimum': 10, 'maximum': -10}}}}}}}}");
+        "           {'b': {'minimum': 10, 'maximum': -10}}}}}}");
     BSONObj document = fromjson("{'a': {'b': 5}}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema',"
@@ -432,7 +432,7 @@ TEST(JSONSchemaValidation, InternalSchemaObjectMatchDottedPathsHandledCorrectly)
         "{'operatorName': '$eq',"
         " 'specifiedAs': {'c' : 1},"
         "'reason': 'comparison failed',"
-        "'consideredValue': 0}]}]}]}");
+        "'consideredValue': 0}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -478,7 +478,7 @@ TEST(JSONSchemaValidation, MultipleNestedProperties) {
         "{'$jsonSchema': {"
         "   'properties': {"
         "       'a': {'properties': {'b': {'minimum': 1}, 'c': {'minimum': 10}}},"
-        "       'd': {'properties': {'e': {'minimum': 50}, 'f': {'minimum': 100}}}}}}}}}");
+        "       'd': {'properties': {'e': {'minimum': 50}, 'f': {'minimum': 100}}}}}}");
     BSONObj document = fromjson("{'a': {'b': 0, 'c': 5}, 'd': {'e': 25, 'f': 50}}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema',"
@@ -558,7 +558,7 @@ TEST(JSONSchemaValidation, NoTopLevelObjectTypeRejectsAllDocuments) {
         "  {'$jsonSchema': {'type': 'number',"
         "   'properties': {"
         "       'a': {'properties': "
-        "           {'b': {'minimum': 1}}}}}}}}");
+        "           {'b': {'minimum': 1}}}}}}");
     BSONObj document = fromjson("{'a': {'b': 1}}");
     BSONObj expectedError = BSON("operatorName"
                                  << "$jsonSchema"
@@ -590,7 +590,7 @@ TEST(JSONSchemaValidation, MultipleTypeFailures) {
         "   {'properties':"
         "        {'a': {'type': 'string'}, "
         "         'b': {'type': 'number'}, "
-        "         'c': {'type': 'object', title: 'property c', description: 'c is a string'}}}}}");
+        "         'c': {'type': 'object', title: 'property c', description: 'c is a string'}}}}");
     BSONObj document = fromjson("{'a': {'b': 1}, 'b': 4, 'c': 'foo'}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema',"
@@ -659,7 +659,7 @@ TEST(JSONSchemaValidation, MultipleBSONTypeFailures) {
         "   {'properties': "
         "        {'a': {'bsonType': 'double'}, "
         "         'b': {'bsonType': 'int'}, "
-        "         'c': {'bsonType': 'decimal'}}}}}");
+        "         'c': {'bsonType': 'decimal'}}}}");
     BSONObj document = fromjson("{'a': {'b': 1}, 'b': 4, 'c': 'foo'}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema',"
@@ -809,7 +809,7 @@ TEST(JSONSchemaValidation, MinLengthNested) {
         "{'$jsonSchema': {"
         "   'properties': {"
         "       'a': {'properties': "
-        "           {'b': {'type': 'string', 'minLength': 4}}}}}}}}");
+        "           {'b': {'type': 'string', 'minLength': 4}}}}}}");
     BSONObj document = fromjson("{'a': {'b':'foo'}}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema',"
@@ -971,7 +971,7 @@ TEST(JSONSchemaValidation, MaxLengthNested) {
         "{'$jsonSchema': {"
         "   'properties': {"
         "       'a': {'properties': "
-        "           {'b': {'type': 'string', 'maxLength': 4}}}}}}}}");
+        "           {'b': {'type': 'string', 'maxLength': 4}}}}}}");
     BSONObj document = fromjson("{'a': {'b': 'foo, bar, baz'}}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema',"
@@ -1128,7 +1128,7 @@ TEST(JSONSchemaValidation, PatternNested) {
         "       'a': {'properties': "
         "           {'b': {'type': 'string', 'pattern': '^S',"
         "                  title: 'pattern property',"
-        "                  description: 'values of a should start with S'}}}}}}}}");
+        "                  description: 'values of a should start with S'}}}}}}");
     BSONObj document = fromjson("{'a': {'b': 'foo'}}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema',"
@@ -1286,7 +1286,7 @@ TEST(JSONSchemaValidation, MultipleOfNested) {
     BSONObj query = fromjson(
         "{'$jsonSchema': {"
         "   'properties': {"
-        "       'a': {'properties':  {'b': {'multipleOf': 2.1}}}}}}}");
+        "       'a': {'properties':  {'b': {'multipleOf': 2.1}}}}}}");
     BSONObj document = fromjson("{'a': {'b': 1}}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema',"
@@ -1746,7 +1746,7 @@ TEST(JSONSchemaLogicalKeywordValidation, BasicNot) {
     BSONObj document = fromjson("{a: 6}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
-        "               {'operatorName': 'not', 'reason': 'child expression matched'}]}]}]}");
+        "               {'operatorName': 'not', 'reason': 'child expression matched'}]}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1770,7 +1770,7 @@ TEST(JSONSchemaLogicalKeywordValidation, NestedNot) {
     BSONObj document = fromjson("{a: 1}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
-        "               {'operatorName': 'not', 'reason': 'child expression matched'}]}]}]}");
+        "               {'operatorName': 'not', 'reason': 'child expression matched'}]}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1803,7 +1803,7 @@ TEST(JSONSchemaLogicalKeywordValidation, NotFailsDueToExistence) {
 }
 
 TEST(JSONSchemaLogicalKeywordValidation, NotUnderProperties) {
-    BSONObj query = fromjson("{$jsonSchema: {properties: {a: {not: {}}}}}}");
+    BSONObj query = fromjson("{$jsonSchema: {properties: {a: {not: {}}}}}");
     BSONObj document = fromjson("{a: 'foo'}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
@@ -1816,7 +1816,7 @@ TEST(JSONSchemaLogicalKeywordValidation, NotUnderProperties) {
 
 // enum
 TEST(JSONSchemaLogicalKeywordValidation, BasicEnum) {
-    BSONObj query = fromjson("{'$jsonSchema': {'properties': {'a': {'enum': [1,2,3]}}}}}");
+    BSONObj query = fromjson("{'$jsonSchema': {'properties': {'a': {'enum': [1,2,3]}}}}");
     BSONObj document = fromjson("{a: 0}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema', schemaRulesNotSatisfied: ["
@@ -1831,7 +1831,7 @@ TEST(JSONSchemaLogicalKeywordValidation, BasicEnum) {
 
 TEST(JSONSchemaLogicalKeywordValidation, EnumWithRequiredMissingProperty) {
     BSONObj query =
-        fromjson("{'$jsonSchema': {'required': ['a'], 'properties': {'a': {'enum':[1,2,3]}}}}}");
+        fromjson("{'$jsonSchema': {'required': ['a'], 'properties': {'a': {'enum':[1,2,3]}}}}");
     BSONObj document = fromjson("{}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema',"
@@ -1869,7 +1869,7 @@ TEST(JSONSchemaLogicalKeywordValidation, EnumTypeArrayWithEmptyArray) {
 }
 
 TEST(JSONSchemaLogicalKeywordValidation, NotOverEnum) {
-    BSONObj query = fromjson("{'$jsonSchema': {'properties': {'a': {'not': {'enum': [1,2,3]}}}}}}");
+    BSONObj query = fromjson("{'$jsonSchema': {'properties': {'a': {'not': {'enum': [1,2,3]}}}}}");
     BSONObj document = fromjson("{a: 1}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
@@ -1884,7 +1884,7 @@ TEST(JSONSchemaLogicalKeywordValidation, CombineLogicalKeywords) {
     BSONObj query = fromjson(
         "{'$jsonSchema': {'properties': {'a': "
         "   {'allOf': [{'bsonType': 'int'},"
-        "               {'oneOf': [{minimum: 1}, {enum: [6,7,8]}]}]}}}}}");
+        "               {'oneOf': [{minimum: 1}, {enum: [6,7,8]}]}]}}}}");
     BSONObj document = fromjson("{a: 0}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
@@ -2729,7 +2729,7 @@ TEST(JSONSchemaValidation, BasicMinProperties) {
 }
 
 TEST(JSONSchemaValidation, NestedMinProperties) {
-    BSONObj query = fromjson("{'$jsonSchema': {'properties': {'a': {'minProperties': 10}}}}}");
+    BSONObj query = fromjson("{'$jsonSchema': {'properties': {'a': {'minProperties': 10}}}}");
     BSONObj document = fromjson("{a: {'b': 1, 'c': 2}}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema',"
@@ -2746,7 +2746,7 @@ TEST(JSONSchemaValidation, NestedMinProperties) {
 TEST(JSONSchemaValidation, NestedMinPropertiesTypeMismatch) {
     BSONObj query = fromjson(
         "{'$jsonSchema': {'properties': {'a': {'minProperties': 10, "
-        "'type': 'object'}}}}}");
+        "'type': 'object'}}}}");
     BSONObj document = fromjson("{a: ['clearly', 'not', 'an', 'object']}");
     // No mention of the 'minProperties' keyword.
     BSONObj expectedError = fromjson(
@@ -2765,7 +2765,7 @@ TEST(JSONSchemaValidation, NestedMinPropertiesTypeMismatch) {
 TEST(JSONSchemaValidation, NestedMinPropertiesWithRequiredMissingProperty) {
     BSONObj query = fromjson(
         "{'$jsonSchema': "
-        "   {'required': ['a'],'properties': {'a': {type: 'object', minProperties: 10}}}}}");
+        "   {'required': ['a'],'properties': {'a': {type: 'object', minProperties: 10}}}}");
     BSONObj document = fromjson("{}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema',"
@@ -2779,7 +2779,7 @@ TEST(JSONSchemaValidation, NestedMinPropertiesWithRequiredMissingProperty) {
 TEST(JSONSchemaValidation, NestedMinPropertiesWithRequiredNonObject) {
     BSONObj query = fromjson(
         "{'$jsonSchema': "
-        "   {'required': ['a'],'properties': {'a': {type: 'object', minProperties: 10}}}}}");
+        "   {'required': ['a'],'properties': {'a': {type: 'object', minProperties: 10}}}}");
     BSONObj document = fromjson("{a: []}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema',"
@@ -2809,7 +2809,7 @@ TEST(JSONSchemaValidation, BasicMaxProperties) {
 }
 
 TEST(JSONSchemaValidation, NestedMaxProperties) {
-    BSONObj query = fromjson("{'$jsonSchema': {'properties': {'a': {'maxProperties': 1}}}}}");
+    BSONObj query = fromjson("{'$jsonSchema': {'properties': {'a': {'maxProperties': 1}}}}");
     BSONObj document = fromjson("{a: {'b': 1, 'c': 2}}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema',"
@@ -2826,7 +2826,7 @@ TEST(JSONSchemaValidation, NestedMaxProperties) {
 TEST(JSONSchemaValidation, NestedMaxPropertiesTypeMismatch) {
     BSONObj query = fromjson(
         "{'$jsonSchema': {'properties': {'a': {'maxProperties': 10, "
-        "'type': 'object'}}}}}");
+        "'type': 'object'}}}}");
     BSONObj document = fromjson("{a: ['clearly', 'not', 'an', 'object']}");
     // No mention of the 'maxProperties' keyword.
     BSONObj expectedError = fromjson(
@@ -3111,7 +3111,7 @@ TEST(JSONSchemaValidation, SchemaDependencyAndPropertyDependency) {
         "               consideredValue: 'foo',"
         "               consideredType: 'string'}]}]}]},"
         "       {conditionalProperty: 'b', "
-        "       missingProperties: ['c']}]}]}]}]}");
+        "       missingProperties: ['c']}]}]}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -3119,7 +3119,7 @@ TEST(JSONSchemaValidation, SchemaDependencyAndPropertyDependency) {
 TEST(JSONSchemaValidation, BasicAdditionalPropertiesFalse) {
     BSONObj query = fromjson(
         "{'$jsonSchema': {'properties': {'b': {'type': 'number'}}, 'additionalProperties': "
-        "false}}}");
+        "false}}");
     BSONObj document = fromjson("{'_id': 0, 'a': 1, 'b': 2}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
@@ -3132,7 +3132,7 @@ TEST(JSONSchemaValidation, BasicAdditionalPropertiesFalse) {
 TEST(JSONSchemaValidation, BasicAdditionalPropertiesFalseRequiredMissingProperty) {
     BSONObj query = fromjson(
         "{'$jsonSchema': {'required': ['a'], 'properties': {'b': {'type': 'number'}}, "
-        "'additionalProperties': false}}}");
+        "'additionalProperties': false}}");
     BSONObj document = fromjson("{'_id': 0, 'b': 2}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
@@ -3177,7 +3177,7 @@ TEST(JSONSchemaValidation, BasicAdditionalPropertiesFalseNestedMultiLevel) {
     BSONObj query = fromjson(
         "{'$jsonSchema': "
         "   {'additionalProperties': false, 'properties':"
-        "       {'_id': {},'a': {'type': 'object', 'additionalProperties':false}}}}}");
+        "       {'_id': {},'a': {'type': 'object', 'additionalProperties':false}}}}");
     BSONObj document = fromjson("{_id: 1, 'a': {'b': 1}, 'c': 1}");
     // Report _id and c at the top level and b in the nested error.
     BSONObj expectedError = fromjson(
@@ -3198,7 +3198,7 @@ TEST(JSONSchemaValidation, BasicAdditionalPropertiesSchema) {
     BSONObj query = fromjson(
         "{'$jsonSchema': "
         "   {'properties': {'a': {'type': 'number'}}, "
-        "   'additionalProperties': {'type': 'string'}}}}");
+        "   'additionalProperties': {'type': 'string'}}}");
     BSONObj document = fromjson(
         "{'a': 1, 'b': 'not this one', 'c': 'not this one either, but the next one', 'd': 1 }");
     // Should only produce an error for 'd'.
@@ -3219,7 +3219,7 @@ TEST(JSONSchemaValidation, BasicAdditionalPropertiesSchemaRequiredMissingPropert
     BSONObj query = fromjson(
         "{'$jsonSchema': "
         "   {'required': ['a', 'b'], 'properties': {'a': {'type': 'number'}}, "
-        "   'additionalProperties': {'type': 'string'}}}}");
+        "   'additionalProperties': {'type': 'string'}}}");
     BSONObj document = fromjson("{'a': 1, 'c': 'not this one, but the next one', 'd': 1 }");
     // Should produce an error for 'd' and 'b'.
     BSONObj expectedError = fromjson(
@@ -3234,7 +3234,7 @@ TEST(JSONSchemaValidation, BasicAdditionalPropertiesSchemaRequiredMissingPropert
         "           'consideredType': 'int'}]},"
         "       {'operatorName': 'required',"
         "       'specifiedAs': {'required': ['a','b']},"
-        "        'missingProperties': ['b']}]}]}");
+        "        'missingProperties': ['b']}]}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -3263,7 +3263,7 @@ TEST(JSONSchemaValidation, AdditionalPropertiesSchemaNoErrorWhenAdditionalProper
         "{'$jsonSchema': "
         "   {'properties': {'_id': {}, 'a': {'type': 'number'}}, "
         "   'minProperties': 10,"
-        "   'additionalProperties': {'type': 'string'}}}}");
+        "   'additionalProperties': {'type': 'string'}}}");
     BSONObj document = fromjson(
         "{'_id': 'foo', 'a': 1, "
         "'b': 'all', 'c': 'additional', 'd': 'properties', 'e': 'are', 'f': 'strings!'}");
@@ -3460,7 +3460,7 @@ TEST(JSONSchemaValidation,
      PatternPropertiesAndAdditionalPropertiesFalseOnlyAdditionalPropertiesFails) {
     BSONObj query = fromjson(
         "{'$jsonSchema': "
-        "   {'patternProperties': {'^S': {'type': 'number'}}, 'additionalProperties': false}}}");
+        "   {'patternProperties': {'^S': {'type': 'number'}}, 'additionalProperties': false}}");
     BSONObj document = fromjson("{'Super': 1, 'Slow': 2, 'b': 'clearly an extra property'}");
     // There should be no 'patternProperties' error.
     BSONObj expectedError = fromjson(
@@ -3476,7 +3476,7 @@ TEST(JSONSchemaValidation, PatternPropertiesAndAdditionalPropertiesFalseNeitherF
         "{'$jsonSchema':"
         "   {'minProperties': 10,"
         "   'patternProperties': {'^_id': {}, '^S': {'type': 'number'}}, "
-        "   'additionalProperties': false}}}");
+        "   'additionalProperties': false}}");
     BSONObj document = fromjson("{'_id': 1, 'Super': 1, 'Slow': 2}");
     // The error should reference neither 'patternProperties' nor 'additionalProperties'.
     BSONObj expectedError = fromjson(
@@ -3496,7 +3496,7 @@ TEST(JSONSchemaValidation, PatternPropertiesAndAdditionalPropertiesSchema) {
         "   {'patternProperties': {'^S': {'type': 'number', title: 'properties starting with S',"
         "                          description: 'property should be of integer type'}},"
         "   'additionalProperties': {'type': 'string', title: 'additional properties',"
-        "                            description: 'additional properties are strings'}}}}");
+        "                            description: 'additional properties are strings'}}}");
     BSONObj document = fromjson("{'Super': 1, 'Slow': 'oh no a string', b: 1}");
     BSONObj expectedError = fromjson(
         "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
@@ -3530,7 +3530,7 @@ TEST(JSONSchemaValidation,
         "{'$jsonSchema': "
         "   {'properties': {_id: {}}, "
         "   'patternProperties': {'^S': {'type': 'number'}},"
-        "   'additionalProperties': {'type': 'string'}}}}");
+        "   'additionalProperties': {'type': 'string'}}}");
     BSONObj document =
         fromjson("{_id: 1, 'Super': 1, 'Slow': 'oh no a string', b: 'actually a string!'}");
     // There should only be a 'patternProperties' error
@@ -3553,7 +3553,7 @@ TEST(JSONSchemaValidation,
     BSONObj query = fromjson(
         "{'$jsonSchema':"
         "   {'patternProperties': {'^S': {'type': 'number'}}, "
-        "   'additionalProperties': {'type': 'string'}}}}");
+        "   'additionalProperties': {'type': 'string'}}}");
     BSONObj document = fromjson("{'Super': 1, 'Slow': 2, 'b': 1}");
     // There should be no 'patternProperties' error.
     BSONObj expectedError = fromjson(
@@ -3573,7 +3573,7 @@ TEST(JSONSchemaValidation, PatternPropertiesAndAdditionalPropertiesSchemaNeither
         "{'$jsonSchema':"
         "   {'minProperties': 10,"
         "   'patternProperties': {'^S': {'type': 'number'}}, "
-        "   'additionalProperties': {'type': 'number'}}}}");
+        "   'additionalProperties': {'type': 'number'}}}");
     BSONObj document = fromjson("{'_id': 1, 'Super': 1, 'Slow': 2, 'b': 1}");
     // The error should reference neither 'patternProperties' nor 'additionalProperties'.
     BSONObj expectedError = fromjson(
@@ -3602,7 +3602,7 @@ TEST(JSONSchemaValidation, BasicRequired) {
 TEST(JSONSchemaValidation, RequiredMixedWithProperties) {
     BSONObj query = fromjson(
         "{'$jsonSchema': {'properties': {'a': {minimum: 2}, 'd': {maximum: 5}}, 'required': "
-        "['a','b','c']}}}");
+        "['a','b','c']}}");
     BSONObj document = fromjson("{'c': 1, 'b': 2}");
     BSONObj expectedError = fromjson(
         "{'operatorName': '$jsonSchema',"

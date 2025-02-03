@@ -167,7 +167,7 @@ TEST(ExpressionWithPlaceholderTest, SuccessfullyParsesExpressionsWithTypeOther) 
     ASSERT(result->getPlaceholder());
     ASSERT_EQ(*result->getPlaceholder(), "a"_sd);
 
-    rawFilter = fromjson("{$_internalSchemaMinProperties: 1}}");
+    rawFilter = fromjson("{$_internalSchemaMinProperties: 1}");
     parsedFilter = assertGet(MatchExpressionParser::parse(rawFilter, expCtx));
     result = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
     ASSERT_FALSE(result->getPlaceholder());
@@ -257,7 +257,7 @@ TEST(ExpressionWithPlaceholderTest, FieldNameStartingWithCapitalFailsToParse) {
 
 TEST(ExpressionWithPlaceholderTest, EquivalentIfPlaceholderAndExpressionMatch) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto rawFilter1 = fromjson("{i: 5}}");
+    auto rawFilter1 = fromjson("{i: 5}");
     auto parsedFilter1 = assertGet(MatchExpressionParser::parse(rawFilter1, expCtx));
     auto expressionWithPlaceholder1 = ExpressionWithPlaceholder::make(std::move(parsedFilter1));
     ASSERT_OK(expressionWithPlaceholder1.getStatus());

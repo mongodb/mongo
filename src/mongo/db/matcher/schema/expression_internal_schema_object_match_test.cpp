@@ -146,7 +146,7 @@ TEST(InternalSchemaObjectMatchExpression, NestedObjectMatchReturnsCorrectPath) {
         "    {a: {$_internalSchemaObjectMatch: {"
         "       b: {$_internalSchemaObjectMatch: {"
         "           $or: [{c: {$type: 'string'}}, {c: {$gt: 0}}]"
-        "       }}}"
+        "       }}"
         "    }}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto objMatch = MatchExpressionParser::parse(query, expCtx);
@@ -161,7 +161,7 @@ TEST(InternalSchemaObjectMatchExpression, MatchesNestedObjectMatch) {
         "    {a: {$_internalSchemaObjectMatch: {"
         "       b: {$_internalSchemaObjectMatch: {"
         "           c: 3"
-        "       }}}"
+        "       }}"
         "    }}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto objMatch = MatchExpressionParser::parse(query, expCtx);

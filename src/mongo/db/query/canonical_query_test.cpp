@@ -256,7 +256,7 @@ TEST(CanonicalQueryTest, NormalizeQuerySort) {
     // Field names
     testNormalizeQuery("{b: 1, a: 1}", "{a: 1, b: 1}");
     // Operator types
-    testNormalizeQuery("{a: {$gt: 5}, a: {$lt: 10}}}", "{a: {$lt: 10}, a: {$gt: 5}}");
+    testNormalizeQuery("{a: {$gt: 5}, a: {$lt: 10}}", "{a: {$lt: 10}, a: {$gt: 5}}");
     // Nested queries
     testNormalizeQuery("{a: {$elemMatch: {c: 1, b:1}}}", "{a: {$elemMatch: {b: 1, c:1}}}");
 }

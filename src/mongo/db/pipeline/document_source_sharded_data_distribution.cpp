@@ -70,7 +70,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceShardedDataDistribution::creat
                 expCtx->getNamespaceString().isCollectionlessAggregateNS());
 
     static const BSONObj kAllCollStatsObj =
-        fromjson("{$_internalAllCollectionStats: {stats: {storageStats: {}}}}}");
+        fromjson("{$_internalAllCollectionStats: {stats: {storageStats: {}}}}");
 
     // TODO (SERVER-92596): Remove `"storageStats.numOrphanDocs": 1` once the bug is fixed.
     static const BSONObj kProjectObj = fromjson(R"({

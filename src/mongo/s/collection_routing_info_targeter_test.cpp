@@ -381,7 +381,7 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithRangePrefixHashedSha
 
     // When update targets using query.
     auto requestAndSet = buildUpdate(kNss,
-                                     fromjson("{$and: [{'a.b': {$gte : 0}}, {'a.b': {$lt: 99}}]}}"),
+                                     fromjson("{$and: [{'a.b': {$gte : 0}}, {'a.b': {$lt: 99}}]}"),
                                      fromjson("{$set: {p : 1}}"),
                                      false);
     res = criTargeter.targetUpdate(operationContext(),
@@ -412,7 +412,7 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithRangePrefixHashedSha
     // For replacement style updates, query on _id uses replacement doc to target. If the
     // replacement doc doesn't have shard key fields, then update should be routed to the shard
     // holding 'null' shard key documents.
-    auto requestReplUpdate = buildUpdate(kNss, fromjson("{_id: 1}"), fromjson("{p: 111}}"), false);
+    auto requestReplUpdate = buildUpdate(kNss, fromjson("{_id: 1}"), fromjson("{p: 111}"), false);
     res = criTargeter.targetUpdate(operationContext(),
                                    BatchItemRef(&requestReplUpdate, 0),
                                    nullptr /* useTwoPhaseWriteProtocol */,

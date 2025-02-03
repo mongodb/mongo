@@ -227,7 +227,7 @@ const BSONObj bucketWithMeta1 = fromjson(R"(
     "control" : {"version" : 1},
     "meta" : "A",
     "data" : {
-        "_id" : {"0" : 0}, "f" : {"0" : 0}, "time" : {"0" : {$date: "2023-06-30T16:47:09.512Z"}}}
+        "_id" : {"0" : 0}, "f" : {"0" : 0}, "time" : {"0" : {$date: "2023-06-30T16:47:09.512Z"}}
     }
 })");
 

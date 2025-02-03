@@ -1066,7 +1066,7 @@ TEST(GetComputedPathsTest, ExpressionMapNotConsideredRenameWithWrongVariableNoEx
 
 TEST(GetComputedPathsTest, ExpressionMapNotConsideredRenameWithDottedInputPath) {
     auto expCtx = ExpressionContextForTest{};
-    auto specObject = fromjson("{$map: {input: '$a.b', as: 'iter', in: {c: '$$iter.d'}}}}");
+    auto specObject = fromjson("{$map: {input: '$a.b', as: 'iter', in: {c: '$$iter.d'}}}");
     auto expr = Expression::parseObject(&expCtx, specObject, expCtx.variablesParseState);
     ASSERT(dynamic_cast<ExpressionMap*>(expr.get()));
     auto computedPaths = expr->getComputedPaths("e");

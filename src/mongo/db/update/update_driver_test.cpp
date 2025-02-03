@@ -689,7 +689,7 @@ TEST_F(ModifiedPathsTestFixture, ArrayFilterThatMatchesNoElements) {
 
 
 TEST_F(ModifiedPathsTestFixture, ReplaceFullDocumentAlwaysAffectsIndex) {
-    BSONObj spec = fromjson("{a: 1, b: 1}}");
+    BSONObj spec = fromjson("{a: 1, b: 1}");
     mutablebson::Document doc(fromjson("{a: 0, b: 0}"));
     runUpdate(&doc, makeUpdateMod(spec));
     ASSERT_EQ(_modifiedPaths, "{}");

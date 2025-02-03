@@ -197,7 +197,7 @@ TEST(NormalizeBSONObj, ObjectArray) {
 }
 
 TEST(NormalizeBSONObj, ObjectArrayNested) {
-    BSONObj bson = fromjson("{a: [{b: 1}, {d: [{b: 1}, {d: 1, c: 1}, {a: 1}], c: 1}, {a: 1}]}]}");
+    BSONObj bson = fromjson("{a: [{b: 1}, {d: [{b: 1}, {d: 1, c: 1}, {a: 1}], c: 1}, {a: 1}]}");
     std::string expected =
         "{ a: [ { a: 1.000000000000000000000000000000000 }, { b: "
         "1.000000000000000000000000000000000 }, { c: 1.000000000000000000000000000000000, d: [ { "

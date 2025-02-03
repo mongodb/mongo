@@ -1152,7 +1152,7 @@ public:
         auto source = DocumentSourceMock::createForTest({"{_id:0,list:[1,2]}",
                                                          "{_id:1,list:[3,4]}",
                                                          "{_id:0,list:[10,20]}",
-                                                         "{_id:1,list:[30,40]}]}"},
+                                                         "{_id:1,list:[30,40]}"},
                                                         ctx());
 
         // Create a group source.

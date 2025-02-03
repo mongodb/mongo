@@ -404,7 +404,7 @@ TEST_F(SortKeyGeneratorWorkingSetTest, CanGetSortKeyFromWorkingSetMemberWithOwne
 }
 
 TEST_F(SortKeyGeneratorWorkingSetTest, CanGenerateKeyFromWSMForTextScoreMetaSort) {
-    BSONObj pattern = fromjson("{a: 1, b: {$meta: 'textScore'}, c: -1}}");
+    BSONObj pattern = fromjson("{a: 1, b: {$meta: 'textScore'}, c: -1}");
     auto sortKeyGen = makeSortKeyGen(pattern, nullptr);
     setOwnedObj(BSON("x" << 1 << "a" << 2 << "y" << 3 << "c" << BSON_ARRAY(4 << 5 << 6)));
     member().metadata().setTextScore(9.9);

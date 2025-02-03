@@ -194,7 +194,7 @@ const auto expectedOptimizedUnpackBucketForMatchAndProject = fromjson(R"(
         include: ['_id', 'tag'],
         timeField: 'time',
         metaField: 'tag',
-        bucketMaxSpanSeconds: 3600}}
+        bucketMaxSpanSeconds: 3600
     }
 }
     )");
