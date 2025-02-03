@@ -73,7 +73,6 @@ try {
     runTest({query: {}, sort: {b: 1}, limit: 0, expectedCard: 1000});
     runTest({query: {}, sort: {b: 1}, skip: 10, limit: 42, expectedCard: 42});
     runTest({query: {}, sort: {a: 1}, skip: 10, limit: 42, expectedCard: 42});
-    // TODO SERVER-99273: Support SORT stage with absorbed limit (top-K sort)
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
