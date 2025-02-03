@@ -35,6 +35,17 @@ imports:
     - "mongo/db/basic_types.idl"
     - "mongo/s/resharding/common_types.idl"
 
+structs:
+  ShardsvrReshardingDonorFetchFinalCollectionStatsResponse:
+      description: "Response for the _shardsvrReshardingDonorFetchFinalCollectionStats command."
+      is_command_reply: true
+      strict: false
+      fields:
+        documentsDelta:
+          type: safeInt64
+          description: "The change in the number of documents since the provided cloneTimestamp."
+
+
 commands:
   reshardCollection:
     description: "The public reshardCollection command on mongos."
@@ -236,3 +247,20 @@ commands:
             gte: 1
             lte: 256
         optional: true
+
+  _shardsvrReshardingDonorFetchFinalCollectionStats:
+      command_name: _shardsvrReshardingDonorFetchFinalCollectionStats
+      cpp_name: ShardsvrReshardingDonorFetchFinalCollectionStats
+      description: ""
+      namespace: type
+      type: namespacestring
+      reply_type: ShardsvrReshardingDonorFetchFinalCollectionStatsResponse
+      api_version: ""
+      strict: false
+      fields:
+        cloneTimestamp:
+          type: timestamp
+          description: "The clone timestamp for the resharding operation. This is the timestamp in which we will start to track the change in the number of documents in the collection."
+        reshardingUUID:
+          type: uuid
+          description: "The resharding operation associated with this request."

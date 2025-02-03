@@ -194,6 +194,7 @@ let testCases = {
     _shardsvrRenameCollectionParticipantUnblock: {skip: "internal command"},
     _shardsvrRenameIndexMetadata: {skip: "internal command"},
     _shardsvrReshardCollection: {skip: "internal command"},
+    _shardsvrReshardingDonorFetchFinalCollectionStats: {skip: "internal command"},
     _shardsvrReshardingOperationTime: {skip: "internal command"},
     _shardsvrResolveView: {skip: "internal command"},
     _shardsvrRunSearchIndexCommand: {skip: "internal command"},

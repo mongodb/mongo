@@ -690,6 +690,14 @@ const internalCommandsMap = {
             key: {},
         },
     },
+    _shardsvrReshardingDonorFetchFinalCollectionStats: {
+        testname: "_shardsvrReshardingDonorFetchFinalCollectionStats",
+        command: {
+            _shardsvrReshardingDonorFetchFinalCollectionStats: "test.x",
+            cloneTimestamp: Timestamp(),
+            reshardingUUID: UUID()
+        },
+    },
     _shardsvrReshardingOperationTime: {
         testname: "_shardsvrReshardingOperationTime",
         command: {
@@ -790,10 +798,11 @@ function createUser(db, userName, roles) {
     return userName;
 }
 /**
- * runOneCommandAuthorizationTest runs authorization failure and success tests for a single command.
- * If the user with __system role can run the command without getting Unauthorized error AND if the
- * user with no roles can run the command and get an 'Unauthorized` error, then we consider the test
- * as passed. Otherwise, the command fails the authorization check.
+ * runOneCommandAuthorizationTest runs authorization failure and success tests for a single
+ * command. If the user with __system role can run the command without getting Unauthorized
+ * error AND if the user with no roles can run the command and get an 'Unauthorized` error,
+ * then we consider the test as passed. Otherwise, the command fails the authorization
+ * check.
  *
  *  Parameters:
  *     testObject -- testObject contains the test information for a single command.
@@ -836,11 +845,13 @@ function runOneCommandAuthorizationTest(testObject, commandName, db, secondDb, c
 }
 
 /**
- * Some commands may be skipped if they are test only commands. isSelf command is also skipped.
+ * Some commands may be skipped if they are test only commands. isSelf command is also
+ * skipped.
  * @param testObjectForCommand test object for the command.
  * @param commandName command Name.
- * @returns true if the command is a test only command or if the command needs to be skipped(
- *     currently only isSelf is skipped. It is used by atlas tools without __system role).
+ * @returns true if the command is a test only command or if the command needs to be
+ *     skipped( currently only isSelf is skipped. It is used by atlas tools without __system
+ *     role).
  */
 function skipCommand(testObjectForCommand, commandName) {
     if (testOnlyCommandsSet.has(commandName) || testObjectForCommand.skip) {
@@ -894,8 +905,8 @@ function runStandaloneTest() {
             trafficRecordingDirectory: dbPath,
             mongotHost: "localhost:27017",  // We have to set the mongotHost parameter for the
                                             // $search-relatead tests to pass configuration checks.
-            syncdelay:
-                0  // Disable checkpoints as this can cause some commands to fail transiently.
+            syncdelay: 0  // Disable checkpoints as this can cause some commands to fail
+                          // transiently.
         }
     };
 
@@ -921,8 +932,8 @@ function setupShardedClusterTest() {
             trafficRecordingDirectory: dbPath,
             mongotHost: "localhost:27017",  // We have to set the mongotHost parameter for the
                                             // $search-related tests to pass configuration checks.
-            syncdelay:
-                0  // Disable checkpoints as this can cause some commands to fail transiently.
+            syncdelay: 0  // Disable checkpoints as this can cause some commands to fail
+                          // transiently.
         }
     };
     return opts;
@@ -1014,12 +1025,13 @@ function runConfigServer(opts) {
 }
 
 /**
- * singleCommandCheckResult gets the update from four setups(runStandaloneTest, sharded cluster,
- * sharded server, config server) and returns the combined result for the command.
+ * singleCommandCheckResult gets the update from four setups(runStandaloneTest, sharded
+ * cluster, sharded server, config server) and returns the combined result for the command.
  *
  *  * Parameters:
  *       commandName -- command name.
- *       resultmap -- an object that has setups as the keys and results for the setup as the values.
+ *       resultmap -- an object that has setups as the keys and results for the setup as the
+ * values.
  *
  * Returns: a combined result for different test setups for a single command.
  */
@@ -1043,12 +1055,13 @@ function singleCommandCheckResult(commandName, resultmap) {
 /**
  * checkResults summarize the results from all the results from all the setups.
  *  * Parameters:
- *       resultmap -- an object that has setups as the keys and results for the setup as the values.
+ *       resultmap -- an object that has setups as the keys and results for the setup as the
+ * values.
  *
  * Returns: None.
  *
- * The results for all the test objects are accumulated and a combined result for the all the tests
- * is announced.
+ * The results for all the test objects are accumulated and a combined result for the all
+ * the tests is announced.
  */
 function checkResults(resultmap) {
     let summaryResultsCount = {passCount: 0, failCount: 0, absentCount: 0};
