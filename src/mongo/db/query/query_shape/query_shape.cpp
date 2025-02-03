@@ -33,32 +33,17 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cstdint>
-#include <memory>
 #include <utility>
-#include <vector>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/sha256_block.h"
-#include "mongo/db/basic_types.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_command_gen.h"
-#include "mongo/db/query/projection.h"
-#include "mongo/db/query/projection_ast_util.h"
-#include "mongo/db/query/query_request_helper.h"
-#include "mongo/db/query/query_shape/agg_cmd_shape.h"
-#include "mongo/db/query/query_shape/find_cmd_shape.h"
-#include "mongo/db/query/query_shape/query_shape_gen.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
-#include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
@@ -77,7 +62,7 @@ void appendCmdNs(BSONObjBuilder& bob,
 }  // namespace
 
 Shape::Shape(NamespaceStringOrUUID nssOrUUID_, BSONObj collation_)
-    : nssOrUUID(nssOrUUID_), collation(std::move(collation_)) {
+    : nssOrUUID(std::move(nssOrUUID_)), collation(std::move(collation_)) {
     if (MONGO_unlikely(queryShapeCreationException.shouldFail())) {
         uasserted(ErrorCodes::InternalError, "Failure creating query shape");
     }

@@ -31,7 +31,6 @@
 
 #include "mongo/db/query/query_shape/let_shape_component.h"
 #include "mongo/db/query/query_shape/query_shape.h"
-#include "mongo/db/query/query_shape/shape_helpers.h"
 
 namespace mongo::query_shape {
 

@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
 #include "mongo/db/query/query_shape/let_shape_component.h"
+#include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"

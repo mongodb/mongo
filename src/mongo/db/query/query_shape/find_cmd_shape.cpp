@@ -102,7 +102,6 @@ void FindCmdShapeComponents::appendTo(BSONObjBuilder& bob,
 
     bob.append("command", "find");
 
-    std::unique_ptr<MatchExpression> filterExpr;
     // Filter.
     bob.append(FindCommandRequest::kFilterFieldName, filter);
 
