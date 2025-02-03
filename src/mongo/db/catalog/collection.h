@@ -749,6 +749,91 @@ public:
 };
 
 /**
+ * A collection pointer that is consistent with the underlying WT snapshot. This class will
+ * invariant in debug builds that there are no pointers to the collection leftover once we abandon
+ * the snapshot. In release mode this class is equivalent to the plain pointer to avoid the
+ * performance overhead of reference counting.
+ *
+ * A proper instance of this class should only be constructed by trusted users such as the
+ * CollectionCatalog or the CollectionPtr to avoid misuse.
+ *
+ * Note that this class cannot detect an ABA problem with respect to collections acquired under a
+ * lock. The following scenario is possible and won't be caught by this class:
+ * - Lock on collA is acquired
+ * - ConsistentCollection on collA is created
+ * - Lock is released
+ * - Lock is acquired again
+ * - ConsistentCollection is used
+ * This usage will yield an invalid ConsistentCollection since the Collection could've potentially
+ * been modified but won't be detected.
+ *
+ * TODO SERVER-95260: Investigate if this can be detected once generational lock information is
+ * available.
+ */
+class ConsistentCollection {
+public:
+    ConsistentCollection() = default;
+
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+    ~ConsistentCollection();
+
+    ConsistentCollection(ConsistentCollection&& other);
+    ConsistentCollection(const ConsistentCollection& other);
+
+    ConsistentCollection& operator=(ConsistentCollection&& other);
+    ConsistentCollection& operator=(const ConsistentCollection& other);
+#else
+    ~ConsistentCollection() = default;
+
+    ConsistentCollection(ConsistentCollection&& other) = default;
+    ConsistentCollection(const ConsistentCollection& other) = default;
+
+    ConsistentCollection& operator=(ConsistentCollection&& other) = default;
+    ConsistentCollection& operator=(const ConsistentCollection& other) = default;
+#endif
+
+    operator bool() const {
+        return static_cast<bool>(_collection);
+    }
+
+    const Collection* operator->() const {
+        return get();
+    }
+
+    const Collection* get() const {
+        return _collection;
+    }
+
+private:
+    friend class CollectionCatalog;  // The catalog is the main source for consistent collections as
+                                     // part of establishing a consistent collection with the WT
+                                     // snapshot.
+    // TODO SERVER-100333: See if we can tighten up CollectionPtr to not be able to create this
+    // class.
+    friend class CollectionPtr;  // CollectionPtr can manually construct a consistent collection in
+                                 // order to maintain compatibility with legacy usages.
+    friend class LockedCollectionYieldRestore;  // Locked collections implicitly guarantee that the
+                                                // collection is consistent with the snapshot since
+                                                // they impede all modifications to it.
+    friend class CatalogTestFixture;
+
+    const Collection* _collection = nullptr;
+
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+    RecoveryUnit::Snapshot* _snapshot = nullptr;
+
+    ConsistentCollection(OperationContext* opCtx, const Collection* collection);
+
+    int _getRefCount() const;
+
+    void _releaseCollectionIfInSnapshot();
+#else
+    ConsistentCollection(OperationContext* opCtx, const Collection* collection)
+        : _collection(collection){};
+#endif
+};
+
+/**
  * Smart-pointer'esque type to handle yielding of Collection lock that may invalidate pointers when
  * resuming. CollectionPtr will re-load the Collection from the Catalog when restoring from a yield
  * that dropped locks.
@@ -759,13 +844,21 @@ public:
 
     // Function for the implementation on how we load a new Collection pointer when restoring from
     // yield
-    using RestoreFn = std::function<const Collection*(OperationContext*, boost::optional<UUID>)>;
+    using RestoreFn = std::function<ConsistentCollection(OperationContext*, boost::optional<UUID>)>;
 
     // Creates non-yieldable CollectionPtr, performing yield/restore will invariant. To make this
     // CollectionPtr yieldable call `makeYieldable` and provide appropriate implementation depending
     // on context.
     CollectionPtr() = default;
-    explicit CollectionPtr(const Collection* collection);
+    explicit CollectionPtr(ConsistentCollection collection);
+    // TODO SERVER-100333: Replace this with a non-const version. Fully owned collections are safe
+    // to use since they are not consistent with any snapshot by definition as they are being
+    // committed.
+    [[deprecated(
+        "This constructor is in the process of being replaced with the much safer "
+        "ConsistentCollection one. Please try to avoid using it as it could lead to an "
+        "inconsistent CollectionPtr in the event of a WT snapshot yield if stored without "
+        "care")]] explicit CollectionPtr(const Collection* coll);
 
     CollectionPtr(const CollectionPtr&) = delete;
     CollectionPtr(CollectionPtr&&);
@@ -785,10 +878,10 @@ public:
         return !operator==(other);
     }
     const Collection* operator->() const {
-        return _collection;
+        return _collection.get();
     }
     const Collection* get() const {
-        return _collection;
+        return _collection.get();
     }
 
     // Makes this CollectionPtr yieldable. The RestoreFn provides an implementation on how to setup
@@ -819,7 +912,7 @@ public:
 private:
     // These members needs to be mutable so the yield/restore interface can be const. We don't want
     // yield/restore to require a non-const instance when it otherwise could be const.
-    mutable const Collection* _collection = nullptr;
+    mutable ConsistentCollection _collection;
 
     // If the collection is currently in the 'yielded' state (i.e. yield() has been called), this
     // field will contain what was the UUID of the collection at the time of yield.

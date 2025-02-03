@@ -403,10 +403,10 @@ public:
                             }
 
                             auto collBson = [&] {
-                                const Collection* collection =
+                                auto collection =
                                     catalog->establishConsistentCollection(opCtx, nss, boost::none);
-                                if (collection != nullptr) {
-                                    return buildCollectionBson(opCtx, collection, nameOnly);
+                                if (collection) {
+                                    return buildCollectionBson(opCtx, collection.get(), nameOnly);
                                 }
 
                                 std::shared_ptr<const ViewDefinition> view =
@@ -416,7 +416,7 @@ public:
                                             catalog->establishConsistentCollection(
                                                 opCtx, view->viewOn(), boost::none)) {
                                         return buildTimeseriesBson(
-                                            opCtx, bucketsCollection, nameOnly);
+                                            opCtx, bucketsCollection.get(), nameOnly);
                                     } else {
                                         // The buckets collection does not exist, so the time-series
                                         // view will be appended when we iterate through the view
@@ -468,10 +468,9 @@ public:
                             return true;
                         };
 
-                        std::vector<const Collection*> collections =
-                            catalog->establishConsistentCollections(opCtx, dbName);
+                        auto collections = catalog->establishConsistentCollections(opCtx, dbName);
                         for (const auto& collection : collections) {
-                            perCollectionWork(collection);
+                            perCollectionWork(collection.get());
                         }
                     }
 

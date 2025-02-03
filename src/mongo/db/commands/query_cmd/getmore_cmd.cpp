@@ -626,10 +626,10 @@ public:
 
             // On early return, typically due to a failed assertion, delete the cursor.
             ScopeGuard cursorDeleter([&] {
+                cursorPin.deleteUnderlying();
                 if (txnResourcesHandler) {
                     txnResourcesHandler->dismissRestoredResources();
                 }
-                cursorPin.deleteUnderlying();
             });
 
             if (cursorPin->getExecutor()->lockPolicy() ==

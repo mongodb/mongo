@@ -10,6 +10,15 @@ import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB("test");
 
+// TODO SERVER-94613: Reenable this test once the stale reference issue is fixed. Early exiting
+// in the meantime.
+const debugBuild = testDB.adminCommand('buildInfo').debug;
+if (debugBuild) {
+    jsTest.log("Skipping test as debug builds are susceptible to a consistent collection bug");
+    MongoRunner.stopMongod(conn);
+    quit();
+}
+
 if (checkSbeFullyEnabled(testDB)) {
     jsTestLog("Skipping test as SBE is not resilient to WCEs");
     MongoRunner.stopMongod(conn);

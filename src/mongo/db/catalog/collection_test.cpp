@@ -504,6 +504,61 @@ TEST_F(CollectionTest, ForceSetIndexIsMultikey) {
     }
 }
 
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+TEST_F(CollectionTest, VerifyConsistentCollectionProperties) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+    auto indexName = "myindex"_sd;
+    makeCollectionForMultikey(nss, indexName);
+
+    auto consistentCollection = ConsistentCollection{};
+    ASSERT_FALSE(consistentCollection);
+    ASSERT_EQ(consistentCollection.get(), nullptr);
+    ASSERT_EQ(getReferenceCount(consistentCollection), 0);
+
+    auto opCtx = operationContext();
+    auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+    consistentCollection = makeConsistentCollection(nullptr, coll);
+
+    ASSERT_TRUE(consistentCollection);
+    ASSERT_EQ(consistentCollection.get(), coll);
+    ASSERT_EQ(getReferenceCount(consistentCollection), 1);
+
+    {
+        auto copy = consistentCollection;
+        // Copies from a collection without an opCtx attached are treated as if they are by
+        // themselves.
+        ASSERT_EQ(getReferenceCount(consistentCollection), 1);
+    }
+
+    consistentCollection = makeConsistentCollection(coll);
+
+    // Verify now that the reference count properties hold for copies.
+    {
+        auto copy = consistentCollection;
+        ASSERT_EQ(getReferenceCount(copy), 2);
+        ASSERT_EQ(getReferenceCount(consistentCollection), 2);
+        copy = ConsistentCollection{};
+        ASSERT_EQ(getReferenceCount(copy), 0);
+        ASSERT_EQ(getReferenceCount(consistentCollection), 1);
+        copy = consistentCollection;
+        ASSERT_EQ(getReferenceCount(copy), 2);
+        ASSERT_EQ(getReferenceCount(consistentCollection), 2);
+    }
+    ASSERT_EQ(getReferenceCount(consistentCollection), 1);
+
+    // Verify now that the reference count properties hold whenever we move the collection.
+    {
+        auto moved = std::move(consistentCollection);
+        ASSERT_EQ(getReferenceCount(moved), 1);
+        ASSERT_EQ(getReferenceCount(consistentCollection), 0);  // NOLINT(bugprone-use-after-move)
+        ASSERT_EQ(consistentCollection.get(), nullptr);         // NOLINT(bugprone-use-after-move)
+        consistentCollection = std::move(moved);                // NOLINT(bugprone-use-after-move)
+        ASSERT_EQ(getReferenceCount(moved), 0);                 // NOLINT(bugprone-use-after-move)
+        ASSERT_EQ(getReferenceCount(consistentCollection), 1);  // NOLINT(bugprone-use-after-move)
+    }
+}
+#endif
+
 TEST_F(CollectionTest, ForceSetIndexIsMultikeyRemovesUncommittedChangesOnRollback) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     auto indexName = "myindex"_sd;
@@ -680,11 +735,10 @@ TEST_F(CatalogTestFixture, CollectionPtrYieldable) {
     int numRestoreCalls = 0;
 
     CollectionPtr coll(&beforeYield);
-    coll.makeYieldable(operationContext(),
-                       [&afterYield, &numRestoreCalls](OperationContext*, boost::optional<UUID>) {
-                           ++numRestoreCalls;
-                           return &afterYield;
-                       });
+    coll.makeYieldable(operationContext(), [&](OperationContext*, boost::optional<UUID>) {
+        ++numRestoreCalls;
+        return makeConsistentCollection(&afterYield);
+    });
 
     ASSERT_TRUE(coll);
     ASSERT_EQ(coll.get(), &beforeYield);

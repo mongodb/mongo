@@ -81,7 +81,7 @@ private:
  * stats above.
  */
 void recoverWhereExpression(CanonicalQuery* canonicalQuery,
-                            sbe::plan_ranker::CandidatePlan&& candidate) {
+                            sbe::plan_ranker::CandidatePlan candidate) {
     if (canonicalQuery->getExpCtxRaw()->getHasWhereClause()) {
         input_params::recoverWhereExprPredicate(canonicalQuery->getPrimaryMatchExpression(),
                                                 candidate.data.stageData);

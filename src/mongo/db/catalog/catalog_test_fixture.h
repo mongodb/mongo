@@ -66,6 +66,10 @@ public:
 
     repl::StorageInterface* storageInterface() const;
 
+    ConsistentCollection makeConsistentCollection(const Collection*) const;
+    ConsistentCollection makeConsistentCollection(OperationContext* opCtx, const Collection*) const;
+    int getReferenceCount(const ConsistentCollection& coll) const;
+
 private:
     ServiceContext::UniqueOperationContext _opCtx;
 };

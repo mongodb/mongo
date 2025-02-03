@@ -728,7 +728,7 @@ std::shared_ptr<const ViewDefinition> lookupView(
     return view;
 }
 
-std::tuple<NamespaceString, const Collection*, std::shared_ptr<const ViewDefinition>>
+std::tuple<NamespaceString, ConsistentCollection, std::shared_ptr<const ViewDefinition>>
 getCollectionForLockFreeRead(OperationContext* opCtx,
                              const std::shared_ptr<const CollectionCatalog>& catalog,
                              boost::optional<Timestamp> readTimestamp,
@@ -737,17 +737,17 @@ getCollectionForLockFreeRead(OperationContext* opCtx,
     // Returns a collection reference compatible with the specified 'readTimestamp'. Creates and
     // places a compatible PIT collection reference in the 'catalog' if needed and the collection
     // exists at that PIT.
-    const Collection* coll = catalog->establishConsistentCollection(opCtx, nsOrUUID, readTimestamp);
+    auto coll = catalog->establishConsistentCollection(opCtx, nsOrUUID, readTimestamp);
     // Note: This call to resolveNamespaceStringOrUUID must happen after getCollectionFromCatalog
     // above, since getCollectionFromCatalog may call openCollection, which could change the result
     // of namespace resolution.
     auto nss = catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
-    checkCollectionUUIDMismatch(opCtx, *catalog, nss, coll, options._expectedUUID);
+    checkCollectionUUIDMismatch(opCtx, *catalog, nss, coll.get(), options._expectedUUID);
 
     std::shared_ptr<const ViewDefinition> viewDefinition =
         coll ? nullptr : lookupView(opCtx, catalog, nss, options._viewMode);
 
-    return {std::move(nss), coll, std::move(viewDefinition)};
+    return {std::move(nss), std::move(coll), std::move(viewDefinition)};
 }
 
 static const Lock::GlobalLockSkipOptions kLockFreeReadsGlobalLockOptions{[] {
@@ -760,7 +760,7 @@ struct CatalogStateForNamespace {
     std::shared_ptr<const CollectionCatalog> catalog;
     bool isAnySecondaryNamespaceAView;
     NamespaceString resolvedNss;
-    const Collection* collection;
+    ConsistentCollection collection;
     std::shared_ptr<const ViewDefinition> view;
 };
 
@@ -787,9 +787,13 @@ inline CatalogStateForNamespace acquireCatalogStateForNamespace(
         // namespace (or the oplog), then we should retry the setup after resetting the read source
         // here using the resolved namespace. This only needs to be done once.
         if (nsOrUUID.isUUID() && !collection->ns().isReplicated() && !needsRetry) {
+            // We reset the consistent collection since we can't hold one open while advancing the
+            // snapshot.
+            const auto ns = collection->ns();
+            collection = ConsistentCollection{};
             shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
             [[maybe_unused]] bool shouldReadAtLastApplied =
-                SnapshotHelper::changeReadSourceIfNeeded(opCtx, collection->ns());
+                SnapshotHelper::changeReadSourceIfNeeded(opCtx, ns);
             needsRetry = true;
             continue;
         }
@@ -797,23 +801,22 @@ inline CatalogStateForNamespace acquireCatalogStateForNamespace(
         return CatalogStateForNamespace{std::move(catalog),
                                         isAnySecondaryNamespaceAView,
                                         std::move(resolvedNss),
-                                        collection,
+                                        std::move(collection),
                                         std::move(view)};
     }
 }
 
 }  // namespace
 
-const Collection* AutoGetCollectionForReadLockFree::_restoreFromYield(OperationContext* opCtx,
-                                                                      boost::optional<UUID> optUuid,
-                                                                      bool hasSecondaryNamespaces) {
+ConsistentCollection AutoGetCollectionForReadLockFree::_restoreFromYield(
+    OperationContext* opCtx, boost::optional<UUID> optUuid, bool hasSecondaryNamespaces) {
 
     if (!optUuid) {
         tassert(9233200,
                 "Restoring a non existent namespace in the presence of requested secondary "
                 "namespaces in a lock-free context",
                 !hasSecondaryNamespaces);
-        return nullptr;
+        return ConsistentCollection{};
     }
 
     const auto& uuid = *optUuid;
@@ -842,7 +845,7 @@ const Collection* AutoGetCollectionForReadLockFree::_restoreFromYield(OperationC
         //
         // In this case, the query subsystem expects that this CollectionPtr::RestoreFn will
         // result in a nullptr, so NamespaceNotFound errors are converted to nullptr here.
-        return nullptr;
+        return ConsistentCollection{};
     }
 }
 
@@ -895,13 +898,13 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
         if (_view) {
             _lockFreeReadsBlock.reset();
         }
-        _collectionPtr = CollectionPtr(collection);
+        _collectionPtr = CollectionPtr(std::move(collection));
         // Nested operations should never yield as we don't yield when the global lock is held
         // recursively. But this is not known when we create the Query plan for this sub operation.
         // Pretend that we are yieldable but don't allow yield to actually be called.
         _collectionPtr.makeYieldable(opCtx, [](OperationContext*, boost::optional<UUID>) {
             MONGO_UNREACHABLE;
-            return nullptr;
+            return ConsistentCollection{};
         });
     } else {
         auto catalogStateForNamespace =
@@ -917,14 +920,14 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
         CollectionCatalog::stash(opCtx, std::move(catalogStateForNamespace.catalog));
         _isAnySecondaryNamespaceAView = catalogStateForNamespace.isAnySecondaryNamespaceAView;
 
-        _collectionPtr = CollectionPtr(catalogStateForNamespace.collection);
+        _collectionPtr = CollectionPtr(std::move(catalogStateForNamespace.collection));
 
         _collectionPtr.makeYieldable(
             opCtx,
             [this,
              hasSecondaryNamespaces = (std::distance(_options._secondaryNssOrUUIDsBegin,
                                                      _options._secondaryNssOrUUIDsEnd) > 0)](
-                OperationContext* opCtx, boost::optional<UUID> uuid) -> const Collection* {
+                OperationContext* opCtx, boost::optional<UUID> uuid) {
                 return _restoreFromYield(opCtx, std::move(uuid), hasSecondaryNamespaces);
             });
     }

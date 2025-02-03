@@ -77,4 +77,21 @@ repl::StorageInterface* CatalogTestFixture::storageInterface() const {
     return repl::StorageInterface::get(getServiceContext());
 }
 
+ConsistentCollection CatalogTestFixture::makeConsistentCollection(const Collection* coll) const {
+    return makeConsistentCollection(operationContext(), coll);
+}
+
+ConsistentCollection CatalogTestFixture::makeConsistentCollection(OperationContext* opCtx,
+                                                                  const Collection* coll) const {
+    return ConsistentCollection{opCtx, coll};
+}
+
+int CatalogTestFixture::getReferenceCount(const ConsistentCollection& coll) const {
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+    return coll._getRefCount();
+#else
+    return 1;
+#endif
+}
+
 }  // namespace mongo

@@ -69,8 +69,8 @@ LockedCollectionYieldRestore::LockedCollectionYieldRestore(OperationContext* opC
     invariant(locked(opCtx, _nss));
 }
 
-const Collection* LockedCollectionYieldRestore::operator()(OperationContext* opCtx,
-                                                           boost::optional<UUID> optUuid) const {
+ConsistentCollection LockedCollectionYieldRestore::operator()(OperationContext* opCtx,
+                                                              boost::optional<UUID> optUuid) const {
     // Confirm that we were set with a valid collection instance at construction if yield is
     // performed.
     invariant(!_nss.isEmpty());
@@ -79,7 +79,7 @@ const Collection* LockedCollectionYieldRestore::operator()(OperationContext* opC
 
     // If no UUID was provided, just do nothing.
     if (!optUuid) {
-        return nullptr;
+        return ConsistentCollection{};
     }
     const auto& uuid = *optUuid;
 
@@ -92,14 +92,14 @@ const Collection* LockedCollectionYieldRestore::operator()(OperationContext* opC
 
     // Collection dropped during yielding.
     if (!collection) {
-        return nullptr;
+        return ConsistentCollection{};
     }
 
     // Collection renamed during yielding.
     // This check ensures that we are locked on the same namespace and that it is safe to return
     // the C-style pointer to the Collection.
     if (collection->ns() != _nss) {
-        return nullptr;
+        return ConsistentCollection{};
     }
 
     // Non-lock-free readers use this path and need to re-establish their capped snapshot.
@@ -117,7 +117,7 @@ const Collection* LockedCollectionYieldRestore::operator()(OperationContext* opC
     // necessary.
     SnapshotHelper::changeReadSourceIfNeeded(opCtx, collection->ns());
 
-    return collection;
+    return ConsistentCollection{opCtx, collection};
 }
 
 }  // namespace mongo

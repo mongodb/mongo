@@ -490,10 +490,6 @@ Status validate(OperationContext* opCtx,
     invariant(!shard_role_details::getLocker(opCtx)->isLocked() || storageGlobalParams.repair ||
               storageGlobalParams.validate);
 
-    // This is deliberately outside of the try-catch block, so that any errors thrown in the
-    // constructor fail the cmd, as opposed to returning OK with valid:false.
-    ValidateState validateState(opCtx, nss, std::move(options));
-
     // Foreground validation needs to ignore prepare conflicts, or else it would deadlock.
     // Repair mode cannot use ignore-prepare because it needs to be able to do writes, and there is
     // no danger of deadlock for this mode anyway since it is only used at startup (or in standalone
@@ -505,6 +501,10 @@ Status validate(OperationContext* opCtx,
         shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
             oldPrepareConflictBehavior);
     });
+
+    // This is deliberately outside of the try-catch block, so that any errors thrown in the
+    // constructor fail the cmd, as opposed to returning OK with valid:false.
+    ValidateState validateState(opCtx, nss, std::move(options));
 
     // Relax corruption detection so that we log and continue scanning instead of failing early.
     auto oldDataCorruptionMode =

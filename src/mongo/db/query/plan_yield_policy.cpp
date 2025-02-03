@@ -255,11 +255,15 @@ void PlanYieldPolicy::performYield(OperationContext* opCtx,
 void PlanYieldPolicy::performYieldWithAcquisitions(OperationContext* opCtx,
                                                    std::function<void()> whileYieldingFn) {
     // Things have to happen here in a specific order:
+    //   * Remove all references to the CollectionPtrs to avoid holding stale references.
     //   * Abandon the current storage engine snapshot.
     //   * Check for interrupt if the yield policy requires.
     //   * Yield the acquired TransactionResources
     //   * Restore the yielded TransactionResources
     invariant(_policy == YieldPolicy::YIELD_AUTO || _policy == YieldPolicy::YIELD_MANUAL);
+
+    // Remove stale CollectionPtr references from the acquisitions.
+    auto preparedForYieldToken = prepareForYieldingTransactionResources(opCtx);
 
     // Release any storage engine resources. This requires holding a global lock to correctly
     // synchronize with states such as shutdown and rollback.
@@ -272,7 +276,8 @@ void PlanYieldPolicy::performYieldWithAcquisitions(OperationContext* opCtx,
         opCtx->checkForInterrupt();  // throws
     }
 
-    auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx);
+    auto yieldedTransactionResources =
+        yieldTransactionResourcesFromOperationContext(opCtx, preparedForYieldToken);
     ScopeGuard yieldFailedScopeGuard(
         [&] { yieldedTransactionResources.transitionTransactionResourcesToFailedState(opCtx); });
 

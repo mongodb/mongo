@@ -374,12 +374,14 @@ DbCheckAcquisition::DbCheckAcquisition(OperationContext* opCtx,
           swapDataCorruptionMode(opCtx, DataCorruptionDetectionMode::kLogAndContinue)),
       // We don't need to write to the collection, so we use acquireCollectionMaybeLockFree with a
       // read acquisition request.
-      coll(acquireCollectionMaybeLockFree(
+      _coll(acquireCollectionMaybeLockFree(
           opCtx,
           CollectionAcquisitionRequest::fromOpCtx(
               opCtx, nss, AcquisitionPrerequisites::OperationType::kRead))) {}
 
 DbCheckAcquisition::~DbCheckAcquisition() {
+    // We remove the going-to-be-stale reference since it cannot survive outside of a snapshot.
+    _coll.reset();
     shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
     swapDataCorruptionMode(_opCtx, prevDataCorruptionMode);
     swapPrepareConflictBehavior(_opCtx, prevPrepareConflictBehavior);
@@ -408,7 +410,7 @@ DbCheckHasher::DbCheckHasher(
     // Get the MD5 hasher set up.
     md5_init_state(&_state);
 
-    auto& collection = acquisition.coll.getCollectionPtr();
+    auto& collection = acquisition.collection().getCollectionPtr();
 
     if (!indexName) {
         if (!collection->isClustered()) {
@@ -1055,7 +1057,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
             PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
 
 
-        if (!acquisition.coll.exists()) {
+        if (!acquisition.collection().exists()) {
             const auto msg = "Collection under dbCheck no longer exists";
             auto logEntry = dbCheckHealthLogEntry(entry.getSecondaryIndexCheckParameters(),
                                                   entry.getNss(),
@@ -1069,7 +1071,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
             return Status::OK();
         }
 
-        const auto& collection = acquisition.coll.getCollectionPtr();
+        const auto& collection = acquisition.collection().getCollectionPtr();
 
         // TODO SERVER-78399: Clean up this check once feature flag is removed.
         const boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters =

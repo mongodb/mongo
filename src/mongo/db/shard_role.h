@@ -468,6 +468,17 @@ struct YieldedTransactionResources {
     shard_role_details::TransactionResources::State _originalState;
 };
 
+class PreparedForYieldToken {
+    PreparedForYieldToken() = default;
+    friend PreparedForYieldToken prepareForYieldingTransactionResources(OperationContext* opCtx);
+};
+/**
+ * This method does some preparatory work for yielding the transaction resources. This is necessary
+ * before proceeding to abandon the snapshot since holding stale CollectionPtr references is
+ * disallowed.
+ */
+PreparedForYieldToken prepareForYieldingTransactionResources(OperationContext* opCtx);
+
 /**
  * This method puts the TransactionResources associated with the current OpCtx into the yielded
  * state and then detaches them from the OpCtx, moving their ownership to the returned object.
@@ -480,6 +491,8 @@ struct YieldedTransactionResources {
  * to verify a yield can be performed by calling Locker::canSaveLockState().
  */
 YieldedTransactionResources yieldTransactionResourcesFromOperationContext(OperationContext* opCtx);
+YieldedTransactionResources yieldTransactionResourcesFromOperationContext(OperationContext* opCtx,
+                                                                          PreparedForYieldToken);
 
 void restoreTransactionResourcesToOperationContext(
     OperationContext* opCtx, YieldedTransactionResources yieldedResourcesHolder);

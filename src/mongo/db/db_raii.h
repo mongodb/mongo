@@ -199,9 +199,9 @@ public:
     }
 
 private:
-    const Collection* _restoreFromYield(OperationContext* opCtx,
-                                        boost::optional<UUID> optUuid,
-                                        bool hasSecondaryNamespaces);
+    ConsistentCollection _restoreFromYield(OperationContext* opCtx,
+                                           boost::optional<UUID> optUuid,
+                                           bool hasSecondaryNamespaces);
 
     // Whether or not this AutoGetCollectionForReadLockFree is being constructed while
     // there's already a lock-free read in progress.

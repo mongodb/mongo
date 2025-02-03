@@ -164,7 +164,7 @@ private:
                                        NamespaceStringOrUUID{nss.dbName(), *uuid},
                                        shard_role_details::getRecoveryUnit(_opCtx)
                                            ->getPointInTimeReadTimestamp())
-                                 : nullptr);
+                                 : ConsistentCollection{});
         }
         return collMap;
     }

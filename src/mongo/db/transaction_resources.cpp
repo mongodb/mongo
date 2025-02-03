@@ -175,9 +175,9 @@ const AcquiredView& TransactionResources::addAcquiredView(AcquiredView&& acquire
 
 void TransactionResources::releaseAllResourcesOnCommitOrAbort() noexcept {
     readConcern.reset();
-    locker.reset();
     acquiredCollections.clear();
     acquiredViews.clear();
+    locker.reset();
     yielded.reset();
     catalogEpoch.reset();
 }

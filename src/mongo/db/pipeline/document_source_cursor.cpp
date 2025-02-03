@@ -191,7 +191,16 @@ void DocumentSourceCursor::loadBatch() {
     _exec->restoreState(autoColl ? &autoColl->getCollection() : nullptr);
 
     try {
-        ON_BLOCK_EXIT([this] { recordPlanSummaryStats(); });
+        ON_BLOCK_EXIT([&] {
+            recordPlanSummaryStats();
+            // At any given time only one operation can own the entirety of resources used by a
+            // multi-document transaction. As we can perform a remote call during the query
+            // execution we will check in the session to avoid deadlocks. If we don't release
+            // the storage engine resources used here then we could have two operations
+            // interacting with resources of a session at the same time. This will leave the
+            // plan in the saved state as a side-effect.
+            _exec->releaseAllAcquiredResources();
+        });
 
         while ((state = _exec->getNextDocument(&resultObj, nullptr)) == PlanExecutor::ADVANCED) {
             boost::optional<BSONObj> resumeToken;
@@ -204,13 +213,6 @@ void DocumentSourceCursor::loadBatch() {
             bool batchCountFull = _batchSizeCount != 0 && _currentBatch.count() >= _batchSizeCount;
             if (batchCountFull || _currentBatch.memUsageBytes() > _batchSizeBytes ||
                 awaitDataState(pExpCtx->getOperationContext()).shouldWaitForInserts) {
-                // At any given time only one operation can own the entirety of resources used by a
-                // multi-document transaction. As we can perform a remote call during the query
-                // execution we will check in the session to avoid deadlocks. If we don't release
-                // the storage engine resources used here then we could have two operations
-                // interacting with resources of a session at the same time. This will leave the
-                // plan in the saved state as a side-effect.
-                _exec->releaseAllAcquiredResources();
                 // Double the size for next batch when batch is full.
                 if (batchCountFull && overflow::mul(_batchSizeCount, 2, &_batchSizeCount)) {
                     _batchSizeCount = 0;  // Go unlimited if we overflow.
@@ -226,13 +228,6 @@ void DocumentSourceCursor::loadBatch() {
         // since we will need to retrieve the resume information the executor observed before
         // hitting EOF.
         if (_resumeTrackingType != ResumeTrackingType::kNone || pExpCtx->isTailableAwaitData()) {
-            // At any given time only one operation can own the entirety of resources used by a
-            // multi-document transaction. As we can perform a remote call during the query
-            // execution we will check in the session to avoid deadlocks. If we don't release the
-            // storage engine resources used here then we could have two operations interacting with
-            // resources of a session at the same time. This will leave the plan in the saved state
-            // as a side-effect.
-            _exec->releaseAllAcquiredResources();
             return;
         }
     } catch (...) {

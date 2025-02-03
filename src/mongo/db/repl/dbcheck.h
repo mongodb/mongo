@@ -179,7 +179,14 @@ public:
     const ReadSourceScope readSourceScope;
     const PrepareConflictBehavior prevPrepareConflictBehavior;
     const DataCorruptionDetectionMode prevDataCorruptionMode;
-    const CollectionAcquisition coll;
+
+private:
+    boost::optional<CollectionAcquisition> _coll;
+
+public:
+    const CollectionAcquisition& collection() const {
+        return *_coll;
+    }
 };
 
 /**

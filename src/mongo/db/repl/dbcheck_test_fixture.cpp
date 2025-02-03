@@ -229,7 +229,7 @@ Status DbCheckTest::runHashForCollectionCheck(
     Date_t deadlineOnSecondary) {
     const DbCheckAcquisition acquisition(
         opCtx, kNss, {RecoveryUnit::ReadSource::kNoTimestamp}, PrepareConflictBehavior::kEnforce);
-    const auto& collection = acquisition.coll.getCollectionPtr();
+    const auto& collection = acquisition.collection().getCollectionPtr();
     // Disable throttling for testing.
     DataThrottle dataThrottle(opCtx, []() { return 0; });
     auto hasher = DbCheckHasher(opCtx,
@@ -256,7 +256,7 @@ Status DbCheckTest::runHashForExtraIndexKeysCheck(
     Date_t deadlineOnSecondary) {
     const DbCheckAcquisition acquisition(
         opCtx, kNss, {RecoveryUnit::ReadSource::kNoTimestamp}, PrepareConflictBehavior::kEnforce);
-    const auto& collection = acquisition.coll.getCollectionPtr();
+    const auto& collection = acquisition.collection().getCollectionPtr();
     // Disable throttling for testing.
     DataThrottle dataThrottle(opCtx, []() { return 0; });
     auto hasher = DbCheckHasher(opCtx,
