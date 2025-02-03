@@ -1017,6 +1017,7 @@ multiblock
 multicycle
 multiprocess
 multithreaded
+multithreading
 munmap
 mutex
 mutexes

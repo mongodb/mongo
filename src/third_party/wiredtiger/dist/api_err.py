@@ -184,6 +184,10 @@ sub_errors = [
         "Another thread currently holds the table lock", '''
         This sub-level error indicates that a concurrent operation is performing
         a table operation.'''),
+    Error('WT_CONFLICT_CHECKPOINT_LOCK', -32012,
+        "Another thread currently holds the checkpoint lock", '''
+        This sub-level error indicates that a concurrent operation is performing
+        a checkpoint.'''),
 ]
 
 # Update the #defines in the wiredtiger.in file.

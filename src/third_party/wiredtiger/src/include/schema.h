@@ -159,9 +159,21 @@ struct __wt_import_list {
  */
 #define WT_WITH_CHECKPOINT_LOCK(session, op) \
     WT_WITH_LOCK_WAIT(session, &S2C(session)->checkpoint_lock, WT_SESSION_LOCKED_CHECKPOINT, op)
-#define WT_WITH_CHECKPOINT_LOCK_NOWAIT(session, ret, op) \
-    WT_WITH_LOCK_NOWAIT(                                 \
-      session, ret, ret, &S2C(session)->checkpoint_lock, WT_SESSION_LOCKED_CHECKPOINT, op)
+#define WT_WITH_CHECKPOINT_LOCK_NOWAIT(session, ret, op)                                         \
+    do {                                                                                         \
+        int __checkpoint_lock_ret;                                                               \
+        WT_WITH_LOCK_NOWAIT(session, ret, __checkpoint_lock_ret, &S2C(session)->checkpoint_lock, \
+          WT_SESSION_LOCKED_CHECKPOINT, op);                                                     \
+        if (__checkpoint_lock_ret != 0) {                                                        \
+            if (__checkpoint_lock_ret == EBUSY)                                                  \
+                __wt_session_set_last_error(session, EBUSY, WT_CONFLICT_CHECKPOINT_LOCK,         \
+                  "another thread is currently holding the checkpoint lock");                    \
+            else                                                                                 \
+                __wt_session_set_last_error(session, __checkpoint_lock_ret, WT_NONE,             \
+                  "failed to acquire the checkpoint lock");                                      \
+            ret = __checkpoint_lock_ret;                                                         \
+        }                                                                                        \
+    } while (0)
 
 /*
  * WT_WITH_HANDLE_LIST_READ_LOCK --
@@ -229,25 +241,25 @@ struct __wt_import_list {
                 WT_SESSION_LOCKED_TABLE));                                                    \
         WT_WITH_LOCK_WAIT(session, &S2C(session)->schema_lock, WT_SESSION_LOCKED_SCHEMA, op); \
     } while (0)
-#define WT_WITH_SCHEMA_LOCK_NOWAIT(session, ret, op)                                           \
-    do {                                                                                       \
-        WT_ASSERT(session,                                                                     \
-          FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SCHEMA) ||                          \
-            !FLD_ISSET(session->lock_flags,                                                    \
-              WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_NO_SCHEMA_LOCK |                      \
-                WT_SESSION_LOCKED_TABLE));                                                     \
-        int __lock_ret;                                                                        \
-        WT_WITH_LOCK_NOWAIT(                                                                   \
-          session, ret, __lock_ret, &S2C(session)->schema_lock, WT_SESSION_LOCKED_SCHEMA, op); \
-        if (__lock_ret != 0) {                                                                 \
-            if (__lock_ret == EBUSY)                                                           \
-                __wt_session_set_last_error(session, EBUSY, WT_CONFLICT_SCHEMA_LOCK,           \
-                  "another thread is currently holding the schema lock");                      \
-            else                                                                               \
-                __wt_session_set_last_error(                                                   \
-                  session, __lock_ret, WT_NONE, "failed to acquire the schema lock");          \
-            ret = __lock_ret;                                                                  \
-        }                                                                                      \
+#define WT_WITH_SCHEMA_LOCK_NOWAIT(session, ret, op)                                         \
+    do {                                                                                     \
+        WT_ASSERT(session,                                                                   \
+          FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SCHEMA) ||                        \
+            !FLD_ISSET(session->lock_flags,                                                  \
+              WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_NO_SCHEMA_LOCK |                    \
+                WT_SESSION_LOCKED_TABLE));                                                   \
+        int __schema_lock_ret;                                                               \
+        WT_WITH_LOCK_NOWAIT(session, ret, __schema_lock_ret, &S2C(session)->schema_lock,     \
+          WT_SESSION_LOCKED_SCHEMA, op);                                                     \
+        if (__schema_lock_ret != 0) {                                                        \
+            if (__schema_lock_ret == EBUSY)                                                  \
+                __wt_session_set_last_error(session, EBUSY, WT_CONFLICT_SCHEMA_LOCK,         \
+                  "another thread is currently holding the schema lock");                    \
+            else                                                                             \
+                __wt_session_set_last_error(                                                 \
+                  session, __schema_lock_ret, WT_NONE, "failed to acquire the schema lock"); \
+            ret = __schema_lock_ret;                                                         \
+        }                                                                                    \
     } while (0)
 
 /*

@@ -134,6 +134,9 @@ This sub-level error returns when the table has dirty content.
 @par \c WT_CONFLICT_TABLE_LOCK
 This sub-level error indicates that a concurrent operation is performing a table operation.
 
+@par \c WT_CONFLICT_CHECKPOINT_LOCK
+This sub-level error indicates that a concurrent operation is performing a checkpoint.
+
 @if IGNORE_BUILT_BY_API_ERR_END
 @endif
 

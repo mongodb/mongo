@@ -67,6 +67,8 @@ __wt_wiredtiger_error(int error)
         return ("WT_DIRTY_DATA: Table has dirty data");
     case WT_CONFLICT_TABLE_LOCK:
         return ("WT_CONFLICT_TABLE_LOCK: Another thread currently holds the table lock");
+    case WT_CONFLICT_CHECKPOINT_LOCK:
+        return ("WT_CONFLICT_CHECKPOINT_LOCK: Another thread currently holds the checkpoint lock");
     }
 
     /* Windows strerror doesn't support ENOTSUP. */

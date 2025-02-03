@@ -6,7 +6,9 @@
  * See the file LICENSE for redistribution information.
  */
 
+#include <thread>
 #include <catch2/catch.hpp>
+
 #include "wt_internal.h"
 #include "../../wrappers/connection_wrapper.h"
 #include "../utils_sub_level_error.h"
@@ -21,11 +23,13 @@
 #define URI "table:test_drop_conflict"
 #define CONFLICT_BACKUP_MSG "the table is currently performing backup and cannot be dropped"
 #define CONFLICT_DHANDLE_MSG "another thread is currently holding the data handle of the table"
+#define CONFLICT_CHECKPOINT_LOCK_MSG "another thread is currently holding the checkpoint lock"
 #define CONFLICT_SCHEMA_LOCK_MSG "another thread is currently holding the schema lock"
 #define CONFLICT_TABLE_LOCK_MSG "another thread is currently holding the table lock"
 
 /*
- * Prepare a session and error_info struct to be used by the drop conflict tests.
+ * prepare_session_and_error --
+ *     Prepare a session and error_info struct to be used by the drop conflict tests.
  */
 void
 prepare_session_and_error(
@@ -89,7 +93,7 @@ TEST_CASE("Test WT_CONFLICT_BACKUP and WT_CONFLICT_DHANDLE", "[sub_level_error_d
 
     /*
      * This section gives us coverage in __drop_tiered. The dir_store extension is only supported
-     * for POSIX systems, so skip this section on Windows.
+     * for POSIX systems, so we skip this section on Windows.
      */
 #ifndef _WIN32
     SECTION("Test WT_CONFLICT_DHANDLE with tiered storage")
@@ -114,9 +118,9 @@ TEST_CASE("Test WT_CONFLICT_BACKUP and WT_CONFLICT_DHANDLE", "[sub_level_error_d
 }
 
 /*
- * This test case covers EBUSY errors resulting from drop while a lock is held by another thread.
+ * This test case covers EBUSY errors resulting from drop while a lock is held by another session.
  */
-TEST_CASE("Test CONFLICT_SCHEMA_LOCK and CONFLICT_TABLE_LOCK", "[sub_level_error_drop_conflict]")
+TEST_CASE("Test conflicts with checkpoint/schema/table locks", "[sub_level_error_drop_conflict]")
 {
     std::string config = "key_format=S,value_format=S";
     WT_SESSION *session_a = NULL;
@@ -124,16 +128,34 @@ TEST_CASE("Test CONFLICT_SCHEMA_LOCK and CONFLICT_TABLE_LOCK", "[sub_level_error
     WT_ERROR_INFO *err_info_a = NULL;
     WT_ERROR_INFO *err_info_b = NULL;
 
-    /* This section directly uses the pthread library which is POSIX-only, so skip on Windows. */
+    connection_wrapper conn_wrapper = connection_wrapper(".", "create");
+    prepare_session_and_error(&conn_wrapper, &session_a, &err_info_a);
+    prepare_session_and_error(&conn_wrapper, &session_b, &err_info_b);
+    REQUIRE(session_a->create(session_a, URI, config.c_str()) == 0);
+
+    /*
+     * The Windows implementation of __wt_spin_lock/__wt_try_spin_lock will still manage to take the
+     * lock if it has already been taken by a different session in the same thread, resulting in a
+     * successful (no conflicts) drop.
+     *
+     * These CHECKPOINT_LOCK/SCHEMA_LOCK sections will therefore fail on Windows - we have decided
+     * to skip them in this case rather than have the tests use multithreading.
+     */
 #ifndef _WIN32
+    SECTION("Test CONFLICT_CHECKPOINT_LOCK")
+    {
+        /* Attempt to drop the table while the checkpoint lock is taken by another session. */
+        WT_WITH_CHECKPOINT_LOCK(((WT_SESSION_IMPL *)session_b),
+          REQUIRE(session_a->drop(session_a, URI, "lock_wait=0") == EBUSY));
+
+        utils::check_error_info(
+          err_info_a, EBUSY, WT_CONFLICT_CHECKPOINT_LOCK, CONFLICT_CHECKPOINT_LOCK_MSG);
+        utils::check_error_info(err_info_b, 0, WT_NONE, WT_ERROR_INFO_EMPTY);
+    }
+
     SECTION("Test CONFLICT_SCHEMA_LOCK")
     {
-        connection_wrapper conn_wrapper = connection_wrapper(".", "create");
-        prepare_session_and_error(&conn_wrapper, &session_a, &err_info_a);
-        prepare_session_and_error(&conn_wrapper, &session_b, &err_info_b);
-        REQUIRE(session_a->create(session_a, URI, config.c_str()) == 0);
-
-        /* Attempt to drop the table while another session holds the schema lock. */
+        /* Attempt to drop the table while the schema lock is taken by another session. */
         WT_WITH_SCHEMA_LOCK(((WT_SESSION_IMPL *)session_b),
           REQUIRE(session_a->drop(session_a, URI, "lock_wait=0") == EBUSY));
 
@@ -145,12 +167,7 @@ TEST_CASE("Test CONFLICT_SCHEMA_LOCK and CONFLICT_TABLE_LOCK", "[sub_level_error
 
     SECTION("Test CONFLICT_TABLE_LOCK")
     {
-        connection_wrapper conn_wrapper = connection_wrapper(".", "create");
-        prepare_session_and_error(&conn_wrapper, &session_a, &err_info_a);
-        prepare_session_and_error(&conn_wrapper, &session_b, &err_info_b);
-        REQUIRE(session_a->create(session_a, URI, config.c_str()) == 0);
-
-        /* Attempt to drop the table while another session holds the table write lock. */
+        /* Attempt to drop the table while the table write lock is taken by another session. */
         WT_WITH_TABLE_WRITE_LOCK(((WT_SESSION_IMPL *)session_b),
                                  REQUIRE(session_a->drop(session_a, URI, "lock_wait=0") == EBUSY););
 

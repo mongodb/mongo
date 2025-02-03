@@ -49,6 +49,7 @@ class test_strerror(wttest.WiredTigerTestCase, suite_subprocess):
         (wiredtiger.WT_UNCOMMITTED_DATA, "WT_UNCOMMITTED_DATA: Table has uncommitted data"),
         (wiredtiger.WT_DIRTY_DATA, "WT_DIRTY_DATA: Table has dirty data"),
         (wiredtiger.WT_CONFLICT_TABLE_LOCK, "WT_CONFLICT_TABLE_LOCK: Another thread currently holds the table lock"),
+        (wiredtiger.WT_CONFLICT_CHECKPOINT_LOCK, "WT_CONFLICT_CHECKPOINT_LOCK: Another thread currently holds the checkpoint lock"),
     ]
 
     def check_error_code(self, error, expected):

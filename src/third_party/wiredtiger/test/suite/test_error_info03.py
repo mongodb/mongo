@@ -37,7 +37,7 @@ class test_error_info03(error_info_util):
     conn_config = 'timing_stress_for_test=[session_alter_slow,open_index_slow]'
     uri="table:test_error_info"
 
-    def hold_schema_lock(self):
+    def hold_checkpoint_and_schema_locks(self):
         session = self.conn.open_session()
         # The content of the new config is not important, it just needs to be non-empty (otherwise
         # the alter operation will abort).
@@ -50,7 +50,28 @@ class test_error_info03(error_info_util):
         c.close()
 
     def try_drop_no_wait(self):
-        self.assertTrue(self.raisesBusy(lambda: self.session.drop(self.uri, "checkpoint_wait=0,lock_wait=0")), "was expecting drop call to fail with EBUSY")
+        self.assertTrue(self.raisesBusy(lambda: self.session.drop(self.uri, "lock_wait=0")), "was expecting drop call to fail with EBUSY")
+
+    def try_drop_no_wait_ignore_checkpoint_lock(self):
+        self.assertTrue(self.raisesBusy(lambda: self.session.drop(self.uri, "lock_wait=0,checkpoint_wait=0")), "was expecting drop call to fail with EBUSY")
+
+    def test_conflict_checkpoint(self):
+        """
+        Try to drop the table while another thread holds the checkpoint lock.
+        """
+        self.session.create(self.uri, 'key_format=S,value_format=S')
+
+        lock_thread = threading.Thread(target=self.hold_checkpoint_and_schema_locks)
+        drop_thread = threading.Thread(target=self.try_drop_no_wait)
+
+        lock_thread.start()
+        time.sleep(1)
+        drop_thread.start()
+
+        lock_thread.join()
+        drop_thread.join()
+
+        self.assert_error_equal(errno.EBUSY, wiredtiger.WT_CONFLICT_CHECKPOINT_LOCK, "another thread is currently holding the checkpoint lock")
 
     def test_conflict_schema(self):
         """
@@ -58,8 +79,8 @@ class test_error_info03(error_info_util):
         """
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
-        lock_thread = threading.Thread(target=self.hold_schema_lock)
-        drop_thread = threading.Thread(target=self.try_drop_no_wait)
+        lock_thread = threading.Thread(target=self.hold_checkpoint_and_schema_locks)
+        drop_thread = threading.Thread(target=self.try_drop_no_wait_ignore_checkpoint_lock)
 
         lock_thread.start()
         time.sleep(1)

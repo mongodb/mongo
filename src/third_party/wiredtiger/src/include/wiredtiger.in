@@ -4136,6 +4136,12 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp)
  * table operation.
  */
 #define	WT_CONFLICT_TABLE_LOCK	(-32011)
+/*!
+ * Another thread currently holds the checkpoint lock.
+ * This sub-level error indicates that a concurrent operation is performing a
+ * checkpoint.
+ */
+#define	WT_CONFLICT_CHECKPOINT_LOCK	(-32012)
 /*
  * Sub-level error return section: END
  * DO NOT EDIT: automatically built by dist/api_err.py.

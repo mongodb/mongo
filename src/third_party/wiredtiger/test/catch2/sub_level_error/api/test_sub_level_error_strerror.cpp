@@ -41,6 +41,8 @@ TEST_CASE("Test generation of sub-level error codes when strerror is called",
           {WT_DIRTY_DATA, "WT_DIRTY_DATA: Table has dirty data"},
           {WT_CONFLICT_TABLE_LOCK,
             "WT_CONFLICT_TABLE_LOCK: Another thread currently holds the table lock"},
+          {WT_CONFLICT_CHECKPOINT_LOCK,
+            "WT_CONFLICT_CHECKPOINT_LOCK: Another thread currently holds the checkpoint lock"},
         };
 
         for (auto const [code, expected] : errors)
