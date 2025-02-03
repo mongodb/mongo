@@ -36,6 +36,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 
@@ -115,7 +116,7 @@ private:
         }
 
         void indicateSuccess() override {
-            // TODO SERVER-98590: utilize this to gracefully finish streams.
+            // TODO SERVER-99246: properly record success stats.
         }
 
         void indicateFailure(Status s) override {
@@ -146,6 +147,11 @@ private:
     void _dropConnections(WithLock);
     void _dropConnections(WithLock, EndpointState& target);
 
+    bool _shutdownComplete(WithLock lk) {
+        return _state == State::kShutdown && _numActiveHandles == 0 &&
+            _finishingClientList.size() == 0;
+    }
+
     stdx::condition_variable _cv;
     stdx::mutex _mutex;
 
@@ -154,6 +160,14 @@ private:
 
     std::uint64_t _numActiveHandles{0};
     stdx::unordered_map<HostAndPort, EndpointState> _endpoints;
+
+    struct FinishingClientState {
+        FinishingClientState(std::shared_ptr<AsyncDBClient> c) : client(std::move(c)) {}
+
+        std::shared_ptr<AsyncDBClient> client;
+        boost::optional<std::list<FinishingClientState>::iterator> it;
+    };
+    std::list<FinishingClientState> _finishingClientList;
 
     ServiceContext* _svcCtx;
     transport::TransportLayer* _tl;

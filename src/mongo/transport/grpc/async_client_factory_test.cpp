@@ -34,6 +34,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/grpc/async_client_factory.h"
+#include "mongo/transport/grpc/client.h"
 #include "mongo/transport/grpc/grpc_session_manager.h"
 #include "mongo/transport/grpc/grpc_transport_layer.h"
 #include "mongo/transport/grpc/grpc_transport_layer_impl.h"
@@ -141,6 +142,28 @@ public:
             .get();
     }
 
+    void waitForDisconnected(
+        const std::shared_ptr<executor::AsyncClientFactory::AsyncClientHandle>& handle) {
+        size_t retries = 3;
+        while (handle->getClient().isStillConnected() && retries-- > 0) {
+            sleepmillis(100);
+        }
+    }
+
+    void shutdownAndAssertOnTransportStats(int successfulStreams, int failedStreams) {
+        // Wait for the factory to shutdown to ensure all clients are destroyed.
+        getFactory().shutdown();
+
+        BSONObjBuilder stats;
+        _tl->appendStatsForServerStatus(&stats);
+        auto egressStats = stats.obj();
+        ASSERT_EQ(
+            egressStats[kStreamsSubsectionFieldName][kSuccessfulStreamsFieldName].numberLong(),
+            successfulStreams);
+        ASSERT_EQ(egressStats[kStreamsSubsectionFieldName][kFailedStreamsFieldName].numberLong(),
+                  failedStreams);
+    }
+
 private:
     std::unique_ptr<GRPCTransportLayer> _tl;
     std::unique_ptr<executor::AsyncClientFactory> _factory;
@@ -155,18 +178,23 @@ private:
 };
 
 TEST_F(GRPCAsyncClientFactoryTest, Ping) {
-    auto handle = getClient();
-    auto msg = makeUniqueMessage();
-    auto resp = handle->getClient().runCommand(OpMsgRequest::parse(msg)).get();
-    ASSERT_OK(getStatusFromCommandResult(resp->getCommandReply()));
-    handle->indicateSuccess();
+    {
+        auto handle = getClient();
+        auto msg = makeUniqueMessage();
+        auto resp = handle->getClient().runCommand(OpMsgRequest::parse(msg)).get();
+        ASSERT_OK(getStatusFromCommandResult(resp->getCommandReply()));
+        handle->indicateSuccess();
+    }
+
+    shutdownAndAssertOnTransportStats(1 /*successful streams*/, 0 /*failed streams*/);
 }
 
 TEST_F(GRPCAsyncClientFactoryTest, ConcurrentUsage) {
+    const int concurrentThreads = CommandServiceTestFixtures::kMaxThreads - 10;
     unittest::threadAssertionMonitoredTest([&](auto& monitor) {
         std::vector<stdx::thread> threads;
 
-        for (int i = 0; i < CommandServiceTestFixtures::kMaxThreads - 10; i++) {
+        for (int i = 0; i < concurrentThreads; i++) {
             auto th = monitor.spawn([&] {
                 auto handle = getClient();
                 for (int req = 0; req < 5; req++) {
@@ -181,46 +209,88 @@ TEST_F(GRPCAsyncClientFactoryTest, ConcurrentUsage) {
 
         for (auto&& thread : threads) {
             thread.join();
-        }
+        };
     });
+
+    shutdownAndAssertOnTransportStats(concurrentThreads /*successful streams*/,
+                                      0 /*failed streams*/);
 }
 
 TEST_F(GRPCAsyncClientFactoryTest, DropAllConnections) {
-    auto handle1 = getClient();
-    auto handle2 = getClient();
+    {
+        auto handle1 = getClient();
+        auto handle2 = getClient();
 
-    getFactory().dropConnections();
-    auto msg = OpMsgRequest::parseOwned(makeUniqueMessage());
-    ASSERT_EQ(handle1->getClient().runCommand(msg).getNoThrow(), ErrorCodes::CallbackCanceled);
-    ASSERT_EQ(handle2->getClient().runCommand(msg).getNoThrow(), ErrorCodes::CallbackCanceled);
+        getFactory().dropConnections();
+        auto msg = OpMsgRequest::parseOwned(makeUniqueMessage());
+        ASSERT_EQ(handle1->getClient().runCommand(msg).getNoThrow(), ErrorCodes::CallbackCanceled);
+        ASSERT_EQ(handle2->getClient().runCommand(msg).getNoThrow(), ErrorCodes::CallbackCanceled);
+    }
+
+    shutdownAndAssertOnTransportStats(0 /*successful streams*/, 2 /*failed streams*/);
 }
 
 TEST_F(GRPCAsyncClientFactoryTest, KeepOpen) {
-    auto handle = getClient();
-    getFactory().setKeepOpen(handle->getClient().remote(), true);
-    getFactory().dropConnections();
-    auto msg = OpMsgRequest::parseOwned(makeUniqueMessage());
-    ASSERT_OK(handle->getClient().runCommand(msg).getNoThrow());
+    {
+        auto handle = getClient();
+        getFactory().setKeepOpen(handle->getClient().remote(), true);
+        getFactory().dropConnections();
+        auto msg = OpMsgRequest::parseOwned(makeUniqueMessage());
+        ASSERT_OK(handle->getClient().runCommand(msg).getNoThrow());
+    }
+
+    shutdownAndAssertOnTransportStats(1 /*successful streams*/, 0 /*failed streams*/);
 }
 
 TEST_F(GRPCAsyncClientFactoryTest, Shutdown) {
+    {
+        auto handle1 = getClient();
+        auto handle2 = getClient();
+
+        auto pf = makePromiseFuture<void>();
+        auto shutdownThread = stdx::thread([&] {
+            getFactory().shutdown();
+            pf.promise.emplaceValue();
+        });
+        waitForDisconnected(handle1);
+        waitForDisconnected(handle2);
+        auto msg = OpMsgRequest::parseOwned(makeUniqueMessage());
+        ASSERT_EQ(handle1->getClient().runCommand(msg).getNoThrow(), ErrorCodes::CallbackCanceled);
+        ASSERT_EQ(handle2->getClient().runCommand(msg).getNoThrow(), ErrorCodes::CallbackCanceled);
+
+        ASSERT_FALSE(pf.future.isReady());
+
+        handle1.reset();
+        handle2.reset();
+
+        pf.future.get();
+        shutdownThread.join();
+    }
+
+    shutdownAndAssertOnTransportStats(0 /*successful streams*/, 2 /*failed streams*/);
+}
+
+TEST_F(GRPCAsyncClientFactoryTest, RefuseShutdownWithActiveClient) {
     auto handle1 = getClient();
-    auto handle2 = getClient();
 
     auto pf = makePromiseFuture<void>();
     auto shutdownThread = stdx::thread([&] {
         getFactory().shutdown();
         pf.promise.emplaceValue();
     });
+    waitForDisconnected(handle1);
     auto msg = OpMsgRequest::parseOwned(makeUniqueMessage());
     ASSERT_EQ(handle1->getClient().runCommand(msg).getNoThrow(), ErrorCodes::CallbackCanceled);
-    ASSERT_EQ(handle2->getClient().runCommand(msg).getNoThrow(), ErrorCodes::CallbackCanceled);
 
     ASSERT_FALSE(pf.future.isReady());
 
-    handle1.reset();
-    handle2.reset();
+    auto client = ServiceContextTest::getClient();
+    auto opCtx = getServiceContext()->makeOperationContext(client);
+    opCtx->setDeadlineAfterNowBy(Milliseconds(500), ErrorCodes::ExceededTimeLimit);
+    ASSERT_THROWS_CODE(pf.future.get(opCtx.get()), DBException, ErrorCodes::ExceededTimeLimit);
 
+    // Now destroy the client so that shutdown can succeed.
+    handle1.reset();
     pf.future.get();
     shutdownThread.join();
 }

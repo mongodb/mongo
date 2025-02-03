@@ -67,11 +67,11 @@ long long getCurrChannelMetric(std::shared_ptr<GRPCClient> client) {
     return currChannelsElem.numberLong();
 }
 
-long long getCurrStreamsMetric(std::shared_ptr<GRPCClient> client) {
+long long getStreamsMetric(std::shared_ptr<GRPCClient> client, StringData fieldName) {
     auto obj = getClientStats(client);
     auto streamSubObj = obj.getObjectField(kStreamsSubsectionFieldName);
 
-    return streamSubObj.getField(kCurrentStreamsFieldName).numberLong();
+    return streamSubObj.getField(fieldName).numberLong();
 }
 
 class GRPCClientTest : public ServiceContextTest {
@@ -425,7 +425,9 @@ TEST_F(GRPCClientTest, GRPCClientAppendStatsFailedSession) {
         client->start();
 
         ASSERT_EQ(getCurrChannelMetric(client), 0);
-        ASSERT_EQ(getCurrStreamsMetric(client), 0);
+        ASSERT_EQ(getStreamsMetric(client, kCurrentStreamsFieldName), 0);
+        ASSERT_EQ(getStreamsMetric(client, kSuccessfulStreamsFieldName), 0);
+        ASSERT_EQ(getStreamsMetric(client, kFailedStreamsFieldName), 0);
 
         // Create a new session each for a different address
         auto session1 = client
@@ -435,7 +437,7 @@ TEST_F(GRPCClientTest, GRPCClientAppendStatsFailedSession) {
                                       {})
                             .get();
         ASSERT_EQ(getCurrChannelMetric(client), 1);
-        ASSERT_EQ(getCurrStreamsMetric(client), 1);
+        ASSERT_EQ(getStreamsMetric(client, kCurrentStreamsFieldName), 1);
 
         auto session2 = client
                             ->connect(server.getListeningAddresses().at(1),
@@ -444,7 +446,7 @@ TEST_F(GRPCClientTest, GRPCClientAppendStatsFailedSession) {
                                       {})
                             .get();
         ASSERT_EQ(getCurrChannelMetric(client), 2);
-        ASSERT_EQ(getCurrStreamsMetric(client), 2);
+        ASSERT_EQ(getStreamsMetric(client, kCurrentStreamsFieldName), 2);
 
         // Finish one session and cancel the other
         ASSERT_OK(session1->finish());
@@ -454,7 +456,9 @@ TEST_F(GRPCClientTest, GRPCClientAppendStatsFailedSession) {
         session2.reset();
 
         ASSERT_EQ(getCurrChannelMetric(client), 2);
-        ASSERT_EQ(getCurrStreamsMetric(client), 0);
+        ASSERT_EQ(getStreamsMetric(client, kCurrentStreamsFieldName), 0);
+        ASSERT_EQ(getStreamsMetric(client, kSuccessfulStreamsFieldName), 1);
+        ASSERT_EQ(getStreamsMetric(client, kFailedStreamsFieldName), 1);
     };
 
     auto options = CommandServiceTestFixtures::makeServerOptions();

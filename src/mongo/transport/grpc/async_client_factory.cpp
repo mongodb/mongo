@@ -33,6 +33,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/async_client_factory.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/transport/grpc/grpc_session.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
@@ -97,8 +98,9 @@ void GRPCAsyncClientFactory::shutdown() {
     LOGV2_DEBUG(9936106,
                 kDiagnosticLogLevel,
                 "Waiting for outstanding streams to terminate",
-                "nActiveStreams"_attr = _numActiveHandles);
-    _cv.wait(lk, [&]() { return _numActiveHandles == 0; });
+                "numActiveStreams"_attr = _numActiveHandles,
+                "numFinishingStreams"_attr = _finishingClientList.size());
+    _cv.wait(lk, [&]() { return _shutdownComplete(lk); });
 }
 
 void GRPCAsyncClientFactory::appendStats(executor::ConnectionPoolStats* stats) {
@@ -185,17 +187,51 @@ Future<std::shared_ptr<GRPCAsyncClientFactory::AsyncClientHandle>> GRPCAsyncClie
 }
 
 void GRPCAsyncClientFactory::_destroyHandle(Handle& handle) {
-    stdx::lock_guard lk(_mutex);
+    FinishingClientState* cs;
+    {
+        stdx::lock_guard lk(_mutex);
+        auto remote = handle.getRemote();
 
-    auto& handlesList = _endpoints[handle.getRemote()].handles;
-    invariant(handle._it);
-    handlesList.erase(*handle._it);
-    handle._it.reset();
+        // Preserve the AsyncDBClient until the call to asyncFinish() is complete.
+        _finishingClientList.emplace_front(std::move(handle._client));
+        cs = &(_finishingClientList.front());
+        cs->it = _finishingClientList.begin();
 
-    _numActiveHandles--;
-    if (_numActiveHandles == 0 && _state == State::kShutdown) {
-        _cv.notify_all();
+        // Remove the handle from the active handles list.
+        auto& handlesList = _endpoints[remote].handles;
+        invariant(handle._it);
+        handlesList.erase(*handle._it);
+        handle._it.reset();
+        _numActiveHandles--;
     }
+
+    // gRPC calls must be ended with a call to finish(), which notifies the server that it is done
+    // with the RPC call and should be gracefully terminated.
+    checked_cast<EgressSession&>(cs->client->getTransportSession())
+        .asyncFinish()
+        .getAsync([cs, this](Status s) {
+            LOGV2_DEBUG(9859000,
+                        kDiagnosticLogLevel,
+                        "Completed call to finish() on gRPC stream",
+                        "status"_attr = s);
+
+            stdx::lock_guard lk(_mutex);
+            // Remove the client from the actively destructing list and stop holding onto the client
+            // object.
+            invariant(cs->it);
+            cs->client.reset();
+            if (MONGO_unlikely(cs->client.use_count() != 0)) {
+                LOGV2_DEBUG(9859001,
+                            kDiagnosticLogLevel,
+                            "AsyncDBClient must be unowned during cleanup",
+                            "clientUseCount"_attr = cs->client.use_count());
+            }
+            _finishingClientList.erase(*cs->it);
+
+            if (_shutdownComplete(lk)) {
+                _cv.notify_all();
+            }
+        });
 }
 
 void GRPCAsyncClientFactory::_dropConnections(WithLock lk) {

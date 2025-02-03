@@ -121,7 +121,7 @@ boost::optional<Status> GRPCSession::terminationStatus() const {
 
 bool GRPCSession::_setTerminationStatus(Status status) {
     auto ts = _terminationStatus.synchronize();
-    if (MONGO_unlikely(ts->has_value() || _isCancelled()))
+    if (ts->has_value() || _isCancelled())
         return false;
     ts->emplace(std::move(status));
     return true;
@@ -255,7 +255,7 @@ EgressSession::~EgressSession() {
                 "status"_attr = status);
 
     if (_cleanupCallback)
-        (*_cleanupCallback)();
+        (*_cleanupCallback)(*status);
 }
 
 Future<Message> EgressSession::_asyncReadFromStream() {

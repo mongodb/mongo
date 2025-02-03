@@ -55,6 +55,8 @@ namespace mongo::transport::grpc {
 constexpr auto kCurrentChannelsFieldName = "currentChannels"_sd;
 constexpr auto kStreamsSubsectionFieldName = "streams"_sd;
 constexpr auto kCurrentStreamsFieldName = "current"_sd;
+constexpr auto kSuccessfulStreamsFieldName = "successful"_sd;
+constexpr auto kFailedStreamsFieldName = "failed"_sd;
 
 class Client : public std::enable_shared_from_this<Client> {
 public:
@@ -119,8 +121,9 @@ protected:
      */
     void setMetadataOnClientContext(ClientContext& ctx, const ConnectOptions& options);
 
-    // TODO SERVER-98590 Implement successful streams and failed streams stat.
     Counter64 _numCurrentStreams;
+    Counter64 _numSuccessfulStreams;
+    Counter64 _numFailedStreams;
 
 private:
     enum class ClientState { kUninitialized, kStarted, kShutdown };

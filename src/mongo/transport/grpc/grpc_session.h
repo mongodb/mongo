@@ -456,7 +456,7 @@ public:
      * Runs the provided callback when destroying the session.
      * Not synchronized, thus not safe to call once the session is visible to other threads.
      */
-    void setCleanupCallback(std::function<void()> callback) {
+    void setCleanupCallback(std::function<void(Status)> callback) {
         _cleanupCallback.emplace(std::move(callback));
     }
 
@@ -505,7 +505,7 @@ private:
     UUID _clientId;
     std::shared_ptr<SharedState> _sharedState;
 
-    boost::optional<std::function<void()>> _cleanupCallback;
+    boost::optional<std::function<void(Status)>> _cleanupCallback;
     boost::optional<SSLConfiguration> _sslConfig;
 };
 

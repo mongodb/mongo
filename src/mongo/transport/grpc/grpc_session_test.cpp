@@ -73,13 +73,22 @@ public:
     }
 
     std::unique_ptr<EgressSession> makeEgressSession(UUID clientId) {
-        return std::make_unique<EgressSession>(nullptr,
-                                               _reactor,
-                                               _streamFixtures->clientCtx,
-                                               _streamFixtures->clientStream,
-                                               /* sslConfig */ boost::none,
-                                               std::move(clientId),
-                                               /* shared state */ nullptr);
+        auto session = std::make_unique<EgressSession>(nullptr,
+                                                       _reactor,
+                                                       _streamFixtures->clientCtx,
+                                                       _streamFixtures->clientStream,
+                                                       /* sslConfig */ boost::none,
+                                                       std::move(clientId),
+                                                       /* shared state */ nullptr);
+
+        session->setCleanupCallback([this](Status terminationStatus) {
+            if (!terminationStatus.isOK()) {
+                _tasksFailed++;
+                return;
+            }
+            _tasksCompleted++;
+        });
+        return session;
     }
 
     template <class SessionType>
@@ -143,6 +152,14 @@ public:
         ASSERT_TRUE(ErrorCodes::isCancellationError(*other.terminationStatus()));
     }
 
+    int getNumTasksCompleted() const {
+        return _tasksCompleted;
+    }
+
+    int getNumTasksFailed() const {
+        return _tasksFailed;
+    }
+
 private:
     std::unique_ptr<MockStreamTestFixtures> _makeStreamFixtures() {
         // The MockStreamTestFixtures created here doesn't contain any references to the channel or
@@ -170,6 +187,8 @@ private:
         cb(*_streamFixtures->rpc, *session);
     }
 
+    int _tasksCompleted = 0;
+    int _tasksFailed = 0;
     std::unique_ptr<MockStreamTestFixtures> _streamFixtures;
     std::shared_ptr<GRPCReactor> _reactor;
 };
@@ -235,6 +254,44 @@ TEST_F(GRPCSessionTest, CancelWithReason) {
         ASSERT_EQ(session.sinkMessage(makeUniqueMessage()), kExpectedReason.code());
         ASSERT_TRUE(rpc.serverCtx->isCancelled());
     });
+}
+
+TEST_F(GRPCSessionTest, CleanupStatColletionFailedTest) {
+    auto egressSession1 = makeSession<EgressSession>();
+    auto egressSession2 = makeSession<EgressSession>();
+
+    ASSERT_EQ(0, getNumTasksCompleted());
+    ASSERT_EQ(0, getNumTasksFailed());
+
+    auto cancelStatus = Status(ErrorCodes::ShutdownInProgress, "Some error condition");
+    egressSession1->cancel(cancelStatus);
+    ASSERT_EQ(0, getNumTasksCompleted());
+    ASSERT_EQ(0, getNumTasksFailed());
+    egressSession1.reset();
+    ASSERT_EQ(0, getNumTasksCompleted());
+    ASSERT_EQ(1, getNumTasksFailed());
+
+    // Since both sessions share the same ClientContext (via the test fixture), canceling one will
+    // cancel all others.
+    ASSERT_EQ(ErrorCodes::CallbackCanceled, egressSession2->finish());
+    ASSERT_EQ(0, getNumTasksCompleted());
+    ASSERT_EQ(1, getNumTasksFailed());
+    egressSession2.reset();
+    ASSERT_EQ(0, getNumTasksCompleted());
+    ASSERT_EQ(2, getNumTasksFailed());
+}
+
+TEST_F(GRPCSessionTest, CleanupStatColletionCompletedTest) {
+    auto egressSession = makeSession<EgressSession>();
+
+    ASSERT_EQ(0, getNumTasksCompleted());
+    ASSERT_EQ(0, getNumTasksFailed());
+
+    fixtures().rpc->sendReturnStatus(::grpc::Status::OK);
+    ASSERT_EQ(Status::OK(), egressSession->finish());
+    egressSession.reset();
+    ASSERT_EQ(1, getNumTasksCompleted());
+    ASSERT_EQ(0, getNumTasksFailed());
 }
 
 TEST_F(GRPCSessionTest, TerminationStatusIsNotOverridden) {
