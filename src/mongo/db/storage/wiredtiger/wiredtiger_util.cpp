@@ -115,7 +115,7 @@ void WiredTigerUtil::fetchTypeAndSourceURI(WiredTigerRecoveryUnit& ru,
 
 StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WiredTigerSession& session,
                                                           StringData uri) {
-    WT_CURSOR* cursor;
+    WT_CURSOR* cursor = nullptr;
     invariantWTOK(session.open_cursor("metadata:create", nullptr, "", &cursor), session);
     invariant(cursor);
     ON_BLOCK_EXIT([cursor, &session] { invariantWTOK(cursor->close(cursor), session); });
