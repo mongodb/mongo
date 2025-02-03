@@ -1395,6 +1395,18 @@ Error:
   python buildscripts/install_bazel.py
 """)
 
+# These are warnings are disabled globally at the toolchain level to allow external repository compilation.
+# Re-enable them for MongoDB source code.
+RE_ENABLE_DISABLED_3RD_PARTY_WARNINGS_FEATURES = select({
+    "//bazel/config:compiler_type_clang": [
+        "-disable_warnings_for_third_party_libraries_clang",
+    ],
+    "//bazel/config:compiler_type_gcc": [
+        "-disable_warnings_for_third_party_libraries_gcc",
+    ],
+    "//conditions:default": [],
+})
+
 MONGO_GLOBAL_INCLUDE_DIRECTORIES = [
     "-Isrc",
     "-I$(GENDIR)/src",
@@ -1711,6 +1723,7 @@ def mongo_cc_library(
             deps += MONGO_GLOBAL_SRC_DEPS
             if name != "_global_header_bypass":
                 deps += ["//src/mongo:_global_header_bypass"]
+        features = features + RE_ENABLE_DISABLED_3RD_PARTY_WARNINGS_FEATURES
 
     if "modules/enterprise" in native.package_name():
         enterprise_compatible = select({
@@ -2001,6 +2014,7 @@ def _mongo_cc_binary_and_test(
         srcs = srcs + ["//src/mongo:mongo_config_header"]
         deps += MONGO_GLOBAL_SRC_DEPS
         deps += ["//src/mongo:_global_header_bypass"]
+        features = features + RE_ENABLE_DISABLED_3RD_PARTY_WARNINGS_FEATURES
 
     if "modules/enterprise" in native.package_name():
         enterprise_compatible = select({

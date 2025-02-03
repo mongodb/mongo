@@ -108,6 +108,7 @@ common --flag_alias=lsan=//bazel/config:lsan
 common --flag_alias=tsan=//bazel/config:tsan
 common --flag_alias=ubsan=//bazel/config:ubsan
 common --flag_alias=dbg_level=//bazel/config:dbg_level
+common --flag_alias=mongo_toolchain_version=//bazel/config:mongo_toolchain_version
 
 #############################################################################################################################
 # BUILD 'PROFILES' - this is the area to set up configurations of flags to be used by developers.

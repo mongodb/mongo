@@ -786,11 +786,51 @@ def _impl(ctx):
     # recognized by the new compilers.
     no_unknown_warning_option_feature = feature(
         name = "no_unknown_warning_option",
-        enabled = True,
+        enabled = ctx.attr.compiler == "clang",
         flag_sets = [
             flag_set(
                 actions = all_compile_actions,
                 flag_groups = [flag_group(flags = ["-Wno-unknown-warning-option"])],
+            ),
+        ],
+    )
+
+    disable_warnings_for_third_party_libraries_clang_feature = feature(
+        name = "disable_warnings_for_third_party_libraries_clang",
+        enabled = ctx.attr.compiler == "clang",
+        flag_sets = [
+            flag_set(
+                actions = all_compile_actions,
+                flag_groups = [flag_group(flags = [
+                    "-Wno-deprecated-declarations",
+                    "-Wno-deprecated-non-prototype",
+                    "-Wno-missing-template-arg-list-after-template-kw",
+                    "-Wno-deprecated-this-capture",
+                ])],
+            ),
+        ],
+    )
+
+    disable_warnings_for_third_party_libraries_gcc_feature = feature(
+        name = "disable_warnings_for_third_party_libraries_gcc",
+        enabled = ctx.attr.compiler == "gcc",
+        flag_sets = [
+            flag_set(
+                actions = all_cpp_compile_actions,
+                flag_groups = [flag_group(flags = [
+                    "-Wno-overloaded-virtual",
+                    "-Wno-dangling-reference",
+                    "-Wno-deprecated",
+                    "-Wno-deprecated-declarations",
+                    "-Wno-class-memaccess",
+                    "-Wno-uninitialized",
+                ])],
+            ),
+            flag_set(
+                actions = all_compile_actions,
+                flag_groups = [flag_group(flags = [
+                    "-Wno-attributes",
+                ])],
             ),
         ],
     )
@@ -843,6 +883,8 @@ def _impl(ctx):
         no_class_memaccess_warning_feature,
         no_interference_size_warning_feature,
         no_unknown_warning_option_feature,
+        disable_warnings_for_third_party_libraries_clang_feature,
+        disable_warnings_for_third_party_libraries_gcc_feature,
     ]
 
     return [
