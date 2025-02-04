@@ -55,7 +55,6 @@ using Full = RangeStatement::Full;
 using GenClass = DocumentSourceInternalDensify::DocGenerator;
 using DensifyFullNumericTest = AggregationContextFixture;
 using DensifyExplicitNumericTest = AggregationContextFixture;
-using DensifyMonthStepTest = AggregationContextFixture;
 using DensifyPartitionNumericTest = AggregationContextFixture;
 using DensifyCloneTest = AggregationContextFixture;
 using DensifyStepTest = AggregationContextFixture;
@@ -1772,41 +1771,6 @@ TEST_F(DensifyRedactionTest, RangeTimeUnitSerializationDebug) {
             }
         })"),
                                      SerializationOptions::kDebugQueryShapeSerializeOptions);
-}
-
-TEST_F(DensifyMonthStepTest, CorrectlyDensifiesForDateExplicitRangeStartingInsideMonthStep) {
-    // Starting at January 31, with a step of 9 Months, takes us initially to April 30th. This test
-    // ensures we don't generate January 30th which is outside of the range.
-    auto densify = DocumentSourceInternalDensify(
-        getExpCtx(),
-        "a",
-        std::list<FieldPath>(),
-        RangeStatement(Value(9),
-                       ExplicitBounds(makeDate("2019-01-31T21:53:45.323Z"),
-                                      makeDate("2020-06-02T10:40:15.842Z")),
-                       TimeUnit::month));
-
-    Document doc{{"a", makeDate("2019-10-01T00:00:00.000Z")}};
-    auto source = DocumentSourceMock::createForTest({doc}, getExpCtx());
-    densify.setSource(source.get());
-
-    auto next = densify.getNext();
-    ASSERT(next.isAdvanced());
-    ASSERT_EQUALS(makeDate("2019-01-31T21:53:45.323Z"), next.getDocument().getField("a").getDate());
-
-    next = densify.getNext();
-    ASSERT(next.isAdvanced());
-    ASSERT_EQUALS(makeDate("2019-10-01T00:00:00.000Z"), next.getDocument().getField("a").getDate());
-
-    next = densify.getNext();
-    ASSERT(next.isAdvanced());
-    ASSERT_EQUALS(makeDate("2019-10-31T21:53:45.323Z"), next.getDocument().getField("a").getDate());
-
-    next = densify.getNext();
-    ASSERT_FALSE(next.isAdvanced());
-
-    next = densify.getNext();
-    ASSERT_FALSE(next.isAdvanced());
 }
 }  // namespace
 }  // namespace mongo

@@ -558,19 +558,6 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::handleNeedGen(Docum
                                                                            Value& partitionKey) {
     auto nextValToGenerate = lastSeen.increment(_range);
 
-    // It is possible that when stepping by a unit of time, due to variance in the length of months
-    // or years, when we initially decrement by our step we could end up on a different day than
-    // expected (For example March 31 - 1 month would give us February 28). When we add the step
-    // back, this could mean our new date is outside of the range (for a range starting on March
-    // 31st, adding 1 month to February 28th would return March 28th, which is outside of the
-    // range). This will only ever happen at the start of the range. Therefore, it is safe to assume
-    // that if the value generated is below the range, the correct value is the start of the range.
-    // TODO SERVER-99860: This solution may need to be overwritten depending on conclusions from
-    // this ticket.
-    if (_rangeDensifyStart && nextValToGenerate < _rangeDensifyStart) {
-        nextValToGenerate = *_rangeDensifyStart;
-    }
-
     // If we don't need to create a generator (no intervening documents to generate before
     // outputting currentDoc), then don't create a generator. Altenatively if this document is above
     // where we need to generated documents, also don't create a generator.
