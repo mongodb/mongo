@@ -228,7 +228,7 @@ structs:
                 description: "If true, this command will be performed directly on the underlying 
                               storage of this collection."
                 type: optionalBool
-                stability: internal
+                stability: unstable
             $_originalQuery:
                 description: "The original write query. This is used for updateOne/deleteOne
                               without shard key during the write phase of the two phase protocol in
