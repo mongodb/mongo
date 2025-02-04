@@ -22,17 +22,17 @@ selector:
     - jstests/core/query/or_use_clustered_collection.js
     # Unique indexes.
     - jstests/core/uniqueness.js
-    - jstests/core/write/bulk/bulk_api_ordered.js
-    - jstests/core/write/bulk/bulk_api_unordered.js
+    - jstests/core/query/bulk/bulk_api_ordered.js
+    - jstests/core/query/bulk/bulk_api_unordered.js
     # Time-series is not compatible with viewOn.
     - jstests/core/query/collation/collation.js
     - jstests/core/query/disallow_system_views_user_writes.js
     - jstests/core/query/agg_hint.js
     - jstests/core/query/collection_uuid_find.js
-    - jstests/core/write/collection_uuid_write_commands.js
+    - jstests/core/query/parsing/collection_uuid_write_commands.js
     # Time-series is not allowed with an explicit validator.
     - jstests/core/list_namespaces_invalidation.js
-    - jstests/core/write/bulk/bulk_write.js
+    - jstests/core/query/bulk/bulk_write.js
     - jstests/core/write/bulk/bulk_write_non_transaction.js
     # Sparse indexes.
     - jstests/core/query/distinct/distinct_hint.js
@@ -51,17 +51,23 @@ selector:
     # Indexed measurement field contains an array value
     - jstests/core/query/project/projection_semantics.js
     - jstests/core/query/array/array_index_and_nonIndex_consistent.js
+    - jstests/core/query/update/update_multi7.js
+    - jstests/core/query/delete/remove_with_in.js
+    - jstests/core/query/delete/remove_with_idx.js
+    - jstests/core/query/update/update_positional_inc.js
+    - jstests/core/query/update/update_arraymatch5.js
+    - jstests/core/query/update/update_arraymatch7.js
     # findAndModify sort.
     - jstests/core/query/natural_validation.js
-    - jstests/core/write/crud_api.js
-    - jstests/core/write/find_and_modify/find_and_modify.js
-    - jstests/core/write/find_and_modify/find_and_modify3.js
-    - jstests/core/write/find_and_modify/find_and_modify_empty_update.js
-    - jstests/core/write/find_and_modify/find_and_modify_invalid_query_params.js
-    - jstests/core/write/find_and_modify/find_and_modify_server7660.js
+    - jstests/core/query/crud_api.js
+    - jstests/core/query/find_and_modify/find_and_modify.js
+    - jstests/core/query/find_and_modify/find_and_modify_positional.js
+    - jstests/core/query/find_and_modify/find_and_modify_empty_update.js
+    - jstests/core/query/find_and_modify/find_and_modify_invalid_query_params.js
+    - jstests/core/query/find_and_modify/find_and_modify_new_upsert_sort.js
     # updateOne sort.
-    - jstests/core/write/update/updateOne_sort.js
-    - jstests/core/write/update/updateOne_sort_sharded.js
+    - jstests/core/query/update/updateOne_sort.js
+    - jstests/core/query/update/updateOne_sort_sharded.js
     # Incompatible find command option.
     - jstests/core/query/min_max_hashed_index.js # min
     - jstests/core/query/expr/expr.js # divide
@@ -109,20 +115,20 @@ selector:
     - jstests/core/query/sort/sort_array.js
     - jstests/core/query/sort/sort_merge_collation.js
     - jstests/core/query/record_store_count.js
-    - jstests/core/write/delete/batched_multi_deletes_a.js
-    - jstests/core/write/delete/batched_multi_deletes_id.js
-    - jstests/core/write/bulk/bulk_write_profile.js
-    - jstests/core/write/delete/delete_hint.js
-    - jstests/core/write/find_and_modify/find_and_modify_hint.js
-    - jstests/core/write/find_and_modify/find_and_modify_pipeline_update.js
-    - jstests/core/write/update/update_hint.js
-    - jstests/core/write/update/update_pipeline_shell_helpers.js
+    - jstests/core/query/delete/batched_multi_deletes_a.js
+    - jstests/core/query/delete/batched_multi_deletes_id.js
+    - jstests/core/query/bulk/bulk_write_profile.js
+    - jstests/core/query/parsing/delete_hint.js
+    - jstests/core/query/find_and_modify/find_and_modify_hint.js
+    - jstests/core/query/find_and_modify/find_and_modify_pipeline_update.js
+    - jstests/core/query/update/update_hint.js
+    - jstests/core/query/update/update_pipeline_shell_helpers.js
     # Incompatible with the update option manipulation from the override.
-    - jstests/core/write/verify_update_mods.js
+    - jstests/core/query/update/verify_update_mods.js
     # Sort takes much more memory for the time-series version.
     - jstests/core/query/sort/sortg.js
     # Update operator results in document without a time field.
-    - jstests/core/write/collation_find_and_modify.js
+    - jstests/core/query/find_and_modify/collation_find_and_modify.js
     # The passthrough creates collections implicitly.
     - jstests/core/no_db_created.js
     - jstests/core/query/invalid_db_name.js
@@ -136,12 +142,12 @@ selector:
     - jstests/core/write/insert/batch_write_command_insert.js
     - jstests/core/write/insert/insert1.js
     - jstests/core/write/insert/insert_id_undefined.js
-    - jstests/core/write/update/update3.js
-    - jstests/core/write/update/update_find_and_modify_id.js
-    - jstests/core/write/update/update_setOnInsert.js
-    - jstests/core/write/update/upsert_fields.js
-    - jstests/core/write/update/upsert_fields_duplicate_or.js
-    - jstests/core/write/update/upsert_nor.js
+    - jstests/core/query/update/update_mod_dotted.js
+    - jstests/core/query/update/update_find_and_modify_id.js
+    - jstests/core/query/update/update_setOnInsert.js
+    - jstests/core/query/update/upsert_fields.js
+    - jstests/core/query/update/upsert_fields_duplicate_or.js
+    - jstests/core/query/update/upsert_nor.js
     - jstests/core/write/write_error_message_truncation.js
     - jstests/core/write/write_result.js
     # Time-series collections may generate different profiling entries from regular ones.
@@ -152,7 +158,7 @@ selector:
     - jstests/core/query/top/top_drop.js
     # Buckets collection creates compounded secondary indexes, which is not compatible with wildcard indexes.
     - jstests/core/compound_index_max_fields.js
-    - jstests/core/write/update/update_with_pipeline.js
+    - jstests/core/query/update/update_with_pipeline.js
     # Operations not allowed on views.
     - jstests/core/datasize2.js # locking
     - jstests/core/datasize_validation.js # locking
@@ -165,7 +171,7 @@ selector:
     - jstests/core/query/plan_cache/query_solution_hash.js # locking
     - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_collscan.js # locking
     - jstests/core/query/project/slice1.js # $slice
-    - jstests/core/write/find_and_modify/find_and_modify_server6865.js # $elemMatch
+    - jstests/core/query/find_and_modify/find_and_modify_positional_new_remove.js # $elemMatch
     # Time-series collections are views which don't support map-reduce
     - jstests/core/commands_namespace_parsing.js
     - jstests/core/query/map_reduce/constructors.js
@@ -215,8 +221,8 @@ selector:
     - jstests/core/query/or/or1.js
     - jstests/core/query/or/or2.js
     # Runs for too long for time-series collections.
-    - jstests/core/write/update/batch_write_command_update.js
-    - jstests/core/write/delete/batch_write_command_delete.js
+    - jstests/core/query/batch_write/batch_write_command_update.js
+    - jstests/core/query/batch_write/batch_write_command_delete.js
     # Multikey indexes and array measurement field.
     - jstests/core/query/match_numeric_components.js
     - jstests/core/query/array/array1.js
@@ -234,7 +240,7 @@ selector:
     - jstests/core/query/sort/sorta.js
     - jstests/core/query/type/null_undefined.js
     - jstests/core/query/type/type_array.js
-    - jstests/core/write/update/update_numeric_field_name.js
+    - jstests/core/query/update/update_numeric_field_name.js
     # Time-series collections have different indexes from regular collections.
     - jstests/core/query/array/arrayfind4.js
     - jstests/core/query/array/arrayfind9.js
@@ -242,13 +248,13 @@ selector:
     - jstests/core/query/count/count_hint.js
     - jstests/core/query/exists/exists9.js
     - jstests/core/query/sort/sort8.js
-    - jstests/core/write/update/collation_update.js
+    - jstests/core/query/update/collation_update.js
     # Document size too big in the bucket format.
     - jstests/core/query/max_doc_size.js
     - jstests/core/query/find/find_getmore_bsonsize.js
     - jstests/core/query/set/set7.js
     # Different error message due to the override.
-    - jstests/core/write/update/update_arrayFilters.js
+    - jstests/core/query/update/update_arrayFilters.js
     # TODO(SERVER-84158): Try to include this test(s).
     - jstests/core/depth_limit.js
     - jstests/core/query/mod/mod_with_where.js
@@ -261,7 +267,7 @@ selector:
     - jstests/core/query/where/**/*.js
     - jstests/core/query/system_js_access.js
     - jstests/core/query/system_js_drop.js
-    - jstests/core/write/find_and_modify/find_and_modify_where.js
+    - jstests/core/query/find_and_modify/find_and_modify_where.js
     # TODO(SERVER-85322): Try to include this test(s).
     - jstests/core/query/resume_query.js
     - jstests/core/query/resume_query_from_non_existent_record.js
@@ -281,11 +287,11 @@ selector:
     - jstests/core/query/cursor/getmore_invalidated_cursors.js
     # For inserts on time-series collections, mongod does _not_ replace empty timestamp values
     # with the current time.
-    - jstests/core/write/empty_ts.js
-    - jstests/core/write/empty_ts_bulk_write.js
-    - jstests/core/write/bypass_empty_ts_replacement.js
-    - jstests/core/write/bypass_empty_ts_replacement_bulk_write.js
-    - jstests/core/write/bypass_empty_ts_replacement_timeseries.js
+    - jstests/core/write/empty_ts/empty_ts.js
+    - jstests/core/write/empty_ts/empty_ts_bulk_write.js
+    - jstests/core/write/empty_ts/bypass_empty_ts_replacement.js
+    - jstests/core/write/empty_ts/bypass_empty_ts_replacement_bulk_write.js
+    - jstests/core/write/empty_ts/bypass_empty_ts_replacement_timeseries.js
     # Assumes collection options do not change
     - jstests/core/rename_system_buckets_collections.js
     # Change stream pre-/post-images are not available for time-series collections.

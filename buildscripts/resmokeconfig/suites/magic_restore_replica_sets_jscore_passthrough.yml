@@ -73,7 +73,7 @@ selector:
 
     # Fails upsert operations with duplicate key errors due to drops being no-oped.
     # The test performs these upserts in retryable writes that cause the test to timeout.
-    - jstests/core/write/update/upsert_fields.js
+    - jstests/core/query/update/upsert_fields.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

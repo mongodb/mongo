@@ -166,7 +166,7 @@ selector:
     - jstests/core/timeseries/write/timeseries_update_one.js
     # moveChunk can be blocked by multi updates causing these tests to not be able to transition to dedicated.
     - jstests/core/index/geo/geo_update_btree.js
-    - jstests/core/write/delete/removec.js
+    - jstests/core/query/delete/remove_adjacent_index_keys.js
     # Exclude tests that run cleanupOrphaned, which can fail running on a config shard if a
     # concurrent migration fails due to the config shard transitioning to dedicated.
     - jstests/core/administrative/cleanup_orphaned.js

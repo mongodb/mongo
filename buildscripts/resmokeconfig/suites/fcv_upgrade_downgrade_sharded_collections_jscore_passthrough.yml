@@ -87,10 +87,10 @@ selector:
     - jstests/aggregation/sources/unionWith/unionWith_invalid_usage.js
     - jstests/core/query/command_let_variables_expressions.js
     - jstests/core/index/hashed/hashed_index_with_arrays.js
-    - jstests/core/write/update/update5.js
-    - jstests/core/write/find_and_modify/find_and_modify_server6582.js
-    - jstests/core/write/update/update_with_pipeline.js
-    - jstests/core/write/update/updated.js
+    - jstests/core/query/update/update_multi5.js
+    - jstests/core/query/find_and_modify/find_and_modify_last_error_object.js
+    - jstests/core/query/update/update_with_pipeline.js
+    - jstests/core/query/update/update_nested_arr_idx.js
     - jstests/core/index/fts/fts_index3.js
     - jstests/core/index/geo/geo_update.js
     - jstests/core/index/index_stats.js
@@ -117,56 +117,57 @@ selector:
     - jstests/core/query/server1470.js
     - jstests/core/shell/shell_writeconcern.js
     - jstests/core/write/autoid.js
-    - jstests/core/write/batch_write_collation_estsize.js
-    - jstests/core/write/batch_write_command_w0.js
-    - jstests/core/write/bulk/bulk_api_ordered.js
-    - jstests/core/write/bulk/bulk_api_unordered.js
-    - jstests/core/write/crud_api.js
-    - jstests/core/write/delete/batch_write_command_delete.js
-    - jstests/core/write/delete/remove_justone.js
-    - jstests/core/write/find_and_modify/find_and_modify.js
-    - jstests/core/write/find_and_modify/find_and_modify2.js
-    - jstests/core/write/find_and_modify/find_and_modify3.js
-    - jstests/core/write/find_and_modify/find_and_modify4.js
-    - jstests/core/write/find_and_modify/find_and_modify_concurrent_update.js
-    - jstests/core/write/find_and_modify/find_and_modify_empty_coll.js
-    - jstests/core/write/find_and_modify/find_and_modify_empty_update.js
-    - jstests/core/write/find_and_modify/find_and_modify_server6254.js
-    - jstests/core/write/find_and_modify/find_and_modify_server6588.js
-    - jstests/core/write/find_and_modify/find_and_modify_server6659.js
-    - jstests/core/write/find_and_modify/find_and_modify_server6865.js
-    - jstests/core/write/find_and_modify/find_and_modify_server6909.js
-    - jstests/core/write/find_and_modify/find_and_modify_server6993.js
-    - jstests/core/write/find_and_modify/find_and_modify_server7660.js
-    - jstests/core/write/find_and_modify/find_and_modify_where.js
-    - jstests/core/write/update/batch_write_command_update.js
-    - jstests/core/write/update/update2.js
-    - jstests/core/write/update/update3.js
-    - jstests/core/write/update/update6.js
-    - jstests/core/write/update/update7.js
-    - jstests/core/write/update/update_addToSet.js
-    - jstests/core/write/update/update_arraymatch1.js
-    - jstests/core/write/update/update_arraymatch4.js
-    - jstests/core/write/update/update_arraymatch6.js
-    - jstests/core/write/update/update_arraymatch7.js
-    - jstests/core/write/update/update_arraymatch8.js
-    - jstests/core/write/update/update_bit_examples.js
-    - jstests/core/write/update/update_blank1.js
-    - jstests/core/write/update/update_currentdate_examples.js
-    - jstests/core/write/update/update_dbref.js
-    - jstests/core/write/update/update_mul_examples.js
-    - jstests/core/write/update/updatea.js
-    - jstests/core/write/update/updateb.js
-    - jstests/core/write/update/updatee.js
-    - jstests/core/write/update/updateg.js
-    - jstests/core/write/update/updateh.js
-    - jstests/core/write/update/updatei.js
-    - jstests/core/write/update/updatek.js
-    - jstests/core/write/update/updatem.js
-    - jstests/core/write/update/upsert_and.js
-    - jstests/core/write/update/upsert_fields.js
-    - jstests/core/write/update/upsert_fields_duplicate_or.js
-    - jstests/core/write/update/upsert_shell.js
+    - jstests/core/query/batch_write/batch_write_collation_estsize.js
+    - jstests/core/query/batch_write/batch_write_command_w0.js
+    - jstests/core/query/bulk/bulk_api_ordered.js
+    - jstests/core/query/bulk/bulk_api_unordered.js
+    - jstests/core/query/crud_api.js
+    - jstests/core/query/batch_write/batch_write_command_delete.js
+    - jstests/core/query/delete/remove_justone.js
+    - jstests/core/query/find_and_modify/find_and_modify.js
+    - jstests/core/query/find_and_modify/find_and_modify_fields.js
+    - jstests/core/query/find_and_modify/find_and_modify_positional.js
+    - jstests/core/query/find_and_modify/find_and_modify_upsert.js
+    - jstests/core/query/find_and_modify/find_and_modify_concurrent_update.js
+    - jstests/core/query/find_and_modify/find_and_modify_empty_coll.js
+    - jstests/core/query/find_and_modify/find_and_modify_empty_update.js
+    - jstests/core/query/find_and_modify/find_and_modify_new.js
+    - jstests/core/query/find_and_modify/find_and_modify_positional2.js
+    - jstests/core/query/find_and_modify/find_and_modify_upsert_non_existent.js
+    - jstests/core/query/find_and_modify/find_and_modify_positional_new_remove.js
+    - jstests/core/query/find_and_modify/find_and_modify_dotted_fields.js
+    - jstests/core/query/find_and_modify/find_and_modify_positional3.js
+    - jstests/core/query/find_and_modify/find_and_modify_new_upsert_sort.js
+    - jstests/core/query/find_and_modify/find_and_modify_where.js
+    - jstests/core/query/batch_write/batch_write_command_update.js
+    - jstests/core/query/update/update_index.js
+    - jstests/core/query/update/update_mod_dotted.js
+    - jstests/core/query/update/update_inc_create_embedded_field.js
+    - jstests/core/query/update/update_multi7.js
+    - jstests/core/query/update/update_addToSet.js
+    - jstests/core/query/update/update_arraymatch1.js
+    - jstests/core/query/update/update_positional_inc.js
+    - jstests/core/query/update/update_arraymatch6.js
+    - jstests/core/query/update/update_arraymatch7.js
+    - jstests/core/query/update/update_arraymatch8.js
+    - jstests/core/query/update/update_bit_examples.js
+    - jstests/core/query/update/update_blank1.js
+    - jstests/core/query/update/update_currentdate_examples.js
+    - jstests/core/query/update/update_dbref.js
+    - jstests/core/query/update/update_mul_examples.js
+    - jstests/core/query/update/update_set_unset.js
+    - jstests/core/query/update/update_upsert_add_filter.js
+    - jstests/core/query/update/update_set_large_numeric_field.js
+    - jstests/core/query/update/update_inc_implicit_subfield.js
+    - jstests/core/query/update/update_dollar_fields.js
+    - jstests/core/query/update/update_options_object.js
+    - jstests/core/query/update/update_numeric_eq_strings.js
+    - jstests/core/query/update/update_guarantee_id.js
+    - jstests/core/query/update/upsert_and.js
+    - jstests/core/query/update/upsert_fields.js
+    - jstests/core/query/update/upsert_fields_duplicate_or.js
+    - jstests/core/query/update/upsert_shell.js
+    - jstests/core/query/update/update_inc.js
     - jstests/core/write/write_result.js
 
     # Expected failure due to interfering collMod commands acquiring a lock that the test does not expect.
@@ -204,7 +205,7 @@ selector:
     - jstests/aggregation/sources/graphLookup/variables.js
     # TODO (SERVER-77935): Investigate timeout from fcv downgrade in jstests/core/query/push/push2.js.
     - jstests/core/query/push/push2.js
-    - jstests/core/write/update/update_addToSet2.js
+    - jstests/core/query/update/update_addToSet2.js
 
     # TODO SERVER-80490: The test below requires a precise lock count that can get modified by concurrent
     # setFCV operations. The exclusion can be removed once the linked ticket is fixed.

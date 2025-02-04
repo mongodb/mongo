@@ -84,8 +84,8 @@ selector:
     - jstests/core/views/views_stats.js
     - jstests/core/**/crud_api.js
     - jstests/core/**/find_and_modify.js
-    - jstests/core/**/find_and_modify2.js
-    - jstests/core/**/find_and_modify_server6865.js
+    - jstests/core/**/find_and_modify_fields.js
+    - jstests/core/**/find_and_modify_positional_new_remove.js
     - jstests/core/**/project_with_collation.js
     - jstests/core/**/currentop.js
     - jstests/core/**/fsync.js

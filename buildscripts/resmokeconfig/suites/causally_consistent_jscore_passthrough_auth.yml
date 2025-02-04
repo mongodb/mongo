@@ -70,7 +70,7 @@ selector:
 
     # These tests expect writes to system.profile to fail with ErrorCodes.InvalidNamespace, but with
     # auth enabled the commands instead fail with ErrorCodes.Unauthorized.
-    - jstests/core/write/bulk/bulk_write_non_auth.js
+    - jstests/core/query/bulk/bulk_write_non_auth.js
 
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos

@@ -39,8 +39,8 @@ selector:
 
     # The tests below are disabled because of embedded router role and replica set endpoint.
     # TODO (SERVER-87512): Support role-aware serverStatus on mongod with router role.
-    - jstests/core/write/find_and_modify/find_and_modify_metrics.js
-    - jstests/core/write/update/update_metrics.js
+    - jstests/core/query/find_and_modify/find_and_modify_metrics.js
+    - jstests/core/query/update/update_metrics.js
     # This test runs {find: uuid} commands which are not supported for replica set endpoints.
     - jstests/core/commands_with_uuid.js
     # TODO (SERVER-80416): cloneCollectionAsCapped command stops working after a replica set

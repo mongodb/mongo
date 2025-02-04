@@ -99,7 +99,7 @@ selector:
     - jstests/core/timeseries/write/timeseries_simple.js
     - jstests/core/timeseries/write/timeseries_update.js
     - jstests/core/timeseries/write/timeseries_update_arbitrary_updates_not_enabled.js
-    - jstests/core/write/bypass_empty_ts_replacement_timeseries.js
+    - jstests/core/write/empty_ts/bypass_empty_ts_replacement_timeseries.js
     - jstests/core/query/queryable_encryption/**/*.js
     - src/mongo/db/modules/enterprise/jstests/fle2/**/*.js
     - jstests/core/index/wildcard/*.js

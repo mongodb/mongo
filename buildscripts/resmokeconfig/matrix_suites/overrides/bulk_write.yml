@@ -22,12 +22,12 @@
       # Runs an update with illegal format (no 'updates'). We could work around this in the override
       # but it is very annoying.
       - jstests/core/write/insert/batch_write_command_insert.js
-      - jstests/core/write/update/batch_write_command_update.js
-      - jstests/core/write/delete/batch_write_command_delete.js
+      - jstests/core/query/batch_write/batch_write_command_update.js
+      - jstests/core/query/batch_write/batch_write_command_delete.js
       # Requires specific commands to be run to trigger failpoint (i.e. requires insert, we run bulkWrite).
       - jstests/core/failcommand_failpoint.js
       # This test adds unknown fields to insert/update/delete ops which we ignore
-      - jstests/core/write/write_commands_reject_unknown_fields.js
+      - jstests/core/query/parsing/write_commands_reject_unknown_fields.js
       # Expects explain to fail for using UUID instead of collection name.
       - jstests/core/query/explain/explain_uuid.js
       # Checks for specific name in the command that was executed that we override.

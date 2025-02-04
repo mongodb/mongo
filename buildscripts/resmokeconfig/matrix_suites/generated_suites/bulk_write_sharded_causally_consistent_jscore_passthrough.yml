@@ -80,10 +80,10 @@ selector:
     - jstests/core/query/comment_field.js
     - jstests/core/fsync.js
     - jstests/core/write/insert/batch_write_command_insert.js
-    - jstests/core/write/update/batch_write_command_update.js
-    - jstests/core/write/delete/batch_write_command_delete.js
+    - jstests/core/query/batch_write/batch_write_command_update.js
+    - jstests/core/query/batch_write/batch_write_command_delete.js
     - jstests/core/failcommand_failpoint.js
-    - jstests/core/write/write_commands_reject_unknown_fields.js
+    - jstests/core/query/parsing/write_commands_reject_unknown_fields.js
     - jstests/core/query/explain/explain_uuid.js
     - jstests/core/query/explain/explain_includes_command.js
     - jstests/core/txns/transactions_profiling.js

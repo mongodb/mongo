@@ -160,8 +160,8 @@ selector:
     - jstests/core/**/update_arrayFilters.js
     - jstests/core/**/update_find_and_modify_id.js
     - jstests/core/**/update_modifier_pop.js
-    - jstests/core/**/updateh.js
-    - jstests/core/**/updatej.js
+    - jstests/core/**/update_dollar_fields.js
+    - jstests/core/**/update_fail_halts_modifications.js
     - jstests/core/**/type8.js
     - jstests/core/**/agg_hint.js
     - jstests/core/**/and.js
@@ -188,13 +188,13 @@ selector:
     - jstests/core/**/push_sort.js
     - jstests/core/**/update_arrayFilters.js
     - jstests/core/**/update_dbref.js
-    - jstests/core/**/updatel.js
+    - jstests/core/**/update_positional_no_array_elem.js
     - jstests/core/**/write_result.js
     - jstests/core/**/query/project/positional_projection.js
     - jstests/core/**/dbref1.js
     - jstests/core/**/dbref2.js
     - jstests/core/**/ref3.js
-    - jstests/core/**/update3.js
+    - jstests/core/**/update_mod_dotted.js
     - jstests/core/**/query/exhaust.js
     - jstests/core/**/awaitdata_getmore_cmd.js
     - jstests/core/**/getmore_cmd_maxtimems.js
@@ -228,15 +228,15 @@ selector:
     - jstests/core/**/geo_update_btree.js
     - jstests/core/**/loadserverscripts.js
     - jstests/core/**/mr_killop.js
-    - jstests/core/**/removeb.js
-    - jstests/core/**/removec.js
+    - jstests/core/**/remove_concurrent_inserts.js
+    - jstests/core/**/remove_adjacent_index_keys.js
     - jstests/core/**/shellstartparallel.js
-    - jstests/core/**/updatef.js
+    - jstests/core/**/update_namespace_details.js
     - jstests/core/**/bench_test1.js
     - jstests/core/**/benchrun_pipeline_updates.js
     - jstests/core/**/cursora.js
     - jstests/core/**/query/SERVER-23626.js
-    - jstests/core/**/find_and_modify_server7660.js
+    - jstests/core/**/find_and_modify_new_upsert_sort.js
     - jstests/core/**/upsert_shell.js
     - jstests/core/**/mixed_version_replica_set.js
   exclude_with_any_tags:

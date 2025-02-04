@@ -17,12 +17,12 @@ selector:
     # Runs an update with illegal format (no 'updates'). We could work around this in the override
     # but it is very annoying.
     - jstests/core/write/insert/batch_write_command_insert.js
-    - jstests/core/write/update/batch_write_command_update.js
-    - jstests/core/write/delete/batch_write_command_delete.js
+    - jstests/core/query/batch_write/batch_write_command_update.js
+    - jstests/core/query/batch_write/batch_write_command_delete.js
     # Requires specific commands to be run to trigger failpoint (i.e. requires insert, we run bulkWrite).
     - jstests/core/failcommand_failpoint.js
     # This test adds unknown fields to insert/update/delete ops which we ignore
-    - jstests/core/write/write_commands_reject_unknown_fields.js
+    - jstests/core/query/parsing/write_commands_reject_unknown_fields.js
     # Checks for op names which bulkWrite will not show up as
     - jstests/core/txns/transactions_profiling.js
     - jstests/core/txns/currentop_blocked_operations.js
@@ -38,15 +38,15 @@ selector:
     - jstests/core/txns/**/*.js
 
     # Uses a timestamp in query which causes mismatch between clusters
-    - jstests/core/write/update/update_currentdate_examples.js
-    - jstests/core/write/update/update_affects_indexes.js
+    - jstests/core/query/update/update_currentdate_examples.js
+    - jstests/core/query/update/update_affects_indexes.js
     - jstests/core/index/index_arr2.js
     - jstests/core/index/index_stats.js
     - jstests/core/ts1.js
     - jstests/core/query/compare_timestamps.js
     - jstests/core/query/command_let_variables.js
-    - jstests/core/write/update/update_min_max_examples.js
-    - jstests/core/write/update/update_arrayFilters.js
+    - jstests/core/query/update/update_min_max_examples.js
+    - jstests/core/query/update/update_arrayFilters.js
     - jstests/core/index/wildcard/wildcard_index_type.js
     - jstests/core/txns/no_writes_to_config_transactions_with_prepared_transaction.js
     - jstests/core/query/type/type3.js
@@ -55,11 +55,11 @@ selector:
     - jstests/core/txns/timeseries/timeseries_reads_in_txns.js
     - jstests/core/txns/timeseries_insert_in_txn.js
     - jstests/core/txns/txn_ops_allowed_on_buckets_coll.js
-    - jstests/core/write/empty_ts.js
-    - jstests/core/write/empty_ts_bulk_write.js
-    - jstests/core/write/bypass_empty_ts_replacement.js
-    - jstests/core/write/bypass_empty_ts_replacement_bulk_write.js
-    - jstests/core/write/bypass_empty_ts_replacement_timeseries.js
+    - jstests/core/write/empty_ts/empty_ts.js
+    - jstests/core/write/empty_ts/empty_ts_bulk_write.js
+    - jstests/core/write/empty_ts/bypass_empty_ts_replacement.js
+    - jstests/core/write/empty_ts/bypass_empty_ts_replacement_bulk_write.js
+    - jstests/core/write/empty_ts/bypass_empty_ts_replacement_timeseries.js
 
     # Multiple cluster override does not support QE
     - jstests/core/query/queryable_encryption/*.js
@@ -73,11 +73,11 @@ selector:
     - jstests/core/txns/commit_and_abort_large_prepared_transactions.js
 
     # Uses mongod generated UUID which is different between the clusters
-    - jstests/core/write/collection_uuid_write_commands.js
+    - jstests/core/query/parsing/collection_uuid_write_commands.js
 
     # update with $ modifiers can sometimes change field ordering
-    - jstests/core/write/update/update5.js
-    - jstests/core/write/update/upsert_and.js
+    - jstests/core/query/update/update_multi5.js
+    - jstests/core/query/update/upsert_and.js
     - jstests/core/query/server1470.js
     - jstests/core/query/rename/rename_operator_missing_source.js
 
@@ -106,7 +106,7 @@ selector:
     # the deep copy we use does not deep copy arrays of objects which can be modified after we save them
     - jstests/core/index/wildcard/wildcard_index_multikey.js
     - jstests/core/index/wildcard/wildcard_index_basic_index_bounds.js
-    - jstests/core/write/update/updatea.js
+    - jstests/core/query/update/update_set_unset.js
 
     # batching can cause planCache to be different than expectations
     - jstests/core/query/sbe/sbe_plan_cache_duplicate_or_clauses.js
@@ -115,7 +115,7 @@ selector:
     - jstests/core/query/plan_cache/plan_cache_sbe.js
 
     # bulkWrite and delete use different parsing for the multi field
-    - jstests/core/write/batch_write_command_w0.js
+    - jstests/core/query/batch_write/batch_write_command_w0.js
 
     # Checks for specific sessions to exist
     - jstests/core/administrative/list_sessions.js
@@ -125,7 +125,7 @@ selector:
 
     # Incompatible with enable_sessions.js
     - jstests/core/txns/shell_prompt_in_transaction.js
-    - jstests/core/write/crud_api.js
+    - jstests/core/query/crud_api.js
 
     # Uses multiple sessions which the override is incapable of doing.
     - jstests/core/txns/multi_statement_transaction_abort.js

@@ -96,8 +96,8 @@ selector:
     - jstests/core/**/update_arrayFilters.js
     - jstests/core/**/update_find_and_modify_id.js
     - jstests/core/**/update_modifier_pop.js
-    - jstests/core/**/updateh.js
-    - jstests/core/**/updatej.js
+    - jstests/core/**/update_dollar_fields.js
+    - jstests/core/**/update_fail_halts_modifications.js
     - jstests/core/views/views_drop.js
     - jstests/core/**/agg_hint.js
     - jstests/core/**/and.js
@@ -128,14 +128,14 @@ selector:
     - jstests/core/**/push_sort.js
     - jstests/core/**/update_arrayFilters.js
     - jstests/core/**/update_dbref.js
-    - jstests/core/**/updatel.js
+    - jstests/core/**/update_positional_no_array_elem.js
     - jstests/core/**/write_result.js
     - jstests/core/**/query/project/positional_projection.js
     - jstests/core/**/invalid_db_name.js
     - jstests/core/**/dbref1.js
     - jstests/core/**/dbref2.js
     - jstests/core/**/ref3.js
-    - jstests/core/**/update3.js
+    - jstests/core/**/update_mod_dotted.js
     - jstests/core/views/invalid_system_views.js
     - jstests/core/**/query/exhaust.js
     - jstests/core/**/awaitdata_getmore_cmd.js
@@ -173,10 +173,10 @@ selector:
     - jstests/core/**/geo_update_btree.js
     - jstests/core/**/loadserverscripts.js
     - jstests/core/**/mr_killop.js
-    - jstests/core/**/removeb.js
-    - jstests/core/**/removec.js
+    - jstests/core/**/remove_concurrent_inserts.js
+    - jstests/core/**/remove_adjacent_index_keys.js
     - jstests/core/**/shellstartparallel.js
-    - jstests/core/**/updatef.js
+    - jstests/core/**/update_namespace_details.js
     - jstests/core/**/bench_test1.js
     - jstests/core/**/benchrun_pipeline_updates.js
     - jstests/core/**/cursora.js
@@ -187,10 +187,10 @@ selector:
     - jstests/core/query/comment_field.js
     - jstests/core/fsync.js
     - jstests/core/write/insert/batch_write_command_insert.js
-    - jstests/core/write/update/batch_write_command_update.js
-    - jstests/core/write/delete/batch_write_command_delete.js
+    - jstests/core/query/batch_write/batch_write_command_update.js
+    - jstests/core/query/batch_write/batch_write_command_delete.js
     - jstests/core/failcommand_failpoint.js
-    - jstests/core/write/write_commands_reject_unknown_fields.js
+    - jstests/core/query/parsing/write_commands_reject_unknown_fields.js
     - jstests/core/query/explain/explain_uuid.js
     - jstests/core/query/explain/explain_includes_command.js
     - jstests/libs/txns/txn_passthrough_runner_selftest.js

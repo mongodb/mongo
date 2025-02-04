@@ -59,8 +59,8 @@ selector:
 
     # Embedded router doesn't support correct UpdateMetrics yet.
     # TODO SERVER-82303 Remove this once we have role-aware metrics.
-    - jstests/core/write/update/update_metrics.js
-    - jstests/core/write/find_and_modify/find_and_modify_metrics.js
+    - jstests/core/query/update/update_metrics.js
+    - jstests/core/query/find_and_modify/find_and_modify_metrics.js
     # Embedded router doesn't support getClusterParameter on router yet.
     - src/mongo/db/modules/enterprise/jstests/audit/cluster_server_parameters.js
     - src/mongo/db/modules/enterprise/jstests/audit/audit_config_upgrade_downgrade.js

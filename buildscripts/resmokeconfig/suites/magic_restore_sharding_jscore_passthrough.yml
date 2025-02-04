@@ -69,7 +69,7 @@ selector:
 
     # Fails upsert operations with duplicate key errors due to drops being no-oped.
     # The test performs these upserts in retryable writes that cause the test to timeout.
-    - jstests/core/write/update/upsert_fields.js
+    - jstests/core/query/update/upsert_fields.js
 
     # Spawns threads for test logic, but after test fails quietly due to assertion
     # no-op override, threads remain unjoined. Causes mongo shell to throw an exception

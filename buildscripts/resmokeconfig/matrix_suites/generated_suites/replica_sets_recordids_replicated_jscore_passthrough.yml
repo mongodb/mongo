@@ -57,17 +57,17 @@ selector:
     - jstests/core/write/bulk/bulk_write_timeseries_basic.js
     - jstests/core/ddl/convert_to_capped.js
     - jstests/core/rename_system_buckets_collections.js
-    - jstests/core/write/bypass_empty_ts_replacement_timeseries.js
+    - jstests/core/write/empty_ts/bypass_empty_ts_replacement_timeseries.js
     - jstests/core/version_api_v1_command_coverage.js
     - jstests/core/query/api/*.js
     - jstests/core/query/distinct/*.js
     - jstests/core/query/cursor/cursora.js
-    - jstests/core/write/delete/removeb.js
-    - jstests/core/write/delete/removec.js
+    - jstests/core/query/delete/remove_concurrent_inserts.js
+    - jstests/core/query/delete/remove_adjacent_index_keys.js
     - jstests/core/index/geo/geo_update_btree.js
-    - jstests/core/write/find_and_modify/find_and_modify_concurrent_update.js
+    - jstests/core/query/find_and_modify/find_and_modify_concurrent_update.js
     - jstests/core/administrative/compact_keeps_indexes.js
-    - jstests/core/write/update/updatef.js
+    - jstests/core/query/update/update_namespace_details.js
     - jstests/core/loadserverscripts.js
     - jstests/core/shell/shellstartparallel.js
     - jstests/core/txns/*.js

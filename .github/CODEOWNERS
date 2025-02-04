@@ -423,12 +423,27 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/core/query/OWNERS.yml
 /jstests/core/query/**/* @10gen/query @svc-auto-approve-bot
 /jstests/core/query/**/boolean_expression_simplification.js @10gen/query-optimization-heuristic-rewrite @svc-auto-approve-bot
+/jstests/core/query/**/noop_writes.js @10gen/query-execution-write-exec @svc-auto-approve-bot
+/jstests/core/query/**/write_change_stream_pit_preimage.js @10gen/query-execution-change-streams @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/query/api/OWNERS.yml
 /jstests/core/query/api/**/* @10gen/query-optimization-parsers @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/core/query/batch_write/OWNERS.yml
+/jstests/core/query/batch_write/**/* @10gen/query-execution-write-exec @svc-auto-approve-bot
+/jstests/core/query/batch_write/**/OWNERS.yml @10gen/query-execution-staff-leads @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/core/query/bulk/OWNERS.yml
+/jstests/core/query/bulk/**/* @10gen/query-execution-write-exec @svc-auto-approve-bot
+/jstests/core/query/bulk/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-integration-staff-leads @svc-auto-approve-bot
+/jstests/core/query/bulk/**/bulk_write_profile.js @10gen/query-integration-observability @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/core/query/collation/OWNERS.yml
 /jstests/core/query/collation/**/* @10gen/query-execution-collation @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/core/query/delete/OWNERS.yml
+/jstests/core/query/delete/**/* @10gen/query-execution-write-exec @svc-auto-approve-bot
+/jstests/core/query/delete/**/OWNERS.yml @10gen/query-execution-staff-leads @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/query/doc_validation/OWNERS.yml
 /jstests/core/query/doc_validation/**/* @10gen/query-execution-doc-validation @svc-auto-approve-bot
@@ -436,11 +451,20 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/core/query/explain/OWNERS.yml
 /jstests/core/query/explain/**/* @10gen/query-optimization-explain @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/core/query/find_and_modify/OWNERS.yml
+/jstests/core/query/find_and_modify/**/* @10gen/query-execution-write-exec @svc-auto-approve-bot
+/jstests/core/query/find_and_modify/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-integration-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+/jstests/core/query/find_and_modify/**/find_and_modify_invalid_query_params.js @10gen/query-optimization-parsers @svc-auto-approve-bot
+/jstests/core/query/find_and_modify/**/find_and_modify_metrics.js @10gen/query-integration-observability @svc-auto-approve-bot
+/jstests/core/query/find_and_modify/**/find_and_modify_pipeline_update.js @10gen/query-optimization-parsers @svc-auto-approve-bot
+/jstests/core/query/find_and_modify/**/find_and_modify_where.js @10gen/query-integration-javascript @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/core/query/geo/OWNERS.yml
 /jstests/core/query/geo/**/* @10gen/query-integration-geo @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/query/inc/OWNERS.yml
 /jstests/core/query/inc/**/* @10gen/query-execution-write-exec @svc-auto-approve-bot
+/jstests/core/query/inc/**/OWNERS.yml @10gen/query-execution-staff-leads @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/query/js/OWNERS.yml
 /jstests/core/query/js/**/* @10gen/query-integration-javascript @svc-auto-approve-bot
@@ -450,6 +474,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/query/map_reduce/OWNERS.yml
 /jstests/core/query/map_reduce/**/* @10gen/query-integration-staff-leads @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/core/query/parsing/OWNERS.yml
+/jstests/core/query/parsing/**/* @10gen/query-optimization-parsers @svc-auto-approve-bot
+/jstests/core/query/parsing/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/query/plan_cache/OWNERS.yml
 /jstests/core/query/plan_cache/**/* @10gen/query-optimization-plan-cache @svc-auto-approve-bot
@@ -481,6 +509,13 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/query/unset/OWNERS.yml
 /jstests/core/query/unset/**/* @10gen/query-execution-write-exec @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/core/query/update/OWNERS.yml
+/jstests/core/query/update/**/* @10gen/query-execution-write-exec @svc-auto-approve-bot
+/jstests/core/query/update/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-integration-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+/jstests/core/query/update/**/update_hint.js @10gen/query-optimization-parsers @svc-auto-approve-bot
+/jstests/core/query/update/**/update_metrics.js @10gen/query-integration-observability @svc-auto-approve-bot
+/jstests/core/query/update/**/update_arrayFilters.js @10gen/query-optimization-parsers @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/query/where/OWNERS.yml
 /jstests/core/query/where/**/* @10gen/query-integration-staff-leads @svc-auto-approve-bot
@@ -522,19 +557,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/core/views/**/* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/write/OWNERS.yml
-/jstests/core/write/**/* @10gen/query-execution-write-exec @svc-auto-approve-bot
-/jstests/core/write/**/*empty_ts*.js @10gen/server-collection-write-path @svc-auto-approve-bot
-/jstests/core/write/**/autoid.js @10gen/server-collection-write-path @svc-auto-approve-bot
-/jstests/core/write/**/validate_user_documents.js @10gen/server-collection-write-path @svc-auto-approve-bot
-/jstests/core/write/**/write_error_message_truncation.js @10gen/server-collection-write-path @svc-auto-approve-bot
-/jstests/core/write/**/write_result.js @10gen/server-collection-write-path @svc-auto-approve-bot
-
-# The following patterns are parsed from ./jstests/core/write/bulk/OWNERS.yml
-/jstests/core/write/bulk/**/bulk_insert*.js @10gen/server-collection-write-path @svc-auto-approve-bot
-/jstests/core/write/bulk/**/bulk_write_timeseries*.js @10gen/server-collection-write-path @svc-auto-approve-bot
-
-# The following patterns are parsed from ./jstests/core/write/insert/OWNERS.yml
-/jstests/core/write/insert/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
+/jstests/core/write/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core_sharding/balancer/OWNERS.yml
 /jstests/core_sharding/balancer/**/* @10gen/server-catalog-and-routing @10gen/server-cluster-scalability @svc-auto-approve-bot
