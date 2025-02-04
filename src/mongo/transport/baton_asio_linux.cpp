@@ -246,7 +246,7 @@ bool TransportLayerASIO::BatonASIO::cancelSession(Session& session) noexcept {
     if (_sessions.find(id) == _sessions.end())
         return false;
 
-    _safeExecute(std::move(lk), [this, id](stdx::unique_lock<Mutex> lk) {
+    _safeExecuteNoThrow(std::move(lk), [this, id](stdx::unique_lock<Mutex> lk) {
         auto iter = _sessions.find(id);
         if (iter == _sessions.end())
             return;
@@ -268,7 +268,7 @@ bool TransportLayerASIO::BatonASIO::cancelTimer(const ReactorTimer& timer) noexc
     if (_timersById.find(id) == _timersById.end())
         return false;
 
-    _safeExecute(std::move(lk), [this, id](stdx::unique_lock<Mutex> lk) {
+    _safeExecuteNoThrow(std::move(lk), [this, id](stdx::unique_lock<Mutex> lk) {
         auto iter = _timersById.find(id);
         if (iter == _timersById.end())
             return;
@@ -302,6 +302,13 @@ void TransportLayerASIO::BatonASIO::_safeExecute(stdx::unique_lock<Mutex> lk,
     } else {
         job(std::move(lk));
     }
+}
+
+void TransportLayerASIO::BatonASIO::_safeExecuteNoThrow(
+    stdx::unique_lock<Mutex> lk, TransportLayerASIO::BatonASIO::Job job) noexcept try {
+    _safeExecute(std::move(lk), std::move(job));
+} catch (...) {
+    invariant(exceptionToStatus());
 }
 
 std::list<Promise<void>> TransportLayerASIO::BatonASIO::_poll(stdx::unique_lock<Mutex>& lk,
@@ -396,23 +403,20 @@ Future<void> TransportLayerASIO::BatonASIO::_addSession(Session& session, short 
 }
 
 void TransportLayerASIO::BatonASIO::detachImpl() noexcept {
-    decltype(_scheduled) scheduled;
-    decltype(_sessions) sessions;
-    decltype(_timers) timers;
 
-    {
-        stdx::lock_guard lk(_mutex);
+    stdx::unique_lock lk(_mutex);
 
-        invariant(_opCtx->getBaton().get() == this);
-        _opCtx->setBaton(nullptr);
+    invariant(_opCtx->getBaton().get() == this);
+    _opCtx->setBaton(nullptr);
 
-        _opCtx = nullptr;
+    _opCtx = nullptr;
 
-        using std::swap;
-        swap(_scheduled, scheduled);
-        swap(_sessions, sessions);
-        swap(_timers, timers);
-    }
+    auto scheduled = std::exchange(_scheduled, {});
+    auto sessions = std::exchange(_sessions, {});
+    auto timers = std::exchange(_timers, {});
+    auto timersById = std::exchange(_timersById, {});
+
+    lk.unlock();
 
     for (auto& job : scheduled) {
         job(stdx::unique_lock(_mutex));
