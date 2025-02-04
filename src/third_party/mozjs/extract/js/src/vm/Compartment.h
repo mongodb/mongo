@@ -417,7 +417,7 @@ class JS::Compartment {
    * dangling (full GCs naturally follow pointers across compartments) and
    * when compacting to update cross-compartment pointers.
    */
-  enum EdgeSelector { AllEdges, NonGrayEdges, GrayEdges };
+  enum EdgeSelector { AllEdges, NonGrayEdges, GrayEdges, BlackEdges };
   void traceWrapperTargetsInCollectedZones(JSTracer* trc,
                                            EdgeSelector whichEdges);
   static void traceIncomingCrossCompartmentEdgesForZoneGC(

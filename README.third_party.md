@@ -39,7 +39,7 @@ a notice will be included in
 | [librdkafka]               | BSD-2-Clause      | 2.0.2             |                      |                                 |
 | [linenoise]                | BSD-3-Clause      | 6cdc775 + changes |                      |                ✗                |
 | [mongo-c-driver]           | Apache-2.0        | 1.27.6            |          ✗           |                ✗                |
-| [MozJS]                    | MPL-2.0           | ESR 115.7         |                      |                ✗                |
+| [Mozilla Firefox]          | MPL-2.0           | 115.19.0esr       |       unknown        |                ✗                |
 | [MurmurHash3]              | Public Domain     | Unknown + changes |          ✗           |                ✗                |
 | [ocspbuilder]              | MIT               | 0.10.2            |                      |                                 |
 | [ocspresponder]            | Apache-2.0        | 0.5.0             |                      |                                 |
@@ -77,7 +77,7 @@ a notice will be included in
 [libstemmer]: https://github.com/snowballstem/snowball
 [librdkafka]: https://github.com/confluentinc/librdkafka
 [linenoise]: https://github.com/antirez/linenoise
-[MozJS]: https://www.mozilla.org/en-US/security/known-vulnerabilities/firefox-esr
+[Mozilla Firefox]: https://www.mozilla.org/en-US/security/known-vulnerabilities/firefox-esr
 [MurmurHash3]: https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp
 [ocspbuilder]: https://github.com/wbond/ocspbuilder
 [ocspresponder]: https://github.com/threema-ch/ocspresponder

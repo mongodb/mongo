@@ -364,6 +364,11 @@ extern void GenerateDirectCallFromJit(jit::MacroAssembler& masm,
                                       jit::Register scratch,
                                       uint32_t* callOffset);
 
+extern void GenerateJumpToCatchHandler(jit::MacroAssembler& masm,
+                                       jit::Register rfe,
+                                       jit::Register scratch1,
+                                       jit::Register scratch2);
+
 }  // namespace wasm
 }  // namespace js
 

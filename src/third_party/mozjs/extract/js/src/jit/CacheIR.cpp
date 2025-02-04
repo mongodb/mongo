@@ -498,8 +498,13 @@ enum class NativeGetPropKind {
 
 static NativeGetPropKind IsCacheableGetPropCall(NativeObject* obj,
                                                 NativeObject* holder,
-                                                PropertyInfo prop) {
+                                                PropertyInfo prop,
+                                                jsbytecode* pc = nullptr) {
   MOZ_ASSERT(IsCacheableProtoChain(obj, holder));
+
+  if (pc && JSOp(*pc) == JSOp::GetBoundName) {
+    return NativeGetPropKind::None;
+  }
 
   if (!prop.isAccessorProperty()) {
     return NativeGetPropKind::None;
@@ -593,7 +598,7 @@ static NativeGetPropKind CanAttachNativeGetProp(JSContext* cx, JSObject* obj,
       return NativeGetPropKind::Slot;
     }
 
-    return IsCacheableGetPropCall(nobj, *holder, propInfo->ref());
+    return IsCacheableGetPropCall(nobj, *holder, propInfo->ref(), pc);
   }
 
   if (!prop.isFound()) {
@@ -3130,7 +3135,7 @@ AttachDecision GetNameIRGenerator::tryAttachGlobalNameGetter(ObjOperandId objId,
 
   GlobalObject* global = &globalLexical->global();
 
-  NativeGetPropKind kind = IsCacheableGetPropCall(global, holder, *prop);
+  NativeGetPropKind kind = IsCacheableGetPropCall(global, holder, *prop, pc_);
   if (kind != NativeGetPropKind::NativeGetter &&
       kind != NativeGetPropKind::ScriptedGetter) {
     return AttachDecision::NoAction;

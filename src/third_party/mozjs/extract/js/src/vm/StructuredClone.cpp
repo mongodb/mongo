@@ -2489,7 +2489,7 @@ BigInt* JSStructuredCloneReader::readBigInt(uint32_t data) {
   if (!in.readArray(result->digits().data(), length)) {
     return nullptr;
   }
-  return result;
+  return JS::BigInt::destructivelyTrimHighZeroDigits(context(), result);
 }
 
 static uint32_t TagToV1ArrayType(uint32_t tag) {
