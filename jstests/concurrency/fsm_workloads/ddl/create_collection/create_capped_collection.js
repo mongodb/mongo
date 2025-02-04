@@ -17,7 +17,7 @@ export const $config = (function() {
 
         // Set 'field' as a string with enough characters
         // to make the whole document 'size' bytes long
-        doc.field = new Array(targetSize - size + 1).join('x');
+        doc.field = 'x'.repeat(targetSize - size);
         assert.eq(targetSize, Object.bsonsize(doc));
 
         return doc;

@@ -45,7 +45,7 @@ assert.commandFailed(
     configDB.adminCommand({split: 'test.user', bounds: [{x: MinKey}, {x: MaxKey}]}));
 
 // Insert documents large enough to fill up a chunk
-var kiloDoc = new Array(1024).join('x');
+var kiloDoc = 'x'.repeat(1023);
 var testDB = st.s.getDB('test');
 var bulk = testDB.user.initializeUnorderedBulkOp();
 for (var x = -1200; x < 1200; x++) {

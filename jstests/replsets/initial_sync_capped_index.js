@@ -69,7 +69,7 @@ assert.commandWorked(
 jsTestLog("Overflowing the capped collection.");
 
 var docSize = cappedCollSize / 8;
-var largeDoc = {a: new Array(docSize).join("*")};
+var largeDoc = {a: "*".repeat(docSize)};
 overflowCappedColl(primaryCappedColl, largeDoc);
 
 // Check that there are more than two documents in the collection. This will ensure the

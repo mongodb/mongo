@@ -321,7 +321,7 @@ assertErrorCode(local, pipeline, [16608, ErrorCodes.BadValue], "division by zero
 // $graphLookup can only consume at most 100MB of memory without spilling.
 foreign.drop();
 
-const string7MB = new Array(7 * 1024 * 1024).join(' ');
+const string7MB = ' '.repeat(7 * 1024 * 1024);
 const string14MB = string7MB + string7MB;
 
 // Here, the visited set exceeds 100MB.

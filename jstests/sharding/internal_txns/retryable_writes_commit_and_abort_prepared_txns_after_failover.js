@@ -61,7 +61,7 @@ function makeInsertCmdObjForRetryableWrite(lsid, txnNumber, stmtId, doc) {
 function makeInsertCmdObjForTransaction(lsid, txnNumber, stmtId, doc, isLargeTxn) {
     return {
         insert: kCollName,
-        documents: [Object.assign(doc, isLargeTxn ? {y: new Array(kSize10MB).join("a")} : {})],
+        documents: [Object.assign(doc, isLargeTxn ? {y: "a".repeat(kSize10MB)} : {})],
         lsid: lsid,
         txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(stmtId),

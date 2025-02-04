@@ -28,7 +28,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         var bsonOverhead = Object.bsonsize({'': ''});
 
-        var bigstr = new Array(maxIndexedSize + 1).join('x');
+        var bigstr = 'x'.repeat(maxIndexedSize);
 
         // prefix the big string with tid to make it unique,
         // then trim it down so that it plus bson overhead is maxIndexedSize

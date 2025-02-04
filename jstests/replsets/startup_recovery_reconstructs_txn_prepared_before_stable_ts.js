@@ -33,7 +33,7 @@ session.startTransaction();
 // test runs with lesser wiredTiger cache size, there would be a higher possibility
 // of this record being considered for eviction from in-memory tree. And, to confirm
 // that we don't see problems like in SERVER-40422.
-const largeArray = new Array(14 * 1024 * 1024).join('x');
+const largeArray = 'x'.repeat(14 * 1024 * 1024);
 assert.commandWorked(sessionColl.update({_id: 0}, {$set: {a: largeArray}}));
 assert.commandWorked(sessionColl.insert({_id: 1}));
 const prepareTimestamp = PrepareHelpers.prepareTransaction(session);

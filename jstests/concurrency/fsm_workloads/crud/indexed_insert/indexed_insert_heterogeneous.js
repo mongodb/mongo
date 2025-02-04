@@ -20,7 +20,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         // prefix str with zeroes to make it have length len
         function pad(len, str) {
-            var padding = new Array(len + 1).join('0');
+            const padding = '0'.repeat(len);
             return (padding + str).slice(-len);
         }
 

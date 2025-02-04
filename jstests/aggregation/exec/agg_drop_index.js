@@ -4,7 +4,7 @@ const docsPerBatch = 3;
 coll.drop();
 
 // Initialize collection with eight 1M documents, and index on field "a".
-const longString = new Array(1024 * 1024).join('x');
+const longString = 'x'.repeat(1024 * 1024);
 for (let i = 0; i < 100; ++i) {
     assert.commandWorked(coll.insert({a: 1, bigField: longString}));
 }

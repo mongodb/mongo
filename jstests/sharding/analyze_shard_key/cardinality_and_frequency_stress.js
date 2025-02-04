@@ -88,7 +88,7 @@ function testAnalyzeShardKeysUnshardedCollection(conn, mongodConns) {
     const mostCommonValues = [];
     for (let i = 1; i <= numDocs; i++) {
         const chars = i.toString();
-        const doc = {a: new Array(kSize100kB / chars.length).join(chars)};
+        const doc = {a: chars.repeat(kSize100kB / chars.length - 1)};
 
         docs.push(doc);
         mostCommonValues.push({
@@ -151,7 +151,7 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
     let sign = 1;
     for (let i = 1; i <= numDocs; i++) {
         const chars = i.toString();
-        const doc = {a: new Array(kSize100kB / chars.length).join(chars), skey: sign};
+        const doc = {a: chars.repeat(kSize100kB / chars.length - 1), skey: sign};
 
         docs.push(doc);
         mostCommonValues.push({

@@ -21,7 +21,7 @@ let testColl = testDB.foo;
 const localDb = rst.getPrimary().getDB("local");
 
 // 400KB each so that oplog can keep at most two insert oplog entries.
-const longString = new Array(400 * 1024).join("a");
+const longString = "a".repeat(400 * 1024);
 
 // fill the oplog with two large documents
 assert.commandWorked(testColl.insert({_id: 0, longString: longString}));

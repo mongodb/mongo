@@ -58,7 +58,7 @@ export const BackupRestoreTest = function(options) {
             let coll = db.getSiblingDB(dbName).getCollection(collectionName);
             coll.createIndex({x: 1});
 
-            let largeValue = new Array(1024).join('L');
+            let largeValue = 'L'.repeat(1023);
 
             Random.setRandomSeed();
 

@@ -97,15 +97,12 @@ function runTest(conn, {isHashed, isUnique, isShardedColl, st, rst}) {
         coll.insert({a: {x: -2, y: {i: -2, ii: "a", iii: -2}, z: -2}, b: -2}, {writeConcern}));
     assert.commandWorked(
         coll.insert({a: {x: -1, y: {i: -1, ii: "A", iii: -1}, z: -1}, b: -1}, {writeConcern}));
-    assert.commandWorked(
-        coll.insert({a: {x: 0, y: {i: 0, ii: new Array(kSize10MB).join("B"), iii: 0}, z: 0}, b: 0},
-                    {writeConcern}));
-    assert.commandWorked(
-        coll.insert({a: {x: 1, y: {i: 1, ii: new Array(kSize10MB).join("C"), iii: 1}, z: 1}, b: 1},
-                    {writeConcern}));
-    assert.commandWorked(
-        coll.insert({a: {x: 2, y: {i: 2, ii: new Array(kSize10MB).join("D"), iii: 2}, z: 2}, b: 2},
-                    {writeConcern}));
+    assert.commandWorked(coll.insert(
+        {a: {x: 0, y: {i: 0, ii: "B".repeat(kSize10MB - 1), iii: 0}, z: 0}, b: 0}, {writeConcern}));
+    assert.commandWorked(coll.insert(
+        {a: {x: 1, y: {i: 1, ii: "C".repeat(kSize10MB - 1), iii: 1}, z: 1}, b: 1}, {writeConcern}));
+    assert.commandWorked(coll.insert(
+        {a: {x: 2, y: {i: 2, ii: "D".repeat(kSize10MB - 1), iii: 2}, z: 2}, b: 2}, {writeConcern}));
 
     const testCases = [];
 

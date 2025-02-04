@@ -84,7 +84,7 @@ assert.eq(firstStreamEntry.documentKey._id, 1);
 const primaryNode = rst.getPrimary();
 const mostRecentOplogEntry = getLatestOp(primaryNode);
 assert.neq(mostRecentOplogEntry, null);
-const largeStr = new Array(4 * 1024 * oplogSize).join('abcdefghi');
+const largeStr = 'abcdefghi'.repeat(4 * 1024 * oplogSize);
 
 function oplogIsRolledOver() {
     // The oplog has rolled over if the op that used to be newest is now older than the

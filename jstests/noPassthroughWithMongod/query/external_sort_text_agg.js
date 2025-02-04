@@ -3,7 +3,7 @@ var t = db.external_sort_text_agg;
 t.drop();
 t.createIndex({text: "text"});
 for (let i = 0; i < 100; i++) {
-    t.insert({_id: i, text: Array(210000).join("asdf ")});
+    t.insert({_id: i, text: "asdf ".repeat(209999)});
     // string over 1MB to hit the 100MB threshold for external sort
 }
 

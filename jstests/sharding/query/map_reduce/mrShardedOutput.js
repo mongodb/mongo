@@ -13,7 +13,7 @@ const inputColl = testDB.foo;
 const outputColl = testDB.mr_sharded_out;
 
 const numDocs = 500;
-const str = new Array(1024).join('a');
+const str = 'a'.repeat(1023);
 // Shard the input collection by "a" and split into two chunks, one on each shard.
 st.shardColl(inputColl, {a: 1}, {a: numDocs / 2}, {a: numDocs});
 

@@ -67,7 +67,7 @@ const lsid = {
         let makeInsertCmdObj = (doc) => {
             return {
                 insert: kCollName,
-                documents: [Object.assign(doc, {y: new Array(kSize10MB).join("a")})],
+                documents: [Object.assign(doc, {y: "a".repeat(kSize10MB)})],
                 lsid: lsid,
                 txnNumber: NumberLong(txnNum),
                 stmtId: NumberInt(stmtId++),

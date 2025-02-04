@@ -19,7 +19,7 @@ export const $config = (function() {
         var cache = {};
         return function getStringOfLength(size) {
             if (!cache[size]) {
-                cache[size] = new Array(size + 1).join('x');
+                cache[size] = 'x'.repeat(size);
             }
             return cache[size];
         };

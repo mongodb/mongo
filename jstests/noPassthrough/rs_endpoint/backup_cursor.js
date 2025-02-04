@@ -30,10 +30,8 @@ function testBackupCursorNotSupported(routerHost, shard0PrimaryHost, dbName, wri
     const testDB = router.getDB(writeOptions.dbName);
     assert.commandWorked(router.adminCommand(
         {enableSharding: writeOptions.dbName, primaryShard: writeOptions.primaryShard}));
-    assert.commandWorked(testDB.runCommand({
-        insert: writeOptions.collName,
-        documents: [{x: new Array(writeOptions.fieldSize).join("0")}]
-    }));
+    assert.commandWorked(testDB.runCommand(
+        {insert: writeOptions.collName, documents: [{x: "0".repeat(writeOptions.fieldSize)}]}));
 
     const routerDB = router.getDB(dbName);
     const shard0PrimaryDB = shard0Primary.getDB(dbName);
@@ -77,10 +75,8 @@ function testBackupCursorSupported(routerHost, shard0PrimaryHost, dbName, writeO
     const testDB = router.getDB(writeOptions.dbName);
     assert.commandWorked(router.adminCommand(
         {enableSharding: writeOptions.dbName, primaryShard: writeOptions.primaryShard}));
-    assert.commandWorked(testDB.runCommand({
-        insert: writeOptions.collName,
-        documents: [{x: new Array(writeOptions.fieldSize).join("0")}]
-    }));
+    assert.commandWorked(testDB.runCommand(
+        {insert: writeOptions.collName, documents: [{x: "0".repeat(writeOptions.fieldSize)}]}));
 
     const routerDB = router.getDB(dbName);
     const shard0PrimaryDB = shard0Primary.getDB(dbName);
@@ -127,7 +123,7 @@ function testBackupCursorSupported(routerHost, shard0PrimaryHost, dbName, writeO
     // Perform some large writes to make $backupCursorExtend return multiple docs.
     const docs = [];
     for (let i = 0; i < 10; i++) {
-        docs.push({x: new Array(writeOptions.fieldSize).join(i.toString())});
+        docs.push({x: i.toString().repeat(writeOptions.fieldSize)});
     }
     const operationTime =
         assert.commandWorked(testDB.runCommand({insert: writeOptions.collName, documents: docs}))

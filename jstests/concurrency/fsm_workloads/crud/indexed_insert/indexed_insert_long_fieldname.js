@@ -17,7 +17,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     // See https://docs.mongodb.com/manual/reference/limits/#Index-Name-Length
     var length = 90;
     var prefix = 'indexed_insert_long_fieldname_';
-    $config.data.indexedField = prefix + new Array(length - prefix.length + 1).join('x');
+    $config.data.indexedField = prefix + 'x'.repeat(length - prefix.length);
     $config.data.shardKey = {};
     $config.data.shardKey[$config.data.indexedField] = 1;
 

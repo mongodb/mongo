@@ -20,7 +20,7 @@ outColl.drop();
 
 // Test with 2 very large documents that do not fit into a single batch.
 const kSize15MB = 15 * 1024 * 1024;
-const largeArray = new Array(kSize15MB).join("a");
+const largeArray = "a".repeat(kSize15MB);
 assert.commandWorked(coll.insert({_id: 0, a: largeArray}));
 assert.commandWorked(coll.insert({_id: 1, a: largeArray}));
 

@@ -22,7 +22,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.partitionSize = 1100;  // number of shard key values
     $config.data.chunkSize = 1;
     $config.data.prevChunkSize = 64;
-    $config.data.bigString = new Array(1024 * 128).join('x');
+    $config.data.bigString = 'x'.repeat(1024 * 128);
 
     $config.setup = function(db, collName, cluster) {
         // Overridden methods should usually call the corresponding

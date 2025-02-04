@@ -5,11 +5,11 @@ t.drop();
 
 // first 63MB
 for (let i = 0; i < 63; i++) {
-    assert.commandWorked(t.insert({a: new Array(1024 * 1024 + 1).join('a')}));
+    assert.commandWorked(t.insert({a: 'a'.repeat(1024 * 1024)}));
 }
 
 // the remaining ~1MB with room for field names and other overhead
-assert.commandWorked(t.insert({a: new Array(1024 * 1024 - 1105).join('a')}));
+assert.commandWorked(t.insert({a: 'a'.repeat(1024 * 1024 - 1106)}));
 
 // do not use cursor form, since it has a different workaroud for this issue.
 assert.commandFailed(db.runCommand({

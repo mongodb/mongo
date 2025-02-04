@@ -49,7 +49,7 @@ export function rollOver1MBOplog(replSet) {
 
     const coll = primary.getDB("test").foo;
     // 400KB each so that oplog can keep at most two insert oplog entries.
-    const longString = new Array(400 * 1024).join("a");
+    const longString = "a".repeat(400 * 1024);
 
     // Insert the first document.
     const firstInsertTimestamp =

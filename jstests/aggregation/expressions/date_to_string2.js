@@ -111,8 +111,8 @@ const date = ISODate("1999-08-29");
 testFormat(date, "%%d", "%d");
 
 // A very long string of "%"s
-const longstr = Array(1000).join("%%");
-const halfstr = Array(1000).join("%");
+const longstr = "%%".repeat(999);
+const halfstr = "%".repeat(999);
 testFormat(date, longstr, halfstr);
 
 // Dates as null (should return a null)
