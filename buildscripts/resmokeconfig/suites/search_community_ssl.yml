@@ -1,0 +1,32 @@
+test_kind: js_test
+
+description: >-
+  This suite tests the search in community architecture (ie using the MongoDB gRPC protocol to
+  communicate with mongot instead of using MongoRPC) with SSL enabled. It runs tests with
+  mongotmock, and sets up an ingress gRPC transport layer on mongotmock in order to facilitate
+  testing.
+
+selector:
+  roots:
+    - jstests/with_mongot/search_mocked/ssl/*.js
+  exclude_with_any_tags:
+    - requires_auth
+    - search_community_incompatible
+
+executor:
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          setParameters:
+            useGrpcForSearch: true
+            featureFlagEgressGrpcForSearch: true
+          setParametersMongos:
+            useGrpcForSearch: true
+            featureFlagEgressGrpcForSearch: true
+      nodb: ""
+      ssl: ""
+      tlsAllowInvalidHostnames: ""
+      tlsAllowInvalidCertificates: ""
+      tlsCAFile: jstests/libs/ca.pem
+      tlsCertificateKeyFile: jstests/libs/client.pem

@@ -194,10 +194,14 @@ Status GRPCTransportLayerImpl::setup() {
         if (_options.enableEgress) {
             GRPCClient::Options clientOptions{};
 
-            if (!sslGlobalParams.sslCAFile.empty()) {
+            if (!sslGlobalParams.sslClusterCAFile.empty()) {
+                clientOptions.tlsCAFile = sslGlobalParams.sslClusterCAFile;
+            } else if (!sslGlobalParams.sslCAFile.empty()) {
                 clientOptions.tlsCAFile = sslGlobalParams.sslCAFile;
             }
-            if (!sslGlobalParams.sslPEMKeyFile.empty()) {
+            if (!sslGlobalParams.sslClusterFile.empty()) {
+                clientOptions.tlsCertificateKeyFile = sslGlobalParams.sslClusterFile;
+            } else if (!sslGlobalParams.sslPEMKeyFile.empty()) {
                 clientOptions.tlsCertificateKeyFile = sslGlobalParams.sslPEMKeyFile;
             }
             clientOptions.tlsAllowInvalidHostnames = sslGlobalParams.sslAllowInvalidHostnames;

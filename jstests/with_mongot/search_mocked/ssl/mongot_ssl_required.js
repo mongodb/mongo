@@ -1,5 +1,10 @@
 /**
  * Test that a mongod running with SSL can connect to a mongotmock (which does not use SSL).
+ *
+ * @tags: [
+ *  # The ingress gRPC server on mongotmock requires that TLS is enabled.
+ *  search_community_incompatible
+ * ]
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";

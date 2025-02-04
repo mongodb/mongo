@@ -6,6 +6,27 @@ import {
 } from "jstests/ssl/libs/ssl_helpers.js";
 import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 
+/**
+ * The ingress gRPC server that we run on mongotmock does not accept non-TLS connections,
+ * and so we have to skip all tests that do not use TLS for mongod=>mongot testing. This is
+ * a test-only issue, the real community binary will accept both TLS and non-TLS connections.
+ */
+function shouldSkipWithGRPC({mongotMockTLSMode, mongodTLSMode, searchTLSMode}) {
+    if (TestData && TestData.setParameters && TestData.setParameters.useGrpcForSearch) {
+        if ((mongotMockTLSMode == "disabled") ||
+            (searchTLSMode == "globalTLS" && ["allowTLS", "disabled"].includes(mongodTLSMode)) ||
+            (["allowTLS", "disabled"].includes(searchTLSMode))) {
+            jsTestLog(
+                `Skipping test with the following configurations due to incompatibility with mongotmock gRPC server: mongotMockTLSMode: ${
+                    mongotMockTLSMode}, mongodTLSMode: ${mongodTLSMode}, searchTLSMode: ${
+                    searchTLSMode}`);
+            return true;
+        }
+    }
+
+    return false;
+}
+
 function setUpMongotAndMongodWithTLSOptions(
     {mongotMockTLSMode, mongodTLSMode = "disabled", searchTLSMode = null}) {
     const mongotmock = new MongotMock();
@@ -31,6 +52,13 @@ function setUpMongotAndMongodWithTLSOptions(
 }
 
 export function verifyTLSConfigurationPasses({mongotMockTLSMode, mongodTLSMode, searchTLSMode}) {
+    if (shouldSkipWithGRPC({mongotMockTLSMode, mongodTLSMode, searchTLSMode})) {
+        return;
+    }
+
+    jsTestLog(`Verifying that the following TLS configurations are supported: mongotMockTLSMode: ${
+        mongotMockTLSMode}, mongodTLSMode: ${mongodTLSMode}, searchTLSMode: ${searchTLSMode}`);
+
     var [mongotmock, mongodConn] =
         setUpMongotAndMongodWithTLSOptions({mongotMockTLSMode, mongodTLSMode, searchTLSMode});
     const mongotConn = mongotmock.getConnection();
@@ -119,6 +147,12 @@ export function verifyTLSConfigurationFails({
     mongodTLSMode,
     searchTLSMode,
 }) {
+    if (shouldSkipWithGRPC({mongotMockTLSMode, mongodTLSMode, searchTLSMode})) {
+        return;
+    }
+
+    jsTestLog(`Verifying that the following TLS configurations fail: mongotMockTLSMode: ${
+        mongotMockTLSMode}, mongodTLSMode: ${mongodTLSMode}, searchTLSMode: ${searchTLSMode}`);
     var [mongotmock, mongodConn] =
         setUpMongotAndMongodWithTLSOptions({mongotMockTLSMode, mongodTLSMode, searchTLSMode});
 

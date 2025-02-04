@@ -722,7 +722,7 @@ buildvariants:
       - name: compile_ninja_quick_TG
       - name: compile_test_parallel_core_stream_TG
       - name: generate_buildid_to_debug_symbols_mapping
-      - name: search_community
+      - name: .search_community_mongotmock
       - name: .search_community_e2e_tests
 
   ###############################################
