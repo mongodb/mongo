@@ -119,6 +119,7 @@ const expectedGlobalVars = [
     "tojsonObject",
     "tojsononeline",
     "tostrictjson",
+    "toEJSON",
     "undefined",
     "unescape",
     "version",

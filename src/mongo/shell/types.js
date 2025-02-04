@@ -656,10 +656,27 @@ if (typeof (gc) == "undefined") {
 }
 
 // Free Functions
+
+/**
+ * Functions to serialize to JSON and EJSON.
+ *
+ * 'tojson()' and 'tojsononeline()' serialize to JSON. The purpose of these functions is to preserve
+ * compatibility with 'eval()'. The output produced by tojson()/tojsononeline() can be used by
+ * 'eval()' to deserialize the object (note: eval does not work with EJSON). Use in any non-logging
+ * code.
+ *
+ * 'toEJSON()' is similar to 'tostrictjson()' (and both serialize to EJSON), but it works
+ * on any type (not just BSON objects) and also fixes some of its limitations (ie, circular
+ * dependencies). The purpose of this function is to to make sure log lines are parsable by
+ * non-mongo-shell json parsing tools like Parsely. Use in any logging code.
+ */
+
+// Note: use 'toEJSON()' instead if the output is used for assertions and/or logging.
 tojsononeline = function(x) {
     return tojson(x, " ", true);
 };
 
+// Note: use 'toEJSON()' instead if the output is used for assertions and/or logging.
 tojson = function(x, indent, nolint, depth, sortKeys) {
     if (x === null)
         return "null";
@@ -783,6 +800,61 @@ tojsonObject = function(x, indent, nolint, depth, sortKeys) {
     // pop one level of indent
     indent = indent.substring(1);
     return s + indent + "}";
+};
+
+// Converts a JavaScript value to an EJSON string when 'TestData.logFormat == "json"', otherwise
+// returns the same result as 'tojson()'.
+// Compared to standard EJSON, this function outputs a different format for Sets, Maps, and Errors.
+//  * Sets serialize as {"$set": [<value1>,...]}
+//  * Maps serialize as {"$map": [[<key1>, <value1>],...]}
+//  * Errors serialize as {"$error": "<error_message>"}
+//
+// Use this function in assertions and/or logging.
+// Note: Use 'tojson()' or 'tojsononeline()' instead if the output is used to rehydrate objects
+// using 'eval()'.
+toEJSON = function(x, indent, nolint, depth, sortKeys) {
+    if (typeof TestData !== "object" || TestData.logFormat !== "json")
+        return tojson(x, indent, nolint, depth, sortKeys);
+
+    function ensureEJSONAndStopOnRecursion() {
+        // Stack of ancestors (objects) of the current 'value'.
+        // eg, For {"x": 1, "y": {"z": 2}} and value = 2,
+        // ancestors = [{"x": 1, "y": {"z": 2}}, {"z": 2}]
+        let ancestors = [];
+        return function(key, value) {
+            if (value instanceof Error) {
+                return {"$error": value.message};
+            }
+            if (value instanceof Map) {
+                return {"$map": [...value]};
+            }
+            if (value instanceof Set) {
+                return {"$set": [...value]};
+            }
+            // 'value' is a a pre-transformed property value (of type string in case of Dates),
+            // so we use 'this[key]' instead to get the original value.
+            if (this[key] instanceof Date) {
+                return {"$date": this[key].toISOString().replace("Z", "+00:00")};
+            }
+            if (typeof value !== "object" || value === null) {
+                return value;
+            }
+            // Remove ancestors not part of the path to current 'value' anymore.
+            // `this` is the object that value is contained in,
+            // i.e., its direct parent.
+            while (ancestors.length > 0 && ancestors.at(-1) !== this) {
+                ancestors.pop();
+            }
+            // 'value' is an object at this point. If it has already been seen, prune the traversal
+            // to avoid a 'TypeError' due to self-referencing objects.
+            if (ancestors.includes(value)) {
+                return "[recursive]";
+            }
+            ancestors.push(value);
+            return value;
+        };
+    }
+    return JSON.stringify(x, ensureEJSONAndStopOnRecursion());
 };
 
 printjson = function(x) {

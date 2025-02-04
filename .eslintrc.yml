@@ -65,6 +65,7 @@ globals:
   tojsononeline: true
   tostrictjson: true
   tojsonObject: true
+  toEJSON: true
   print: true
   printjson: true
   printjsononeline: true
