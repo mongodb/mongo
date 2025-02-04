@@ -491,22 +491,21 @@ BSONObj groupEachScore(
 
 BSONObj calculateFinalScore(
     const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputs) {
-    // Generate a string with an array of all the fields containing a score for a given pipeline.
+    // Generate a $add object with an array of all the fields containing a score for a given
+    // pipeline.
     const auto& allInputs = [&] {
-        StringBuilder sb;
-        sb << "[";
-        bool first = true;
+        BSONObjBuilder addBob;
+
+        BSONArrayBuilder addArrBuilder(addBob.subarrayStart("$add"_sd));
         for (auto it = inputs.begin(); it != inputs.end(); it++) {
-            if (!first) {
-                sb << ", ";
-            }
-            first = false;
-            sb << "\"$" << it->first << "_score\"";
+            StringBuilder sb;
+            sb << "$" << it->first << "_score";
+            addArrBuilder.append(sb.str());
         }
-        sb << "]";
-        return sb.str();
+        addArrBuilder.done();
+        return addBob.obj();
     };
-    return fromjson(fmt::format(R"({{$addFields: {{score: {{$add: {0}}}}}}})", allInputs()));
+    return BSON("$addFields" << BSON("score" << allInputs()));
 }
 
 BSONObj calculateFinalScoreDetails(
