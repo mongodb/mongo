@@ -75,7 +75,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
@@ -1053,9 +1052,9 @@ StatusWith<int64_t> WiredTigerRecordStore::_compact(OperationContext* opCtx,
         WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))->getSession();
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
-    // Set a pointer on the WT_SESSION to the opCtx, so that WT::compact can use a callback to
-    // check for interrupts.
-    SessionDataRAII sessionRaii(s, opCtx);
+    // Ensure that the WT session is configured to interrupt on this operation
+    invariant(
+        s->with([opCtx](auto wtSession) { return wtSession && wtSession->app_private == opCtx; }));
 
     StringBuilder config;
     config << "timeout=0";

@@ -497,11 +497,7 @@ Status WiredTigerIndex::initAsEmpty() {
 
 StatusWith<int64_t> WiredTigerIndex::compact(OperationContext* opCtx,
                                              const CompactOptions& options) {
-    return WiredTigerIndexUtil::compact(
-        *opCtx,
-        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
-        _uri,
-        options);
+    return WiredTigerIndexUtil::compact(opCtx, _uri, options);
 }
 
 boost::optional<RecordId> WiredTigerIndex::_keyExists(OperationContext* opCtx,
@@ -729,8 +725,7 @@ public:
         : _idx(idx),
           _opCtx(opCtx),
           _metrics(ResourceConsumption::MetricsCollector::get(opCtx)),
-          _cursor(*WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)),
-                  idx->uri()) {}
+          _cursor(opCtx, idx->uri()) {}
 
 protected:
     void insert(std::span<const char> key, std::span<const char> value) {

@@ -70,6 +70,7 @@ WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection,
       _idleExpireTime(Date_t::min()) {}
 
 WiredTigerSession::~WiredTigerSession() {
+    _detachOperationContext();
     if (_session) {
         invariantWTOK(_session->close(_session, nullptr), nullptr);
     }
@@ -209,6 +210,19 @@ void WiredTigerSession::resetSessionConfiguration() {
         invariantWTOK(reconfigure(undoConfigString.c_str()), *this);
     }
     _undoConfigStrings.clear();
+}
+
+void WiredTigerSession::_attachOperationContext(OperationContext* opCtx) {
+    invariant(_session);
+    invariant(!_session->app_private);
+    invariant(opCtx);
+    _session->app_private = opCtx;
+}
+
+void WiredTigerSession::_detachOperationContext() {
+    if (_session) {
+        _session->app_private = nullptr;
+    }
 }
 
 }  // namespace mongo

@@ -174,7 +174,11 @@ void WiredTigerRecoveryUnit::doAbortUnitOfWork() {
 void WiredTigerRecoveryUnit::_ensureSession() {
     if (!_unique_session) {
         invariant(!_session);
-        _unique_session = _connection->getSession();
+        if (_opCtx) {
+            _unique_session = _connection->getSession(_opCtx);
+        } else {
+            _unique_session = _connection->getUninterruptibleSession();
+        }
         _session = _unique_session.get();
     }
 }

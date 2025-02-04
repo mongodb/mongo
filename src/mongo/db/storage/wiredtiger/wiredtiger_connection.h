@@ -91,8 +91,16 @@ public:
      * Returns a smart pointer to a previously released session for reuse, or creates a new session.
      * This method must only be called while holding the global lock to avoid races with
      * shuttingDown, but otherwise is thread safe.
+     * The passed in OperationContext is used to propagate interrupts from MongoDB to WiredTiger. If
+     * interrupts are not needed call getUninterruptibleSession()
      */
-    std::unique_ptr<WiredTigerSession, WiredTigerSessionDeleter> getSession();
+    std::unique_ptr<WiredTigerSession, WiredTigerSessionDeleter> getSession(
+        OperationContext* opCtx);
+    /**
+     * As above but does not propagate interrupts
+     */
+    std::unique_ptr<WiredTigerSession, WiredTigerSessionDeleter> getUninterruptibleSession();
+
 
     /**
      * Get a count of idle sessions in the session cache.

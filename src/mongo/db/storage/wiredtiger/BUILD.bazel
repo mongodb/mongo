@@ -96,7 +96,6 @@ mongo_cc_library(
         "wiredtiger_record_store.h",
         "wiredtiger_recovery_unit.h",
         "wiredtiger_session.h",
-        "wiredtiger_session_data.h",
         "wiredtiger_size_storer.h",
         "wiredtiger_snapshot_manager.h",
         "wiredtiger_stats.h",

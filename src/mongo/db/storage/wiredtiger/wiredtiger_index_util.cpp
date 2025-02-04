@@ -42,7 +42,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
@@ -98,10 +97,10 @@ bool WiredTigerIndexUtil::appendCustomStats(WiredTigerRecoveryUnit& ru,
     return true;
 }
 
-StatusWith<int64_t> WiredTigerIndexUtil::compact(Interruptible& interruptible,
-                                                 WiredTigerRecoveryUnit& ru,
+StatusWith<int64_t> WiredTigerIndexUtil::compact(OperationContext* opCtx,
                                                  const std::string& uri,
                                                  const CompactOptions& options) {
+    auto& ru = *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
     WiredTigerConnection* connection = ru.getConnection();
     if (connection->isEphemeral()) {
         return 0;
@@ -110,9 +109,9 @@ StatusWith<int64_t> WiredTigerIndexUtil::compact(Interruptible& interruptible,
     WiredTigerSession* s = ru.getSession();
     ru.abandonSnapshot();
 
-    // Set a pointer on the WT_SESSION to the interruptible, so that WT::compact can use a
-    // callback to check for interrupts.
-    SessionDataRAII sessionRaii(s, &interruptible);
+    // Ensure that the WT session is configured to interrupt on this operation
+    invariant(
+        s->with([opCtx](auto wtSession) { return wtSession && wtSession->app_private == opCtx; }));
 
     StringBuilder config;
     config << "timeout=0";
@@ -122,6 +121,7 @@ StatusWith<int64_t> WiredTigerIndexUtil::compact(Interruptible& interruptible,
     if (options.freeSpaceTargetMB) {
         config << ",free_space_target=" + std::to_string(*options.freeSpaceTargetMB) + "MB";
     }
+
     int ret = s->compact(uri.c_str(), config.str().c_str());
     Status status = wtRCToStatus(ret, *s);
 
@@ -129,7 +129,7 @@ StatusWith<int64_t> WiredTigerIndexUtil::compact(Interruptible& interruptible,
     // while it is already running.
     uassert(status.code(), status.reason(), status != ErrorCodes::AlreadyInitialized);
 
-    if (ret == WT_ERROR && !interruptible.checkForInterruptNoAssert().isOK()) {
+    if (ret == WT_ERROR && !opCtx->checkForInterruptNoAssert().isOK()) {
         return Status(ErrorCodes::Interrupted,
                       str::stream() << "Storage compaction interrupted on " << uri.c_str());
     }

@@ -98,7 +98,7 @@ protected:
  */
 class WiredTigerBulkLoadCursor {
 public:
-    WiredTigerBulkLoadCursor(WiredTigerRecoveryUnit&, const std::string& indexUri);
+    WiredTigerBulkLoadCursor(OperationContext* opCtx, const std::string& indexUri);
 
     ~WiredTigerBulkLoadCursor() {
         _cursor->close(_cursor);

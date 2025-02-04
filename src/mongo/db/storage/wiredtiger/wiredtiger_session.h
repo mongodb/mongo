@@ -43,6 +43,7 @@ namespace mongo {
 
 class StatsCollectionPermit;
 class WiredTigerConnection;
+class OperationContext;
 
 /**
  * This is a structure that caches 1 cursor for each uri.
@@ -237,6 +238,13 @@ private:
     uint64_t _getEpoch() const {
         return _epoch;
     }
+
+    // Attach an operation context that acts as an interrupt source and contains other relevant
+    // state. WT will periodically use callbacks to check whether specific WT operations should be
+    // interrupted
+    void _attachOperationContext(OperationContext* opCtx);
+    // Remove the interrupt source
+    void _detachOperationContext();
 
     const uint64_t _epoch;
 

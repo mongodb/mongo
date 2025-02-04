@@ -694,7 +694,7 @@ int mdb_handle_general(WT_EVENT_HANDLER* handler,
         return 0;
     }
 
-    return reinterpret_cast<Interruptible*>(session->app_private)
+    return reinterpret_cast<OperationContext*>(session->app_private)
                ->checkForInterruptNoAssert()
                .isOK()
         ? 0
@@ -879,7 +879,7 @@ Status WiredTigerUtil::setTableLogging(WiredTigerRecoveryUnit& ru,
     // succeed.
     std::string existingMetadata;
     {
-        auto session = connection->getSession();
+        auto session = connection->getUninterruptibleSession();
         existingMetadata = getMetadataCreate(*session, uri).getValue();
     }
 

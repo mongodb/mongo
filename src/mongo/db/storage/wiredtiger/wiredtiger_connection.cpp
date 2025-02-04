@@ -169,7 +169,13 @@ bool WiredTigerConnection::isEphemeral() {
     return _engine && _engine->isEphemeral();
 }
 
-UniqueWiredTigerSession WiredTigerConnection::getSession() {
+UniqueWiredTigerSession WiredTigerConnection::getSession(OperationContext* opCtx) {
+    auto session = getUninterruptibleSession();
+    session->_attachOperationContext(opCtx);
+    return session;
+}
+
+UniqueWiredTigerSession WiredTigerConnection::getUninterruptibleSession() {
     // We should never be able to get here after _shuttingDown is set, because no new
     // operations should be allowed to start.
     invariant(!(_shuttingDown.load() & kShuttingDownMask));
@@ -199,17 +205,18 @@ void WiredTigerConnection::_releaseSession(WiredTigerSession* session) {
     uint64_t currentEpoch = _epoch.load();
     if (isShuttingDown() || session->_getEpoch() != currentEpoch) {
         invariant(session->_getEpoch() <= currentEpoch);
-        // There is a race condition with clean shutdown, where the storage engine is ripped from
-        // underneath OperationContexts, which are not "active" (i.e., do not have any locks), but
-        // are just about to delete the recovery unit. See SERVER-16031 for more information. Since
-        // shutting down the WT_CONNECTION will close all WT_SESSIONS, we shouldn't also try to
-        // directly close this session.
+        // There is a race condition with clean shutdown, where the storage engine is ripped
+        // from underneath OperationContexts, which are not "active" (i.e., do not have any
+        // locks), but are just about to delete the recovery unit. See SERVER-16031 for more
+        // information. Since shutting down the WT_CONNECTION will close all WT_SESSIONS, we
+        // shouldn't also try to directly close this session.
         session->dropSessionBeforeDeleting();
         delete session;
         return;
     }
 
     invariant(session->cursorsOut() == 0);
+    session->_detachOperationContext();
 
     {
         uint64_t range;

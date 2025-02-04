@@ -34,6 +34,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -122,12 +123,15 @@ WiredTigerCursor::~WiredTigerCursor() {
     }
 }
 
-WiredTigerBulkLoadCursor::WiredTigerBulkLoadCursor(WiredTigerRecoveryUnit& ru,
+WiredTigerBulkLoadCursor::WiredTigerBulkLoadCursor(OperationContext* opCtx,
                                                    const std::string& indexUri)
-    : _session(ru.getConnection()->getSession()) {
+    : _session(WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))
+                   ->getConnection()
+                   ->getSession(opCtx)) {
+    auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
     // Open cursors can cause bulk open_cursor to fail with EBUSY.
     // TODO any other cases that could cause EBUSY?
-    WiredTigerSession* outerSession = ru.getSession();
+    WiredTigerSession* outerSession = ru->getSession();
     outerSession->closeAllCursors(indexUri);
 
     // The 'checkpoint_wait=false' option is set to prefer falling back on the "non-bulk" cursor
