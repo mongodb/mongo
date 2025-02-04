@@ -32,6 +32,7 @@
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/transaction_resources.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -93,10 +94,12 @@ void SpillableDocumentMap::spillToDisk() {
     writer.flush();
     _diskMapSize += writer.writtenRecords();
 
-    _stats.spills++;
-    _stats.spilledBytes += writer.writtenBytes();
-    _stats.spilledRecords += writer.writtenRecords();
-    updateStorageSizeStat();
+    _stats.updateSpillingStats(
+        1,
+        writer.writtenBytes(),
+        writer.writtenRecords(),
+        static_cast<uint64_t>(_diskMap->rs()->storageSize(
+            *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext()))));
 }
 
 void SpillableDocumentMap::initDiskMap() {
@@ -118,10 +121,8 @@ RecordId SpillableDocumentMap::computeKey(const Value& id) const {
 }
 
 void SpillableDocumentMap::updateStorageSizeStat() {
-    _stats.spilledDataStorageSize =
-        std::max(_stats.spilledDataStorageSize,
-                 static_cast<uint64_t>(_diskMap->rs()->storageSize(
-                     *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext()))));
+    _stats.updateSpilledDataStorageSize(_diskMap->rs()->storageSize(
+        *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext())));
 }
 
 template <bool IsConst>
@@ -171,7 +172,11 @@ auto SpillableDocumentMap::IteratorImpl<IsConst>::operator++() -> IteratorImpl& 
     } else if (!diskExhausted()) {
         _diskDocuments.pop_front();
         if (_diskDocuments.empty()) {
-            readNextBatchFromDisk();
+            if (_diskItExhausted) {
+                _diskIt.reset();
+            } else {
+                readNextBatchFromDisk();
+            }
         }
     }
     return *this;
@@ -193,6 +198,7 @@ void SpillableDocumentMap::IteratorImpl<IsConst>::spill() {
     _diskDocuments.clear();
 
     restoreDiskIt();
+    ON_BLOCK_EXIT([&]() { saveDiskIt(); });
 
     boost::optional<Record> bson = _diskIt->seekExact(frontRecordId);
     tassert(2398005, "Previously present RecordId not found", bson.has_value());
@@ -201,8 +207,6 @@ void SpillableDocumentMap::IteratorImpl<IsConst>::spill() {
     Document doc{bson->data.releaseToBson()};
     _diskDocuments.emplace_back(MemoryUsageToken{doc.getApproximateSize(), &_map->_memTracker},
                                 doc.getOwned());
-
-    saveDiskIt();
 }
 
 template <bool IsConst>
@@ -222,6 +226,7 @@ void SpillableDocumentMap::IteratorImpl<IsConst>::readNextBatchFromDisk() {
     }
 
     restoreDiskIt();
+    ON_BLOCK_EXIT([&]() { saveDiskIt(); });
 
     // Always read at least one document
     do {
@@ -234,8 +239,6 @@ void SpillableDocumentMap::IteratorImpl<IsConst>::readNextBatchFromDisk() {
         _diskDocuments.emplace_back(MemoryUsageToken{doc.getApproximateSize(), &_map->_memTracker},
                                     doc.getOwned());
     } while (!_diskItExhausted && _map->_memTracker.withinMemoryLimit());
-
-    saveDiskIt();
 }
 
 template <bool IsConst>

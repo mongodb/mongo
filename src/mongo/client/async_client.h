@@ -135,6 +135,10 @@ public:
 
     void end();
 
+    transport::Session& getTransportSession() {
+        return *_session;
+    }
+
     const HostAndPort& remote() const;
     static constexpr Seconds kSlowConnAcquiredToWireLogSuppresionPeriod{5};
 

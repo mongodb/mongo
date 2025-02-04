@@ -921,7 +921,7 @@ void CollectionCatalog::reloadViews(OperationContext* opCtx, const DatabaseName&
     PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
 }
 
-const Collection* CollectionCatalog::establishConsistentCollection(
+ConsistentCollection CollectionCatalog::establishConsistentCollection(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nssOrUUID,
     boost::optional<Timestamp> readTimestamp) const {
@@ -940,36 +940,35 @@ const Collection* CollectionCatalog::establishConsistentCollection(
         if (coll && coll->usesCappedSnapshots() && !CappedSnapshots::get(opCtx).getSnapshot(coll)) {
             CappedSnapshots::get(opCtx).establish(opCtx, coll, /*isNewCollection=*/true);
         }
-        return coll;
+        return ConsistentCollection{opCtx, coll};
     }
 
-    return lookupCollectionByNamespaceOrUUID(opCtx, nssOrUUID);
+    auto coll = lookupCollectionByNamespaceOrUUID(opCtx, nssOrUUID);
+    return ConsistentCollection{opCtx, coll};
 }
 
-std::vector<const Collection*> CollectionCatalog::establishConsistentCollections(
+std::vector<ConsistentCollection> CollectionCatalog::establishConsistentCollections(
     OperationContext* opCtx, const DatabaseName& dbName) const {
-    std::vector<const Collection*> result;
+    std::vector<ConsistentCollection> result;
     stdx::unordered_set<const Collection*> visitedCollections;
-    auto appendIfUnique = [&result, &visitedCollections](const Collection* col) {
-        auto [_, isNewCollection] = visitedCollections.emplace(col);
-        if (col && isNewCollection) {
-            result.push_back(col);
+    auto appendIfUnique = [&result, &visitedCollections](ConsistentCollection coll) {
+        auto [_, isNewCollection] = visitedCollections.emplace(coll.get());
+        if (coll && isNewCollection) {
+            result.emplace_back(std::move(coll));
         }
     };
 
     // We iterate both already committed and uncommitted changes and validate them with
     // the storage snapshot.
     for (const auto& coll : range(dbName)) {
-        const Collection* currentCollection =
-            establishConsistentCollection(opCtx, coll->ns(), boost::none);
-        appendIfUnique(currentCollection);
+        auto currentCollection = establishConsistentCollection(opCtx, coll->ns(), boost::none);
+        appendIfUnique(std::move(currentCollection));
     }
 
     for (auto const& [ns, coll] : _pendingCommitNamespaces) {
         if (ns.dbName() == dbName) {
-            const Collection* currentCollection =
-                establishConsistentCollection(opCtx, ns, boost::none);
-            appendIfUnique(currentCollection);
+            auto currentCollection = establishConsistentCollection(opCtx, ns, boost::none);
+            appendIfUnique(std::move(currentCollection));
         }
     }
 

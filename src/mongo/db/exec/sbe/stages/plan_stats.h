@@ -290,15 +290,7 @@ struct HashAggStats : public SpecificStats {
     }
 
     bool usedDisk{false};
-    // The number of times that the entire hash table was spilled.
-    long long spills{0};
-    // The number of individual records spilled to disk.
-    long long spilledRecords{0};
-    // The number of total bytes spilled to disk.
-    long long spilledBytes{0};
-    // An estimate, in bytes, of the size of the final spill table after all spill events have taken
-    // place.
-    long long spilledDataStorageSize{0};
+    SpillingStats spillingStats;
 };
 
 struct BlockHashAggStats : public HashAggStats {
@@ -351,19 +343,15 @@ struct HashLookupStats : public SpecificStats {
         visitor->visit(this);
     }
 
-    long long getSpilledRecords() const {
-        return spilledHtRecords + spilledBuffRecords;
-    }
-
-    long long getSpilledBytesApprox() const {
-        return spilledHtBytesOverAllRecords + spilledBuffBytesOverAllRecords;
+    SpillingStats getTotalSpillingStats() const {
+        SpillingStats stats = spillingHtStats;
+        stats.accumulate(spillingBuffStats);
+        return stats;
     }
 
     bool usedDisk{false};
-    long long spilledHtRecords{0};
-    long long spilledHtBytesOverAllRecords{0};
-    long long spilledBuffRecords{0};
-    long long spilledBuffBytesOverAllRecords{0};
+    SpillingStats spillingHtStats;
+    SpillingStats spillingBuffStats;
 };
 
 struct WindowStats : public SpecificStats {
@@ -385,15 +373,7 @@ struct WindowStats : public SpecificStats {
 
     // Whether the window buffer was spilled.
     bool usedDisk{false};
-    // The number of times that the entire window buffer was spilled.
-    long long spills{0};
-    // The number of bytes that the entire window buffer was spilled.
-    long long spilledBytes{0};
-    // The number of individual records spilled to disk.
-    long long spilledRecords{0};
-    // An estimate, in bytes, of the size of the final spill table after all spill events have taken
-    // place.
-    long long spilledDataStorageSize{0};
+    SpillingStats spillingStats;
 };
 
 /**

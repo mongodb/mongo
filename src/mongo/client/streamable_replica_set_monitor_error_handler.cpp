@@ -49,7 +49,7 @@ SdamErrorHandler::ErrorActions SdamErrorHandler::computeErrorActions(const HostA
                                                                      const Status& status,
                                                                      HandshakeStage handshakeStage,
                                                                      bool isApplicationOperation,
-                                                                     BSONObj bson) noexcept {
+                                                                     BSONObj bson) {
     // Initial state: don't drop connections, no immediate check, and don't generate an error server
     // description.
     ErrorActions result;

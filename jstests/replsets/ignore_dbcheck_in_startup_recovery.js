@@ -2,7 +2,7 @@
  * Test that dbcheck command will be ignored during startup recovery.
  *
  * @tags: [
- *   requires_fcv_81,
+ *   requires_fcv_80,
  *   # Requires persistency because we restart a node to enter startup recovery.
  *   requires_persistence,
  * ]

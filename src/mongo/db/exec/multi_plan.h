@@ -94,7 +94,7 @@ public:
                    OnPickBestPlan onPickBestPlan,
                    boost::optional<std::string> replanReason = boost::none);
 
-    bool isEOF() final;
+    bool isEOF() const final;
 
     StageState doWork(WorkingSetID* out) final;
 

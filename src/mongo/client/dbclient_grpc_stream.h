@@ -61,7 +61,7 @@ public:
         : DBClientSession(_autoReconnect, so_timeout, uri, hook, apiParameters),
           _authToken{std::move(authToken)} {}
 
-    ~DBClientGRPCStream();
+    ~DBClientGRPCStream() override;
 
     /**
      * Logout is not implemented for gRPC, throws an exception.
@@ -90,11 +90,11 @@ public:
     int getMaxWireVersion() override;
 
 #ifdef MONGO_CONFIG_SSL
-    /**
-     * Returns nullptr. SSL config is handled by gRPC.
-     */
     const SSLConfiguration* getSSLConfiguration() override {
-        return nullptr;
+        if (!_session) {
+            return nullptr;
+        }
+        return _session->getSSLConfiguration();
     }
 
     bool isTLS() override {

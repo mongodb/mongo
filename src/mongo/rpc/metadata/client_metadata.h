@@ -258,7 +258,7 @@ public:
      * Write the $client section to request bodies if there is a non-empty client metadata
      * connection with the current client.
      */
-    void writeToMetadata(BSONObjBuilder* builder) const noexcept;
+    void writeToMetadata(BSONObjBuilder* builder) const;
 
     /**
      * Modify the existing client metadata document to include a mongos section.

@@ -6,7 +6,6 @@
 //   uses_change_streams,
 // ]
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
@@ -31,19 +30,6 @@ assert.commandWorked(
 // Shard the test collection on the field "shardKey".
 assert.commandWorked(
     mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: "hashed"}}));
-
-// TODO SERVER-81884: update once 8.0 becomes last LTS.
-if (!FeatureFlagUtil.isPresentAndEnabled(mongosDB,
-                                         "OneChunkPerShardEmptyCollectionWithHashedShardKey")) {
-    assert.commandWorked(mongosDB.adminCommand({
-        mergeChunks: mongosColl.getFullName(),
-        bounds: [{shardKey: MinKey}, {shardKey: NumberLong("0")}]
-    }));
-    assert.commandWorked(mongosDB.adminCommand({
-        mergeChunks: mongosColl.getFullName(),
-        bounds: [{shardKey: NumberLong("0")}, {shardKey: MaxKey}]
-    }));
-}
 
 // Make sure the negative chunk is on shard 0.
 assert.commandWorked(mongosDB.adminCommand({

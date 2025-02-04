@@ -113,11 +113,12 @@ void WiredTigerUtil::fetchTypeAndSourceURI(WiredTigerRecoveryUnit& ru,
     *source = std::string(sourceItem.str, sourceItem.len);
 }
 
-StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WT_SESSION* session, StringData uri) {
-    WT_CURSOR* cursor;
-    invariantWTOK(session->open_cursor(session, "metadata:create", nullptr, "", &cursor), session);
+StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WiredTigerSession& session,
+                                                          StringData uri) {
+    WT_CURSOR* cursor = nullptr;
+    invariantWTOK(session.open_cursor("metadata:create", nullptr, "", &cursor), session);
     invariant(cursor);
-    ON_BLOCK_EXIT([cursor, session] { invariantWTOK(cursor->close(cursor), session); });
+    ON_BLOCK_EXIT([cursor, &session] { invariantWTOK(cursor->close(cursor), session); });
 
     return _getMetadata(cursor, uri);
 }
@@ -144,11 +145,11 @@ StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WiredTigerRecoveryUnit
     return _getMetadata(cursor, uri);
 }
 
-StatusWith<std::string> WiredTigerUtil::getMetadata(WT_SESSION* session, StringData uri) {
+StatusWith<std::string> WiredTigerUtil::getMetadata(WiredTigerSession& session, StringData uri) {
     WT_CURSOR* cursor;
-    invariantWTOK(session->open_cursor(session, "metadata:", nullptr, "", &cursor), session);
+    invariantWTOK(session.open_cursor("metadata:", nullptr, "", &cursor), session);
     invariant(cursor);
-    ON_BLOCK_EXIT([cursor, session] { invariantWTOK(cursor->close(cursor), session); });
+    ON_BLOCK_EXIT([cursor, &session] { invariantWTOK(cursor->close(cursor), session); });
 
     return _getMetadata(cursor, uri);
 }
@@ -339,10 +340,19 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
 }
 
 // static
-StatusWith<int64_t> WiredTigerUtil::getStatisticsValue(WT_SESSION* session,
+StatusWith<int64_t> WiredTigerUtil::getStatisticsValue(WiredTigerSession& session,
                                                        const std::string& uri,
                                                        const std::string& config,
                                                        int statisticsKey) {
+    return session.with(
+        [&](WT_SESSION* s) { return getStatisticsValue_DoNotUse(s, uri, config, statisticsKey); });
+}
+
+// static
+StatusWith<int64_t> WiredTigerUtil::getStatisticsValue_DoNotUse(WT_SESSION* session,
+                                                                const std::string& uri,
+                                                                const std::string& config,
+                                                                int statisticsKey) {
     invariant(session);
     WT_CURSOR* cursor = nullptr;
     const char* cursorConfig = config.empty() ? nullptr : config.c_str();
@@ -379,7 +389,7 @@ StatusWith<int64_t> WiredTigerUtil::getStatisticsValue(WT_SESSION* session,
     return StatusWith<int64_t>(value);
 }
 
-int64_t WiredTigerUtil::getIdentSize(WT_SESSION* s, const std::string& uri) {
+int64_t WiredTigerUtil::getIdentSize(WiredTigerSession& s, const std::string& uri) {
     StatusWith<int64_t> result = WiredTigerUtil::getStatisticsValue(
         s, "statistics:" + uri, "statistics=(size)", WT_STAT_DSRC_BLOCK_SIZE);
     const Status& status = result.getStatus();
@@ -393,7 +403,7 @@ int64_t WiredTigerUtil::getIdentSize(WT_SESSION* s, const std::string& uri) {
     return result.getValue();
 }
 
-int64_t WiredTigerUtil::getEphemeralIdentSize(WT_SESSION* s, const std::string& uri) {
+int64_t WiredTigerUtil::getEphemeralIdentSize(WiredTigerSession& s, const std::string& uri) {
     // For ephemeral case, use cursor statistics
     const auto statsUri = "statistics:" + uri;
 
@@ -424,14 +434,14 @@ int64_t WiredTigerUtil::getEphemeralIdentSize(WT_SESSION* s, const std::string& 
     return numEntries * bytesPerEntry;
 }
 
-int64_t WiredTigerUtil::getIdentReuseSize(WT_SESSION* s, const std::string& uri) {
+int64_t WiredTigerUtil::getIdentReuseSize(WiredTigerSession& s, const std::string& uri) {
     auto result = WiredTigerUtil::getStatisticsValue(
         s, "statistics:" + uri, "statistics=(fast)", WT_STAT_DSRC_BLOCK_REUSE_BYTES);
     uassertStatusOK(result.getStatus());
     return result.getValue();
 }
 
-int64_t WiredTigerUtil::getIdentCompactRewrittenExpectedSize(WT_SESSION* s,
+int64_t WiredTigerUtil::getIdentCompactRewrittenExpectedSize(WiredTigerSession& s,
                                                              const std::string& uri) {
     auto result =
         WiredTigerUtil::getStatisticsValue(s,
@@ -684,7 +694,7 @@ int mdb_handle_general(WT_EVENT_HANDLER* handler,
         return 0;
     }
 
-    return reinterpret_cast<Interruptible*>(session->app_private)
+    return reinterpret_cast<OperationContext*>(session->app_private)
                ->checkForInterruptNoAssert()
                .isOK()
         ? 0
@@ -750,23 +760,21 @@ int WiredTigerUtil::verifyTable(WiredTigerRecoveryUnit& ru,
 
     // Try to close as much as possible to avoid EBUSY errors.
     ru.getSession()->closeAllCursors(uri);
-    WiredTigerSessionCache* sessionCache = ru.getSessionCache();
-    sessionCache->closeAllCursors(uri);
+    WiredTigerConnection* connection = ru.getConnection();
 
     // Open a new session with custom error handlers.
     const char* sessionConfig = nullptr;
     if (gFeatureFlagPrefetch.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        !sessionCache->isEphemeral()) {
+        !connection->isEphemeral()) {
         sessionConfig = "prefetch=(enabled=true)";
     }
-    WT_CONNECTION* conn = ru.getSessionCache()->conn();
-    WiredTigerSession session(conn, &eventHandler, sessionConfig);
+    WiredTigerSession session(ru.getConnection(), &eventHandler, sessionConfig);
 
     const char* verifyConfig =
         configurationOverride.has_value() ? configurationOverride->c_str() : nullptr;
     // Do the verify. Weird parens prevent treating "verify" as a macro.
-    return (session->verify)(*session, uri.c_str(), verifyConfig);
+    return session.verify(uri.c_str(), verifyConfig);
 }
 
 void WiredTigerUtil::validateTableLogging(WiredTigerRecoveryUnit& ru,
@@ -860,8 +868,7 @@ Status WiredTigerUtil::setTableLogging(WiredTigerRecoveryUnit& ru,
 
     // Try to close as much as possible to avoid EBUSY errors.
     ru.getSession()->closeAllCursors(uri);
-    WiredTigerSessionCache* sessionCache = ru.getSessionCache();
-    sessionCache->closeAllCursors(uri);
+    WiredTigerConnection* connection = ru.getConnection();
 
     // This method uses the WiredTiger config parser to see if the table is in the expected logging
     // state. Only attempt to alter the table when a change is needed. This avoids grabbing heavy
@@ -872,8 +879,8 @@ Status WiredTigerUtil::setTableLogging(WiredTigerRecoveryUnit& ru,
     // succeed.
     std::string existingMetadata;
     {
-        auto session = sessionCache->getSession();
-        existingMetadata = getMetadataCreate(session->getSession(), uri).getValue();
+        auto session = connection->getUninterruptibleSession();
+        existingMetadata = getMetadataCreate(*session, uri).getValue();
     }
 
     {
@@ -895,10 +902,10 @@ Status WiredTigerUtil::setTableLogging(WiredTigerRecoveryUnit& ru,
         22432, 1, "Changing table logging settings", "uri"_attr = uri, "loggingEnabled"_attr = on);
     // Only alter the metadata once we're sure that we need to change the table settings, since
     // WT_SESSION::alter may return EBUSY and require taking a checkpoint to make progress.
-    auto status = sessionCache->getKVEngine()->alterMetadata(uri, setting);
+    auto status = connection->getKVEngine()->alterMetadata(uri, setting);
     if (!status.isOK()) {
         // Dump the storage engine's internal state to assist in diagnosis.
-        sessionCache->getKVEngine()->dump();
+        connection->getKVEngine()->dump();
 
         LOGV2_FATAL(50756,
                     "Failed to update log setting",
@@ -918,15 +925,15 @@ bool WiredTigerUtil::collectConnectionStatistics(WiredTigerKVEngine* engine, BSO
         return false;
     }
 
-    // Bypass the WiredTigerSessionCache to obtain a session that can be used after it shuts down,
+    // Obtain a session that can be used during shut down,
     // potentially before the storage engine itself shuts down.
-    WiredTigerSession session(permit->conn());
+    WiredTigerSession session(&engine->getConnection(), *permit);
 
     // Filter out irrelevant statistic fields.
     std::vector<std::string> fieldsToIgnore = {"LSM"};
 
     Status status = WiredTigerUtil::exportTableToBSON(
-        session.getSession(), "statistics:", "statistics=(fast)", bob, fieldsToIgnore);
+        session, "statistics:", "statistics=(fast)", bob, fieldsToIgnore);
     if (!status.isOK()) {
         bob.append("error", "unable to retrieve statistics");
         bob.append("code", static_cast<int>(status.code()));
@@ -935,24 +942,23 @@ bool WiredTigerUtil::collectConnectionStatistics(WiredTigerKVEngine* engine, BSO
     return true;
 }
 
-Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
+Status WiredTigerUtil::exportTableToBSON(WiredTigerSession& session,
                                          const std::string& uri,
                                          const std::string& config,
                                          BSONObjBuilder& bob) {
     return exportTableToBSON(session, uri, config, bob, {});
 }
 
-Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
+Status WiredTigerUtil::exportTableToBSON(WiredTigerSession& session,
                                          const std::string& uri,
                                          const std::string& config,
                                          BSONObjBuilder& bob,
                                          const std::vector<std::string>& filter) {
-    invariant(session);
     WT_CURSOR* cursor = nullptr;
     const char* cursorConfig = config.empty() ? nullptr : config.c_str();
 
     // Attempt to open a statistics cursor on the provided URI.
-    int ret = session->open_cursor(session, uri.c_str(), nullptr, cursorConfig, &cursor);
+    int ret = session.open_cursor(uri.c_str(), nullptr, cursorConfig, &cursor);
     if (ret != 0) {
         return Status(ErrorCodes::CursorNotFound,
                       str::stream() << "unable to open cursor at URI " << uri

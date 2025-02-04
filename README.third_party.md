@@ -26,20 +26,21 @@ a notice will be included in
 | [Abseil]                                             | Apache-2.0                                                                                          | 20230802.1                               |                      | ✗                               |
 | [arximboldi/immer]                                   | BSL-1.0                                                                                             | Unknown                                  |                      | ✗                               |
 | [Asio C++ Library]                                   | BSL-1.0                                                                                             | 1.12.2                                   |                      | ✗                               |
+| [aws-sdk - the AWS SDK client library]               | Apache-2.0                                                                                          | 1.11.471                                 |                      | ✗                               |
 | [benchmark]                                          | Apache-2.0                                                                                          | v1.5.2                                   |                      |                                 |
 | [Boost C++ Libraries - boost]                        | BSL-1.0                                                                                             | 1.79.0                                   |                      | ✗                               |
-| [c-ares]                                             | MIT                                                                                                 | 1.19.1                                   |                      | ✗                               |
+| [c-ares]                                             | MIT                                                                                                 | 1.27.0                                   |                      | ✗                               |
 | [concurrencytest]                                    | GPL-3.0-or-later                                                                                    | 0.1.2                                    | unknown              |                                 |
 | [Cyrus SASL]                                         | BSD-Attribution-HPND-disclaimer                                                                     | 2.1.28                                   | unknown              |                                 |
 | [dcleblanc/SafeInt]                                  | MIT                                                                                                 | 3.0.26                                   |                      | ✗                               |
-| [derickr/timelib]                                    | MIT                                                                                                 | 2022.10                                  |                      | ✗                               |
+| [derickr/timelib]                                    | MIT                                                                                                 | 2022.13                                  |                      | ✗                               |
 | [discover]                                           | BSD-3-Clause                                                                                        | 0.4.0                                    | unknown              |                                 |
 | [fmtlib/fmt]                                         | MIT                                                                                                 | 7.1.3                                    |                      | ✗                               |
 | [google-re2]                                         | BSD-3-Clause                                                                                        | 2023-11-01                               |                      | ✗                               |
 | [google-snappy]                                      | BSD-3-Clause                                                                                        | 1.1.10                                   | ✗                    | ✗                               |
 | [google/s2geometry]                                  | Apache-2.0                                                                                          | Unknown                                  | ✗                    | ✗                               |
 | [gperftools]                                         | BSD-3-Clause                                                                                        | 2.9.1                                    |                      | ✗                               |
-| [grpc]                                               | Apache-2.0                                                                                          | 1.59.2                                   |                      | ✗                               |
+| [grpc]                                               | Apache-2.0                                                                                          | 1.59.5                                   |                      | ✗                               |
 | [ICU for C/C++ (ICU4C)]                              | BSD-3-Clause, MIT v2 with Ad Clause License, Public Domain, BSD-2-Clause                            | 57.1                                     | ✗                    | ✗                               |
 | [Intel Decimal Floating-Point Math Library]          | BSD-3-Clause                                                                                        | v2.0 U1                                  |                      | ✗                               |
 | [jbeder/yaml-cpp]                                    | MIT                                                                                                 | 0.6.3                                    |                      | ✗                               |
@@ -50,11 +51,13 @@ a notice will be included in
 | [libunwind/libunwind]                                | MIT                                                                                                 | v1.8.1                                   |                      | ✗                               |
 | [linenoise]                                          | BSD-2-Clause                                                                                        | Unknown                                  |                      | ✗                               |
 | [MongoDB C Driver]                                   | Apache-2.0                                                                                          | 1.27.6                                   | ✗                    | ✗                               |
-| [Mozilla Firefox]                                    | MPL-2.0                                                                                             | 115.7.0esr                               | unknown              | ✗                               |
+| [Mozilla Firefox]                                    | MPL-2.0                                                                                             | 115.19.0esr                              | unknown              | ✗                               |
 | [nlohmann.json.decomposed]                           | MIT                                                                                                 | 3.10.5                                   | unknown              |                                 |
 | [node]                                               | ISC                                                                                                 | 22.1.0                                   | unknown              |                                 |
 | [ocspbuilder]                                        | MIT                                                                                                 | 0.10.2                                   |                      |                                 |
 | [ocspresponder]                                      | Apache-2.0                                                                                          | 0.5.0                                    |                      |                                 |
+| [opentelemetry-cpp]                                  | Apache-2.0                                                                                          | 1.17                                     | ✗                    |                                 |
+| [opentelemetry-proto]                                | Apache-2.0                                                                                          | 1.3.2                                    | ✗                    |                                 |
 | [PCRE2]                                              | BSD-3-Clause, Public Domain                                                                         | 10.40                                    |                      | ✗                               |
 | [Protobuf]                                           | BSD-3-Clause                                                                                        | v4.25.0                                  |                      | ✗                               |
 | [pyiso8601]                                          | MIT                                                                                                 | 2.1.0                                    | unknown              |                                 |
@@ -70,7 +73,7 @@ a notice will be included in
 | [testtools]                                          | MIT                                                                                                 | 2.7.1                                    | unknown              |                                 |
 | [unicode-data]                                       | Unicode-DFS-2016                                                                                    | 8.0                                      | ✗                    | ✗                               |
 | [valgrind]                                           | GPL-2.0-or-later                                                                                    | Unknown                                  |                      | ✗                               |
-| [zlib]                                               | Zlib                                                                                                | v1.3                                     | ✗                    | ✗                               |
+| [zlib]                                               | Zlib                                                                                                | v1.3.1                                   | ✗                    | ✗                               |
 | [zstd]                                               | BSD-3-Clause, GPL-2.0-or-later                                                                      | 1.5.5                                    | ✗                    | ✗                               |
 
 [Abseil]: https://github.com/abseil/abseil-cpp
@@ -90,6 +93,7 @@ a notice will be included in
 [SchemaStore/schemastore]: https://www.schemastore.org/json/
 [Snowball Stemming Algorithms]: https://github.com/snowballstem/snowball
 [arximboldi/immer]: https://github.com/arximboldi/immer
+[aws-sdk - the AWS SDK client library]: https://github.com/aws/aws-sdk-cpp
 [benchmark]: https://github.com/google/benchmark
 [c-ares]: https://c-ares.org/
 [concurrencytest]: https://pypi.org/project/concurrencytest/
@@ -105,12 +109,15 @@ a notice will be included in
 [jbeder/yaml-cpp]: https://github.com/jbeder/yaml-cpp/releases
 [libmongocrypt]: https://github.com/mongodb/libmongocrypt
 [librdkafka - the Apache Kafka C/C++ client library]: https://github.com/confluentinc/librdkafka
-[libunwind/libunwind]: http://www.nongnu.org/libunwind/
+[libunwind/libunwind]: http://www.github.com/libunwind/libunwind
 [linenoise]: https://github.com/antirez/linenoise
+[nlohmann-json]: https://github.com/open-telemetry/opentelemetry-proto
 [nlohmann.json.decomposed]: https://www.nuget.org/packages/nlohmann.json.decomposed
 [node]: https://nodejs.org/en/blog/release
 [ocspbuilder]: https://github.com/wbond/ocspbuilder
 [ocspresponder]: https://github.com/threema-ch/ocspresponder
+[opentelemetry-cpp]: https://github.com/open-telemetry/opentelemetry-cpp/
+[opentelemetry-proto]: https://github.com/open-telemetry/opentelemetry-proto
 [pyiso8601]: https://pypi.org/project/iso8601/
 [smhasher]: https://github.com/aappleby/smhasher/blob/a6bd3ce/
 [subunit]: https://github.com/testing-cabal/subunit

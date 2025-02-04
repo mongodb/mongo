@@ -96,7 +96,7 @@ public:
      */
     TaskExecutorCursor(std::shared_ptr<executor::TaskExecutor> executor,
                        const RemoteCommandRequest& rcr,
-                       TaskExecutorCursorOptions options = {});
+                       TaskExecutorCursorOptions options);
 
     /**
      * Construct the cursor from a cursor response from a previously executed RemoteCommandRequest.
@@ -110,7 +110,7 @@ public:
                        std::shared_ptr<executor::TaskExecutor> underlyingExec,
                        CursorResponse&& response,
                        const RemoteCommandRequest& rcr,
-                       TaskExecutorCursorOptions&& options = {});
+                       TaskExecutorCursorOptions&& options);
 
     /**
      * Move constructor to enable storing cursors in vectors.
@@ -295,7 +295,7 @@ inline std::unique_ptr<TaskExecutorCursor> makeTaskExecutorCursor(
     OperationContext* opCtx,
     std::shared_ptr<executor::TaskExecutor> executor,
     const RemoteCommandRequest& rcr,
-    TaskExecutorCursorOptions options = {},
+    TaskExecutorCursorOptions options,
     std::function<bool(Status)> retryPolicy = nullptr) {
     for (;;) {
         try {

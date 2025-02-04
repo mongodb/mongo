@@ -78,11 +78,9 @@ public:
 
     struct DSSAndLock {
         DSSAndLock(const DatabaseName& dbName)
-            : dssMutex("DSSMutex::" +
-                       DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault())),
-              dss(std::make_unique<DatabaseShardingState>(dbName)) {}
+            : dss(std::make_unique<DatabaseShardingState>(dbName)) {}
 
-        const Lock::ResourceMutex dssMutex;
+        std::shared_mutex dssMutex;  // NOLINT
         std::unique_ptr<DatabaseShardingState> dss;
     };
 
@@ -161,12 +159,12 @@ void checkPlacementConflictTimestamp(const boost::optional<LogicalTime> atCluste
 DatabaseShardingState::DatabaseShardingState(const DatabaseName& dbName) : _dbName(dbName) {}
 
 DatabaseShardingState::ScopedExclusiveDatabaseShardingState::ScopedExclusiveDatabaseShardingState(
-    Lock::ResourceLock lock, DatabaseShardingState* dss)
+    std::unique_lock<std::shared_mutex> lock, DatabaseShardingState* dss)  // NOLINT
     : _lock(std::move(lock)), _dss(dss) {}
 
 DatabaseShardingState::ScopedSharedDatabaseShardingState::ScopedSharedDatabaseShardingState(
-    Lock::ResourceLock lock, DatabaseShardingState* dss)
-    : DatabaseShardingState::ScopedExclusiveDatabaseShardingState(std::move(lock), dss) {}
+    std::shared_lock<std::shared_mutex> lock, DatabaseShardingState* dss)  // NOLINT
+    : _lock(std::move(lock)), _dss(dss) {}
 
 DatabaseShardingState::ScopedExclusiveDatabaseShardingState DatabaseShardingState::acquireExclusive(
     OperationContext* opCtx, const DatabaseName& dbName) {
@@ -174,12 +172,11 @@ DatabaseShardingState::ScopedExclusiveDatabaseShardingState DatabaseShardingStat
     DatabaseShardingStateMap::DSSAndLock* dssAndLock =
         DatabaseShardingStateMap::get(opCtx->getServiceContext()).getOrCreate(dbName);
 
-    // First lock the RESOURCE_MUTEX associated to this dbName to guarantee stability of the
+    // First lock the shared_mutex associated to this dbName to guarantee stability of the
     // DatabaseShardingState pointer. After that, it is safe to get and store the
-    // DatabaseShadingState*, as long as the RESOURCE_MUTEX is kept locked.
-    Lock::ResourceLock lock(opCtx, dssAndLock->dssMutex.getRid(), MODE_X);
-
-    return ScopedExclusiveDatabaseShardingState(std::move(lock), dssAndLock->dss.get());
+    // DatabaseShadingState*, as long as the shared_mutex is kept locked.
+    return ScopedExclusiveDatabaseShardingState(std::unique_lock(dssAndLock->dssMutex),
+                                                dssAndLock->dss.get());
 }
 
 DatabaseShardingState::ScopedSharedDatabaseShardingState DatabaseShardingState::acquireShared(
@@ -188,12 +185,11 @@ DatabaseShardingState::ScopedSharedDatabaseShardingState DatabaseShardingState::
     DatabaseShardingStateMap::DSSAndLock* dssAndLock =
         DatabaseShardingStateMap::get(opCtx->getServiceContext()).getOrCreate(dbName);
 
-    // First lock the RESOURCE_MUTEX associated to this dbName to guarantee stability of the
+    // First lock the shared_mutex associated to this dbName to guarantee stability of the
     // DatabaseShardingState pointer. After that, it is safe to get and store the
-    // DatabaseShadingState*, as long as the RESOURCE_MUTEX is kept locked.
-    Lock::ResourceLock lock(opCtx, dssAndLock->dssMutex.getRid(), MODE_IS);
-
-    return ScopedSharedDatabaseShardingState(std::move(lock), dssAndLock->dss.get());
+    // DatabaseShadingState*, as long as the shared_mutex is kept locked.
+    return ScopedSharedDatabaseShardingState(std::shared_lock(dssAndLock->dssMutex),  // NOLINT
+                                             dssAndLock->dss.get());
 }
 
 DatabaseShardingState::ScopedExclusiveDatabaseShardingState
@@ -284,17 +280,25 @@ void DatabaseShardingState::assertIsPrimaryShardForDb(OperationContext* opCtx) c
             primaryShardId == thisShardId);
 }
 
-void DatabaseShardingState::setDbInfo(OperationContext* opCtx, const DatabaseType& dbInfo) {
+void DatabaseShardingState::setDbInfo(OperationContext* opCtx,
+                                      const DatabaseType& dbInfo,
+                                      bool useDssForTesting) {
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(_dbName, MODE_IX));
 
     LOGV2(7286900,
           "Setting this node's cached database info",
           logAttrs(_dbName),
           "dbVersion"_attr = dbInfo.getVersion());
-    _dbInfo.emplace(dbInfo);
+
+    if (useDssForTesting)
+        _dbInfo_forTesting.emplace(dbInfo);
+    else
+        _dbInfo.emplace(dbInfo);
 }
 
-void DatabaseShardingState::clearDbInfo(OperationContext* opCtx, bool cancelOngoingRefresh) {
+void DatabaseShardingState::clearDbInfo(OperationContext* opCtx,
+                                        bool cancelOngoingRefresh,
+                                        bool useDssForTesting) {
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(_dbName, MODE_IX));
 
     if (cancelOngoingRefresh) {
@@ -302,11 +306,20 @@ void DatabaseShardingState::clearDbInfo(OperationContext* opCtx, bool cancelOngo
     }
 
     LOGV2(7286901, "Clearing this node's cached database info", logAttrs(_dbName));
-    _dbInfo = boost::none;
+
+    if (useDssForTesting)
+        _dbInfo_forTesting = boost::none;
+    else
+        _dbInfo = boost::none;
 }
 
-boost::optional<DatabaseVersion> DatabaseShardingState::getDbVersion(
-    OperationContext* opCtx) const {
+boost::optional<DatabaseVersion> DatabaseShardingState::getDbVersion(OperationContext* opCtx,
+                                                                     bool useDssForTesting) const {
+    if (useDssForTesting)
+        return _dbInfo_forTesting
+            ? boost::optional<DatabaseVersion>(_dbInfo_forTesting->getVersion())
+            : boost::none;
+
     return _dbInfo ? boost::optional<DatabaseVersion>(_dbInfo->getVersion()) : boost::none;
 }
 

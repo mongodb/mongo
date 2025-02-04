@@ -85,7 +85,6 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/named_pipe/named_pipe.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/destructor_guard.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/pcre.h"
@@ -969,7 +968,12 @@ BSONObj GetFCVConstants(const BSONObj&, void*) {
 }
 
 MongoProgramScope::~MongoProgramScope() {
-    DESTRUCTOR_GUARD(KillMongoProgramInstances(); ClearRawMongoProgramOutput(BSONObj(), nullptr))
+    try {
+        KillMongoProgramInstances();
+        ClearRawMongoProgramOutput(BSONObj(), nullptr);
+    } catch (...) {
+        reportFailedDestructor(MONGO_SOURCE_LOCATION());
+    }
 }
 
 /**

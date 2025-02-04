@@ -56,6 +56,7 @@ REGISTER_DOCUMENT_SOURCE(_internalApplyOplogUpdate,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceInternalApplyOplogUpdate::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalApplyOplogUpdate, DocumentSourceInternalApplyOplogUpdate::id)
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalApplyOplogUpdate::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {

@@ -83,6 +83,8 @@ REGISTER_DOCUMENT_SOURCE(changeStream,
                          DocumentSourceChangeStream::createFromBson,
                          AllowedWithApiStrict::kConditionally);
 
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamStage, DocumentSourceInternalChangeStreamStage::id)
+
 constexpr StringData DocumentSourceChangeStream::kDocumentKeyField;
 constexpr StringData DocumentSourceChangeStream::kFullDocumentBeforeChangeField;
 constexpr StringData DocumentSourceChangeStream::kFullDocumentField;
@@ -107,6 +109,7 @@ constexpr StringData DocumentSourceChangeStream::kRenameCollectionOpType;
 constexpr StringData DocumentSourceChangeStream::kDropDatabaseOpType;
 constexpr StringData DocumentSourceChangeStream::kInvalidateOpType;
 constexpr StringData DocumentSourceChangeStream::kReshardBeginOpType;
+constexpr StringData DocumentSourceChangeStream::kReshardBlockingWritesOpType;
 constexpr StringData DocumentSourceChangeStream::kReshardDoneCatchUpOpType;
 constexpr StringData DocumentSourceChangeStream::kNewShardDetectedOpType;
 

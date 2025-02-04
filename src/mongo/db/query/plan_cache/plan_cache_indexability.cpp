@@ -45,7 +45,7 @@
 #include "mongo/db/query/plan_cache/plan_cache_indexability.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

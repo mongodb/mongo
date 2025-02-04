@@ -95,7 +95,7 @@
 #include "mongo/dbtests/storage_debug_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/uuid.h"
@@ -2137,7 +2137,7 @@ public:
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &entry, &interceptor](const key_string::Value& duplicateKey) {
+                        [this, &entry, &interceptor](const key_string::View& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
@@ -2387,7 +2387,7 @@ public:
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &entry, &interceptor](const key_string::Value& duplicateKey) {
+                        [this, &entry, &interceptor](const key_string::View& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
@@ -2692,7 +2692,7 @@ public:
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &entry, &interceptor](const key_string::Value& duplicateKey) {
+                        [this, &entry, &interceptor](const key_string::View& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
@@ -2739,7 +2739,7 @@ public:
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &entry, &interceptor](const key_string::Value& duplicateKey) {
+                        [this, &entry, &interceptor](const key_string::View& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
@@ -3305,7 +3305,7 @@ public:
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &entry, &interceptor](const key_string::Value& duplicateKey) {
+                        [this, &entry, &interceptor](const key_string::View& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
@@ -3352,7 +3352,7 @@ public:
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &entry, &interceptor](const key_string::Value& duplicateKey) {
+                        [this, &entry, &interceptor](const key_string::View& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
@@ -4528,7 +4528,7 @@ public:
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &entry, &interceptor](const key_string::Value& duplicateKey) {
+                        [this, &entry, &interceptor](const key_string::View& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);

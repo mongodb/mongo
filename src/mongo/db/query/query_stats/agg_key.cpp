@@ -57,10 +57,11 @@
 namespace mongo::query_stats {
 
 AggCmdComponents::AggCmdComponents(const AggregateCommandRequest& request_,
-                                   stdx::unordered_set<NamespaceString> involvedNamespaces_)
+                                   stdx::unordered_set<NamespaceString> involvedNamespaces_,
+                                   const boost::optional<ExplainOptions::Verbosity>& verbosity)
     : involvedNamespaces(std::move(involvedNamespaces_)),
       _bypassDocumentValidation(request_.getBypassDocumentValidation().value_or(false)),
-      _verbosity(request_.getExplain()),
+      _verbosity(verbosity),
       _hasField{.batchSize = request_.getCursor().getBatchSize().has_value(),
                 .bypassDocumentValidation = request_.getBypassDocumentValidation().has_value(),
                 .explain = request_.getExplain().has_value(),
@@ -164,6 +165,6 @@ AggKey::AggKey(AggregateCommandRequest request,
           request.getReadConcern(),
           request.getMaxTimeMS().has_value(),
           collectionType),
-      _components(request, std::move(involvedNamespaces)) {}
+      _components(request, std::move(involvedNamespaces), expCtx->getExplain()) {}
 
 }  // namespace mongo::query_stats

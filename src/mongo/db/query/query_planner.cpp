@@ -225,42 +225,6 @@ bool hintMatchesClusterKey(const boost::optional<ClusteredCollectionInfo>& clust
         hintObj, clusteredIndexSpec.getName().value(), clusteredIndexSpec.getKey());
 }
 
-/**
- * Returns the dependencies for the CanonicalQuery, split by those needed to answer the filter,
- * and those needed for "everything else", e.g. project, sort and shard filter.
- */
-std::pair<DepsTracker /* filter */, DepsTracker /* other */> computeDeps(
-    const QueryPlannerParams& params, const CanonicalQuery& query) {
-    DepsTracker filterDeps;
-    match_expression::addDependencies(query.getPrimaryMatchExpression(), &filterDeps);
-    DepsTracker outputDeps;
-    if ((!query.getProj() || query.getProj()->requiresDocument()) && !query.isCountLike()) {
-        outputDeps.needWholeDocument = true;
-        return {std::move(filterDeps), std::move(outputDeps)};
-    }
-    if (params.mainCollectionInfo.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-        for (auto&& field : params.shardKey) {
-            outputDeps.fields.emplace(field.fieldNameStringData());
-        }
-    }
-    if (query.isCountLike()) {
-        // If this is a count, we won't have required projections, but may still need to output the
-        // shard filter.
-        return {std::move(filterDeps), std::move(outputDeps)};
-    }
-
-    const auto& reqFields = query.getProj()->getRequiredFields();
-    outputDeps.fields.insert(reqFields.begin(), reqFields.end());
-
-    if (auto sortPattern = query.getSortPattern()) {
-        sortPattern->addDependencies(&outputDeps);
-    }
-    // There's no known way a sort would depend on the whole document, and we already verified
-    // that the projection doesn't depend on the whole document.
-    tassert(6430503, "Unexpectedly required entire object", !outputDeps.needWholeDocument);
-    return {std::move(filterDeps), std::move(outputDeps)};
-}
-
 bool isSolutionBoundedCollscan(const QuerySolution* querySoln) {
     auto [node, count] = querySoln->getFirstNodeByType(StageType::STAGE_COLLSCAN);
     if (node) {
@@ -341,18 +305,6 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
 }  // namespace
 
 using std::unique_ptr;
-
-// Copied verbatim from db/index.h
-static bool isIdIndex(const BSONObj& pattern) {
-    BSONObjIterator i(pattern);
-    BSONElement e = i.next();
-    //_id index must have form exactly {_id : 1} or {_id : -1}.
-    // Allows an index of form {_id : "hashed"} to exist but
-    // do not consider it to be the primary _id index
-    if (!(strcmp(e.fieldName(), "_id") == 0 && (e.numberInt() == 1 || e.numberInt() == -1)))
-        return false;
-    return i.next().eoo();
-}
 
 static bool is2DIndex(const BSONObj& pattern) {
     BSONObjIterator it(pattern);
@@ -1375,6 +1327,18 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         }
     }
 
+    // Past this point, if an EOF solution is _possible_, it will be
+    // used regardless of sort, project, skip, or limit. We explicitly
+    // do this before considering a hint. Missing the opportunity for
+    // an EOF plan may result in an unbounded index scan where all
+    // fetched documents are filtered out by something like
+    // $alwaysFalse.
+    if (auto soln = tryEofSoln(query)) {
+        // A query with a trivially false primary match expression will never have any
+        // results, so a simple EOF is all that is required.
+        return singleSolution(std::move(soln));
+    }
+
     // An index was hinted. If there are any solutions, they use the hinted index.  If not, we
     // scan the entire index to provide results and output that as our plan.  This is the
     // desired behavior when an index is hinted that is not relevant to the query. In the case
@@ -1402,15 +1366,6 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         }
         return Status(ErrorCodes::NoQueryExecutionPlans,
                       "Failed to build whole-index solution for $hint");
-    }
-
-    // Past this point, if an EOF solution is _possible_, it will be used regardless of sort,
-    // project, skip, or limit. Only a hinted index would prevent this, and that has been checked
-    // already.
-    if (auto soln = tryEofSoln(query)) {
-        // A query with a trivially false primary match expression will never have any
-        // results, so a simple EOF is all that is required.
-        return singleSolution(std::move(soln));
     }
 
     // If a sort order is requested, there may be an index that provides it, even if that
@@ -1628,14 +1583,19 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     }
 
     // If CanonicalQuery is distinct-like and we haven't generated a plan that features
-    // a DISTINCT_SCAN, we should use SBE instead.
-    if (isDistinctMultiplanningEnabled && query.isSbeCompatible() && query.getDistinct()) {
-        const bool noDistinctScans = std::none_of(out.begin(), out.end(), [](const auto& soln) {
-            return soln->hasNode(STAGE_DISTINCT_SCAN);
-        });
-        if (noDistinctScans) {
-            return Status(ErrorCodes::NoDistinctScansForDistinctEligibleQuery,
-                          "No DISTINCT_SCAN plans available");
+    // a DISTINCT_SCAN, we should use SBE or subplanning if possible instead.
+    if (isDistinctMultiplanningEnabled && query.getDistinct()) {
+        const bool canSubplan =
+            MatchExpression::OR == query.getPrimaryMatchExpression()->matchType() &&
+            query.getPrimaryMatchExpression()->numChildren() > 0;
+        if (query.isSbeCompatible() || canSubplan) {
+            const bool noDistinctScans = std::none_of(out.begin(), out.end(), [](const auto& soln) {
+                return soln->hasNode(STAGE_DISTINCT_SCAN);
+            });
+            if (noDistinctScans) {
+                return Status(ErrorCodes::NoDistinctScansForDistinctEligibleQuery,
+                              "No DISTINCT_SCAN plans available");
+            }
         }
     }
 
@@ -1655,8 +1615,9 @@ StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedR
 
     auto cbrMode = query.getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode();
     EstimateMap estimates;
-    CardinalityEstimator cardEstimator(
-        *params.mainCollectionInfo.collStats, samplingEstimator, estimates, cbrMode);
+    const auto& collInfo = params.mainCollectionInfo;
+    tassert(9969001, "CBR received incomplete catalog statistics", collInfo.collStats != nullptr);
+    CardinalityEstimator cardEstimator(collInfo, samplingEstimator, estimates, cbrMode);
     CostEstimator costEstimator(estimates);
 
     std::vector<std::unique_ptr<QuerySolution>> allSoln =
@@ -1675,8 +1636,11 @@ StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedR
         auto ceRes = cardEstimator.estimatePlan(*soln);
         if (!ceRes.isOK()) {
             // This plan's cardinality cannot be estimated.
-            if (cbrMode == QueryPlanRankerModeEnum::kAutomaticCE) {
-                // In automatic CE mode fallback to multi-planning for inestimable plans.
+            if (cbrMode == QueryPlanRankerModeEnum::kAutomaticCE ||
+                ceRes.getStatus().code() == ErrorCodes::UnsupportedCbrNode) {
+                // We'll fallback to multi-planning for an inestimable plan if either:
+                // * We are in automatic CE mode
+                // * The reason for the inestimable plan was an unsupported node
                 acceptedSoln.push_back(std::move(soln));
             } else {
                 // All other CE modes are considered "strict", that is, when a CE method couldn't

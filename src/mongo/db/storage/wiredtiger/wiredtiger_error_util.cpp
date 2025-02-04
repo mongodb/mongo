@@ -32,6 +32,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/exception_util_gen.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWiredTiger
 
@@ -46,7 +47,7 @@ namespace {
  * transaction is considered too large.
  */
 bool cacheIsInsufficientForTransaction(WT_SESSION* session, double threshold) {
-    StatusWith<int64_t> txnDirtyBytes = WiredTigerUtil::getStatisticsValue(
+    StatusWith<int64_t> txnDirtyBytes = WiredTigerUtil::getStatisticsValue_DoNotUse(
         session, "statistics:session", "", WT_STAT_SESSION_TXN_BYTES_DIRTY);
     if (!txnDirtyBytes.isOK()) {
         tasserted(6190900,
@@ -54,7 +55,7 @@ bool cacheIsInsufficientForTransaction(WT_SESSION* session, double threshold) {
                                 << txnDirtyBytes.getStatus());
     }
 
-    StatusWith<int64_t> cacheDirtyBytes = WiredTigerUtil::getStatisticsValue(
+    StatusWith<int64_t> cacheDirtyBytes = WiredTigerUtil::getStatisticsValue_DoNotUse(
         session, "statistics:", "", WT_STAT_CONN_CACHE_BYTES_DIRTY_LEAF);
     if (!cacheDirtyBytes.isOK()) {
         tasserted(6190901,
@@ -90,14 +91,8 @@ bool txnExceededCacheThreshold(int64_t txnDirtyBytes, int64_t cacheDirtyBytes, d
     return txnBytesDirtyOverCacheBytesDirty > threshold;
 }
 
-bool rollbackReasonWasCachePressure(const char* reason) {
-    return reason &&
-        (strncmp(WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION,
-                 reason,
-                 sizeof(WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION)) == 0 ||
-         strncmp(WT_TXN_ROLLBACK_REASON_CACHE_OVERFLOW,
-                 reason,
-                 sizeof(WT_TXN_ROLLBACK_REASON_CACHE_OVERFLOW)) == 0);
+bool rollbackReasonWasCachePressure(int sub_level_err) {
+    return sub_level_err == WT_CACHE_OVERFLOW || sub_level_err == WT_OLDEST_FOR_EVICTION;
 }
 
 void throwCachePressureExceptionIfAppropriate(bool txnTooLargeEnabled,
@@ -123,9 +118,10 @@ void throwAppropriateException(bool txnTooLargeEnabled,
                                double cacheThreshold,
                                const char* reason,
                                StringData prefix,
-                               int retCode) {
+                               int retCode,
+                               int sub_level_err) {
     if ((txnTooLargeEnabled || temporarilyUnavailableEnabled) &&
-        rollbackReasonWasCachePressure(reason)) {
+        rollbackReasonWasCachePressure(sub_level_err)) {
         throwCachePressureExceptionIfAppropriate(
             txnTooLargeEnabled,
             temporarilyUnavailableEnabled,
@@ -142,19 +138,58 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
     if (retCode == 0)
         return Status::OK();
 
+    // These values are initialized by WT_SESSION::get_last_error and should only be accessed if the
+    // session is not null.
+    int err = 0;
+    int sub_level_err = WT_NONE;
+    const char* err_msg = "";
+
+
+    // Sub-level error codes are defined at the session level only. Since connection level calls use
+    // wtRCToStatus as well, these connection level calls may pass in a nullptr for the session.
+    if (session) {
+        session->get_last_error(session, &err, &sub_level_err, &err_msg);
+    }
+
+    // Convert sub-level error codes to more granular statuses if applicable.
+    auto subLevelStatus = [&]() -> Status {
+        if (sub_level_err == WT_NONE) {
+            return Status::OK();
+        }
+
+        // We do not convert WT_ROLLBACK error codes into statuses, so we return Status::OK here
+        // and instead handle them differently below.
+        if (retCode == WT_ROLLBACK) {
+            return Status::OK();
+        }
+
+        auto s = generateContextStrStream(prefix, err_msg, err);
+
+        if (sub_level_err == WT_BACKGROUND_COMPACT_ALREADY_RUNNING) {
+            return Status(ErrorCodes::AlreadyInitialized, s);
+        }
+
+        // Return OK when we have an unhandled sublevel error code.
+        return Status::OK();
+    }();
+
+    if (!subLevelStatus.isOK()) {
+        return subLevelStatus;
+    }
+
     if (retCode == WT_ROLLBACK) {
         double cacheThreshold = gTransactionTooLargeForCacheThreshold.load();
         bool txnTooLargeEnabled = cacheThreshold < 1.0;
         bool temporarilyUnavailableEnabled = gEnableTemporarilyUnavailableExceptions.load();
-        const char* reason = session ? session->get_rollback_reason(session) : "";
 
         throwAppropriateException(txnTooLargeEnabled,
                                   temporarilyUnavailableEnabled,
                                   session,
                                   cacheThreshold,
-                                  reason,
+                                  err_msg,
                                   prefix,
-                                  retCode);
+                                  retCode,
+                                  sub_level_err);
     }
 
     // Don't abort on WT_PANIC when repairing, as the error will be handled at a higher layer.
@@ -176,6 +211,11 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
 
     // TODO convert specific codes rather than just using UNKNOWN_ERROR for everything.
     return Status(ErrorCodes::UnknownError, s);
+}
+
+Status wtRCToStatus_slow(int retCode, WiredTigerSession& session, StringData prefix) {
+    return session.with(
+        [retCode, prefix](WT_SESSION* s) { return wtRCToStatus_slow(retCode, s, prefix); });
 }
 
 }  // namespace mongo

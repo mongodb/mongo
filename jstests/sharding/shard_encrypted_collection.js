@@ -1,12 +1,18 @@
-// Verify valid and invalid scenarios for sharding an encrypted collection
-
-import {ShardingTest} from "jstests/libs/shardingtest.js";
-
 /**
+ * Verify valid and invalid scenarios for sharding an encrypted collection
+ *
  * @tags: [
  *  requires_fcv_60,
  * ]
  */
+
+import {EncryptedClient, isEnterpriseShell} from "jstests/fle2/libs/encrypted_client_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
+if (!isEnterpriseShell()) {
+    jsTestLog("Skipping test as it requires the enterprise module");
+    quit();
+}
 
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
@@ -15,6 +21,7 @@ const st = new ShardingTest({shards: 1, mongos: 1});
 const mongos = st.s0;
 const kDbName = 'db';
 
+const client = new EncryptedClient(st.s0, kDbName);
 const sampleEncryptedFields = {
     "fields": [
         {
@@ -34,7 +41,7 @@ const sampleEncryptedFields = {
 
 // Set up the encrypted collection & enable sharding
 assert.commandWorked(
-    mongos.getDB(kDbName).createCollection("basic", {encryptedFields: sampleEncryptedFields}));
+    client.createEncryptionCollection("basic", {encryptedFields: sampleEncryptedFields}));
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 
 function testShardingCommand(command) {

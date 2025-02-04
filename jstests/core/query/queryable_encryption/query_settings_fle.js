@@ -51,8 +51,6 @@ function assertEncryptedQuerySucceeds(query) {
 }
 
 const queries = {
-    findLastNameEq: qsutils.makeFindQueryInstance({filter: {lastName: "Baggins"}}),
-    findLastNameIn: qsutils.makeFindQueryInstance({filter: {lastName: {$in: ["Baggins", "Tuck"]}}}),
     findFirstNameEq: qsutils.makeFindQueryInstance({filter: {firstName: "Frodo"}}),
     findFirstNameIn:
         qsutils.makeFindQueryInstance({filter: {firstName: {$in: ["Bilbo", "Frodo"]}}}),

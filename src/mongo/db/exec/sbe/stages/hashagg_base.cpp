@@ -169,8 +169,6 @@ int64_t HashAggBaseStage<Derived>::spillRowToDisk(const value::MaterializedRow& 
             _recordStore->upsertToRecordStore(_opCtx, rid, val, typeBits, false /*update*/);
     }
 
-    static_cast<Derived*>(this)->getHashAggStats()->spilledBytes += spilledBytes;
-    static_cast<Derived*>(this)->getHashAggStats()->spilledRecords++;
     return spilledBytes;
 }
 
@@ -202,7 +200,8 @@ void HashAggBaseStage<Derived>::spill(MemoryCheckData& mcd) {
 
     _ht->clear();
 
-    static_cast<Derived*>(this)->getHashAggStats()->spills++;
+    static_cast<Derived*>(this)->getHashAggStats()->spillingStats.updateSpillingStats(
+        1 /* spills */, spilledBytes, spilledRecords, _recordStore->storageSize(_opCtx));
     groupCounters.incrementGroupCountersPerSpilling(1 /* spills */, spilledBytes, spilledRecords);
 }
 

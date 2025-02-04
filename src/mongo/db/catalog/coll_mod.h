@@ -72,7 +72,7 @@ CollModRequest makeCollModDryRunRequest(const CollModRequest& request);
 Status processCollModCommand(OperationContext* opCtx,
                              const NamespaceStringOrUUID& nsOrUUID,
                              const CollMod& cmd,
-                             const CollectionAcquisition* acquisition,
+                             CollectionAcquisition* acquisition,
                              BSONObjBuilder* result);
 
 /**

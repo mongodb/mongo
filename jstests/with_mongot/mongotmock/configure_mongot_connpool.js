@@ -1,5 +1,11 @@
 /**
- * @tags: [requires_replication, requires_sharding, sets_replica_set_matching_strategy]
+ * @tags: [
+ *  requires_replication,
+ *  requires_sharding,
+ *  sets_replica_set_matching_strategy,
+ *   # TODO SERVER-99246: re-enable this test once the connection pool stats with gRPC are correct.
+ *   search_community_incompatible,
+ * ]
  */
 
 import {assertHasConnPoolStats} from "jstests/libs/conn_pool_helpers.js";

@@ -32,6 +32,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/notification.h"
@@ -133,6 +134,9 @@ public:
 
             ASSERT_OK(std::move(pf.future).getNoThrow());
 
+            // Give the reactor stats enough time to update.
+            sleepmillis(100);
+
             // No need to test the functionality of ExecutorStats, but we should ensure the reactor
             // properly monitors tasks via wrapTask.
             BSONObjBuilder bob;
@@ -200,15 +204,18 @@ public:
     void testBasicTimerCancel() {
         runTestWithReactor([](ReactorHandle reactor, Atomic<bool>&, Notification<void>* shutdown) {
             auto timer = reactor->makeTimer();
+            auto timeout = Seconds(5);
 
             auto pf = makePromiseFuture<void>();
-            timer->waitUntil(Date_t::now() + Seconds(1)).getAsync([&](Status s) {
+            timer->waitUntil(Date_t::now() + timeout).getAsync([&](Status s) {
                 std::move(pf.promise).setFrom(s);
             });
 
             timer->cancel();
 
+            auto now = Date_t::now();
             ASSERT_EQ(std::move(pf.future).getNoThrow().code(), ErrorCodes::CallbackCanceled);
+            ASSERT_LT(Date_t::now() - now, timeout);
 
             reactor->stop();
             shutdown->get();

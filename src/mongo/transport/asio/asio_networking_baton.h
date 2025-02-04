@@ -70,7 +70,7 @@ public:
     }
 
     // Overrides for `OutOfLineExecutor`
-    void schedule(Task func) noexcept override;
+    void schedule(Task func) override;
 
     // Overrides for `Waitable` and `Notifiable`
     void notify() noexcept override;
@@ -80,12 +80,12 @@ public:
     void run(ClockSource* clkSource) noexcept override;
 
     // Overrides for `Baton`
-    void markKillOnClientDisconnect() noexcept override;
+    void markKillOnClientDisconnect() override;
 
     // Overrides for `NetworkingBaton`
-    Future<void> addSession(Session& session, Type type) noexcept override;
+    Future<void> addSession(Session& session, Type type) override;
 
-    Future<void> waitUntil(const ReactorTimer& timer, Date_t expiration) noexcept override;
+    Future<void> waitUntil(const ReactorTimer& timer, Date_t expiration) override;
 
     Future<void> waitUntil(Date_t expiration, const CancellationToken&) override;
 
@@ -100,11 +100,11 @@ public:
      * Sessions and timers that are still active when the baton detaches will be cancelled in the
      * context of the detachment and their continuations will run inline with detachment.
      */
-    bool cancelSession(Session& session) noexcept override;
+    bool cancelSession(Session& session) override;
 
-    bool cancelTimer(const ReactorTimer& timer) noexcept override;
+    bool cancelTimer(const ReactorTimer& timer) override;
 
-    bool canWait() noexcept override;
+    bool canWait() override;
 
     const TransportLayer* getTransportLayer() const override {
         return _tl;
@@ -124,7 +124,7 @@ private:
         Promise<void> promise;
     };
 
-    bool _cancelTimer(size_t timerId) noexcept;
+    bool _cancelTimer(size_t timerId);
     void _addTimer(Date_t expiration, Timer timer);
 
     /*
@@ -166,7 +166,7 @@ private:
 
     Future<void> _addSession(Session& session, short events);
 
-    void detachImpl() noexcept override;
+    void detachImpl() override;
 
     stdx::mutex _mutex;
 

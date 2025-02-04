@@ -34,7 +34,7 @@
 
 
 #include "mongo/base/status.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/functional.h"
 
 namespace mongo {

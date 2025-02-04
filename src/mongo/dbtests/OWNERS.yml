@@ -1,5 +1,14 @@
 version: 1.0.0
 filters:
+  - "directclienttests.cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "framework*":
+    approvers:
+      - 10gen/server-programmability
+  - "threadedtests.cpp":
+    approvers:
+      - 10gen/server-programmability
   - "mock_dbclient_conn_test.cpp":
     approvers:
       - 10gen/server-networking-and-observability
@@ -51,3 +60,6 @@ filters:
   - "catalogtests.cpp":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "socktests.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability

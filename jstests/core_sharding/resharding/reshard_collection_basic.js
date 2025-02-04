@@ -4,6 +4,8 @@
  *  uses_atclustertime,
  *  # Stepdown test coverage is already provided by the resharding FSM suites.
  *  does_not_support_stepdowns,
+ *  # This test performs explicit calls to shardCollection
+ *  assumes_unsharded_collection,
  * ]
  */
 

@@ -59,16 +59,6 @@ AccumulatorCovariance::AccumulatorCovariance(ExpressionContext* const expCtx, bo
     _memUsageTracker.set(sizeof(*this));
 }
 
-boost::intrusive_ptr<AccumulatorState> AccumulatorCovarianceSamp::create(
-    ExpressionContext* const expCtx) {
-    return new AccumulatorCovarianceSamp(expCtx);
-}
-
-boost::intrusive_ptr<AccumulatorState> AccumulatorCovariancePop::create(
-    ExpressionContext* const expCtx) {
-    return new AccumulatorCovariancePop(expCtx);
-}
-
 void AccumulatorCovariance::reset() {
     _covarianceWF.reset();
 }

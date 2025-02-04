@@ -19,14 +19,6 @@ set -o verbose
 # Use `eval` to force evaluation of the environment variables in the echo statement:
 eval echo "Execution environment: Args: ${args} Target: ${target}"
 
-source ./evergreen/bazel_RBE_supported.sh
-
-if bazel_rbe_supported; then
-  LOCAL_ARG=""
-else
-  LOCAL_ARG="--config=local"
-fi
-
 # We only support explicitly limited arch for code coverage, so there
 # are fewer conditionals here than elsewhere in more general utilities.
 BAZEL_BINARY=bazel
@@ -34,10 +26,11 @@ BAZEL_BINARY=bazel
 # Print command being run to file that can be uploaded
 echo "python buildscripts/install_bazel.py" > bazel-invocation.txt
 
-# TODO(SERVER-98912): Remove when bazel test is better integrated with evergreen
+# TODO(SERVER-99431): Remove when bazel test timeouts are under control
 set +e
 
-echo "       bazel coverage $LOCAL_ARG ${args} ${target}" >> bazel-invocation.txt
-eval $BAZEL_BINARY coverage $LOCAL_ARG ${args} ${target}
+echo "       bazel coverage ${args} ${target}" >> bazel-invocation.txt
+# use eval since some flags have quotes-in-quotes that are otherwise misintepreted
+eval $BAZEL_BINARY coverage ${args} ${target}
 
 exit 0

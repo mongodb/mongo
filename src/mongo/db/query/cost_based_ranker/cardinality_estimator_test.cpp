@@ -334,7 +334,7 @@ TEST(CardinalityEstimator, IndexUnionWithFetchFilter) {
     CardinalityEstimate e2 = getPlanHeuristicCE(*unionPlan2, 1000);
 
     ASSERT_EQ(e1, e2);
-    ASSERT_EQ(e1, makeCard(20.8395));
+    ASSERT_EQ(e1, makeCard(21.0504));
 }
 
 TEST(CardinalityEstimator, HistogramIndexedAndNonIndexedSolutionHaveSameCardinality) {
@@ -351,9 +351,9 @@ TEST(CardinalityEstimator, HistogramIndexedAndNonIndexedSolutionHaveSameCardinal
     BSONObj query = fromjson("{a: {$gt: 5}}");
     auto plan2 = makeCollScanPlan(parse(query));
 
-    auto collStats = makeCollStatsWithHistograms(histFields, 1000.0);
-    CardinalityEstimate e1 = getPlanHistogramCE(*plan1, collStats);
-    CardinalityEstimate e2 = getPlanHistogramCE(*plan2, collStats);
+    auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms(histFields, 1000.0));
+    CardinalityEstimate e1 = getPlanHistogramCE(*plan1, collInfo);
+    CardinalityEstimate e2 = getPlanHistogramCE(*plan2, collInfo);
     ASSERT_EQ(e1, e2);
     ASSERT_GT(e1, zeroCE);
 }
@@ -371,9 +371,9 @@ TEST(CardinalityEstimator, HistogramIndexedAndNonIndexedSolutionConjunctionHaveS
     BSONObj query = fromjson("{a: 5, b: 6}");
     auto plan2 = makeCollScanPlan(parse(query));
 
-    auto collStats = makeCollStatsWithHistograms(histFields, 1000.0);
-    CardinalityEstimate e1 = getPlanHistogramCE(*plan1, collStats);
-    CardinalityEstimate e2 = getPlanHistogramCE(*plan2, collStats);
+    auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms(histFields, 1000.0));
+    CardinalityEstimate e1 = getPlanHistogramCE(*plan1, collInfo);
+    CardinalityEstimate e2 = getPlanHistogramCE(*plan2, collInfo);
     ASSERT_EQ(e1, e2);
     ASSERT_GT(e1, zeroCE);
 }
@@ -381,9 +381,97 @@ TEST(CardinalityEstimator, HistogramIndexedAndNonIndexedSolutionConjunctionHaveS
 TEST(CardinalityEstimator, NoHistogramForPath) {
     BSONObj query = fromjson("{a: {$gt: 5}}");
     auto plan = makeCollScanPlan(parse(query));
-    auto collStats = makeCollStatsWithHistograms({"b"}, 1000.0);
-    const auto ceRes = getPlanCE(*plan, collStats, QueryPlanRankerModeEnum::kHistogramCE);
+    auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({"b"}, 1000.0));
+    const auto ceRes = getPlanCE(*plan, collInfo, QueryPlanRankerModeEnum::kHistogramCE);
     ASSERT(!ceRes.isOK() && ceRes.getStatus().code() == ErrorCodes::HistogramCEFailure);
+}
+
+TEST(CardinalityEstimator, HistogramConjunctionOverMultikey) {
+    BSONObj query = fromjson("{a: {$gt: 1, $lt: 5}}");
+    auto plan = makeCollScanPlan(parse(query));
+    auto collStatsFn = []() {
+        return makeCollStatsWithHistograms({"a"}, 1000.0);
+    };
+    auto nonMultikeyIndex = buildSimpleIndexEntry({"a"});
+    auto nonMultikeyCollInfo = buildCollectionInfo({nonMultikeyIndex}, collStatsFn());
+
+    auto multikeyIndex = buildMultikeyIndexEntry({"a"}, "a");
+    auto multikeyCollInfo = buildCollectionInfo({multikeyIndex}, collStatsFn());
+
+    // Estimate the cardinality of the query twice: one using a catalog with 'a' as non-multikey and
+    // a second time with a catalog with 'a' as multikey. The non-multikey version will create an
+    // interval (1,5) while the multikey version cannot intersect intervals and thus will estimate
+    // [-inf, 5) and (1, inf] using the histogram and combine their selectivities like a regular
+    // conjunction (exponential backoff). We verify this behavior by asserting the estimates have
+    // histogram source and that the non-multikey estimate is smaller.
+    CardinalityEstimate nonMultikeyEst = getPlanHistogramCE(*plan, nonMultikeyCollInfo);
+    CardinalityEstimate multikeyEst = getPlanHistogramCE(*plan, multikeyCollInfo);
+    ASSERT_EQ(nonMultikeyEst.source(), EstimationSource::Histogram);
+    ASSERT_EQ(multikeyEst.source(), EstimationSource::Histogram);
+    ASSERT_LT(nonMultikeyEst, multikeyEst);
+}
+
+TEST(CardinalityEstimator, NorEstimatesNegateOr) {
+    // Test relationship between Nor and Or
+    BSONObj norEqualities = fromjson("{$nor: [{a: 5}, {b: 6}]}");
+    BSONObj orEqualities = fromjson("{$or: [{a: 5}, {b: 6}]}");
+    auto norPlan = makeCollScanPlan(parse(norEqualities));
+    auto orPlan = makeCollScanPlan(parse(orEqualities));
+    CardinalityEstimate norEst = getPlanHeuristicCE(*norPlan, 1000);
+    CardinalityEstimate orEst = getPlanHeuristicCE(*orPlan, 1000);
+    ASSERT_EQ(norEst + orEst, makeCard(1000));
+}
+
+TEST(CardinalityEstimator, NorWithEqGreaterEstiamteThanNorWithInequality) {
+    // Test relationship between NOR(a=5,b=6) and NOR(a>5, b=6)
+    BSONObj norEqualities = fromjson("{$nor: [{a: 5}, {b: 6}]}");
+    BSONObj norInequalities = fromjson("{$nor: [{a: {$gt: 5}}, {b: 6}]}");
+    auto eqPlan = makeCollScanPlan(parse(norEqualities));
+    auto inEqPlan = makeCollScanPlan(parse(norInequalities));
+    CardinalityEstimate eqEst = getPlanHeuristicCE(*eqPlan, 1000);
+    CardinalityEstimate inEqEst = getPlanHeuristicCE(*inEqPlan, 1000);
+    ASSERT_GT(eqEst, inEqEst);
+}
+
+TEST(CardinalityEstimator, ElemMatchNonMultiKey) {
+    BSONObj elemMatchQuery = fromjson("{a: {$elemMatch: {$gt: 5, $lt: 10}}}");
+    auto elemMatchPlan = makeCollScanPlan(parse(elemMatchQuery));
+    auto index = buildSimpleIndexEntry({"a"});
+    auto collInfo = buildCollectionInfo({index}, makeCollStats(1000.0));
+    CardinalityEstimate est = getPlanHeuristicCE(*elemMatchPlan, collInfo);
+    ASSERT_EQ(est, zeroCE);
+}
+
+TEST(CardinalityEstimator, ElemMatchMultikeyComparedToAndNonMultikey) {
+    CardinalityEstimate elemMatchEst{zeroCE};
+    CardinalityEstimate andEst{zeroCE};
+    {
+        BSONObj elemMatchQuery = fromjson("{a: {$elemMatch: {$gt: 5, $lt: 10}}}");
+        auto elemMatchPlan = makeCollScanPlan(parse(elemMatchQuery));
+        auto index = buildMultikeyIndexEntry({"a"}, "a");
+        auto collInfo = buildCollectionInfo({index}, makeCollStats(1000.0));
+        elemMatchEst = getPlanHeuristicCE(*elemMatchPlan, collInfo);
+    }
+    {
+        BSONObj andQuery = fromjson("{a: {$gt: 5, $lt: 10}}");
+        auto andPlan = makeCollScanPlan(parse(andQuery));
+        auto index = buildSimpleIndexEntry({"a"});
+        auto collInfo = buildCollectionInfo({index}, makeCollStats(1000.0));
+        andEst = getPlanHeuristicCE(*andPlan, collInfo);
+    }
+    ASSERT_LT(elemMatchEst, andEst);
+}
+
+TEST(CardinalityEstimator, NestedElemMatchMoreSelectiveThanSingle) {
+    BSONObj elemMatchQuery = fromjson("{a: {$elemMatch: {$gt: 5, $lt: 10}}}");
+    BSONObj nestedElemMatchQuery = fromjson("{a: {$elemMatch: {$elemMatch: {$gt: 5, $lt: 10}}}}");
+    auto elemMatchPlan = makeCollScanPlan(parse(elemMatchQuery));
+    auto nestedElemMatchPlan = makeCollScanPlan(parse(nestedElemMatchQuery));
+    auto index = buildMultikeyIndexEntry({"a"}, "a");
+    auto collInfo = buildCollectionInfo({index}, makeCollStats(1000.0));
+    auto elemMatchEst = getPlanHeuristicCE(*elemMatchPlan, collInfo);
+    auto nestedElemMatchEst = getPlanHeuristicCE(*nestedElemMatchPlan, collInfo);
+    ASSERT_GT(elemMatchEst, nestedElemMatchEst);
 }
 
 }  // unnamed namespace

@@ -2,6 +2,8 @@
  * Test explaining various operations against a non-existent collection.
  * @tags: [
  *   assumes_no_implicit_collection_creation_after_drop,
+ *   # explain is a non-retryable command
+ *   requires_non_retryable_commands,
  * ]
  */
 // Ensure db exists (needed for explain to work).

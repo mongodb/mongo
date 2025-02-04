@@ -311,4 +311,8 @@ assertSetParameterSucceeds("internalQueryFindCommandBatchSize", 30);
 assertSetParameterFails("internalQueryFindCommandBatchSize", 0);
 assertSetParameterFails("internalQueryFindCommandBatchSize", -1);
 
+assertSetParameterSucceeds("internalTextOrStageMaxMemoryBytes", 100 * 1024 * 1024);
+assertSetParameterFails("internalTextOrStageMaxMemoryBytes", 0);
+assertSetParameterFails("internalTextOrStageMaxMemoryBytes", -1);
+
 MongoRunner.stopMongod(conn);

@@ -16,3 +16,35 @@ filters:
     approvers:
       - 10gen/query-integration-javascript
       - 10gen/server-security
+  - "asio-master":
+    approvers:
+      - 10gen/server-networking-and-observability
+      - 10gen/devprod-build
+  - "cares":
+    approvers:
+      - 10gen/server-networking-and-observability
+      - 10gen/devprod-build
+  - "grpc":
+    approvers:
+      - 10gen/server-networking-and-observability
+      - 10gen/devprod-build
+  - "nlohmann-json":
+    approvers:
+      - 10gen/server-networking-and-observability
+      - 10gen/devprod-build
+  - "protobuf":
+    approvers:
+      - 10gen/server-networking-and-observability
+      - 10gen/devprod-build
+  - "snappy":
+    approvers:
+      - 10gen/server-networking-and-observability
+      - 10gen/devprod-build
+  - "zlib":
+    approvers:
+      - 10gen/server-networking-and-observability
+      - 10gen/devprod-build
+  - "zstandard":
+    approvers:
+      - 10gen/server-networking-and-observability
+      - 10gen/devprod-build

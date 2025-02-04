@@ -13,6 +13,16 @@ selector:
 
   exclude_with_any_tags:
     - assumes_standalone_mongod
+    - incompatible_with_initial_sync
+    # Tests that query the system.profile collection cannot run in this suite since an initial sync
+    # may insert unexpected operations into the profile collection.
+    - queries_system_profile_collection
+    # Tests that examine the SBE plan cache, which initial sync may change the contents of.
+    - examines_sbe_cache
+    # The tests below do not expect concurrent reads against their test collections (e.g. the checks aren't expecting concurrent reads but initial sync will be reading those collections).
+    - does_not_support_concurrent_reads
+    # Tests that run getLatestProfilerEntry(). The downstream syncing node affects the profiler.
+    - run_getLatestProfilerEntry
 
 run_hook_interval: &run_hook_interval 20
 executor:

@@ -128,7 +128,7 @@ __wti_connection_close(WT_CONNECTION_IMPL *conn)
      */
     if (ret == 0 && F_ISSET(&conn->log_mgr, WT_LOG_ENABLED) &&
       F_ISSET(&conn->log_mgr, WT_LOG_RECOVER_DONE))
-        WT_TRET(__wt_txn_checkpoint_log(session, true, WT_TXN_LOG_CKPT_STOP, NULL));
+        WT_TRET(__wt_checkpoint_log(session, true, WT_TXN_LOG_CKPT_STOP, NULL));
     WT_TRET(__wt_logmgr_destroy(session));
 
     /* Free memory for collators, compressors, data sources. */
@@ -231,20 +231,21 @@ __wti_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
     WT_RET(__wti_tiered_storage_create(session));
     WT_RET(__wt_logmgr_create(session));
 
-#ifndef _MSC_VER
-    /*
-     * If we're performing a live restore start the server. This is intentionally placed before
-     * recovery starts as we assist recovery by copying over the log files in the background.
-     */
-    WT_RET(__wt_live_restore_server_create(session, cfg));
-#endif
-
     /*
      * Run recovery. NOTE: This call will start (and stop) eviction if recovery is required.
      * Recovery must run before the history store table is created (because recovery will update the
      * metadata, and set the maximum file id seen), and before eviction is started for real.
      */
     WT_RET(__wt_txn_recover(session, cfg));
+
+#ifndef _MSC_VER
+    /*
+     * If we're performing a live restore start the server. This is intentionally placed after
+     * recovery finishes as we depend on the metadata file containing the list of objects that need
+     * live restoration.
+     */
+    WT_RET(__wt_live_restore_server_create(session, cfg));
+#endif
 
     /* Initialize metadata tracking, required before creating tables. */
     WT_RET(__wt_meta_track_init(session));

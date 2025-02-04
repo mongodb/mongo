@@ -60,7 +60,7 @@ public:
 
     void kill(OperationContext* opCtx) final;
 
-    bool remotesExhausted() final;
+    bool remotesExhausted() const final;
 
     std::size_t getNumRemotes() const final;
 

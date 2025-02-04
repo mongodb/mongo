@@ -131,6 +131,7 @@ public:
                                               request().getShardId(),
                                               request().getAtClusterTime(),
                                               request().getOutputNs(),
+                                              true /* storeProgress */,
                                               request().getRelaxed());
 
             std::shared_ptr<ThreadPool> cancelableOperationContextPool = [] {

@@ -41,7 +41,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/repl/election_reason_counter.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {

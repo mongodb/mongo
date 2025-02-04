@@ -8,6 +8,9 @@ from buildscripts.resmokelib.testing.fixtures.external import ExternalFixture
 from buildscripts.resmokelib.testing.fixtures.replicaset import ReplicaSetFixture
 from buildscripts.resmokelib.testing.testcases import interface
 from buildscripts.resmokelib.utils import registry
+from buildscripts.resmokelib.utils.sharded_cluster_util import (
+    refresh_logical_session_cache_with_retry,
+)
 
 
 class FixtureTestCase(interface.TestCase):  # pylint: disable=abstract-method
@@ -59,7 +62,7 @@ class FixtureSetupTestCase(FixtureTestCase):
                 # by the router, when performing the LogicalSessionCache refresh.
                 mongo_client.admin["system.version"].find({})
                 # Perform the LogicalSessionCache refresh.
-                mongo_client.admin.command({"refreshLogicalSessionCacheNow": 1})
+                refresh_logical_session_cache_with_retry(mongo_client)
             self.logger.info("Finished the setup of %s.", self.fixture)
             self.return_code = 0
         except errors.ServerFailure as err:

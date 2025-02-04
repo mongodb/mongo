@@ -27,6 +27,7 @@
 Execution Engine: sbe
 ```json
 {
+	"queryShapeHash" : "091EB94278A1F85267F3544B6ECD5890DFDB1D53FDE9A7D5FEEB911C428C4A54",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -94,6 +95,7 @@ Execution Engine: sbe
 Execution Engine: classic
 ```json
 {
+	"queryShapeHash" : "091EB94278A1F85267F3544B6ECD5890DFDB1D53FDE9A7D5FEEB911C428C4A54",
 	"stages" : [
 		{
 			"$cursor" : {
@@ -177,6 +179,7 @@ Execution Engine: classic
 Execution Engine: sbe
 ```json
 {
+	"queryShapeHash" : "9BC802D6FC495962065BF0847511778C78810FDE9598FA921AD057035FD6327F",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -221,6 +224,7 @@ Execution Engine: sbe
 Execution Engine: classic
 ```json
 {
+	"queryShapeHash" : "9BC802D6FC495962065BF0847511778C78810FDE9598FA921AD057035FD6327F",
 	"stages" : [
 		{
 			"$cursor" : {
@@ -279,6 +283,7 @@ Execution Engine: classic
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "28EA60B44617FE1C60E96E928E1A442CB819DBD37D1B88B62234E5D52985D523",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -331,6 +336,7 @@ Execution Engine: classic
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "246577E6358122F9987A766BA54FD210A7CD32BD545D012BBF0E306FE8AAD0FB",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -380,6 +386,7 @@ Execution Engine: classic
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "246577E6358122F9987A766BA54FD210A7CD32BD545D012BBF0E306FE8AAD0FB",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -404,6 +411,7 @@ Execution Engine: classic
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "CD06A55A8CF0B75DEEF9069F1DF542FFA9797E2B886DF4BE69B8F9C0DE9BC071",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{

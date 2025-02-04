@@ -79,20 +79,11 @@ public:
      */
     void shutdown();
 
-    /**
-     * Invoked when the node enters the primary state.
-     */
-    void onStepUp();
-
     void updateSleepSeconds(Seconds newSeconds);
 
     long long getTTLPasses_forTest();
     long long getTTLSubPasses_forTest();
-
-    /*
-     * Audit indexes when stepping up to primary and do any necessary fixes.
-     */
-    static void doStepUpFixes(OperationContext* opCtx);
+    long long getInvalidTTLIndexSkips_forTest();
 
 private:
     friend class TTLTest;

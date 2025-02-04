@@ -20,6 +20,7 @@ py_library(
         "otel_utils.py",
         "queue.py",
         "registry.py",
+        "sharded_cluster_util.py",
     ],
     visibility = ["//visibility:public"],
     deps = [dependency(

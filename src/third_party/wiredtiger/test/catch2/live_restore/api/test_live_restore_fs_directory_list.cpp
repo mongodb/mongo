@@ -32,7 +32,7 @@ directory_list(live_restore_test_env &env, const std::string &directory = NO_DIR
 {
 
     WT_SESSION *wt_session = reinterpret_cast<WT_SESSION *>(env.session);
-    WT_LIVE_RESTORE_FS *lr_fs = env.lr_fs;
+    WTI_LIVE_RESTORE_FS *lr_fs = env.lr_fs;
 
     char **dirlist = NULL;
     uint32_t count;

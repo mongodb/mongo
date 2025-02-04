@@ -29,26 +29,16 @@
 
 #pragma once
 
-#include <memory>
-#include <utility>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/primary_only_service.h"
-#include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_observer.h"
+#include "mongo/db/s/resharding/resharding_coordinator_service_external_state.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -59,101 +49,16 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/future.h"
-#include "mongo/util/future_impl.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo {
+
 namespace resharding {
 class CoordinatorCommitMonitor;
-
-CollectionType createTempReshardingCollectionType(
-    OperationContext* opCtx,
-    const ReshardingCoordinatorDocument& coordinatorDoc,
-    const ChunkVersion& chunkVersion,
-    const BSONObj& collation,
-    boost::optional<CollectionIndexes> indexVersion,
-    boost::optional<bool> isUnsplittable);
-
-void removeChunkDocs(OperationContext* opCtx, const UUID& collUUID);
-
-void writeDecisionPersistedState(OperationContext* opCtx,
-                                 ReshardingMetrics* metrics,
-                                 const ReshardingCoordinatorDocument& coordinatorDoc,
-                                 OID newCollectionEpoch,
-                                 Timestamp newCollectionTimestamp,
-                                 boost::optional<CollectionIndexes> indexVersion,
-                                 const std::vector<ShardId>& reshardedCollectionPlacement);
-
-void updateTagsDocsForTempNss(OperationContext* opCtx,
-                              const ReshardingCoordinatorDocument& coordinatorDoc,
-                              TxnNumber txnNumber);
-
-void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
-                                          ReshardingMetrics* metrics,
-                                          const ReshardingCoordinatorDocument& coordinatorDoc);
-
-void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
-                                           ReshardingMetrics* metrics,
-                                           const ReshardingCoordinatorDocument& coordinatorDoc,
-                                           std::vector<ChunkType> initialChunks,
-                                           std::vector<BSONObj> zones,
-                                           boost::optional<CollectionIndexes> indexVersion,
-                                           boost::optional<bool> isUnsplittable);
-
-void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
-    OperationContext* opCtx,
-    ReshardingMetrics* metrics,
-    const ReshardingCoordinatorDocument& coordinatorDoc);
-
-ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
-    OperationContext* opCtx,
-    ReshardingMetrics* metrics,
-    const ReshardingCoordinatorDocument& coordinatorDoc,
-    boost::optional<Status> abortReason = boost::none);
 }  // namespace resharding
-
-class ReshardingCoordinatorExternalState {
-public:
-    struct ParticipantShardsAndChunks {
-        std::vector<DonorShardEntry> donorShards;
-        std::vector<RecipientShardEntry> recipientShards;
-        std::vector<ChunkType> initialChunks;
-    };
-
-    virtual ~ReshardingCoordinatorExternalState() = default;
-
-    virtual ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
-        OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) = 0;
-
-    ChunkVersion calculateChunkVersionForInitialChunks(OperationContext* opCtx);
-
-    boost::optional<CollectionIndexes> getCatalogIndexVersion(OperationContext* opCtx,
-                                                              const NamespaceString& nss,
-                                                              const UUID& uuid);
-
-    bool getIsUnsplittable(OperationContext* opCtx, const NamespaceString& nss);
-
-    boost::optional<CollectionIndexes> getCatalogIndexVersionForCommit(OperationContext* opCtx,
-                                                                       const NamespaceString& nss);
-
-    template <typename CommandType>
-    void sendCommandToShards(OperationContext* opCtx,
-                             std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts,
-                             const std::vector<ShardId>& shardIds);
-};
-
-class ReshardingCoordinatorExternalStateImpl final : public ReshardingCoordinatorExternalState {
-public:
-    ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
-        OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) override;
-};
 
 /**
  * Construct to encapsulate cancellation tokens and related semantics on the ReshardingCoordinator.
@@ -244,6 +149,7 @@ private:
 };
 
 class ReshardingCoordinator;
+class CoordinatorCancellationTokenHolder;
 
 class ReshardingCoordinatorService : public repl::PrimaryOnlyService {
 public:
@@ -316,11 +222,16 @@ public:
      */
     void abort(bool skipQuiescePeriod = false);
 
-    /**
-     * Replace in-memory representation of the CoordinatorDoc
+    /*
+     * Sets _coordinatorDoc equal to the supplied doc.
      */
-    void installCoordinatorDoc(OperationContext* opCtx,
-                               const ReshardingCoordinatorDocument& doc) noexcept;
+    void _installCoordinatorDoc(const ReshardingCoordinatorDocument& doc) noexcept;
+
+    /**
+     * Replace in-memory representation of the CoordinatorDoc and logs state transition.
+     */
+    void installCoordinatorDocOnStateTransition(OperationContext* opCtx,
+                                                const ReshardingCoordinatorDocument& doc) noexcept;
 
     CommonReshardingMetadata getMetadata() const {
         return _metadata;
@@ -475,6 +386,13 @@ private:
      * below a configurable threshold (i.e., `remainingReshardingOperationTimeThresholdMillis`).
      */
     void _startCommitMonitor(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    /**
+     * Fetches the number of documents to clone from all donor shards involved in resharding and
+     * persists the value for each donor shard entry in the coordinator state document.
+     */
+    ExecutorFuture<void> _fetchAndPersistNumDocumentsToCloneFromDonors(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
      * Waits on _reshardingCoordinatorObserver to notify that all recipients have finished

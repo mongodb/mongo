@@ -1,52 +1,17 @@
-import io
+import argparse
 import os
 import subprocess
-import sys
 
-# assume we are always running from project root to find buildscripts
-sys.path.append(".")
+parser = argparse.ArgumentParser(description="Generate coverity build file.")
+parser.add_argument("--bazel_executable", required=True)
+parser.add_argument("--bazel_cache", required=True)
+parser.add_argument("--bazel_query", required=True)
 
-from buildscripts.install_bazel import install_bazel
+args, unknownargs = parser.parse_known_args()
 
-bazel_bin_dir = os.path.expanduser("~/.local/bin")
-if not os.path.exists(bazel_bin_dir):
-    os.makedirs(bazel_bin_dir)
-
-
-fake_out = io.StringIO()
-orig_stdout = sys.stdout
-orig_stderr = sys.stderr
-sys.stdout = fake_out
-sys.stderr = fake_out
-bazel_executable = install_bazel(bazel_bin_dir)
-sys.stdout = orig_stdout
-sys.stderr = orig_stderr
-
-
-subprocess.run([bazel_executable, "--output_user_root=/data/bazel_cache", "clean", "--expunge"])
-
-cmd = (
-    [
-        sys.executable,
-        "./buildscripts/scons.py",
-    ]
-    + sys.argv
-    + [
-        "BAZEL_INTEGRATION_DEBUG=1",
-        "\\$BUILD_ROOT/scons/\\$VARIANT_DIR/sconf_temp",
-    ]
-)
-
-# Run a lightwieght scons build to generate the bazel command.
-bazel_cmd_args = None
-proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-for line in proc.stdout.splitlines():
-    if "BAZEL_COMMAND:" in line:
-        # The script is intended to be have output placed into a bash variable, so we should
-        # only ever print the bazel build command
-        bazel_cmd_args = line.split("BAZEL_COMMAND:")[-1].strip().split()[2:-1]
-        break
-
+bazel_cmd_args = unknownargs
+bazel_executable = os.path.expanduser(args.bazel_executable)
+bazel_cache = os.path.expanduser(args.bazel_cache)
 
 # coverity requires a single target which has dependencies on all
 # the cc_library and cc_binaries in our build. There is not a good way from
@@ -55,13 +20,11 @@ for line in proc.stdout.splitlines():
 proc = subprocess.run(
     [
         bazel_executable,
+        bazel_cache,
         "aquery",
     ]
     + bazel_cmd_args
-    + [
-        "--config=local",
-        'mnemonic("CppCompile|LinkCompile", //src/mongo/...)',
-    ],
+    + [args.bazel_query],
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
     text=True,
@@ -96,11 +59,3 @@ cov_gen_script(
     ],
 )
 """)
-
-print(
-    " ".join(
-        [bazel_executable, "--output_user_root=/data/bazel_cache", "build"]
-        + bazel_cmd_args
-        + ["//src/mongo/db/modules/enterprise/coverity:enterprise_coverity_build"]
-    )
-)

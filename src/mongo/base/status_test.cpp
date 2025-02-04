@@ -293,6 +293,19 @@ TEST(Status, ExceptionToStatus) {
     ASSERT_EQUALS(fromBoostExcept, ErrorCodes::UnknownError);
     // Reason should include that it was a boost::exception
     ASSERT_TRUE(fromBoostExcept.reason().find("boost::exception") != std::string::npos);
+
+    Status fromUnknownExceptionType = [=]() {
+        try {
+            throw 7;
+        } catch (...) {
+            return exceptionToStatus();
+        }
+    }();
+
+    ASSERT_NOT_OK(fromUnknownExceptionType);
+    ASSERT_EQUALS(fromUnknownExceptionType, ErrorCodes::UnknownError);
+    // Reason should include that it was an unknown exception
+    ASSERT_TRUE(fromUnknownExceptionType.reason().find("unknown type") != std::string::npos);
 }
 
 DEATH_TEST_REGEX(ErrorExtraInfo, InvariantAllRegistered, "Invariant failure.*parsers::") {

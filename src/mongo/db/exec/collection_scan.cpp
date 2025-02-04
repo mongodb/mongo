@@ -553,7 +553,7 @@ PlanStage::StageState CollectionScan::returnIfMatches(WorkingSetMember* member,
     return PlanStage::ADVANCED;
 }
 
-bool CollectionScan::isEOF() {
+bool CollectionScan::isEOF() const {
     return _commonStats.isEOF;
 }
 

@@ -248,7 +248,9 @@ void DocumentMetadataFields::setScoreAndScoreDetails(Value scoreDetails) {
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         auto score = scoreDetails.getDocument().getField(scoreDetailsScoreField);
         tassert(9679300,
-                "scoreDetails must provide a numeric 'value' field with which to set the score too",
+                str::stream() << "scoreDetails must provide a numeric 'value' field with which to "
+                                 "set the score too, but got "
+                              << scoreDetails.toString(),
                 score.numeric());
 
         const bool featureFlagAlreadyValidated = true;

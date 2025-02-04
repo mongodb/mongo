@@ -101,7 +101,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
@@ -425,6 +425,9 @@ public:
                              const OpTime& lastOpTimeFromClient,
                              BSONObjBuilder* builder) const override;
 
+
+    void setOldestTimestamp(const Timestamp& timestamp) override;
+
     Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
                               ReplSetHeartbeatResponse* response) override;
 
@@ -626,6 +629,12 @@ public:
      */
     void cancelElection_forTest();
 
+
+    /**
+     * Returns a pointer to the topology coordinator used by this replication coordinator.
+     */
+    TopologyCoordinator* getTopologyCoordinator_forTest();
+
     /**
      * Runs the repl set initiate internal function.
      */
@@ -705,6 +714,9 @@ public:
     void setConsistentDataAvailable(OperationContext* opCtx, bool isDataMajorityCommitted) override;
     bool isDataConsistent() const override;
     void setConsistentDataAvailable_forTest();
+
+    ReplicationCoordinatorExternalState* getExternalState_forTest();
+    executor::TaskExecutor* getReplExecutor_forTest();
 
 private:
     using CallbackFn = executor::TaskExecutor::CallbackFn;

@@ -205,12 +205,13 @@ void DbCheckTest::dropIndex(OperationContext* opCtx, const std::string& indexNam
 
     WriteUnitOfWork wuow(opCtx);
 
-    auto writableCollection = collection.getWritableCollection(opCtx);
+    CollectionWriter collWriter{opCtx, collection};
+    auto writableCollection = collWriter.getWritableCollection(opCtx);
     auto writableEntry =
         writableCollection->getIndexCatalog()->getWritableEntryByName(opCtx, indexName);
     ASSERT(writableEntry);
     ASSERT_OK(writableCollection->getIndexCatalog()->dropIndexEntry(
-        opCtx, collection.getWritableCollection(opCtx), writableEntry));
+        opCtx, writableCollection, writableEntry));
 
     ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(
         repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime().getTimestamp() + 1));
@@ -228,7 +229,7 @@ Status DbCheckTest::runHashForCollectionCheck(
     Date_t deadlineOnSecondary) {
     const DbCheckAcquisition acquisition(
         opCtx, kNss, {RecoveryUnit::ReadSource::kNoTimestamp}, PrepareConflictBehavior::kEnforce);
-    const auto& collection = acquisition.coll.getCollectionPtr();
+    const auto& collection = acquisition.collection().getCollectionPtr();
     // Disable throttling for testing.
     DataThrottle dataThrottle(opCtx, []() { return 0; });
     auto hasher = DbCheckHasher(opCtx,
@@ -255,7 +256,7 @@ Status DbCheckTest::runHashForExtraIndexKeysCheck(
     Date_t deadlineOnSecondary) {
     const DbCheckAcquisition acquisition(
         opCtx, kNss, {RecoveryUnit::ReadSource::kNoTimestamp}, PrepareConflictBehavior::kEnforce);
-    const auto& collection = acquisition.coll.getCollectionPtr();
+    const auto& collection = acquisition.collection().getCollectionPtr();
     // Disable throttling for testing.
     DataThrottle dataThrottle(opCtx, []() { return 0; });
     auto hasher = DbCheckHasher(opCtx,

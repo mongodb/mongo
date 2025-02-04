@@ -17,6 +17,7 @@ buildvariants:
       burn_in_tag_include_all_required_and_suggested: true
       burn_in_tag_exclude_build_variants: >-
         macos-debug-suggested
+        ubuntu2204-arm64-bazel-compile
       burn_in_tag_include_build_variants: >-
         enterprise-rhel-8-64-bit-inmem
         enterprise-rhel-8-64-bit-multiversion

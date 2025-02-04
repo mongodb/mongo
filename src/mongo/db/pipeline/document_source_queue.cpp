@@ -47,6 +47,7 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(queue,
                                   LiteParsedDocumentSourceDefault::parse,
                                   DocumentSourceQueue::createFromBson,
                                   true);
+ALLOCATE_DOCUMENT_SOURCE_ID(queue, DocumentSourceQueue::id)
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceQueue::createFromBson(
     BSONElement arrayElem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {

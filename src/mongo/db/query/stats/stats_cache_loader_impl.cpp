@@ -67,7 +67,7 @@ SemiFuture<StatsCacheVal> StatsCacheLoaderImpl::getStats(OperationContext* opCtx
 
     FindCommandRequest findRequest{statsNss};
     BSONObj filter = BSON("_id" << statsPath.second);
-    LOGV2_DEBUG(7085600, 1, "findRequest filter", "filter"_attr = filter.toString());
+    LOGV2_DEBUG(7085600, 1, "findRequest filter", "filter"_attr = redact(filter.toString()));
     findRequest.setFilter(filter.getOwned());
 
     try {

@@ -45,7 +45,7 @@ checkLog.contains(secondaryDB,
 assert.commandWorked(primaryDB.createCollection(primaryColl.getName(), caseInsensitive));
 
 // A string of the character 'b' repeated.
-const baseStr = new Array(50).join("b");
+const baseStr = "b".repeat(49);
 
 for (var i = 0; i < 1000; i++) {
     // Make an _id by uppercasing each character in "baseStr" with 0.5 probability.

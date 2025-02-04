@@ -52,6 +52,9 @@ void testExprRewrite(BSONObj expr, BSONObj expectedMatch) {
 
     auto expression =
         Expression::parseOperand(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    // The $expr + $in rewrite expects the rhs array to a constant array (ExpressionConstant), so we
+    // call optimize() here to ensure the Expression is in a valid format.
+    expression = expression->optimize();
 
     auto result = RewriteExpr::rewrite(expression, expCtx.getCollator());
 
@@ -278,5 +281,59 @@ TEST(RewriteExpr, OrWithAndContainingMatchAndNonMatchChildPartiallyRewritesToMat
     testExprRewrite(expr, expectedMatch);
 }
 
+TEST(RewriteExpr, InWithScalarInListRewritesToMatch) {
+    const BSONObj expr = fromjson("{$expr: {$in: ['$category', ['clothing', 'materials']]}}");
+    const BSONObj expectedMatch = fromjson("{category: {$in: ['clothing', 'materials']}}");
+    testExprRewrite(expr, expectedMatch);
+}
+
+TEST(RewriteExpr, InWithDottedFieldPathRewritesToMatch) {
+    const BSONObj expr = fromjson("{$expr: {$in: ['$category.a', ['clothing', 'materials']]}}");
+    const BSONObj expectedMatch = fromjson("{'category.a': {$in: ['clothing', 'materials']}}");
+    testExprRewrite(expr, expectedMatch);
+}
+
+TEST(RewriteExpr, InWithObjectInListRewritesToMatch) {
+    const BSONObj expr = fromjson("{$expr: {$in: ['$category', [{}, {a: 'clothing'}]]}}");
+    const BSONObj expectedMatch = fromjson("{category: {$in: [{}, {a: 'clothing'}]}}");
+    testExprRewrite(expr, expectedMatch);
+}
+
+TEST(RewriteExpr, InWithArrayInListDoesNotRewriteToMatch) {
+    // Arrays are unsupported because MatchExpressions have implicit array traversal semantics,
+    // while agg expressions don't traverse arrays and will only match on direct equalities.
+    const BSONObj expr = fromjson(
+        "{$expr: {$in: ['$category', ['clothing', 'materials', ['clothing', 'electronics']]]}}");
+    const BSONObj expectedMatch;
+    testExprRewrite(expr, expectedMatch);
+}
+
+TEST(RewriteExpr, InWithRegexInListDoesNotRewriteToMatch) {
+    // Regexes are unsupported because MatchExpressions will evaluate the regex and match documents
+    // that satisfy the regex (/clothing/ will match /clothing/, "clothing", and "clothings").
+    // However, agg will only match on strict equality (/clothing/ only matches a value of
+    // /clothing/).
+    const BSONObj expr = fromjson("{$expr: {$in: ['$category', [/clothing/]]}}");
+    const BSONObj expectedMatch;
+    testExprRewrite(expr, expectedMatch);
+}
+
+TEST(RewriteExpr, InWithNullInListDoesNotRewriteToMatch) {
+    // Nulls are unsupported because MatchExpressions will also match on missing values, such as
+    // documents without a "category" field. However, agg will only match documents whose value at
+    // the field is null.
+    const BSONObj expr = fromjson("{$expr: {$in: ['$category', [null]]}}");
+    const BSONObj expectedMatch;
+    testExprRewrite(expr, expectedMatch);
+}
+
+TEST(RewriteExpr, InWithGetFieldFieldPathDoesNotRewriteToMatch) {
+    // $getField can express field names with dots in them, while InMatchExpression can't, so we
+    // can't rewrite this case.
+    const BSONObj expr =
+        fromjson("{$expr: {$in: [{$getField: 'category.a'}, ['clothing', 'electronics']]}}");
+    const BSONObj expectedMatch;
+    testExprRewrite(expr, expectedMatch);
+}
 }  // namespace
 }  // namespace mongo

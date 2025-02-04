@@ -353,6 +353,10 @@ TEST_F(AsioGRPCTransportLayerManagerTest, MarkKillOnGRPCClientDisconnect) {
 
 TEST_F(AsioGRPCTransportLayerManagerTest, StartupUsingCreateWithConfig) {
     runTest([&](auto& monitor) {
+        int initialPort = serverGlobalParams.port;
+        serverGlobalParams.port = test::kLetKernelChoosePort;
+        ON_BLOCK_EXIT([&] { serverGlobalParams.port = initialPort; });
+
         auto tlm = transport::TransportLayerManagerImpl::createWithConfig(
             &serverGlobalParams, getServiceContext(), true);
 

@@ -335,6 +335,7 @@ std::vector<BSONObj> _runExhaustiveAggregation(OperationContext* opCtx,
                                                              ClusterAggregate::Namespaces{nss, nss},
                                                              aggRequest,
                                                              PrivilegeVector(),
+                                                             boost::none, /*verbosity*/
                                                              &responseBuilder);
                 uassertStatusOKWithContext(
                     status, str::stream() << "Failed to execute aggregation for: " << reason);

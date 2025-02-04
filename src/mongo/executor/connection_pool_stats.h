@@ -37,7 +37,6 @@
 #include <string>
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/s/sharding_task_executor_pool_controller.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/histogram.h"
@@ -113,7 +112,9 @@ struct ConnectionPoolStats {
     size_t totalWasNeverUsed = 0u;
     size_t totalWasUsedOnce = 0u;
     Milliseconds totalConnUsageTime{0};
-    boost::optional<ShardingTaskExecutorPoolController::MatchingStrategy> strategy;
+
+    // The ShardingTaskExecutorPoolController::MatchingStrategy in use by this pool, if any.
+    boost::optional<std::string> matchingStrategy;
 
     ConnectionWaitTimeHistogram acquisitionWaitTimes{};
 

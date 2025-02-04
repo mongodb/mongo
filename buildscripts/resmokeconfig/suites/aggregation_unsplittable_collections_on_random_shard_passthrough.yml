@@ -8,10 +8,10 @@ selector:
     - jstests/aggregation/extras/*.js
     - jstests/aggregation/data/*.js
     # TODO SERVER-32311: These tests use getAggPlanStage(), which can't handle sharded explain output.
-    - jstests/aggregation/match_swapping_renamed_fields.js
-    - jstests/aggregation/use_query_project_and_sort.js
-    - jstests/aggregation/use_query_projection.js
-    - jstests/aggregation/use_query_sort.js
+    - jstests/aggregation/optimization/match_swapping_renamed_fields.js
+    - jstests/aggregation/optimization/use_query_project_and_sort.js
+    - jstests/aggregation/optimization/use_query_projection.js
+    - jstests/aggregation/optimization/use_query_sort.js
 
     # These tests are written such that, after we check the engine being used and the colocation of
     # the involved collections, we drop and recreate our collections for each test case. Given that

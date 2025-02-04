@@ -154,11 +154,6 @@ public:
     // The key (i.e. (namespace, metadata)) for this bucket.
     const BucketKey key;
 
-    // Top-level hashed field names of the measurements that have been inserted into the bucket.
-    // TODO(SERVER-99003): Remove to avoid extra overhead. These are stored as keys in
-    // measurementMap.
-    tracking::StringSet fieldNames;
-
     // Top-level hashed new field names that have not yet been committed into the bucket.
     tracking::StringSet uncommittedFieldNames;
 

@@ -1,7 +1,16 @@
 /**
  * Control mongotmock.
+ * @tags: [
+ *   # Unix domain sockets are not available on windows.
+ *   incompatible_with_windows_tls
+ * ]
  */
 
+import {
+    CA_CERT,
+    CLIENT_CERT,
+    SERVER_CERT,
+} from "jstests/ssl/libs/ssl_helpers.js";
 import {
     getDefaultExplainContents,
     getDefaultLastExplainContents
@@ -288,6 +297,9 @@ export function mockAllRequestsWithBatchSizes({
     mongotMockConn.setMockResponses(history, cursorId);
 }
 
+const tlsModeOptions = ["disabled", "allowTLS", "preferTLS", "requireTLS"];
+const kSIGTERM = 15;
+
 export class MongotMock {
     /**
      * Create a new mongotmock.
@@ -296,33 +308,70 @@ export class MongotMock {
         this.mongotMock = "mongotmock";
         this.pid = undefined;
         this.port = allocatePort();
+        if (this.useGRPC()) {
+            this.gRPCPort = allocatePort();
+        }
         this.conn = undefined;
         this.dataDir = (options && options.dataDir) || MongoRunner.dataDir + "/mongotmock";
         if (!pathExists(this.dataDir)) {
             resetDbpath(this.dataDir);
         }
-        this.dataDir = this.dataDir + "/" + this.port;
+        this.dataDir = this.dataDir + "/" + (this.useGRPC() ? this.gRPCPort : this.port);
         resetDbpath(this.dataDir);
     }
 
     /**
      *  Start mongotmock and wait for it to start.
      */
-    start(opts = {bypassAuth: false}) {
-        print("mongotmock: " + this.port);
+    start(opts = {bypassAuth: false, tlsMode: "disabled"}) {
+        print("mongotmock: " + (this.useGRPC() ? this.gRPCPort : this.port));
+        const tlsEnabled = tlsModeOptions.includes(opts.tlsMode) && opts.tlsMode != "disabled";
 
-        const conn_str = this.dataDir + "/mongocryptd.sock";
+        // The search_ssl suite automatically enables TLS for connections to mongo processes,
+        // including mongotmock. We need to control TLS usage for mongotmock connections to test
+        // scenarios with TLS disabled on mongot but enabled on mongod. Therefore, we use host:port
+        // configurations when enabling TLS on mongot, and use mongocryptd.sock otherwise, as it
+        // doesn't use TLS for mongotmock connections.
+        const conn_str = tlsEnabled ? "localhost:" + this.port : this.dataDir + "/mongocryptd.sock";
         const args = [this.mongotMock];
 
         args.push("--port=" + this.port);
+        if (this.useGRPC()) {
+            args.push("--grpcPort=" + this.gRPCPort);
+        }
         // mongotmock uses mongocryptd.sock.
         args.push("--unixSocketPrefix=" + this.dataDir);
+
+        if (this.useGRPC()) {
+            // We set up mongotmock with ingress gRPC to enable testing the community architecture,
+            // but this is still gated behind a feature flag.
+            args.push("--setParameter");
+            args.push("featureFlagGRPC=1");
+            // TLS is needed to start ingress gRPC.
+            args.push("--tlsMode");
+            args.push("allowTLS");
+            args.push("--tlsCertificateKeyFile");
+            args.push(SERVER_CERT);
+            args.push("--tlsCAFile");
+            args.push(CA_CERT);
+            args.push("--tlsAllowConnectionsWithoutCertificates");
+        }
 
         args.push("--setParameter");
         args.push("enableTestCommands=1");
         args.push("-vvv");
 
         args.push("--pidfilepath=" + this.dataDir + "/cryptd.pid");
+
+        if (tlsEnabled) {
+            args.push("--tlsMode");
+            args.push(opts.tlsMode);
+            args.push("--tlsCertificateKeyFile");
+            args.push(SERVER_CERT);
+            args.push("--tlsCAFile");
+            args.push(CA_CERT);
+            args.push("--tlsAllowConnectionsWithoutCertificates");
+        }
 
         if (TestData && TestData.auth && !opts.bypassAuth) {
             args.push("--clusterAuthMode=keyFile");
@@ -336,11 +385,18 @@ export class MongotMock {
         // Wait for connection to be established with server
         var conn = null;
         const pid = this.pid;
-        const port = this.port;
+        const useGRPC = this.useGRPC();
 
         assert.soon(function() {
             try {
-                conn = new Mongo(conn_str);
+                if (!tlsEnabled) {
+                    conn = new Mongo(conn_str, undefined, {gRPC: useGRPC});
+                } else {
+                    conn = new Mongo(
+                        conn_str,
+                        undefined,
+                        {tls: {certificateKeyFile: CLIENT_CERT, CAFile: CA_CERT}, gRPC: useGRPC});
+                }
                 if (TestData && TestData.auth && opts.bypassAuth) {
                     // if Mongot is opting out of auth, we don't need to
                     // authenticate our connection to it.
@@ -364,13 +420,13 @@ export class MongotMock {
     }
 
     /**
-     *  Stop mongotmock, asserting that it shutdown cleanly.
+     *  Stop mongotmock, asserting that it shutdown cleanly or with the provided code.
      */
-    stop() {
+    stop(code = kSIGTERM) {
         // Check the remaining history on the mock. There should be 0 remaining queued commands.
         this.assertEmpty();
 
-        return stopMongoProgramByPid(this.pid);
+        return stopMongoProgramByPid(this.pid, code);
     }
 
     /**
@@ -378,6 +434,10 @@ export class MongotMock {
      */
     getConnection() {
         return this.conn;
+    }
+
+    useGRPC() {
+        return TestData && TestData.setParameters && TestData.setParameters.useGrpcForSearch;
     }
 
     /**

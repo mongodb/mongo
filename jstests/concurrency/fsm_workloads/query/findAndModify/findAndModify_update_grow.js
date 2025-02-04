@@ -25,7 +25,7 @@ export const $config = (function() {
         var uniqueFieldName = 'findAndModify_update_grow';
 
         function makeStringOfLength(length) {
-            return new Array(length + 1).join('x');
+            return 'x'.repeat(length);
         }
 
         function makeDoc(tid) {

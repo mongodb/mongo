@@ -36,12 +36,6 @@ env.SConscript(
 )
 
 env.CppUnitTest(
-    target="command_diagnostic_printer_test",
-    source=[],
-    LIBDEPS=[],
-)
-
-env.CppUnitTest(
     target="express_execution_test",
     source=[],
     LIBDEPS=[],

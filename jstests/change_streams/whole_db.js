@@ -1,9 +1,14 @@
 // Basic tests for $changeStream against all collections in a database.
 // Do not run in whole-cluster passthrough since this test assumes that the change stream will be
 // invalidated by a database drop.
-// @tags: [do_not_run_in_whole_cluster_passthrough]
+// @tags: [
+//   do_not_run_in_whole_cluster_passthrough,
+//   requires_profiling,
+//   requires_fcv_81
+// ]
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {
     assertInvalidChangeStreamNss,
     ChangeStreamTest
@@ -80,5 +85,15 @@ validSystemColls.forEach(collName => {
         },
     });
 });
+
+// Test that getMore commands from the whole-db change stream are logged by the profiler.
+if (!FixtureHelpers.isMongos(testDb)) {
+    assert.commandWorked(testDb.runCommand({profile: 2}));
+    cst.getNextBatch(cursor);
+    const profileEntry = getLatestProfilerEntry(testDb, {op: "getmore"});
+    const firstStage = Object.keys(profileEntry.originatingCommand.pipeline[0])[0];
+    assert(["$changeStream", "$_internalChangeStreamOplogMatch"].includes(firstStage),
+           profileEntry);
+}
 
 cst.cleanUp();

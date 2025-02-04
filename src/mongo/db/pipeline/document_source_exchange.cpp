@@ -61,6 +61,8 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(exchangeFailLoadNextBatch);
 
+ALLOCATE_DOCUMENT_SOURCE_ID(exchange, DocumentSourceExchange::id)
+
 class MutexAndResourceLock {
     OperationContext* _opCtx;
     ResourceYielder* _resourceYielder;

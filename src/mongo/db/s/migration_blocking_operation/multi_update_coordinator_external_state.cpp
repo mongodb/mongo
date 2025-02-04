@@ -101,6 +101,7 @@ bool MultiUpdateCoordinatorExternalStateImpl::isUpdatePending(
                                                          request,
                                                          LiteParsedPipeline{request},
                                                          PrivilegeVector(),
+                                                         boost::none, /* verbosity */
                                                          &responseBuilder);
 
             uassertStatusOKWithContext(status,

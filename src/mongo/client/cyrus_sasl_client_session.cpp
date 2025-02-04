@@ -122,7 +122,7 @@ MONGO_INITIALIZER(CyrusSaslAllocatorsAndMutexesClient)(InitializerContext*) {
     sasl_set_mutex(saslMutexAlloc, saslMutexLock, saslMutexUnlock, saslMutexFree);
 }
 
-int saslClientLogSwallow(void* context, int priority, const char* message) noexcept {
+int saslClientLogSwallow(void* context, int priority, const char* message) {
     return SASL_OK;  // do nothing
 }
 
@@ -189,7 +189,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CyrusSaslClientContext,
  * Note that in Mongo, the authentication and authorization ids (authid and authzid) are always
  * the same.  These correspond to SASL_CB_AUTHNAME and SASL_CB_USER.
  */
-int saslClientGetSimple(void* context, int id, const char** result, unsigned* resultLen) noexcept {
+int saslClientGetSimple(void* context, int id, const char** result, unsigned* resultLen) {
     try {
         CyrusSaslClientSession* session = static_cast<CyrusSaslClientSession*>(context);
         if (!session || !result)
@@ -221,10 +221,7 @@ int saslClientGetSimple(void* context, int id, const char** result, unsigned* re
  * Callback registered on the sasl_conn_t underlying a CyrusSaslClientSession to allow
  * the Cyrus SASL library to query for the password data.
  */
-int saslClientGetPassword(sasl_conn_t* conn,
-                          void* context,
-                          int id,
-                          sasl_secret_t** outSecret) noexcept {
+int saslClientGetPassword(sasl_conn_t* conn, void* context, int id, sasl_secret_t** outSecret) {
     try {
         CyrusSaslClientSession* session = static_cast<CyrusSaslClientSession*>(context);
         if (!session || !outSecret)

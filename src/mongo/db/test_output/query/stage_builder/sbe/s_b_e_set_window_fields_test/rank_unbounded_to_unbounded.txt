@@ -1,0 +1,12 @@
+# Golden test output of SBESetWindowFieldsTest/RankUnboundedToUnbounded
+[2] project [s10 = makeBsonObj(MakeObjSpec([rank = Set(0)], Open, NewObj, 0), s2, s9)] 
+[2] project [s9 = 
+    if exists(s6) 
+    then aggRankFinalize(s6) 
+    else null 
+] 
+[2] window [s2, s3, s7] [frameFirst[], frameLast[], lowBound{}, highBound{((s8 <=> s7) <= 0)}] [s6 = {init{}, add{aggRank(s3, true)}, remove{}}] 
+[2] agg_project [s7 = sum(1)] 
+[1] project [s3 = getField(s2, "a")] 
+[1] project [s2 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"a" : 1, "b" : 1}], [{"a" : 2, "b" : 7}], [{"a" : 3, "b" : 5}], [{"a" : 4, "b" : 3}]]} 

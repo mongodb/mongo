@@ -85,7 +85,7 @@ AccumulationExpression AccumulatorInternalJsReduce::parseInternalJsReduce(
             argument);
 
     auto factory = [expCtx, funcSource = funcSource]() {
-        return AccumulatorInternalJsReduce::create(expCtx, funcSource);
+        return make_intrusive<AccumulatorInternalJsReduce>(expCtx, funcSource);
     };
 
     auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
@@ -196,12 +196,6 @@ Value AccumulatorInternalJsReduce::getValue(bool toBeMerged) {
     }
 }
 
-boost::intrusive_ptr<AccumulatorState> AccumulatorInternalJsReduce::create(
-    ExpressionContext* const expCtx, StringData funcSource) {
-
-    return make_intrusive<AccumulatorInternalJsReduce>(expCtx, funcSource);
-}
-
 void AccumulatorInternalJsReduce::reset() {
     _values.clear();
     _memUsageTracker.set(sizeof(*this));
@@ -217,16 +211,6 @@ Document AccumulatorInternalJsReduce::serialize(boost::intrusive_ptr<Expression>
 }
 
 REGISTER_ACCUMULATOR(accumulator, AccumulatorJs::parse);
-
-boost::intrusive_ptr<AccumulatorState> AccumulatorJs::create(
-    ExpressionContext* const expCtx,
-    std::string init,
-    std::string accumulate,
-    std::string merge,
-    boost::optional<std::string> finalize) {
-    return new AccumulatorJs(
-        expCtx, std::move(init), std::move(accumulate), std::move(merge), std::move(finalize));
-}
 
 namespace {
 // Parses a constant expression of type String or Code.
@@ -340,7 +324,7 @@ AccumulationExpression AccumulatorJs::parse(ExpressionContext* const expCtx,
                     accumulate = std::move(accumulate),
                     merge = std::move(merge),
                     finalize = std::move(finalize)]() {
-        return new AccumulatorJs(expCtx, init, accumulate, merge, finalize);
+        return make_intrusive<AccumulatorJs>(expCtx, init, accumulate, merge, finalize);
     };
     return {
         std::move(initArgs), std::move(accumulateArgs), std::move(factory), AccumulatorJs::kName};

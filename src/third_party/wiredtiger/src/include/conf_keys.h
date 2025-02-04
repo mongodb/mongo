@@ -155,7 +155,6 @@
 #define WT_CONF_ID_file_extend 272ULL
 #define WT_CONF_ID_file_max 220ULL
 #define WT_CONF_ID_file_metadata 86ULL
-#define WT_CONF_ID_fill_holes_on_close 279ULL
 #define WT_CONF_ID_final_flush 145ULL
 #define WT_CONF_ID_flush_time 64ULL
 #define WT_CONF_ID_flush_timestamp 65ULL
@@ -244,6 +243,7 @@
 #define WT_CONF_ID_read 138ULL
 #define WT_CONF_ID_read_corrupt 128ULL
 #define WT_CONF_ID_read_once 114ULL
+#define WT_CONF_ID_read_size 279ULL
 #define WT_CONF_ID_read_timestamp 4ULL
 #define WT_CONF_ID_readonly 60ULL
 #define WT_CONF_ID_realloc_exact 187ULL
@@ -450,11 +450,9 @@ static const struct {
         uint64_t total;
     } Io_capacity;
     struct {
-        struct {
-            uint64_t fill_holes_on_close;
-        } Debug;
         uint64_t enabled;
         uint64_t path;
+        uint64_t read_size;
         uint64_t threads_max;
     } Live_restore;
     struct {
@@ -807,11 +805,9 @@ static const struct {
     WT_CONF_ID_Io_capacity | (WT_CONF_ID_total << 16),
   },
   {
-    {
-      WT_CONF_ID_Live_restore | (WT_CONF_ID_Debug << 16) | (WT_CONF_ID_fill_holes_on_close << 32),
-    },
     WT_CONF_ID_Live_restore | (WT_CONF_ID_enabled << 16),
     WT_CONF_ID_Live_restore | (WT_CONF_ID_path << 16),
+    WT_CONF_ID_Live_restore | (WT_CONF_ID_read_size << 16),
     WT_CONF_ID_Live_restore | (WT_CONF_ID_threads_max << 16),
   },
   {

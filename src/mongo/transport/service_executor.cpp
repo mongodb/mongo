@@ -43,7 +43,7 @@
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/processinfo.h"
@@ -103,13 +103,12 @@ void forEachServiceExecutor(ServiceContext* svcCtx, const Func& func) {
 
 }  // namespace
 
-ServiceExecutorContext* ServiceExecutorContext::get(Client* client) noexcept {
+ServiceExecutorContext* ServiceExecutorContext::get(Client* client) {
     // Service worker Clients will never have a ServiceExecutorContext.
     return getServiceExecutorContext(client).get();
 }
 
-void ServiceExecutorContext::set(Client* client,
-                                 std::unique_ptr<ServiceExecutorContext> seCtxPtr) noexcept {
+void ServiceExecutorContext::set(Client* client, std::unique_ptr<ServiceExecutorContext> seCtxPtr) {
     auto& seCtx = *seCtxPtr;
     auto& serviceExecutorContext = getServiceExecutorContext(client);
     invariant(!serviceExecutorContext);
@@ -129,7 +128,7 @@ void ServiceExecutorContext::set(Client* client,
     serviceExecutorContext = std::move(seCtxPtr);
 }
 
-void ServiceExecutorContext::reset(Client* client) noexcept {
+void ServiceExecutorContext::reset(Client* client) {
     if (!client)
         return;
     auto& seCtx = getServiceExecutorContext(client);

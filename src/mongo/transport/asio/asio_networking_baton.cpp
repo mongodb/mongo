@@ -154,7 +154,7 @@ public:
 
 }  // namespace
 
-void AsioNetworkingBaton::schedule(Task func) noexcept {
+void AsioNetworkingBaton::schedule(Task func) {
     auto task = [this, func = std::move(func)](stdx::unique_lock<stdx::mutex> lk) mutable {
         auto status = _opCtx ? Status::OK() : getDetachedError();
         lk.unlock();
@@ -246,7 +246,7 @@ void AsioNetworkingBaton::run(ClockSource* clkSource) noexcept {
     }
 }
 
-void AsioNetworkingBaton::markKillOnClientDisconnect() noexcept {
+void AsioNetworkingBaton::markKillOnClientDisconnect() {
     auto client = _opCtx->getClient();
     invariant(client);
     if (auto session = client->session()) {
@@ -258,12 +258,12 @@ void AsioNetworkingBaton::markKillOnClientDisconnect() noexcept {
     }
 }
 
-Future<void> AsioNetworkingBaton::addSession(Session& session, Type type) noexcept {
+Future<void> AsioNetworkingBaton::addSession(Session& session, Type type) {
     return _addSession(session, type == Type::In ? POLLIN : POLLOUT);
 }
 
 Future<void> AsioNetworkingBaton::waitUntil(const ReactorTimer& reactorTimer,
-                                            Date_t expiration) noexcept try {
+                                            Date_t expiration) try {
     auto pf = makePromiseFuture<void>();
     _addTimer(expiration, Timer{reactorTimer.id(), std::move(pf.promise)});
 
@@ -337,7 +337,7 @@ void AsioNetworkingBaton::_addTimer(Date_t expiration, Timer timer) {
     });
 }
 
-bool AsioNetworkingBaton::cancelSession(Session& session) noexcept {
+bool AsioNetworkingBaton::cancelSession(Session& session) {
     const auto id = session.id();
 
     stdx::unique_lock lk(_mutex);
@@ -385,12 +385,12 @@ bool AsioNetworkingBaton::cancelSession(Session& session) noexcept {
     return true;
 }
 
-bool AsioNetworkingBaton::cancelTimer(const ReactorTimer& timer) noexcept {
+bool AsioNetworkingBaton::cancelTimer(const ReactorTimer& timer) {
     const auto id = timer.id();
     return _cancelTimer(id);
 }
 
-bool AsioNetworkingBaton::_cancelTimer(size_t id) noexcept {
+bool AsioNetworkingBaton::_cancelTimer(size_t id) {
     stdx::unique_lock lk(_mutex);
 
     // If the timer is pending, cancel it immediately, inline.
@@ -432,7 +432,7 @@ bool AsioNetworkingBaton::_cancelTimer(size_t id) noexcept {
     return true;
 }
 
-bool AsioNetworkingBaton::canWait() noexcept {
+bool AsioNetworkingBaton::canWait() {
     stdx::lock_guard lk(_mutex);
     return _opCtx;
 }
@@ -645,7 +645,7 @@ Future<void> AsioNetworkingBaton::_addSession(Session& session, short events) tr
     return ex.toStatus();
 }
 
-void AsioNetworkingBaton::detachImpl() noexcept {
+void AsioNetworkingBaton::detachImpl() {
 
     stdx::unique_lock lk(_mutex);
 

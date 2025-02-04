@@ -47,6 +47,7 @@ REGISTER_DOCUMENT_SOURCE(_internalSplitPipeline,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceInternalSplitPipeline::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalSplitPipeline, DocumentSourceInternalSplitPipeline::id)
 
 constexpr StringData DocumentSourceInternalSplitPipeline::kStageName;
 

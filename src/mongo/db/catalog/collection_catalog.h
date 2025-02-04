@@ -58,7 +58,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/views/view.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/immutable/map.h"
 #include "mongo/util/immutable/unordered_map.h"
@@ -71,6 +71,13 @@ namespace mongo {
 
 extern const SharedCollectionDecorations::Decoration<AtomicWord<bool>>
     historicalIDTrackerAllowsMixedModeWrites;
+
+namespace catalog {
+// Forward declaration of a friend class for the CollectionCatalog since it resides in another
+// namespace. This is a special class that controls opening/closing the catalog and resides in
+// catalog_control.cpp
+class CatalogControlUtils;
+};  // namespace catalog
 
 class CollectionCatalog {
     friend class iterator;
@@ -233,15 +240,16 @@ public:
      *
      * No collection level lock is required to call this function.
      */
-    const Collection* establishConsistentCollection(OperationContext* opCtx,
-                                                    const NamespaceStringOrUUID& nssOrUUID,
-                                                    boost::optional<Timestamp> readTimestamp) const;
+    ConsistentCollection establishConsistentCollection(
+        OperationContext* opCtx,
+        const NamespaceStringOrUUID& nssOrUUID,
+        boost::optional<Timestamp> readTimestamp) const;
 
     // Establish a consistent view of the database. This method will only work against the latest
     // timestamp. It is equivalent to calling establishConsistentCollection with no timestamp on all
     // collections of the database.
-    std::vector<const Collection*> establishConsistentCollections(OperationContext* opCtx,
-                                                                  const DatabaseName& dbName) const;
+    std::vector<ConsistentCollection> establishConsistentCollections(
+        OperationContext* opCtx, const DatabaseName& dbName) const;
 
     /**
      * Returns a shared_ptr to a drop pending index if it's found and not expired.
@@ -318,8 +326,8 @@ public:
                                                      boost::optional<Timestamp> commitTime);
 
     /**
-     * Create a temporary record of an uncommitted view namespace to aid in detecting a simultaneous
-     * attempt to create a collection with the same namespace.
+     * Create a temporary record of an uncommitted view namespace to aid in detecting a
+     * simultaneous attempt to create a collection with the same namespace.
      */
     void registerUncommittedView(OperationContext* opCtx, const NamespaceString& nss);
 
@@ -381,31 +389,6 @@ public:
         OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID) const;
 
     /**
-     * Returns a non-const Collection pointer that corresponds to the provided NamespaceString/UUID
-     * for a DDL operation.
-     *
-     * A MODE_X collection lock is required to call this function, unless the namespace/UUID
-     * corresponds to an uncommitted collection creation in which case a MODE_IX lock is sufficient.
-     *
-     * A WriteUnitOfWork must be active and the instance returned will be created using
-     * copy-on-write and will be different than prior calls to lookupCollection. However, subsequent
-     * calls to lookupCollection will return the same instance as this function as long as the
-     * WriteUnitOfWork remains active.
-     *
-     * When the WriteUnitOfWork commits future versions of the CollectionCatalog will return this
-     * instance. If the WriteUnitOfWork rolls back the instance will be discarded.
-     *
-     * It is safe to write to the returned instance in onCommit handlers but not in onRollback
-     * handlers.
-     *
-     * Returns nullptr if the 'uuid' is not known.
-     */
-    Collection* lookupCollectionByUUIDForMetadataWrite(OperationContext* opCtx,
-                                                       const UUID& uuid) const;
-    Collection* lookupCollectionByNamespaceForMetadataWrite(OperationContext* opCtx,
-                                                            const NamespaceString& nss) const;
-
-    /**
      * This function gets the NamespaceString from the collection catalog entry that
      * corresponds to UUID uuid. If no collection exists with the uuid, return
      * boost::none. See onCloseCatalog/onOpenCatalog for more info.
@@ -423,13 +406,20 @@ public:
      * Checks if the provided instance is the latest version for this catalog version. This check
      * should be used to determine if the collection instance is safe to perform CRUD writes on. For
      * the check to be meaningful it should be performed against CollectionCatalog::latest.
+     * NOTE: the check is based on pointer equality between the 'collection' parameter and
+     * the object stored by the catalog under the same UUID; this may lead to unexpected false
+     * results when a different, but structurally equivalent parameter is passed in (like a
+     * 'collection' obtained via read-through). Consider using checkIfUUIDExistsAtLatest when such a
+     * behavior is not desirable.
      */
     bool isLatestCollection(OperationContext* opCtx, const Collection* collection) const;
 
     /**
      * Checks if the provided UUID is compatible with the latest version for this catalog version
-     * (plus uncommitted catalog updates). The method is exclusively meant to support the ShardRole
-     * API in the resource acquisition for unsharded collection.
+     * (plus uncommitted catalog updates).
+     * The function only returns a meaningful result when called against CollectionCatalog::latest()
+     * and it is exclusively meant to support the ShardRole API in the resource acquisition for
+     * unsharded collection.
      */
     bool checkIfUUIDExistsAtLatest(OperationContext* opCtx, UUID uuid) const;
 
@@ -680,6 +670,41 @@ public:
 
 private:
     friend class CollectionCatalog::iterator;
+
+    // We only allow the CollectionWriter class to interface with the catalog. This is to prevent
+    // misuse (i.e. bypassing existing infrastructure) and to only provide a single way to interact
+    // with the catalog for writers.
+    friend class CollectionWriter;
+
+    // We allow this class to access the internal methods as it deals with opening/closing the
+    // catalog and will perform live modifications to the catalog.
+    friend class catalog::CatalogControlUtils;
+
+    /**
+     * Returns a non-const Collection pointer that corresponds to the provided NamespaceString/UUID
+     * for a DDL operation.
+     *
+     * A MODE_X collection lock is required to call this function, unless the namespace/UUID
+     * corresponds to an uncommitted collection creation in which case a MODE_IX lock is sufficient.
+     *
+     * A WriteUnitOfWork must be active and the instance returned will be created using
+     * copy-on-write and will be different than prior calls to lookupCollection. However, subsequent
+     * calls to lookupCollection will return the same instance as this function as long as the
+     * WriteUnitOfWork remains active.
+     *
+     * When the WriteUnitOfWork commits future versions of the CollectionCatalog will return this
+     * instance. If the WriteUnitOfWork rolls back the instance will be discarded.
+     *
+     * It is safe to write to the returned instance in onCommit handlers but not in onRollback
+     * handlers.
+     *
+     * Returns nullptr if the 'uuid' is not known.
+     */
+    Collection* lookupCollectionByUUIDForMetadataWrite(OperationContext* opCtx,
+                                                       const UUID& uuid) const;
+    Collection* lookupCollectionByNamespaceForMetadataWrite(OperationContext* opCtx,
+                                                            const NamespaceString& nss) const;
+
     class PublishCatalogUpdates;
 
     /**

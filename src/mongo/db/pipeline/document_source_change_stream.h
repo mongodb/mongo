@@ -262,6 +262,7 @@ public:
 
     // The internal change events that are not exposed to the users.
     static constexpr StringData kReshardBeginOpType = "reshardBegin"_sd;
+    static constexpr StringData kReshardBlockingWritesOpType = "reshardBlockingWrites"_sd;
     static constexpr StringData kReshardDoneCatchUpOpType = "reshardDoneCatchUp"_sd;
 
     // Internal op type to signal mongos to open cursors on new shards.
@@ -408,8 +409,10 @@ public:
 
     virtual Value doSerialize(const SerializationOptions& opts) const = 0;
 
-    DocumentSourceType getType() const final {
-        return DocumentSourceType::kInternalChangeStream;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 };
 

@@ -152,10 +152,10 @@ std::tuple<bool, value::TypeTags, value::Value> LookupHashTable::normalizeString
 }
 
 bool LookupHashTable::shouldCheckDiskSpace() {
-    _spilledBytesSinceLastCheck += _hashLookupStats.spilledBuffBytesOverAllRecords +
-        _hashLookupStats.spilledHtBytesOverAllRecords - _totalSpilledBytes;
-    _totalSpilledBytes = _hashLookupStats.spilledBuffBytesOverAllRecords +
-        _hashLookupStats.spilledHtBytesOverAllRecords;
+    long long currentTotalSpilledBytes = _hashLookupStats.spillingBuffStats.getSpilledBytes() +
+        _hashLookupStats.spillingHtStats.getSpilledBytes();
+    _spilledBytesSinceLastCheck += currentTotalSpilledBytes - _totalSpilledBytes;
+    _totalSpilledBytes = currentTotalSpilledBytes;
 
     if (_spilledBytesSinceLastCheck > kMaxSpilledBytesForDiskSpaceCheck) {
         _spilledBytesSinceLastCheck = 0;
@@ -265,16 +265,16 @@ void LookupHashTable::spillBufferedValueToDisk(SpillingStore* rs,
 
     rs->upsertToRecordStore(_opCtx, rid, buf, false);
 
-    _hashLookupStats.spilledBuffRecords++;
     // Add size of record ID + size of buffer.
     int64_t spillToDiskBytes = sizeof(size_t) + buf.len();
-    _hashLookupStats.spilledBuffBytesOverAllRecords += spillToDiskBytes;
 
     auto& opDebug = CurOp::get(_opCtx)->debug();
     opDebug.hashLookupSpillToDisk += 1;
     opDebug.hashLookupSpillToDiskBytes += spillToDiskBytes;
     lookupPushdownCounters.incrementLookupCountersPerSpilling(1 /* spillToDisk */,
                                                               spillToDiskBytes);
+    _hashLookupStats.spillingBuffStats.updateSpillingStats(
+        1, spillToDiskBytes, 1, _recordStoreBuf->storageSize(_opCtx));
 }
 
 size_t LookupHashTable::bufferValueOrSpill(value::MaterializedRow& value) {
@@ -307,16 +307,14 @@ int64_t LookupHashTable::writeIndicesToRecordStore(SpillingStore* rs,
     auto [rid, typeBits] = serializeKeyForRecordStore(key);
 
     rs->upsertToRecordStore(_opCtx, rid, buf, typeBits, update);
+
+    int64_t spilledBytes = value.size() * sizeof(size_t);
     if (!update) {
-        _hashLookupStats.spilledHtRecords++;
         // Add the size of key (which comprises of the memory usage for the key + its type bits),
         // as well as the size of one integer to store the length of indices vector in the value.
-        _hashLookupStats.spilledHtBytesOverAllRecords +=
-            rid.memUsage() + typeBits.getSize() + sizeof(size_t);
+        spilledBytes += rid.memUsage() + typeBits.getSize() + sizeof(size_t);
     }
     // Add the size of indices vector used in the hash-table value to the accounting.
-    int64_t spilledBytes = value.size() * sizeof(size_t);
-    _hashLookupStats.spilledHtBytesOverAllRecords += spilledBytes;
     return spilledBytes;
 }
 
@@ -336,12 +334,11 @@ void LookupHashTable::spillIndicesToRecordStore(SpillingStore* rs,
     auto valFromRs = readIndicesFromRecordStore(rs, tagKeyColl, valKeyColl);
 
     auto update = false;
+    int64_t alreadySpilledBytes = 0;
     if (valFromRs) {
+        alreadySpilledBytes = valFromRs->size() * sizeof(size_t);
         valFromRs->insert(valFromRs->end(), value.begin(), value.end());
         update = true;
-        // As we're updating these records, we'd remove the old size from the accounting. The new
-        // size is added back to the accounting in the call to 'writeIndicesToRecordStore' below.
-        _hashLookupStats.spilledHtBytesOverAllRecords -= value.size();
     } else {
         valFromRs = value;
     }
@@ -349,11 +346,21 @@ void LookupHashTable::spillIndicesToRecordStore(SpillingStore* rs,
     auto spillToDiskBytes =
         writeIndicesToRecordStore(rs, tagKeyColl, valKeyColl, *valFromRs, update);
 
+    tassert(9956400,
+            str::stream() << "Total spilled to disk bytes " << spillToDiskBytes
+                          << " is smaller than already existing bytes on disk "
+                          << alreadySpilledBytes,
+            spillToDiskBytes >= alreadySpilledBytes);
+    spillToDiskBytes -= alreadySpilledBytes;
+
     auto& opDebug = CurOp::get(_opCtx)->debug();
     opDebug.hashLookupSpillToDisk += 1;
     opDebug.hashLookupSpillToDiskBytes += spillToDiskBytes;
+    _hashLookupStats.spillingHtStats.incrementSpills();
     lookupPushdownCounters.incrementLookupCountersPerSpilling(1 /* spillToDisk */,
                                                               spillToDiskBytes);
+    _hashLookupStats.spillingHtStats.updateSpillingStats(
+        1 /*spills*/, spillToDiskBytes, update ? 0 : 1, _recordStoreHt->storageSize(_opCtx));
 }
 
 void LookupHashTable::makeTemporaryRecordStore() {
@@ -404,10 +411,15 @@ boost::optional<std::pair<value::TypeTags, value::Value>> LookupHashTable::getVa
 void LookupHashTable::reset(bool fromClose) {
     _memoryUseInBytesBeforeSpill = internalQuerySBELookupApproxMemoryUseInBytesBeforeSpill.load();
     _memoryHt = boost::none;
+
     if (_recordStoreHt) {
+        _hashLookupStats.spillingHtStats.updateSpilledDataStorageSize(
+            _recordStoreHt->storageSize(_opCtx));
         _recordStoreHt.reset(nullptr);
     }
     if (_recordStoreBuf) {
+        _hashLookupStats.spillingBuffStats.updateSpilledDataStorageSize(
+            _recordStoreBuf->storageSize(_opCtx));
         _recordStoreBuf.reset(nullptr);
     }
 

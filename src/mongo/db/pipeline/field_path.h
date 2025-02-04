@@ -36,7 +36,6 @@
 #include <utility>
 #include <vector>
 
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"

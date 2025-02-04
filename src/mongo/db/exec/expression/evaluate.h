@@ -129,6 +129,7 @@ Value evaluate(const ExpressionIsoWeekYear& expr, const Document& root, Variable
 Value evaluate(const ExpressionIsoDayOfWeek& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionIsoWeek& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionYear& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionCurrentDate& expr, const Document& root, Variables* variables);
 
 Value evaluate(const ExpressionArray& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionArrayElemAt& expr, const Document& root, Variables* variables);
@@ -227,17 +228,41 @@ StatusWith<Value> evaluateDivide(Value lhs, Value rhs);
 StatusWith<Value> evaluateMod(Value lhs, Value rhs);
 
 Value evaluate(const ExpressionAdd& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionConstant& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionDivide& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionMod& expr, const Document& root, Variables* variables);
+
+inline Value evaluate(const ExpressionConstant& expr, const Document& root, Variables* variables) {
+    return expr.getValue();
+}
+
+inline Value evaluate(const ExpressionDivide& expr, const Document& root, Variables* variables) {
+    auto& children = expr.getChildren();
+    return uassertStatusOK(evaluateDivide(children[0]->evaluate(root, variables),
+                                          children[1]->evaluate(root, variables)));
+}
+
+inline Value evaluate(const ExpressionMod& expr, const Document& root, Variables* variables) {
+    auto& children = expr.getChildren();
+    return uassertStatusOK(evaluateMod(children[0]->evaluate(root, variables),
+                                       children[1]->evaluate(root, variables)));
+}
+
 Value evaluate(const ExpressionMultiply& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionLog& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionRandom& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionRange& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionSubtract& expr, const Document& root, Variables* variables);
+
+inline Value evaluate(const ExpressionSubtract& expr, const Document& root, Variables* variables) {
+    auto& children = expr.getChildren();
+    return uassertStatusOK(evaluateSubtract(children[0]->evaluate(root, variables),
+                                            children[1]->evaluate(root, variables)));
+}
+
 Value evaluate(const ExpressionRound& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionTrunc& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionIsNumber& expr, const Document& root, Variables* variables);
+
+inline Value evaluate(const ExpressionIsNumber& expr, const Document& root, Variables* variables) {
+    return Value(expr.getChildren()[0]->evaluate(root, variables).numeric());
+}
+
 Value evaluate(const ExpressionConvert& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionAbs& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionCeil& expr, const Document& root, Variables* variables);
@@ -271,17 +296,110 @@ Value evaluate(const ExpressionHyperbolicTangent& expr, const Document& root, Va
 Value evaluate(const ExpressionFunction& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionInternalJsEmit& expr, const Document& root, Variables* variables);
 
-Value evaluate(const ExpressionAnd& expr, const Document& root, Variables* variables);
+inline Value evaluate(const ExpressionAnd& expr, const Document& root, Variables* variables) {
+    for (auto&& child : expr.getChildren()) {
+        if (!child->evaluate(root, variables).coerceToBool()) {
+            return Value(false);
+        }
+    }
+
+    return Value(true);
+}
+
 Value evaluate(const ExpressionAllElementsTrue& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionAnyElementTrue& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionCoerceToBool& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionCompare& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionCond& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionIfNull& expr, const Document& root, Variables* variables);
+
+inline Value evaluate(const ExpressionCoerceToBool& expr,
+                      const Document& root,
+                      Variables* variables) {
+    return Value(expr.getExpression()->evaluate(root, variables).coerceToBool());
+}
+
+inline Value evaluate(const ExpressionCompare& expr, const Document& root, Variables* variables) {
+    const auto& children = expr.getChildren();
+    int cmp = expr.getExpressionContext()->getValueComparator().compare(
+        children[0]->evaluate(root, variables), children[1]->evaluate(root, variables));
+
+    // Make cmp one of 1, 0, or -1.
+    if (cmp == 0) {
+        // leave as 0
+    } else if (cmp < 0) {
+        cmp = -1;
+    } else if (cmp > 0) {
+        cmp = 1;
+    }
+
+    if (expr.getOp() == ExpressionCompare::CmpOp::CMP) {
+        return Value(cmp);
+    }
+
+    static const bool cmpLookup[6][3] = {
+        /*          -1      0      1   */
+        /* EQ  */ {false, true, false},
+        /* NE  */ {true, false, true},
+        /* GT  */ {false, false, true},
+        /* GTE */ {false, true, true},
+        /* LT  */ {true, false, false},
+        /* LTE */ {true, true, false},
+
+        // We don't require the lookup table for CMP.
+    };
+
+    bool returnValue = cmpLookup[expr.getOp()][cmp + 1];
+    return Value(returnValue);
+}
+
+inline Value evaluate(const ExpressionCond& expr, const Document& root, Variables* variables) {
+    const auto& children = expr.getChildren();
+    int idx = children[0]->evaluate(root, variables).coerceToBool() ? 1 : 2;
+    return children[idx]->evaluate(root, variables);
+}
+
+inline Value evaluate(const ExpressionIfNull& expr, const Document& root, Variables* variables) {
+    const auto& children = expr.getChildren();
+    const size_t n = children.size();
+    for (size_t i = 0; i < n; ++i) {
+        Value pValue(children[i]->evaluate(root, variables));
+        if (!pValue.nullish() || i == n - 1) {
+            return pValue;
+        }
+    }
+    return Value();
+}
+
 Value evaluate(const ExpressionIn& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionNot& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionOr& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionSwitch& expr, const Document& root, Variables* variables);
+
+inline Value evaluate(const ExpressionNot& expr, const Document& root, Variables* variables) {
+    return Value(!expr.getChildren()[0]->evaluate(root, variables).coerceToBool());
+}
+
+inline Value evaluate(const ExpressionOr& expr, const Document& root, Variables* variables) {
+    for (auto&& child : expr.getChildren()) {
+        if (child->evaluate(root, variables).coerceToBool()) {
+            return Value(true);
+        }
+    }
+
+    return Value(false);
+}
+
+inline Value evaluate(const ExpressionSwitch& expr, const Document& root, Variables* variables) {
+    for (int i = 0; i < expr.numBranches(); ++i) {
+        auto [caseExpr, thenExpr] = expr.getBranch(i);
+        Value caseResult = caseExpr->evaluate(root, variables);
+
+        if (caseResult.coerceToBool()) {
+            return thenExpr->evaluate(root, variables);
+        }
+    }
+
+    uassert(40066,
+            "$switch could not find a matching branch for an input, and no default was specified.",
+            expr.defaultExpr());
+
+    return expr.defaultExpr()->evaluate(root, variables);
+}
+
 Value evaluate(const ExpressionBitAnd& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionBitOr& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionBitXor& expr, const Document& root, Variables* variables);
@@ -290,10 +408,67 @@ Value evaluate(const ExpressionRegexFind& expr, const Document& root, Variables*
 Value evaluate(const ExpressionRegexFindAll& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionRegexMatch& expr, const Document& root, Variables* variables);
 
+Value evaluate(const ExpressionObject& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionBsonSize& expr, const Document& root, Variables* variables);
+
+/*
+ * Helper function to evaluate ExpressionFieldPath, used recursively.
+ *
+ * The helper function doesn't just use a loop because of
+ * the possibility that we need to skip over an array.  If the path
+ * is "a.b.c", and a is an array, then we fan out from there, and
+ * traverse "b.c" for each element of a:[...].  This requires that
+ * a be an array of objects in order to navigate more deeply.
+ *
+ * @param fieldPath
+ * @param index current path field index to extract
+ * @param input current document traversed to (not the top-level one)
+ * @returns the field found; could be an array
+ */
+Value evaluatePath(const FieldPath& fieldPath, size_t index, const Document& input);
+
+/*
+ * Helper for evaluatePath to handle Array case
+ */
+Value evaluatePathArray(const FieldPath& fieldPath, size_t index, const Value& input);
+
+inline Value evaluate(const ExpressionFieldPath& expr, const Document& root, Variables* variables) {
+    auto& fieldPath = expr.getFieldPath();
+    auto variable = expr.getVariableId();
+
+    if (fieldPath.getPathLength() == 1) {  // get the whole variable
+        return variables->getValue(variable, root);
+    }
+
+    if (variable == Variables::kRootId) {
+        // ROOT is always a document so use optimized code path
+        return evaluatePath(fieldPath, 1, root);
+    }
+
+    Value var = variables->getValue(variable, root);
+    switch (var.getType()) {
+        case Object:
+            return evaluatePath(fieldPath, 1, var.getDocument());
+        case Array:
+            return evaluatePathArray(fieldPath, 1, var);
+        default:
+            return Value();
+    }
+}
+
+Value evaluate(const ExpressionGetField& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionSetField& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionInternalFindAllValuesAtPath& expr,
+               const Document& root,
+               Variables* variables);
+
 Value evaluate(const ExpressionMeta& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionType& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionTestApiVersion& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionLet& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionInternalRawSortKey& expr,
+               const Document& root,
+               Variables* variables);
 
 Value evaluate(const ExpressionToHashedIndexKey& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionInternalKeyStringValue& expr,
@@ -305,6 +480,11 @@ Value evaluate(const ExpressionInternalFindPositional& expr,
                Variables* variables);
 Value evaluate(const ExpressionInternalFindSlice& expr, const Document& root, Variables* variables);
 Value evaluate(const ExpressionInternalFindElemMatch& expr,
+               const Document& root,
+               Variables* variables);
+
+Value evaluate(const ExpressionInternalFLEEqual& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionInternalFLEBetween& expr,
                const Document& root,
                Variables* variables);
 

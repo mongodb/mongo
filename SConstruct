@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import textwrap
+import time
 import uuid
 from datetime import datetime
 from glob import glob
@@ -54,6 +55,18 @@ SCons.Node.FS.File.release_target_info = release_target_info_noop
 import psutil
 
 from buildscripts import moduleconfig, utils
+
+if os.environ.get("CI") is None:
+    print("""
+    -------- ANNOUNCEMENT -------- 
+    The SCons interface will soon be deprecated on the master branch, please try
+    your workflow with Bazel directly by visiting https://wiki.corp.mongodb.com/display/HGTC/Building+with+Bazel
+
+    If your workflow does not work with Bazel now, please post in #ask-devprod-build with details.
+    ------------------------------
+    """)
+
+    time.sleep(5)
 
 scons_invocation = "{} {}".format(sys.executable, " ".join(sys.argv))
 print("scons: running with args {}".format(scons_invocation))
@@ -1560,13 +1573,6 @@ env_vars.Add(
     help="Set the boolean (auto, on/off true/false 1/0) to enable gsplit-dwarf (non-Windows). Incompatible with DWARF_VERSION=5",
     converter=functools.partial(bool_var_converter, var="SPLIT_DWARF"),
     default="auto",
-)
-
-env_vars.Add(
-    "ENABLE_GRPC_BUILD",
-    help="Set the boolean (auto, on/off true/false 1/0) to enable building grpc and protobuf compiler.",
-    converter=functools.partial(bool_var_converter, var="ENABLE_GRPC_BUILD"),
-    default="0",
 )
 
 env_vars.Add(
@@ -5859,7 +5865,7 @@ if gdb_index_enabled is True:
     elif env.get("GDB_INDEX") != "auto":
         env.FatalError("Could not enable explicit request for gdb index generation.")
 
-if env.get("ENABLE_GRPC_BUILD"):
+if env.TargetOSIs("linux") and get_option("ssl") == "on":
     env.Tool("protobuf_compiler")
 
 if (get_option("separate-debug") == "on" or env.TargetOSIs("windows")) and debug_symbols:
@@ -6424,13 +6430,6 @@ def injectModule(env, module, **kwargs):
 
 env.AddMethod(injectModule, "InjectModule")
 
-if get_option("ninja") == "disabled":
-    compileCommands = env.CompilationDatabase("compile_commands.json")
-    # Initialize generated-sources Alias as a placeholder so that it can be used as a
-    # dependency for compileCommands. This Alias will be properly updated in other SConscripts.
-    env.Depends(compileCommands, env.Alias("generated-sources"))
-    compileDb = env.Alias("compiledb", compileCommands)
-
 msvc_version = ""
 if "MSVC_VERSION" in env and env["MSVC_VERSION"]:
     msvc_version = "--version " + env["MSVC_VERSION"] + " "
@@ -6439,7 +6438,7 @@ if "MSVC_VERSION" in env and env["MSVC_VERSION"]:
 if get_option("ninja") == "disabled":
     vcxprojFile = env.Command(
         "mongodb.vcxproj",
-        compileCommands,
+        "compiledb",
         r"$PYTHON buildscripts\make_vcxproj.py " + msvc_version + "mongodb",
     )
     vcxproj = env.Alias("vcxproj", vcxprojFile)
@@ -6973,7 +6972,9 @@ gen_header_paths = [
 ]
 
 replacements = {
-    "@MONGO_BUILD_DIR@": ("|".join([path + "/.*" for path in gen_header_paths])),
+    "@MONGO_BUILD_DIR@": (
+        gen_header_paths[0] + "(?!.*\.pb\.h)" + "|" + gen_header_paths[1] + "/.*"
+    ),
     "@MONGO_BRACKET_BUILD_DIR@": (";".join(gen_header_paths)),
 }
 

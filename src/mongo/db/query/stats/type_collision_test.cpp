@@ -78,8 +78,8 @@ TEST(TypeCollisionTest, ZeroedCollidingTypesHistogram) {
     auto i = 0;
     ASSERT_THROWS(createCEHistogram(data, 0), DBException);
 
-    // We should always fail to build a histogram if we have fewer buckets than type classes.
-    for (i = 1; i < 5; i++) {
+    // We should always fail to build a histogram if we have fewer buckets than type classes + 1.
+    for (i = 1; i < 6; i++) {
         ASSERT_THROWS(createCEHistogram(data, i), DBException);
     }
 

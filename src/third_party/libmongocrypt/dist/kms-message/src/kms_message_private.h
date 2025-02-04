@@ -125,12 +125,12 @@ struct _kms_response_parser_t {
    } while (0)
 
 void
-set_error (char *error, size_t size, const char *fmt, ...);
+kms_set_error (char *error, size_t size, const char *fmt, ...);
 
 #define KMS_ERROR(obj, ...)                                     \
    do {                                                         \
       obj->failed = true;                                       \
-      set_error (obj->error, sizeof (obj->error), __VA_ARGS__); \
+      kms_set_error (obj->error, sizeof (obj->error), __VA_ARGS__); \
    } while (0)
 
 #define KMS_ASSERT(stmt)                      \

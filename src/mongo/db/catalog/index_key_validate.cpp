@@ -96,7 +96,6 @@ namespace {
 // names will be disabled. This will allow for creation of indexes with invalid field names in their
 // specification.
 MONGO_FAIL_POINT_DEFINE(skipIndexCreateFieldNameValidation);
-MONGO_FAIL_POINT_DEFINE(skipIndexCreateWeightsFieldValidation);
 
 // When the skipTTLIndexExpireAfterSecondsValidation failpoint is enabled,
 // validation for TTL index 'expireAfterSeconds' will be disabled in certain codepaths.
@@ -333,6 +332,13 @@ BSONObj repairIndexSpec(const NamespaceString& ns,
                           "indexSpec"_attr = redact(indexSpec));
             builder->appendNumber(fieldName,
                                   durationCount<Seconds>(kExpireAfterSecondsForInactiveTTLIndex));
+        } else if (IndexDescriptor::k2dIndexBitsFieldName == fieldName) {
+            // The bits index option might've been stored as a double in the catalog which is
+            // incorrect considering this field represent the number of precision bits of a 2d
+            // index. This can cause migrations to fail when comparing indexes from source and
+            // destination shards, due to the usage of listIndexes, which makes an internal coercion
+            // to int when parsing the indexes options.
+            builder->appendNumber(fieldName, indexSpecElem.safeNumberInt());
         } else {
             builder->append(indexSpecElem);
         }
@@ -664,12 +670,10 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
     }
 
     if (indexType != IndexNames::TEXT && hasWeightsField) {
-        if (!skipIndexCreateWeightsFieldValidation.shouldFail()) {
-            return {ErrorCodes::CannotCreateIndex,
-                    str::stream() << "Invalid index specification " << indexSpec << "; the field '"
-                                  << IndexDescriptor::kWeightsFieldName
-                                  << "' can only be specified with text indexes"};
-        }
+        return {ErrorCodes::CannotCreateIndex,
+                str::stream() << "Invalid index specification " << indexSpec << "; the field '"
+                              << IndexDescriptor::kWeightsFieldName
+                              << "' can only be specified with text indexes"};
     }
 
     if (unique && prepareUnique) {

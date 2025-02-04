@@ -102,7 +102,7 @@
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/impersonated_user_metadata.h"
+#include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/async_requests_sender.h"
@@ -1029,7 +1029,7 @@ Status ShardingCatalogManager::_notifyClusterOnNewDatabases(
         request.setWriteConcern(generic_argument_util::kMajorityWriteConcern);
         BSONObjBuilder bob;
         request.serialize(&bob);
-        rpc::writeAuthDataToImpersonatedUserMetadata(altOpCtx, &bob);
+        rpc::writeAuditMetadata(altOpCtx, &bob);
 
         // send cmd
         auto executor = Grid::get(altOpCtx)->getExecutorPool()->getFixedExecutor();

@@ -33,21 +33,21 @@ buffBytes:0
 --- Fourth Stats
 dsk:1
 htRecs:3
-htIndices:162
+htIndices:155
 buffRecs:4
 buffBytes:124
 
 --- Fifth Stats
 dsk:1
 htRecs:6
-htIndices:324
+htIndices:310
 buffRecs:8
 buffBytes:248
 
 --- Sixth Stats
 dsk:1
 htRecs:9
-htIndices:486
+htIndices:465
 buffRecs:12
 buffBytes:372
 
@@ -145,21 +145,21 @@ buffBytes:0
 --- Fourth Stats
 dsk:1
 htRecs:4
-htIndices:211
+htIndices:204
 buffRecs:4
 buffBytes:124
 
 --- Fifth Stats
 dsk:1
 htRecs:8
-htIndices:422
+htIndices:408
 buffRecs:8
 buffBytes:248
 
 --- Sixth Stats
 dsk:1
 htRecs:12
-htIndices:633
+htIndices:612
 buffRecs:12
 buffBytes:372
 
@@ -210,21 +210,21 @@ buffBytes:0
 --- Fourth Stats
 dsk:1
 htRecs:4
-htIndices:256
+htIndices:228
 buffRecs:7
 buffBytes:217
 
 --- Fifth Stats
 dsk:1
 htRecs:8
-htIndices:512
+htIndices:456
 buffRecs:14
 buffBytes:434
 
 --- Sixth Stats
 dsk:1
 htRecs:12
-htIndices:768
+htIndices:684
 buffRecs:21
 buffBytes:651
 
@@ -280,21 +280,21 @@ buffBytes:0
 --- Fourth Stats
 dsk:1
 htRecs:4
-htIndices:279
+htIndices:236
 buffRecs:8
 buffBytes:248
 
 --- Fifth Stats
 dsk:1
 htRecs:8
-htIndices:558
+htIndices:472
 buffRecs:16
 buffBytes:496
 
 --- Sixth Stats
 dsk:1
 htRecs:12
-htIndices:837
+htIndices:708
 buffRecs:24
 buffBytes:744
 
@@ -353,21 +353,21 @@ buffBytes:0
 --- Fourth Stats
 dsk:1
 htRecs:5
-htIndices:390
+htIndices:301
 buffRecs:9
 buffBytes:279
 
 --- Fifth Stats
 dsk:1
 htRecs:10
-htIndices:780
+htIndices:602
 buffRecs:18
 buffBytes:558
 
 --- Sixth Stats
 dsk:1
 htRecs:15
-htIndices:1170
+htIndices:903
 buffRecs:27
 buffBytes:837
 
@@ -420,21 +420,21 @@ buffBytes:0
 --- Fourth Stats
 dsk:1
 htRecs:3
-htIndices:185
+htIndices:163
 buffRecs:5
 buffBytes:155
 
 --- Fifth Stats
 dsk:1
 htRecs:6
-htIndices:370
+htIndices:326
 buffRecs:10
 buffBytes:310
 
 --- Sixth Stats
 dsk:1
 htRecs:9
-htIndices:555
+htIndices:489
 buffRecs:15
 buffBytes:465
 

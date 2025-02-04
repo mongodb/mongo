@@ -7,6 +7,8 @@
 //   requires_fastcount,
 //   requires_fcv_70,
 //   requires_profiling,
+//   # The test runs getLatestProfileEntry(). The downstream syncing node affects the profiler.
+//   run_getLatestProfilerEntry,
 // ]
 
 import {isLinux} from "jstests/libs/os_helpers.js";

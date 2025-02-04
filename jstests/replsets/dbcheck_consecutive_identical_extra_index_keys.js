@@ -3,7 +3,7 @@
  * consecutive identical index keys.
  *
  * @tags: [
- *   requires_fcv_81
+ *   requires_fcv_80
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

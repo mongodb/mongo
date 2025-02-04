@@ -58,6 +58,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/util/net:network",
+        "//src/mongo/util/net:ssl_options",
     ],
 )
 

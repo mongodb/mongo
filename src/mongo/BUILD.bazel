@@ -360,7 +360,6 @@ mongo_cc_library(
         "//src/mongo/util:intrusive_counter.h",
         "//src/mongo/util:itoa.h",
         "//src/mongo/util:lockable_adapter.h",
-        "//src/mongo/util:memory_usage_tracker.h",
         "//src/mongo/util:modules.h",
         "//src/mongo/util:murmur3.h",
         "//src/mongo/util:optional_util.h",
@@ -414,6 +413,7 @@ mongo_cc_library(
         "//conditions:default": [],
     }),
     deps = [
+        "//src/mongo/db/memory_tracking",
         "//src/mongo/stdx",
         "//src/mongo/util:boost_assert_shim",
         "//src/mongo/util:debugger",
@@ -427,7 +427,10 @@ mongo_cc_library(
         "//src/third_party/boost:boost_iostreams",
         "//src/third_party/boost:boost_log",
         "//src/third_party/boost:boost_program_options",
-    ],
+    ] + select({
+        "@platforms//os:linux": ["//src/mongo/platform:throw_hook"],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(
@@ -670,7 +673,7 @@ filegroup(
         "//src/mongo/rpc:reply_interface.h",
         "//src/mongo/rpc:topology_version_gen",
         "//src/mongo/rpc:unique_message.h",
-        "//src/mongo/rpc/metadata:impersonated_user_metadata_gen",
+        "//src/mongo/rpc/metadata:audit_metadata_gen",
         "//src/mongo/rpc/metadata:oplog_query_metadata.h",
         "//src/mongo/s:chunk.h",
         "//src/mongo/s:chunk_manager.h",

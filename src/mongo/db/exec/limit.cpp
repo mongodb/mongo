@@ -51,7 +51,7 @@ LimitStage::LimitStage(ExpressionContext* expCtx,
 
 LimitStage::~LimitStage() {}
 
-bool LimitStage::isEOF() {
+bool LimitStage::isEOF() const {
     return (0 == _numToReturn) || child()->isEOF();
 }
 

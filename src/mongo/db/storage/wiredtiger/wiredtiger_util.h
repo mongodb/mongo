@@ -46,7 +46,8 @@ class OperationContext;
 class WiredTigerConfigParser;
 
 class WiredTigerKVEngine;
-class WiredTigerSessionCache;
+class WiredTigerConnection;
+class WiredTigerSession;
 
 /**
  * A wrapper for WT_ITEM to make it more convenient to work with from C++.
@@ -114,11 +115,11 @@ public:
      *
      * A filter can be specified to skip desired fields.
      */
-    static Status exportTableToBSON(WT_SESSION* s,
+    static Status exportTableToBSON(WiredTigerSession& session,
                                     const std::string& uri,
                                     const std::string& config,
                                     BSONObjBuilder& bob);
-    static Status exportTableToBSON(WT_SESSION* s,
+    static Status exportTableToBSON(WiredTigerSession& session,
                                     const std::string& uri,
                                     const std::string& config,
                                     BSONObjBuilder& bob,
@@ -170,14 +171,14 @@ public:
      * This returns more information, but is slower than getMetadata().
      */
     static StatusWith<std::string> getMetadataCreate(WiredTigerRecoveryUnit&, StringData uri);
-    static StatusWith<std::string> getMetadataCreate(WT_SESSION* session, StringData uri);
+    static StatusWith<std::string> getMetadataCreate(WiredTigerSession& session, StringData uri);
 
     /**
      * Gets the entire metadata string for collection or index at URI. Accepts an OperationContext
      * or session.
      */
     static StatusWith<std::string> getMetadata(WiredTigerRecoveryUnit&, StringData uri);
-    static StatusWith<std::string> getMetadata(WT_SESSION* session, StringData uri);
+    static StatusWith<std::string> getMetadata(WiredTigerSession& session, StringData uri);
 
     /**
      * Reads app_metadata for collection/index at URI as a BSON document.
@@ -207,26 +208,34 @@ public:
      * Reads individual statistics using URI.
      * List of statistics keys WT_STAT_* can be found in wiredtiger.h.
      */
-    static StatusWith<int64_t> getStatisticsValue(WT_SESSION* session,
+    static StatusWith<int64_t> getStatisticsValue(WiredTigerSession& session,
                                                   const std::string& uri,
                                                   const std::string& config,
                                                   int statisticsKey);
 
-    static int64_t getEphemeralIdentSize(WT_SESSION* s, const std::string& uri);
+    // A version of the above taking a WT_SESSION is necessary due to encryptDB does not use the
+    // wrappers. Avoid using this, use the wrapped version instead.
+    static StatusWith<int64_t> getStatisticsValue_DoNotUse(WT_SESSION* session,
+                                                           const std::string& uri,
+                                                           const std::string& config,
+                                                           int statisticsKey);
 
-    static int64_t getIdentSize(WT_SESSION* s, const std::string& uri);
+    static int64_t getEphemeralIdentSize(WiredTigerSession& s, const std::string& uri);
+
+    static int64_t getIdentSize(WiredTigerSession& s, const std::string& uri);
 
     /**
      * Returns the bytes available for reuse for an ident. This is the amount of allocated space on
      * disk that is not storing any data.
      */
-    static int64_t getIdentReuseSize(WT_SESSION* s, const std::string& uri);
+    static int64_t getIdentReuseSize(WiredTigerSession& s, const std::string& uri);
 
     /**
      * Returns the bytes compaction may reclaim for an ident. This is the amount of allocated space
      * on disk that can be potentially reclaimed.
      */
-    static int64_t getIdentCompactRewrittenExpectedSize(WT_SESSION* s, const std::string& uri);
+    static int64_t getIdentCompactRewrittenExpectedSize(WiredTigerSession& s,
+                                                        const std::string& uri);
 
     /**
      * Return amount of memory to use for the WiredTiger cache based on either the startup

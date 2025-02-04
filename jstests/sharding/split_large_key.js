@@ -25,8 +25,7 @@ tests.forEach(function(test) {
     var midKey = {};
     var chunkKeys = {min: {}, max: {}};
     for (var k in test.key) {
-        // new Array with join creates string length 1 less than size, so add 1
-        midKey[k] = new Array(test.keyFieldSize + 1).join('a');
+        midKey[k] = 'a'.repeat(test.keyFieldSize);
         // min & max keys for each field in the index
         chunkKeys.min[k] = MinKey;
         chunkKeys.max[k] = MaxKey;

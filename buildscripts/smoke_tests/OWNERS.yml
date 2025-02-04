@@ -3,3 +3,6 @@ filters:
   - "server_programmability.yml":
     approvers:
       - 10gen/server-programmability
+  - "catalog_and_routing.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing

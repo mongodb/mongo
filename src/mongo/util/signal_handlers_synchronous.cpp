@@ -102,42 +102,6 @@ int sehExceptionFilter(unsigned int code, struct _EXCEPTION_POINTERS* excPointer
 // Bit 29:     1 = Client bit, i.e. a user-defined code
 #define STATUS_EXIT_ABRUPT 0xE0000001
 
-// Historically we relied on raising SEH exception and letting the unhandled exception handler
-// then handle it to that we can dump the process. This works in all but one case. The C++
-// terminate handler runs the terminate handler in a SEH __try/__catch. Therefore, any SEH
-// exceptions we raise become handled. Now, we setup our own SEH handler to quick catch the SEH
-// exception and take the dump bypassing the unhandled exception handler.
-//
-void endProcessWithSignal(int signalNum) {
-
-    __try {
-        RaiseException(STATUS_EXIT_ABRUPT, EXCEPTION_NONCONTINUABLE, 0, nullptr);
-    } __except (sehExceptionFilter(GetExceptionCode(), GetExceptionInformation())) {
-        // The exception filter exits the process
-        quickExit(ExitCode::abrupt);
-    }
-}
-
-#else
-
-void endProcessWithSignal(int signalNum) {
-    // This works by restoring the system-default handler for the given signal, unblocking the
-    // signal, and re-raising it, in order to get the system default termination behavior (i.e.,
-    // dumping core, or just exiting).
-    struct sigaction defaultedSignals;
-    memset(&defaultedSignals, 0, sizeof(defaultedSignals));
-    defaultedSignals.sa_handler = SIG_DFL;
-    sigemptyset(&defaultedSignals.sa_mask);
-    invariant(sigaction(signalNum, &defaultedSignals, nullptr) == 0);
-
-    sigset_t unblockSignalMask;
-    invariant(sigemptyset(&unblockSignalMask) == 0);
-    invariant(sigaddset(&unblockSignalMask, signalNum) == 0);
-    invariant(sigprocmask(SIG_UNBLOCK, &unblockSignalMask, nullptr) == 0);
-
-    raise(signalNum);
-}
-
 #endif
 
 // This should only be used with MallocFreeOSteam
@@ -387,6 +351,38 @@ void setupSignalTestingHandler() {
 #endif
 
 }  // namespace
+
+void endProcessWithSignal(int signalNum) {
+#if defined(_WIN32)
+    // Historically we relied on raising SEH exception and letting the unhandled exception handler
+    // then handle it to that we can dump the process. This works in all but one case. The C++
+    // terminate handler runs the terminate handler in a SEH __try/__catch. Therefore, any SEH
+    // exceptions we raise become handled. Now, we setup our own SEH handler to quick catch the SEH
+    // exception and take the dump bypassing the unhandled exception handler.
+    __try {
+        RaiseException(STATUS_EXIT_ABRUPT, EXCEPTION_NONCONTINUABLE, 0, nullptr);
+    } __except (sehExceptionFilter(GetExceptionCode(), GetExceptionInformation())) {
+        // The exception filter exits the process
+        quickExit(ExitCode::abrupt);
+    }
+#else
+    // This works by restoring the system-default handler for the given signal, unblocking the
+    // signal, and re-raising it, in order to get the system default termination behavior (i.e.,
+    // dumping core, or just exiting).
+    struct sigaction defaultedSignals;
+    memset(&defaultedSignals, 0, sizeof(defaultedSignals));
+    defaultedSignals.sa_handler = SIG_DFL;
+    sigemptyset(&defaultedSignals.sa_mask);
+    invariant(sigaction(signalNum, &defaultedSignals, nullptr) == 0);
+
+    sigset_t unblockSignalMask;
+    invariant(sigemptyset(&unblockSignalMask) == 0);
+    invariant(sigaddset(&unblockSignalMask, signalNum) == 0);
+    invariant(sigprocmask(SIG_UNBLOCK, &unblockSignalMask, nullptr) == 0);
+
+    raise(signalNum);
+#endif
+}
 
 void setupSynchronousSignalHandlers() {
     stdx::set_terminate(myTerminate);

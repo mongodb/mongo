@@ -30,7 +30,6 @@ executor:
     mongod_options:
       bind_ip_all: ""
       set_parameters:
-        coordinateCommitReturnImmediatelyAfterPersistingDecision: true
         enableTestCommands: 1
         logComponentVerbosity:
           command: 1

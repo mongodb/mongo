@@ -35,7 +35,7 @@ assert(getHostStats.hasOwnProperty('currentlyActive'));
 assert(!stats.hasOwnProperty('hosts'));
 
 // Check a few properties, without attempting to be thorough.
-assert(stats.pools.hasOwnProperty('NetworkInterfaceTL-ShardRegistry'));
+assert(stats.pools.hasOwnProperty('NetworkInterfaceTL-Sharding-Fixed'));
 assert(stats.replicaSetPingTimesMillis.hasOwnProperty(st.configRS.name));
 
 st.stop();

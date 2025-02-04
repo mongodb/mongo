@@ -50,7 +50,7 @@ buildvariants:
   # and is not configured with any downstream project triggers on 10gen/mongot.
   - name: amazon-linux-2023-x86-mongot-integration-patchable
     display_name: "AL2023 x86 mongot integration tasks"
-    tags: []
+    tags: ["mongot_e2e"]
     patch_only: true
     run_on:
       - amazon2023.3-small
@@ -113,7 +113,7 @@ buildvariants:
   # and is not configured with any downstream project triggers on 10gen/mongot.
   - name: amazon2023-arm64-mongot-integration-patchable
     display_name: "AL2023 arm64 mongot integration tasks"
-    tags: []
+    tags: ["mongot_e2e"]
     patch_only: true
     run_on:
       - amazon2023.3-arm64-small
@@ -169,7 +169,7 @@ buildvariants:
   # and is not configured with any downstream project triggers on 10gen/mongot.
   - name: amazon-linux2-arm64-mongot-integration-patchable
     display_name: "AL2 arm64 mongot integration tasks"
-    tags: []
+    tags: ["mongot_e2e"]
     patch_only: true
     run_on:
       - amazon2-arm64-latest-small
@@ -230,7 +230,7 @@ buildvariants:
   # and is not configured with any downstream project triggers on 10gen/mongot
   - name: amazon2-x86-mongot-integration-patchable
     display_name: "AL2 x86 mongot integration tasks"
-    tags: []
+    tags: ["mongot_e2e"]
     cron: "0 */4 * * *" # Run these tasks every 4 hours
     run_on:
       - amazon2-latest-large
@@ -265,3 +265,57 @@ buildvariants:
           - rhel8.8-large
       - name: search_end_to_end_sharded_cluster
       - name: search_end_to_end_single_node
+
+  # The below variants test the search in community architecture with gRPC.
+  # TODO SERVER-99592: remove these separate build variants for gRPC.
+  - name: &al2023-arm64-search-with-grpc al2023-arm64-search-with-grpc
+    display_name: "~ AL2023.3 arm64 Enterprise Search in Community with GRPC"
+    tags: []
+    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    stepback: false
+    run_on:
+      - amazon2023.3-arm64-large
+    expansions:
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      has_packages: false
+      evergreen_remote_exec: on
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=amazon2023
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      compile_variant: *al2023-arm64-search-with-grpc
+      build_mongot: true
+    tasks:
+      - name: compile_ninja_quick_TG
+      - name: compile_test_parallel_core_stream_TG
+      - name: generate_buildid_to_debug_symbols_mapping
+      - name: search_community
+      - name: .search_community_e2e_tests
+
+  - name: &al2023-x86-search-with-grpc al2023-x86-search-with-grpc
+    display_name: "~ AL2023.3 x86 Enterprise Search in Community with GRPC"
+    tags: []
+    cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+    stepback: false
+    run_on:
+      - amazon2023.3-large
+    expansions:
+      scons_cache_scope: shared
+      scons_cache_mode: all
+      evergreen_remote_exec: on
+      has_packages: false
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=amazon2023
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      compile_variant: *al2023-x86-search-with-grpc
+      build_mongot: true
+    tasks:
+      - name: compile_ninja_quick_TG
+      - name: compile_test_parallel_core_stream_TG
+      - name: generate_buildid_to_debug_symbols_mapping
+      - name: search_community
+      - name: .search_community_e2e_tests

@@ -435,6 +435,7 @@ WILLNEED
 WIREDTIGER
 WRLSN
 WRNOLOCK
+WTI
 WTPERF
 WaitForSingleObject
 WaitOn
@@ -1016,6 +1017,7 @@ multiblock
 multicycle
 multiprocess
 multithreaded
+multithreading
 munmap
 mutex
 mutexes

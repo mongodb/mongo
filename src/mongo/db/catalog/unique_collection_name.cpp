@@ -43,7 +43,7 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"

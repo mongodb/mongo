@@ -126,8 +126,9 @@ def _py_download(ctx):
         usercustomize_file,
         """
 import sys
-
-sys.dont_write_bytecode = True
+import os
+import tempfile
+sys.pycache_prefix = os.path.join(tempfile.gettempdir(), "bazel_pycache")
 """,
     )
 

@@ -32,12 +32,12 @@
 #include <absl/container/node_hash_map.h>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/exec/sbe/abt/abt_unit_test_literals.h"
-#include "mongo/db/exec/sbe/abt/abt_unit_test_utils.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/expression_const_eval.h"
+#include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_literals.h"
+#include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -45,7 +45,7 @@ namespace mongo::stage_builder {
 namespace {
 
 using namespace optimizer;
-using namespace unit_test_abt_literals;
+using namespace abt::unit_test_abt_literals;
 
 Constant* constEval(ABT& tree, const CollatorInterface* collator = nullptr) {
     ExpressionConstEval evaluator{collator};

@@ -85,7 +85,7 @@
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_common.h"
@@ -158,7 +158,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> handleViewHelper(
         return Pipeline::parse(aggExState.getRequest().getPipeline(), expCtx);
     }
 
-    else if (search_helpers::isMongotPipeline(pipeline.get())) {
+    else if (search_helpers::isMongotPipeline(pipeline.get()) &&
+             expCtx->isFeatureFlagMongotIndexedViewsEnabled()) {
         if (search_helpers::isStoredSource(pipeline.get())) {
             // For returnStoredSource queries, the documents returned by mongot already include the
             // fields transformed by the view pipeline. As such, mongod doesn't need to apply the
@@ -396,7 +397,7 @@ bool getFirstBatch(const AggExState& aggExState,
                           "Aggregate command executor error",
                           "error"_attr = exception.toStatus(),
                           "stats"_attr = redact(stats),
-                          "cmd"_attr = *aggExState.getDeferredCmd());
+                          "cmd"_attr = redact(*aggExState.getDeferredCmd()));
 
             exception.addContext("PlanExecutor error during aggregation");
             throw;
@@ -542,9 +543,12 @@ void executeUntilFirstBatch(const AggExState& aggExState,
         auto exec =
             maybePinnedCursor ? maybePinnedCursor->getCursor()->getExecutor() : execs[0].get();
         const auto& planExplainer = exec->getPlanExplainer();
-        if (const auto& coll = aggCatalogState.getCtx().getCollection()) {
-            CollectionQueryInfo::get(coll).notifyOfQuery(
-                coll, CurOp::get(aggExState.getOpCtx())->debug());
+        if (const auto& coll = aggCatalogState.getPrimaryCollection()) {
+            auto& debugInfo = CurOp::get(aggExState.getOpCtx())->debug();
+            CollectionIndexUsageTrackerDecoration::get(coll.get())
+                .recordCollectionIndexUsage(debugInfo.collectionScans,
+                                            debugInfo.collectionScansNonTailable,
+                                            debugInfo.indexesUsed);
         }
         // For SBE pushed down pipelines, we may need to report stats saved for secondary
         // collections separately.
@@ -553,8 +557,10 @@ void executeUntilFirstBatch(const AggExState& aggExState,
             if (coll) {
                 PlanSummaryStats secondaryStats;
                 planExplainer.getSecondarySummaryStats(secondaryNss, &secondaryStats);
-                CollectionQueryInfo::get(coll).notifyOfQuery(
-                    aggExState.getOpCtx(), coll, secondaryStats);
+                CollectionIndexUsageTrackerDecoration::get(coll.get())
+                    .recordCollectionIndexUsage(secondaryStats.collectionScans,
+                                                secondaryStats.collectionScansNonTailable,
+                                                secondaryStats.indexesUsed);
             }
         }
     }
@@ -782,7 +788,7 @@ Status runAggregateOnView(AggExState& aggExState,
     // Resolve the request's collation and check that the default collation of 'view' is compatible
     // with the operation's collation. The collation resolution and check are both skipped if the
     // request did not specify a collation.
-    const ViewDefinition* view = aggCatalogState->getCtx().getView();
+    const ViewDefinition* view = aggCatalogState->getPrimaryView();
     if (!aggExState.getRequest().getCollation().get_value_or(BSONObj()).isEmpty()) {
         auto [collatorToUse, collatorToUseMatchesDefault] = aggCatalogState->resolveCollator();
         if (!CollatorInterface::collatorsMatch(view->defaultCollator(), collatorToUse.get()) &&
@@ -792,7 +798,7 @@ Status runAggregateOnView(AggExState& aggExState,
         }
     }
 
-    aggExState.setView(aggCatalogState->getCatalog(), view);
+    aggExState.setView(aggCatalogState, view);
     // Resolved view will be available after view has been set on AggregationExecutionState
     auto resolvedView = aggExState.getResolvedView().value();
 
@@ -881,8 +887,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     // Register query stats with the pre-optimized pipeline. Exclude queries against collections
     // with encrypted fields. We still collect query stats on collection-less aggregations.
     bool hasEncryptedFields = aggCatalogState.lockAcquired() &&
-        aggCatalogState.getCtx().getCollection() &&
-        aggCatalogState.getCtx().getCollection()->getCollectionOptions().encryptedFieldConfig;
+        aggCatalogState.getPrimaryCollection() &&
+        aggCatalogState.getPrimaryCollection()->getCollectionOptions().encryptedFieldConfig;
     if (!hasEncryptedFields) {
         // If this is a query over a resolved view, we want to register query stats with the
         // original user-given request and pipeline, rather than the new request generated when
@@ -944,6 +950,7 @@ StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> preparePipeline(
 
     // Start the query planning timer right after parsing.
     CurOp::get(aggExState.getOpCtx())->beginQueryPlanningTimer();
+    CurOp::get(aggExState.getOpCtx())->debug().isChangeStreamQuery = aggExState.hasChangeStream();
 
     if (expCtx->getServerSideJsConfig().accumulator && _samplerAccumulatorJs.tick()) {
         LOGV2_WARNING(
@@ -1034,13 +1041,13 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
 
     // If this is a view, we must resolve the view, then recursively call runAggregate from
     // runAggregateOnView.
-    if (aggCatalogState->lockAcquired() && aggCatalogState->getCtx().getView()) {
+    if (aggCatalogState->lockAcquired() && aggCatalogState->getPrimaryView()) {
         // We do not need to expand the view pipeline when there is a $collStats stage, as
         // $collStats is supported on a view namespace. For a time-series collection, however,
         // the view is abstracted out for the users, so we needed to resolve the namespace to
         // get the underlying bucket collection.
         bool shouldViewBeExpanded =
-            !aggExState.startsWithCollStats() || aggCatalogState->getCtx().getView()->timeseries();
+            !aggExState.startsWithCollStats() || aggCatalogState->getPrimaryView()->timeseries();
         if (shouldViewBeExpanded) {
             return runAggregateOnView(aggExState, std::move(aggCatalogState), result);
         }
@@ -1083,12 +1090,13 @@ Status runAggregate(
     const LiteParsedPipeline& liteParsedPipeline,
     const BSONObj& cmdObj,
     const PrivilegeVector& privileges,
+    boost::optional<ExplainOptions::Verbosity> verbosity,
     rpc::ReplyBuilderInterface* result,
     const std::vector<std::pair<NamespaceString, std::vector<ExternalDataSourceInfo>>>&
         usedExternalDataSources) {
 
     AggExState aggExState(
-        opCtx, request, liteParsedPipeline, cmdObj, privileges, usedExternalDataSources);
+        opCtx, request, liteParsedPipeline, cmdObj, privileges, usedExternalDataSources, verbosity);
 
     Status status = _runAggregate(aggExState, result);
 

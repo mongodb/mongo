@@ -6,6 +6,8 @@
 //   not_allowed_with_signed_security_token,
 //   uses_transactions,
 //   requires_profiling,
+//   # The test runs getLatestProfileEntry(). The downstream syncing node affects the profiler.
+//   run_getLatestProfilerEntry,
 // ]
 
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";

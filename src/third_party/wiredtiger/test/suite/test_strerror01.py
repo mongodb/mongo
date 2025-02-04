@@ -38,7 +38,7 @@ from suite_subprocess import suite_subprocess
 class test_strerror(wttest.WiredTigerTestCase, suite_subprocess):
     sub_errors = [
         (wiredtiger.WT_NONE, "WT_NONE: No additional context"),
-        (wiredtiger.WT_COMPACTION_ALREADY_RUNNING, "WT_COMPACTION_ALREADY_RUNNING: Compaction is already running"),
+        (wiredtiger.WT_BACKGROUND_COMPACT_ALREADY_RUNNING, "WT_BACKGROUND_COMPACT_ALREADY_RUNNING: Background compaction is already running"),
         (wiredtiger.WT_SESSION_MAX, "WT_SESSION_MAX: Max capacity of configured sessions reached"),
         (wiredtiger.WT_CACHE_OVERFLOW, "WT_CACHE_OVERFLOW: Cache capacity has overflown"),
         (wiredtiger.WT_WRITE_CONFLICT, "WT_WRITE_CONFLICT: Write conflict between concurrent operations"),
@@ -49,6 +49,7 @@ class test_strerror(wttest.WiredTigerTestCase, suite_subprocess):
         (wiredtiger.WT_UNCOMMITTED_DATA, "WT_UNCOMMITTED_DATA: Table has uncommitted data"),
         (wiredtiger.WT_DIRTY_DATA, "WT_DIRTY_DATA: Table has dirty data"),
         (wiredtiger.WT_CONFLICT_TABLE_LOCK, "WT_CONFLICT_TABLE_LOCK: Another thread currently holds the table lock"),
+        (wiredtiger.WT_CONFLICT_CHECKPOINT_LOCK, "WT_CONFLICT_CHECKPOINT_LOCK: Another thread currently holds the checkpoint lock"),
     ]
 
     def check_error_code(self, error, expected):

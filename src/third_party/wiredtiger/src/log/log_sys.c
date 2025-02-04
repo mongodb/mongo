@@ -20,7 +20,7 @@ __wt_log_system_backup_id(WT_SESSION_IMPL *session)
     WT_CONNECTION_IMPL *conn;
     WT_DECL_ITEM(logrec);
     WT_DECL_RET;
-    WT_LOG *log;
+    WTI_LOG *log;
     size_t recsize;
     uint32_t i, rectype;
     char nul;
@@ -35,7 +35,7 @@ __wt_log_system_backup_id(WT_SESSION_IMPL *session)
     if (!F_ISSET(&conn->log_mgr, WT_LOG_ENABLED) || !F_ISSET(&conn->log_mgr, WT_LOG_INCR_BACKUP))
         return (0);
     log = conn->log_mgr.log;
-    if (log->log_version < WT_LOG_VERSION_SYSTEM)
+    if (log->log_version < WTI_LOG_VERSION_SYSTEM)
         return (0);
 
     /*
@@ -85,9 +85,9 @@ __wti_log_system_prevlsn(WT_SESSION_IMPL *session, WT_FH *log_fh, WT_LSN *lsn)
 {
     WT_DECL_ITEM(logrec_buf);
     WT_DECL_RET;
-    WT_LOGSLOT tmp;
+    WTI_LOGSLOT tmp;
     WT_LOG_RECORD *logrec;
-    WT_MYSLOT myslot;
+    WTI_MYSLOT myslot;
     size_t recsize;
     uint32_t rectype;
     const char *fmt;
@@ -95,15 +95,15 @@ __wti_log_system_prevlsn(WT_SESSION_IMPL *session, WT_FH *log_fh, WT_LSN *lsn)
     rectype = WT_LOGREC_SYSTEM;
     fmt = WT_UNCHECKED_STRING(I);
 
-    WT_RET(__wt_logrec_alloc(session, WT_LOG_ALIGN, &logrec_buf));
-    memset((uint8_t *)logrec_buf->mem, 0, WT_LOG_ALIGN);
+    WT_RET(__wt_logrec_alloc(session, WTI_LOG_ALIGN, &logrec_buf));
+    memset((uint8_t *)logrec_buf->mem, 0, WTI_LOG_ALIGN);
 
     WT_ERR(__wt_struct_size(session, &recsize, fmt, rectype));
     WT_ERR(__wt_struct_pack(
       session, (uint8_t *)logrec_buf->data + logrec_buf->size, recsize, fmt, rectype));
     logrec_buf->size += recsize;
     WT_ERR(__wt_logop_prev_lsn_pack(session, logrec_buf, lsn));
-    WT_ASSERT(session, logrec_buf->size <= WT_LOG_ALIGN);
+    WT_ASSERT(session, logrec_buf->size <= WTI_LOG_ALIGN);
 
     logrec = (WT_LOG_RECORD *)logrec_buf->mem;
 
@@ -112,13 +112,13 @@ __wti_log_system_prevlsn(WT_SESSION_IMPL *session, WT_FH *log_fh, WT_LSN *lsn)
      * going through the normal log write path and the packing functions needed the correct offset
      * earlier.
      */
-    logrec_buf->size = logrec->len = WT_LOG_ALIGN;
+    logrec_buf->size = logrec->len = WTI_LOG_ALIGN;
 
     /* We do not compress nor encrypt this record. */
     logrec->checksum = 0;
     logrec->flags = 0;
     __wti_log_record_byteswap(logrec);
-    logrec->checksum = __wt_checksum(logrec, WT_LOG_ALIGN);
+    logrec->checksum = __wt_checksum(logrec, WTI_LOG_ALIGN);
 #ifdef WORDS_BIGENDIAN
     logrec->checksum = __wt_bswap32(logrec->checksum);
 #endif
@@ -159,7 +159,7 @@ __wti_log_recover_prevlsn(
 int
 __wt_verbose_dump_log(WT_SESSION_IMPL *session)
 {
-    WT_LOG *log;
+    WTI_LOG *log;
     WT_LOG_MANAGER *log_mgr;
 
     log_mgr = &S2C(session)->log_mgr;
@@ -189,16 +189,16 @@ __wt_verbose_dump_log(WT_SESSION_IMPL *session)
         FLD_ISSET(log_mgr->txn_logsync, WT_LOG_FLUSH)       ? "write to OS" :
         FLD_ISSET(log_mgr->txn_logsync, WT_LOG_FSYNC)       ? "fsync to disk" :
                                                               "unknown sync setting"));
-    WT_RET(__wt_msg(session, "Log record allocation alignment: %" PRId32, WT_LOG_ALIGN));
+    WT_RET(__wt_msg(session, "Log record allocation alignment: %" PRId32, WTI_LOG_ALIGN));
     WT_RET(__wt_msg(session, "Current log file number: %" PRIu32, log->fileid));
     WT_RET(__wt_msg(session, "Current log version number: %" PRIu16, log->log_version));
-    WT_RET(WT_LSN_MSG(&log->alloc_lsn, "Next allocation"));
-    WT_RET(WT_LSN_MSG(&log->ckpt_lsn, "Last checkpoint"));
-    WT_RET(WT_LSN_MSG(&log->sync_dir_lsn, "Last directory sync"));
-    WT_RET(WT_LSN_MSG(&log->sync_lsn, "Last sync"));
-    WT_RET(WT_LSN_MSG(&log->trunc_lsn, "Recovery truncate"));
-    WT_RET(WT_LSN_MSG(&log->write_lsn, "Last written"));
-    WT_RET(WT_LSN_MSG(&log->write_start_lsn, "Start of last written"));
+    WT_RET(WTI_LSN_MSG(&log->alloc_lsn, "Next allocation"));
+    WT_RET(WTI_LSN_MSG(&log->ckpt_lsn, "Last checkpoint"));
+    WT_RET(WTI_LSN_MSG(&log->sync_dir_lsn, "Last directory sync"));
+    WT_RET(WTI_LSN_MSG(&log->sync_lsn, "Last sync"));
+    WT_RET(WTI_LSN_MSG(&log->trunc_lsn, "Recovery truncate"));
+    WT_RET(WTI_LSN_MSG(&log->write_lsn, "Last written"));
+    WT_RET(WTI_LSN_MSG(&log->write_start_lsn, "Start of last written"));
     /*
      * If we wanted a dump of the slots, it would go here. Walking the slot pool may not require a
      * lock since they're statically allocated, but output could be inconsistent without it.

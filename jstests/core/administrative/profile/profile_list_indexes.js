@@ -6,6 +6,9 @@
 //   does_not_support_stepdowns,
 //   requires_getmore,
 //   requires_profiling,
+//   # The test queries the system.profile collection so it is not compatible with initial sync
+//   # since an initial sync may insert unexpected operations into the profile collection.
+//   queries_system_profile_collection
 // ]
 
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";

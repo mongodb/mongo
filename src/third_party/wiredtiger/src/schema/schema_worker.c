@@ -168,7 +168,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session, const char *uri,
             WT_ERR(dsrc->salvage(dsrc, wt_session, uri, (WT_CONFIG_ARG *)cfg));
         else if (file_func == __wt_verify && dsrc->verify != NULL)
             WT_ERR(dsrc->verify(dsrc, wt_session, uri, (WT_CONFIG_ARG *)cfg));
-        else if (file_func == __wt_checkpoint)
+        else if (file_func == __wt_checkpoint_file)
             ;
         else if (file_func == __wt_checkpoint_get_handles)
             ;

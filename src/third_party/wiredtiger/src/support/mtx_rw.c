@@ -303,7 +303,7 @@ __wt_readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 
 /*
  * __wt_try_writelock --
- *     Try to get an exclusive lock, fail immediately if unavailable.
+ *     Try to get an exclusive lock, fail immediately with EBUSY if unavailable.
  */
 int
 __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l)

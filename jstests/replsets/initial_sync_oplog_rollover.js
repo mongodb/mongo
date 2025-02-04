@@ -44,7 +44,7 @@ replSet.reInitiate();
 failPoint.wait();
 
 // Keep inserting large documents until they roll over the oplog.
-const largeStr = new Array(4 * 1024 * oplogSizeOnPrimary).join('aaaaaaaa');
+const largeStr = 'aaaaaaaa'.repeat(4 * 1024 * oplogSizeOnPrimary);
 var i = 0;
 while (bsonWoCompare(getFirstOplogEntry(primary), firstOplogEntry) === 0) {
     assert.commandWorked(coll.insert({a: 2, x: i++, long_str: largeStr}));

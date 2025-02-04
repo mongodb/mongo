@@ -50,10 +50,6 @@ MemoryUsageHandle ChunkedMemoryAggregator::createUsageHandle(int64_t initialByte
     return MemoryUsageHandle(initialBytes, this);
 }
 
-ChunkedMemoryUsageToken ChunkedMemoryAggregator::createUsageToken(int64_t memoryUsageBytes) {
-    return ChunkedMemoryUsageToken(memoryUsageBytes, this);
-}
-
 int64_t ChunkedMemoryAggregator::getCurrentMemoryUsageBytes() const {
     return _curMemoryUsageBytes.load();
 }

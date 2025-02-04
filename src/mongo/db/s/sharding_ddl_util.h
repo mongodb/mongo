@@ -60,7 +60,7 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/rpc/metadata/impersonated_user_metadata.h"
+#include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/async_rpc_shard_retry_policy.h"
 #include "mongo/s/async_rpc_shard_targeter.h"
@@ -105,9 +105,9 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
         return {};
     }
 
-    // AsyncRPC ignores impersonation metadata so we need to manually attach them to
+    // AsyncRPC ignores audit metadata so we need to manually attach them to
     // the command
-    if (auto meta = rpc::getAuthDataToImpersonatedUserMetadata(opCtx)) {
+    if (auto meta = rpc::getAuditAttrsToAuditMetadata(opCtx)) {
         originalOpts->cmd.setDollarAudit(*meta);
     }
     originalOpts->cmd.setMayBypassWriteBlocking(

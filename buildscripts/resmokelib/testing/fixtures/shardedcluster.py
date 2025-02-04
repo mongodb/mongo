@@ -9,6 +9,9 @@ import pymongo.errors
 import yaml
 
 from buildscripts.resmokelib.testing.fixtures import _builder, external, interface
+from buildscripts.resmokelib.utils.sharded_cluster_util import (
+    refresh_logical_session_cache_with_retry,
+)
 
 
 class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface):
@@ -202,7 +205,14 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             # These mongot parameters are popped from shard.mongod_options when mongod is launched in above
             # setup() call. As such, the final values can't be cleanly copied over from mongod_options, but
             # need to be recreated here.
-            self.mongotHost = "localhost:" + str(self.shards[-1].mongot_port)
+            if self.mongos[0].mongos_options["set_parameters"].get("useGrpcForSearch"):
+                # If mongos & mongod are configured to use egress gRPC for search, then set the
+                # `mongotHost` parameter to the mongot listening address expecting communication via
+                # the MongoDB gRPC protocol (which we configured in setup_mongot_params).
+                self.mongotHost = "localhost:" + str(self.shards[-1].mongot_grpc_port)
+            else:
+                self.mongotHost = "localhost:" + str(self.shards[-1].mongot_port)
+
             self.searchIndexManagementHostAndPort = self.mongotHost
 
             for mongos in self.mongos:
@@ -296,18 +306,8 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
         # Ensure that the sessions collection gets auto-sharded by the config server
         if self.configsvr is not None:
-            retry_count = 10
-            while retry_count > 0:
-                try:
-                    self.refresh_logical_session_cache(self.configsvr)
-                    break
-                except pymongo.errors.OperationFailure as err:
-                    if err.code == 70:  # ShardNotFound
-                        time.sleep(0.5)  # Wait a little bit before trying again.
-                        retry_count -= 1
-                    raise err
-            if retry_count == 0:
-                raise Exception("Unable refresh the logical session cache for the config server.")
+            primary_mongo_client = self.configsvr.get_primary().mongo_client()
+            refresh_logical_session_cache_with_retry(primary_mongo_client)
 
         for shard in self.shards:
             self.refresh_logical_session_cache(shard)

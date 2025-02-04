@@ -55,6 +55,8 @@ void logCreateInactiveCacheEntry(std::string&& query,
                 "Creating inactive cache entry for query",
                 "query"_attr = redact(query),
                 "planCacheShapeHash"_attr = planCacheShapeHash,
+                // TODO SERVER-93305: Remove deprecated 'queryHash' usages.
+                "queryHash"_attr = planCacheShapeHash,
                 "planCacheKey"_attr = planCacheKey,
                 "newWorks"_attr = newWorks);
 }
@@ -69,6 +71,8 @@ void logReplaceActiveCacheEntry(std::string&& query,
                 "Replacing active cache entry for query",
                 "query"_attr = redact(query),
                 "planCacheShapeHash"_attr = planCacheShapeHash,
+                // TODO SERVER-93305: Remove deprecated 'queryHash' usages.
+                "queryHash"_attr = planCacheShapeHash,
                 "planCacheKey"_attr = planCacheKey,
                 "oldWorks"_attr = works,
                 "newWorks"_attr = newWorks);
@@ -85,6 +89,8 @@ void logNoop(std::string&& query,
                 "an active cache entry with a lower works value",
                 "query"_attr = redact(query),
                 "planCacheShapeHash"_attr = planCacheShapeHash,
+                // TODO SERVER-93305: Remove deprecated 'queryHash' usages.
+                "queryHash"_attr = planCacheShapeHash,
                 "planCacheKey"_attr = planCacheKey,
                 "oldWorks"_attr = works,
                 "newWorks"_attr = newWorks);
@@ -100,6 +106,8 @@ void logIncreasingWorkValue(std::string&& query,
                 "Increasing work value associated with cache entry",
                 "query"_attr = redact(query),
                 "planCacheShapeHash"_attr = planCacheShapeHash,
+                // TODO SERVER-93305: Remove deprecated 'queryHash' usages.
+                "queryHash"_attr = planCacheShapeHash,
                 "planCacheKey"_attr = planCacheKey,
                 "oldWorks"_attr = works,
                 "increasedWorks"_attr = increasedWorks);
@@ -115,6 +123,8 @@ void logPromoteCacheEntry(std::string&& query,
                 "Inactive cache entry for query is being promoted to active entry",
                 "query"_attr = redact(query),
                 "planCacheShapeHash"_attr = planCacheShapeHash,
+                // TODO SERVER-93305: Remove deprecated 'queryHash' usages.
+                "queryHash"_attr = planCacheShapeHash,
                 "planCacheKey"_attr = planCacheKey,
                 "oldWorks"_attr = works,
                 "newWorks"_attr = newWorks);
@@ -132,6 +142,8 @@ void logUnexpectedPinnedCacheEntry(std::string&& query,
           "Found unexpected pinned plan cache entry",
           "query"_attr = redact(query),
           "planCacheShapeHash"_attr = planCacheShapeHash,
+          // TODO SERVER-93305: Remove deprecated 'queryHash' usages.
+          "queryHash"_attr = planCacheShapeHash,
           "planCacheKey"_attr = planCacheKey,
           "oldEntry"_attr = oldEntry,
           "newEntry"_attr = newEntry,

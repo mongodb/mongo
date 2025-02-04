@@ -139,7 +139,7 @@ struct __wt_reconcile {
      * generates more split chunks, the previous chunk is written to the disk and current and
      * previous swap.
      */
-    WT_REC_CHUNK chunk_A, chunk_B, *cur_ptr, *prev_ptr;
+    WTI_REC_CHUNK chunk_A, chunk_B, *cur_ptr, *prev_ptr;
 
     size_t disk_img_buf_size; /* Base size needed for a chunk memory image */
 
@@ -226,12 +226,12 @@ struct __wt_reconcile {
      */
     bool cell_zero; /* Row-store internal page 0th key */
 
-    WT_REC_DICTIONARY **dictionary;          /* Dictionary */
+    WTI_REC_DICTIONARY **dictionary;         /* Dictionary */
     u_int dictionary_next, dictionary_slots; /* Next, max entries */
                                              /* Skiplist head. */
-    WT_REC_DICTIONARY *dictionary_head[WT_SKIP_MAXDEPTH];
+    WTI_REC_DICTIONARY *dictionary_head[WT_SKIP_MAXDEPTH];
 
-    WT_REC_KV k, v; /* Key/Value being built */
+    WTI_REC_KV k, v; /* Key/Value being built */
 
     WT_ITEM *cur, _cur;   /* Key/Value being built */
     WT_ITEM *last, _last; /* Last key/value built */

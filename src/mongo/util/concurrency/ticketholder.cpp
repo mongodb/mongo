@@ -102,7 +102,7 @@ void TicketHolder::_immediateResize(WithLock, int32_t newSize) {
     }
 }
 
-void TicketHolder::_releaseTicketUpdateStats(Ticket& ticket) noexcept {
+void TicketHolder::_releaseTicketUpdateStats(Ticket& ticket) {
     if (ticket._priority == AdmissionContext::Priority::kExempt) {
         _updateQueueStatsOnRelease(_exemptQueueStats, ticket);
         return;
@@ -340,7 +340,7 @@ int32_t TicketHolder::available() const {
     return _tickets.load();
 }
 
-void TicketHolder::_releaseNormalPriorityTicket(AdmissionContext* admCtx) noexcept {
+void TicketHolder::_releaseNormalPriorityTicket(AdmissionContext* admCtx) {
     // Notifying a futex costs a syscall. Since queued waiters guarantee that the `_waiterCount` is
     // non-zero while they are waiting, we can avoid the needless cost if there are tickets and no
     // queued waiters.

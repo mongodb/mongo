@@ -25,7 +25,6 @@ selector:
     - jstests/core/**/geo_update_btree2.js # notablescan.
     - jstests/core/**/index9.js # "local" database.
     - jstests/core/**/queryoptimizera.js # "local" database.
-    - jstests/core/**/stages*.js # stageDebug.
     - jstests/core/**/startup_log.js # "local" database.
     - jstests/core/**/tailable_cursor_invalidation.js # capped collections.
     - jstests/core/**/tailable_getmore_batch_size.js # capped collections.
@@ -67,7 +66,7 @@ selector:
 
     # TODO: Remove after fixing SERVER-78201: the following received command without explicit readConcern.
     - jstests/aggregation/sources/densify/internal_parse.js
-    - jstests/aggregation/api_version_stage_allowance_checks.js
+    - jstests/aggregation/parsing/api_version_stage_allowance_checks.js
 
     # TODO (SERVER-78200): The tests below sometimes hang when they run concurrently with a setFCV command.
     - src/mongo/db/modules/*/jstests/fle/fle_admin_e2e.js
@@ -194,14 +193,14 @@ selector:
     # Queryable encryption tests create internal transactions which are expected to fail.
     - jstests/core/query/queryable_encryption/*.js
     # TODO (SERVER-77910): Find out why spill_to_disk.js fails to spill to disk after FCV down.
-    - jstests/aggregation/spill_to_disk.js
+    - jstests/aggregation/exec/spill_to_disk.js
     # TODO (SERVER-32311): These tests use getAggPlanStage(), which can't handle sharded explain output.
-    - jstests/aggregation/match_swapping_renamed_fields.js
-    - jstests/aggregation/use_query_project_and_sort.js
-    - jstests/aggregation/use_query_projection.js
-    - jstests/aggregation/use_query_sort.js
+    - jstests/aggregation/optimization/match_swapping_renamed_fields.js
+    - jstests/aggregation/optimization/use_query_project_and_sort.js
+    - jstests/aggregation/optimization/use_query_projection.js
+    - jstests/aggregation/optimization/use_query_sort.js
     # TODO: Remove when SERVER-23229 is fixed.
-    - jstests/aggregation/bugs/groupMissing.js
+    - jstests/aggregation/sources/group/groupMissing.js
     - jstests/aggregation/sources/graphLookup/variables.js
     # TODO (SERVER-77935): Investigate timeout from fcv downgrade in jstests/core/query/push/push2.js.
     - jstests/core/query/push/push2.js
@@ -216,7 +215,7 @@ selector:
 
     # TODO (SERVER-95788): This test creates a capped collection and fails because this suite is not
     # compatible with them (they can't be sharded), but does not exclude the `requires_capped` tag.
-    - jstests/core/catalog/catalog_list_operations_consistency.js
+    - jstests/core/catalog/list_catalog_stage_consistency.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

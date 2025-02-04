@@ -13,6 +13,8 @@
 //   requires_scripting,
 //   # TODO SERVER-89016 Remove this tag
 //   does_not_support_multiplanning_single_solutions,
+//   # The test runs getLatestProfileEntry(). The downstream syncing node affects the profiler.
+//   run_getLatestProfilerEntry,
 // ]
 
 import {

@@ -286,6 +286,14 @@ function runTest(conn, {rst, st}) {
     assert.commandFailedWithCode(
         testDb.runCommand({aggregate: 1, pipeline: [{$listSampledQueries: {}}], cursor: {}}),
         ErrorCodes.InvalidNamespace);
+
+    jsTest.log("Test that running with a namespace that contains a null byte results in error");
+    assert.commandFailedWithCode(adminDb.runCommand({
+        aggregate: 1,
+        pipeline: [{$listSampledQueries: {namespace: "invalid_\x00_ns"}}],
+        cursor: {}
+    }),
+                                 ErrorCodes.InvalidNamespace);
 }
 
 {

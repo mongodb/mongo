@@ -16,3 +16,6 @@
 - featureFlagSearchInSbe
 - featureFlagEgressGrpcForSearch
 - featureFlagTrackUnshardedCollectionsUponCreation
+- featureFlagTSBucketingParametersUnchanged
+- featureFlagMongogProxyProcolSupport
+- featureFlagShardAuthoritativeDbMetadata

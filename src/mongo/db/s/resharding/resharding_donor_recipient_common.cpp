@@ -330,6 +330,9 @@ ReshardingDonorDocument constructDonorDocumentFromReshardingFields(
                                  reshardingFields.getDonorFields()->getReshardingKey().toBSON());
     commonMetadata.setStartTime(reshardingFields.getStartTime());
     commonMetadata.setProvenance(reshardingFields.getProvenance());
+    resharding::validatePerformVerification(reshardingFields.getPerformVerification());
+    commonMetadata.setPerformVerification(reshardingFields.getPerformVerification());
+
     donorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
 
     return donorDoc;
@@ -365,6 +368,8 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
     resharding::validateImplicitlyCreateIndex(reshardingFields.getImplicitlyCreateIndex(),
                                               metadata.getKeyPattern());
     commonMetadata.setImplicitlyCreateIndex(reshardingFields.getImplicitlyCreateIndex());
+    resharding::validatePerformVerification(reshardingFields.getPerformVerification());
+    commonMetadata.setPerformVerification(reshardingFields.getPerformVerification());
 
     ReshardingRecipientMetrics metrics;
     metrics.setApproxDocumentsToCopy(recipientFields->getApproxDocumentsToCopy());

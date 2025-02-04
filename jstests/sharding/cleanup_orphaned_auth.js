@@ -8,9 +8,6 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 TestData.disableImplicitSessions = true;
 
 function assertUnauthorized(res, msg) {
-    if (assert._debug && msg)
-        print("in assert for: " + msg);
-
     if (res.ok == 0 &&
         (res.errmsg.startsWith('not authorized') || res.errmsg.match(/requires authentication/)))
         return;

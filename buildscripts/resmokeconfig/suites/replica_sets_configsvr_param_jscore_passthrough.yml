@@ -44,7 +44,7 @@ selector:
     # in a prepared state for an extended period, it will result in a timeout for the dbcheck process.
     - jstests/core/txns/prepare_conflict.js
     # Implicit collection creation not supported for certain commands that are run direct to shard.
-    - jstests/core/ddl/capped_convertToCapped1.js
+    - jstests/core/ddl/clone_collection_as_capped.js
     - jstests/core/query/collation/collation.js
     # Logical session cache for a config server replica set is not usable until there is a shard.
     - jstests/core/administrative/list_all_sessions.js

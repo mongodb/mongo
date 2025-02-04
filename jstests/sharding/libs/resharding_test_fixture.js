@@ -438,9 +438,15 @@ export var ReshardingTest = class {
     }
 
     /** @private */
-    _startReshardingInBackgroundAndAllowCommandFailure(
-        {newShardKeyPattern, newChunks, forceRedistribution, reshardingUUID, toShard},
-        expectedErrorCode) {
+    _startReshardingInBackgroundAndAllowCommandFailure({
+        newShardKeyPattern,
+        newChunks,
+        forceRedistribution,
+        reshardingUUID,
+        toShard,
+        performVerification
+    },
+                                                       expectedErrorCode) {
         for (let disallowedErrorCode of [ErrorCodes.FailedToSatisfyReadPreference,
                                          ErrorCodes.HostUnreachable,
         ]) {
@@ -485,7 +491,8 @@ export var ReshardingTest = class {
                      reshardingUUID,
                      commandDoneSignal,
                      opType,
-                     toShard) {
+                     toShard,
+                     performVerification) {
                 const conn = new Mongo(host);
 
                 // We allow the client to retry the reshardCollection a large but still finite
@@ -528,6 +535,9 @@ export var ReshardingTest = class {
                     if (toShard !== undefined) {
                         command = Object.merge(command, {toShard: toShard});
                     }
+                    if (performVerification !== undefined) {
+                        command = Object.merge(command, {performVerification});
+                    }
                     res = conn.adminCommand(command);
 
                     if (res.ok === 1 ||
@@ -553,7 +563,8 @@ export var ReshardingTest = class {
             reshardingUUID ? reshardingUUID.toString() : undefined,
             this._commandDoneSignal,
             this._opType,
-            toShard);
+            toShard,
+            performVerification);
 
         this._reshardingThread.start();
         this._isReshardingActive = true;
@@ -680,18 +691,24 @@ export var ReshardingTest = class {
      * finishes but before checking the the state post resharding. By the time afterReshardingFn
      * is called the temporary resharding collection will either have been dropped or renamed.
      */
-    withReshardingInBackground({newShardKeyPattern, newChunks, forceRedistribution, reshardingUUID},
-                               duringReshardingFn = (tempNs) => {},
-                               {
-                                   expectedErrorCode = ErrorCodes.OK,
-                                   postCheckConsistencyFn = (tempNs) => {},
-                                   postDecisionPersistedFn = () => {},
-                                   afterReshardingFn = () => {}
-                               } = {}) {
+    withReshardingInBackground(
+        {newShardKeyPattern, newChunks, forceRedistribution, reshardingUUID, performVerification},
+        duringReshardingFn = (tempNs) => {},
+        {
+            expectedErrorCode = ErrorCodes.OK,
+            postCheckConsistencyFn = (tempNs) => {},
+            postDecisionPersistedFn = () => {},
+            afterReshardingFn = () => {}
+        } = {}) {
         this._opType = "reshardCollection";
-        this._startReshardingInBackgroundAndAllowCommandFailure(
-            {newShardKeyPattern, newChunks, forceRedistribution, reshardingUUID},
-            expectedErrorCode);
+        this._startReshardingInBackgroundAndAllowCommandFailure({
+            newShardKeyPattern,
+            newChunks,
+            forceRedistribution,
+            reshardingUUID,
+            performVerification
+        },
+                                                                expectedErrorCode);
 
         assert.soon(() => {
             const op = this._findReshardingCommandOp();

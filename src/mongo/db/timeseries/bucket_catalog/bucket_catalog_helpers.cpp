@@ -241,11 +241,9 @@ StatusWith<std::pair<Date_t, BSONElement>> extractTimeAndMeta(const BSONObj& doc
 void handleDirectWrite(RecoveryUnit& ru,
                        BucketCatalog& bucketCatalog,
                        const TimeseriesOptions& options,
-                       const StringDataComparator* comparator,
                        const UUID& collectionUUID,
                        const BSONObj& bucket) {
-    const BucketId bucketId =
-        extractBucketId(bucketCatalog, options, comparator, collectionUUID, bucket);
+    const BucketId bucketId = extractBucketId(bucketCatalog, options, collectionUUID, bucket);
 
     // First notify the BucketCatalog that we intend to start a direct write, so we can conflict
     // with any already-prepared operation, and also block bucket reopening if it's enabled.

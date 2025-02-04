@@ -34,7 +34,7 @@
 #include <vector>
 
 
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/static_immortal.h"

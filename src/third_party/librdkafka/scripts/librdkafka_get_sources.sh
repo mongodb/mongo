@@ -47,7 +47,7 @@ rm -rf CHANGELOG.md CODE_OF_CONDUCT.md CONFIGURATION.md CONTRIBUTING.md INTRODUC
         CMakeLists.txt lds-gen.py mklove/ packaging/ service.yml tests/ vcpkg.json win32/ \
         Makefile Makefile.config config.cache configure.self configure debian mainpage.doxy Doxyfile \
         src/CMakeLists.txt src/Makefile src/generate_proto.sh src/librdkafka_cgrp_synch.png src/statistics_schema.json \
-        src-cpp/CMakeLists.txt src-cpp/Makefile src-cpp/README.md config.log
+        src/cJSON.c src/cJSON.h src-cpp/CMakeLists.txt src-cpp/Makefile src-cpp/README.md config.log
 
 pushd src
 # Replace all instances of the string "LZ4" and "XXH" with "KLZ4" and "KXXH" in the C source code.

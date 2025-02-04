@@ -33,13 +33,10 @@
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/query/stage_builder/sbe/abt_holder_def.h"
-#include "mongo/db/query/stage_builder/sbe/type_signature.h"
-
-#include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
-#include "mongo/db/exec/sbe/abt/slots_provider.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/stage_builder/sbe/abt_holder_def.h"
+#include "mongo/db/query/stage_builder/sbe/type_signature.h"
 
 namespace mongo::stage_builder {
 

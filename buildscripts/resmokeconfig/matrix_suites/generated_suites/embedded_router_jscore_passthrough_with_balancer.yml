@@ -59,7 +59,6 @@ selector:
     - jstests/core/**/geo_update_btree2.js
     - jstests/core/**/index9.js
     - jstests/core/**/queryoptimizera.js
-    - jstests/core/**/stages*.js
     - jstests/core/**/startup_log.js
     - jstests/core/**/query/top/top.js
     - jstests/core/**/geo_2d_explain.js
@@ -71,7 +70,6 @@ selector:
     - jstests/core/index/index_stats.js
     - jstests/core/timeseries/query/timeseries_predicates.js
     - jstests/core/index/geo/geo_update_btree.js
-    - jstests/core/timeseries/query/timeseries_union_with.js
     - jstests/core/**/*[aA]uth*.js
   exclude_with_any_tags:
     - assumes_standalone_mongod

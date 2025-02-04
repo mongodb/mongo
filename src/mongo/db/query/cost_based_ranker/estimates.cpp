@@ -157,6 +157,10 @@ SelectivityEstimate operator/(const CardinalityEstimate& smaller_ce,
             str::stream() << smaller_ce._estimate.v() << " must be <= " << bigger_ce._estimate.v()
                           << " to produce selectivity",
             smaller_ce._estimate.v() <= bigger_ce._estimate.v());
+    // Prevent undefined selectivity
+    tassert(9967301,
+            str::stream{} << "selectivity undefined with 0 cardinality denominator",
+            bigger_ce._estimate._v > 0.0);
 
     SelectivityEstimate result(SelectivityType{0.0}, smaller_ce._source);
     result.mergeSources(bigger_ce);

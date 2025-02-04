@@ -752,5 +752,24 @@ TEST_F(ShardServerCatalogCacheLoaderTest, RecoverAfterPartiallyFlushedMetadata) 
     ASSERT_FALSE(persistedCollection.getRefreshing().value_or(false));
 }
 
+TEST_F(ShardServerCatalogCacheLoaderTest, UnsplittableFieldIsPropagatedOnSSCCL) {
+    ChunkVersion collectionPlacementVersion({OID::gen(), Timestamp(1, 1)}, {1, 0});
+
+    CollectionType collectionType = makeCollectionType(collectionPlacementVersion);
+    std::vector<ChunkType> chunk = {
+        ChunkType{UUID::gen(),
+                  ChunkRange{BSON("_id" << MINKEY), BSON("_id" << MAXKEY)},
+                  collectionPlacementVersion,
+                  kShardId},
+    };
+    collectionType.setUnsplittable(true);
+
+    _remoteLoaderMock->setCollectionRefreshReturnValue(collectionType);
+    _remoteLoaderMock->setChunkRefreshReturnValue(chunk);
+
+    auto collAndChunksRes =
+        retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNSHARDED());
+    ASSERT(collAndChunksRes.unsplittable);
+}
 }  // namespace
 }  // namespace mongo

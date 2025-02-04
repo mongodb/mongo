@@ -190,7 +190,7 @@ public:
     }
 
     std::unique_ptr<TaskExecutorCursor> makeTec(RemoteCommandRequest rcr,
-                                                TaskExecutorCursorOptions&& options = {}) {
+                                                TaskExecutorCursorOptions&& options) {
         options.pinConnection = false;
         return std::make_unique<TaskExecutorCursor>(getExecutorPtr(), rcr, std::move(options));
     }
@@ -201,7 +201,7 @@ public:
     void postSetUp() {}
 
     BSONObj scheduleResponse(StatusWith<BSONObj> response) {
-        int32_t responseToId;
+        int32_t responseToId = -1;
         BSONObj cmdObjReceived;
         auto pf = makePromiseFuture<void>();
         expectSinkMessage([&](Message m) {
@@ -256,7 +256,7 @@ public:
     }
 
     std::unique_ptr<TaskExecutorCursor> makeTec(RemoteCommandRequest rcr,
-                                                TaskExecutorCursorOptions&& options = {}) {
+                                                TaskExecutorCursorOptions&& options) {
         options.pinConnection = true;
         return std::make_unique<TaskExecutorCursor>(getExecutorPtr(), rcr, std::move(options));
     }

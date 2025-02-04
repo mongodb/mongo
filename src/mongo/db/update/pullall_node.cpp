@@ -41,7 +41,7 @@
 #include "mongo/db/exec/mutable_bson/const_element.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/update/pullall_node.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

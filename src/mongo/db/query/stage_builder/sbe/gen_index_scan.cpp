@@ -995,8 +995,8 @@ IndexIntervals makeIntervalsFromIndexBounds(const IndexBounds& bounds,
         LOGV2_DEBUG(4742906,
                     5,
                     "Generated interval [lowKey, highKey]",
-                    "lowKey"_attr = lowKey,
-                    "highKey"_attr = highKey);
+                    "lowKey"_attr = redact(lowKey),
+                    "highKey"_attr = redact(highKey));
         result.push_back(makeKeyStringPair(
             lowKey, lowKeyInclusive, highKey, highKeyInclusive, version, ordering, forward));
     }

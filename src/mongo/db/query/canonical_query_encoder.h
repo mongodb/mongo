@@ -89,10 +89,10 @@ CanonicalQuery::QueryShapeString encodePipeline(
 
 /**
  * Encode the given CanonicalQuery into a string representation which represents the shape of the
- * query specifically for the classic plan cache. This is done by encoding the match, projection and
- * sort and stripping the values from the match. Two queries with the same shape may not necessarily
- * be able to use the same plan, so the plan cache has to add information to discriminate between
- * queries with the same shape.
+ * query specifically for the classic plan cache. This is done by encoding the match, projection,
+ * sort, and distinct and stripping the values from the match. Two queries with the same shape may
+ * not necessarily be able to use the same plan, so the plan cache has to add information to
+ * discriminate between queries with the same shape.
  */
 CanonicalQuery::QueryShapeString encodeClassic(const CanonicalQuery& cq);
 

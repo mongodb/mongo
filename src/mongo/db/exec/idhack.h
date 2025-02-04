@@ -71,7 +71,7 @@ public:
 
     ~IDHackStage() override;
 
-    bool isEOF() final;
+    bool isEOF() const final;
     StageState doWork(WorkingSetID* out) final;
 
     void doDetachFromOperationContext() final;

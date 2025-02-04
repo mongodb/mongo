@@ -67,7 +67,7 @@ namespace mongo {
 
 DocumentSourceGroupBase::~DocumentSourceGroupBase() {
     const auto& stats = _groupProcessor.getStats();
-    groupCounters.incrementGroupCountersPerQuery(stats.spilledDataStorageSize);
+    groupCounters.incrementGroupCountersPerQuery(stats.spillingStats.getSpilledDataStorageSize());
 }
 
 Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const {
@@ -102,9 +102,11 @@ Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const
     if (_groupProcessor.doingMerge()) {
         insides[kDoingMergeSpecField] = opts.serializeLiteral(true);
     } else if (pExpCtx->isFeatureFlagShardFilteringDistinctScanEnabled() &&
-               !_groupProcessor.willBeMerged()) {
-        // Only serialize this flag when it is set to false & we are not already merging -
-        // otherwise, mongod must infer from the expression context what to do.
+               !_groupProcessor.willBeMerged() &&
+               opts.literalPolicy == LiteralSerializationPolicy::kUnchanged) {
+        // Only serialize this flag when it is set to false & we are not already merging & this is
+        // not being used for query settings - otherwise, mongod must infer from the expression
+        // context what to do.
         insides[kWillBeMergedSpecField] = opts.serializeLiteral(_groupProcessor.willBeMerged());
     }
 
@@ -128,13 +130,15 @@ Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const
         const auto& stats = _groupProcessor.getStats();
         out["totalOutputDataSizeBytes"] =
             opts.serializeLiteral(static_cast<long long>(stats.totalOutputDataSizeBytes));
-        out["usedDisk"] = opts.serializeLiteral(stats.spills > 0);
-        out["spills"] = opts.serializeLiteral(static_cast<long long>(stats.spills));
-        out["spilledDataStorageSize"] =
-            opts.serializeLiteral(static_cast<long long>(stats.spilledDataStorageSize));
+        out["usedDisk"] = opts.serializeLiteral(stats.spillingStats.getSpills() > 0);
+        out["spills"] =
+            opts.serializeLiteral(static_cast<long long>(stats.spillingStats.getSpills()));
+        out["spilledDataStorageSize"] = opts.serializeLiteral(
+            static_cast<long long>(stats.spillingStats.getSpilledDataStorageSize()));
         out["numBytesSpilledEstimate"] =
-            opts.serializeLiteral(static_cast<long long>(stats.numBytesSpilledEstimate));
-        out["spilledRecords"] = opts.serializeLiteral(static_cast<long long>(stats.spilledRecords));
+            opts.serializeLiteral(static_cast<long long>(stats.spillingStats.getSpilledBytes()));
+        out["spilledRecords"] =
+            opts.serializeLiteral(static_cast<long long>(stats.spillingStats.getSpilledRecords()));
     }
 
     return out.freezeToValue();

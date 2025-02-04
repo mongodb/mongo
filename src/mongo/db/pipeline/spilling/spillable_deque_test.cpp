@@ -47,6 +47,8 @@
 
 namespace mongo {
 namespace {
+static constexpr bool isSingleElementSortKey = true;
+static const Value sortKeyVal = Value(1.0);
 
 class SpillableDequeTest : public SpillingTestFixture {
 public:
@@ -58,28 +60,41 @@ public:
 
     void buildAndLoadDocumentSet(int numDocs, SpillableDeque* cache) {
         for (int i = _lastIndex; i < _lastIndex + numDocs; ++i) {
-            _docSet.emplace_back(Document{{"val", i}});
+            // Make sure we can load metadata to/from the store.
+            _docSet.emplace_back(addMetadata(Document{{"val", i}}));
             cache->addDocument(_docSet.back());
         }
     }
 
     void verifyDocsInCache(int start, int end, SpillableDeque* cache) {
         for (int i = start; i < end; ++i) {
-            ASSERT_DOCUMENT_EQ(cache->getDocumentById(i), _docSet[i]);
+            auto foundDoc = cache->getDocumentById(i);
+            ASSERT_DOCUMENT_EQ(foundDoc, _docSet[i]);
+            assertMetaIsStillPresent(foundDoc);
         }
     }
 
+    Document addMetadata(Document&& mockInput) const {
+        MutableDocument doc(std::move(mockInput));
+        doc.metadata().setSortKey(sortKeyVal, isSingleElementSortKey);
+        std::cout << doc.peek().memUsageForSorter() << std::endl;
+        return doc.freeze();
+    }
+
+    void assertMetaIsStillPresent(const Document& foundDoc) const {
+        ASSERT_VALUE_EQ(foundDoc.metadata().getSortKey(), sortKeyVal);
+    }
 
     std::unique_ptr<MemoryUsageTracker> _tracker;
 
-    // Docs are ~200 each.
+    // Docs are ~500 each.
     std::vector<Document> _docSet;
     int _lastIndex = 0;
 };
 
 TEST_F(SpillableDequeTest, CanReadAndWriteDocumentsInMem) {
     _expCtx->setAllowDiskUse(false);
-    auto cache = createSpillableDeque(1000);
+    auto cache = createSpillableDeque(2000);
     buildAndLoadDocumentSet(2, cache.get());
     verifyDocsInCache(0, 2, cache.get());
 }
@@ -100,8 +115,8 @@ TEST_F(SpillableDequeTest, CanReadAndWriteDocumentsToDisk) {
 
 TEST_F(SpillableDequeTest, CanReturnDocumentsFromCacheAndDisk) {
     _expCtx->setAllowDiskUse(true);
-    // Docs are ~200 each.
-    auto cache = createSpillableDeque(250);
+    // Docs are ~500 each.
+    auto cache = createSpillableDeque(700);
     buildAndLoadDocumentSet(3, cache.get());
     verifyDocsInCache(0, 3, cache.get());
     _expCtx->setAllowDiskUse(false);
@@ -110,7 +125,7 @@ TEST_F(SpillableDequeTest, CanReturnDocumentsFromCacheAndDisk) {
 
 DEATH_TEST_F(SpillableDequeTest, RemovesDocumentsWhenExpired, "Requested expired document") {
     _expCtx->setAllowDiskUse(false);
-    auto cache = createSpillableDeque(1000);
+    auto cache = createSpillableDeque(2000);
     buildAndLoadDocumentSet(4, cache.get());
     cache->freeUpTo(0);
     verifyDocsInCache(1, 4, cache.get());
@@ -127,7 +142,7 @@ TEST_F(SpillableDequeTest, ReturnsCorrectDocumentsIfSomeHaveBeenRemovedMemOnly) 
 
 TEST_F(SpillableDequeTest, ReturnsCorrectDocumentsIfSomeHaveBeenRemovedMixed) {
     _expCtx->setAllowDiskUse(true);
-    auto cache = createSpillableDeque(1000);
+    auto cache = createSpillableDeque(2000);
     buildAndLoadDocumentSet(10, cache.get());
     // Only mark documents on disk as freed.
     cache->freeUpTo(4);

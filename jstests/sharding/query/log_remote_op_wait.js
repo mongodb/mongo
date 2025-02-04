@@ -65,8 +65,8 @@ function getRemoteOpWait(logLine) {
     return millis;
 }
 
-function getDuration(logLine) {
-    const pattern = /durationMillis"?:([0-9]+)/;
+function getWorkingMillis(logLine) {
+    const pattern = /workingMillis"?:([0-9]+)/;
     const match = logLine.match(pattern);
     assert(match, `pattern ${pattern} did not match line: ${logLine}`);
     const millis = parseInt(match[1]);
@@ -81,8 +81,8 @@ const cursor = coll.aggregate(pipeline, {comment: pipelineComment, batchSize: 1}
     const line = findMatchingLogLine(mongosLog.log, {msg: "Slow query", comment: pipelineComment});
     assert(line, 'Failed to find a log line matching the comment');
     const remoteOpWait = getRemoteOpWait(line);
-    const duration = getDuration(line);
-    assert.lte(remoteOpWait, duration);
+    const workingMillis = getWorkingMillis(line);
+    assert.lte(remoteOpWait, workingMillis);
 }
 
 // Run a getMore and check again for the log line: .next() empties the current 1-document batch, and
@@ -96,8 +96,8 @@ cursor.hasNext();
     const line = lines.find(line => line.match(/command.{1,4}getMore/));
     assert(line, 'Failed to find a getMore log line matching the comment');
     const remoteOpWait = getRemoteOpWait(line);
-    const duration = getDuration(line);
-    assert.lte(remoteOpWait, duration);
+    const workingMillis = getWorkingMillis(line);
+    assert.lte(remoteOpWait, workingMillis);
 }
 
 // A changestream is a type of aggregation, so it reports remoteOpWait. The initial $changeStream
@@ -110,8 +110,8 @@ const csCursor = coll.watch([], {comment: watchComment});
     const line = findMatchingLogLine(mongosLog.log, {msg: "Slow query", comment: watchComment});
     assert(line, "Failed to find a log line matching the comment");
     const remoteOpWait = getRemoteOpWait(line);
-    const duration = getDuration(line);
-    assert.lte(remoteOpWait, duration);
+    const workingMillis = getWorkingMillis(line);
+    assert.lte(remoteOpWait, workingMillis);
 }
 
 // A $changeStream getMore may pause execution while awaiting data if no results are currently
@@ -124,8 +124,8 @@ assert(!csCursor.hasNext());
         mongosLog.log, {msg: "Slow query", comment: watchComment, command: "getMore"});
     assert(line, "Failed to find a log line matching the comment");
     const remoteOpWait = getRemoteOpWait(line);
-    const duration = getDuration(line);
-    assert.lte(duration, 100);
+    const workingMillis = getWorkingMillis(line);
+    assert.lte(workingMillis, 100);
     assert.gte(remoteOpWait, 900);
 }
 
@@ -149,8 +149,8 @@ coll.aggregate(pipeline2, {allowDiskUse: true, comment: pipelineComment2}).next(
     const line = lines.find(line => line.match(/mergeCursors/));
     assert(line, `Failed to find a log line mentioning 'mergeCursors': ${lines}`);
     const remoteOpWait = getRemoteOpWait(line);
-    const duration = getDuration(line);
-    assert.lte(remoteOpWait, duration);
+    const workingMillis = getWorkingMillis(line);
+    assert.lte(remoteOpWait, workingMillis);
 }
 
 st.stop();

@@ -72,6 +72,8 @@ public:
 
     size_t getTestNum() const;
 
+    bool hasErrored() const;
+
     /**
      * Compute the normalized version of the input set.
      */
@@ -81,7 +83,8 @@ public:
 
     /**
      * Parses a single test definition. This includes the number and name line, the comment line(s)
-     * and the actual test command.
+     * and the actual test command. nextTestNum = prevTestNum + 1, and will be overriden if a user
+     * specifies a different testNum so long as it's greater than the previous.
      * Expects the file stream to be open and allow reading.
     <----- Test Format ----->
     <testNumber> <testName>
@@ -90,7 +93,7 @@ public:
     <result if result file>
     <----- End Test Format ----->
      */
-    static Test parseTest(std::fstream&, ModeOption, bool optimizationsOff, size_t testNum);
+    static Test parseTest(std::fstream&, ModeOption, bool optimizationsOff, size_t nextTestNum);
 
     /**
      * Runs the test and records the result returned by the server.
@@ -113,11 +116,12 @@ private:
         std::vector<std::string> postQuery;
         std::vector<std::string> postTest;
     } _comments;
-    std::vector<BSONObj> _expectedResult;
-    std::vector<std::string> _normalizedResult;
-    NormalizationOptsSet _testType;
-    BSONObj _query;
-    std::string _db;
+    std::vector<BSONObj> _expectedResult = {};
+    std::vector<std::string> _normalizedResult = {};
+    NormalizationOptsSet _testType = {};
+    BSONObj _query = {};
+    bool _errored = false;
+    std::string _db = {};
 };
 
 }  // namespace mongo::query_tester

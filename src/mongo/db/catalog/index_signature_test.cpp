@@ -75,10 +75,12 @@ public:
     StatusWith<const IndexCatalogEntry*> createIndex(BSONObj spec) {
         // Build the specified index on the collection.
         WriteUnitOfWork wuow(opCtx());
+        CollectionWriter writer{opCtx(), *_coll};
+
         // Get the index catalog associated with the test collection.
-        auto* indexCatalog = _coll->getWritableCollection(opCtx())->getIndexCatalog();
+        auto* indexCatalog = writer.getWritableCollection(opCtx())->getIndexCatalog();
         auto status = indexCatalog->createIndexOnEmptyCollection(
-            opCtx(), _coll->getWritableCollection(opCtx()), spec);
+            opCtx(), writer.getWritableCollection(opCtx()), spec);
         if (!status.isOK()) {
             return status.getStatus();
         }

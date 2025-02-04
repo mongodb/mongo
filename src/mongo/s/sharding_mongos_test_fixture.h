@@ -49,7 +49,7 @@
 #include "mongo/s/catalog_cache_mock.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/sharding_test_fixture_common.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {

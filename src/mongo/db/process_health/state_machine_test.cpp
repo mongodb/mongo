@@ -69,7 +69,7 @@ public:
     public:
         using StateMachineTest::StateHandler::StateHandler;
 
-        boost::optional<MachineState> accept(const SM::OptionalMessageType& m) noexcept override {
+        boost::optional<MachineState> accept(const SM::OptionalMessageType& m) override {
             return m->nextState;
         }
     };
@@ -260,7 +260,7 @@ DEATH_TEST_F(StateMachineTestFixture, CrashOnUndefinedHandler, "invariant") {
     subject()->start();
 }
 
-DEATH_TEST_F(StateMachineTestFixture, CrashIfHookThrowsException, "fatal") {
+DEATH_TEST_F(StateMachineTestFixture, CrashIfHookThrowsException, "9894901") {
     auto hook = [](MachineState oldState, MachineState newState, const SM::OptionalMessageType& m) {
         throw std::runtime_error("exception");
     };

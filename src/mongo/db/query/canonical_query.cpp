@@ -149,6 +149,10 @@ CanonicalQuery::CanonicalQuery(OperationContext* opCtx, const CanonicalQuery& ba
            false,  // The parent query countLike is independent from the subquery countLike.
            baseQuery.isSearchQuery(),
            false /*optimizeMatchExpression*/);
+
+    if (baseQuery.getDistinct().has_value()) {
+        setDistinct(CanonicalDistinct(baseQuery.getDistinct().get()));
+    }
 }
 
 void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,

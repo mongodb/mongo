@@ -284,7 +284,6 @@ mongo_cc_library(
     name = "map_reduce_agg",
     srcs = [
         "map_reduce_agg.cpp",
-        "//src/mongo/db/query:command_diagnostic_printer.h",
     ],
     hdrs = [
         "map_reduce_agg.h",

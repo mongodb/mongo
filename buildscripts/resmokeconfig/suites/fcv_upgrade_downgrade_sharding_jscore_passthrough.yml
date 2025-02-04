@@ -24,7 +24,6 @@ selector:
     - jstests/core/**/geo_update_btree2.js # notablescan.
     - jstests/core/**/index9.js # "local" database.
     - jstests/core/**/queryoptimizera.js # "local" database.
-    - jstests/core/**/stages*.js # stageDebug.
     - jstests/core/**/startup_log.js # "local" database.
     - jstests/core/**/query/top/top.js # top.
     # The following tests fail because mongos behaves differently from mongod when testing certain
@@ -42,7 +41,7 @@ selector:
 
     # TODO: Remove after fixing SERVER-78201: the following received command without explicit readConcern.
     - jstests/aggregation/sources/densify/internal_parse.js
-    - jstests/aggregation/api_version_stage_allowance_checks.js
+    - jstests/aggregation/parsing/api_version_stage_allowance_checks.js
 
     # TODO (SERVER-78200): The tests below sometimes hang when they run concurrently with a setFCV command.
     - src/mongo/db/modules/*/jstests/fle/fle_admin_e2e.js
@@ -84,7 +83,7 @@ selector:
     # Queryable encryption tests create internal transactions which are expected to fail.
     - jstests/core/query/queryable_encryption/*.js
     # TODO (SERVER-77910): Find out why spill_to_disk.js fails to spill to disk after FCV down.
-    - jstests/aggregation/spill_to_disk.js
+    - jstests/aggregation/exec/spill_to_disk.js
 
     # TODO SERVER-80490: The test below requires a precise lock count that can get modified by concurrent
     # setFCV operations. The exclusion can be removed once the linked ticket is fixed.

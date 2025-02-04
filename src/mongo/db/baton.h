@@ -73,7 +73,7 @@ public:
      * opCtx.  Also, any calls to schedule after this point will immediately invoke their callback
      * with a null opCtx.
      */
-    void detach() noexcept {
+    void detach() {
         // We make this anchor so that deleting the shared_ptr inside opCtx doesn't remove the last
         // reference to this type until we return from detach.
         const auto anchor = shared_from_this();
@@ -93,12 +93,12 @@ public:
      * inline if passed a nullptr.  Examples of such work are logging, simple cleanup and
      * rescheduling the task on another executor.
      */
-    void schedule(Task func) noexcept override = 0;
+    void schedule(Task func) override = 0;
 
     /**
      * Returns a networking view of the baton, if this baton supports networking functionality
      */
-    virtual transport::NetworkingBaton* networking() noexcept {
+    virtual transport::NetworkingBaton* networking() {
         return nullptr;
     }
 
@@ -173,7 +173,7 @@ public:
     SubBatonHolder makeSubBaton();
 
 private:
-    virtual void detachImpl() noexcept = 0;
+    virtual void detachImpl() = 0;
 };
 
 }  // namespace mongo

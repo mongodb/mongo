@@ -118,6 +118,7 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/mirror_maestro.h"
 #include "mongo/db/mongod_options.h"
+#include "mongo/db/mongod_options_general_gen.h"
 #include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
@@ -133,15 +134,12 @@
 #include "mongo/db/op_observer/user_write_block_mode_op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/periodic_runner_job_abort_expired_transactions.h"
-#include "mongo/db/pipeline/change_stream_expired_pre_image_remover.h"
-#include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
 #include "mongo/db/profile_filter_impl.h"
 #include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
-#include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/query/stats/stats_cache_loader_impl.h"
 #include "mongo/db/query/stats/stats_catalog.h"
@@ -299,6 +297,7 @@
 #include "mongo/watchdog/watchdog_mongod.h"
 
 #ifdef MONGO_CONFIG_GRPC
+#include "mongo/db/query/search/mongot_options.h"
 #include "mongo/transport/grpc/grpc_feature_flag_gen.h"
 #endif
 
@@ -324,6 +323,7 @@ const ntservice::NtServiceDefaultStrings defaultServiceStrings = {
 auto makeTransportLayer(ServiceContext* svcCtx) {
     boost::optional<int> routerPort;
     boost::optional<int> loadBalancerPort;
+    boost::optional<int> proxyPort;
 
     if (serverGlobalParams.routerPort) {
         routerPort = serverGlobalParams.routerPort;
@@ -334,6 +334,23 @@ auto makeTransportLayer(ServiceContext* svcCtx) {
             quickExit(ExitCode::badOptions);
         }
         // TODO SERVER-78730: add support for load-balanced connections.
+    }
+
+    if (serverGlobalParams.proxyPort) {
+        proxyPort = *serverGlobalParams.proxyPort;
+        if (*proxyPort == serverGlobalParams.port) {
+            LOGV2_ERROR(9967800,
+                        "The proxy port must be different from the public listening port.",
+                        "port"_attr = serverGlobalParams.port);
+            quickExit(ExitCode::badOptions);
+        }
+
+        if (routerPort && *proxyPort == *routerPort) {
+            LOGV2_ERROR(9967801,
+                        "The proxy port must be different from the public router port.",
+                        "port"_attr = *routerPort);
+            quickExit(ExitCode::badOptions);
+        }
     }
 
     // Mongod should not bind to any ports in repair mode so only allow egress.
@@ -1094,12 +1111,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
     }
 
     // If not in standalone mode, start background tasks to:
-    //  * Periodically remove expired pre-images from the 'system.preimages'
     //  * Periodically remove expired documents from change collections
     if (!isStandalone) {
-        if (!gPreImageRemoverDisabled) {
-            startChangeStreamExpiredPreImagesRemover(serviceContext);
-        }
         if (!gChangeCollectionRemoverDisabled) {
             startChangeCollectionExpiredDocumentsRemover(serviceContext);
         }
@@ -1943,7 +1956,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     LOGV2_OPTIONS(9439300, {LogComponent::kSharding}, "Shutting down the filtering metadata cache");
     FilteringMetadataCache::get(opCtx)->shutDown();
 
-    if (auto configServerRoutingInfoCache = RoutingInformationCache::get(serviceContext)) {
+    // (Ignore FCV check): this feature flag is not FCV-gated.
+    if (auto configServerRoutingInfoCache = RoutingInformationCache::get(serviceContext);
+        configServerRoutingInfoCache != nullptr &&
+        !feature_flags::gDualCatalogCache.isEnabledAndIgnoreFCVUnsafe()) {
         LOGV2_OPTIONS(
             8778000, {LogComponent::kSharding}, "Shutting down the RoutingInformationCache");
         configServerRoutingInfoCache->shutDownAndJoin();
@@ -1975,13 +1991,9 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     }
 
     {
-        TimeElapsedBuilderScopedTimer scopedTimer(
-            serviceContext->getFastClockSource(),
-            "Shut down expired pre-images and documents removers",
-            &shutdownTimeElapsedBuilder);
-        LOGV2(6278511, "Shutting down the Change Stream Expired Pre-images Remover");
-        shutdownChangeStreamExpiredPreImagesRemover(serviceContext);
-
+        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                                  "Shut down expired change collection removers",
+                                                  &shutdownTimeElapsedBuilder);
         shutdownChangeCollectionExpiredDocumentsRemover(serviceContext);
     }
 

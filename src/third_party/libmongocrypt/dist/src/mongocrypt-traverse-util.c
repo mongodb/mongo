@@ -45,7 +45,7 @@ static bool _check_first_byte(uint8_t byte, traversal_match_t match) {
             || byte == MC_SUBTYPE_FLE2InsertUpdatePayload || byte == MC_SUBTYPE_FLE2IndexedRangeEncryptedValue
             || byte == MC_SUBTYPE_FLE2InsertUpdatePayloadV2 || byte == MC_SUBTYPE_FLE2UnindexedEncryptedValueV2
             || byte == MC_SUBTYPE_FLE2IndexedEqualityEncryptedValueV2
-            || byte == MC_SUBTYPE_FLE2IndexedRangeEncryptedValueV2;
+            || byte == MC_SUBTYPE_FLE2IndexedRangeEncryptedValueV2 || byte == MC_SUBTYPE_FLE2IndexedTextEncryptedValue;
     case TRAVERSE_MATCH_SUBTYPE6: return true;
     default: break;
     }

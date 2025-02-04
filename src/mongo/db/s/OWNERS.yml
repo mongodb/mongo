@@ -1,5 +1,8 @@
 version: 1.0.0
 filters:
+  - "*migration*":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "*active_migrations_registry*":
     approvers:
       - 10gen/server-cluster-scalability
@@ -13,9 +16,6 @@ filters:
     approvers:
       - 10gen/server-cluster-scalability
   - "chunk_move_write_concern_options*":
-    approvers:
-      - 10gen/server-cluster-scalability
-  - "*migration*":
     approvers:
       - 10gen/server-cluster-scalability
   - "*move_range*":
@@ -63,9 +63,6 @@ filters:
   - "chunk_operation_precondition_checks*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "clone_catalog_data_command.cpp":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "collection_*":
     approvers:
       - 10gen/server-catalog-and-routing
@@ -73,9 +70,6 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing
   - "*convert_to_capped*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "*create*":
     approvers:
       - 10gen/server-catalog-and-routing
   - "*collection_creation*":
@@ -145,9 +139,6 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing
   - "*cluster_param*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "*catalog_client*":
     approvers:
       - 10gen/server-catalog-and-routing
   - "*sharding_recovery*":
@@ -305,10 +296,6 @@ filters:
   - "sharding_write_router*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "*structured_encryption_data_command*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-      - 10gen/server-security
   - "shardsvr_commit*":
     approvers:
       - 10gen/server-catalog-and-routing

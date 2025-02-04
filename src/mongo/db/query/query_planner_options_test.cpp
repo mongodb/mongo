@@ -420,7 +420,7 @@ TEST_F(QueryPlannerTest, ShardFilterCollScan) {
     assertNumSolutions(1U);
     assertSolutionExists(
         "{sharding_filter: {node: "
-        "{cscan: {dir: 1}}}}}}}");
+        "{cscan: {dir: 1}}}}");
 }
 
 TEST_F(QueryPlannerTest, ShardFilterBasicIndex) {

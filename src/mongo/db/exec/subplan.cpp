@@ -103,6 +103,11 @@ bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
         return false;
     }
 
+    // Distinct-eligible queries cannot use subplanning.
+    if (query.getDistinct()) {
+        return false;
+    }
+
     // We can only subplan rooted $or queries, and only if they have at least one clause.
     return MatchExpression::OR == expr->matchType() && expr->numChildren() > 0;
 }
@@ -313,7 +318,7 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
     return Status::OK();
 }
 
-bool SubplanStage::isEOF() {
+bool SubplanStage::isEOF() const {
     // If we're running we best have a runner.
     invariant(child());
     return child()->isEOF();

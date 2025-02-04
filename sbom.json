@@ -147,6 +147,49 @@
       "supplier": {
         "name": "Organization: github"
       },
+      "name": "aws-sdk - the AWS SDK client library",
+      "version": "1.11.471",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:github/aws/aws-sdk-cpp@1.11.471",
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Atlas Streams"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "info_link",
+          "value": "https://github.com/aws/aws-sdk-cpp"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/aws-sdk/scripts/getsources.sh"
+        }
+      ],
+      "type": "library",
+      "bom-ref": "b6c87079-ee43-42ea-8e6c-eef197972f82",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/aws-sdk"
+          }
+        ]
+      },
+      "scope": "required"
+    },
+    {
+      "supplier": {
+        "name": "Organization: github"
+      },
       "name": "benchmark",
       "version": "v1.5.2",
       "licenses": [
@@ -234,7 +277,7 @@
         "name": "Organization: github"
       },
       "name": "c-ares",
-      "version": "1.19.1",
+      "version": "1.27.0",
       "licenses": [
         {
           "license": {
@@ -242,7 +285,7 @@
           }
         }
       ],
-      "purl": "pkg:github/c-ares/c-ares@cares-1_19_1",
+      "purl": "pkg:github/c-ares/c-ares@cares-1_27_0",
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -383,7 +426,7 @@
         "name": ""
       },
       "name": "derickr/timelib",
-      "version": "2022.10",
+      "version": "2022.13",
       "licenses": [
         {
           "license": {
@@ -419,7 +462,7 @@
         ]
       },
       "scope": "required",
-      "purl": "pkg:github/derickr/timelib@2022.10"
+      "purl": "pkg:github/derickr/timelib@2022.13"
     },
     {
       "supplier": {
@@ -672,7 +715,7 @@
         "name": "Organization: github"
       },
       "name": "grpc",
-      "version": "1.59.2",
+      "version": "1.59.5",
       "licenses": [
         {
           "license": {
@@ -680,7 +723,7 @@
           }
         }
       ],
-      "purl": "pkg:github/grpc/grpc@v1.59.2",
+      "purl": "pkg:github/grpc/grpc@v1.59.5",
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -1191,7 +1234,7 @@
         "name": "Organization: debian"
       },
       "name": "Mozilla Firefox",
-      "version": "115.7.0esr",
+      "version": "115.19.0esr",
       "licenses": [
         {
           "license": {
@@ -1199,7 +1242,7 @@
           }
         }
       ],
-      "purl": "pkg:deb/debian/firefox-esr@115.7.0esr-1",
+      "purl": "pkg:deb/debian/firefox-esr@115.19.0esr-1",
       "properties": [
         {
           "name": "internal:team_responsible",

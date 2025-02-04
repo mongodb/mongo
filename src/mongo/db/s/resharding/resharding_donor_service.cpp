@@ -131,11 +131,6 @@ const WriteConcernOptions kNoWaitWriteConcern{1, WriteConcernOptions::SyncMode::
 const WriteConcernOptions kMajorityWriteConcern{
     WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
 
-Date_t getCurrentTime() {
-    const auto svcCtx = cc().getServiceContext();
-    return svcCtx->getFastClockSource()->now();
-}
-
 Timestamp generateMinFetchTimestamp(OperationContext* opCtx, const NamespaceString& sourceNss) {
     // Do a no-op write and use the OpTime as the minFetchTimestamp
     writeConflictRetry(
@@ -458,7 +453,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                            *onReleaseCriticalSectionAction);
 
                    _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
-                                       getCurrentTime());
+                                       resharding::getCurrentTime());
 
                    // We force a refresh to make sure that the placement information is updated in
                    // cache after abort decision before the donor state document is deleted.
@@ -796,7 +791,8 @@ void ReshardingDonorService::DonorStateMachine::
                 _critSecReason,
                 ShardingCatalogClient::kLocalWriteConcern);
 
-        _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCriticalSection, getCurrentTime());
+        _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCriticalSection,
+                              resharding::getCurrentTime());
     }
 
     {
@@ -809,6 +805,12 @@ void ReshardingDonorService::DonorStateMachine::
         auto rawOpCtx = opCtx.get();
 
         auto generateOplogEntry = [&](ShardId destinedRecipient) {
+            ReshardBlockingWritesChangeEventO2Field changeEvent{
+                _metadata.getSourceNss(),
+                _metadata.getReshardingUUID(),
+                resharding::kReshardFinalOpLogType.toString(),
+            };
+
             repl::MutableOplogEntry oplog;
             oplog.setNss(_metadata.getSourceNss());
             oplog.setOpType(repl::OpTypeEnum::kNoop);
@@ -819,8 +821,8 @@ void ReshardingDonorService::DonorStateMachine::
                          "Writes to {} are temporarily blocked for resharding.",
                          NamespaceStringUtil::serialize(_metadata.getSourceNss(),
                                                         SerializationContext::stateDefault()))));
-            oplog.setObject2(BSON("type" << resharding::kReshardFinalOpLogType << "reshardingUUID"
-                                         << _metadata.getReshardingUUID()));
+            oplog.setObject2(changeEvent.toBSON());
+            oplog.setFromMigrate(true);
             oplog.setOpTime(OplogSlot());
             oplog.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
             return oplog;

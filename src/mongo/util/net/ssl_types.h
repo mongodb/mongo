@@ -139,7 +139,7 @@ public:
 
     // Returns true if the server currently accepts certificates with a certain value for the
     // clusterMembership extension - either through the config option or the override.
-    bool isClusterExtensionSet() {
+    bool isClusterExtensionSet() const {
         bool containsClusterMembershipConfig = false;
         bool containsOverrideClusterMembershipConfig = false;
         auto visitor = OverloadedVisitor{[](const SSLX509Name&) { return false; },

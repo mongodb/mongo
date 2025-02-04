@@ -468,6 +468,15 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 break;
             }
 
+            if (!o2Field["reshardBlockingWrites"].missing()) {
+                operationType = DocumentSourceChangeStream::kReshardBlockingWritesOpType;
+                doc.addField(DocumentSourceChangeStream::kReshardingUuidField,
+                             o2Field["reshardingUUID"]);
+                operationDescription =
+                    Value(copyDocExceptFields(o2Field, {"reshardBlockingWrites"_sd}));
+                break;
+            }
+
             if (!o2Field["reshardDoneCatchUp"].missing()) {
                 operationType = DocumentSourceChangeStream::kReshardDoneCatchUpOpType;
                 doc.addField(DocumentSourceChangeStream::kReshardingUuidField,

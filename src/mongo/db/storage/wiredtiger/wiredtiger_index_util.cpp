@@ -38,11 +38,10 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
@@ -88,9 +87,8 @@ bool WiredTigerIndexUtil::appendCustomStats(WiredTigerRecoveryUnit& ru,
     }
 
     WiredTigerSession* session = ru.getSession();
-    WT_SESSION* s = session->getSession();
-    Status status =
-        WiredTigerUtil::exportTableToBSON(s, "statistics:" + uri, "statistics=(fast)", *output);
+    Status status = WiredTigerUtil::exportTableToBSON(
+        *session, "statistics:" + uri, "statistics=(fast)", *output);
     if (!status.isOK()) {
         output->append("error", "unable to retrieve statistics");
         output->append("code", static_cast<int>(status.code()));
@@ -99,21 +97,21 @@ bool WiredTigerIndexUtil::appendCustomStats(WiredTigerRecoveryUnit& ru,
     return true;
 }
 
-StatusWith<int64_t> WiredTigerIndexUtil::compact(Interruptible& interruptible,
-                                                 WiredTigerRecoveryUnit& ru,
+StatusWith<int64_t> WiredTigerIndexUtil::compact(OperationContext* opCtx,
                                                  const std::string& uri,
                                                  const CompactOptions& options) {
-    WiredTigerSessionCache* cache = ru.getSessionCache();
-    if (cache->isEphemeral()) {
+    auto& ru = *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
+    WiredTigerConnection* connection = ru.getConnection();
+    if (connection->isEphemeral()) {
         return 0;
     }
 
-    WT_SESSION* s = ru.getSession()->getSession();
+    WiredTigerSession* s = ru.getSession();
     ru.abandonSnapshot();
 
-    // Set a pointer on the WT_SESSION to the interruptible, so that WT::compact can use a
-    // callback to check for interrupts.
-    SessionDataRAII sessionRaii(s, &interruptible);
+    // Ensure that the WT session is configured to interrupt on this operation
+    invariant(
+        s->with([opCtx](auto wtSession) { return wtSession && wtSession->app_private == opCtx; }));
 
     StringBuilder config;
     config << "timeout=0";
@@ -123,8 +121,15 @@ StatusWith<int64_t> WiredTigerIndexUtil::compact(Interruptible& interruptible,
     if (options.freeSpaceTargetMB) {
         config << ",free_space_target=" + std::to_string(*options.freeSpaceTargetMB) + "MB";
     }
-    int ret = s->compact(s, uri.c_str(), config.str().c_str());
-    if (ret == WT_ERROR && !interruptible.checkForInterruptNoAssert().isOK()) {
+
+    int ret = s->compact(uri.c_str(), config.str().c_str());
+    Status status = wtRCToStatus(ret, *s);
+
+    // We may get ErrorCodes::AlreadyInitialized when we try to reconfigure background compaction
+    // while it is already running.
+    uassert(status.code(), status.reason(), status != ErrorCodes::AlreadyInitialized);
+
+    if (ret == WT_ERROR && !opCtx->checkForInterruptNoAssert().isOK()) {
         return Status(ErrorCodes::Interrupted,
                       str::stream() << "Storage compaction interrupted on " << uri.c_str());
     }
@@ -139,9 +144,9 @@ StatusWith<int64_t> WiredTigerIndexUtil::compact(Interruptible& interruptible,
                                     << " due to cache eviction pressure");
     }
 
-    invariantWTOK(ret, s);
+    invariantWTOK(ret, *s);
 
-    return options.dryRun ? WiredTigerUtil::getIdentCompactRewrittenExpectedSize(s, uri) : 0;
+    return options.dryRun ? WiredTigerUtil::getIdentCompactRewrittenExpectedSize(*s, uri) : 0;
 }
 
 bool WiredTigerIndexUtil::isEmpty(OperationContext* opCtx,
@@ -168,7 +173,7 @@ void WiredTigerIndexUtil::validateStructure(
     const std::string& uri,
     const boost::optional<std::string>& configurationOverride,
     IndexValidateResults& results) {
-    if (ru.getSessionCache()->isEphemeral()) {
+    if (ru.getConnection()->isEphemeral()) {
         return;
     }
 

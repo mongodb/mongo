@@ -415,10 +415,14 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
             bob->appendNumber("keysExamined", static_cast<long long>(spec->keysExamined));
             if (spec->isShardFilteringDistinctScanEnabled) {
                 // Because we push FETCH and SHARD_FILTERING stages into the DISTINCT_SCAN stage
-                // when applicable, we don't see FETCH's docsExamined or SHARD_FILTERING's
-                // chunkSkips in the explain output. We add them to DISTINCT_SCAN's explain here.
+                // when applicable, we don't see FETCH's 'docsExamined' or SHARD_FILTERING's
+                // 'chunkSkips' in the explain output. We also don't see if we were able to skip any
+                // contiguous sequences of orphans ('orphanChunkSkips'). We add them to
+                // DISTINCT_SCAN's explain here.
                 bob->appendNumber("docsExamined", static_cast<long long>(spec->docsExamined));
                 bob->appendNumber("chunkSkips", static_cast<long long>(spec->chunkSkips));
+                bob->appendNumber("orphanChunkSkips",
+                                  static_cast<long long>(spec->orphanChunkSkips));
             }
         }
     } else if (STAGE_FETCH == stats.stageType) {
@@ -537,10 +541,11 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("totalDataSizeSorted",
                               static_cast<long long>(spec->totalDataSizeBytes));
-            bob->appendBool("usedDisk", (spec->spills > 0));
-            bob->appendNumber("spills", static_cast<long long>(spec->spills));
-            bob->appendNumber("spilledDataStorageSize",
-                              static_cast<long long>(spec->spilledDataStorageSize));
+            bob->appendBool("usedDisk", (spec->spillingStats.getSpills() > 0));
+            bob->appendNumber("spills", static_cast<long long>(spec->spillingStats.getSpills()));
+            bob->appendNumber(
+                "spilledDataStorageSize",
+                static_cast<long long>(spec->spillingStats.getSpilledDataStorageSize()));
         }
     } else if (STAGE_SORT_MERGE == stats.stageType) {
         MergeSortStats* spec = static_cast<MergeSortStats*>(stats.specific.get());
@@ -566,6 +571,15 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("docsExamined", static_cast<long long>(spec->fetches));
+            bob->appendBool("usedDisk", (spec->spillingStats.getSpills() > 0));
+            bob->appendNumber("spills", static_cast<long long>(spec->spillingStats.getSpills()));
+            bob->appendNumber("spilledRecords",
+                              static_cast<long long>(spec->spillingStats.getSpilledRecords()));
+            bob->appendNumber("spilledBytes",
+                              static_cast<long long>(spec->spillingStats.getSpilledBytes()));
+            bob->appendNumber(
+                "spilledDataStorageSize",
+                static_cast<long long>(spec->spillingStats.getSpilledDataStorageSize()));
         }
     } else if (STAGE_TIMESERIES_MODIFY == stats.stageType) {
         TimeseriesModifyStats* spec = static_cast<TimeseriesModifyStats*>(stats.specific.get());
@@ -613,13 +627,15 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("totalDataSizeSpooled",
                               static_cast<long long>(spec->totalDataSizeBytes));
-            bob->appendBool("usedDisk", (spec->spills > 0));
-            bob->appendNumber("spills", static_cast<long long>(spec->spills));
-            bob->appendNumber("spilledRecords", static_cast<long long>(spec->spilledRecords));
-            bob->appendNumber("spilledDataStorageSize",
-                              static_cast<long long>(spec->spilledDataStorageSize));
+            bob->appendBool("usedDisk", (spec->spillingStats.getSpills() > 0));
+            bob->appendNumber("spills", static_cast<long long>(spec->spillingStats.getSpills()));
+            bob->appendNumber("spilledRecords",
+                              static_cast<long long>(spec->spillingStats.getSpilledRecords()));
+            bob->appendNumber(
+                "spilledDataStorageSize",
+                static_cast<long long>(spec->spillingStats.getSpilledDataStorageSize()));
             bob->appendNumber("spilledUncompressedDataSize",
-                              static_cast<long long>(spec->spilledUncompressedDataSize));
+                              static_cast<long long>(spec->spillingStats.getSpilledBytes()));
         }
     } else if (STAGE_EOF == stats.stageType) {
         EofStats* spec = static_cast<EofStats*>(stats.specific.get());
@@ -900,6 +916,11 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
                     static_cast<const CollectionScanStats*>(collScan->getSpecificStats());
                 if (!collScanStats->tailable)
                     statsOut->collectionScansNonTailable++;
+                break;
+            }
+            case STAGE_TEXT_OR: {
+                auto textOrStats = static_cast<const TextOrStats*>(stages[i]->getSpecificStats());
+                PlanSummaryStatsVisitor(*statsOut).visit(textOrStats);
                 break;
             }
             default:

@@ -454,7 +454,7 @@ void OperationContext::setTxnRetryCounter(TxnRetryCounter txnRetryCounter) {
     _txnRetryCounter = txnRetryCounter;
 }
 
-std::unique_ptr<RecoveryUnit> OperationContext::releaseRecoveryUnit_DO_NOT_USE() {
+std::unique_ptr<RecoveryUnit> OperationContext::releaseRecoveryUnit_DO_NOT_USE(ClientLock&) {
     if (_recoveryUnit) {
         _recoveryUnit->setOperationContext(nullptr);
     }
@@ -462,22 +462,25 @@ std::unique_ptr<RecoveryUnit> OperationContext::releaseRecoveryUnit_DO_NOT_USE()
     return std::move(_recoveryUnit);
 }
 
-std::unique_ptr<RecoveryUnit> OperationContext::releaseAndReplaceRecoveryUnit_DO_NOT_USE() {
-    auto ru = releaseRecoveryUnit_DO_NOT_USE();
+std::unique_ptr<RecoveryUnit> OperationContext::releaseAndReplaceRecoveryUnit_DO_NOT_USE(
+    ClientLock& clientLock) {
+    auto ru = releaseRecoveryUnit_DO_NOT_USE(clientLock);
     setRecoveryUnit_DO_NOT_USE(
         std::unique_ptr<RecoveryUnit>(getServiceContext()->getStorageEngine()->newRecoveryUnit()),
-        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
+        clientLock);
     return ru;
 }
 
-void OperationContext::replaceRecoveryUnit_DO_NOT_USE() {
+void OperationContext::replaceRecoveryUnit_DO_NOT_USE(ClientLock& clientLock) {
     setRecoveryUnit_DO_NOT_USE(
         std::unique_ptr<RecoveryUnit>(getServiceContext()->getStorageEngine()->newRecoveryUnit()),
-        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
+        clientLock);
 }
 
 WriteUnitOfWork::RecoveryUnitState OperationContext::setRecoveryUnit_DO_NOT_USE(
-    std::unique_ptr<RecoveryUnit> unit, WriteUnitOfWork::RecoveryUnitState state) {
+    std::unique_ptr<RecoveryUnit> unit, WriteUnitOfWork::RecoveryUnitState state, ClientLock&) {
     _recoveryUnit = std::move(unit);
     if (_recoveryUnit) {
         _recoveryUnit->setOperationContext(this);
@@ -495,7 +498,7 @@ void OperationContext::setLockState_DO_NOT_USE(std::unique_ptr<Locker> locker) {
 }
 
 std::unique_ptr<Locker> OperationContext::swapLockState_DO_NOT_USE(std::unique_ptr<Locker> locker,
-                                                                   WithLock clientLock) {
+                                                                   ClientLock& clientLock) {
     invariant(_locker);
     invariant(locker);
     _locker.swap(locker);

@@ -1642,7 +1642,6 @@ void ExecCommandDatabase::_initiateCommand() {
     }
 
     if (MONGO_unlikely(genericArgs.getHelp().value_or(false))) {
-        CurOp::get(opCtx)->ensureStarted();
         // We disable not-primary-error tracker for help requests due to SERVER-11492, because
         // config servers use help requests to determine which commands are database writes, and so
         // must be forwarded to all config servers.
@@ -1838,22 +1837,23 @@ void ExecCommandDatabase::_initiateCommand() {
             if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kAvailableReadConcern) {
                 OperationShardingState::get(opCtx).setTreatAsFromRouter();
             } else {
+                const auto invocationNss = _invocation->ns();
+                OperationShardingState::setShardRole(
+                    opCtx, invocationNss, shardVersion, databaseVersion);
+
                 // If a timeseries collection is sharded, only the buckets collection would be
                 // sharded. We expect all versioned commands to be sent over 'system.buckets'
                 // namespace. But it is possible that a stale mongos may send the request over a
                 // view namespace. In this case, we initialize the 'OperationShardingState' with
-                // buckets namespace.
+                // both the invocation and buckets namespaces.
                 // TODO: SERVER-80719 revisit this.
-                const auto invocationNss = _invocation->ns();
                 auto bucketNss = invocationNss.makeTimeseriesBucketsNamespace();
-                // Hold reference to the catalog for collection lookup without locks to be safe.
                 auto catalog = CollectionCatalog::get(opCtx);
                 auto coll = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
-                auto namespaceForSharding =
-                    (coll && coll->getTimeseriesOptions()) ? bucketNss : invocationNss;
 
-                OperationShardingState::setShardRole(
-                    opCtx, namespaceForSharding, shardVersion, databaseVersion);
+                if (coll && coll->getTimeseriesOptions()) {
+                    OperationShardingState::setShardRole(opCtx, bucketNss, shardVersion, {});
+                }
             }
         }
     }
@@ -1868,8 +1868,6 @@ void ExecCommandDatabase::_initiateCommand() {
         status != ErrorCodes::InterruptedDueToReplStateChange) {
         uassertStatusOK(status);
     }
-
-    CurOp::get(opCtx)->ensureStarted();
 
     command->incrementCommandsExecuted();
 }
@@ -2298,6 +2296,8 @@ void HandleRequest::startOperation() {
     auto opCtx = executionContext.getOpCtx();
     auto& client = executionContext.client();
 
+    CurOp::get(opCtx)->ensureStarted();
+
     if (client.isInDirectClient()) {
         if (!opCtx->getLogicalSessionId() || !opCtx->getTxnNumber()) {
             invariant(!opCtx->inMultiDocumentTransaction() &&
@@ -2419,6 +2419,9 @@ void onHandleRequestException(const HandleRequest::ExecutionContext& context,
 
 Future<DbResponse> ServiceEntryPointShardRole::handleRequest(OperationContext* opCtx,
                                                              const Message& m) noexcept try {
+    tassert(9391501,
+            "Invalid ClusterRole in ServiceEntryPointShardRole",
+            opCtx->getService()->role().hasExclusively(ClusterRole::ShardServer));
     HandleRequest hr(opCtx, m);
     hr.startOperation();
 

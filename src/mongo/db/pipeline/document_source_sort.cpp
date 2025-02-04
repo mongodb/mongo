@@ -157,6 +157,9 @@ REGISTER_DOCUMENT_SOURCE(sort,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceSort::createFromBson,
                          AllowedWithApiStrict::kAlways);
+
+ALLOCATE_DOCUMENT_SOURCE_ID(sort, DocumentSourceSort::id)
+
 REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(_internalBoundedSort,
                                        LiteParsedDocumentSourceDefault::parse,
                                        DocumentSourceSort::parseBoundedSort,
@@ -359,8 +362,9 @@ void DocumentSourceSort::serializeWithVerbosity(std::vector<Value>& array,
 
         mutDoc["totalDataSizeSortedBytesEstimate"] =
             opts.serializeLiteral(static_cast<long long>(stats.totalDataSizeBytes));
-        mutDoc["usedDisk"] = opts.serializeLiteral(stats.spills > 0);
-        mutDoc["spills"] = opts.serializeLiteral(static_cast<long long>(stats.spills));
+        mutDoc["usedDisk"] = opts.serializeLiteral(stats.spillingStats.getSpills() > 0);
+        mutDoc["spills"] =
+            opts.serializeLiteral(static_cast<long long>(stats.spillingStats.getSpills()));
         mutDoc["spilledDataStorageSize"] =
             opts.serializeLiteral(static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
     }
@@ -417,21 +421,22 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
 
     // Since $sort is not guaranteed to be stable, we can blindly remove the first $sort only when
     // there's no limit on the current sort.
-    auto nextSort = dynamic_cast<DocumentSourceSort*>((*nextStage).get());
-    if (!limit && nextSort) {
-        container->erase(itr);
-        return nextStage;
-    }
-
-    if (limit && nextSort) {
-        // If there's a limit between two adjacent sorts with the same key pattern it's safe to
-        // merge the two sorts and take the minimum of the limits.
-        if (dynamic_cast<DocumentSourceSort*>((*itr).get())->getSortKeyPattern() ==
-            nextSort->getSortKeyPattern()) {
-            // When coalescing subsequent $sort stages, the existing/lower limit is retained in
-            // 'setLimit'.
-            nextSort->_sortExecutor->setLimit(*limit);
+    if (auto nextSort = dynamic_cast<DocumentSourceSort*>((*nextStage).get())) {
+        // Ensure that we don't accidentally erase the request to output the sort key metadata.
+        nextSort->_outputSortKeyMetadata |= _outputSortKeyMetadata;
+        if (!limit) {
             container->erase(itr);
+            return nextStage;
+        } else {
+            // If there's a limit between two adjacent sorts with the same key pattern it's safe to
+            // merge the two sorts and take the minimum of the limits.
+            if (dynamic_cast<DocumentSourceSort*>((*itr).get())->getSortKeyPattern() ==
+                nextSort->getSortKeyPattern()) {
+                // When coalescing subsequent $sort stages, the existing/lower limit is retained in
+                // 'setLimit'.
+                nextSort->_sortExecutor->setLimit(*limit);
+                container->erase(itr);
+            }
         }
     }
     return nextStage;

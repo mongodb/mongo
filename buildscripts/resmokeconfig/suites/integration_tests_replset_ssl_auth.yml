@@ -6,6 +6,8 @@ selector:
   include_files:
     - build/**/network_interface_ssl_test
     - build/install/bin/network_interface_ssl_test
+  exclude_files:
+    - build/**/grpc_transport_integration_test # Must be run with parameters in the integration_tests_standalone_grpc variant
 
 config_variables:
   - &keyFile jstests/libs/authTestsKey

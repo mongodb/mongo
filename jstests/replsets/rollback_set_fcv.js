@@ -242,7 +242,6 @@ function rollbackFCVFromUpgradingToDowngrading() {
         },
         "Failed waiting for the server to unset the previous version and set the target version to " +
             latestFCV);
-    checkFCV(rollbackNodeAdminDB, lastLTSFCV, latestFCV);
 
     rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
 
@@ -250,7 +249,18 @@ function rollbackFCVFromUpgradingToDowngrading() {
 
     fcvDoc = rollbackNodeAdminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
     jsTestLog(`Rollback node's version after setFCVInParallel: ${tojson(fcvDoc)}`);
-    checkFCV(rollbackNodeAdminDB, lastLTSFCV, latestFCV);
+    // Since the rollback node is isolated and the FCV changes are not guaranteed to be visible
+    // in the majority committed snapshot, we only check the node's FCV document values directly.
+    assert.eq(fcvDoc.version,
+              lastLTSFCV,
+              "FCV document 'version' field does not match: " + tojson(fcvDoc));
+    assert.eq(fcvDoc.targetVersion,
+              latestFCV,
+              "FCV document 'targetVersion' field does not match: " + tojson(fcvDoc));
+    assert.eq(fcvDoc.previousVersion,
+              undefined,
+              "FCV server parameter 'previousVersion' field does not match: " + tojson(fcvDoc));
+
     // Secondaries should never have received the FCV update.
     fcvDoc = syncSourceAdminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
     jsTestLog(`syncSource's version (should still be downgrading): ${tojson(fcvDoc)}`);

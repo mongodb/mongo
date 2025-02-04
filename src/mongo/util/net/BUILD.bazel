@@ -292,10 +292,24 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "hostandport_impl",
+    srcs = [
+        "hostandport.cpp",
+        ":hostandport_gen",
+    ],
+    hdrs = [
+        "hostandport.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
+mongo_cc_library(
     name = "network",
     srcs = [
         "cidr.cpp",
-        "hostandport.cpp",
         "hostname_canonicalization.cpp",
         "hostname_canonicalization.h",
         "sockaddr.cpp",

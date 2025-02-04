@@ -1865,24 +1865,6 @@ protected:
 private:
     monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final;
 
-    /*
-      Internal implementation of evaluate(), used recursively.
-
-      The internal implementation doesn't just use a loop because of
-      the possibility that we need to skip over an array.  If the path
-      is "a.b.c", and a is an array, then we fan out from there, and
-      traverse "b.c" for each element of a:[...].  This requires that
-      a be an array of objects in order to navigate more deeply.
-
-      @param index current path field index to extract
-      @param input current document traversed to (not the top-level one)
-      @returns the field found; could be an array
-     */
-    Value evaluatePath(size_t index, const Document& input) const;
-
-    // Helper for evaluatePath to handle Array case
-    Value evaluatePathArray(size_t index, const Value& input) const;
-
     const FieldPath _fieldPath;
     const Variables::Id _variable;
 };
@@ -2258,6 +2240,10 @@ public:
         return visitor->visit(this);
     }
 
+    const auto& getEncryptedPredicateEvaluator() const {
+        return _evaluatorV2;
+    }
+
 private:
     EncryptedPredicateEvaluatorV2 _evaluatorV2;
 };
@@ -2283,6 +2269,10 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    const auto& getEncryptedPredicateEvaluator() const {
+        return _evaluatorV2;
     }
 
 private:
@@ -2412,6 +2402,34 @@ private:
     static ParseMetaTypeResult _parseMetaType(ExpressionContext* expCtx, StringData typeName);
 
     DocumentMetadataFields::MetaType _metaType;
+};
+
+/**
+ * A 'flavor' of {$meta: "sortKey"} which is intended for efficient comparisons internally. This is
+ * in contrast to the public facing expression which is meant to return a user-comprehensible sort
+ * key, represented as an array. That expression will materialize a new array. Constructing this
+ * array is not necessary for just making internal comparisons.
+ */
+class ExpressionInternalRawSortKey final : public Expression {
+public:
+    static constexpr StringData kName = "$_internalSortKey"_sd;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext*,
+                                                  BSONElement,
+                                                  const VariablesParseState&);
+
+    ExpressionInternalRawSortKey(ExpressionContext* expCtx) : Expression(expCtx) {}
+
+    Value serialize(const SerializationOptions& options = {}) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
 };
 
 class ExpressionMillisecond final : public DateExpressionAcceptingTimeZone {
@@ -4056,6 +4074,35 @@ private:
     explicit ExpressionRandom(ExpressionContext* expCtx);
 };
 
+/**
+ * Returns current wall clock time.
+ */
+class ExpressionCurrentDate final : public Expression {
+public:
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement exprElement,
+                                                  const VariablesParseState& vps);
+
+    Value serialize(const SerializationOptions& options = {}) const final;
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    [[nodiscard]] boost::intrusive_ptr<Expression> optimize() final;
+
+    const char* getOpName() const;
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+private:
+    explicit ExpressionCurrentDate(ExpressionContext* expCtx);
+};
+
 class ExpressionToHashedIndexKey : public Expression {
 public:
     ExpressionToHashedIndexKey(ExpressionContext* const expCtx,
@@ -4409,6 +4456,14 @@ public:
         return visitor->visit(this);
     }
 
+    const Expression* getField() const {
+        return _children[_kField].get();
+    }
+
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+
     static constexpr auto kExpressionName = "$getField"_sd;
 
 private:
@@ -4447,6 +4502,22 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+    const std::string& getFieldName() const {
+        return _fieldName;
+    }
+
+    const Expression* getField() const {
+        return _children[_kField].get();
+    }
+
+    const Expression* getInput() const {
+        return _children[_kInput].get();
+    }
+
+    const Expression* getValue() const {
+        return _children[_kValue].get();
     }
 
     static constexpr auto kExpressionName = "$setField"_sd;

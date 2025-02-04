@@ -34,10 +34,10 @@
 #include <memory>
 
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/spilling/spilling_stats.h"
 #include "mongo/db/storage/temporary_record_store.h"
-#include "mongo/util/memory_usage_tracker.h"
 
 namespace mongo {
 
@@ -70,13 +70,21 @@ public:
     bool isIdInCache(int id);
     Document getDocumentById(int id);
 
+    Document peekFront() {
+        return getDocumentById(getLowestIndex());
+    }
+
+    void popFront() {
+        freeUpTo(getLowestIndex());
+    }
+
     /**
      * Removes all documents with ids up to but not including 'id' from the cache.
      */
     void freeUpTo(int id);
 
     /**
-     *  Remove all documents from the cache and reset state while preserving the ability to perform
+     * Remove all documents from the cache and reset state while preserving the ability to perform
      * more inserts.
      */
     void clear();
@@ -107,8 +115,12 @@ public:
         return _memCache.size() + _diskWrittenIndex - _nextFreedIndex;
     }
 
+    bool empty() const {
+        return getNumDocs() == 0;
+    }
+
     bool usedDisk() const {
-        return _stats.spills > 0;
+        return _stats.getSpills() > 0;
     }
 
     /**

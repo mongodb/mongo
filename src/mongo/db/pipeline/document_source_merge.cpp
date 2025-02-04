@@ -75,6 +75,7 @@ REGISTER_DOCUMENT_SOURCE(merge,
                          DocumentSourceMerge::LiteParsed::parse,
                          DocumentSourceMerge::createFromBson,
                          AllowedWithApiStrict::kAlways);
+ALLOCATE_DOCUMENT_SOURCE_ID(merge, DocumentSourceMerge::id)
 
 namespace {
 

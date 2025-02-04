@@ -360,7 +360,8 @@ Milliseconds ShardingTaskExecutorPoolController::toRefreshTimeout() const {
 
 void ShardingTaskExecutorPoolController::updateConnectionPoolStats(
     executor::ConnectionPoolStats* cps) const {
-    cps->strategy = gParameters.matchingStrategy.load();
+    cps->matchingStrategy =
+        matchingStrategyToString(gParameters.matchingStrategy.load()).toString();
 }
 
 }  // namespace mongo

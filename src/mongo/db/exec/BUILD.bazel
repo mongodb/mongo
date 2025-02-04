@@ -142,18 +142,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "stagedebug_cmd",
-    srcs = [
-        "stagedebug_cmd.cpp",
-    ],
-    deps = [
-        "//src/mongo/db:query_exec",
-        "//src/mongo/db/commands:test_commands_enabled",
-        "//src/mongo/db/index:index_access_method",
-    ],
-)
-
-mongo_cc_library(
     name = "query_shard_server_test_fixture",
     srcs = [
         "query_shard_server_test_fixture.cpp",
@@ -183,6 +171,7 @@ mongo_cc_unit_test(
         "projection_executor_utils_test.cpp",
         "projection_executor_wildcard_access_test.cpp",
         "queued_data_stage_test.cpp",
+        "recordid_deduplicator_test.cpp",
         "sort_test.cpp",
         "spool_test.cpp",
         "working_set_test.cpp",
@@ -191,6 +180,28 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/document_value:document_value_test.cpp",
         "//src/mongo/db/exec/document_value:document_value_test_util_self_test.cpp",
         "//src/mongo/db/exec/document_value:value_comparator_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_and_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_array_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_bson_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_compare_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_convert_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_date_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_field_path_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_find_internal_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_fle_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_logical_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_math_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_meta_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_nary_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_object_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_or_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_regex_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_replace_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_string_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_test.cpp",
+        "//src/mongo/db/exec/expression:evaluate_test_helpers.cpp",
+        "//src/mongo/db/exec/expression:evaluate_test_helpers.h",
+        "//src/mongo/db/exec/expression:evaluate_trigonometric_test.cpp",
         "//src/mongo/db/exec/timeseries:bucket_unpacker_test.cpp",
     ],
     tags = ["mongo_unittest_second_group"],
@@ -207,6 +218,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/exec/document_value:document_value_test_util",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
+        "//src/mongo/db/pipeline/spilling:spilling_test_utils",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/collation:collator_factory_mock",
         "//src/mongo/db/query/collation:collator_interface_mock",
@@ -227,5 +239,36 @@ mongo_cc_benchmark(
         ":query_shard_server_test_fixture",
         "//src/mongo/db:query_exec",
         "//src/mongo/db:service_context_d_test_fixture",
+    ],
+)
+
+mongo_cc_library(
+    name = "expression_bm_fixture",
+    srcs = [
+        "expression_bm_fixture.cpp",
+    ],
+    hdrs = [
+        "expression_bm_fixture.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/exec/document_value",
+        "//src/third_party/benchmark",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "expression_bm",
+    srcs = [
+        "//src/mongo/db/exec/expression:expression_bm.cpp",
+    ],
+    deps = [
+        ":expression_bm_fixture",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/pipeline:accumulator",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_test_service_context",
     ],
 )

@@ -56,6 +56,7 @@ REGISTER_DOCUMENT_SOURCE(limit,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceLimit::createFromBson,
                          AllowedWithApiStrict::kAlways);
+ALLOCATE_DOCUMENT_SOURCE_ID(limit, DocumentSourceLimit::id)
 
 constexpr StringData DocumentSourceLimit::kStageName;
 

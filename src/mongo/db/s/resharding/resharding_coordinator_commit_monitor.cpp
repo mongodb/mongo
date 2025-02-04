@@ -66,6 +66,7 @@
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/future_util.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/testing_proctor.h"
 
@@ -226,34 +227,36 @@ CoordinatorCommitMonitor::queryRemainingOperationTimeForRecipients() const {
 }
 
 ExecutorFuture<void> CoordinatorCommitMonitor::_makeFuture(Milliseconds delayBetweenQueries) const {
-    return ExecutorFuture<void>(_executor)
-        // Start waiting so that we have a more time to calculate a more realistic remaining time
-        // estimate.
-        .then([this, anchor = shared_from_this(), delayBetweenQueries] {
-            return _executor->sleepFor(delayBetweenQueries, _cancelToken)
-                .then([this, anchor = std::move(anchor)] {
-                    return queryRemainingOperationTimeForRecipients();
-                });
-        })
-        .onError([this](Status status) {
-            if (_cancelToken.isCanceled()) {
-                // Do not retry on cancellation errors.
-                iasserted(status);
+    auto delay = std::make_shared<Milliseconds>(delayBetweenQueries);
+    // We do not use withDelayBetweenIterations option because we want to delay the initial query.
+    return AsyncTry([this, anchor = shared_from_this(), delay] {
+               return _executor->sleepFor(*delay, _cancelToken)
+                   .then([this, anchor = std::move(anchor)] {
+                       return queryRemainingOperationTimeForRecipients();
+                   });
+           })
+        .until([this, anchor = shared_from_this(), delay](
+                   const StatusWith<RemainingOperationTimes> result) -> bool {
+            RemainingOperationTimes remainingTimes;
+            if (!result.isOK()) {
+                if (_cancelToken.isCanceled()) {
+                    // Do not retry on cancellation errors.
+                    iasserted(result.getStatus());
+                }
+                // Absorbs any exception thrown by the query phase, except for cancellation errors,
+                // and retries. The intention is to handle short term issues with querying
+                // recipients (e.g., network hiccups and connection timeouts).
+                LOGV2_WARNING(5392006,
+                              "Encountered an error while querying recipients, will retry shortly",
+                              "error"_attr = result.getStatus());
+                // On error we definitely cannot begin the critical section.  Therefore,
+                // return Milliseconds::max for remainingTimes.max (remainingTimes.max is used
+                // for determining whether the critical section should begin).
+                remainingTimes = RemainingOperationTimes{Milliseconds(-1), Milliseconds::max()};
+            } else {
+                remainingTimes = result.getValue();
             }
 
-            // Absorbs any exception thrown by the query phase, except for cancellation errors, and
-            // retries. The intention is to handle short term issues with querying recipients (e.g.,
-            // network hiccups and connection timeouts).
-            LOGV2_WARNING(5392006,
-                          "Encountered an error while querying recipients, will retry shortly",
-                          "error"_attr = status);
-
-            // On error we definitely cannot begin the critical section.  Therefore,
-            // return Milliseconds::max for remainingTimes.max (remainingTimes.max is used
-            // for determining whether the critical section should begin).
-            return RemainingOperationTimes{Milliseconds(-1), Milliseconds::max()};
-        })
-        .then([this, anchor = shared_from_this()](RemainingOperationTimes remainingTimes) mutable {
             // If remainingTimes.max (or remainingTimes.min) is Milliseconds::max, then use -1 so
             // that the scale of the y-axis is still useful when looking at FTDC metrics.
             auto clampIfMax = [](Milliseconds t) {
@@ -264,15 +267,18 @@ ExecutorFuture<void> CoordinatorCommitMonitor::_makeFuture(Milliseconds delayBet
 
             // Check if all recipient shards are within the commit threshold.
             if (remainingTimes.max <= _threshold)
-                return ExecutorFuture<void>(_executor);
+                return true;
 
             // The following ensures that the monitor would never sleep for more than a predefined
             // maximum delay between querying recipient shards. Thus, it can handle very large,
             // and potentially inaccurate estimates of the remaining operation time.
-            auto delayBetweenQueries =
-                std::min(remainingTimes.max - _threshold, _maxDelayBetweenQueries);
+            *delay = std::min(remainingTimes.max - _threshold, _maxDelayBetweenQueries);
 
-            return _makeFuture(delayBetweenQueries);
+            return false;
+        })
+        .on(_executor, _cancelToken)
+        .onCompletion([](StatusWith<CoordinatorCommitMonitor::RemainingOperationTimes> statusWith) {
+            return mongo::Future<void>::makeReady(statusWith.getStatus());
         });
 }
 

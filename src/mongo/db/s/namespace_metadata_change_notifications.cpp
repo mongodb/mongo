@@ -33,7 +33,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/s/namespace_metadata_change_notifications.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

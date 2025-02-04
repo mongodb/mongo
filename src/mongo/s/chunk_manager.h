@@ -644,19 +644,19 @@ private:
 };
 
 /**
- * This intermediate structure is necessary to be able to store UNSHARDED collections in the routing
+ * This intermediate structure is necessary to be able to store UNTRACKED collections in the routing
  * table history cache below. The reason is that currently the RoutingTableHistory class only
- * supports sharded collections (i.e., collections which have entries in config.collections and
+ * supports tracked collections (i.e., collections which have entries in config.collections and
  * config.chunks).
  */
 struct OptionalRoutingTableHistory {
-    // UNSHARDED collection constructor
+    // UNTRACKED collection constructor
     OptionalRoutingTableHistory() = default;
 
-    // SHARDED collection constructor
+    // TRACKED collection constructor
     OptionalRoutingTableHistory(std::shared_ptr<RoutingTableHistory> rt) : optRt(std::move(rt)) {}
 
-    // If nullptr, the collection is UNSHARDED, otherwise it is SHARDED
+    // If nullptr, the collection is UNTRACKED, otherwise it is TRACKED by the cluster catalog.
     std::shared_ptr<RoutingTableHistory> optRt;
 };
 

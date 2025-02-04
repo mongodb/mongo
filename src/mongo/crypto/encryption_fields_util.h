@@ -152,6 +152,10 @@ inline bool isFLE2UnindexedSupportedType(BSONType type) {
     }
 }
 
+inline bool isFLE2TextIndexedSupportedType(BSONType type) {
+    return type == BSONType::String;
+}
+
 // Wrapper of the three helper functions above. Should be used on FLE type 6, 7, and 9, 14, and 15.
 inline bool isFLE2SupportedType(EncryptedBinDataType fleType, BSONType bsonType) {
     switch (fleType) {
@@ -164,6 +168,8 @@ inline bool isFLE2SupportedType(EncryptedBinDataType fleType, BSONType bsonType)
         case EncryptedBinDataType::kFLE2RangeIndexedValue:
         case EncryptedBinDataType::kFLE2RangeIndexedValueV2:
             return isFLE2RangeIndexedSupportedType(bsonType);
+        case EncryptedBinDataType::kFLE2TextIndexedValue:
+            return isFLE2TextIndexedSupportedType(bsonType);
         default:
             MONGO_UNREACHABLE;
     }

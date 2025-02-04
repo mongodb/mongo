@@ -19,7 +19,7 @@ const lengthPerString = 1 * 1024 * 1024;
 const nDocs = 17;
 const bulk = testDB[coll].initializeUnorderedBulkOp();
 for (let i = 0; i < nDocs; ++i) {
-    bulk.insert({_id: i, key: i % 2, y: Array(lengthPerString).join("a")});
+    bulk.insert({_id: i, key: i % 2, y: "a".repeat(lengthPerString)});
 }
 assert.commandWorked(bulk.execute());
 
@@ -54,10 +54,8 @@ function runLimitTests(dbConn, expectedError) {
         dbConn.runCommand({mapReduce: coll, map: mapFunc, reduce: reduceFunc, out: {inline: 1}}));
 
     // Re-insert the docs to keep the collection state consistent.
-    assert.commandWorked(
-        dbConn[coll].insert({_id: 0, key: 0, y: Array(lengthPerString).join("a")}));
-    assert.commandWorked(
-        dbConn[coll].insert({_id: 1, key: 1, y: Array(lengthPerString).join("a")}));
+    assert.commandWorked(dbConn[coll].insert({_id: 0, key: 0, y: "a".repeat(lengthPerString)}));
+    assert.commandWorked(dbConn[coll].insert({_id: 1, key: 1, y: "a".repeat(lengthPerString)}));
 }
 
 // First run directly against the primary shard. This is meant to test the mongod translation of

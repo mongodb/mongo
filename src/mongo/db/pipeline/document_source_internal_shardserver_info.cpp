@@ -46,6 +46,7 @@ REGISTER_DOCUMENT_SOURCE(_internalShardServerInfo,
                          DocumentSourceInternalShardServerInfo::LiteParsed::parse,
                          DocumentSourceInternalShardServerInfo::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalShardServerInfo, DocumentSourceInternalShardServerInfo::id)
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalShardServerInfo::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {

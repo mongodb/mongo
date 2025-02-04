@@ -59,6 +59,12 @@ public:
     boost::optional<ShardId> getReshardingDestinedRecipient(const BSONObj& fullDocument) const;
 
 private:
+    // TODO SERVER-99702: We have to disable lock ordering checks while this class is instantiated
+    // in the op observers. This is because it will hold a CSS mutex and the op observers can
+    // acquire other collections. Doing so would break the lock ordering assumption that CSS mutexes
+    // are short lived and the last in the stack of locks.
+    DisableLockerRuntimeOrderingChecks _disableRuntimeChecks;
+
     boost::optional<CollectionShardingState::ScopedCollectionShardingState> _scopedCss;
     boost::optional<ScopedCollectionDescription> _collDesc;
 

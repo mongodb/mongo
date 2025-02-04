@@ -39,10 +39,10 @@ bash_command = (
 )
 subprocess.run(bash_command, shell=True, text=True, check=True)
 
-# Extract DB and COLL from the .fail file
-db, coll = utils.extract_db_and_coll(fail_filepath)
+# Extract DB from the .fail file
+db = utils.extract_db(fail_filepath)
 
-# Convert JSON into DataFrame, passing in the relevant DB and COLL.
+# Convert JSON into DataFrame, passing in the relevant DB.
 cmd = [
     "bin/venv",
     "extract_features_to_dataframe.py",
@@ -50,8 +50,6 @@ cmd = [
     utils.MONGODB_URI,
     "--db",
     db,
-    "--coll",
-    coll,
 ]
 with open(json_file, encoding="utf-8") as json_input:
     with open(pkl_file, "ab") as pkl_output:

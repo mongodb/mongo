@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
+#include "mongo/db/query/stage_builder/sbe/abt_lower.h"
 #include "mongo/db/query/stage_builder/sbe/gen_abt_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
@@ -248,7 +248,7 @@ public:
 
     SbExpr makeBalancedBooleanOpTree(optimizer::Operations logicOp, SbExpr::Vector leaves) {
         return stage_builder::makeBalancedBooleanOpTree(
-            getEPrimBinaryOp(logicOp), std::move(leaves), _state);
+            abt::getEPrimBinaryOp(logicOp), std::move(leaves), _state);
     }
 
     std::unique_ptr<sbe::EExpression> lower(SbExpr& e, const VariableTypes* varTypes = nullptr) {

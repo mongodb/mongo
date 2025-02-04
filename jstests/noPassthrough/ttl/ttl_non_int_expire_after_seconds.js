@@ -112,41 +112,4 @@ function createIndexWithoutExpireAfterSecondsValidation(coll, indexName, expireA
     assert.commandWorked(coll.dropIndex('t_1'));
 }());
 
-// Tests that a node with an existing TTL non-integer 'expireAfterSeconds' index converts the
-// non-integer value to its truncated integer value on step up and replicates the new value to all
-// nodes in the replica set.
-(function testNonIntNormalizedOnStepUp() {
-    createIndexWithoutExpireAfterSecondsValidation(coll, 't_1', nonIntVal);
-    assertExpireAfterSecondsAcrossNodes('t_1', nonIntVal);
-
-    jsTestLog('Beginning step down');
-    assert.commandWorked(primary.adminCommand({replSetStepDown: 5, force: true}));
-    primary = rst.waitForPrimary();
-    jsTestLog('Found new primary');
-
-    let newPrimaryColl = primary.getDB(dbName).getCollection(collName);
-    const newPrimaryCatalogContents = newPrimaryColl.aggregate([{$listCatalog: {}}]).toArray();
-    jsTestLog("Catalog contents on new primary: " + tojson(newPrimaryCatalogContents));
-    assert.soon(
-        () => {
-            return 1 ===
-                rst.findOplog(primary,
-                              {
-                                  op: 'c',
-                                  ns: newPrimaryColl.getDB().getCollection('$cmd').getFullName(),
-                                  'o.collMod': collName,
-                                  'o.index.name': 't_1',
-                                  'o.index.expireAfterSeconds': intVal,
-                              },
-                              /*limit=*/ 1)
-                    .toArray()
-                    .length;
-        },
-        'TTL index with ' + nonIntVal +
-            ' expireAfterSeconds was not fixed using collMod during step-up: ' +
-            tojson(rst.findOplog(primary, {op: {$ne: 'n'}}, /*limit=*/ 10).toArray()));
-
-    assertExpireAfterSecondsAcrossNodes('t_1', intVal);
-}());
-
 rst.stopSet();

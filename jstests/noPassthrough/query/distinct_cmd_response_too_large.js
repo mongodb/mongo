@@ -6,7 +6,7 @@ const conn = MongoRunner.runMongod();
 const db = conn.getDB('test');
 const coll = db.test;
 
-const largeString = new Array(1000 * 1000).join('x');
+const largeString = 'x'.repeat(1000 * 1000);
 
 let bulk = coll.initializeUnorderedBulkOp();
 for (let x = 0; x < 17; ++x) {

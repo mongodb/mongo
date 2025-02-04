@@ -155,7 +155,7 @@ public:
         return STAGE_TIMESERIES_MODIFY;
     }
 
-    bool isEOF() override;
+    bool isEOF() const override;
 
     std::unique_ptr<PlanStageStats> getStats() override;
 

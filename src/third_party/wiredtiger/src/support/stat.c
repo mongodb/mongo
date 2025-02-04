@@ -1365,11 +1365,19 @@ static const char *const __stats_connection_desc[] = {
   "block-manager: blocks read",
   "block-manager: blocks written",
   "block-manager: bytes read",
+  "block-manager: bytes read for internal pages",
+  "block-manager: bytes read for internal pages before decompression and decryption",
+  "block-manager: bytes read for leaf pages",
+  "block-manager: bytes read for leaf pages before decompression and decryption",
   "block-manager: bytes read via memory map API",
   "block-manager: bytes read via system call API",
   "block-manager: bytes written",
   "block-manager: bytes written by compaction",
   "block-manager: bytes written for checkpoint",
+  "block-manager: bytes written for internal pages after compression and encryption",
+  "block-manager: bytes written for internal pages before compression and encryption",
+  "block-manager: bytes written for leaf pages after compression and encryption",
+  "block-manager: bytes written for leaf pages before compression and encryption",
   "block-manager: bytes written via memory map API",
   "block-manager: bytes written via system call API",
   "block-manager: mapped blocks read",
@@ -1971,8 +1979,12 @@ static const char *const __stats_connection_desc[] = {
   "thread-state: active filesystem read calls",
   "thread-state: active filesystem write calls",
   "thread-yield: application thread operations waiting for cache",
+  "thread-yield: application thread operations waiting for cache eviction while idle",
+  "thread-yield: application thread operations waiting for mandatory cache eviction",
   "thread-yield: application thread snapshot refreshed for eviction",
   "thread-yield: application thread time waiting for cache (usecs)",
+  "thread-yield: application thread time waiting for cache eviction while idle (usecs)",
+  "thread-yield: application thread time waiting for mandatory cache eviction (usecs)",
   "thread-yield: connection close blocked waiting for transaction state stabilization",
   "thread-yield: data handle lock yielded",
   "thread-yield: get reference for page index and slot time sleeping (usecs)",
@@ -2137,11 +2149,19 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->block_read = 0;
     stats->block_write = 0;
     stats->block_byte_read = 0;
+    stats->block_byte_read_intl = 0;
+    stats->block_byte_read_intl_disk = 0;
+    stats->block_byte_read_leaf = 0;
+    stats->block_byte_read_leaf_disk = 0;
     stats->block_byte_read_mmap = 0;
     stats->block_byte_read_syscall = 0;
     stats->block_byte_write = 0;
     stats->block_byte_write_compact = 0;
     stats->block_byte_write_checkpoint = 0;
+    stats->block_byte_write_intl_disk = 0;
+    stats->block_byte_write_intl = 0;
+    stats->block_byte_write_leaf_disk = 0;
+    stats->block_byte_write_leaf = 0;
     stats->block_byte_write_mmap = 0;
     stats->block_byte_write_syscall = 0;
     stats->block_map_read = 0;
@@ -2523,7 +2543,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->dh_session_handles = 0;
     stats->dh_session_sweeps = 0;
     /* not clearing live_restore_state */
-    /* not clearing live_restore_queue_length */
+    /* not clearing live_restore_work_remaining */
     stats->lock_btree_page_count = 0;
     stats->lock_btree_page_wait_application = 0;
     stats->lock_btree_page_wait_internal = 0;
@@ -2720,8 +2740,12 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing thread_read_active */
     /* not clearing thread_write_active */
     stats->application_cache_ops = 0;
+    stats->application_cache_idle_ops = 0;
+    stats->application_cache_busy_ops = 0;
     stats->application_evict_snapshot_refreshed = 0;
     stats->application_cache_time = 0;
+    stats->application_cache_idle_time = 0;
+    stats->application_cache_busy_time = 0;
     stats->txn_release_blocked = 0;
     stats->dhandle_lock_blocked = 0;
     stats->page_index_slot_ref_blocked = 0;
@@ -2862,11 +2886,19 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->block_read += WT_STAT_CONN_READ(from, block_read);
     to->block_write += WT_STAT_CONN_READ(from, block_write);
     to->block_byte_read += WT_STAT_CONN_READ(from, block_byte_read);
+    to->block_byte_read_intl += WT_STAT_CONN_READ(from, block_byte_read_intl);
+    to->block_byte_read_intl_disk += WT_STAT_CONN_READ(from, block_byte_read_intl_disk);
+    to->block_byte_read_leaf += WT_STAT_CONN_READ(from, block_byte_read_leaf);
+    to->block_byte_read_leaf_disk += WT_STAT_CONN_READ(from, block_byte_read_leaf_disk);
     to->block_byte_read_mmap += WT_STAT_CONN_READ(from, block_byte_read_mmap);
     to->block_byte_read_syscall += WT_STAT_CONN_READ(from, block_byte_read_syscall);
     to->block_byte_write += WT_STAT_CONN_READ(from, block_byte_write);
     to->block_byte_write_compact += WT_STAT_CONN_READ(from, block_byte_write_compact);
     to->block_byte_write_checkpoint += WT_STAT_CONN_READ(from, block_byte_write_checkpoint);
+    to->block_byte_write_intl_disk += WT_STAT_CONN_READ(from, block_byte_write_intl_disk);
+    to->block_byte_write_intl += WT_STAT_CONN_READ(from, block_byte_write_intl);
+    to->block_byte_write_leaf_disk += WT_STAT_CONN_READ(from, block_byte_write_leaf_disk);
+    to->block_byte_write_leaf += WT_STAT_CONN_READ(from, block_byte_write_leaf);
     to->block_byte_write_mmap += WT_STAT_CONN_READ(from, block_byte_write_mmap);
     to->block_byte_write_syscall += WT_STAT_CONN_READ(from, block_byte_write_syscall);
     to->block_map_read += WT_STAT_CONN_READ(from, block_map_read);
@@ -3317,7 +3349,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->dh_session_handles += WT_STAT_CONN_READ(from, dh_session_handles);
     to->dh_session_sweeps += WT_STAT_CONN_READ(from, dh_session_sweeps);
     to->live_restore_state += WT_STAT_CONN_READ(from, live_restore_state);
-    to->live_restore_queue_length += WT_STAT_CONN_READ(from, live_restore_queue_length);
+    to->live_restore_work_remaining += WT_STAT_CONN_READ(from, live_restore_work_remaining);
     to->lock_btree_page_count += WT_STAT_CONN_READ(from, lock_btree_page_count);
     to->lock_btree_page_wait_application +=
       WT_STAT_CONN_READ(from, lock_btree_page_wait_application);
@@ -3545,9 +3577,13 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->thread_read_active += WT_STAT_CONN_READ(from, thread_read_active);
     to->thread_write_active += WT_STAT_CONN_READ(from, thread_write_active);
     to->application_cache_ops += WT_STAT_CONN_READ(from, application_cache_ops);
+    to->application_cache_idle_ops += WT_STAT_CONN_READ(from, application_cache_idle_ops);
+    to->application_cache_busy_ops += WT_STAT_CONN_READ(from, application_cache_busy_ops);
     to->application_evict_snapshot_refreshed +=
       WT_STAT_CONN_READ(from, application_evict_snapshot_refreshed);
     to->application_cache_time += WT_STAT_CONN_READ(from, application_cache_time);
+    to->application_cache_idle_time += WT_STAT_CONN_READ(from, application_cache_idle_time);
+    to->application_cache_busy_time += WT_STAT_CONN_READ(from, application_cache_busy_time);
     to->txn_release_blocked += WT_STAT_CONN_READ(from, txn_release_blocked);
     to->dhandle_lock_blocked += WT_STAT_CONN_READ(from, dhandle_lock_blocked);
     to->page_index_slot_ref_blocked += WT_STAT_CONN_READ(from, page_index_slot_ref_blocked);
@@ -3634,6 +3670,8 @@ static const char *const __stats_session_desc[] = {
   "session: page write from cache to disk time (usecs)",
   "session: schema lock wait time (usecs)",
   "session: time waiting for cache (usecs)",
+  "session: time waiting for cache eviction while idle (usecs)",
+  "session: time waiting for mandatory cache eviction (usecs)",
 };
 
 int
@@ -3661,4 +3699,6 @@ __wt_stat_session_clear_single(WT_SESSION_STATS *stats)
     stats->write_time = 0;
     stats->lock_schema_wait = 0;
     stats->cache_time = 0;
+    stats->cache_time_idle = 0;
+    stats->cache_time_busy = 0;
 }

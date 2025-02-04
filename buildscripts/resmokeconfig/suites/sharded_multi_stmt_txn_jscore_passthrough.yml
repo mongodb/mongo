@@ -20,7 +20,6 @@ selector:
     - jstests/core/**/geo_update_btree2.js # notablescan.
     - jstests/core/**/index9.js # "local" database.
     - jstests/core/**/queryoptimizera.js # "local" database.
-    - jstests/core/**/stages*.js # stageDebug.
     - jstests/core/**/startup_log.js # "local" database.
     - jstests/core/**/query/top/top.js # top.
     # The following tests fail because mongos behaves differently from mongod when testing certain
@@ -190,7 +189,7 @@ selector:
 
     # txn interrupted by command outside of txn before getMore runs.
     - jstests/core/**/commands_namespace_parsing.js
-    - jstests/core/**/drop3.js
+    - jstests/core/ddl/drop_collection_cursors.js
     - jstests/core/**/geo_s2cursorlimitskip.js
     - jstests/core/**/getmore_invalidated_cursors.js
     - jstests/core/**/getmore_invalidated_documents.js
@@ -229,7 +228,7 @@ selector:
     - jstests/core/**/query/SERVER-23626.js
 
     # Creates a session explicitly causing override to resume a transaction that was not started.
-    - jstests/core_sharding/refine_collection_shard_key.js
+    - jstests/core_sharding/ddl/refine_collection_shard_key.js
 
   exclude_with_any_tags:
     # "Cowardly refusing to override read concern of command: ..."

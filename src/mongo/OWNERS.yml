@@ -1,0 +1,5 @@
+version: 1.0.0
+filters:
+  - "config.h.in":
+    approvers:
+      - 10gen/server-programmability

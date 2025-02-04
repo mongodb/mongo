@@ -36,7 +36,6 @@
 #include "mongo/db/catalog/validate/validate_results.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/util/interruptible.h"
 
 namespace mongo {
 
@@ -53,8 +52,7 @@ public:
                                   double scale,
                                   const std::string& uri);
 
-    static StatusWith<int64_t> compact(Interruptible&,
-                                       WiredTigerRecoveryUnit&,
+    static StatusWith<int64_t> compact(OperationContext* opCtx,
                                        const std::string& uri,
                                        const CompactOptions& options);
 

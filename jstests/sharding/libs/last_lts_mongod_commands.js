@@ -7,6 +7,7 @@ export const commandsRemovedFromMongodSinceLastLTS = [
     "_shardsvrDropCollectionIfUUIDNotMatching",
     "_getAuditConfigGeneration",  // Removed in 8.1
     "_configsvrRefineCollectionShardKey",
+    "stageDebug",
 ];
 
 // These commands were added in mongod since the last LTS version, so will not appear in the

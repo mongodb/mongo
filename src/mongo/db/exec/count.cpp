@@ -33,7 +33,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/count.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -55,7 +55,7 @@ CountStage::CountStage(ExpressionContext* expCtx,
     _children.emplace_back(child);
 }
 
-bool CountStage::isEOF() {
+bool CountStage::isEOF() const {
     if (_limit > 0 && _specificStats.nCounted >= _limit) {
         return true;
     }

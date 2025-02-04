@@ -1487,7 +1487,7 @@ __wt_meta_sysinfo_set(WT_SESSION_IMPL *session, const char *name, size_t namelen
     /*
      * Record the base write gen in metadata as part of full checkpoints.
      *
-     * Note that "full" here means what it does in __txn_checkpoint: the user didn't give an
+     * Note that "full" here means what it does in __checkpoint_db_internal: the user didn't give an
      * explicit list of trees to checkpoint. It is allowed (though currently not sensible) for the
      * user to do that with a named checkpoint, in which case we don't want to make this change.
      */

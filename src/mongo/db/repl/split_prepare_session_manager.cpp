@@ -35,7 +35,7 @@
 #include <absl/meta/type_traits.h>
 #include <boost/none.hpp>
 
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace repl {

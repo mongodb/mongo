@@ -88,14 +88,14 @@ T& append(T& s, int family, const std::array<uint8_t, 16> ip, int len) {
 
 }  // namespace
 
-StatusWith<CIDR> CIDR::parse(BSONElement from) noexcept {
+StatusWith<CIDR> CIDR::parse(BSONElement from) {
     if (from.type() != String) {
         return {ErrorCodes::UnsupportedFormat, "CIDR range must be a string"};
     }
     return parse(from.valueStringData());
 }
 
-StatusWith<CIDR> CIDR::parse(StringData s) noexcept {
+StatusWith<CIDR> CIDR::parse(StringData s) {
     CIDR value;
     auto slash = find(begin(s), end(s), '/');
     auto ip = (slash == end(s)) ? s.toString() : s.substr(0, slash - begin(s)).toString();

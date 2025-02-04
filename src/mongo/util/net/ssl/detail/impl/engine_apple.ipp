@@ -61,7 +61,7 @@ public:
         return "Secure.Transport";
     }
 
-    std::string message(int value) const noexcept final {
+    std::string message(int value) const final {
         const auto status = static_cast<::OSStatus>(value);
         apple::CFUniquePtr<::CFStringRef> errstr(::SecCopyErrorMessageString(status, nullptr));
         if (!errstr) {

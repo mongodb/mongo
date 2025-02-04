@@ -39,7 +39,7 @@
 #include "mongo/db/default_baton.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
@@ -62,7 +62,7 @@ DefaultBaton::~DefaultBaton() {
     invariant(_scheduled.empty());
 }
 
-void DefaultBaton::detachImpl() noexcept {
+void DefaultBaton::detachImpl() {
     decltype(_scheduled) scheduled;
     decltype(_timers) timers;
 
@@ -89,7 +89,7 @@ void DefaultBaton::detachImpl() noexcept {
     }
 }
 
-void DefaultBaton::schedule(Task func) noexcept {
+void DefaultBaton::schedule(Task func) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     if (!_opCtx) {

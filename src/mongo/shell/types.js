@@ -183,6 +183,11 @@ Array.tojson = function(a, indent, nolint, depth, sortKeys) {
         return "[Array]";
     }
 
+    if (typeof TestData === "object" && TestData.logFormat === "json" &&
+        typeof nolint !== "boolean") {
+        nolint = true;
+        indent = "";
+    }
     var elementSeparator = nolint ? " " : "\n";
 
     if (!indent)
@@ -662,6 +667,12 @@ tojson = function(x, indent, nolint, depth, sortKeys) {
     if (x === undefined)
         return "undefined";
 
+    if (typeof TestData === "object" && TestData.logFormat === "json" &&
+        typeof nolint !== "boolean") {
+        nolint = true;
+        indent = "";
+    }
+
     if (!indent)
         indent = "";
 
@@ -697,6 +708,11 @@ tojsonObject = function(x, indent, nolint, depth, sortKeys) {
     if (typeof depth !== 'number') {
         depth = 0;
     }
+    if (typeof TestData === "object" && TestData.logFormat === "json" &&
+        typeof nolint !== "boolean") {
+        nolint = true;
+        indent = "";
+    }
     var lineEnding = nolint ? " " : "\n";
     var tabSpace = nolint ? "" : "\t";
     assert.eq((typeof x), "object", "tojsonObject needs object, not [" + (typeof x) + "]");
@@ -714,7 +730,7 @@ tojsonObject = function(x, indent, nolint, depth, sortKeys) {
     }
 
     if (x instanceof Error) {
-        return x.toString();
+        return `Error(${JSON.stringify(x.message)})`;
     }
 
     try {

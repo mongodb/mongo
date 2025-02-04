@@ -979,7 +979,7 @@ Status DbChecker::_runHashExtraKeyCheck(OperationContext* opCtx,
             return acquisitionSW.getStatus();
         }
 
-        const CollectionPtr& collection = acquisitionSW.getValue()->coll.getCollectionPtr();
+        const CollectionPtr& collection = acquisitionSW.getValue()->collection().getCollectionPtr();
 
         auto readTimestamp =
             shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
@@ -1187,7 +1187,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         return acquisitionSW.getStatus();
     }
 
-    const auto collAcquisition = acquisitionSW.getValue()->coll;
+    const auto collAcquisition = acquisitionSW.getValue()->collection();
 
     const CollectionPtr& collection = collAcquisition.getCollectionPtr();
 
@@ -1774,7 +1774,7 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
         }
 
         // Set up progress tracker.
-        const CollectionAcquisition collAcquisition = acquisitionSW.getValue()->coll;
+        const CollectionAcquisition collAcquisition = acquisitionSW.getValue()->collection();
         stdx::unique_lock<Client> lk(*opCtx->getClient());
         progress.set(
             lk,
@@ -1907,7 +1907,8 @@ StatusWith<DbCheckCollectionBatchStats> DbChecker::_runBatch(OperationContext* o
         }
 
         // The CollectionPtr needs to outlive the DbCheckHasher as it's used internally.
-        const CollectionPtr& collectionPtr = acquisitionSW.getValue()->coll.getCollectionPtr();
+        const CollectionPtr& collectionPtr =
+            acquisitionSW.getValue()->collection().getCollectionPtr();
         if (collectionPtr.get()->uuid() != _info.uuid) {
             const auto msg = "Collection under dbCheck no longer exists";
             return {ErrorCodes::NamespaceNotFound, msg};
@@ -2036,8 +2037,8 @@ StatusWith<std::unique_ptr<DbCheckAcquisition>> DbChecker::_acquireDBCheckLocks(
         return ex.toStatus();
     }
 
-    if (!acquisition->coll.exists() ||
-        acquisition->coll.getCollectionPtr().get()->uuid() != _info.uuid) {
+    if (!acquisition->collection().exists() ||
+        acquisition->collection().getCollectionPtr().get()->uuid() != _info.uuid) {
         Status status = Status(
             ErrorCodes::NamespaceNotFound,
             str::stream()

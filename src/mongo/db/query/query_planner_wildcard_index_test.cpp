@@ -1988,7 +1988,7 @@ TEST_F(QueryPlannerWildcardTest, CanPushProjectionBeneathSortWithExistsPredicate
         "{proj: {spec: {_id: 0, b: 1}, node: {fetch: {filter: {a: {$eq: 1}}, node:"
         "{ixscan: {filter: null, pattern: {$_path: 1, b: 1}, bounds:"
         "{$_path: [['b','b',true,true], ['b.', 'b/', true, false]],"
-        "b: [['MinKey','MaxKey',true,true]]}}}}}}}}}}}");
+        "b: [['MinKey','MaxKey',true,true]]}}}}}}}}}");
     assertSolutionExists(
         "{sort: {pattern: {b: 1}, limit: 0, type: 'simple', node:"
         "{proj: {spec: {_id: 0, b: 1}, node: {fetch: {filter: {b: {$exists: true}}, node:"

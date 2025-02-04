@@ -426,11 +426,11 @@ __wti_txn_ts_log(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_txn_checkpoint_log --
+ * __wt_checkpoint_log --
  *     Write a log record for a checkpoint operation.
  */
 int
-__wt_txn_checkpoint_log(WT_SESSION_IMPL *session, bool full, uint32_t flags, WT_LSN *lsnp)
+__wt_checkpoint_log(WT_SESSION_IMPL *session, bool full, uint32_t flags, WT_LSN *lsnp)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_ITEM(logrec);

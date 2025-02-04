@@ -116,7 +116,7 @@ void Vectorizer::logUnsupportedConversion(const optimizer::ABT& node) {
                         2,
                         {logv2::LogTruncation::Disabled},
                         "Operation is not supported in block-oriented mode",
-                        "node"_attr = optimizer::ExplainGenerator::explainV2(node),
+                        "node"_attr = redact(optimizer::ExplainGenerator::explainV2(node)),
                         "variables"_attr = dumpVariables(_variableTypes));
 }
 

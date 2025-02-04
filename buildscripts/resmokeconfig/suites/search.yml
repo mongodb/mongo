@@ -4,6 +4,9 @@ selector:
   roots:
     - jstests/with_mongot/search_mocked/*.js
     - jstests/with_mongot/mongotmock/*.js
+    # The following tests can't run in the search_ssl suite since that suite automatically
+    # enables TLS connections to mongod while these tests have TLS disabled on mongod.
+    - jstests/with_mongot/search_mocked/ssl/ssl_disabled_on_mongod/*.js
   exclude_with_any_tags:
     - requires_auth
 

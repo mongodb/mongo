@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include <absl/container/node_hash_map.h>
+#include "mongo/db/pipeline/field_path.h"
 
+#include <absl/container/node_hash_map.h>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
-#include "mongo/db/pipeline/field_path.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
@@ -61,10 +61,7 @@ const StringDataSet kAllowedDollarPrefixedFields = {
 
 }  // namespace
 
-using std::string;
-using std::vector;
-
-string FieldPath::getFullyQualifiedPath(StringData prefix, StringData suffix) {
+std::string FieldPath::getFullyQualifiedPath(StringData prefix, StringData suffix) {
     if (prefix.empty()) {
         return suffix.toString();
     }
@@ -73,14 +70,14 @@ string FieldPath::getFullyQualifiedPath(StringData prefix, StringData suffix) {
 }
 
 FieldPath::FieldPath(std::string inputPath, bool precomputeHashes, bool validateFieldNames)
-    : _fieldPath(std::move(inputPath)), _fieldPathDotPosition{string::npos} {
+    : _fieldPath(std::move(inputPath)), _fieldPathDotPosition{std::string::npos} {
     uassert(40352, "FieldPath cannot be constructed with empty string", !_fieldPath.empty());
     uassert(40353, "FieldPath must not end with a '.'.", _fieldPath[_fieldPath.size() - 1] != '.');
 
     // Store index delimiter position for use in field lookup.
     size_t dotPos;
     size_t startPos = 0;
-    while (string::npos != (dotPos = _fieldPath.find('.', startPos))) {
+    while (std::string::npos != (dotPos = _fieldPath.find('.', startPos))) {
         _fieldPathDotPosition.push_back(dotPos);
         startPos = dotPos + 1;
     }
@@ -115,13 +112,13 @@ Status FieldPath::validateFieldName(StringData fieldName) {
                                     << fieldName << "'.");
     }
 
-    if (fieldName.find('\0') != string::npos) {
+    if (fieldName.find('\0') != std::string::npos) {
         return Status(ErrorCodes::Error{16411},
                       str::stream() << "FieldPath field names may not contain '\0', given '"
                                     << fieldName << "'.");
     }
 
-    if (fieldName.find('.') != string::npos) {
+    if (fieldName.find('.') != std::string::npos) {
         return Status(ErrorCodes::Error{16412},
                       str::stream() << "FieldPath field names may not contain '.', given '"
                                     << fieldName << "'.");

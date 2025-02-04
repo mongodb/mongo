@@ -54,6 +54,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
@@ -824,7 +825,8 @@ Status MultiIndexBlock::_insert(
     }
 
     for (size_t i = 0; i < _indexes.size(); i++) {
-        if (_indexes[i].filterExpression && !_indexes[i].filterExpression->matchesBSON(doc)) {
+        if (_indexes[i].filterExpression &&
+            !exec::matcher::matchesBSON(_indexes[i].filterExpression, doc)) {
             continue;
         }
 
@@ -906,22 +908,22 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                 entry,
                 dupsAllowed,
                 kYieldIterations,
-                [&](const key_string::Value& duplicateKey) {
+                [&](const key_string::View& duplicateKey) {
                     // Do not record duplicates when explicitly ignored. This may be the case on
                     // secondaries.
+                    if (!dupsAllowed || onDuplicateRecord || _ignoreUnique ||
+                        !entry->indexBuildInterceptor()) {
+                        return Status::OK();
+                    }
                     return writeConflictRetry(
                         opCtx, "recordingDuplicateKey", entry->getNSSFromCatalog(opCtx), [&] {
-                            if (dupsAllowed && !onDuplicateRecord && !_ignoreUnique &&
-                                entry->indexBuildInterceptor()) {
-                                WriteUnitOfWork wuow(opCtx);
-                                Status status = entry->indexBuildInterceptor()->recordDuplicateKey(
-                                    opCtx, entry, duplicateKey);
-                                if (!status.isOK()) {
-                                    return status;
-                                }
+                            WriteUnitOfWork wuow(opCtx);
+                            Status status = entry->indexBuildInterceptor()->recordDuplicateKey(
+                                opCtx, entry, duplicateKey);
+                            if (status.isOK()) {
                                 wuow.commit();
                             }
-                            return Status::OK();
+                            return status;
                         });
                 },
                 onDuplicateRecord);

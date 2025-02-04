@@ -65,7 +65,7 @@ protected:
                     const char* stageType);
 
 public:
-    bool isEOF() final;
+    bool isEOF() const final;
     StageState doWork(WorkingSetID* out) final;
 
     std::unique_ptr<PlanStageStats> getStats() final;

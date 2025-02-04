@@ -67,6 +67,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
@@ -170,7 +171,7 @@ void _addWorkingSetMember(OperationContext* opCtx,
                           const MatchExpression* matcher,
                           WorkingSet* ws,
                           std::vector<WorkingSetID>& results) {
-    if (matcher && !matcher->matchesBSON(maybe)) {
+    if (matcher && !exec::matcher::matchesBSON(matcher, maybe)) {
         return;
     }
 
@@ -402,10 +403,10 @@ public:
                             }
 
                             auto collBson = [&] {
-                                const Collection* collection =
+                                auto collection =
                                     catalog->establishConsistentCollection(opCtx, nss, boost::none);
-                                if (collection != nullptr) {
-                                    return buildCollectionBson(opCtx, collection, nameOnly);
+                                if (collection) {
+                                    return buildCollectionBson(opCtx, collection.get(), nameOnly);
                                 }
 
                                 std::shared_ptr<const ViewDefinition> view =
@@ -415,7 +416,7 @@ public:
                                             catalog->establishConsistentCollection(
                                                 opCtx, view->viewOn(), boost::none)) {
                                         return buildTimeseriesBson(
-                                            opCtx, bucketsCollection, nameOnly);
+                                            opCtx, bucketsCollection.get(), nameOnly);
                                     } else {
                                         // The buckets collection does not exist, so the time-series
                                         // view will be appended when we iterate through the view
@@ -467,10 +468,9 @@ public:
                             return true;
                         };
 
-                        std::vector<const Collection*> collections =
-                            catalog->establishConsistentCollections(opCtx, dbName);
+                        auto collections = catalog->establishConsistentCollections(opCtx, dbName);
                         for (const auto& collection : collections) {
-                            perCollectionWork(collection);
+                            perCollectionWork(collection.get());
                         }
                     }
 

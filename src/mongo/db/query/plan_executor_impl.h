@@ -172,20 +172,23 @@ public:
     ExecState getNext(BSONObj* out, RecordId* dlOut) final;
     size_t getNextBatch(size_t batchSize, AppendBSONObjFn append) final;
 
-    bool isEOF() final;
+    bool isEOF() const final;
     long long executeCount() override;
     UpdateResult getUpdateResult() const override;
     long long getDeleteResult() const override;
     BatchedDeleteStats getBatchedDeleteStats() override;
     void markAsKilled(Status killStatus) final;
     void dispose(OperationContext* opCtx) final;
+    void forceSpill() final {
+        _root->forceSpill();
+    }
     void stashResult(const BSONObj& obj) final;
 
     MONGO_COMPILER_ALWAYS_INLINE bool isMarkedAsKilled() const final {
         return !_killStatus.isOK();
     }
 
-    Status getKillStatus() final;
+    Status getKillStatus() const final;
     bool isDisposed() const final;
     Timestamp getLatestOplogTimestamp() const final;
     BSONObj getPostBatchResumeToken() const final;

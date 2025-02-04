@@ -60,7 +60,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
@@ -126,8 +125,8 @@ public:
             auto& ru =
                 *checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx));
             StorageWriteTransaction txn(ru);
-            WT_SESSION* s = ru.getSession()->getSession();
-            invariantWTOK(s->create(s, uri.c_str(), config.c_str()), s);
+            WiredTigerSession* s = ru.getSession();
+            invariantWTOK(s->create(uri.c_str(), config.c_str()), *s);
             txn.commit();
         }
 
@@ -185,10 +184,9 @@ public:
     }
 
     void getCursor(WiredTigerRecoveryUnit* ru, WT_CURSOR** cursor) {
-        WT_SESSION* wt_session = ru->getSession()->getSession();
-        invariantWTOK(wt_session->create(wt_session, wt_uri, wt_config), wt_session);
-        invariantWTOK(wt_session->open_cursor(wt_session, wt_uri, nullptr, nullptr, cursor),
-                      wt_session);
+        WiredTigerSession* session = ru->getSession();
+        invariantWTOK(session->create(wt_uri, wt_config), *session);
+        invariantWTOK(session->open_cursor(wt_uri, nullptr, nullptr, cursor), *session);
     }
 
     void setUp() override {
@@ -809,80 +807,6 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsCached) {
     ASSERT_EQ(0, ru1->getSession()->cursorsOut());
 
     ASSERT(ru1->getReadOnce());
-}
-
-TEST_F(WiredTigerRecoveryUnitTestFixture, CacheMixedOverwrite) {
-    auto opCtx = clientAndCtx1.second.get();
-    std::unique_ptr<RecordStore> rs(harnessHelper->createRecordStore(opCtx, "test.A"));
-    auto uri = dynamic_cast<WiredTigerRecordStore*>(rs.get())->getURI();
-
-    // Close all cached cursors to establish a 'before' state.
-    auto session = ru1->getSession();
-    ru1->getSession()->closeAllCursors(uri);
-    int cachedCursorsBefore = ru1->getSession()->cachedCursors();
-
-    // Use a large, unused table ID for this test to ensure we don't collide with any other table
-    // ids.
-    int tableId = 999999999;
-    WT_CURSOR* cursor;
-
-    // Expect no cached cursors.
-    {
-        auto config = "";
-        cursor = session->getCachedCursor(tableId, config);
-        ASSERT_FALSE(cursor);
-
-        cursor = session->getNewCursor(uri, config);
-        ASSERT(cursor);
-        session->releaseCursor(tableId, cursor, config);
-        ASSERT_GT(session->cachedCursors(), cachedCursorsBefore);
-    }
-
-    cachedCursorsBefore = session->cachedCursors();
-
-    // Use a different overwrite setting, expect no cached cursors.
-    {
-        auto config = "overwrite=false";
-        cursor = session->getCachedCursor(tableId, config);
-        ASSERT_FALSE(cursor);
-
-        cursor = session->getNewCursor(uri, config);
-        ASSERT(cursor);
-        session->releaseCursor(tableId, cursor, config);
-        ASSERT_GT(session->cachedCursors(), cachedCursorsBefore);
-    }
-
-    cachedCursorsBefore = session->cachedCursors();
-
-    // Expect cursors to be cached.
-    {
-        auto config = "";
-        cursor = session->getCachedCursor(tableId, config);
-        ASSERT(cursor);
-        session->releaseCursor(tableId, cursor, config);
-        ASSERT_EQ(session->cachedCursors(), cachedCursorsBefore);
-    }
-
-    // Expect cursors to be cached.
-    {
-        auto config = "overwrite=false";
-        cursor = session->getCachedCursor(tableId, config);
-        ASSERT(cursor);
-        session->releaseCursor(tableId, cursor, config);
-        ASSERT_EQ(session->cachedCursors(), cachedCursorsBefore);
-    }
-
-    // Use yet another cursor config, and expect no cursors to be cached.
-    {
-        auto config = "overwrite=true";
-        cursor = session->getCachedCursor(tableId, config);
-        ASSERT_FALSE(cursor);
-
-        cursor = session->getNewCursor(uri, config);
-        ASSERT(cursor);
-        session->releaseCursor(tableId, cursor, config);
-        ASSERT_GT(session->cachedCursors(), cachedCursorsBefore);
-    }
 }
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorNotChanged) {

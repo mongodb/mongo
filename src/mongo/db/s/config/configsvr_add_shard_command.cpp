@@ -28,9 +28,7 @@
  */
 
 
-#include <memory>
 #include <string>
-#include <utility>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -39,9 +37,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/audit.h"
@@ -59,16 +54,12 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
-#include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/request_types/add_shard_request_type.h"
+#include "mongo/s/request_types/add_shard_gen.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -79,9 +70,93 @@ namespace mongo {
 /**
  * Internal sharding command run on config servers to add a shard to the cluster.
  */
-class ConfigSvrAddShardCommand : public BasicCommand {
+class ConfigSvrAddShardCommand : public TypedCommand<ConfigSvrAddShardCommand> {
 public:
-    ConfigSvrAddShardCommand() : BasicCommand("_configsvrAddShard") {}
+    using Request = ConfigsvrAddShard;
+    using Response = AddShardResponse;
+
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        Response typedRun(OperationContext* opCtx) {
+            uassert(ErrorCodes::IllegalOperation,
+                    "_configsvrAddShard can only be run on config servers",
+                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
+            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
+                                                          opCtx->getWriteConcern());
+
+            // Set the operation context read concern level to local for reads into the config
+            // database.
+            repl::ReadConcernArgs::get(opCtx) =
+                repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
+            const auto target = request().getCommandParameter();
+            const auto name = request().getName()
+                ? boost::make_optional(request().getName()->toString())
+                : boost::none;
+
+            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+            auto validationStatus = _validate(target, replCoord->getConfig().isLocalHostAllowed());
+            uassertStatusOK(validationStatus);
+
+            audit::logAddShard(Client::getCurrent(), name ? name.value() : "", target.toString());
+
+
+            StatusWith<std::string> addShardResult = ShardingCatalogManager::get(opCtx)->addShard(
+                opCtx, name ? &(name.value()) : nullptr, target, false);
+
+            Status status = addShardResult.getStatus();
+
+            if (!status.isOK()) {
+                LOGV2(21920,
+                      "addShard request failed",
+                      "request"_attr = request(),
+                      "error"_attr = status);
+                uassertStatusOK(status);
+            }
+
+            Response result;
+            result.setShardAdded(addShardResult.getValue());
+
+            return result;
+        }
+
+    private:
+        bool supportsWriteConcern() const override {
+            return true;
+        }
+
+        NamespaceString ns() const override {
+            return {};
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
+        }
+
+        static Status _validate(const ConnectionString& target, bool allowLocalHost) {
+            // Check that if one of the new shard's hosts is localhost, we are allowed to use
+            // localhost as a hostname. (Using localhost requires that every server in the cluster
+            // uses localhost).
+            for (const auto& serverAddr : target.getServers()) {
+                if (serverAddr.isLocalHost() != allowLocalHost) {
+                    std::string errmsg = str::stream()
+                        << "Can't use localhost as a shard since all shards need to"
+                        << " communicate. Either use all shards and configdbs in localhost"
+                        << " or all in actual IPs. host: " << serverAddr.toString()
+                        << " isLocalHost:" << serverAddr.isLocalHost();
+                    return Status(ErrorCodes::InvalidOptions, errmsg);
+                }
+            }
+            return Status::OK();
+        }
+    };
 
     bool skipApiVersionCheck() const override {
         // Internal command (server to server).
@@ -98,69 +173,6 @@ public:
     }
 
     bool adminOnly() const override {
-        return true;
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
-
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName& dbName,
-                                 const BSONObj&) const override {
-        if (!AuthorizationSession::get(opCtx->getClient())
-                 ->isAuthorizedForActionsOnResource(
-                     ResourcePattern::forClusterResource(dbName.tenantId()),
-                     ActionType::internal)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
-        return Status::OK();
-    }
-
-    bool run(OperationContext* opCtx,
-             const DatabaseName&,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        uassert(ErrorCodes::IllegalOperation,
-                "_configsvrAddShard can only be run on config servers",
-                serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
-        CommandHelpers::uassertCommandRunWithMajority(getName(), opCtx->getWriteConcern());
-
-        // Set the operation context read concern level to local for reads into the config database.
-        repl::ReadConcernArgs::get(opCtx) =
-            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
-
-        auto swParsedRequest = AddShardRequest::parseFromConfigCommand(cmdObj);
-        uassertStatusOK(swParsedRequest.getStatus());
-        auto parsedRequest = std::move(swParsedRequest.getValue());
-
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-
-        auto validationStatus = parsedRequest.validate(replCoord->getConfig().isLocalHostAllowed());
-        uassertStatusOK(validationStatus);
-
-        audit::logAddShard(Client::getCurrent(),
-                           parsedRequest.hasName() ? parsedRequest.getName() : "",
-                           parsedRequest.getConnString().toString());
-
-        StatusWith<std::string> addShardResult = ShardingCatalogManager::get(opCtx)->addShard(
-            opCtx,
-            parsedRequest.hasName() ? &parsedRequest.getName() : nullptr,
-            parsedRequest.getConnString(),
-            false);
-
-        Status status = addShardResult.getStatus();
-
-        if (!status.isOK()) {
-            LOGV2(21920,
-                  "addShard request failed",
-                  "request"_attr = parsedRequest,
-                  "error"_attr = status);
-            uassertStatusOK(status);
-        }
-
-        result << "shardAdded" << addShardResult.getValue();
-
         return true;
     }
 };

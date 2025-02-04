@@ -44,7 +44,6 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/stats/counters.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -456,6 +455,47 @@ TEST(AsioTransportLayer, SourceSyncTimeoutSucceeds) {
     SyncClient conn(tf.tla().listenerPort());
     ping(conn);  // This time we send a message
     ASSERT_OK(received.get().getStatus());
+}
+
+TEST(AsioTransportLayer, IngressPhysicalNetworkMetricsTest) {
+    Message req = []() {
+        auto omb = OpMsgBuilder{};
+        omb.setBody(BSON("ping" << 1));
+        Message msg = omb.finish();
+        msg.header().setResponseToMsgId(0);
+        msg.header().setId(0);
+        OpMsg::appendChecksum(&msg);
+        return msg;
+    }();
+
+    Message resp = []() {
+        auto omb = OpMsgBuilder{};
+        omb.setBody(BSONObjBuilder{}.append("ok", 1).obj());
+        return omb.finish();
+    }();
+
+    TestFixture tf;
+    auto received = makePromiseFuture<Message>();
+    auto responsed = makePromiseFuture<void>();
+
+    tf.sessionManager().setOnStartSession([&](test::SessionThread& st) {
+        st.schedule([&](auto& session) {
+            received.promise.setFrom(session.sourceMessage());
+            responsed.promise.setFrom(session.sinkMessage(resp));
+        });
+    });
+    SyncClient conn(tf.tla().listenerPort());
+    auto stats = test::NetworkConnectionStats::get(NetworkCounter::ConnectionType::kIngress);
+    conn.write(req.buf(), req.size());
+    ASSERT_OK(received.future.getNoThrow());
+    ASSERT_OK(responsed.future.getNoThrow());
+    auto diff = test::NetworkConnectionStats::get(NetworkCounter::ConnectionType::kIngress)
+                    .getDifference(stats);
+
+    ASSERT_EQ(diff.physicalBytesIn, req.size());
+    ASSERT_EQ(diff.physicalBytesOut, resp.size());
+    // The transport layer should not increase the numRequests of network metrics.
+    ASSERT_EQ(diff.numRequests, 0);
 }
 
 /** Switching from timeouts to no timeouts must reset the timeout to unlimited. */

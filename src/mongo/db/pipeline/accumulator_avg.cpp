@@ -51,8 +51,6 @@
 
 namespace mongo {
 
-using boost::intrusive_ptr;
-
 template <>
 Value ExpressionFromAccumulator<AccumulatorAvg>::evaluate(const Document& root,
                                                           Variables* variables) const {
@@ -125,10 +123,6 @@ void AccumulatorAvg::processInternal(const Value& input, bool merging) {
             MONGO_UNREACHABLE;
     }
     _count++;
-}
-
-intrusive_ptr<AccumulatorState> AccumulatorAvg::create(ExpressionContext* const expCtx) {
-    return new AccumulatorAvg(expCtx);
 }
 
 Decimal128 AccumulatorAvg::_getDecimalTotal() const {

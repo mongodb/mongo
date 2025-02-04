@@ -181,8 +181,10 @@ mongo_cc_library(
         "connection_pool_tl.h",
         "exhaust_response_reader_tl.h",
         "network_interface_tl.h",
+        "pooled_async_client_factory.h",
     ],
     deps = [
+        ":async_client_factory",
         ":connection_pool_executor",
         ":network_interface",
         "//src/mongo/client:async_client",
@@ -313,7 +315,7 @@ mongo_cc_library(
         "//src/mongo/idl:generic_argument.h",
         "//src/mongo/idl:generic_argument_gen",
         "//src/mongo/rpc:get_status_from_command_result.h",
-        "//src/mongo/rpc/metadata:impersonated_user_metadata_gen",
+        "//src/mongo/rpc/metadata:audit_metadata_gen",
         "//src/mongo/s:chunk_version.h",
         "//src/mongo/s:database_version.h",
         "//src/mongo/s:database_version_base_gen",
@@ -372,7 +374,6 @@ mongo_cc_library(
         "//src/mongo/transport:message_compressor_manager.h",
         "//src/mongo/transport:ssl_connection_context.h",
         "//src/mongo/transport:transport_layer.h",
-        "//src/mongo/util:destructor_guard.h",
         "//src/mongo/util/concurrency:thread_pool_interface.h",
         "//src/mongo/util/net:sock.h",
         "//src/mongo/util/net:ssl_manager.h",
@@ -404,6 +405,22 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "async_client_factory",
+    srcs = [
+    ],
+    hdrs = [
+        "async_client_factory.h",
+    ],
+    deps = [
+        ":connection_pool_stats",
+        ":egress_connection_closer_manager",
+        "//src/mongo/client:async_client",
+        "//src/mongo/db:server_base",
         "//src/mongo/util/net:network",
     ],
 )
@@ -603,8 +620,6 @@ mongo_cc_unit_test(
         "//src/mongo/util:executor_test_util.h",
     ],
     tags = [
-        "code_coverage_quarantine",
-        "code_coverage_quarantine-SERVER_99060",
         "compile_requires_large_memory_gcc_fission",
         "mongo_unittest_third_group",
     ],
@@ -648,8 +663,6 @@ mongo_cc_unit_test(
         "//src/mongo/util:executor_test_util.h",
     ],
     tags = [
-        "code_coverage_quarantine",
-        "code_coverage_quarantine-SERVER_99060",
         "mongo_unittest_second_group",
         "server-programmability",
     ],
@@ -690,5 +703,6 @@ mongo_cc_integration_test(
         "//src/mongo/transport:transport_layer_egress_init",
         "//src/mongo/util:version_impl",
         "//src/mongo/util/concurrency:thread_pool",
+        "//src/mongo/util/net:ssl_options_server",
     ],
 )

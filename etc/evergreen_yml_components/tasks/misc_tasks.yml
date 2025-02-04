@@ -391,6 +391,28 @@ tasks:
           args:
             - "./src/evergreen/todos_check.sh"
 
+  - name: check_for_legacy_command_types
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "development_critical_single_variant",
+      ]
+    exec_timeout_secs: 600 # 10 minute timeout
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "configure evergreen api credentials"
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/check_legacy_command_types.sh"
+
   - name: generate_buildid_to_debug_symbols_mapping
     tags:
       [
@@ -1048,33 +1070,6 @@ tasks:
             - "buildscripts/pyrightlint.py"
             - "lint-all"
 
-  - name: lint_shellscripts
-    tags:
-      [
-        "assigned_to_jira_team_devprod_correctness",
-        "development_critical_single_variant",
-        "lint",
-      ]
-    commands:
-      - command: timeout.update
-        params:
-          # 20 mins
-          exec_timeout_secs: 1200
-      - func: "f_expansions_write"
-      - command: manifest.load
-      - func: "git get project and add git tag"
-      - func: "f_expansions_write"
-      - func: "kill processes"
-      - func: "cleanup environment"
-      - func: "set up venv"
-      - func: "upload pip requirements"
-      - command: subprocess.exec
-        type: test
-        params:
-          binary: bash
-          args:
-            - "src/evergreen/lint_shellscripts.sh"
-
   - name: lint_yaml
     tags:
       [
@@ -1123,7 +1118,7 @@ tasks:
     commands:
       - command: timeout.update
         params:
-          exec_timeout_secs: 10800 # 3 hours
+          exec_timeout_secs: 21600 # 6 hours
       - func: "f_expansions_write"
       - command: manifest.load
       - func: "git get project and add git tag"
@@ -1145,20 +1140,10 @@ tasks:
           #   bazel test $targets
           target: >-
             //src/mongo/...
-          # -Wno-mismatched-new-delete to address https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100485
-          # which appears to only happen when coverage is enabled. It seems like enabling coverage is
-          # changing inlining behavior, since this doesn't manifest when -fno-inline is passed in.
           args: >-
-            --config=dbg
-            --compiler_type=gcc
-            --linkstatic=False
-            --test_output=all
-            --combined_report=lcov
             --test_tag_filters=mongo_unittest,-final_target,-code_coverage_quarantine
             --test_timeout=600
             --verbose_failures
-            --copt=-Wno-mismatched-new-delete
-            ${coverage_bazel_tags}
             --instrumentation_filter="^//src/mongo[/:],-^//src/mongo/util:boost_assert_shim,-^//src/mongo/util:icu,-^//src/mongo/db/modules/enterprise/src/streams[/:]"
 
   - name: monitor_build_status
@@ -1679,3 +1664,24 @@ tasks:
           permissions: public-read
           content_type: text/plain
           display_name: bazel
+
+  # Package the supplementary DSI data (mongo tools, feature flag list,
+  # server params list, jstests, and buildscripts).
+  - name: package_supplementary_data
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    tags: ["assigned_to_jira_team_devprod_performance_analysis", "auxiliary"]
+    commands:
+      - command: manifest.load
+      - func: "git get shallow project"
+      - func: "f_expansions_write"
+      - func: "restore git history and tags"
+      - func: "add git tag"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "get and apply version expansions"
+      - func: "gen supplementary data"
+      - func: "upload supplementary data"

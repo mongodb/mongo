@@ -33,45 +33,26 @@
  *     Confirm the backup worked.
  */
 static void
-check_copy(void)
+check_copy(uint64_t id)
 {
     WT_CONNECTION *conn;
-    WT_DECL_RET;
-    size_t len;
-    char *path;
+    char from_path[MAX_FORMAT_PATH], to_path[MAX_FORMAT_PATH];
 
-    len = WT_MAX(strlen(BACKUP_INFO_FILE), strlen(BACKUP_INFO_FILE_TMP));
-    len = WT_MAX(len, strlen("BACKUP"));
-    len += strlen(g.home) + 2;
-    path = dmalloc(len);
-    /*
-     * Remove any backup info files that exist. We're about the run recovery in the backup directory
-     * so we cannot use the backup directory after that restart. We must remove the files before the
-     * restart to avoid a window where they could exist and the backup directory has had recovery
-     * run.
-     */
-    testutil_snprintf(path, len, "%s/%s", g.home, BACKUP_INFO_FILE_TMP);
-    ret = unlink(path);
-    /* Check if unlink command failed. It is fine if the file does not exist. */
-    if (ret != 0 && errno != ENOENT)
-        testutil_die(errno, "unlink command failed with error code: %s", path);
-
-    testutil_snprintf(path, len, "%s/%s", g.home, BACKUP_INFO_FILE);
-    ret = unlink(path);
-    /* Check if unlink command failed. It is fine if the file does not exist. */
-    if (ret != 0 && errno != ENOENT)
-        testutil_die(errno, "unlink command failed with error code: %s", path);
+    /* Create the empty check directory. */
+    testutil_create_backup_directory(g.home, id, true);
+    testutil_snprintf(from_path, sizeof(from_path), "%s/BACKUP", g.home);
+    testutil_snprintf(to_path, sizeof(to_path), "%s/CHECK.%" PRIu64, g.home, id);
+    testutil_copy(from_path, to_path);
 
     /* Now setup and open the path for real. */
-    testutil_snprintf(path, len, "%s/BACKUP", g.home);
-    wts_open(path, &conn, false);
+    wts_open(to_path, &conn, false);
 
     /* Verify the objects. */
     wts_verify(conn, true);
 
     wts_close(&conn);
-
-    free(path);
+    /* If successful, remove the check directory. */
+    testutil_remove(to_path);
 }
 
 /*
@@ -191,9 +172,6 @@ again:
             fprintf(stderr, "Removing file from backup: %s\n", filename);
 #endif
             testutil_assert_errno(unlink(filename) == 0);
-            testutil_snprintf(
-              filename, sizeof(filename), "%s/BACKUP.copy/%s", g.home, prev->names[prevpos]);
-            testutil_assert_errno(unlink(filename) == 0);
         } else {
             /*
              * There is something in the current list not in the prev list. Walk past it in the
@@ -231,17 +209,18 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
 {
     WT_CURSOR *incr_cur;
     WT_DECL_RET;
-    size_t len, tmp_sz;
+    size_t tmp_sz;
     ssize_t rdsize;
     uint64_t offset, size, this_size, total, type;
-    int rfd, wfd1, wfd2;
-    char config[MAX_FORMAT_PATH], *tmp;
+    int rfd, wfd;
+    char config[MAX_FORMAT_PATH], from[MAX_FORMAT_PATH], to[MAX_FORMAT_PATH];
+    char *tmp;
     bool first_pass;
 
     tmp_sz = 0;
     tmp = NULL;
     first_pass = true;
-    rfd = wfd1 = wfd2 = -1;
+    rfd = wfd = -1;
 
     /* Open the duplicate incremental backup cursor with the file name given. */
     testutil_snprintf(config, sizeof(config), "incremental=(file=%s)", name);
@@ -257,26 +236,11 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
              * prepend the home directory to the file names ourselves.
              */
             if (first_pass) {
-                len = strlen(g.home) + strlen(name) + 10;
-                tmp = dmalloc(len);
-                testutil_snprintf(tmp, len, "%s/%s", g.home, name);
-                testutil_assert_errno((rfd = open(tmp, O_RDONLY, 0644)) != -1);
-                free(tmp);
-                tmp = NULL;
+                testutil_snprintf(from, sizeof(from), "%s/%s", g.home, name);
+                testutil_assert_errno((rfd = open(from, O_RDONLY, 0644)) != -1);
 
-                len = strlen(g.home) + strlen("BACKUP") + strlen(name) + 10;
-                tmp = dmalloc(len);
-                testutil_snprintf(tmp, len, "%s/BACKUP/%s", g.home, name);
-                testutil_assert_errno((wfd1 = open(tmp, O_WRONLY | O_CREAT, 0644)) != -1);
-                free(tmp);
-                tmp = NULL;
-
-                len = strlen(g.home) + strlen("BACKUP.copy") + strlen(name) + 10;
-                tmp = dmalloc(len);
-                testutil_snprintf(tmp, len, "%s/BACKUP.copy/%s", g.home, name);
-                testutil_assert_errno((wfd2 = open(tmp, O_WRONLY | O_CREAT, 0644)) != -1);
-                free(tmp);
-                tmp = NULL;
+                testutil_snprintf(to, sizeof(to), "%s/BACKUP/%s", g.home, name);
+                testutil_assert_errno((wfd = open(to, O_WRONLY | O_CREAT, 0644)) != -1);
 
                 first_pass = false;
             }
@@ -292,10 +256,8 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
              */
             if (lseek(rfd, (wt_off_t)offset, SEEK_SET) == -1)
                 testutil_die(errno, "backup-read: lseek");
-            if (lseek(wfd1, (wt_off_t)offset, SEEK_SET) == -1)
-                testutil_die(errno, "backup-write1: lseek");
-            if (lseek(wfd2, (wt_off_t)offset, SEEK_SET) == -1)
-                testutil_die(errno, "backup-write2: lseek");
+            if (lseek(wfd, (wt_off_t)offset, SEEK_SET) == -1)
+                testutil_die(errno, "backup-write: lseek");
             total = 0;
             while (total < size) {
                 /* Use the read size since we may have read less than the granularity. */
@@ -303,8 +265,7 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
                 /* If we get EOF, we're done. */
                 if (rdsize == 0)
                     break;
-                testutil_assert_errno((write(wfd1, tmp, (size_t)rdsize)) != -1);
-                testutil_assert_errno((write(wfd2, tmp, (size_t)rdsize)) != -1);
+                testutil_assert_errno((write(wfd, tmp, (size_t)rdsize)) != -1);
                 total += (uint64_t)rdsize;
                 offset += (uint64_t)rdsize;
                 this_size = WT_MIN(this_size, size - total);
@@ -319,27 +280,15 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
              * These operations are using a WiredTiger function so it will prepend the home
              * directory to the name for us.
              */
-            len = strlen("BACKUP") + strlen(name) + 10;
-            tmp = dmalloc(len);
-            testutil_snprintf(tmp, len, "BACKUP/%s", name);
-            testutil_check(__wt_copy_and_sync(session, name, tmp));
-            free(tmp);
-            tmp = NULL;
-
-            len = strlen("BACKUP.copy") + strlen(name) + 10;
-            tmp = dmalloc(len);
-            testutil_snprintf(tmp, len, "BACKUP.copy/%s", name);
-            testutil_check(__wt_copy_and_sync(session, name, tmp));
-            free(tmp);
-            tmp = NULL;
+            testutil_snprintf(to, sizeof(to), "BACKUP/%s", name);
+            testutil_check(__wt_copy_and_sync(session, name, to));
         }
     }
     testutil_assert(ret == WT_NOTFOUND);
     testutil_check(incr_cur->close(incr_cur));
     if (rfd != -1) {
         testutil_assert_errno(close(rfd) == 0);
-        testutil_assert_errno(close(wfd1) == 0);
-        testutil_assert_errno(close(wfd2) == 0);
+        testutil_assert_errno(close(wfd) == 0);
     }
     free(tmp);
 }
@@ -459,7 +408,7 @@ save_backup_info(ACTIVE_FILES *active, uint64_t id)
 
 /*
  * copy_format_files --
- *     Copies over format-specific files to the BACKUP.copy directory. These include CONFIG and any
+ *     Copies over format-specific files to the backup directory. These include CONFIG and any
  *     CONFIG.keylen* files.
  */
 static void
@@ -596,11 +545,11 @@ backup(void *arg)
 
         /* If we're taking a full backup, create the backup directories. */
         if (full || incremental == 0) {
-            testutil_create_backup_directory(g.home);
+            testutil_create_backup_directory(g.home, 0, false);
 
             /*
              * Copy format-specific files into the backup directories so that test/format can be run
-             * on the BACKUP.copy database for verification.
+             * on the backup database for verification.
              */
             copy_format_files(session);
         }
@@ -664,15 +613,12 @@ backup(void *arg)
             if (g.backup_incr)
                 incremental = mmrand(&g.extra_rnd, 1, 8);
         }
-        if (--incremental == 0) {
-            check_copy();
-            /* We ran recovery in the backup directory, so next time it must be a full backup. */
+        /* Checking is done in a separate directory so we can check every iteration. */
+        check_copy(g.backup_id);
+        if (--incremental == 0)
+            /* Periodically restart with a full backup. */
             incr_full = full = true;
-        }
     }
-
-    if (incremental != 0)
-        check_copy();
 
     active_files_free(&active[0]);
     active_files_free(&active[1]);

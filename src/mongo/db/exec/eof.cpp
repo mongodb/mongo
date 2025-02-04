@@ -44,7 +44,7 @@ EOFStage::EOFStage(ExpressionContext* expCtx, eof_node::EOFType type)
 
 EOFStage::~EOFStage() {}
 
-bool EOFStage::isEOF() {
+bool EOFStage::isEOF() const {
     return true;
 }
 

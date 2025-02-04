@@ -128,10 +128,11 @@ public:
     }
 
     /**
-     * Returns true if the desugared pipeline begins with a $queue stage.
+     * Returns true if the pipeline begins with a stage that generates its own data and should run
+     * once.
      */
-    bool startsWithQueue() const {
-        return !_stageSpecs.empty() && _stageSpecs.front()->startsWithQueue();
+    bool generatesOwnDataOnce() const {
+        return !_stageSpecs.empty() && _stageSpecs.front()->generatesOwnDataOnce();
     }
 
     /**
@@ -146,6 +147,15 @@ public:
      */
     bool hasChangeStream() const {
         return _hasChangeStream.get(_stageSpecs);
+    }
+
+    /**
+     * Returns true if the pipeline has a search stage.
+     */
+    bool hasSearchStage() const {
+        return std::any_of(_stageSpecs.begin(), _stageSpecs.end(), [](auto&& spec) {
+            return spec->isSearchStage();
+        });
     }
 
     /**
@@ -189,10 +199,9 @@ public:
     /**
      * Verifies that this pipeline is allowed to run with the specified read concern level.
      */
-    ReadConcernSupportResult supportsReadConcern(
-        repl::ReadConcernLevel level,
-        bool isImplicitDefault,
-        boost::optional<ExplainOptions::Verbosity> explain) const;
+    ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                 bool isImplicitDefault,
+                                                 bool explain) const;
 
     /**
      * Checks that all of the stages in this pipeline are allowed to run with the specified read
@@ -207,16 +216,14 @@ public:
      * only be called if the caller has determined the current operation is part of a
      * transaction.
      */
-    void assertSupportsMultiDocumentTransaction(
-        boost::optional<ExplainOptions::Verbosity> explain) const;
+    void assertSupportsMultiDocumentTransaction(bool explain) const;
 
     /**
      * Verifies that this pipeline is allowed to run with the read concern from the provided
      * opCtx. Used only when asserting is the desired behavior, otherwise use
      * supportsReadConcern instead.
      */
-    void assertSupportsReadConcern(OperationContext* opCtx,
-                                   boost::optional<ExplainOptions::Verbosity> explain) const;
+    void assertSupportsReadConcern(OperationContext* opCtx, bool explain) const;
 
     /**
      * Perform checks that verify that the LitePipe is valid. Note that this function must be
@@ -225,7 +232,7 @@ public:
      */
     void verifyIsSupported(OperationContext* opCtx,
                            std::function<bool(OperationContext*, const NamespaceString&)> isSharded,
-                           boost::optional<ExplainOptions::Verbosity> explain) const;
+                           bool explain) const;
 
     /**
      * Returns true if the first stage in the pipeline does not require an input source.

@@ -42,7 +42,7 @@
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/uuid.h"

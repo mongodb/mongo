@@ -175,7 +175,6 @@ void WindowStage::spill() {
         _recordStore = std::make_unique<SpillingStore>(_opCtx, KeyFormat::Long);
         _specificStats.usedDisk = true;
     }
-    _specificStats.spills++;
 
     auto writeBatch = [&]() {
         auto status = _recordStore->insertRecords(_opCtx, &_records, _recordTimestamps);
@@ -185,17 +184,18 @@ void WindowStage::spill() {
     };
 
     // Spill all in memory rows in batches.
-    int64_t spilledBytes = 0;
+    uint64_t spilledBytes = 0;
+    uint64_t spilledRecords = 0;
     for (size_t i = 0, id = getLastSpilledRowId() + 1; i < _rows.size(); ++i, ++id) {
         BufBuilder buf;
         _rows[i].serializeForSorter(buf);
         int bufferSize = buf.len();
         spilledBytes += bufferSize;
+        spilledRecords++;
         auto buffer = buf.release();
         auto recordId = RecordId(id);
         _recordBuffers.push_back(buffer);
         _records.push_back(Record{RecordId(id), RecordData(buffer.get(), bufferSize)});
-        _specificStats.spilledRecords++;
         if (_records.size() == _batchSize) {
             writeBatch();
         }
@@ -207,9 +207,8 @@ void WindowStage::spill() {
     }
 
     // Record spilling statistics.
-    _specificStats.spilledBytes += spilledBytes;
-    auto& ru = *shard_role_details::getRecoveryUnit(_opCtx);
-    _specificStats.spilledDataStorageSize = _recordStore->rs()->storageSize(ru);
+    _specificStats.spillingStats.updateSpillingStats(
+        1 /* spills */, spilledBytes, spilledRecords, _recordStore->storageSize(_opCtx));
     setWindowFieldsCounters.incrementSetWindowFieldsCountersPerSpilling(
         1 /* spills */, spilledBytes, _rows.size());
 
@@ -841,10 +840,15 @@ std::unique_ptr<PlanStageStats> WindowStage::getStats(bool includeDebugInfo) con
         BSONObjBuilder bob;
         // Spilling stats.
         bob.appendBool("usedDisk", _specificStats.usedDisk);
-        bob.appendNumber("spills", _specificStats.spills);
-        bob.appendNumber("spilledBytes", _specificStats.spilledBytes);
-        bob.appendNumber("spilledRecords", _specificStats.spilledRecords);
-        bob.appendNumber("spilledDataStorageSize", _specificStats.spilledDataStorageSize);
+        bob.appendNumber("spills",
+                         static_cast<long long>(_specificStats.spillingStats.getSpills()));
+        bob.appendNumber("spilledBytes",
+                         static_cast<long long>(_specificStats.spillingStats.getSpilledBytes()));
+        bob.appendNumber("spilledRecords",
+                         static_cast<long long>(_specificStats.spillingStats.getSpilledRecords()));
+        bob.appendNumber(
+            "spilledDataStorageSize",
+            static_cast<long long>(_specificStats.spillingStats.getSpilledDataStorageSize()));
 
         ret->debugInfo = bob.obj();
     }

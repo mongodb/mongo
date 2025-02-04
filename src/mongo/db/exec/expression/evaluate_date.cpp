@@ -32,6 +32,8 @@
 
 namespace mongo {
 
+MONGO_FAIL_POINT_DEFINE(sleepBeforeCurrentDateEvaluation);
+
 namespace {
 
 /**
@@ -790,6 +792,14 @@ Value evaluate(const ExpressionYear& expr, const Document& root, Variables* vari
         });
 }
 
+Value evaluate(const ExpressionCurrentDate&, const Document&, Variables*) {
+    if (MONGO_unlikely(sleepBeforeCurrentDateEvaluation.shouldFail())) {
+        sleepBeforeCurrentDateEvaluation.execute(
+            [&](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });
+    }
+
+    return Value(Date_t::now());
+}
 
 }  // namespace exec::expression
 }  // namespace mongo

@@ -175,7 +175,8 @@ idl_generator(
     src = "forwardable_operation_metadata.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/rpc/metadata:impersonated_user_metadata_gen",
+        "//src/mongo/rpc/metadata:audit_client_attrs_gen",
+        "//src/mongo/rpc/metadata:audit_metadata_gen",
     ],
 )
 
@@ -196,16 +197,6 @@ mongo_cc_library(
         "//src/mongo/db/auth:security_token_auth",
         "//src/mongo/rpc:metadata_impersonated_user",
         "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
-idl_generator(
-    name = "add_shard_cmd_gen",
-    src = "add_shard_cmd.idl",
-    deps = [
-        ":type_shard_identity_gen",
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
     ],
 )
 
@@ -358,6 +349,7 @@ idl_generator(
     deps = [
         ":sharding_ddl_coordinator_gen",
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/s:sharding_types_gen",
     ],
 )
 
@@ -446,6 +438,29 @@ idl_generator(
         ":sharding_ddl_coordinator_gen",
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/s/request_types:sharded_ddl_commands_gen",
+    ],
+)
+
+idl_generator(
+    name = "remove_shard_draining_progress_gen",
+    src = "remove_shard_draining_progress.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "remove_shard_draining_progress_idl",
+    srcs = ["remove_shard_draining_progress_gen"],
+    deps = ["//src/mongo/db:server_base"],
+)
+
+mongo_cc_library(
+    name = "type_shard_identity_idl",
+    srcs = ["type_shard_identity_gen"],
+    deps = [
+        "//src/mongo/client:connection_string",
+        "//src/mongo/db:server_base",
     ],
 )
 
@@ -607,12 +622,10 @@ mongo_cc_library(
         "sharding_util.cpp",
         "split_chunk_request_type.cpp",
         "type_shard_identity.cpp",
-        ":add_shard_cmd_gen",
         ":participant_block_gen",
         ":remove_tags_gen",
         ":sharded_index_catalog_commands_gen",
         ":sharding_config_server_parameters_gen",
-        ":type_shard_identity_gen",
         "//src/mongo/db/s/balancer:auto_merger_policy.cpp",
         "//src/mongo/db/s/balancer:balance_stats.cpp",
         "//src/mongo/db/s/balancer:balancer.cpp",
@@ -675,6 +688,7 @@ mongo_cc_library(
     }),
     deps = [
         ":forwardable_operation_metadata",
+        ":remove_shard_draining_progress_idl",
         ":resharding_server_parameters_idl",
         ":sharding_logging",
         ":user_writes_recoverable_critical_section",
@@ -719,6 +733,7 @@ mongo_cc_library(
         "//src/mongo/executor:inline_executor",
         "//src/mongo/executor:network_interface",
         "//src/mongo/idl:cluster_server_parameter_common",
+        "//src/mongo/s:add_shard_idl",
         "//src/mongo/s:common_s",
         "//src/mongo/s/catalog:sharding_catalog_client_impl",
         "//src/mongo/s/client:sharding_client",
@@ -788,6 +803,7 @@ mongo_cc_library(
         "session_catalog_migration.cpp",
         "session_catalog_migration_destination.cpp",
         "session_catalog_migration_source.cpp",
+        "shard_database_metadata_client.cpp",
         "shard_filtering_metadata_refresh.cpp",
         "shard_identity_rollback_notifier.cpp",
         "shard_key_util.cpp",
@@ -828,10 +844,13 @@ mongo_cc_library(
         "//src/mongo/db/s/resharding:recipient_document_gen",
         "//src/mongo/db/s/resharding:recipient_resume_document_gen",
         "//src/mongo/db/s/resharding:resharding_change_event_o2_field_gen",
+        "//src/mongo/db/s/resharding:resharding_change_streams_monitor.cpp",
         "//src/mongo/db/s/resharding:resharding_collection_cloner.cpp",
         "//src/mongo/db/s/resharding:resharding_coordinator_commit_monitor.cpp",
         "//src/mongo/db/s/resharding:resharding_coordinator_observer.cpp",
         "//src/mongo/db/s/resharding:resharding_coordinator_service.cpp",
+        "//src/mongo/db/s/resharding:resharding_coordinator_service_external_state.cpp",
+        "//src/mongo/db/s/resharding:resharding_coordinator_service_util.cpp",
         "//src/mongo/db/s/resharding:resharding_cumulative_metrics.cpp",
         "//src/mongo/db/s/resharding:resharding_cumulative_metrics_field_name_provider.cpp",
         "//src/mongo/db/s/resharding:resharding_data_copy_util.cpp",
@@ -896,6 +915,7 @@ mongo_cc_library(
         "session_catalog_migration.h",
         "session_catalog_migration_destination.h",
         "session_catalog_migration_source.h",
+        "shard_database_metadata_client.h",
         "shard_filtering_metadata_refresh.h",
         "shard_identity_rollback_notifier.h",
         "shard_key_util.h",
@@ -944,10 +964,13 @@ mongo_cc_library(
         "//src/mongo/db/s/resharding:document_source_resharding_add_resume_id.h",
         "//src/mongo/db/s/resharding:document_source_resharding_iterate_transaction.h",
         "//src/mongo/db/s/resharding:document_source_resharding_ownership_match.h",
+        "//src/mongo/db/s/resharding:resharding_change_streams_monitor.h",
         "//src/mongo/db/s/resharding:resharding_collection_cloner.h",
         "//src/mongo/db/s/resharding:resharding_coordinator_commit_monitor.h",
         "//src/mongo/db/s/resharding:resharding_coordinator_observer.h",
         "//src/mongo/db/s/resharding:resharding_coordinator_service.h",
+        "//src/mongo/db/s/resharding:resharding_coordinator_service_external_state.h",
+        "//src/mongo/db/s/resharding:resharding_coordinator_service_util.h",
         "//src/mongo/db/s/resharding:resharding_cumulative_metrics.h",
         "//src/mongo/db/s/resharding:resharding_cumulative_metrics_field_name_provider.h",
         "//src/mongo/db/s/resharding:resharding_data_copy_util.h",
@@ -1192,6 +1215,7 @@ mongo_cc_library(
         "shardsvr_rename_collection_participant_command.cpp",
         "shardsvr_rename_index_metadata_command.cpp",
         "shardsvr_reshard_collection_command.cpp",
+        "shardsvr_resharding_donor_fetch_final_collection_stats_command.cpp",
         "shardsvr_resharding_operation_time_command.cpp",
         "shardsvr_set_allow_migrations_command.cpp",
         "shardsvr_set_cluster_parameter_command.cpp",
@@ -1214,6 +1238,7 @@ mongo_cc_library(
         ":untrack_unsplittable_collection_coordinator_document_gen",
         "//src/mongo/db/s/config:configsvr_abort_reshard_collection_command.cpp",
         "//src/mongo/db/s/config:configsvr_add_shard_command.cpp",
+        "//src/mongo/db/s/config:configsvr_add_shard_coordinator_command.cpp",
         "//src/mongo/db/s/config:configsvr_add_shard_to_zone_command.cpp",
         "//src/mongo/db/s/config:configsvr_balancer_collection_status_command.cpp",
         "//src/mongo/db/s/config:configsvr_check_cluster_metadata_consistency_command.cpp",
@@ -1240,6 +1265,7 @@ mongo_cc_library(
         "//src/mongo/db/s/config:configsvr_move_range_command.cpp",
         "//src/mongo/db/s/config:configsvr_remove_chunks_command.cpp",
         "//src/mongo/db/s/config:configsvr_remove_shard_command.cpp",
+        "//src/mongo/db/s/config:configsvr_remove_shard_commit_command.cpp",
         "//src/mongo/db/s/config:configsvr_remove_shard_from_zone_command.cpp",
         "//src/mongo/db/s/config:configsvr_remove_tags_command.cpp",
         "//src/mongo/db/s/config:configsvr_repair_sharded_collection_chunks_history_command.cpp",
@@ -1457,6 +1483,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/s/migration_blocking_operation:multi_update_coordinator_test.cpp",
         "//src/mongo/db/s/primary_only_service_helpers:cancel_state_test.cpp",
         "//src/mongo/db/s/resharding:resharding_agg_test.cpp",
+        "//src/mongo/db/s/resharding:resharding_change_streams_monitor_test.cpp",
         "//src/mongo/db/s/resharding:resharding_collection_cloner_test.cpp",
         "//src/mongo/db/s/resharding:resharding_collection_test.cpp",
         "//src/mongo/db/s/resharding:resharding_cumulative_metrics_test.cpp",
@@ -1576,6 +1603,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/s/config:sharding_catalog_manager_split_chunk_test.cpp",
         "//src/mongo/db/s/resharding:resharding_coordinator_commit_monitor_test.cpp",
         "//src/mongo/db/s/resharding:resharding_coordinator_observer_test.cpp",
+        "//src/mongo/db/s/resharding:resharding_coordinator_service_external_state_test.cpp",
         "//src/mongo/db/s/resharding:resharding_coordinator_service_test.cpp",
         "//src/mongo/db/s/resharding:resharding_coordinator_test.cpp",
         "//src/mongo/db/s/resharding:resharding_service_test_helpers.h",

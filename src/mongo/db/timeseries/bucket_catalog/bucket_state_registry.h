@@ -102,7 +102,6 @@ enum class BucketState : uint8_t {
  * Writes initiated outside of the BucketCatalog are considered "direct writes" since they are
  * operating directly on the 'system.buckets' collection. We must synchronize these writes with the
  * BucketCatalog to ensure we don't try to insert into a bucket that is currently being written to.
- * We also represent buckets undergoing compression with a DirectWriteCounter.
  *
  * Note: we cannot perform direct writes on prepared buckets and there can be multiple direct writes
  * on the same bucket. Conflicts between multiple simultaneous direct writes are mediated by the

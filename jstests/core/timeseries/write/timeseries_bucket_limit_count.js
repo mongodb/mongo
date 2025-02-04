@@ -7,6 +7,7 @@
  *   requires_collstats,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   requires_getmore,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";

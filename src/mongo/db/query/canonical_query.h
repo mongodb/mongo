@@ -194,36 +194,6 @@ public:
     }
 
     /**
-     * Returns a bitset indicating what search metadata has been requested by the pipeline.
-     */
-    const QueryMetadataBitSet& searchMetadata() const {
-        return _searchMetadataDeps;
-    }
-
-    /**
-     * Set the bitset indicating what search metadata has been requested by the pipeline.
-     */
-    void setSearchMetadata(const QueryMetadataBitSet& deps) {
-        _searchMetadataDeps = deps;
-    }
-
-    /**
-     * Returns a bitset indicating what metadata has been requested by stages remaining in the
-     * pipeline.
-     */
-    const QueryMetadataBitSet& remainingSearchMetadata() const {
-        return _remainingSearchMetadataDeps;
-    }
-
-    /**
-     * Set the bitset indicating what metadata has been requested by stages remaining in the
-     * pipeline.
-     */
-    void setRemainingSearchMetadata(const QueryMetadataBitSet& deps) {
-        _remainingSearchMetadataDeps = deps;
-    }
-
-    /**
      * Similar to 'encodeKey()' above, but intended for use with plan cache commands rather than
      * the plan cache itself.
      */
@@ -449,14 +419,6 @@ private:
 
     // Keeps track of what metadata has been explicitly requested.
     QueryMetadataBitSet _metadataDeps;
-
-    // Keeps track of what search metadata has been explicitly requested.
-    QueryMetadataBitSet _searchMetadataDeps;
-
-    // Keeps track of what search metadata has been explicitly requested for stages in pipeline that
-    // are not pushed down into '_cqPipeline'. This is used by the executor to prepare corresponding
-    // metadata.
-    QueryMetadataBitSet _remainingSearchMetadataDeps;
 
     // True if this query can be executed by the SBE.
     bool _sbeCompatible = false;

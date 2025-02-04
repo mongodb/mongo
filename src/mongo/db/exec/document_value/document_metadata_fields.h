@@ -211,7 +211,7 @@ public:
     }
 
     Value getSortKey() const {
-        invariant(hasSortKey());
+        tassert(9973200, "Attempt to get sort key which has not been populated", hasSortKey());
         return _holder->sortKey;
     }
 
@@ -265,7 +265,7 @@ public:
     void setSearchScore(double score) {
         _setCommon(MetaType::kSearchScore);
         _holder->searchScore = score;
-        // The 'score' metadata field is also set, with the value of the 'textScore'.
+        // The 'score' metadata field is also set, with the value of the 'searchScore'.
         setScore(score);
     }
 
@@ -386,7 +386,7 @@ public:
     void setVectorSearchScore(double vectorSearchScore) {
         _setCommon(MetaType::kVectorSearchScore);
         _holder->vectorSearchScore = vectorSearchScore;
-        // The 'score' metadata field is also set, with the value of the 'textScore'.
+        // The 'score' metadata field is also set, with the value of the 'vectorSearchScore'.
         setScore(vectorSearchScore);
     }
 

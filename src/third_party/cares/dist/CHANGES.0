@@ -250,7 +250,7 @@ Version 1.7.0 (Nov 30, 2009)
   which are _not_ related with memory tracking. For the c-ares library when
   --enable-debug is given it does not enable the memory tracking feature. If
   you wish to enable the curl debug memory tracking you must use configure
-  option --enable-curldebug explicitily to do so.
+  option --enable-curldebug explicitly to do so.
 
   Internally, definition of preprocessor symbol DEBUGBUILD restricts code
   which is only compiled for debug enabled builds. And symbol CURLDEBUG is
@@ -376,7 +376,7 @@ Version 1.6.0 (Dec 9, 2008)
   buffer to shrink instead of expand if a reply contained 8 or more records.
 
 * Nov 25 2008 (Yang Tse)
-- In preparation for the upcomming IPv6 nameservers patch, the internal
+- In preparation for the upcoming IPv6 nameservers patch, the internal
   ares_addr union is now changed into an internal struct which also holds
   the address family.
 
@@ -533,7 +533,7 @@ Version 1.5.3 (Aug 29, 2008)
   elsewhere). The define was also somewhat artificially used in the windows
   port. Now, I instead rewrote the use of gethostbyname to enlarge the host
   name buffer in case of need and totally avoid the use of the MAXHOSTNAMELEN
-  define. I thus also removed the defien from the namser.h file where it was
+  define. I thus also removed the define from the namser.h file where it was
   once added for the windows build.
 
   I also fixed init_by_defaults() function to not leak memory in case if
@@ -673,7 +673,7 @@ Version 1.5.0 (Nov 21, 2007)
 
   3. The third problem is that Valgrind assumes that query->qid is not
   initialised correctly. And it does that because query->qid is set from
-  DNS_HEADER_QID(qbuf); Valgrind says that qbuf has unitialised bytes. And
+  DNS_HEADER_QID(qbuf); Valgrind says that qbuf has uninitialised bytes. And
   qbuf has uninitialised bytes because of channel->next_id . And next_id is
   set by ares_init.c:ares__generate_new_id() . I found that putting short r=0
   in this function (instead of short r) makes all Valgrind warnings go away.
@@ -681,8 +681,8 @@ Version 1.5.0 (Nov 21, 2007)
 
         buffer_ptr[counter] ^= state[xorIndex];   (ares_query.c:62)
 
-  This is what triggers Valgrind.. buffer_ptr is unitialised in this function,
-  and by applying ^= on it, it remains unitialised.
+  This is what triggers Valgrind.. buffer_ptr is uninitialised in this function,
+  and by applying ^= on it, it remains uninitialised.
 
 Version 1.4.0 (June 8, 2007)
 
@@ -1094,7 +1094,7 @@ Version 1.2.1 (October 20, 2004)
   from a series of registry branches.
 
   This can be wrong in the case where DHCP has assigned nameservers, but the
-  user has overridden these servers with other prefered settings. Then it's
+  user has overridden these servers with other preferred settings. Then it's
   wrong to use the DHCPNAMESERVER setting in registry.
 
   In the case of no global DHCP-assigned or fixed servers, but DNS server(s)

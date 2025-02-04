@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import hashlib
 import os
@@ -5,9 +7,8 @@ import platform
 import shutil
 import stat
 import sys
+import time
 import urllib.request
-
-from retry import retry
 
 _S3_HASH_MAPPING = {
     "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-7.2.1-ppc64le": "4ecc7f1396b8d921c6468b34cc8ed356c4f2dbe8a154c25d681a61ccb5dfc9cb",
@@ -19,10 +20,47 @@ _S3_HASH_MAPPING = {
     "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-windows-amd64.exe": "d04555245a99dfb628e33da24e2b9198beb8f46d7e7661c313eb045f6a59f5e4",
 }
 
+BUILDOZER_RELEASE_URL = "https://github.com/bazelbuild/buildtools/releases/download/v7.3.1/"
 
-@retry(tries=5, delay=3)
+
+def determine_platform():
+    syst = platform.system()
+    pltf = None
+    if syst == "Darwin":
+        pltf = "darwin"
+    elif syst == "Windows":
+        pltf = "windows"
+    elif syst == "Linux":
+        pltf = "linux"
+    else:
+        return None
+    return pltf
+
+
+def determine_architecture():
+    arch = None
+    machine = platform.machine()
+    if machine in ("AMD64", "x86_64"):
+        arch = "amd64"
+    elif machine in ("arm", "arm64", "aarch64"):
+        arch = "arm64"
+    else:
+        return None
+
+    return arch
+
+
 def _download_path_with_retry(*args, **kwargs):
-    urllib.request.urlretrieve(*args, **kwargs)
+    for i in range(5):
+        try:
+            return urllib.request.urlretrieve(*args, **kwargs)
+        except Exception as e:
+            print(f"Download failed: {e}")
+            if i == 4:
+                raise
+            print("Retrying download...")
+            time.sleep(3)
+            continue
 
 
 def _sha256_file(filename: str) -> str:
@@ -46,7 +84,29 @@ def _verify_s3_hash(s3_path: str, local_path: str) -> None:
         )
 
 
+def install_buildozer(download_location: str = "./"):
+    operating_system = determine_platform()
+    architechture = determine_architecture()
+    if operating_system is None or architechture is None:
+        print("Unsupported OS for buildozer, not installing.")
+        return None
+
+    if operating_system == "windows" and architechture == "arm64":
+        print("There are no published arm windows releases for buildifier.")
+        return None
+
+    extension = ".exe" if operating_system == "windows" else ""
+    binary_name = f"buildozer-{operating_system}-{architechture}{extension}"
+    url = f"{BUILDOZER_RELEASE_URL}{binary_name}"
+
+    file_location = os.path.join(download_location, f"buildozer{extension}")
+    urllib.request.urlretrieve(url, file_location)
+    os.chmod(file_location, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+    return file_location
+
+
 def install_bazel(binary_directory: str) -> str:
+    install_buildozer(binary_directory)
     normalized_arch = (
         platform.machine().lower().replace("aarch64", "arm64").replace("x86_64", "amd64")
     )
@@ -143,22 +203,22 @@ def main():
             if sys.platform == "win32":
                 print("To add it to your PATH, run: \n")
                 print(
-                    f'[Environment]::SetEnvironmentVariable("Path", $env:Path + ";{abs_binary_directory}", "Machine")'
+                    f'[Environment]::SetEnvironmentVariable("Path", "{abs_binary_directory};" + $env:Path, "Machine")'
                 )
                 print("refreshenv")
             else:
                 print("To add it to your PATH, run: \n")
                 if os.path.exists(os.path.expanduser("~/.bashrc")):
-                    print(f'echo "export PATH=\\$PATH:{abs_binary_directory}" >> ~/.bashrc')
+                    print(f'echo "export PATH=\\{abs_binary_directory}:$PATH" >> ~/.bashrc')
                     print("source ~/.bashrc")
                 elif os.path.exists(os.path.expanduser("~/.bash_profile")):
-                    print(f'echo "export PATH=\\$PATH:{abs_binary_directory}" >> ~/.bash_profile')
+                    print(f'echo "export PATH=\\{abs_binary_directory}:$PATH" >> ~/.bash_profile')
                     print("source ~/.bash_profile")
                 elif os.path.exists(os.path.expanduser("~/.zshrc")):
-                    print(f'echo "export PATH=\\$PATH:{abs_binary_directory}" >> ~/.zshrc')
+                    print(f'echo "export PATH=\\{abs_binary_directory}:$PATH" >> ~/.zshrc')
                     print("source ~/.zshrc")
                 else:
-                    print(f"export PATH=$PATH:{abs_binary_directory}")
+                    print(f"export PATH={abs_binary_directory}:$PATH")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,20 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/server-programmability
+  - "MongoCollectionShardingRuntimeCheck.*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "MongoFCVConstantCheck.*":
+    approvers:
+      - 10gen/server-replication
+  - "MongoMacroDefinitionLeaksCheck.*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "MongoTraceCheck.*":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "MongoUnstructuredLogCheck.*":
+    approvers:
+      - 10gen/server-networking-and-observability

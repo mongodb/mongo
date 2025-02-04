@@ -128,9 +128,7 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
     _maxRecordIdSlot = env->getSlotIfExists("maxRecordId"_sd);
 
     if (_cq) {
-        initializeAccessors(_metadataAccessors,
-                            _rootData.staticData->metadataSlots,
-                            _cq->remainingSearchMetadata());
+        initializeAccessors(_metadataAccessors, _rootData.staticData->metadataSlots);
     }
 
     if (!_stash.empty()) {
@@ -613,25 +611,20 @@ Document convertToDocument(const sbe::value::Object& obj) {
 }  // namespace
 
 void PlanExecutorSBE::initializeAccessors(
-    MetaDataAccessor& accessor,
-    const stage_builder::PlanStageMetadataSlots& metadataSlots,
-    const QueryMetadataBitSet& metadataBit) {
-    bool needsMerge = _cq->getExpCtxRaw()->getNeedsMerge();
-
-    if (auto slot = metadataSlots.searchScoreSlot;
-        slot && (needsMerge || metadataBit.test(DocumentMetadataFields::MetaType::kSearchScore))) {
+    MetaDataAccessor& accessor, const stage_builder::PlanStageMetadataSlots& metadataSlots) {
+    // If Search in SBE is used, we should only initialize these metadata slots if the metadata type
+    // is requested by the pipeline. However, since Search in SBE is currently not in use,
+    // SERVER-99589 changed it to always initialize these slots, for simplicity of a refactor.
+    if (auto slot = metadataSlots.searchScoreSlot) {
         accessor.metadataSearchScore = _root->getAccessor(_rootData.env.ctx, *slot);
     }
-    if (auto slot = metadataSlots.searchHighlightsSlot; slot &&
-        (needsMerge || metadataBit.test(DocumentMetadataFields::MetaType::kSearchHighlights))) {
+    if (auto slot = metadataSlots.searchHighlightsSlot) {
         accessor.metadataSearchHighlights = _root->getAccessor(_rootData.env.ctx, *slot);
     }
-    if (auto slot = metadataSlots.searchDetailsSlot; slot &&
-        (needsMerge || metadataBit.test(DocumentMetadataFields::MetaType::kSearchScoreDetails))) {
+    if (auto slot = metadataSlots.searchDetailsSlot) {
         accessor.metadataSearchDetails = _root->getAccessor(_rootData.env.ctx, *slot);
     }
-    if (auto slot = metadataSlots.searchSortValuesSlot; slot &&
-        (needsMerge || metadataBit.test(DocumentMetadataFields::MetaType::kSearchSortValues))) {
+    if (auto slot = metadataSlots.searchSortValuesSlot) {
         accessor.metadataSearchSortValues = _root->getAccessor(_rootData.env.ctx, *slot);
     }
     if (auto slot = metadataSlots.sortKeySlot) {
@@ -648,8 +641,7 @@ void PlanExecutorSBE::initializeAccessors(
             }
         }
     }
-    if (auto slot = metadataSlots.searchSequenceToken; slot &&
-        (needsMerge || metadataBit.test(DocumentMetadataFields::MetaType::kSearchSequenceToken))) {
+    if (auto slot = metadataSlots.searchSequenceToken) {
         accessor.metadataSearchSequenceToken = _root->getAccessor(_rootData.env.ctx, *slot);
     }
 }

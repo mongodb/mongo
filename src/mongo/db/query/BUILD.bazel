@@ -654,29 +654,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "command_diagnostic_printer",
-    srcs = [],
-    hdrs = [
-        "//src/mongo/db/query:command_diagnostic_printer.h",
-    ],
-    deps = [],
-)
-
-mongo_cc_unit_test(
-    name = "command_diagnostic_printer_test",
-    srcs = [
-        "command_diagnostic_printer_test.cpp",
-    ],
-    tags = ["mongo_unittest_second_group"],
-    deps = [
-        "//src/mongo/db:commands",
-        "//src/mongo/db:service_context_test_fixture",
-        "//src/mongo/db/commands:standalone",
-        "//src/mongo/db/query:command_diagnostic_printer",
-    ],
-)
-
-mongo_cc_library(
     name = "query_test_service_context",
     srcs = [
         "query_test_service_context.cpp",
@@ -733,7 +710,6 @@ mongo_cc_unit_test(
         "canonical_query_test.cpp",
         "canonical_query_test_util.cpp",
         "canonical_query_test_util.h",
-        "collection_query_info_test.cpp",
         "count_command_test.cpp",
         "field_effects_test.cpp",
         "field_set_test.cpp",
@@ -753,6 +729,7 @@ mongo_cc_unit_test(
         "interval_test.cpp",
         "lru_key_value_test.cpp",
         "map_reduce_output_format_test.cpp",
+        "plan_executor_express_test.cpp",
         "plan_ranker_index_prefix_test.cpp",
         "plan_ranker_test.cpp",
         "planner_access_test.cpp",
@@ -763,6 +740,7 @@ mongo_cc_unit_test(
         "projection_test.cpp",
         "query_planner_array_test.cpp",
         "query_planner_collation_test.cpp",
+        "query_planner_common_test.cpp",
         "query_planner_distinct_test.cpp",
         "query_planner_geo_test.cpp",
         "query_planner_hashed_index_test.cpp",
@@ -804,10 +782,10 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/query_settings:query_settings_utils_test.cpp",
         "//src/mongo/db/query/query_settings:query_settings_validation_test.cpp",
         "//src/mongo/db/query/query_shape:agg_cmd_shape_test.cpp",
-        "//src/mongo/db/query/query_shape:cmd_with_let_shape_test.cpp",
         "//src/mongo/db/query/query_shape:count_cmd_shape_test.cpp",
         "//src/mongo/db/query/query_shape:distinct_cmd_shape_test.cpp",
         "//src/mongo/db/query/query_shape:find_cmd_shape_test.cpp",
+        "//src/mongo/db/query/query_shape:let_shape_component_test.cpp",
         "//src/mongo/db/query/stage_builder:classic_stage_builder_test.cpp",
         "//src/mongo/db/query/stage_builder/sbe/tests:and_hash_test.cpp",
         "//src/mongo/db/query/stage_builder/sbe/tests:and_sorted_test.cpp",
@@ -820,6 +798,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/stage_builder/sbe/tests:sbe_builder_test.cpp",
         "//src/mongo/db/query/stage_builder/sbe/tests:sbe_builder_test_fixture.cpp",
         "//src/mongo/db/query/stage_builder/sbe/tests:sbe_builder_test_fixture.h",
+        "//src/mongo/db/query/stage_builder/sbe/tests:sbe_builder_ts_test.cpp",
         "//src/mongo/db/query/stage_builder/sbe/tests:shard_filter_test.cpp",
         "//src/mongo/db/query/stage_builder/sbe/tests:type_checker_test.cpp",
         "//src/mongo/db/query/stage_builder/sbe/tests:value_lifetime_test.cpp",
@@ -830,12 +809,16 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/util:hash_roaring_set_test.cpp",
         "//src/mongo/db/query/util:jparse_util_test.cpp",
         "//src/mongo/db/query/util:memory_util_test.cpp",
+        "//src/mongo/db/query/util:string_util_test.cpp",
     ],
     data = [
         "//src/mongo/db/test_output/query/canonical_query_encoder_test:test_data",
         "//src/mongo/db/test_output/query/stage_builder/sbe/golden_gen_expression_test:test_data",
         "//src/mongo/db/test_output/query/stage_builder/sbe/golden_gen_filtern_test:test_data",
         "//src/mongo/db/test_output/query/stage_builder/sbe/golden_sbe_stage_builder_test:test_data",
+        "//src/mongo/db/test_output/query/stage_builder/sbe/s_b_e_set_window_fields_test:test_data",
+        "//src/mongo/db/test_output/query/stage_builder/sbe/sbe_timeseries_test:test_data",
+        "//src/mongo/db/test_output/query/stage_builder/sbe/search_sbe_stage_builder_test:test_data",
     ],
     tags = [
         "compile_requires_large_memory_gcc",
@@ -860,7 +843,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/catalog:collection_query_info",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/exec/document_value:document_value_test_util",
-        "//src/mongo/db/exec/sbe:abt_unit_test_utils",
         "//src/mongo/db/exec/sbe:sbe_plan_stage_test",
         "//src/mongo/db/pipeline",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
@@ -871,6 +853,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/plan_cache:plan_cache_test_util",
         "//src/mongo/db/query/query_settings:manager",
         "//src/mongo/db/query/query_shape",
+        "//src/mongo/db/query/stage_builder/sbe:abt_unit_test_utils",
         "//src/mongo/db/query/util:jparse_util",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/repl:storage_interface_impl",
@@ -897,12 +880,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/catalog:catalog_test_fixture",
         "//src/mongo/db/collection_crud",
     ],
-)
-
-# TODO(SERVER-96860): Remove cycle created by moving //src/mongo/db/query:explain_options.h to //src/mongo/db/query:common_query_enums_and_helpers
-filegroup(
-    name = "explain_options_hdrs",
-    srcs = [":explain_options.h"],
 )
 
 mongo_cc_benchmark(

@@ -70,7 +70,7 @@
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
 
@@ -423,6 +423,12 @@ boost::optional<Status> coordinatorAbortedError();
 void validateImplicitlyCreateIndex(bool implicitlyCreateIndex, const BSONObj& shardKey);
 
 /**
+ * If 'performVerification' is true, asserts that featureFlagReshardingVerification is enabled.
+ */
+void validatePerformVerification(boost::optional<bool> performVerification);
+void validatePerformVerification(bool performVerification);
+
+/**
  * Verifies that for each index spec in sourceIndexSpecs, there is an identical spec in
  * localIndexSpecs. Field order does not matter.
  */
@@ -460,6 +466,22 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     const CollectionType& collEntry,
     const NamespaceString& nss,
     const bool& setProvenance);
+
+inline Status validateReshardBlockingWritesO2FieldType(const std::string& value) {
+
+    if (value != kReshardFinalOpLogType) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Expected the oplog type to be '" << kReshardFinalOpLogType
+                              << "'"};
+    }
+
+    return Status::OK();
+}
+
+Date_t getCurrentTime();
+
+ReshardingCoordinatorDocument getCoordinatorDoc(OperationContext* opCtx,
+                                                const UUID& reshardingUUID);
 
 }  // namespace resharding
 }  // namespace mongo

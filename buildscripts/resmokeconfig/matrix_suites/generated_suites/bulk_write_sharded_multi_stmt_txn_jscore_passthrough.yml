@@ -58,7 +58,6 @@ selector:
     - jstests/core/**/geo_update_btree2.js
     - jstests/core/**/index9.js
     - jstests/core/**/queryoptimizera.js
-    - jstests/core/**/stages*.js
     - jstests/core/**/startup_log.js
     - jstests/core/**/query/top/top.js
     - jstests/core/**/geo_2d_explain.js
@@ -168,7 +167,7 @@ selector:
     - jstests/core/**/fsync.js
     - jstests/core/**/constructors.js
     - jstests/core/**/commands_namespace_parsing.js
-    - jstests/core/**/drop3.js
+    - jstests/core/ddl/drop_collection_cursors.js
     - jstests/core/**/geo_s2cursorlimitskip.js
     - jstests/core/**/getmore_invalidated_cursors.js
     - jstests/core/**/getmore_invalidated_documents.js
@@ -197,7 +196,7 @@ selector:
     - jstests/core/**/benchrun_pipeline_updates.js
     - jstests/core/**/cursora.js
     - jstests/core/**/query/SERVER-23626.js
-    - jstests/core_sharding/refine_collection_shard_key.js
+    - jstests/core_sharding/ddl/refine_collection_shard_key.js
     - jstests/core/timeseries/write/timeseries_delete_hint.js
     - jstests/core/**/set_param1.js
     - jstests/core/**/profile*.js

@@ -36,6 +36,7 @@
 #include "mongo/transport/grpc/grpc_session.h"
 #include "mongo/transport/grpc/test_fixtures.h"
 #include "mongo/transport/grpc/util.h"
+#include "mongo/transport/test_fixtures.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
@@ -53,8 +54,8 @@ public:
 
     void setUp() override {
         ServiceContextWithClockSourceMockTest::setUp();
-        _streamFixtures = _makeStreamFixtures();
         _reactor = std::make_shared<GRPCReactor>();
+        _streamFixtures = _makeStreamFixtures();
     }
 
     void tearDown() override {
@@ -72,12 +73,22 @@ public:
     }
 
     std::unique_ptr<EgressSession> makeEgressSession(UUID clientId) {
-        return std::make_unique<EgressSession>(nullptr,
-                                               _reactor,
-                                               _streamFixtures->clientCtx,
-                                               _streamFixtures->clientStream,
-                                               std::move(clientId),
-                                               /* shared state */ nullptr);
+        auto session = std::make_unique<EgressSession>(nullptr,
+                                                       _reactor,
+                                                       _streamFixtures->clientCtx,
+                                                       _streamFixtures->clientStream,
+                                                       /* sslConfig */ boost::none,
+                                                       std::move(clientId),
+                                                       /* shared state */ nullptr);
+
+        session->setCleanupCallback([this](Status terminationStatus) {
+            if (!terminationStatus.isOK()) {
+                _tasksFailed++;
+                return;
+            }
+            _tasksCompleted++;
+        });
+        return session;
     }
 
     template <class SessionType>
@@ -141,14 +152,24 @@ public:
         ASSERT_TRUE(ErrorCodes::isCancellationError(*other.terminationStatus()));
     }
 
+    int getNumTasksCompleted() const {
+        return _tasksCompleted;
+    }
+
+    int getNumTasksFailed() const {
+        return _tasksFailed;
+    }
+
 private:
     std::unique_ptr<MockStreamTestFixtures> _makeStreamFixtures() {
         // The MockStreamTestFixtures created here doesn't contain any references to the channel or
         // server, so it's okay to let stubFixture go out of scope.
         MockStubTestFixtures stubFixture;
         MetadataView metadata = {{"foo", "bar"}};
-        return stubFixture.makeStreamTestFixtures(
-            getServiceContext()->getFastClockSource()->now() + kStreamTimeout, std::move(metadata));
+        return stubFixture.makeStreamTestFixtures(getServiceContext()->getFastClockSource()->now() +
+                                                      kStreamTimeout,
+                                                  std::move(metadata),
+                                                  _reactor);
     }
 
     template <class SessionType>
@@ -166,6 +187,8 @@ private:
         cb(*_streamFixtures->rpc, *session);
     }
 
+    int _tasksCompleted = 0;
+    int _tasksFailed = 0;
     std::unique_ptr<MockStreamTestFixtures> _streamFixtures;
     std::shared_ptr<GRPCReactor> _reactor;
 };
@@ -233,6 +256,44 @@ TEST_F(GRPCSessionTest, CancelWithReason) {
     });
 }
 
+TEST_F(GRPCSessionTest, CleanupStatColletionFailedTest) {
+    auto egressSession1 = makeSession<EgressSession>();
+    auto egressSession2 = makeSession<EgressSession>();
+
+    ASSERT_EQ(0, getNumTasksCompleted());
+    ASSERT_EQ(0, getNumTasksFailed());
+
+    auto cancelStatus = Status(ErrorCodes::ShutdownInProgress, "Some error condition");
+    egressSession1->cancel(cancelStatus);
+    ASSERT_EQ(0, getNumTasksCompleted());
+    ASSERT_EQ(0, getNumTasksFailed());
+    egressSession1.reset();
+    ASSERT_EQ(0, getNumTasksCompleted());
+    ASSERT_EQ(1, getNumTasksFailed());
+
+    // Since both sessions share the same ClientContext (via the test fixture), canceling one will
+    // cancel all others.
+    ASSERT_EQ(ErrorCodes::CallbackCanceled, egressSession2->finish());
+    ASSERT_EQ(0, getNumTasksCompleted());
+    ASSERT_EQ(1, getNumTasksFailed());
+    egressSession2.reset();
+    ASSERT_EQ(0, getNumTasksCompleted());
+    ASSERT_EQ(2, getNumTasksFailed());
+}
+
+TEST_F(GRPCSessionTest, CleanupStatColletionCompletedTest) {
+    auto egressSession = makeSession<EgressSession>();
+
+    ASSERT_EQ(0, getNumTasksCompleted());
+    ASSERT_EQ(0, getNumTasksFailed());
+
+    fixtures().rpc->sendReturnStatus(::grpc::Status::OK);
+    ASSERT_EQ(Status::OK(), egressSession->finish());
+    egressSession.reset();
+    ASSERT_EQ(1, getNumTasksCompleted());
+    ASSERT_EQ(0, getNumTasksFailed());
+}
+
 TEST_F(GRPCSessionTest, TerminationStatusIsNotOverridden) {
     Status kExpectedReason = Status(ErrorCodes::ShutdownInProgress, "Some error condition");
     runWithBoth([&](auto&, auto& session) {
@@ -276,6 +337,62 @@ TEST_F(GRPCSessionTest, ReadAndWrite) {
 
     sendMessage(*egressSession, *ingressSession);
     sendMessage(*ingressSession, *egressSession);
+}
+
+TEST_F(GRPCSessionTest, IngressPhysicalMetrics) {
+    auto ingressSession = makeSession<IngressSession>();
+    auto clientSession = makeSession<EgressSession>();
+    ON_BLOCK_EXIT([&] {
+        ingressSession->end();
+        clientSession->end();
+    });
+
+    auto sendMessage = [&](Session& sender, Session& receiver, const Message& msg) {
+        ASSERT_OK(sender.sinkMessage(msg));
+        auto swReceived = receiver.sourceMessage();
+        ASSERT_OK(swReceived.getStatus());
+    };
+
+    auto req = makeUniqueMessage("request");
+    auto resp = makeUniqueMessage("response to the client");
+    auto ingressStats = test::NetworkConnectionStats::get(NetworkCounter::ConnectionType::kIngress);
+
+    sendMessage(*clientSession, *ingressSession, req);
+    sendMessage(*ingressSession, *clientSession, resp);
+
+    auto ingressDiff = test::NetworkConnectionStats::get(NetworkCounter::ConnectionType::kIngress)
+                           .getDifference(ingressStats);
+    ASSERT_EQ(ingressDiff.physicalBytesIn, req.size());
+    ASSERT_EQ(ingressDiff.physicalBytesOut, resp.size());
+    ASSERT_EQ(ingressDiff.numRequests, 0);
+}
+
+TEST_F(GRPCSessionTest, EgressPhysicalMetrics) {
+    auto serverSession = makeSession<IngressSession>();
+    auto egressSession = makeSession<EgressSession>();
+    ON_BLOCK_EXIT([&] {
+        serverSession->end();
+        egressSession->end();
+    });
+
+    auto sendMessage = [&](Session& sender, Session& receiver, const Message& msg) {
+        ASSERT_OK(sender.sinkMessage(msg));
+        auto swReceived = receiver.sourceMessage();
+        ASSERT_OK(swReceived.getStatus());
+    };
+
+    auto req = makeUniqueMessage("request to remote server");
+    auto resp = makeUniqueMessage("response");
+    auto egressStats = test::NetworkConnectionStats::get(NetworkCounter::ConnectionType::kEgress);
+
+    sendMessage(*egressSession, *serverSession, req);
+    sendMessage(*serverSession, *egressSession, resp);
+
+    auto egressDiff = test::NetworkConnectionStats::get(NetworkCounter::ConnectionType::kEgress)
+                          .getDifference(egressStats);
+    ASSERT_EQ(egressDiff.physicalBytesIn, resp.size());
+    ASSERT_EQ(egressDiff.physicalBytesOut, req.size());
+    ASSERT_EQ(egressDiff.numRequests, 0);
 }
 
 enum class Operation { kSink, kSource };

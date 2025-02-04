@@ -1,0 +1,27 @@
+version: 1.0.0
+filters:
+  # These tests cover parsing, optimization, and execution. As such, they are jointly owned by QE and QO.
+  - "*":
+    approvers:
+      - 10gen/query-execution-aggregation
+      - 10gen/query-optimization
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads
+      - 10gen/query-optimization-staff-leads
+      - 10gen/query-integration-staff-leads
+  - "collation_expressions.js":
+    approvers:
+      - 10gen/query-execution-collation
+  - "internal_js*":
+    approvers:
+      - 10gen/query-integration-javascript
+  - "median*":
+    approvers:
+      - 10gen/query-integration-analytic-extensions
+  - "percentile*":
+    approvers:
+      - 10gen/query-integration-analytic-extensions
+  - "sigmoid.js":
+    approvers:
+      - 10gen/query-integration-analytic-extensions

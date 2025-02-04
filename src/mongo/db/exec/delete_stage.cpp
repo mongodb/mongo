@@ -105,7 +105,7 @@ DeleteStage::DeleteStage(const char* stageType,
     _children.emplace_back(child);
 }
 
-bool DeleteStage::isEOF() {
+bool DeleteStage::isEOF() const {
     if (!_params->isMulti && _specificStats.docsDeleted > 0) {
         return true;
     }

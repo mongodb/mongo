@@ -3,7 +3,6 @@
  * which spreads the collection across all available shards.
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
@@ -20,14 +19,8 @@ assert.commandWorked(mongos.adminCommand({shardCollection: 'test.user', key: {x:
 // metadata so they will show up in the getShardVersion command
 assert.eq(0, mongos.getDB('test').user.find({}).itcount());
 
-let expectedChunksOnConfigCount = 2;
-let expectedChunksPerShardCount = 1;
-// TODO SERVER-81884: update once 8.0 becomes last LTS.
-if (!FeatureFlagUtil.isPresentAndEnabled(mongos,
-                                         "OneChunkPerShardEmptyCollectionWithHashedShardKey")) {
-    expectedChunksOnConfigCount = 4;
-    expectedChunksPerShardCount = 2;
-}
+const expectedChunksOnConfigCount = 2;
+const expectedChunksPerShardCount = 1;
 
 st.printShardingStatus();
 

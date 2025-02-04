@@ -7,7 +7,6 @@
 //   uses_transactions,
 // ]
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
@@ -234,16 +233,12 @@ const hashedNs = dbName + '.' + hashedCollName;
 
 assert.commandWorked(st.s.adminCommand({shardCollection: hashedNs, key: {_id: 'hashed'}}));
 
-// TODO SERVER-81884: update once 8.0 becomes last LTS.
-if (FeatureFlagUtil.isPresentAndEnabled(st.s.getDB(dbName),
-                                        "OneChunkPerShardEmptyCollectionWithHashedShardKey")) {
-    // Make sure there two chunks on each shard
-    assert.commandWorked(
-        st.s.adminCommand({split: hashedNs, middle: {_id: NumberLong("-6148914691236517204")}}));
-    assert.commandWorked(st.s.adminCommand({split: hashedNs, middle: {_id: NumberLong("0")}}));
-    assert.commandWorked(
-        st.s.adminCommand({split: hashedNs, middle: {_id: NumberLong("6148914691236517204")}}));
-}
+// Make sure there are two chunks on each shard
+assert.commandWorked(
+    st.s.adminCommand({split: hashedNs, middle: {_id: NumberLong("-6148914691236517204")}}));
+assert.commandWorked(st.s.adminCommand({split: hashedNs, middle: {_id: NumberLong("0")}}));
+assert.commandWorked(
+    st.s.adminCommand({split: hashedNs, middle: {_id: NumberLong("6148914691236517204")}}));
 
 // Setup a predictable chunk distribution:
 assert.commandWorked(st.s.adminCommand({

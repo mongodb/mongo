@@ -353,10 +353,13 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
     std::vector<BSONObj>& backingBsonObjs) {
     // Noop change events:
     //   - reshardBegin: A resharding operation begins.
+    //   - reshardBlockingWrites: Collection being resharded starts to block writes.
     //   - reshardDoneCatchUp: "Catch up" phase of reshard operation completes.
     //   - shardCollection: A shardCollection operation has completed.
-    std::vector<StringData> internalOpTypes = {
-        "reshardBegin"_sd, "reshardDoneCatchUp"_sd, "shardCollection"_sd};
+    std::vector<StringData> internalOpTypes = {"reshardBegin"_sd,
+                                               "reshardBlockingWrites"_sd,
+                                               "reshardDoneCatchUp"_sd,
+                                               "shardCollection"_sd};
 
     // Noop change events that are only applicable when merging results on router:
     //   - migrateChunkToNewShard: A chunk migrated to a shard that didn't have any chunks.

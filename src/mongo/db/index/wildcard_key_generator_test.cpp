@@ -1242,7 +1242,7 @@ TEST_F(WildcardKeyGeneratorDottedFieldsTest, DoNotIndexDottedFields) {
 
     auto inputDoc = fromjson(
         "{'a.b': 0, '.b': 1, 'b.': 2, a: {'.b': 3, 'b.': 4, 'b.c': 5, 'q': 6}, b: [{'d.e': 7}, {r: "
-        "8}, [{'a.b': 9}]], c: 10}}");
+        "8}, [{'a.b': 9}]], c: 10}");
 
     auto expectedKeys = makeKeySet({fromjson("{'': 'a.q', '': 6}"),
                                     fromjson("{'': 'b.r', '': 8}"),

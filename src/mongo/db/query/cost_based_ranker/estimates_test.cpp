@@ -162,7 +162,8 @@ TEST(EstimatesFramework, PrintEstimates) {
 
     CostCoefficient cc1(CostCoefficientType::minValue());
     CostCoefficient cc2(CostCoefficientType::maxValue());
-    ASSERT_EQUALS(cc1.toBSON().toString(), "{ Cost coefficient: 5e-05.0, Source: \"Code\" }");
+    ASSERT_EQUALS(cc1.toBSON().toString(),
+                  "{ Cost coefficient: 9.999999999999999e-06, Source: \"Code\" }");
     ASSERT_EQUALS(cc2.toBSON().toString(), "{ Cost coefficient: 0.015, Source: \"Code\" }");
 }
 

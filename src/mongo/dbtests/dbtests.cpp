@@ -73,7 +73,7 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/unittest/assert.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
@@ -130,8 +130,8 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     {
         Lock::CollectionLock collLock(opCtx, nss, MODE_X);
         WriteUnitOfWork wunit(opCtx);
-        auto coll =
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(opCtx, nss);
+        CollectionWriter writer{opCtx, nss};
+        auto coll = writer.getWritableCollection(opCtx);
         if (!coll) {
             auto db = autoDb.ensureDbExists(opCtx);
             invariant(db);

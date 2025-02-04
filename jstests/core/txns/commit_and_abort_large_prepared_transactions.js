@@ -20,7 +20,7 @@ const testColl = testDB.getCollection(collName);
 // of 10MB each to create a "large" transaction.
 const kSize10MB = 10 * 1024 * 1024;
 function createLargeDocument(id) {
-    return {_id: id, longString: new Array(kSize10MB).join("a")};
+    return {_id: id, longString: "a".repeat(kSize10MB)};
 }
 
 testColl.drop({writeConcern: {w: "majority"}});

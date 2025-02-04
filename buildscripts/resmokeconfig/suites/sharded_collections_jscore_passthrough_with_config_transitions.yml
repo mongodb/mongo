@@ -22,7 +22,6 @@ selector:
     - jstests/core/**/geo_update_btree2.js # notablescan.
     - jstests/core/**/index9.js # "local" database.
     - jstests/core/**/queryoptimizera.js # "local" database.
-    - jstests/core/**/stages*.js # stageDebug.
     - jstests/core/**/startup_log.js # "local" database.
     - jstests/core/**/tailable_cursor_invalidation.js # capped collections.
     - jstests/core/**/tailable_getmore_batch_size.js # capped collections.
@@ -75,11 +74,6 @@ selector:
     # as we transition to dedicated, the balancer will try an insert the document with a parallel
     # array on the shard with the index created.
     - jstests/core/index/geo/geo_multikey1.js
-    # TODO SERVER-89210: Chunk migration can unnecessarily fail due to inconsistency between listIndexes
-    # and local catalog
-    - jstests/core/index/indexu.js
-    - jstests/core/index/geo/geo_small_large.js
-    - jstests/core/index/geo/geo_invalid_polygon.js
     # These timeseries tests use a helper that runs and expects a chunk migration to succeed, which can
     # conflict with a config transition.
     - jstests/core/timeseries/ddl/bucket_granularity.js
@@ -201,6 +195,7 @@ selector:
 
     # The following tags are excluded specifically for this suite.
     - config_shard_incompatible
+    - assumes_stable_shard_list
     # Currently this passthrough enables the balancer to allow the config transition to successfully complete.
     - assumes_balancer_off
     # Fast count doesn't filter orphan documents
@@ -210,6 +205,9 @@ selector:
     - assumes_stable_collection_uuid
     - does_not_support_retryable_writes
     - requires_non_retryable_writes
+    # This suite executes random moveCollections in the background that cause open cursors on the
+    # collection to be killed.
+    - requires_getmore
 
 executor:
   archive:
@@ -227,6 +225,7 @@ executor:
         TestData:
           alwaysInjectTransactionNumber: true
           shardsAddedRemoved: true
+          runningWithBalancer: true
           sessionOptions:
             retryWrites: true
   hooks:

@@ -529,7 +529,7 @@ TEST_F(CreateFromQuery, ImmutableFieldsOp) {
 }
 
 TEST_F(CreateFromQuery, ShardKeyRepl) {
-    BSONObj query = fromjson("{a:{$eq:1}}, b:2}");
+    BSONObj query = fromjson("{a:{$eq:1}, b:2}");
     std::vector<std::unique_ptr<FieldRef>> immutablePathsVector;
     immutablePathsVector.push_back(std::make_unique<FieldRef>("a"));
     immutablePathsVector.push_back(std::make_unique<FieldRef>("_id"));
@@ -540,7 +540,7 @@ TEST_F(CreateFromQuery, ShardKeyRepl) {
 }
 
 TEST_F(CreateFromQuery, NestedShardKeyRepl) {
-    BSONObj query = fromjson("{a:{$eq:1},'b.c':2},d:2}");
+    BSONObj query = fromjson("{a:{$eq:1},'b.c':2, d:2}");
     std::vector<std::unique_ptr<FieldRef>> immutablePathsVector;
     immutablePathsVector.push_back(std::make_unique<FieldRef>("a"));
     immutablePathsVector.push_back(std::make_unique<FieldRef>("b.c"));
@@ -552,7 +552,7 @@ TEST_F(CreateFromQuery, NestedShardKeyRepl) {
 }
 
 TEST_F(CreateFromQuery, NestedShardKeyOp) {
-    BSONObj query = fromjson("{a:{$eq:1},'b.c':2,d:{$all:[3]}},e:2}");
+    BSONObj query = fromjson("{a:{$eq:1},'b.c':2,d:{$all:[3]},e:2}");
     std::vector<std::unique_ptr<FieldRef>> immutablePathsVector;
     immutablePathsVector.push_back(std::make_unique<FieldRef>("a"));
     immutablePathsVector.push_back(std::make_unique<FieldRef>("b.c"));
@@ -560,11 +560,11 @@ TEST_F(CreateFromQuery, NestedShardKeyOp) {
     FieldRefSet immutablePaths;
     immutablePaths.fillFrom(immutablePathsVector);
     ASSERT_OK(driverOps().populateDocumentWithQueryFields(opCtx(), query, immutablePaths, doc()));
-    assertSameFields(fromjson("{a:1,b:{c:2},d:3}"), doc().getObject());
+    assertSameFields(fromjson("{a:1,b:{c:2},d:3,e:2}"), doc().getObject());
 }
 
 TEST_F(CreateFromQuery, NotFullShardKeyRepl) {
-    BSONObj query = fromjson("{a:{$eq:1}, 'b.c':2}, d:2}");
+    BSONObj query = fromjson("{a:{$eq:1}, 'b.c':2, d:2}");
     std::vector<std::unique_ptr<FieldRef>> immutablePathsVector;
     immutablePathsVector.push_back(std::make_unique<FieldRef>("a"));
     immutablePathsVector.push_back(std::make_unique<FieldRef>("b"));
@@ -689,7 +689,7 @@ TEST_F(ModifiedPathsTestFixture, ArrayFilterThatMatchesNoElements) {
 
 
 TEST_F(ModifiedPathsTestFixture, ReplaceFullDocumentAlwaysAffectsIndex) {
-    BSONObj spec = fromjson("{a: 1, b: 1}}");
+    BSONObj spec = fromjson("{a: 1, b: 1}");
     mutablebson::Document doc(fromjson("{a: 0, b: 0}"));
     runUpdate(&doc, makeUpdateMod(spec));
     ASSERT_EQ(_modifiedPaths, "{}");

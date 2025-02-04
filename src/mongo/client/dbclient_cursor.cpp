@@ -54,7 +54,6 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/logv2/log.h"
@@ -65,7 +64,6 @@
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/destructor_guard.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -391,7 +389,7 @@ StatusWith<std::unique_ptr<DBClientCursor>> DBClientCursor::fromAggregationReque
     BSONObj ret;
     try {
         if (!client->runCommand(aggRequest.getNamespace().dbName(),
-                                aggregation_request_helper::serializeToCommandObj(aggRequest),
+                                aggRequest.toBSON(),
                                 ret,
                                 secondaryOk ? QueryOption_SecondaryOk : 0)) {
             return getStatusFromCommandResult(ret);
@@ -438,7 +436,7 @@ DBClientCursor::~DBClientCursor() {
 }
 
 void DBClientCursor::kill() {
-    DESTRUCTOR_GUARD({
+    try {
         if (_cursorId && !globalInShutdownDeprecated()) {
             auto killCursor = [&](auto&& conn) {
                 conn->killCursor(_ns, _cursorId);
@@ -451,7 +449,9 @@ void DBClientCursor::kill() {
                 killCursor(_client);
             }
         }
-    });
+    } catch (...) {
+        reportFailedDestructor(MONGO_SOURCE_LOCATION());
+    }
 
     // Mark this cursor as dead since we can't do any getMores.
     _cursorId = 0;

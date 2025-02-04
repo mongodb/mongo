@@ -135,6 +135,13 @@ commands:
                 type: uuid
                 optional: true
                 stability: unstable
+            rawData:
+                description: "Whether to use the raw underlying data format. When being run on a
+                             collection type that stores its data in a different format from that
+                             in which users interact with, this means that the command will operate
+                             directly on the format in which it is stored."
+                type: optionalBool
+                stability: unstable
             includeQueryStatsMetrics:
                 description: "Indicates whether or not query stats metrics should be included in the response."
                 type: optionalBool

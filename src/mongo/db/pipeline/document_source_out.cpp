@@ -56,7 +56,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/util/destructor_guard.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
@@ -73,18 +73,20 @@ MONGO_FAIL_POINT_DEFINE(hangWhileBuildingDocumentSourceOutBatch);
 MONGO_FAIL_POINT_DEFINE(outWaitAfterTempCollectionCreation);
 MONGO_FAIL_POINT_DEFINE(outWaitBeforeTempCollectionRename);
 MONGO_FAIL_POINT_DEFINE(outWaitAfterTempCollectionRenameBeforeView);
+MONGO_FAIL_POINT_DEFINE(outImplictlyCreateDBOnSpecificShard);
 
 REGISTER_DOCUMENT_SOURCE(out,
                          DocumentSourceOut::LiteParsed::parse,
                          DocumentSourceOut::createFromBson,
                          AllowedWithApiStrict::kAlways);
+ALLOCATE_DOCUMENT_SOURCE_ID(out, DocumentSourceOut::id)
 
 DocumentSourceOut::~DocumentSourceOut() {
     if (_tmpCleanUpState == OutCleanUpProgress::kComplete) {
         return;
     }
 
-    DESTRUCTOR_GUARD({
+    try {
         // Make sure we drop the temp collection(s) if anything goes wrong.
         // Errors are ignored here because nothing can be done about them. Additionally, if
         // this fails and the collection is left behind, it will be cleaned up next time the
@@ -137,7 +139,9 @@ DocumentSourceOut::~DocumentSourceOut() {
                 MONGO_UNREACHABLE;
                 break;
         }
-    });
+    } catch (...) {
+        reportFailedDestructor(MONGO_SOURCE_LOCATION());
+    }
 }
 
 StageConstraints DocumentSourceOut::constraints(Pipeline::SplitState pipeState) const {
@@ -263,9 +267,17 @@ void DocumentSourceOut::createTemporaryCollection() {
         createCommandOptions.appendElementsUnique(_originalOutOptions);
     }
 
-    // If the output collection exists, we should create the temp collection on the shard that
-    // owns the output collection.
-    auto targetShard = getMergeShardId();
+    auto targetShard = [&]() -> boost::optional<ShardId> {
+        if (auto fpTarget = outImplictlyCreateDBOnSpecificShard.scoped();
+            // Used for consistently picking a shard in testing.
+            MONGO_unlikely(fpTarget.isActive())) {
+            return ShardId(fpTarget.getData()["shardId"].String());
+        } else {
+            // If the output collection exists, we should create the temp collection on the shard
+            // that owns the output collection.
+            return getMergeShardId();
+        }
+    }();
 
     // Set the enum state to 'kTmpCollExists' first, because 'createTempCollection' can throw
     // after constructing the collection.

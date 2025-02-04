@@ -5,39 +5,21 @@ selector:
     - jstests/core/**/*.js
     - jstests/fle2/**/*.js
     - src/mongo/db/modules/*/jstests/fle2/**/*.js
-  exclude_files:
-    # Tests that query the system.profile collection cannot run in this suite since an initial sync
-    # may insert unexpected operations into the profile collection.
-    - jstests/core/**/profile_list_collections.js
-    - jstests/core/**/profile_list_indexes.js
-    - jstests/core/**/query/recursion.js
-    - jstests/core/**/system_profile.js
-    # The tests below do not expect concurrent reads against their test collections.
-    - jstests/core/**/operation_latency_histogram.js
-    - jstests/core/**/geo_s2cursorlimitskip.js
-    - jstests/core/administrative/current_op/currentop_find.js
-    # These tests run getLatestProfilerEntry(). The downstream syncing node affects the profiler.
-    - jstests/core/**/profile_agg.js
-    - jstests/core/**/profile_count.js
-    - jstests/core/**/profile_delete.js
-    - jstests/core/**/profile_distinct.js
-    - jstests/core/**/profile_find.js
-    - jstests/core/**/profile_findandmodify.js
-    - jstests/core/**/profile_getmore.js
-    - jstests/core/**/profile_insert.js
-    - jstests/core/**/profile_mapreduce.js
-    - jstests/core/**/profile_sampling.js
-    - jstests/core/**/profile_update.js
-    - jstests/core/txns/transactions_profiling.js
-    # The downstream syncing node affects the top output.
-    - jstests/core/**/query/top/top.js
-    # The following tests use fsyncLock which will fail if FCBIS has a backup cursor open.
-    - jstests/core/**/currentop.js
-    - jstests/core/**/fsync.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod
+    - incompatible_with_initial_sync
+    # Tests that use fsyncLock which will fail if FCBIS has a backup cursor open.
     - requires_fsync
+    # Tests that query the system.profile collection cannot run in this suite since an initial sync
+    # may insert unexpected operations into the profile collection.
+    - queries_system_profile_collection
+    # Tests that examine the SBE plan cache, which initial sync may change the contents of.
+    - examines_sbe_cache
+    # The tests below do not expect concurrent reads against their test collections (e.g. the checks aren't expecting concurrent reads but initial sync will be reading those collections).
+    - does_not_support_concurrent_reads
+    # Tests that run getLatestProfilerEntry(). The downstream syncing node affects the profiler.
+    - run_getLatestProfilerEntry
 
 run_hook_interval: &run_hook_interval 20
 executor:

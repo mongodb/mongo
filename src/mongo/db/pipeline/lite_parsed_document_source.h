@@ -190,9 +190,10 @@ public:
     }
 
     /**
-     * Returns true if this desugars to a pipeline starting with a $queue stage.
+     * Returns true if this stage is an initial source and should run just once on the entire
+     * cluster.
      */
-    virtual bool startsWithQueue() const {
+    virtual bool generatesOwnDataOnce() const {
         return false;
     }
 
@@ -208,6 +209,13 @@ public:
      * control.
      */
     virtual bool isExemptFromIngressAdmissionControl() const {
+        return false;
+    }
+
+    /**
+     * Returns true if this is a search stage ($search, $vectorSearch, $rankFusion, etc.)
+     */
+    virtual bool isSearchStage() const {
         return false;
     }
 

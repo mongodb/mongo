@@ -240,21 +240,21 @@ void CommonAsioSession::end() {
     }
 }
 
-StatusWith<Message> CommonAsioSession::sourceMessage() noexcept try {
+StatusWith<Message> CommonAsioSession::sourceMessage() try {
     ensureSync();
     return sourceMessageImpl().getNoThrow();
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
 
-Future<Message> CommonAsioSession::asyncSourceMessage(const BatonHandle& baton) noexcept try {
+Future<Message> CommonAsioSession::asyncSourceMessage(const BatonHandle& baton) try {
     ensureAsync();
     return sourceMessageImpl(baton);
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
 
-Status CommonAsioSession::waitForData() noexcept try {
+Status CommonAsioSession::waitForData() try {
     ensureSync();
     asio::error_code ec;
     getSocket().wait(asio::ip::tcp::socket::wait_read, ec);
@@ -263,22 +263,21 @@ Status CommonAsioSession::waitForData() noexcept try {
     return ex.toStatus();
 }
 
-Future<void> CommonAsioSession::asyncWaitForData() noexcept try {
+Future<void> CommonAsioSession::asyncWaitForData() try {
     ensureAsync();
     return getSocket().async_wait(asio::ip::tcp::socket::wait_read, UseFuture{});
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
 
-Status CommonAsioSession::sinkMessage(Message message) noexcept try {
+Status CommonAsioSession::sinkMessage(Message message) try {
     ensureSync();
     return sinkMessageImpl(std::move(message)).getNoThrow();
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
 
-Future<void> CommonAsioSession::asyncSinkMessage(Message message, const BatonHandle& baton) noexcept
-    try {
+Future<void> CommonAsioSession::asyncSinkMessage(Message message, const BatonHandle& baton) try {
     ensureAsync();
     return sinkMessageImpl(std::move(message), baton);
 } catch (const DBException& ex) {
@@ -289,9 +288,9 @@ Future<void> CommonAsioSession::sinkMessageImpl(Message message, const BatonHand
     _asyncOpState.start();
     return write(asio::buffer(message.buf(), message.size()), baton)
         .then([this, message /*keep the buffer alive*/]() {
-            if (_isIngressSession) {
-                networkCounter.hitPhysicalOut(message.size());
-            }
+            auto connectionType = _isIngressSession ? NetworkCounter::ConnectionType::kIngress
+                                                    : NetworkCounter::ConnectionType::kEgress;
+            networkCounter.hitPhysicalOut(connectionType, message.size());
         })
         .onCompletion([this](Status status) {
             _asyncOpState.complete();
@@ -358,6 +357,13 @@ bool CommonAsioSession::isConnected() {
 
 const std::shared_ptr<SSLManagerInterface>& CommonAsioSession::getSSLManager() const {
     return _sslContext->manager;
+}
+
+const SSLConfiguration* CommonAsioSession::getSSLConfiguration() const {
+    if (!_sslContext->manager) {
+        return nullptr;
+    }
+    return &_sslContext->manager->getSSLConfiguration();
 }
 
 Status CommonAsioSession::buildSSLSocket(const HostAndPort& target) {
@@ -527,11 +533,11 @@ Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
                 return Future<Message>::makeReady(Status(ErrorCodes::ProtocolError, str));
             }
 
+            auto connectionType = _isIngressSession ? NetworkCounter::ConnectionType::kIngress
+                                                    : NetworkCounter::ConnectionType::kEgress;
             if (msgLen == kHeaderSize) {
                 // This probably isn't a real case since all (current) messages have bodies.
-                if (_isIngressSession) {
-                    networkCounter.hitPhysicalIn(msgLen);
-                }
+                networkCounter.hitPhysicalIn(connectionType, msgLen);
                 return Future<Message>::makeReady(Message(std::move(headerBuffer)));
             }
 
@@ -540,10 +546,8 @@ Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
 
             MsgData::View msgView(buffer.get());
             return read(asio::buffer(msgView.data(), msgView.dataLen()), baton)
-                .then([this, buffer = std::move(buffer), msgLen]() mutable {
-                    if (_isIngressSession) {
-                        networkCounter.hitPhysicalIn(msgLen);
-                    }
+                .then([this, buffer = std::move(buffer), connectionType, msgLen]() mutable {
+                    networkCounter.hitPhysicalIn(connectionType, msgLen);
                     return Message(std::move(buffer));
                 });
         })

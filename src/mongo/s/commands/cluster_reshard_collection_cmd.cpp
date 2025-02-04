@@ -128,6 +128,7 @@ public:
                 reshardCollectionRequest.setProvenance(ProvenanceEnum::kReshardCollection);
             }
             reshardCollectionRequest.setImplicitlyCreateIndex(request().getImplicitlyCreateIndex());
+            reshardCollectionRequest.setPerformVerification(request().getPerformVerification());
 
             if (resharding::gfeatureFlagReshardingNumSamplesPerChunk.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {

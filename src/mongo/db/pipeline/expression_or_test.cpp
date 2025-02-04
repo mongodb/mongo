@@ -97,29 +97,6 @@ Document fromBson(BSONObj obj) {
 
 namespace Or {
 
-class ExpectedResultBase {
-public:
-    virtual ~ExpectedResultBase() {}
-    void run() {
-        auto expCtx = ExpressionContextForTest{};
-        BSONObj specObject = BSON("" << spec());
-        BSONElement specElement = specObject.firstElement();
-        VariablesParseState vps = expCtx.variablesParseState;
-        intrusive_ptr<Expression> expression = Expression::parseOperand(&expCtx, specElement, vps);
-        ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
-        ASSERT_BSONOBJ_EQ(
-            BSON("" << expectedResult()),
-            toBson(expression->evaluate(fromBson(BSON("a" << 1)), &expCtx.variables)));
-        intrusive_ptr<Expression> optimized = expression->optimize();
-        ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()),
-                          toBson(optimized->evaluate(fromBson(BSON("a" << 1)), &expCtx.variables)));
-    }
-
-protected:
-    virtual BSONObj spec() = 0;
-    virtual bool expectedResult() = 0;
-};
-
 class OptimizeBase {
 public:
     virtual ~OptimizeBase() {}
@@ -142,126 +119,6 @@ protected:
 class NoOptimizeBase : public OptimizeBase {
     BSONObj expectedOptimized() override {
         return constify(spec());
-    }
-};
-
-/** $or without operands. */
-class NoOperands : public ExpectedResultBase {
-    BSONObj spec() override {
-        return BSON("$or" << BSONArray());
-    }
-    bool expectedResult() override {
-        return false;
-    }
-};
-
-/** $or passed 'true'. */
-class True : public ExpectedResultBase {
-    BSONObj spec() override {
-        return BSON("$or" << BSON_ARRAY(true));
-    }
-    bool expectedResult() override {
-        return true;
-    }
-};
-
-/** $or passed 'false'. */
-class False : public ExpectedResultBase {
-    BSONObj spec() override {
-        return BSON("$or" << BSON_ARRAY(false));
-    }
-    bool expectedResult() override {
-        return false;
-    }
-};
-
-/** $or passed 'true', 'true'. */
-class TrueTrue : public ExpectedResultBase {
-    BSONObj spec() override {
-        return BSON("$or" << BSON_ARRAY(true << true));
-    }
-    bool expectedResult() override {
-        return true;
-    }
-};
-
-/** $or passed 'true', 'false'. */
-class TrueFalse : public ExpectedResultBase {
-    BSONObj spec() override {
-        return BSON("$or" << BSON_ARRAY(true << false));
-    }
-    bool expectedResult() override {
-        return true;
-    }
-};
-
-/** $or passed 'false', 'true'. */
-class FalseTrue : public ExpectedResultBase {
-    BSONObj spec() override {
-        return BSON("$or" << BSON_ARRAY(false << true));
-    }
-    bool expectedResult() override {
-        return true;
-    }
-};
-
-/** $or passed 'false', 'false'. */
-class FalseFalse : public ExpectedResultBase {
-    BSONObj spec() override {
-        return BSON("$or" << BSON_ARRAY(false << false));
-    }
-    bool expectedResult() override {
-        return false;
-    }
-};
-
-/** $or passed 'false', 'false', 'false'. */
-class FalseFalseFalse : public ExpectedResultBase {
-    BSONObj spec() override {
-        return BSON("$or" << BSON_ARRAY(false << false << false));
-    }
-    bool expectedResult() override {
-        return false;
-    }
-};
-
-/** $or passed 'false', 'false', 'true'. */
-class FalseFalseTrue : public ExpectedResultBase {
-    BSONObj spec() override {
-        return BSON("$or" << BSON_ARRAY(false << false << true));
-    }
-    bool expectedResult() override {
-        return true;
-    }
-};
-
-/** $or passed '0', '1'. */
-class ZeroOne : public ExpectedResultBase {
-    BSONObj spec() override {
-        return BSON("$or" << BSON_ARRAY(0 << 1));
-    }
-    bool expectedResult() override {
-        return true;
-    }
-};
-
-/** $or passed '0', 'false'. */
-class ZeroFalse : public ExpectedResultBase {
-    BSONObj spec() override {
-        return BSON("$or" << BSON_ARRAY(0 << false));
-    }
-    bool expectedResult() override {
-        return false;
-    }
-};
-
-/** $or passed a field path. */
-class FieldPath : public ExpectedResultBase {
-    BSONObj spec() override {
-        return BSON("$or" << BSON_ARRAY("$a"));
-    }
-    bool expectedResult() override {
-        return true;
     }
 };
 
@@ -396,18 +253,6 @@ public:
     All() : OldStyleSuiteSpecification("expression") {}
 
     void setupTests() override {
-        add<Or::NoOperands>();
-        add<Or::True>();
-        add<Or::False>();
-        add<Or::TrueTrue>();
-        add<Or::TrueFalse>();
-        add<Or::FalseTrue>();
-        add<Or::FalseFalse>();
-        add<Or::FalseFalseFalse>();
-        add<Or::FalseFalseTrue>();
-        add<Or::ZeroOne>();
-        add<Or::ZeroFalse>();
-        add<Or::FieldPath>();
         add<Or::OptimizeConstantExpression>();
         add<Or::NonConstant>();
         add<Or::ConstantNonConstantTrue>();

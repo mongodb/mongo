@@ -209,6 +209,7 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                                 LiteParsedPipeline{request},
                                 PrivilegeVector(),
                                 cri,
+                                boost::none /* verbosity */,
                                 &responseBuilder);
 
                             // Stop counting if the agg command failed for one of the collections

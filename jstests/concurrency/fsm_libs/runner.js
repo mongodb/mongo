@@ -318,7 +318,7 @@ export const runner = (function() {
 
         // Indents a multiline string with the specified number of spaces.
         function indent(str, size) {
-            var prefix = new Array(size + 1).join(' ');
+            const prefix = ' '.repeat(size);
             return prefix + str.split('\n').join('\n' + prefix);
         }
 

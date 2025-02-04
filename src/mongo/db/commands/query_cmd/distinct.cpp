@@ -74,7 +74,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/client_cursor/collect_query_stats_mongod.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_command.h"
@@ -99,6 +99,7 @@
 #include "mongo/db/shard_role.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -426,7 +427,7 @@ public:
 
     bool runWithReplyBuilder(OperationContext* opCtx,
                              const DatabaseName& dbName,
-                             const BSONObj& cmdObj,
+                             const BSONObj& originalCmdObj,
                              rpc::ReplyBuilderInterface* replyBuilder) override {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
@@ -447,15 +448,53 @@ public:
                             DatabaseProfileSettings::get(opCtx->getServiceContext())
                                 .getDatabaseProfileLevel(nss.dbName()));
         };
-        auto const nssOrUUID = CommandHelpers::parseNsOrUUID(dbName, cmdObj);
+        auto nssOrUUID = CommandHelpers::parseNsOrUUID(dbName, originalCmdObj);
+
         if (nssOrUUID.isNamespaceString()) {
             initializeTracker(nssOrUUID.nss());
         }
-        const auto acquisitionRequest = CollectionOrViewAcquisitionRequest::fromOpCtx(
-            opCtx, nssOrUUID, AcquisitionPrerequisites::kRead);
+        auto acquire = [&] {
+            return acquireCollectionOrViewMaybeLockFree(
+                opCtx,
+                CollectionOrViewAcquisitionRequest::fromOpCtx(
+                    opCtx, nssOrUUID, AcquisitionPrerequisites::kRead));
+        };
+        boost::optional<CollectionOrViewAcquisition> collectionOrView = acquire();
 
-        boost::optional<CollectionOrViewAcquisition> collectionOrView =
-            acquireCollectionOrViewMaybeLockFree(opCtx, acquisitionRequest);
+        auto cmdObj = [&] {
+            if (OptionalBool::parseFromBSON(
+                    originalCmdObj[DistinctCommandRequest::kRawDataFieldName])) {
+                const auto vts = auth::ValidatedTenancyScope::get(opCtx);
+                const auto serializationContext = vts != boost::none
+                    ? SerializationContext::stateCommandRequest(vts->hasTenantId(),
+                                                                vts->isFromAtlasProxy())
+                    : SerializationContext::stateCommandRequest();
+
+                auto [isTimeseriesViewRequest, ns] = timeseries::isTimeseriesViewRequest(
+                    opCtx,
+                    DistinctCommandRequest::parse(
+                        IDLParserContext{
+                            "rawData", vts, nssOrUUID.dbName().tenantId(), serializationContext},
+                        originalCmdObj));
+                if (isTimeseriesViewRequest) {
+                    nssOrUUID = ns;
+                    collectionOrView = acquire();
+
+                    // Rewrite the command object to use the buckets namespace.
+                    BSONObjBuilder builder{originalCmdObj.objsize()};
+                    for (auto&& [fieldName, elem] : originalCmdObj) {
+                        if (fieldName == DistinctCommandRequest::kCommandName) {
+                            builder.append(fieldName, ns.coll());
+                        } else {
+                            builder.append(elem);
+                        }
+                    }
+                    return builder.obj();
+                }
+            }
+
+            return originalCmdObj;
+        }();
         const auto nss = collectionOrView->nss();
 
         if (!tracker) {
@@ -576,7 +615,7 @@ public:
                           "Plan executor error during distinct command",
                           "error"_attr = exception.toStatus(),
                           "stats"_attr = redact(stats),
-                          "cmd"_attr = cmdObj);
+                          "cmd"_attr = redact(cmdObj));
 
             exception.addContext("Executor error during distinct command");
             throw;
@@ -590,7 +629,9 @@ public:
         auto&& explainer = executor->getPlanExplainer();
         explainer.getSummaryStats(&stats);
         if (collection) {
-            CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, stats);
+            CollectionIndexUsageTrackerDecoration::get(collection.get())
+                .recordCollectionIndexUsage(
+                    stats.collectionScans, stats.collectionScansNonTailable, stats.indexesUsed);
         }
 
         curOp->debug().setPlanSummaryMetrics(std::move(stats));
@@ -684,8 +725,8 @@ public:
                                          {viewAggRequest},
                                          viewAggCmd,
                                          PrivilegeVector(),
-                                         replyBuilder,
-                                         {} /* usedExternalDataSources */));
+                                         verbosity,
+                                         replyBuilder));
             return;
         }
 
@@ -699,8 +740,8 @@ public:
                                      {viewAggRequest},
                                      viewAggCmd,
                                      privileges,
-                                     replyBuilder,
-                                     {} /* usedExternalDataSources */));
+                                     verbosity,
+                                     replyBuilder));
 
         // Copy the result from the aggregate command.
         auto resultBuilder = replyBuilder->getBodyBuilder();
@@ -734,6 +775,7 @@ public:
             keyBob.append("query", 1);
             keyBob.append("hint", 1);
             keyBob.append("collation", 1);
+            keyBob.append("rawData", 1);
             keyBob.append("shardVersion", 1);
             keyBob.append("databaseVersion", 1);
             return keyBob.obj();

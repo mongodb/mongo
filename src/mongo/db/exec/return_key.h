@@ -68,7 +68,7 @@ public:
         return STAGE_RETURN_KEY;
     }
 
-    bool isEOF() final {
+    bool isEOF() const final {
         return child()->isEOF();
     }
 

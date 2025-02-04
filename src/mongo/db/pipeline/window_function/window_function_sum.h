@@ -52,7 +52,7 @@ class RemovableSum : public WindowFunctionState {
 protected:
     explicit RemovableSum(ExpressionContext* const expCtx)
         : WindowFunctionState(expCtx),
-          _sumAcc(AccumulatorSum::create(expCtx)),
+          _sumAcc(make_intrusive<AccumulatorSum>(expCtx)),
           _posInfiniteValueCount(0),
           _negInfiniteValueCount(0),
           _nanCount(0),

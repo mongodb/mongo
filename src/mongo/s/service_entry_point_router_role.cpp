@@ -131,10 +131,9 @@ void HandleRequest::setupEnvironment() {
     // Start a new NotPrimaryErrorTracker session. Any exceptions thrown from here onwards will be
     // returned to the caller (if the type of the message permits it).
     auto client = opCtx->getClient();
+    CurOp::get(opCtx)->ensureStarted();
     NotPrimaryErrorTracker::get(client).startRequest();
     AuthorizationSession::get(client)->startRequest(opCtx);
-
-    CurOp::get(opCtx)->ensureStarted();
 }
 
 DbResponse HandleRequest::handleRequest() {
@@ -208,6 +207,9 @@ Future<DbResponse> ServiceEntryPointRouterRole::handleRequestImpl(OperationConte
 
 Future<DbResponse> ServiceEntryPointRouterRole::handleRequest(OperationContext* opCtx,
                                                               const Message& message) noexcept {
+    tassert(9391502,
+            "Invalid ClusterRole in ServiceEntryPointRouterRole",
+            opCtx->getService()->role().hasExclusively(ClusterRole::RouterServer));
     return handleRequestImpl(opCtx, message);
 }
 

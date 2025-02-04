@@ -1597,6 +1597,16 @@ class RunPlugin(PluginInterface):
             help="Have resmoke redirect all output to FILE. Additionally, stdout will contain lines that typically indicate that the test is making progress, or an error has happened. If `mrlog` is in the path it will be used. `tee` and `egrep` must be in the path.",
         )
 
+        # TODO-99797: Change the default value or remove this parameter completely when the
+        # depandent tools are ready to accept the new format.
+        parser.add_argument(
+            "--logFormat",
+            dest="log_format",
+            choices=("json", "legacy"),
+            default="legacy",
+            help="Resmoke output log format. Defaults to '%(default)s'.",
+        )
+
         parser.add_argument(
             "--runAllFeatureFlagTests",
             dest="run_all_feature_flag_tests",
@@ -1649,6 +1659,13 @@ class RunPlugin(PluginInterface):
             dest="tag_files",
             metavar="TAG_FILES",
             help="One or more YAML files that associate tests and tags.",
+        )
+
+        parser.add_argument(
+            "--enableEvergreenApiTestSelection",
+            dest="enable_evergreen_api_test_selection",
+            action="store_true",
+            help="Enable test selection using the Evergreen API",
         )
 
         configure_resmoke.add_otel_args(parser)

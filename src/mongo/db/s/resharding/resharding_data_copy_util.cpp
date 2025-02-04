@@ -326,8 +326,9 @@ int insertBatchTransactionally(OperationContext* opCtx,
                                const UUID& reshardingUUID,
                                const ShardId& donorShard,
                                const HostAndPort& donorHost,
-                               const BSONObj& resumeToken) {
-    int numBytes = 0;
+                               const BSONObj& resumeToken,
+                               bool storeProgress) {
+    long long numBytes = 0;
     int attempt = 1;
     for (auto insert = batch.begin(); insert != batch.end(); ++insert) {
         numBytes += insert->doc.objsize();
@@ -341,7 +342,8 @@ int insertBatchTransactionally(OperationContext* opCtx,
                 "txnNumber"_attr = txnNumber,
                 "donorShard"_attr = donorShard,
                 "donorHost"_attr = donorHost,
-                "resumeToken"_attr = resumeToken);
+                "resumeToken"_attr = resumeToken,
+                "storeProgress"_attr = storeProgress);
 
     while (true) {
         try {
@@ -373,15 +375,30 @@ int insertBatchTransactionally(OperationContext* opCtx,
                             NamespaceString::kRecipientReshardingResumeDataNamespace),
                         AcquisitionPrerequisites::kWrite),
                     MODE_IX);
-                ReshardingRecipientResumeData resumeData({reshardingUUID, donorShard});
-                resumeData.setDonorHost(donorHost);
-                resumeData.setResumeToken(resumeToken);
-                auto resumeDataBSON = resumeData.toBSON();
+
+                auto resumeDataIdBSON =
+                    ReshardingRecipientResumeDataId{reshardingUUID, donorShard}.toBSON();
+                auto query = BSON(ReshardingRecipientResumeData::kIdFieldName << resumeDataIdBSON);
+                BSONObjBuilder updateModBuilder;
+                updateModBuilder.append(
+                    "$set",
+                    BSON(ReshardingRecipientResumeData::kIdFieldName
+                         << resumeDataIdBSON << ReshardingRecipientResumeData::kDonorHostFieldName
+                         << donorHost.toString()
+                         << ReshardingRecipientResumeData::kResumeTokenFieldName << resumeToken));
+                if (storeProgress) {
+                    updateModBuilder.append(
+                        "$inc",
+                        BSON(ReshardingRecipientResumeData::kDocumentsCopiedFieldName
+                             << static_cast<long long>(batch.size())
+                             << ReshardingRecipientResumeData::kBytesCopiedFieldName << numBytes));
+                }
+
                 UpdateRequest updateRequest;
                 updateRequest.setNamespaceString(
                     NamespaceString::kRecipientReshardingResumeDataNamespace);
-                updateRequest.setQuery(resumeDataBSON["_id"].wrap());
-                updateRequest.setUpdateModification(resumeDataBSON);
+                updateRequest.setQuery(query);
+                updateRequest.setUpdateModification(updateModBuilder.obj());
                 updateRequest.setUpsert(true);
                 updateRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
                 UpdateResult ur = update(opCtx, resumeDataColl, updateRequest);

@@ -112,6 +112,15 @@ idl_generator(
 )
 
 idl_generator(
+    name = "shardsvr_resolve_view_command_gen",
+    src = "shardsvr_resolve_view_command.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
     name = "sessions_commands_gen",
     src = "sessions_commands.idl",
     deps = [
@@ -769,8 +778,8 @@ mongo_cc_library(
         "//src/mongo/idl:cluster_server_parameter_gen",
         "//src/mongo/idl:generic_argument_gen",
         "//src/mongo/rpc:topology_version_gen",
+        "//src/mongo/rpc/metadata:audit_metadata_gen",
         "//src/mongo/rpc/metadata:client_metadata.h",
-        "//src/mongo/rpc/metadata:impersonated_user_metadata_gen",
         "//src/mongo/s:chunk.h",
         "//src/mongo/s:chunk_manager.h",
         "//src/mongo/s:chunk_version_gen",
@@ -1104,6 +1113,7 @@ mongo_cc_library(
         "refresh_sessions_command.cpp",
         "rename_collection_common.cpp",
         "server_status_command.cpp",
+        "shardsvr_resolve_view_command.cpp",
         "shardsvr_run_search_index_command.cpp",
         "start_session_command.cpp",
         ":fle2_cleanup_gen",
@@ -1111,6 +1121,7 @@ mongo_cc_library(
         ":generic_gen",
         ":parameters_gen",
         ":sessions_commands_gen",
+        ":shardsvr_resolve_view_command_gen",
         ":shardsvr_run_search_index_command_gen",
     ],
     hdrs = [
@@ -1142,6 +1153,7 @@ mongo_cc_library(
         "//src/mongo/db/session:logical_session_id_helpers",
         "//src/mongo/db/stats:counters",
         "//src/mongo/db/transaction:transaction_api",
+        "//src/mongo/db/views:view_catalog_helpers",
         "//src/mongo/executor:async_multicaster",
         "//src/mongo/logv2:logv2_options",
         "//src/mongo/rpc:message",
@@ -1447,7 +1459,6 @@ mongo_cc_library(
         "//src/mongo/db/commands/query_cmd:search_index_commands",
         "//src/mongo/db/concurrency:exception_util",
         "//src/mongo/db/concurrency:lock_manager",
-        "//src/mongo/db/exec/sbe:query_sbe_abt",
         "//src/mongo/db/index_builds:index_builds_coordinator",
         "//src/mongo/db/index_builds:multi_index_block",
         "//src/mongo/db/index_builds:two_phase_index_build_knobs_idl",
@@ -1461,6 +1472,7 @@ mongo_cc_library(
         "//src/mongo/db/query/query_shape",
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/query/search:search_index_process_shard",
+        "//src/mongo/db/query/stage_builder/sbe:query_sbe_abt",
         "//src/mongo/db/query/stats",
         "//src/mongo/db/query/stats:stats_histograms",
         "//src/mongo/db/query/write_ops",
@@ -1590,7 +1602,6 @@ mongo_cc_library(
         "//src/mongo/db/catalog:database_holder",
         "//src/mongo/db/catalog:index_key_validate",
         "//src/mongo/db/commands/query_cmd:map_reduce_agg",
-        "//src/mongo/db/exec:stagedebug_cmd",
         "//src/mongo/db/index_builds:index_builds_coordinator",
         "//src/mongo/db/pipeline",
         "//src/mongo/db/pipeline/process_interface:mongo_process_interface",

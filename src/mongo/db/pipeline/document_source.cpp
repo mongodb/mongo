@@ -102,6 +102,7 @@ void DocumentSource::registerParser(string name,
             it == parserMap.end());
     parserMap[name] = {parser, featureFlag};
 }
+
 void DocumentSource::registerParser(string name,
                                     SimpleParser simpleParser,
                                     boost::optional<FeatureFlag> featureFlag) {
@@ -114,6 +115,14 @@ void DocumentSource::registerParser(string name,
     };
     return registerParser(std::move(name), std::move(parser), std::move(featureFlag));
 }
+
+DocumentSource::Id DocumentSource::allocateId(StringData name) {
+    static AtomicWord<Id> next{kUnallocatedId + 1};
+    auto id = next.fetchAndAdd(1);
+    LOGV2_DEBUG(9901900, 5, "Allocating DocumentSourceId", "id"_attr = id, "name"_attr = name);
+    return id;
+}
+
 bool DocumentSource::hasQuery() const {
     return false;
 }
@@ -341,4 +350,8 @@ MONGO_INITIALIZER_GROUP(BeginDocumentSourceRegistration,
                         ("default"),
                         ("EndDocumentSourceRegistration"))
 MONGO_INITIALIZER_GROUP(EndDocumentSourceRegistration, ("BeginDocumentSourceRegistration"), ())
+MONGO_INITIALIZER_GROUP(BeginDocumentSourceIdAllocation,
+                        ("default"),
+                        ("EndDocumentSourceIdAllocation"))
+MONGO_INITIALIZER_GROUP(EndDocumentSourceIdAllocation, ("BeginDocumentSourceIdAllocation"), ())
 }  // namespace mongo

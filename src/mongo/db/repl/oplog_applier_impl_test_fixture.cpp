@@ -231,9 +231,12 @@ void OplogApplierImplTest::setUp() {
 
     HealthLogInterface::set(serviceContext, std::make_unique<HealthLog>());
     HealthLogInterface::get(serviceContext)->startup();
+
+    _disableChecks.emplace(_opCtx.get());
 }
 
 void OplogApplierImplTest::tearDown() {
+    _disableChecks.reset();
     HealthLogInterface::get(serviceContext)->shutdown();
     _opCtx.reset();
     _consistencyMarkers = {};

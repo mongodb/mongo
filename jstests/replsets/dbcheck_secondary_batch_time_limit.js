@@ -1,7 +1,7 @@
 /**
  * Tests the dbCheckSecondaryBatchMaxTimeMs parameter.
  * @tags: [
- *   requires_fcv_81
+ *   requires_fcv_80
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";

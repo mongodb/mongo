@@ -132,7 +132,7 @@ selector:
     # are wrapped within a txn, if a getMore fails due to the node being killed the entire txn will be
     # retried, including the getMore, on a new node.
     # A very small number of tests run a getMore in the same state function as an operation that is
-    # incompatible with txns (such as dropDatabase). When this happens, the entire state function is run
+    # incompatible with txns (such as dropDatabase or $out). When this happens, the entire state function is run
     # outside a txn. Therefore, because the getMore will also be run outside a txn, it once again becomes
     # incompatible with killing / terminating nodes and the test must be excluded.
     - uses_getmore_outside_of_transaction

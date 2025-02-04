@@ -1,8 +1,8 @@
 /**
  * Test that verifies the javascript integration can handle large string exception messages.
  */
-var len = 65 * 1024 * 1024;
-var str = new Array(len + 1).join('b');
+const len = 65 * 1024 * 1024;
+const str = 'b'.repeat(len);
 
 // We expect to successfully throw and catch this large exception message.
 // We do not want the mongo shell to terminate.

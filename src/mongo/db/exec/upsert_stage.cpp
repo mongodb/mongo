@@ -96,7 +96,7 @@ UpsertStage::UpsertStage(ExpressionContext* expCtx,
 };
 
 // We're done when updating is finished and we have either matched or inserted.
-bool UpsertStage::isEOF() {
+bool UpsertStage::isEOF() const {
     return UpdateStage::isEOF() && (_specificStats.nMatched > 0 || _specificStats.nUpserted > 0);
 }
 

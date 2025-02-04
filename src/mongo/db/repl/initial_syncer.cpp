@@ -88,7 +88,6 @@
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/destructor_guard.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/scopeguard.h"
@@ -253,10 +252,12 @@ InitialSyncer::InitialSyncer(
 }
 
 InitialSyncer::~InitialSyncer() {
-    DESTRUCTOR_GUARD({
+    try {
         shutdown().transitional_ignore();
         join();
-    });
+    } catch (...) {
+        reportFailedDestructor(MONGO_SOURCE_LOCATION());
+    }
 }
 
 bool InitialSyncer::isActive() const {

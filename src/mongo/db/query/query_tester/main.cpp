@@ -126,6 +126,7 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
                    const bool dropData,
                    const bool loadData,
                    const bool createAllIndices,
+                   const bool ignoreIndexFailures,
                    const WriteOutOptions outOpt,
                    const ModeOption mode,
                    const bool optimizationsOff,
@@ -152,8 +153,12 @@ int runTestProgram(const std::vector<TestSpec> testsToRun,
         // Treat data load errors as failures, too.
         try {
             currFile.readInEntireFile(mode, startRange, endRange);
-            currFile.loadCollections(
-                conn.get(), dropData, loadData, createAllIndices, prevFileCollections);
+            currFile.loadCollections(conn.get(),
+                                     dropData,
+                                     loadData,
+                                     createAllIndices,
+                                     ignoreIndexFailures,
+                                     prevFileCollections);
         } catch (const std::exception& exception) {
             std::cerr << std::endl
                       << testPath.string() << std::endl
@@ -247,6 +252,7 @@ void printHelpString() {
         {"--extractFeatures",
          "Extracts syntax, query planner, and execution stats metadata for failed queries for an "
          "enriched debugging experience."},
+        {"--ignore-index-failures", "Creates indices while ignoring index creation failures."},
         {"--load",
          "Load all collections specified in relevant test files. If "
          "not specified will assume data "
@@ -302,6 +308,7 @@ int queryTesterMain(const int argc, const char** const argv) {
     auto createAllIndices = true;
     auto dropOpt = false;
     auto extractFeatures = false;
+    auto ignoreIndexFailures = false;
     auto loadOpt = false;
     auto mongoURIString = boost::optional<std::string>{};
     auto mode = ModeOption::Compare;  // Default.
@@ -320,6 +327,8 @@ int queryTesterMain(const int argc, const char** const argv) {
             dropOpt = true;
         } else if (parsedArgs[argNum] == "--extractFeatures") {
             extractFeatures = true;
+        } else if (parsedArgs[argNum] == "--ignore-index-failures") {
+            ignoreIndexFailures = true;
         } else if (parsedArgs[argNum] == "--load") {
             loadOpt = true;
         } else if (parsedArgs[argNum] == "--minimal-index") {
@@ -433,6 +442,7 @@ int queryTesterMain(const int argc, const char** const argv) {
                               dropOpt,
                               loadOpt,
                               createAllIndices,
+                              ignoreIndexFailures,
                               outOpt,
                               mode,
                               optimizationsOff,

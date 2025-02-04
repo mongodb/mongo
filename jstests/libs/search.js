@@ -1,3 +1,4 @@
+import {getCollectionName} from "jstests/libs/cmd_object_utils.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
@@ -61,7 +62,29 @@ function _validateSearchIndexArguments(
     }
 }
 
-function _runListSearchIndexOnMongod(
+function isShardedView(coll) {
+    // The isSharded function identifies a sharded collection by looking for an entry in the config
+    // database for the given nss. However, the view nss is not entered in the config database. For
+    // this reason, we have to resolve the view and then check the config database on the resolved
+    // nss to identify if the query is being run on a sharded view.
+    let db = coll.getDB();
+    if (FixtureHelpers.getViewDefinition(db, coll.getName())) {
+        let sourceColl = getCollectionName(db, coll.getName());
+        if (FixtureHelpers.isSharded(db[sourceColl])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function isShardedHelper(coll) {
+    if (FixtureHelpers.isSharded(coll) || isShardedView(coll)) {
+        return true;
+    }
+    return false;
+}
+
+function _runListSearchIndexOnNode(
     coll, keys, blockOnIndexQueryable, mongodConn, latestDefinition) {
     let name = keys["name"];
     let dbName = coll.getDB().getName();
@@ -90,6 +113,41 @@ function _runListSearchIndexOnMongod(
     assert.soon(() => testColl.aggregate([{$listSearchIndexes: {name}}]).toArray()[0]["queryable"]);
 }
 
+function runListSearchIndexHelper(coll, keys, blockOnIndexQueryable, latestDefinition) {
+    // Please see block comment at the top of this file to understand the sharded implementation.
+    if (isShardedHelper(coll)) {
+        let topology = DiscoverTopology.findConnectedNodes(coll.getDB().getMongo());
+        if (isShardedView(coll)) {
+            // if its a view, run listSearchIndexe on view
+            topology.mongos.nodes.forEach((node) => {
+                let sconn = new Mongo(node);
+                // To ensure we return the initial response from calling the specified search index
+                // command (in this case create), we do not modify response here with these
+                // listSearchIndex calls on a specified host.
+                _runListSearchIndexOnNode(
+                    coll, keys, blockOnIndexQueryable, sconn, latestDefinition);
+            });
+        } else {
+            // Call $listSearchIndex on every mongod to ensure the create command was propogated to
+            // each mongod (and therefore to each mongot).
+            for (const shardName of Object.keys(topology.shards)) {
+                topology.shards[shardName].nodes.forEach((node) => {
+                    let sconn = new Mongo(node);
+                    // To ensure we return the initial response from calling the specified search
+                    // index command (in this case create), we do not modify response here with
+                    // these listSearchIndex calls on a specified host.
+                    _runListSearchIndexOnNode(
+                        coll, keys, blockOnIndexQueryable, sconn, latestDefinition);
+                });
+            }
+        }
+    } else {
+        // To ensure we return the initial response from calling the specified search index command
+        // (in this case create), we do not modify response here with this listSearchIndex call.
+        _runListSearchIndexOnNode(coll, keys, blockOnIndexQueryable, null, latestDefinition);
+    }
+}
+
 export function updateSearchIndex(coll, keys, blockUntilSearchIndexQueryable = {
     "blockUntilSearchIndexQueryable": true
 }) {
@@ -99,27 +157,9 @@ export function updateSearchIndex(coll, keys, blockUntilSearchIndexQueryable = {
     const name = keys["name"];
     let response = assert.commandWorked(
         coll.runCommand({updateSearchIndex: coll.getName(), name, definition: keys["definition"]}));
-    let topology = DiscoverTopology.findConnectedNodes(coll.getDB().getMongo());
-    // Please see block comment at the top of this file to understand the sharded implementation.
-    if (FixtureHelpers.isSharded(coll)) {
-        let response = {};
-        // Call $listSearchIndex on every mongod to ensure the create command was propogated to each
-        // mongod (and therefore to each mongot).
-        for (const shardName of Object.keys(topology.shards)) {
-            topology.shards[shardName].nodes.forEach((node) => {
-                let sconn = new Mongo(node);
-                // To ensure we return the initial response from calling the specified search index
-                // command (in this case create), we do not modify response here with these
-                // listSearchIndex calls on a specified host.
-                _runListSearchIndexOnMongod(
-                    coll, keys, blockOnIndexQueryable, sconn, keys["definition"]);
-            });
-        }
-    } else {
-        // To ensure we return the initial response from calling the specified search index command
-        // (in this case create), we do not modify response here with this listSearchIndex call.
-        _runListSearchIndexOnMongod(coll, keys, blockOnIndexQueryable, null, keys["definition"]);
-    }
+
+    runListSearchIndexHelper(coll, keys, blockOnIndexQueryable, keys["definition"]);
+
     return response;
 }
 function _runDropSearchIndexOnShard(coll, keys, shardConn) {
@@ -175,25 +215,7 @@ export function createSearchIndex(coll, keys, blockUntilSearchIndexQueryable) {
 
     let response = assert.commandWorked(
         coll.getDB().runCommand({createSearchIndexes: coll.getName(), indexes: [keys]}));
-    let topology = DiscoverTopology.findConnectedNodes(coll.getDB().getMongo());
-    // Please see block comment at the top of this file to understand the sharded implementation.
-    if (FixtureHelpers.isSharded(coll)) {
-        // Call $listSearchIndex on every mongod to ensure the create command was propogated to each
-        // mongod (and therefore to each mongot).
-        for (const shardName of Object.keys(topology.shards)) {
-            topology.shards[shardName].nodes.forEach((node) => {
-                let sconn = new Mongo(node);
-                // To ensure we return the initial response from calling the specified search index
-                // command (in this case create), we do not modify response here with these
-                // listSearchIndex calls on a specified host.
-                _runListSearchIndexOnMongod(coll, keys, blockOnIndexQueryable, sconn);
-            });
-        }
-    } else {
-        // To ensure we return the initial response from calling the specified search index command
-        // (in this case create), we do not modify response here with this listSearchIndex call.
-        _runListSearchIndexOnMongod(coll, keys, blockOnIndexQueryable);
-    }
 
+    runListSearchIndexHelper(coll, keys, blockOnIndexQueryable, null, null);
     return response;
 }

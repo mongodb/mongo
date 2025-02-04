@@ -75,9 +75,11 @@
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/change_stream_expired_pre_image_remover.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/server_parameter_with_storage.h"
@@ -509,6 +511,94 @@ TEST_F(PreImagesRemoverTest, TruncatesAreOnlyAfterAllDurable) {
     ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
     ASSERT_EQ(passStats["docsDeleted"].numberLong(), numRecordsBeforeAllDurableTimestamp);
     ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 1);
+}
+
+/**
+ * Tests the conditions under which the ChangeStreamExpiredPreImagesRemoverService starts
+ * periodic pre-image removal.
+ */
+class PreImagesRemoverServiceTest : service_context_test::WithSetupTransportLayer,
+                                    public CatalogTestFixture {
+protected:
+    void setUp() override {
+        CatalogTestFixture::setUp();
+        // Simulates a standard server startup.
+        preImageRemoverService(operationContext())->onStartup(operationContext());
+    }
+
+    void tearDown() override {
+        // Guarantee the pre-image removal job, if initialized, is shutdown so there is no active
+        // client during ServiceContext destruction.
+        preImageRemoverService(operationContext())->onShutdown();
+        CatalogTestFixture::tearDown();
+    }
+
+    ChangeStreamExpiredPreImagesRemoverService* preImageRemoverService(OperationContext* opCtx) {
+        return ChangeStreamExpiredPreImagesRemoverService::get(opCtx);
+    }
+};
+
+TEST_F(PreImagesRemoverServiceTest, PeriodicJobStartsWithRollbackFalse) {
+    auto opCtx = operationContext();
+    auto preImageRemoverService = ChangeStreamExpiredPreImagesRemoverService::get(opCtx);
+
+    ASSERT_FALSE(preImageRemoverService->startedPeriodicJob_forTest());
+
+    preImageRemoverService->onConsistentDataAvailable(
+        opCtx, false /* isMajority */, false /* isRollback */);
+
+    ASSERT_TRUE(preImageRemoverService->startedPeriodicJob_forTest());
+}
+
+TEST_F(PreImagesRemoverServiceTest, PeriodicJobDoesNotStartWhenRollbackTrue) {
+    auto opCtx = operationContext();
+    auto preImageRemoverService = ChangeStreamExpiredPreImagesRemoverService::get(opCtx);
+
+    ASSERT_FALSE(preImageRemoverService->startedPeriodicJob_forTest());
+
+    preImageRemoverService->onConsistentDataAvailable(
+        opCtx, false /* isMajority */, true /* isRollback */);
+    ASSERT_FALSE(preImageRemoverService->startedPeriodicJob_forTest());
+
+    // Test a second call doesn't start up the periodic remover, since 'isRollback' true may be
+    // called multiple times throughout the lifetime of the mongod.
+    preImageRemoverService->onConsistentDataAvailable(
+        opCtx, false /* isMajority */, true /* isRollback */);
+    ASSERT_FALSE(preImageRemoverService->startedPeriodicJob_forTest());
+}
+
+TEST_F(PreImagesRemoverServiceTest, PeriodicJobOnSecondary) {
+    auto opCtx = operationContext();
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
+
+    auto preImageRemoverService = ChangeStreamExpiredPreImagesRemoverService::get(opCtx);
+
+    ASSERT_FALSE(preImageRemoverService->startedPeriodicJob_forTest());
+
+    preImageRemoverService->onConsistentDataAvailable(
+        opCtx, false /* isMajority */, true /* isRollback */);
+    ASSERT_FALSE(preImageRemoverService->startedPeriodicJob_forTest());
+
+    preImageRemoverService->onConsistentDataAvailable(
+        opCtx, false /* isMajority */, false /* isRollback */);
+    ASSERT_TRUE(preImageRemoverService->startedPeriodicJob_forTest());
+}
+
+TEST_F(PreImagesRemoverServiceTest, PeriodicJobDoesntStartOnStandalone) {
+    auto opCtx = operationContext();
+    repl::ReplicationCoordinator::set(getServiceContext(),
+                                      std::make_unique<repl::ReplicationCoordinatorMock>(
+                                          getServiceContext(), repl::ReplSettings()));
+
+    auto preImageRemoverService = ChangeStreamExpiredPreImagesRemoverService::get(opCtx);
+
+    ASSERT_FALSE(preImageRemoverService->startedPeriodicJob_forTest());
+
+    preImageRemoverService->onConsistentDataAvailable(
+        opCtx, false /* isMajority */, false /* isRollback */);
+
+    ASSERT_FALSE(preImageRemoverService->startedPeriodicJob_forTest());
 }
 
 }  // namespace mongo

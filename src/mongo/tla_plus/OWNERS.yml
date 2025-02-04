@@ -1,5 +1,0 @@
-version: 1.0.0
-filters:
-  - "TxnsMoveRange*":
-    approvers:
-      - 10gen/server-catalog-and-routing

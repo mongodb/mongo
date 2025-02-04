@@ -100,6 +100,7 @@ public:
         kLog10,
         kInternalFLEBetween,
         kInternalFLEEqual,
+        kInternalRawSortKey,
         kMap,
         kMeta,
         kMod,
@@ -202,6 +203,7 @@ public:
         kInternalOwningShard,
         kInternalIndexKey,
         kInternalKeyStringValue,
+        kCurrentDate,
     };
 
     explicit ExpressionHashVisitor(H hashState) : _hashState(std::move(hashState)) {}
@@ -412,6 +414,10 @@ public:
         combine(OpType::kInternalFLEEqual);
     }
 
+    void visit(const ExpressionInternalRawSortKey* expr) final {
+        combine(OpType::kInternalRawSortKey);
+    }
+
     void visit(const ExpressionMap* expr) final {
         combine(OpType::kMap, expr->_varId, expr->_varName);
     }
@@ -511,6 +517,10 @@ public:
 
     void visit(const ExpressionRandom* expr) final {
         combine(OpType::kRandom);
+    }
+
+    void visit(const ExpressionCurrentDate* expr) final {
+        combine(OpType::kCurrentDate);
     }
 
     void visit(const ExpressionRound* expr) final {

@@ -174,7 +174,7 @@ mongo_cc_library(
         "//src/mongo/rpc:reply_interface.h",
         "//src/mongo/rpc:topology_version_gen",
         "//src/mongo/rpc:unique_message.h",
-        "//src/mongo/rpc/metadata:impersonated_user_metadata_gen",
+        "//src/mongo/rpc/metadata:audit_metadata_gen",
         "//src/mongo/rpc/metadata:oplog_query_metadata.h",
         "//src/mongo/s:chunk.h",
         "//src/mongo/s:chunk_manager.h",

@@ -334,7 +334,7 @@ TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryOnReshardingBegin) {
         << op.getEntry();
     ASSERT_EQ(*op.getUuid(), doc.getSourceUUID()) << op.getEntry();
     ASSERT_EQ(op.getObject()["msg"].type(), BSONType::String) << op.getEntry();
-    ASSERT_TRUE(receivedChangeEvent == expectedChangeEvent);
+    ASSERT_EQ(receivedChangeEvent, expectedChangeEvent);
     ASSERT_TRUE(op.getFromMigrate());
     ASSERT_FALSE(bool(op.getDestinedRecipient())) << op.getEntry();
 }
@@ -400,9 +400,18 @@ TEST_F(ReshardingDonorServiceTest, WritesFinalReshardOpOplogEntriesWhileWritesBl
 
     ASSERT_TRUE(cursor->more()) << "Found no oplog entries for source collection";
 
+    ReshardBlockingWritesChangeEventO2Field expectedChangeEvent{
+        doc.getSourceNss(),
+        doc.getReshardingUUID(),
+        resharding::kReshardFinalOpLogType.toString(),
+    };
+
     for (const auto& recipientShardId : doc.getRecipientShards()) {
         ASSERT_TRUE(cursor->more()) << "Didn't find finalReshardOp entry for source collection";
         repl::OplogEntry op(cursor->next());
+
+        auto receivedChangeEvent = ReshardBlockingWritesChangeEventO2Field::parse(
+            IDLParserContext("ReshardBlockingWritesChangeEventO2Field"), *op.getObject2());
 
         ASSERT_EQ(OpType_serializer(op.getOpType()), OpType_serializer(repl::OpTypeEnum::kNoop))
             << op.getEntry();
@@ -410,10 +419,7 @@ TEST_F(ReshardingDonorServiceTest, WritesFinalReshardOpOplogEntriesWhileWritesBl
         ASSERT_EQ(op.getDestinedRecipient(), recipientShardId) << op.getEntry();
         ASSERT_EQ(op.getObject()["msg"].type(), BSONType::String) << op.getEntry();
         ASSERT_TRUE(bool(op.getObject2())) << op.getEntry();
-        ASSERT_BSONOBJ_BINARY_EQ(*op.getObject2(),
-                                 BSON("type"
-                                      << "reshardFinalOp"
-                                      << "reshardingUUID" << doc.getReshardingUUID()));
+        ASSERT_EQ(receivedChangeEvent, expectedChangeEvent);
     }
 
     ASSERT_FALSE(cursor->more()) << "Found extra oplog entry for source collection: "

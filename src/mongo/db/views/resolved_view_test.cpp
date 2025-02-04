@@ -74,7 +74,7 @@ TEST(ResolvedViewTest, ExpandingAggRequestWithEmptyPipelineOnNoOpViewYieldsEmpty
     BSONObj expected =
         BSON("aggregate" << backingNss.coll() << "pipeline" << BSONArray() << "cursor"
                          << kDefaultCursorOptionDocument << "collation" << BSONObj());
-    ASSERT_BSONOBJ_EQ(aggregation_request_helper::serializeToCommandObj(result), expected);
+    ASSERT_BSONOBJ_EQ(result.toBSON(), expected);
 }
 
 TEST(ResolvedViewTest, ExpandingAggRequestWithNonemptyPipelineAppendsToViewPipeline) {
@@ -88,17 +88,17 @@ TEST(ResolvedViewTest, ExpandingAggRequestWithNonemptyPipelineAppendsToViewPipel
         BSON("aggregate" << backingNss.coll() << "pipeline"
                          << BSON_ARRAY(BSON("skip" << 7) << BSON("limit" << 3)) << "cursor"
                          << kDefaultCursorOptionDocument << "collation" << BSONObj());
-    ASSERT_BSONOBJ_EQ(aggregation_request_helper::serializeToCommandObj(result), expected);
+    ASSERT_BSONOBJ_EQ(result.toBSON(), expected);
 }
 
 TEST(ResolvedViewTest, ExpandingAggRequestPreservesExplain) {
     const ResolvedView resolvedView{backingNss, emptyPipeline, kSimpleCollation};
     AggregateCommandRequest aggRequest{viewNss, std::vector<mongo::BSONObj>()};
-    aggRequest.setExplain(ExplainOptions::Verbosity::kExecStats);
+    aggRequest.setExplain(true);
 
     auto result = resolvedView.asExpandedViewAggregation(aggRequest);
     ASSERT(result.getExplain());
-    ASSERT(*result.getExplain() == ExplainOptions::Verbosity::kExecStats);
+    ASSERT(*result.getExplain() == true);
 }
 
 TEST(ResolvedViewTest, ExpandingAggRequestWithCursorAndExplainOnlyPreservesExplain) {
@@ -107,11 +107,11 @@ TEST(ResolvedViewTest, ExpandingAggRequestWithCursorAndExplainOnlyPreservesExpla
     SimpleCursorOptions cursor;
     cursor.setBatchSize(10);
     aggRequest.setCursor(cursor);
-    aggRequest.setExplain(ExplainOptions::Verbosity::kExecStats);
+    aggRequest.setExplain(true);
 
     auto result = resolvedView.asExpandedViewAggregation(aggRequest);
     ASSERT(result.getExplain());
-    ASSERT(*result.getExplain() == ExplainOptions::Verbosity::kExecStats);
+    ASSERT(*result.getExplain() == true);
     ASSERT_EQ(
         result.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
         aggregation_request_helper::kDefaultBatchSize);
@@ -364,6 +364,87 @@ TEST(ResolvedViewTest, SerializeOutputCanBeReparsed) {
     ASSERT_BSONOBJ_EQ(reparsedResolvedView.getDefaultCollation(),
                       BSON("locale"
                            << "fr_CA"));
+}
+
+TEST(ResolvedViewTest, ParseFromBSONCorrectly) {
+    BSONObj searchStage = BSON("$search" << BSON("text"
+                                                 << "foo"));
+    BSONObj matchStage = BSON("$match" << BSON("x" << 1));
+    BSONArray pipeline = BSON_ARRAY(searchStage << matchStage);
+
+    BSONObj cmdResponse = BSON("resolvedView" << BSON("ns" << backingNss.ns_forTest() << "pipeline"
+                                                           << pipeline << "collation"
+                                                           << BSON("locale"
+                                                                   << "fil")));
+    BSONElement elem = cmdResponse.getField("resolvedView");
+
+    std::vector<BSONObj> expectedPipeline{searchStage, matchStage};
+    const ResolvedView result = ResolvedView::parseFromBSON(elem);
+    ASSERT_EQ(result.getNamespace(), backingNss);
+    ASSERT(std::equal(expectedPipeline.begin(),
+                      expectedPipeline.end(),
+                      result.getPipeline().begin(),
+                      SimpleBSONObjComparator::kInstance.makeEqualTo()));
+    ASSERT_BSONOBJ_EQ(result.getDefaultCollation(),
+                      BSON("locale"
+                           << "fil"));
+}
+
+TEST(ResolvedViewTest, ParseFromBSONFailsIfNotAnObject) {
+    BSONObj cmdResponse = BSON("resolvedView"
+                               << "ThisIsNotAnObject");
+    BSONElement elem = cmdResponse.getField("resolvedView");
+
+    ASSERT_THROWS_CODE(ResolvedView::parseFromBSON(elem), AssertionException, 936370);
+}
+
+TEST(ResolvedViewTest, ParseFromBSONFailsIfEmptyObject) {
+    BSONObj cmdResponse = BSON("resolvedView" << BSONObj());
+    BSONElement elem = cmdResponse.getField("resolvedView");
+
+    ASSERT_THROWS_CODE(ResolvedView::parseFromBSON(elem), AssertionException, 40249);
+}
+
+TEST(ResolvedViewTest, SerializeToBSONCorrectly) {
+    const ResolvedView resolvedView{backingNss,
+                                    std::vector<BSONObj>{BSON("$search" << BSON("text"
+                                                                                << "foo")),
+                                                         BSON("$match" << BSON("x" << 1))},
+                                    BSON("locale"
+                                         << "fil")};
+    BSONObjBuilder bob;
+    resolvedView.serializeToBSON("resolvedView", &bob);
+    ASSERT_BSONOBJ_EQ(bob.obj(), fromjson(R"({
+        resolvedView: {
+            ns: 'testdb.testcoll',
+            pipeline: [{$search: {text: "foo"}}, {$match: {x: 1}}],
+            collation: {locale: 'fil'}
+        }
+    })"));
+}
+
+TEST(ResolvedViewTest, IDLParserRoundtrip) {
+    BSONObj searchStage = BSON("$search" << BSON("text"
+                                                 << "foo"));
+    BSONObj matchStage = BSON("$match" << BSON("x" << 1));
+    BSONArray pipeline = BSON_ARRAY(searchStage << matchStage);
+
+    BSONObj cmdResponse = BSON("resolvedView" << BSON("ns" << backingNss.ns_forTest() << "pipeline"
+                                                           << pipeline << "collation"
+                                                           << BSON("locale"
+                                                                   << "fil")));
+    BSONElement elem = cmdResponse.getField("resolvedView");
+    const ResolvedView fromObj = ResolvedView::parseFromBSON(elem);
+
+    BSONObjBuilder toObj;
+    fromObj.serializeToBSON("resolvedView", &toObj);
+    ASSERT_BSONOBJ_EQ(toObj.obj(), fromjson(R"({
+        resolvedView: {
+            ns: 'testdb.testcoll',
+            pipeline: [{$search: {text: "foo"}}, {$match: {x: 1}}],
+            collation: {locale: 'fil'}
+        }
+    })"));
 }
 }  // namespace
 }  // namespace mongo

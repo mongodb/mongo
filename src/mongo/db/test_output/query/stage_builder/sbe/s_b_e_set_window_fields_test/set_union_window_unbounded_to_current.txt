@@ -1,0 +1,16 @@
+# Golden test output of SBESetWindowFieldsTest/SetUnionWindowUnboundedToCurrent
+[2] project [s11 = makeBsonObj(MakeObjSpec([result = Set(0)], Open, NewObj, 0), s2, s10)] 
+[2] project [s10 = 
+    if exists(s7) 
+    then getElement(s7, 0) 
+    else null 
+] 
+[2] window [s2, s4, s8] [frameFirst[], frameLast[], lowBound{}, highBound{((s9 <=> s8) <= 0)}] [s7 = {init{}, add{setUnionCapped(
+    if isArray(s4) 
+    then s4 
+    else fail(14, "Expected new value for $setUnion to be an array") 
+, 104857600)}, remove{}}] 
+[2] agg_project [s8 = sum(1)] 
+[1] project [s3 = getField(s2, "a"), s4 = getField(s2, "b")] 
+[1] project [s2 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"a" : 1, "b" : [1, 2]}], [{"a" : 2, "b" : [3, 4]}], [{"a" : 2, "b" : [5, 6]}], [{"a" : 2}], [{"a" : 1, "b" : [5, 6]}]]} 

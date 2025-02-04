@@ -937,6 +937,8 @@ protected:
         _snapshot.reset();
     }
 
+    OperationContext* _opCtx = nullptr;
+
 private:
     virtual void doBeginUnitOfWork() = 0;
     virtual void doAbandonSnapshot() = 0;
@@ -955,7 +957,6 @@ private:
     boost::optional<Snapshot> _snapshot;
     State _state = State::kInactive;
     AtomicStorageMetrics _storageMetrics;
-    OperationContext* _opCtx = nullptr;
     bool _readOnly = false;
     bool _blockingAllowed = true;
 };

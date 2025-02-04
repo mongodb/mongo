@@ -133,8 +133,10 @@ public:
         return DocumentSourcePlanCacheStats::kStageName.rawData();
     }
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kPlanCacheStats;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
     /**

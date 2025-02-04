@@ -49,7 +49,6 @@
 #include "mongo/logv2/redaction.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/destructor_guard.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
@@ -84,7 +83,12 @@ SyncSourceResolver::SyncSourceResolver(executor::TaskExecutor* taskExecutor,
 }
 
 SyncSourceResolver::~SyncSourceResolver() {
-    DESTRUCTOR_GUARD(shutdown(); join(););
+    try {
+        shutdown();
+        join();
+    } catch (...) {
+        reportFailedDestructor(MONGO_SOURCE_LOCATION());
+    }
 }
 
 bool SyncSourceResolver::isActive() const {

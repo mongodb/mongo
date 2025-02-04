@@ -34,11 +34,6 @@ namespace mongo {
 
 constexpr StringData InternalSchemaRootDocEqMatchExpression::kName;
 
-bool InternalSchemaRootDocEqMatchExpression::matches(const MatchableDocument* doc,
-                                                     MatchDetails* details) const {
-    return _objCmp.evaluate(doc->toBSON() == _rhsObj);
-}
-
 void InternalSchemaRootDocEqMatchExpression::debugString(StringBuilder& debug,
                                                          int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);

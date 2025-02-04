@@ -55,7 +55,7 @@ SortKeyGeneratorStage::SortKeyGeneratorStage(const boost::intrusive_ptr<Expressi
     _children.emplace_back(std::move(child));
 }
 
-bool SortKeyGeneratorStage::isEOF() {
+bool SortKeyGeneratorStage::isEOF() const {
     return child()->isEOF();
 }
 

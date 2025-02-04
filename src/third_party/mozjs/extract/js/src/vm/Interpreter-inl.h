@@ -120,7 +120,8 @@ inline bool FetchName(JSContext* cx, HandleObject receiver, HandleObject holder,
   }
 
   /* Take the slow path if shape was not found in a native object. */
-  if (!receiver->is<NativeObject>() || !holder->is<NativeObject>()) {
+  if (!receiver->is<NativeObject>() || !holder->is<NativeObject>() ||
+      receiver->is<WithEnvironmentObject>()) {
     Rooted<jsid> id(cx, NameToId(name));
     if (!GetProperty(cx, receiver, receiver, id, vp)) {
       return false;
@@ -131,11 +132,8 @@ inline bool FetchName(JSContext* cx, HandleObject receiver, HandleObject holder,
       /* Fast path for Object instance properties. */
       vp.set(holder->as<NativeObject>().getSlot(propInfo.slot()));
     } else {
-      // Unwrap 'with' environments for reasons given in
-      // GetNameBoundInEnvironment.
-      RootedObject normalized(cx, MaybeUnwrapWithEnvironment(receiver));
       RootedId id(cx, NameToId(name));
-      if (!NativeGetExistingProperty(cx, normalized, holder.as<NativeObject>(),
+      if (!NativeGetExistingProperty(cx, receiver, holder.as<NativeObject>(),
                                      id, propInfo, vp)) {
         return false;
       }

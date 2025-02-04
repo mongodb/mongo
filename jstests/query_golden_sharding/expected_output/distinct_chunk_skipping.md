@@ -119,7 +119,8 @@
 				}
 			}
 		}
-	]
+	],
+	"queryShapeHash" : "2209486C2E1164C3906C2002ABE4D156E6CA7B9B8F8679EA27FE4B8E819792B5"
 }
 ```
 
@@ -342,6 +343,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "2209486C2E1164C3906C2002ABE4D156E6CA7B9B8F8679EA27FE4B8E819792B5",
 	"shardsPart" : [
 		{
 			"$match" : {
@@ -589,6 +591,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "B9BC1E78DD6A3A08A3F84BAFFEFAEDBFFFE732B016DE718C9C056C098CADA9CA",
 	"shardsPart" : [
 		{
 			"$match" : {
@@ -910,6 +913,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "2209486C2E1164C3906C2002ABE4D156E6CA7B9B8F8679EA27FE4B8E819792B5",
 	"shardsPart" : [
 		{
 			"$match" : {

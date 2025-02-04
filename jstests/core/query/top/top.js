@@ -12,6 +12,8 @@
  *    requires_fastcount,
  *    does_not_support_repeated_reads,
  *    requires_fcv_62,
+ *    # The downstream syncing node affects the top output.
+ *    incompatible_with_initial_sync,
  *    requires_getmore,
  * ]
  */

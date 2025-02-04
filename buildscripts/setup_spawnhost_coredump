@@ -198,7 +198,7 @@ fi' >> .bash_profile
     cd debug
 
     # As the name suggests, pretty printers. Primarily for boost::optional<T>
-    git clone git@github.com:mongodb-forks/Boost-Pretty-Printer.git --branch mongodb-stable &
+    git clone https://github.com/mongodb-forks/Boost-Pretty-Printer.git --branch mongodb-stable &
 
     # Discover and unarchive necessary files and source code. This will put mongo binaries and their
     # partner .debug files in the same `debug/bin` directory. The `bin` directory will later be symbolic

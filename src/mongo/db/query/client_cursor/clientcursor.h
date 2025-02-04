@@ -508,6 +508,9 @@ private:
     // Flag for query stats on if the current cursor is used for a tailable or change stream query.
     bool _queryStatsWillNeverExhaust{false};
 
+    // Flag if the current cursor is used for a change stream query.
+    bool _isChangeStreamQuery{false};
+
     // Flag to decide if diagnostic information should be omitted.
     bool _shouldOmitDiagnosticInformation{false};
 

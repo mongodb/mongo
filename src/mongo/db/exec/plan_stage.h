@@ -29,13 +29,13 @@
 
 #pragma once
 
+#include <absl/container/inlined_vector.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <memory>
 #include <string>
 #include <utility>
-#include <vector>
 
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/scoped_timer.h"
@@ -143,7 +143,7 @@ protected:
 public:
     virtual ~PlanStage() {}
 
-    using Children = std::vector<std::unique_ptr<PlanStage>>;
+    using Children = absl::InlinedVector<std::unique_ptr<PlanStage>, 4>;
 
     /**
      * All possible return values of work(...)
@@ -157,7 +157,7 @@ public:
         // output in the out parameter.
         IS_EOF,
 
-        // work(...) needs more time to product a result.  Call work(...) again.  There is
+        // work(...) needs more time to produce a result.  Call work(...) again.  There is
         // nothing output in the out parameter.
         NEED_TIME,
 
@@ -229,9 +229,19 @@ public:
     }
 
     /**
+     * The stage spills its data and asks from all its children to spill their data as well.
+     */
+    void forceSpill() {
+        doForceSpill();
+        for (const auto& child : _children) {
+            child->forceSpill();
+        }
+    }
+
+    /**
      * Returns true if no more work can be done on the query / out of results.
      */
-    virtual bool isEOF() = 0;
+    virtual bool isEOF() const = 0;
 
     //
     // Yielding and isolation semantics:
@@ -443,6 +453,12 @@ private:
     // The PlanExecutor holds a strong reference to this which ensures that this pointer remains
     // valid for the entire lifetime of the PlanStage.
     ExpressionContext* _expCtx;
+
+    /**
+     * Spills the stage's data to disk. Stages that can spill their own data need to override this
+     * method.
+     */
+    virtual void doForceSpill() {}
 };
 
 }  // namespace mongo

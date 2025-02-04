@@ -200,8 +200,10 @@ Status initializeGlobalShardingState(
         return std::make_shared<ShardingTaskExecutorPoolController>(srwp);
     };
 
-    auto network = executor::makeNetworkInterface(
-        "ShardRegistry", std::make_unique<ShardingNetworkConnectionHook>(), hookBuilder());
+    auto network = executor::makeNetworkInterface("Sharding-Fixed",
+                                                  std::make_unique<ShardingNetworkConnectionHook>(),
+                                                  hookBuilder(),
+                                                  connPoolOptions);
     auto networkPtr = network.get();
     auto executorPool = makeShardingTaskExecutorPool(
         std::move(network), hookBuilder, connPoolOptions, taskExecutorPoolSize);

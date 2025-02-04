@@ -26,7 +26,6 @@ selector:
     - jstests/core/write/bulk/bulk_api_unordered.js
     # Time-series is not compatible with viewOn.
     - jstests/core/query/collation/collation.js
-    - jstests/core/dbstats.js
     - jstests/core/query/disallow_system_views_user_writes.js
     - jstests/core/query/agg_hint.js
     - jstests/core/query/collection_uuid_find.js
@@ -45,6 +44,7 @@ selector:
     # Hashed indexes.
     - jstests/core/query/hashed_partial_and_sparse_index.js
     - jstests/core/query/distinct/distinct_with_hashed_index.js
+    - jstests/core/query/distinct/distinct_for_passthrough.js
     - jstests/core/query/internal_hash_eq/**/*.js
     - jstests/core/query/project/projection_with_hashed_index.js
     - jstests/core/query/single_field_hashed_index.js
@@ -82,6 +82,7 @@ selector:
     - jstests/core/query/distinct/distinct_sbe_compatibility.js
     - jstests/core/query/exists/existsa.js
     - jstests/core/query/explain/**/*.js
+    - jstests/core/query/expr/expr_in_index_use.js
     - jstests/core/query/expr/expr_index_use.js
     - jstests/core/query/idhack.js
     - jstests/core/query/index_deduplication.js
@@ -224,6 +225,7 @@ selector:
     - jstests/core/query/covered_multikey.js
     - jstests/core/query/dotted_path_in_null.js
     - jstests/core/query/explode_for_sort_equality_to_array.js
+    - jstests/core/query/explode_for_sort_multikey.js
     - jstests/core/query/find/find_dedup.js
     - jstests/core/query/find/find_project_sort.js
     - jstests/core/query/nan.js

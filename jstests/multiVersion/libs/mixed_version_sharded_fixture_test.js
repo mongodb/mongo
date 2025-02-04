@@ -7,9 +7,9 @@ export function testPerformUpgradeDowngradeSharded({
     whenFullyDowngraded,
     whenOnlyConfigIsLatestBinary,
     whenSecondariesAndConfigAreLatestBinary,
-    whenFullyUpgraded,
+    whenMongosBinaryIsLastLTS,
     whenBinariesAreLatestAndFCVIsLastLTS,
-    whenMongosBinaryIsLastLTS
+    whenFullyUpgraded
 }) {
     const st = new ShardingTest({
         shards: 2,

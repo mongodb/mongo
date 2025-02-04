@@ -23,6 +23,8 @@
 //   simulate_atlas_proxy_incompatible,
 //   # Query settings are not supported in upgrade/downgrade scenario
 //   cannot_run_during_upgrade_downgrade,
+//   # The test examines the SBE plan cache, which initial sync may change the contents of.
+//   examines_sbe_cache,
 //   # This test checks a new field "solutionHash" in $planCacheStats, not available in previous
 //   # versions.
 //   requires_fcv_72,

@@ -29,9 +29,7 @@
 
 #pragma once
 
-#include <bitset>
 #include <boost/intrusive_ptr.hpp>
-#include <variant>
 
 #include "mongo/base/static_assert.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"

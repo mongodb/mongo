@@ -114,6 +114,7 @@ jsTestLog(
 let replSetGetStatus;
 assert.soon(() => {
     replSetGetStatus = assert.commandWorked(testNode.adminCommand({replSetGetStatus: 1}));
+    jsTestLog(replSetGetStatus);
 
     // Wait for a heartbeat from the target sync source that shows that the target sync source's
     // last timestamp is at least 'advancedTimestamp'. This ensures the test node sees that the

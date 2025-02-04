@@ -14,8 +14,7 @@ function testUnshardedCollection(conn) {
 
     const candidateKey = {candidateKey: 1};
     assert.commandWorked(coll.createIndex(candidateKey));
-    assert.commandWorked(
-        coll.insert([{candidateKey: "a"}, {candidateKey: new Array(1000).join("a")}]));
+    assert.commandWorked(coll.insert([{candidateKey: "a"}, {candidateKey: "a".repeat(999)}]));
 
     const res = assert.commandWorked(conn.adminCommand({
         analyzeShardKey: ns,
@@ -57,9 +56,9 @@ function testShardedCollection(st) {
     assert.commandWorked(coll.insert([
         {currentKey: -10, candidateKey: "a"},
         {currentKey: -5, candidateKey: "a"},
-        {currentKey: 0, candidateKey: new Array(1000).join("a")},
-        {currentKey: 5, candidateKey: new Array(1000).join("a")},
-        {currentKey: 10, candidateKey: new Array(1000).join("a")}
+        {currentKey: 0, candidateKey: "a".repeat(999)},
+        {currentKey: 5, candidateKey: "a".repeat(999)},
+        {currentKey: 10, candidateKey: "a".repeat(999)},
     ]));
 
     const res = st.s.adminCommand({

@@ -28,6 +28,7 @@
 Execution Engine: classic
 ```json
 {
+	"queryShapeHash" : "A8D462371CDE9BE554D607AD88916CF20C2B5633E0454E7FFF6F7D0A89C142CD",
 	"stages" : [
 		{
 			"$cursor" : {
@@ -112,6 +113,7 @@ Execution Engine: classic
 Execution Engine: classic
 ```json
 {
+	"queryShapeHash" : "A8D462371CDE9BE554D607AD88916CF20C2B5633E0454E7FFF6F7D0A89C142CD",
 	"stages" : [
 		{
 			"$cursor" : {
@@ -196,6 +198,7 @@ Execution Engine: classic
 Execution Engine: sbe
 ```json
 {
+	"queryShapeHash" : "A8D462371CDE9BE554D607AD88916CF20C2B5633E0454E7FFF6F7D0A89C142CD",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -249,6 +252,7 @@ Execution Engine: sbe
 Execution Engine: sbe
 ```json
 {
+	"queryShapeHash" : "4D59D9B70CAA743C51507B7F4CF216F652E91F22553A942308E91D358F754C44",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -296,6 +300,7 @@ Execution Engine: sbe
 Execution Engine: classic
 ```json
 {
+	"queryShapeHash" : "CA2B2C90B53877652CBF1F4F7692F1DA0FA9476BC770590F5D8BCC5820FB58BA",
 	"stages" : [
 		{
 			"$cursor" : {
@@ -358,6 +363,7 @@ Execution Engine: classic
 Execution Engine: sbe
 ```json
 {
+	"queryShapeHash" : "CA2B2C90B53877652CBF1F4F7692F1DA0FA9476BC770590F5D8BCC5820FB58BA",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{

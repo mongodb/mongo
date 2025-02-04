@@ -45,6 +45,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -411,7 +412,7 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::getNextTrans
                 _addAffectedNamespaces(doc);
             }
             // If the document is relevant, update it with the required txn fields before returning.
-            if (_expression->matchesBSON(doc.toBson())) {
+            if (exec::matcher::matchesBSON(_expression, doc.toBson())) {
                 return _addRequiredTransactionFields(doc);
             }
         }
@@ -572,7 +573,9 @@ boost::optional<Document> DocumentSourceChangeStreamUnwindTransaction::Transacti
     newDoc.addField(DocumentSourceChangeStream::kApplyOpsTsField, Value(applyOpsTs()));
 
     Document endOfTransaction = newDoc.freeze();
-    return {_endOfTransactionExpression->matchesBSON(endOfTransaction.toBson()), endOfTransaction};
+    return {
+        exec::matcher::matchesBSON(_endOfTransactionExpression.get(), endOfTransaction.toBson()),
+        endOfTransaction};
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceChangeStreamUnwindTransaction::doOptimizeAt(

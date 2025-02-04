@@ -38,7 +38,7 @@
 namespace mongo {
 
 /**
- * A class that writes records to a temporary record store. Performes writes in batches and
+ * A class that writes records to a temporary record store. Performs writes in batches and
  * accumulates statistics.
  */
 class RecordStoreBatchWriter {
@@ -46,6 +46,12 @@ public:
     RecordStoreBatchWriter(ExpressionContext* expCtx, RecordStore* rs) : _expCtx(expCtx), _rs(rs) {}
 
     void write(RecordId recordId, BSONObj obj);
+
+    /**
+     * The caller is the owner of the data in recordData and should make sure to keep it alive until
+     * the data has been flushed.
+     */
+    void write(RecordId recordId, RecordData recordData);
 
     void flush();
 

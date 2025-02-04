@@ -125,14 +125,12 @@ void TimeSeriesOpObserver::onUpdate(OperationContext* opCtx,
             *shard_role_details::getRecoveryUnit(opCtx),
             timeseries::bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext()),
             options.value(),
-            args.coll->getDefaultCollator(),
             args.coll->uuid(),
             args.updateArgs->preImageDoc);
         timeseries::bucket_catalog::handleDirectWrite(
             *shard_role_details::getRecoveryUnit(opCtx),
             timeseries::bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext()),
             options.value(),
-            args.coll->getDefaultCollator(),
             args.coll->uuid(),
             args.updateArgs->updatedDoc);
     }
@@ -155,7 +153,6 @@ void TimeSeriesOpObserver::onDelete(OperationContext* opCtx,
         *shard_role_details::getRecoveryUnit(opCtx),
         timeseries::bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext()),
         options.value(),
-        coll->getDefaultCollator(),
         coll->uuid(),
         doc);
 }

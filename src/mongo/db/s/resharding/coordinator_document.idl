@@ -49,6 +49,15 @@ structs:
             # We intentionally have the mutable state nested in a subobject to make it easy to
             # overwrite with a single $set.
             mutableState: DonorShardContext
+            documentsToCopy:
+                type: long
+                description: "The number of documents to copy from this donor in the 'cloning'
+                             state."
+                optional: true
+            documentsFinal:
+                type: long
+                description: "The number of documents on this donor in the 'blocking-writes' state."
+                optional: true
 
     RecipientShardEntry:
         description: "Represents a recipient shard for a particular resharding operation on the
@@ -72,7 +81,7 @@ structs:
                     type: ReshardingMetricsTimeInterval
                     description: >-
                         The time interval of the entire resharding operation on the coordinator.
-                    optional: true            
+                    optional: true
             documentCopy:
                     type: ReshardingMetricsTimeInterval
                     description: >-

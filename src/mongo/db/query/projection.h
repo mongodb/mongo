@@ -37,7 +37,7 @@
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/query/projection_ast.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -178,6 +178,14 @@ public:
      * depend on "b".
      */
     void optimize();
+
+    /**
+     * Extracts all field names for the sortKey meta-projection and stores them in the returned
+     * array. Returns an empty array if there were no sortKey meta-projection specified in the
+     * given projection. For example, given a projection {a: 1, b: {$meta: "sortKey"},
+     * c: {$meta: "sortKey"}}, the returned vector will contain two elements ["b", "c"].
+     */
+    std::vector<FieldPath> extractSortKeyMetaFields() const;
 
 private:
     ProjectionPathASTNode _root;

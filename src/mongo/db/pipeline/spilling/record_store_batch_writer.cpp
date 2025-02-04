@@ -32,9 +32,14 @@
 namespace mongo {
 
 void RecordStoreBatchWriter::write(RecordId recordId, BSONObj obj) {
-    _batchSize += recordId.memUsage() + obj.objsize();
     _ownedObjects.push_back(obj.getOwned());
-    _records.push_back({std::move(recordId), RecordData{obj.objdata(), obj.objsize()}});
+    const BSONObj& ownedObj = _ownedObjects.back();
+    write(recordId, RecordData{ownedObj.objdata(), ownedObj.objsize()});
+}
+
+void RecordStoreBatchWriter::write(RecordId recordId, RecordData recordData) {
+    _records.emplace_back(Record{std::move(recordId), recordData});
+    _batchSize += _records.back().id.memUsage() + _records.back().data.size();
     if (_records.size() > kMaxWriteRecordCount || _batchSize > kMaxWriteRecordSize) {
         flush();
     }

@@ -62,21 +62,3 @@ mongo_cc_benchmark(
         "//src/mongo/db/concurrency:lock_manager",
     ],
 )
-
-# TODO(SERVER-96859): Remove cycle created by moving //src/mongo/db/exec/document_value:document.h to //src/mongo/db/exec/document_value:document_value
-filegroup(
-    name = "document_hdrs",
-    srcs = [":document.h"],
-)
-
-# TODO(SERVER-96859): Remove cycle created by moving //src/mongo/db/exec/document_value:document_metadata_fields.h to //src/mongo/db/exec/document_value:document_value
-filegroup(
-    name = "document_metadata_fields_hdrs",
-    srcs = [":document_metadata_fields.h"],
-)
-
-# TODO(SERVER-96859): Remove cycle created by moving //src/mongo/db/exec/document_value:value.h to //src/mongo/db/exec/document_value:document_value
-filegroup(
-    name = "value_hdrs",
-    srcs = [":value.h"],
-)

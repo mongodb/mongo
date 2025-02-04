@@ -41,12 +41,9 @@
 namespace mongo::transport::grpc::util {
 namespace constants {
 /**
- * Placeholder wire version constant corresponding to the first wire version that supports using
- * gRPC.
- * TODO SERVER-78614: Move this to the WireVersion enum closer to the initial release containing
- * gRPC support.
+ * Wire version constant corresponding to the first wire version that supports using gRPC.
  */
-static constexpr auto kMinimumWireVersion = 22;
+static constexpr auto kMinimumWireVersion = 26;
 
 static constexpr auto kAuthenticatedCommandStreamMethodName =
     "/mongodb.CommandService/AuthenticatedCommandStream";

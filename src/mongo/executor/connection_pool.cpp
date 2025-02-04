@@ -59,7 +59,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/debug_util.h"
-#include "mongo/util/destructor_guard.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/lru_cache.h"
@@ -96,7 +95,7 @@ auto makeSeveritySuppressor() {
 }
 
 template <typename Map, typename Key>
-auto& getOrInvariant(Map&& map, const Key& key) noexcept {
+auto& getOrInvariant(Map&& map, const Key& key) {
     auto it = std::forward<Map>(map).find(key);
     invariant(it != std::forward<Map>(map).end(), "Unable to find key in map");
 
@@ -104,12 +103,12 @@ auto& getOrInvariant(Map&& map, const Key& key) noexcept {
 }
 
 template <typename Map, typename... Args>
-void emplaceOrInvariant(Map&& map, Args&&... args) noexcept {
+void emplaceOrInvariant(Map&& map, Args&&... args) {
     auto ret = std::forward<Map>(map).emplace(std::forward<Args>(args)...);
     invariant(ret.second, "Element already existed in map/set");
 }
 
-bool shouldInvariantOnPoolCorrectness() noexcept {
+bool shouldInvariantOnPoolCorrectness() {
     return kDebugBuild;
 }
 
@@ -244,7 +243,7 @@ protected:
 };
 
 
-auto ConnectionPool::makeLimitController() noexcept -> std::shared_ptr<ControllerInterface> {
+auto ConnectionPool::makeLimitController() -> std::shared_ptr<ControllerInterface> {
     return std::make_shared<LimitController>();
 }
 
@@ -843,7 +842,11 @@ ConnectionPool::SpecificPool::SpecificPool(std::shared_ptr<ConnectionPool> paren
 }
 
 ConnectionPool::SpecificPool::~SpecificPool() {
-    DESTRUCTOR_GUARD(_eventTimer->cancelTimeout();)
+    try {
+        _eventTimer->cancelTimeout();
+    } catch (...) {
+        reportFailedDestructor(MONGO_SOURCE_LOCATION());
+    }
 
     if (shouldInvariantOnPoolCorrectness()) {
         invariant(_requests.empty());

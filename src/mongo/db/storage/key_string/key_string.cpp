@@ -27,8 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/storage/key_string/key_string.h"
 
-#include "mongo/bson/bson_validate.h"
 #include <algorithm>
 #include <boost/optional.hpp>
 #include <cfloat>
@@ -39,15 +39,12 @@
 #include <memory>
 #include <type_traits>
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bson_depth.h"
+#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -766,9 +763,8 @@ void BuilderBase<BufferT>::_appendRecordIdStr(const char* str, int size) {
 template <class BufferT>
 void BuilderBase<BufferT>::appendTypeBits(const TypeBits& typeBits) {
     _transition(BuildState::kAppendedTypeBits);
-    // As an optimization, encode AllZeros as a single 0 byte.
+    // As an optimization, encode AllZeros as an empty buffer
     if (typeBits.isAllZeros()) {
-        _append(uint8_t(0), false);
         return;
     }
 
@@ -2453,6 +2449,10 @@ std::string Value::toString() const {
     return hexblob::encode(_buffer.get(), _ksSize);
 }
 
+std::string View::toString() const {
+    return hexblob::encode(_buffer, _ksSize);
+}
+
 TypeBits& TypeBits::operator=(const TypeBits& tb) {
     if (&tb == this) {
         return *this;
@@ -3042,24 +3042,6 @@ void appendToBSONArray(const char* buf, int len, BSONArrayBuilder* builder, Vers
     toBsonValue(ctype, &reader, &typeBitsReader, inverted, version, builder, depth);
 }
 
-void Value::serializeWithoutRecordIdLong(BufBuilder& buf) const {
-    dassert(decodeRecordIdLongAtEnd(getView()).isValid());
-
-    const int32_t sizeWithoutRecordId = getSizeWithoutRecordId();
-    buf.appendNum(sizeWithoutRecordId);                 // Serialize size of KeyString
-    buf.appendBuf(_buffer.get(), sizeWithoutRecordId);  // Serialize KeyString
-    buf.appendBuf(_buffer.get() + _ksSize, _buffer.size() - _ksSize);  // Serialize TypeBits
-}
-
-void Value::serializeWithoutRecordIdStr(BufBuilder& buf) const {
-    dassert(decodeRecordIdStrAtEnd(getView()).isValid());
-
-    const int32_t sizeWithoutRecordId = getSizeWithoutRecordId();
-    buf.appendNum(sizeWithoutRecordId);                 // Serialize size of KeyString
-    buf.appendBuf(_buffer.get(), sizeWithoutRecordId);  // Serialize KeyString
-    buf.appendBuf(_buffer.get() + _ksSize, _buffer.size() - _ksSize);  // Serialize TypeBits
-}
-
 Value Value::deserialize(BufReader& buf,
                          key_string::Version version,
                          boost::optional<KeyFormat> ridFormat) {
@@ -3073,9 +3055,7 @@ Value Value::deserialize(BufReader& buf,
     const auto withoutRid = ridFormat ? withoutRecordIdAtEnd(keystring, *ridFormat) : keystring;
 
     auto typeBits = TypeBits::fromBuffer(version, &buf);  // advances the buf
-    if (typeBits.isAllZeros()) {
-        newBuf.appendChar(0);
-    } else {
+    if (!typeBits.isAllZeros()) {
         newBuf.appendBuf(typeBits.getBuffer(), typeBits.getSize());
     }
     // Note: this variable is needed to make sure that no method is called on 'newBuf'
@@ -3085,6 +3065,26 @@ Value Value::deserialize(BufReader& buf,
             sizeOfKeystring,
             static_cast<int32_t>(sizeOfKeystring - withoutRid.size()),
             SharedBufferFragment(newBuf.release(), newBufLen)};
+}
+
+View View::deserialize(BufReader& reader,
+                       key_string::Version version,
+                       boost::optional<KeyFormat> ridFormat) {
+    auto ksSize = reader.read<LittleEndian<int32_t>>();
+    auto ksData = static_cast<const char*>(reader.skip(ksSize));
+
+    uint32_t ridSize = 0;
+    if (ridFormat) {
+        ridSize = ksSize - withoutRecordIdAtEnd(std::span(ksData, ksSize), *ridFormat).size();
+    }
+
+    uint32_t tbSize = 0;
+    auto tbStart = reader.remaining();
+    if (!TypeBits::fromBuffer(version, &reader).isAllZeros()) {
+        tbSize = tbStart - reader.remaining();
+    }
+
+    return View(version, std::span(ksData, ksSize + tbSize), ridSize, tbSize);
 }
 
 size_t Value::getApproximateSize() const {
@@ -3097,15 +3097,11 @@ Value Value::makeValue(Version version,
                        std::span<const char> ks,
                        std::span<const char> rid,
                        std::span<const char> typeBits) {
-    const auto bufSize = ks.size() + rid.size() + (typeBits.size() > 0 ? typeBits.size() : 1);
+    const auto bufSize = ks.size() + rid.size() + typeBits.size();
     BufBuilder buf(bufSize);
     buf.appendBuf(ks.data(), ks.size());
     buf.appendBuf(rid.data(), rid.size());
-    if (typeBits.size() == 0) {
-        buf.appendChar(0);
-    } else {
-        buf.appendBuf(typeBits.data(), typeBits.size());
-    }
+    buf.appendBuf(typeBits.data(), typeBits.size());
 
     invariant(bufSize == static_cast<unsigned long>(buf.len()));
     return {version,

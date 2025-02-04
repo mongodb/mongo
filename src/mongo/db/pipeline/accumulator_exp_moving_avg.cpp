@@ -41,8 +41,6 @@
 
 namespace mongo {
 
-using boost::intrusive_ptr;
-
 REGISTER_STABLE_WINDOW_FUNCTION(expMovingAvg,
                                 mongo::window_function::ExpressionExpMovingAvg::parse);
 
@@ -62,11 +60,6 @@ void AccumulatorExpMovingAvg::processInternal(const Value& input, bool merging) 
         _currentResult = decimalVal.multiply(_alpha).add(
             _currentResult.multiply(Decimal128(1).subtract(_alpha)));
     }
-}
-
-intrusive_ptr<AccumulatorState> AccumulatorExpMovingAvg::create(ExpressionContext* const expCtx,
-                                                                Decimal128 alpha) {
-    return new AccumulatorExpMovingAvg(expCtx, alpha);
 }
 
 Value AccumulatorExpMovingAvg::getValue(bool toBeMerged) {

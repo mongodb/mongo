@@ -174,7 +174,7 @@ bool ReplaceRootTransformation::pushDotRenamedMatchBefore(Pipeline::SourceContai
             // resulted in an error before the optimization are not 'optimized' to cases which do
             // not error. Optimizations should not change the behavior.
             splitMatchForReplaceRoot.first->joinMatchWith(
-                createTypeNEObjectPredicate(prefixPath, _expCtx), "$or"_sd);
+                createTypeNEObjectPredicate(prefixPath, _expCtx), MatchExpression::MatchType::OR);
 
             // Swap the eligible portion of the match stage with the replaceRoot stage. std::swap is
             // used here as it performs reassignment of what the iterators point to in O(1) for

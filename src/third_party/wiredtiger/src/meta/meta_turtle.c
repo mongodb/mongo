@@ -610,6 +610,7 @@ __wti_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
     WT_DECL_ITEM(buf);
     WT_DECL_RET;
     WT_FSTREAM *fs;
+    char msg[512];
     bool exist;
 
     *valuep = NULL;
@@ -629,21 +630,29 @@ __wti_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
           strcmp(key, WT_METAFILE_URI) == 0 ? __metadata_config(session, valuep) : WT_NOTFOUND);
     WT_RET(__wt_fopen(session, WT_METADATA_TURTLE, 0, WT_STREAM_READ, &fs));
 
+    strcpy(msg, "wt_scr_alloc");
     WT_ERR(__wt_scr_alloc(session, 512, &buf));
 
     /* Search for the key. */
+    WT_ERR(__wt_snprintf(msg, sizeof(msg), "key %s search loop", key));
     do {
         WT_ERR(__wt_getline(session, fs, buf));
-        if (buf->size == 0)
+        if (buf->size == 0) {
+            WT_ERR(__wt_snprintf(msg, sizeof(msg), "key %s reached EOF, not found", key));
             WT_ERR(WT_NOTFOUND);
+        }
     } while (strcmp(key, buf->data) != 0);
 
     /* Key matched: read the subsequent line for the value. */
+    WT_ERR(__wt_snprintf(msg, sizeof(msg), "key %s read value line", key));
     WT_ERR(__wt_getline(session, fs, buf));
-    if (buf->size == 0)
+    if (buf->size == 0) {
+        WT_ERR(__wt_snprintf(msg, sizeof(msg), "key %s reached EOF, value not found", key));
         WT_ERR(WT_NOTFOUND);
+    }
 
     /* Copy the value for the caller. */
+    strcpy(msg, "wt_strdup value");
     WT_ERR(__wt_strdup(session, buf->data, valuep));
 
 err:
@@ -661,7 +670,8 @@ err:
     if (ret == 0 || strcmp(key, WT_METADATA_COMPAT) == 0 || F_ISSET(S2C(session), WT_CONN_SALVAGE))
         return (ret);
     F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
-    WT_RET_PANIC(session, WT_TRY_SALVAGE, "%s: fatal turtle file read error", WT_METADATA_TURTLE);
+    WT_RET_PANIC(session, WT_TRY_SALVAGE, "%s: fatal turtle file read error %d at %s",
+      WT_METADATA_TURTLE, ret, msg);
 }
 
 /*

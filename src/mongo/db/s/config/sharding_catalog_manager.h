@@ -58,6 +58,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/s/remove_shard_draining_progress_gen.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_cache.h"
@@ -85,34 +86,46 @@
 
 namespace mongo {
 
-struct RemoveShardProgress {
-    /**
-     * Used to indicate to the caller of the removeShard method whether draining of chunks for
-     * a particular shard has started, is ongoing, or has been completed. When removing a catalog
-     * shard, there is a new state when waiting for range deletions of all moved away chunks and any
-     * in progress drops of user collections. Removing other shards will skip this state.
-     */
-    enum DrainingShardStatus {
-        STARTED,
-        ONGOING,
-        PENDING_DATA_CLEANUP,
-        COMPLETED,
-    };
+// TODO (SERVER-97816): remove these helpers and move the implementations into the add/remove shard
+// coordinators once 9.0 becomes last LTS.
+namespace topology_change_helpers {
 
-    /**
-     * Used to indicate to the caller of the removeShard method the remaining amount of chunks,
-     * jumbo chunks and databases within the shard
-     */
-    struct DrainingShardUsage {
-        long long totalChunks;
-        long long databases;
-        long long jumboChunks;
-    };
+// Returns the count of range deletion tasks locally on the config server.
+long long getRangeDeletionCount(OperationContext* opCtx);
 
-    DrainingShardStatus status;
-    boost::optional<DrainingShardUsage> remainingCounts;
-    boost::optional<long long> pendingRangeDeletions;
-    boost::optional<NamespaceString> firstNonEmptyCollection;
+// Calls ShardsvrJoinMigrations locally on the config server.
+void joinMigrations(OperationContext* opCtx);
+
+/**
+ * Used during addShard to determine if there is already an existing shard that matches the shard
+ * that is currently being added. An OK return with boost::none indicates that there is no
+ * conflicting shard, and we can proceed trying to add the new shard. An OK return with a ShardType
+ * indicates that there is an existing shard that matches the shard being added but since the
+ * options match, this addShard request can do nothing and return success. A non-OK return either
+ * indicates a problem reading the existing shards from disk or more likely indicates that an
+ * existing shard conflicts with the shard being added and they have different options, so the
+ * addShard attempt must be aborted.
+ */
+StatusWith<boost::optional<ShardType>> checkIfShardExists(
+    OperationContext* opCtx,
+    const ConnectionString& proposedShardConnectionString,
+    const boost::optional<StringData>& proposedShardName,
+    ShardingCatalogClient& localCatalogClient);
+
+/**
+ * Given the shard draining state, returns the message that should be included as part of the remove
+ * shard response.
+ */
+std::string getRemoveShardMessage(const ShardDrainingStateEnum& status);
+
+}  // namespace topology_change_helpers
+
+struct DrainingShardUsage {
+    RemainingCounts removeShardCounts;
+    // This is a failsafe check to be sure we do not accidentally remove a shard which has chunks
+    // left, sharded or otherwise. It is not reported to the user and thus not included in
+    // RemainingCounts.
+    long long totalChunks;
 };
 
 /**
@@ -616,6 +629,14 @@ public:
                                    ShardId shardId);
 
     /**
+     * Appends db and coll information on the status of shard draining to the passed in result
+     * BSONObjBuilder
+     */
+    void appendDBAndCollDrainingInfo(OperationContext* opCtx,
+                                     BSONObjBuilder& result,
+                                     ShardId shardId);
+
+    /**
      * Only used for unit-tests, clears a previously-created catalog manager from the specified
      * service context, so that 'create' can be called again.
      */
@@ -691,21 +712,6 @@ private:
      * Ensure that config.collections exists upon configsvr startup
      */
     Status _initConfigCollections(OperationContext* opCtx);
-
-    /**
-     * Used during addShard to determine if there is already an existing shard that matches the
-     * shard that is currently being added.  An OK return with boost::none indicates that there
-     * is no conflicting shard, and we can proceed trying to add the new shard.  An OK return
-     * with a ShardType indicates that there is an existing shard that matches the shard being added
-     * but since the options match, this addShard request can do nothing and return success.  A
-     * non-OK return either indicates a problem reading the existing shards from disk or more likely
-     * indicates that an existing shard conflicts with the shard being added and they have different
-     * options, so the addShard attempt must be aborted.
-     */
-    StatusWith<boost::optional<ShardType>> _checkIfShardExists(
-        OperationContext* opCtx,
-        const ConnectionString& propsedShardConnectionString,
-        const std::string* shardProposedName);
 
     /**
      * Validates that the specified endpoint can serve as a shard server. In particular, this

@@ -34,7 +34,7 @@ function createBigDocument() {
 
         // Set 'value' as a string with enough characters to make the whole document 'size'
         // bytes long.
-        doc.value = new Array(targetSize - size + 1).join('x');
+        doc.value = 'x'.repeat(targetSize - size);
         assert.eq(targetSize, Object.bsonsize(doc));
 
         return doc;

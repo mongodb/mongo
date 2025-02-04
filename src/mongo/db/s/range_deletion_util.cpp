@@ -98,14 +98,14 @@ MONGO_FAIL_POINT_DEFINE(hangInReadyRangeDeletionLocallyThenSimulateErrorUninterr
  * Performs the deletion of up to numDocsToRemovePerBatch entries within the range in progress. Must
  * be called under the collection lock.
  *
- * Returns the number of documents deleted, 0 if done with the range, or bad status if deleting
- * the range failed.
+ * Returns the number of documents and bytes deleted, 0 if done with the range, or bad status if
+ * deleting the range failed.
  */
-StatusWith<int> deleteNextBatch(OperationContext* opCtx,
-                                const CollectionAcquisition& collection,
-                                BSONObj const& keyPattern,
-                                ChunkRange const& range,
-                                int numDocsToRemovePerBatch) {
+StatusWith<std::pair<int, int>> deleteNextBatch(OperationContext* opCtx,
+                                                const CollectionAcquisition& collection,
+                                                BSONObj const& keyPattern,
+                                                ChunkRange const& range,
+                                                int numDocsToRemovePerBatch) {
     invariant(collection.exists());
 
     auto const nss = collection.nss();
@@ -215,7 +215,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
     ShardingStatistics::get(opCtx).countDocsDeletedByRangeDeleter.addAndFetch(numDocsDeleted);
     ShardingStatistics::get(opCtx).countBytesDeletedByRangeDeleter.addAndFetch(bytesDeleted);
 
-    return numDocsDeleted;
+    return std::make_pair(numDocsDeleted, bytesDeleted);
 }
 
 void ensureRangeDeletionTaskStillExists(OperationContext* opCtx,
@@ -309,14 +309,15 @@ BSONObj getQueryFilterForRangeDeletionTaskOnRecipient(const UUID& collectionUuid
 
 namespace rangedeletionutil {
 
-Status deleteRangeInBatches(OperationContext* opCtx,
-                            const DatabaseName& dbName,
-                            const UUID& collectionUuid,
-                            const BSONObj& keyPattern,
-                            const ChunkRange& range) {
+StatusWith<std::pair<int, int>> deleteRangeInBatches(OperationContext* opCtx,
+                                                     const DatabaseName& dbName,
+                                                     const UUID& collectionUuid,
+                                                     const BSONObj& keyPattern,
+                                                     const ChunkRange& range) {
     suspendRangeDeletion.pauseWhileSet(opCtx);
 
     bool allDocsRemoved = false;
+    int totalNumDeleted = 0, totalBytesDeleted = 0;
     // Delete all batches in this range unless a stepdown error occurs. Do not yield the
     // executor to ensure that this range is fully deleted before another range is
     // processed.
@@ -354,8 +355,11 @@ Status deleteRangeInBatches(OperationContext* opCtx,
                                 "numDocsToRemovePerBatch"_attr = numDocsToRemovePerBatch,
                                 "delayBetweenBatches"_attr = delayBetweenBatches);
 
-                    numDeleted = uassertStatusOK(deleteNextBatch(
+                    auto numDocsAndBytesDeleted = uassertStatusOK(deleteNextBatch(
                         opCtx, collection, keyPattern, range, numDocsToRemovePerBatch));
+                    numDeleted = numDocsAndBytesDeleted.first;
+                    totalNumDeleted += numDeleted;
+                    totalBytesDeleted += numDocsAndBytesDeleted.second;
 
                     return collection.nss();
                 } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
@@ -405,7 +409,7 @@ Status deleteRangeInBatches(OperationContext* opCtx,
             };
         }
     }
-    return Status::OK();
+    return std::make_pair(totalNumDeleted, totalBytesDeleted);
 }
 
 void snapshotRangeDeletionsForRename(OperationContext* opCtx,

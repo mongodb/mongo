@@ -344,6 +344,8 @@ REGISTER_DOCUMENT_SOURCE(_analyzeShardKeyReadWriteDistribution,
                          DocumentSourceAnalyzeShardKeyReadWriteDistribution::LiteParsed::parse,
                          DocumentSourceAnalyzeShardKeyReadWriteDistribution::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
+ALLOCATE_DOCUMENT_SOURCE_ID(_analyzeShardKeyReadWriteDistribution,
+                            DocumentSourceAnalyzeShardKeyReadWriteDistribution::id)
 
 boost::intrusive_ptr<DocumentSource>
 DocumentSourceAnalyzeShardKeyReadWriteDistribution::createFromBson(

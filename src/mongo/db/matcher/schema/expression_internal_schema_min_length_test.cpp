@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -47,42 +48,48 @@ namespace {
 TEST(InternalSchemaMinLengthMatchExpression, RejectsNonStringElements) {
     InternalSchemaMinLengthMatchExpression minLength("a"_sd, 1);
 
-    ASSERT_FALSE(minLength.matchesBSON(BSON("a" << BSONObj())));
-    ASSERT_FALSE(minLength.matchesBSON(BSON("a" << 1)));
-    ASSERT_FALSE(minLength.matchesBSON(BSON("a" << BSON_ARRAY(1))));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&minLength, BSON("a" << BSONObj())));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&minLength, BSON("a" << 1)));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&minLength, BSON("a" << BSON_ARRAY(1))));
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, RejectsStringsWithTooFewChars) {
     InternalSchemaMinLengthMatchExpression minLength("a"_sd, 2);
 
-    ASSERT_FALSE(minLength.matchesBSON(BSON("a"
-                                            << "")));
-    ASSERT_FALSE(minLength.matchesBSON(BSON("a"
-                                            << "a")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&minLength,
+                                            BSON("a"
+                                                 << "")));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&minLength,
+                                            BSON("a"
+                                                 << "a")));
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, AcceptsStringWithAtLeastMinChars) {
     InternalSchemaMinLengthMatchExpression minLength("a"_sd, 2);
 
-    ASSERT_TRUE(minLength.matchesBSON(BSON("a"
-                                           << "ab")));
-    ASSERT_TRUE(minLength.matchesBSON(BSON("a"
-                                           << "abc")));
-    ASSERT_TRUE(minLength.matchesBSON(BSON("a"
-                                           << "abcde")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&minLength,
+                                           BSON("a"
+                                                << "ab")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&minLength,
+                                           BSON("a"
+                                                << "abc")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&minLength,
+                                           BSON("a"
+                                                << "abcde")));
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, MinLengthZeroAllowsEmptyString) {
     InternalSchemaMinLengthMatchExpression minLength("a"_sd, 0);
 
-    ASSERT_TRUE(minLength.matchesBSON(BSON("a"
-                                           << "")));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&minLength,
+                                           BSON("a"
+                                                << "")));
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, RejectsNull) {
     InternalSchemaMinLengthMatchExpression minLength("a"_sd, 1);
 
-    ASSERT_FALSE(minLength.matchesBSON(BSON("a" << BSONNULL)));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&minLength, BSON("a" << BSONNULL)));
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, TreatsMultiByteCodepointAsOneCharacter) {
@@ -91,8 +98,8 @@ TEST(InternalSchemaMinLengthMatchExpression, TreatsMultiByteCodepointAsOneCharac
 
     // This string has one code point, so it should meet minimum length 1 but not minimum length 2.
     const auto testString = u8"\U0001f4a9"_as_char_ptr;
-    ASSERT_TRUE(matchingMinLength.matchesBSON(BSON("a" << testString)));
-    ASSERT_FALSE(nonMatchingMinLength.matchesBSON(BSON("a" << testString)));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&matchingMinLength, BSON("a" << testString)));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&nonMatchingMinLength, BSON("a" << testString)));
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, CorectlyCountsUnicodeCodepoints) {
@@ -109,8 +116,8 @@ TEST(InternalSchemaMinLengthMatchExpression, CorectlyCountsUnicodeCodepoints) {
 
     // This string has five code points, so it should meet minimum length 5 but not minimum
     // length 6.
-    ASSERT_TRUE(matchingMinLength.matchesBSON(BSON("a" << testString)));
-    ASSERT_FALSE(nonMatchingMinLength.matchesBSON(BSON("a" << testString)));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&matchingMinLength, BSON("a" << testString)));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&nonMatchingMinLength, BSON("a" << testString)));
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, DealsWithInvalidUTF8) {
@@ -125,21 +132,26 @@ TEST(InternalSchemaMinLengthMatchExpression, DealsWithInvalidUTF8) {
 
     // Because these inputs are invalid, we don't have any expectations about the answers we get.
     // Our only requirement is that the test does not crash.
-    std::ignore = minLength.matchesBSON(BSON("a" << testStringUnexpectedContinuationByte));
-    std::ignore = minLength.matchesBSON(BSON("a" << testStringOverlongEncoding));
-    std::ignore = minLength.matchesBSON(BSON("a" << testStringInvalidCodePoint));
-    std::ignore = minLength.matchesBSON(BSON("a" << testStringLeadingByteWithoutContinuationByte));
+    std::ignore =
+        exec::matcher::matchesBSON(&minLength, BSON("a" << testStringUnexpectedContinuationByte));
+    std::ignore = exec::matcher::matchesBSON(&minLength, BSON("a" << testStringOverlongEncoding));
+    std::ignore = exec::matcher::matchesBSON(&minLength, BSON("a" << testStringInvalidCodePoint));
+    std::ignore = exec::matcher::matchesBSON(
+        &minLength, BSON("a" << testStringLeadingByteWithoutContinuationByte));
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, NestedFieldsWorkWithDottedPaths) {
     InternalSchemaMinLengthMatchExpression minLength("a.b"_sd, 2);
 
-    ASSERT_TRUE(minLength.matchesBSON(BSON("a" << BSON("b"
-                                                       << "ab"))));
-    ASSERT_TRUE(minLength.matchesBSON(BSON("a" << BSON("b"
-                                                       << "abc"))));
-    ASSERT_FALSE(minLength.matchesBSON(BSON("a" << BSON("b"
-                                                        << "a"))));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&minLength,
+                                           BSON("a" << BSON("b"
+                                                            << "ab"))));
+    ASSERT_TRUE(exec::matcher::matchesBSON(&minLength,
+                                           BSON("a" << BSON("b"
+                                                            << "abc"))));
+    ASSERT_FALSE(exec::matcher::matchesBSON(&minLength,
+                                            BSON("a" << BSON("b"
+                                                             << "a"))));
 }
 
 TEST(InternalSchemaMinLengthMatchExpression, SameMinLengthTreatedEquivalent) {

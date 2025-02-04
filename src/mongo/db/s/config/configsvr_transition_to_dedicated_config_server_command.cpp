@@ -131,10 +131,10 @@ public:
             shardingCatalogManager->appendShardDrainingStatus(
                 opCtx, result, shardDrainingStatus, shardId);
 
-            if (shardDrainingStatus.status == RemoveShardProgress::COMPLETED) {
+            if (shardDrainingStatus.getState() == ShardDrainingStateEnum::kCompleted) {
                 ShardingStatistics::get(opCtx)
                     .countTransitionToDedicatedConfigServerCompleted.addAndFetch(1);
-            } else if (shardDrainingStatus.status == RemoveShardProgress::STARTED) {
+            } else if (shardDrainingStatus.getState() == ShardDrainingStateEnum::kStarted) {
                 ShardingStatistics::get(opCtx)
                     .countTransitionToDedicatedConfigServerStarted.addAndFetch(1);
             }

@@ -67,7 +67,7 @@ const InsertUntilPred = (replSet, pred, ...args) => {
     const oplog = primary.getDB("local").oplog.rs;
     const coll = primary.getDB("insertUntilPred").growOplogPastMaxSize;
     const numNodes = replSet.nodeList().length;
-    const tenKB = new Array(10 * 1024).join("a");
+    const tenKB = "a".repeat(10 * 1024);
 
     print(`Oplog on ${primary} dataSize = ${oplog.dataSize()}`);
     assert.soon(

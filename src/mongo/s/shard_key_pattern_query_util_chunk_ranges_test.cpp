@@ -158,7 +158,7 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksUpdateWithRangePrefix
 
     // When update targets using query.
     auto requestAndSet = buildUpdate(kNss,
-                                     fromjson("{$and: [{'a.b': {$gte : 0}}, {'a.b': {$lt: 99}}]}}"),
+                                     fromjson("{$and: [{'a.b': {$gte : 0}}, {'a.b': {$lt: 99}}]}"),
                                      fromjson("{$set: {p : 1}}"),
                                      false);
 
@@ -215,7 +215,7 @@ void ShardKeyPatternQueryUtilTest::testGetShardIdsAndChunksUpdateWithRangePrefix
     // For replacement style updates, query on _id uses replacement doc to target. If the
     // replacement doc doesn't have shard key fields, then update should be routed to the shard
     // holding 'null' shard key documents.
-    auto requestReplUpdate = buildUpdate(kNss, fromjson("{_id: 1}"), fromjson("{p: 111}}"), false);
+    auto requestReplUpdate = buildUpdate(kNss, fromjson("{_id: 1}"), fromjson("{p: 111}"), false);
     getShardIdsAndChunksForCanonicalQuery(
         *makeCQUpdate(requestReplUpdate, fromjson("{}"), cri.cm), cri.cm, &shardIds, &info, false);
     ASSERT_EQUALS(shardIds.size(), 5);

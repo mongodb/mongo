@@ -101,6 +101,12 @@ private:
     static const CostCoefficient projectionStartup;
     static const CostCoefficient projectionIncrement;
 
+    static const CostCoefficient limitStartup;
+    static const CostCoefficient limitIncrement;
+
+    static const CostCoefficient skipStartup;
+    static const CostCoefficient skipIncrement;
+
     EstimateMap& _estimateMap;
 };
 

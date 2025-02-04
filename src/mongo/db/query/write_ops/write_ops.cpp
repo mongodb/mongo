@@ -62,7 +62,7 @@
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/impersonated_user_metadata.h"
+#include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
@@ -140,10 +140,10 @@ int getWriteCommandRequestBaseSize(const WriteCommandRequestBase& base,
     auto estSize = static_cast<int>(BSONObj::kMinBSONLength) + kSizeOfOrderedField +
         kSizeOfBypassDocumentValidationField;
 
-    // While most metadata attached to a command is limited to less than a KB, Impersonation
-    // metadata may grow to an arbitrary size.
+    // While most metadata attached to a command is limited to less than a KB, Audit metadata may
+    // grow to an arbitrary size.
     if (auto& md = genericArgs.getDollarAudit()) {
-        estSize += rpc::estimateImpersonatedUserMetadataSize(md.get());
+        estSize += rpc::estimateAuditMetadataSize(md.get());
     }
 
     if (auto stmtId = base.getStmtId(); stmtId) {
@@ -179,6 +179,11 @@ int getWriteCommandRequestBaseSize(const WriteCommandRequestBase& base,
         bypassEmptyTsReplacement.has_value()) {
         estSize += write_ops::WriteCommandRequestBase::kBypassEmptyTsReplacementFieldName.size() +
             kBoolSize + kPerElementOverhead;
+    }
+
+    if (auto rawData = base.getRawData(); rawData.has_value()) {
+        estSize += write_ops::WriteCommandRequestBase::kRawDataFieldName.size() + kBoolSize +
+            kPerElementOverhead;
     }
 
     if (auto query = base.getOriginalQuery(); query) {

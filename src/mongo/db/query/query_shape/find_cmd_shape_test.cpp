@@ -74,9 +74,13 @@ public:
         return std::make_unique<FindCmdShape>(*parsedRequest, _expCtx);
     }
 
+    const FindCmdShapeComponents& getShapeComponents(FindCmdShape& shape) {
+        return static_cast<const FindCmdShapeComponents&>(shape.specificComponents());
+    }
+
     BSONObj sortShape(StringData sortJson) {
         auto shape = makeShapeFromSort(sortJson);
-        return shape->components.sort;
+        return getShapeComponents(*shape).sort;
     }
 
     /**
@@ -170,7 +174,7 @@ TEST_F(FindCmdShapeTest, NoOptionalArguments) {
     auto&& parsedRequest =
         uassertStatusOK(::mongo::parsed_find_command::parse(_expCtx, {std::move(fcr)}));
     auto cmdShape = std::make_unique<FindCmdShape>(*parsedRequest, _expCtx);
-    ASSERT_EQUALS(0, cmdShape->components.optionalArgumentsEncoding());
+    ASSERT_EQUALS(0, getShapeComponents(*cmdShape).optionalArgumentsEncoding());
 }
 
 TEST_F(FindCmdShapeTest, AllOptionalArgumentsSetToTrue) {
@@ -189,7 +193,7 @@ TEST_F(FindCmdShapeTest, AllOptionalArgumentsSetToTrue) {
     auto&& parsedRequest =
         uassertStatusOK(::mongo::parsed_find_command::parse(_expCtx, {std::move(fcr)}));
     auto cmdShape = std::make_unique<FindCmdShape>(*parsedRequest, _expCtx);
-    ASSERT_EQUALS(0x2FFFF, cmdShape->components.optionalArgumentsEncoding());
+    ASSERT_EQUALS(0x2FFFF, getShapeComponents(*cmdShape).optionalArgumentsEncoding());
 }
 
 TEST_F(FindCmdShapeTest, AllOptionalArgumentsSetToFalse) {
@@ -205,7 +209,7 @@ TEST_F(FindCmdShapeTest, AllOptionalArgumentsSetToFalse) {
     auto&& parsedRequest =
         uassertStatusOK(::mongo::parsed_find_command::parse(_expCtx, {std::move(fcr)}));
     auto cmdShape = std::make_unique<FindCmdShape>(*parsedRequest, _expCtx);
-    ASSERT_EQUALS(0x2AAA8, cmdShape->components.optionalArgumentsEncoding());
+    ASSERT_EQUALS(0x2AAA8, getShapeComponents(*cmdShape).optionalArgumentsEncoding());
 }
 
 
@@ -217,7 +221,7 @@ TEST_F(FindCmdShapeTest, SizeOfShapeComponents) {
     const auto minimumSize = sizeof(FindCmdShapeComponents) + querySize;
     ASSERT_GT(findCmdComponent->size(), minimumSize);
     ASSERT_LTE(findCmdComponent->size(),
-               minimumSize + static_cast<size_t>(4 * BSONObj().objsize()));
+               minimumSize + static_cast<size_t>(5 * BSONObj().objsize()));
 }
 
 TEST_F(FindCmdShapeTest, EquivalentShapeComponentsSizes) {

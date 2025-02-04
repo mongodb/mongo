@@ -47,6 +47,8 @@ REGISTER_DOCUMENT_SOURCE(_internalInhibitOptimization,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceInternalInhibitOptimization::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalInhibitOptimization,
+                            DocumentSourceInternalInhibitOptimization::id)
 
 constexpr StringData DocumentSourceInternalInhibitOptimization::kStageName;
 

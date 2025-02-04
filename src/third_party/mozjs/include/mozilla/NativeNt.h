@@ -1242,6 +1242,59 @@ class MOZ_RAII PEExportSection {
     return rvaToFunction;
   }
 
+  BOOL ReplaceExportNameTableEntry(const char* aFunctionNameASCII,
+                                   const char* aReplFunctionNameASCII) const {
+    if (!*this || !aFunctionNameASCII || !aReplFunctionNameASCII) {
+      return FALSE;
+    }
+
+    struct NameTableComparator {
+      NameTableComparator(const PEExportSection<MMPolicy>& aExportSection,
+                          const char* aTarget)
+          : mExportSection(aExportSection),
+            mTargetName(aTarget),
+            mTargetNamelength(StrlenASCII(aTarget)) {}
+
+      int operator()(DWORD aRVAToString) const {
+        mozilla::interceptor::TargetObjectArray<MMPolicy, char> itemString(
+            mExportSection.mMMPolicy, mExportSection.mImageBase + aRVAToString,
+            mTargetNamelength + 1);
+        return StrcmpASCII(mTargetName, itemString[0]);
+      }
+
+      const PEExportSection<MMPolicy>& mExportSection;
+      const char* mTargetName;
+      size_t mTargetNamelength;
+    };
+
+    const NameTableComparator comp(*this, aFunctionNameASCII);
+
+    size_t match;
+    if (!mExportNameTable.BinarySearchIf(comp, &match)) {
+      return FALSE;
+    }
+
+    const DWORD* rvaToString = mExportNameTable[match];
+    if (!rvaToString) {
+      return FALSE;
+    }
+
+    auto replNameLen = StrlenASCII(aReplFunctionNameASCII);
+    char* namePtr = reinterpret_cast<char*>(mImageBase + *rvaToString);
+    if (StrlenASCII(namePtr) < replNameLen) {
+      return FALSE;
+    }
+
+    auto replNameLenIncNull = replNameLen + 1;
+    AutoVirtualProtect prot(namePtr, replNameLenIncNull, PAGE_READWRITE);
+    if (!prot) {
+      return FALSE;
+    }
+
+    memcpy(namePtr, aReplFunctionNameASCII, replNameLenIncNull);
+    return TRUE;
+  }
+
   /**
    * This functions behaves the same as the native ::GetProcAddress except
    * the following cases:

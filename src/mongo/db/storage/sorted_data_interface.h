@@ -105,7 +105,7 @@ public:
      */
     virtual std::variant<Status, DuplicateKey> insert(
         OperationContext* opCtx,
-        const key_string::Value& keyString,
+        const key_string::View& keyString,
         bool dupsAllowed,
         IncludeDuplicateRecordId includeDuplicateRecordId = IncludeDuplicateRecordId::kOff) = 0;
 
@@ -118,7 +118,7 @@ public:
      *        match, false otherwise
      */
     virtual void unindex(OperationContext* opCtx,
-                         const key_string::Value& keyString,
+                         const key_string::View& keyString,
                          bool dupsAllowed) = 0;
 
     /**
@@ -137,7 +137,7 @@ public:
      * @param opCtx the transaction under which this operation takes place
      */
     virtual boost::optional<DuplicateKey> dupKeyCheck(OperationContext* opCtx,
-                                                      const SortedDataKeyValueView& keyString) = 0;
+                                                      const key_string::View& keyString) = 0;
 
     /**
      * Attempt to reduce the storage space used by this index via compaction. Only called if the
@@ -188,7 +188,7 @@ public:
      * Prints any storage engine provided metadata for the index entry with key 'keyString'.
      */
     virtual void printIndexEntryMetadata(OperationContext* opCtx,
-                                         const key_string::Value& keyString) const = 0;
+                                         const key_string::View& keyString) const = 0;
 
     /**
      * Return the number of entries in 'this' index.
@@ -453,7 +453,7 @@ public:
      * transactionally. Other storage engines do not perform inserts transactionally and will ignore
      * any parent WriteUnitOfWork.
      */
-    virtual void addKey(const key_string::Value& keyString) = 0;
+    virtual void addKey(const key_string::View& keyString) = 0;
 };
 
 /**
@@ -463,6 +463,9 @@ public:
  * - KeyString data without RecordId
  * - Encoded RecordId
  * - TypeBits (optional)
+ *
+ * This differs from key_string::View in that the three components may not be contiguous in memory,
+ * as keystrings are split into a key and value when stored in an index.
  */
 class SortedDataKeyValueView {
 public:
@@ -487,19 +490,6 @@ public:
         invariant(rid.size() < std::numeric_limits<int32_t>::max());
         invariant(typeBits.size() < std::numeric_limits<int32_t>::max());
         _ksOriginalSize = isRecordIdAtEndOfKeyString ? (key.size() + rid.size()) : key.size();
-    }
-
-    /**
-     * Construct a SortedDataKeyValueView which points into the given RecordData, which must outlive
-     * this view.
-     */
-    SortedDataKeyValueView(const RecordData& record, key_string::Version keyStringVersion)
-        : _version(keyStringVersion) {
-        BufReader reader(record.data(), record.size());
-        _ksOriginalSize = _ksSize = reader.read<LittleEndian<int32_t>>();
-        _ksData = static_cast<const char*>(reader.skip(_ksSize));
-        _tbSize = reader.remaining();
-        _tbData = static_cast<const char*>(reader.skip(_tbSize));
     }
 
     SortedDataKeyValueView() = default;

@@ -94,6 +94,7 @@ enums:
             kAbortTransaction: "abortTransaction"
             kImportCollection: "importCollection"
             kModifyCollectionShardingIndexCatalog: "modifyCollectionShardingIndexCatalog"
+            kDatabaseMetadataUpdate: "databaseMetadataUpdate"
 
 types:
     zeroOneManyStmtId:

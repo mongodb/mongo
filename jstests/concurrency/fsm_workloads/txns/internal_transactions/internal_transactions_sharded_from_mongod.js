@@ -74,6 +74,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         return defaultDb.getCollection(collName);
     };
 
+    $config.data.insertSessionDoc = function insertSessionDoc(db, sessionId) {
+        const res = db["testSessionIds"].insert({"_id": sessionId});
+        assert.commandWorked(res);
+        assert.eq(1, res.nInserted);
+    };
+
     $config.data.startSessions = function startSessions(db) {
         const randomShardPrimary = this.randomShardRst.getPrimary();
 
@@ -87,6 +93,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         }
         this.sessions.push(this.nonRetryableWriteSession);
         this.sessions.push(this.retryableWriteSession);
+        this.insertSessionDoc(db, this.nonRetryableWriteSession.getSessionId().id);
+        this.insertSessionDoc(db, this.retryableWriteSession.getSessionId().id);
 
         const randomShardInfo = {shard: this.randomShardRst.name, primary: randomShardPrimary};
         print(`Started a non-retryable write session ${
@@ -111,8 +119,30 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 this.startSessions(defaultDb);
                 return;
             }
+            if (e.code == ErrorCodes.IncompleteTransactionHistory &&
+                e.errmsg.includes("Incomplete history detected for transaction")) {
+                // This test sets a low transactionLifeTimeLimit so a retry may hit this error.
+                print("Ignoring retry error" + tojsononeline(e));
+                return;
+            }
             throw e;
         }
+    };
+
+    $config.teardown = function teardown(db, collName, cluster) {
+        $super.teardown.apply(this, arguments);
+
+        // If a shard node that is acting as a router for an internal transaction is
+        // killed/terminated/stepped down or the transaction's session is killed while running a
+        // non-retryable transaction, the transaction would be left in-progress since nothing
+        // would abort it. Such dangling transactions can cause the CheckReplDBHash hook to hang
+        // as the fsyncLock command requires taking the global S lock and it cannot do that while
+        // there is an in-progress transaction.
+
+        // Cleanup up all local sessions.
+        let sessionIds = db["testSessionIds"].find({}, {id: "$_id", _id: 0}).toArray();
+        assert.commandWorked(db.runCommand({killSessions: sessionIds}));
+        assert(db["testSessionIds"].drop());
     };
 
     $config.states.init = function init(db, collName, connCache) {

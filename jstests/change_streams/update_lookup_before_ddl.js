@@ -101,6 +101,11 @@ function assertUpdateLookupResultBeforeOp(op, changeStreamOptions) {
             changeStreamOptions.matchCollectionUUIDForUpdateLookup ? null : updatedDocInCollA;
     }
 
+    // If this test is running with secondary read preference, it's necessary for the update
+    // to propagate to all secondary nodes and be available for majority reads before we can
+    // assume looking up the document will succeed.
+    FixtureHelpers.awaitLastOpCommitted(db);
+
     expected = {
         documentKey: {_id: doc._id},
         fullDocument: expectedFullDocument,

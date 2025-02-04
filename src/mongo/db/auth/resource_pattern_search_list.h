@@ -36,7 +36,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
 
 namespace mongo::auth {

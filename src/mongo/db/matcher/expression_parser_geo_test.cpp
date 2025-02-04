@@ -34,6 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -54,11 +55,11 @@ TEST(MatchExpressionParserGeo, WithinBox) {
         query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_TRUE(result.isOK());
 
-    ASSERT(!result.getValue()->matchesBSON(fromjson("{a: [3,4]}")));
-    ASSERT(result.getValue()->matchesBSON(fromjson("{a: [4,4]}")));
-    ASSERT(result.getValue()->matchesBSON(fromjson("{a: [5,5]}")));
-    ASSERT(result.getValue()->matchesBSON(fromjson("{a: [5,5.1]}")));
-    ASSERT(result.getValue()->matchesBSON(fromjson("{a: {x: 5, y:5.1}}")));
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: [3,4]}")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: [4,4]}")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: [5,5]}")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: [5,5.1]}")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: {x: 5, y:5.1}}")));
 }
 
 TEST(MatchExpressionParserGeoNear, ParseNear) {

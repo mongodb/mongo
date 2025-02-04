@@ -51,6 +51,8 @@ REGISTER_DOCUMENT_SOURCE(search,
                          DocumentSourceSearch::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
 
+ALLOCATE_DOCUMENT_SOURCE_ID(search, DocumentSourceSearch::id)
+
 // $searchBeta is supported as an alias for $search for compatibility with applications that used
 // search during its beta period.
 REGISTER_DOCUMENT_SOURCE(searchBeta,
@@ -100,6 +102,12 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
 }
 
 std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
+    if (pExpCtx->getViewNSForMongotIndexedView()) {
+        // This function will throw if the view violates validation rules for supporting
+        // mongot-indexed views.
+        search_helpers::validateViewPipeline(pExpCtx);
+    }
+
     auto executor =
         executor::getMongotTaskExecutor(pExpCtx->getOperationContext()->getServiceContext());
     std::list<intrusive_ptr<DocumentSource>> desugaredPipeline;
@@ -172,7 +180,7 @@ bool checkRequiresSearchSequenceToken(Pipeline::SourceContainer::iterator itr,
         nextStage->getDependencies(&deps);
         ++itr;
     }
-    return deps.searchMetadataDeps()[DocumentMetadataFields::kSearchSequenceToken];
+    return deps.getNeedsMetadata(DocumentMetadataFields::kSearchSequenceToken);
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceSearch::doOptimizeAt(

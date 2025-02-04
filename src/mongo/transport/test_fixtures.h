@@ -36,6 +36,7 @@
 #include <boost/filesystem.hpp>
 
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session.h"
@@ -313,6 +314,41 @@ private:
     std::string _sslCAFile;
     std::string _sslPEMKeyFile;
     int _sslMode;
+};
+
+struct NetworkConnectionStats {
+    int logicalBytesIn;
+    int logicalBytesOut;
+    int physicalBytesIn;
+    int physicalBytesOut;
+    int numRequests;
+
+    static NetworkConnectionStats get(NetworkCounter::ConnectionType type) {
+        BSONObjBuilder bob;
+        networkCounter.append(bob);
+        BSONObj metrics = bob.obj();
+        if (type == NetworkCounter::ConnectionType::kEgress) {
+            metrics = metrics.getField("egress").Obj().getOwned();
+        }
+
+        NetworkConnectionStats stats;
+        stats.logicalBytesIn = metrics["bytesIn"].numberInt();
+        stats.logicalBytesOut = metrics["bytesOut"].numberInt();
+        stats.physicalBytesIn = metrics["physicalBytesIn"].numberInt();
+        stats.physicalBytesOut = metrics["physicalBytesOut"].numberInt();
+        stats.numRequests = metrics["numRequests"].numberInt();
+        return stats;
+    }
+
+    NetworkConnectionStats getDifference(NetworkConnectionStats other) {
+        NetworkConnectionStats diff;
+        diff.logicalBytesIn = logicalBytesIn - other.logicalBytesIn;
+        diff.logicalBytesOut = logicalBytesOut - other.logicalBytesOut;
+        diff.physicalBytesIn = physicalBytesIn - other.physicalBytesIn;
+        diff.physicalBytesOut = physicalBytesOut - other.physicalBytesOut;
+        diff.numRequests = numRequests - other.numRequests;
+        return diff;
+    }
 };
 
 }  // namespace mongo::transport::test

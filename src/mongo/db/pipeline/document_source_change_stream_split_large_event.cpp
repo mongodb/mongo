@@ -62,6 +62,8 @@ REGISTER_DOCUMENT_SOURCE(changeStreamSplitLargeEvent,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceChangeStreamSplitLargeEvent::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
+ALLOCATE_DOCUMENT_SOURCE_ID(changeStreamSplitLargeEvent,
+                            DocumentSourceChangeStreamSplitLargeEvent::id)
 
 boost::intrusive_ptr<DocumentSourceChangeStreamSplitLargeEvent>
 DocumentSourceChangeStreamSplitLargeEvent::create(

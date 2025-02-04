@@ -38,7 +38,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/transaction_resources.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {

@@ -92,7 +92,6 @@ groups:
       - "Query Integration"
     slack_tags:
       - "<@U067K23N0RL>" # thomas.chang@mongodb.com - VP
-      - "<@U01KLN6C8V8>" # kyle.suarez@mongodb.com - Director
       - "<@U0X6DK154>" # bernard.gorman@mongodb.com - Director
       - "<@U02QV8TTGG0>" # steve.tarzia@mongodb.com - Director
       - "<@U0294T002>" # james.wahlin@mongodb.com - Director
@@ -109,7 +108,7 @@ groups:
       - "Build"
       - "Correctness"
     slack_tags:
-      - "<@U03F4KZUYP5>" # tara.hernandex@mongodb.com - VP
+      - "<@U03F4KZUYP5>" # tara.hernandez@mongodb.com - VP
       - "<@U05RNJZ9212>" # byron.hood@mongodb.com - Director
       - "<@U064RTDGS2W>" # stacey.kingpoling@mongodb.com - Director
       - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
@@ -171,15 +170,16 @@ teams:
       - "<!subteam^S05UGLCB76U>" # @leads-storage-engines - Leads
   - name: "Query Execution"
     slack_tags:
-      - "<@U01KLN6C8V8>" # kyle.suarez@mongodb.com - Director
       - "<@U0X6DK154>" # bernard.gorman@mongodb.com - Director
+      - "<!subteam^S088MANHJCW>" # @leads-query-execution - Leads
   - name: "Query Optimization"
     slack_tags:
-      - "<@U0X6DK154>" # bernard.gorman@mongodb.com - Director
       - "<@U02QV8TTGG0>" # steve.tarzia@mongodb.com - Director
+      - "<@UFX9FEFDG>" # anton.korshunov@mongodb.com - Senior Lead
   - name: "Query Integration"
     slack_tags:
       - "<@U0294T002>" # james.wahlin@mongodb.com - Director
+      - "<!subteam^S080PEJEYUW>" # @leads-staff-query-integration - Leads + Staff
   - name: "Server Triage"
     slack_tags:
       - "<@U0V9XLF8R>" # kelsey.schubert@mongodb.com - Director

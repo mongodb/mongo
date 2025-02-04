@@ -93,6 +93,7 @@ public:
                                const LiteParsedPipeline& liteParsedPipeline,
                                const PrivilegeVector& privileges,
                                boost::optional<CollectionRoutingInfo> cri,
+                               boost::optional<ExplainOptions::Verbosity> verbosity,
                                BSONObjBuilder* result);
 
     /**
@@ -103,6 +104,7 @@ public:
                                AggregateCommandRequest& request,
                                const LiteParsedPipeline& liteParsedPipeline,
                                const PrivilegeVector& privileges,
+                               boost::optional<ExplainOptions::Verbosity> verbosity,
                                BSONObjBuilder* result);
 
 
@@ -113,6 +115,7 @@ public:
                                const Namespaces& namespaces,
                                AggregateCommandRequest& request,
                                const PrivilegeVector& privileges,
+                               boost::optional<ExplainOptions::Verbosity> verbosity,
                                BSONObjBuilder* result);
 
     /**
@@ -129,6 +132,7 @@ public:
                                    const ResolvedView& resolvedView,
                                    const NamespaceString& requestedNss,
                                    const PrivilegeVector& privileges,
+                                   boost::optional<ExplainOptions::Verbosity> verbosity,
                                    BSONObjBuilder* result,
                                    unsigned numberRetries = 0);
 };

@@ -28,9 +28,12 @@
  */
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 namespace mongo {
 namespace {
 class WiredTigerUtilHelperTest : public unittest::Test {
@@ -39,7 +42,7 @@ public:
         bool txnTooLarge;
         bool tempUnavailable;
         bool cacheInsufficient;
-        const char* reason;
+        int sub_level_err;
     };
 
     void throwsWriteConflictException(TestCase testCase, ErrorCodes::Error err) {
@@ -47,22 +50,23 @@ public:
                                                      testCase.tempUnavailable,
                                                      session,
                                                      cacheThreshold,
-                                                     testCase.reason,
+                                                     reason,
                                                      prefix,
-                                                     retCode),
+                                                     retCode,
+                                                     testCase.sub_level_err),
                            StorageUnavailableException,
                            err)
             << "Expected " << ErrorCodes::errorString(err)
             << " error for txnTooLargeEnabled: " << testCase.txnTooLarge
             << ", temporarilyUnavailableEnabled: " << testCase.tempUnavailable
-            << ", and rollback reason: " << testCase.reason;
+            << ", and sub_level_err: " << subLevelErrorToString(testCase.sub_level_err);
     }
 
     void throwsCachePressureException(TestCase testCase, ErrorCodes::Error err) {
         ASSERT_THROWS_CODE(throwCachePressureExceptionIfAppropriate(testCase.txnTooLarge,
                                                                     testCase.tempUnavailable,
                                                                     testCase.cacheInsufficient,
-                                                                    testCase.reason,
+                                                                    reason,
                                                                     prefix,
                                                                     retCode),
                            StorageUnavailableException,
@@ -71,14 +75,29 @@ public:
             << " error for txnTooLargeEnabled: " << testCase.txnTooLarge
             << ", temporarilyUnavailableEnabled: " << testCase.tempUnavailable
             << ", cacheIsInsufficientForTransaction: " << testCase.cacheInsufficient
-            << ", and rollback reason: " << testCase.reason;
+            << ", and sub_level_err: " << subLevelErrorToString(testCase.sub_level_err);
     }
 
-    const char* reasonEviction = WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION;
-    const char* reasonOverflow = WT_TXN_ROLLBACK_REASON_CACHE_OVERFLOW;
-    const char* noReason = "";
+    std::string subLevelErrorToString(int sub_level_err) {
+        switch (sub_level_err) {
+            case WT_WRITE_CONFLICT:
+                return "WT_WRITE_CONFLICT";
+            case WT_OLDEST_FOR_EVICTION:
+                return "WT_OLDEST_FOR_EVICTION";
+            case WT_CACHE_OVERFLOW:
+                return "WT_CACHE_OVERFLOW";
+            case WT_NONE:
+                return "WT_NONE";
+            default:
+                break;
+        }
+        LOGV2_DEBUG(
+            9979801, 1, "Unexpected sub-level error code", "sub_level_err"_attr = sub_level_err);
+        MONGO_UNREACHABLE;
+    }
 
     StringData prefix = "";
+    const char* reason = "";
     int retCode = 0;
     double cacheThreshold = 0;
     WT_SESSION* session = nullptr;
@@ -91,13 +110,10 @@ TEST_F(WiredTigerUtilHelperTest, transactionExceededCacheThreshold) {
 }
 
 TEST_F(WiredTigerUtilHelperTest, rollbackReasonWasCachePressure) {
-    auto randomReason = "random";
-
-    ASSERT_FALSE(rollbackReasonWasCachePressure(noReason));
-    ASSERT_FALSE(rollbackReasonWasCachePressure(randomReason));
-
-    ASSERT_TRUE(rollbackReasonWasCachePressure(reasonEviction));
-    ASSERT_TRUE(rollbackReasonWasCachePressure(reasonOverflow));
+    ASSERT_FALSE(rollbackReasonWasCachePressure(WT_BACKGROUND_COMPACT_ALREADY_RUNNING));
+    ASSERT_FALSE(rollbackReasonWasCachePressure(WT_NONE));
+    ASSERT_TRUE(rollbackReasonWasCachePressure(WT_OLDEST_FOR_EVICTION));
+    ASSERT_TRUE(rollbackReasonWasCachePressure(WT_CACHE_OVERFLOW));
 }
 
 TEST_F(WiredTigerUtilHelperTest, throwTransactionTooLargeForCacheException) {
@@ -108,19 +124,19 @@ TEST_F(WiredTigerUtilHelperTest, throwTransactionTooLargeForCacheException) {
         {.txnTooLarge = true,
          .tempUnavailable = false,
          .cacheInsufficient = true,
-         .reason = reasonEviction},
+         .sub_level_err = WT_OLDEST_FOR_EVICTION},
         {.txnTooLarge = true,
          .tempUnavailable = false,
          .cacheInsufficient = true,
-         .reason = reasonOverflow},
+         .sub_level_err = WT_CACHE_OVERFLOW},
         {.txnTooLarge = true,
          .tempUnavailable = true,
          .cacheInsufficient = true,
-         .reason = reasonEviction},
+         .sub_level_err = WT_OLDEST_FOR_EVICTION},
         {.txnTooLarge = true,
          .tempUnavailable = true,
          .cacheInsufficient = true,
-         .reason = reasonOverflow},
+         .sub_level_err = WT_CACHE_OVERFLOW},
     };
 
     for (auto testCase : transactionTooLargeTestCases) {
@@ -136,27 +152,27 @@ TEST_F(WiredTigerUtilHelperTest, throwTemporarilyUnavailableException) {
         {.txnTooLarge = false,
          .tempUnavailable = true,
          .cacheInsufficient = false,
-         .reason = reasonEviction},
+         .sub_level_err = WT_OLDEST_FOR_EVICTION},
         {.txnTooLarge = false,
          .tempUnavailable = true,
          .cacheInsufficient = false,
-         .reason = reasonOverflow},
-        {.txnTooLarge = false,
-         .tempUnavailable = true,
-         .cacheInsufficient = true,
-         .reason = reasonEviction},
+         .sub_level_err = WT_CACHE_OVERFLOW},
         {.txnTooLarge = false,
          .tempUnavailable = true,
          .cacheInsufficient = true,
-         .reason = reasonOverflow},
+         .sub_level_err = WT_OLDEST_FOR_EVICTION},
+        {.txnTooLarge = false,
+         .tempUnavailable = true,
+         .cacheInsufficient = true,
+         .sub_level_err = WT_CACHE_OVERFLOW},
         {.txnTooLarge = true,
          .tempUnavailable = true,
          .cacheInsufficient = false,
-         .reason = reasonEviction},
+         .sub_level_err = WT_OLDEST_FOR_EVICTION},
         {.txnTooLarge = true,
          .tempUnavailable = true,
          .cacheInsufficient = false,
-         .reason = reasonOverflow},
+         .sub_level_err = WT_CACHE_OVERFLOW},
     };
 
     for (auto testCase : temporarilyUnavailableTestCases) {
@@ -170,38 +186,38 @@ TEST_F(WiredTigerUtilHelperTest, throwWriteConflictException) {
         {.txnTooLarge = true,
          .tempUnavailable = false,
          .cacheInsufficient = false /*ignored*/,
-         .reason = noReason},
+         .sub_level_err = WT_NONE},
         {.txnTooLarge = true,
          .tempUnavailable = true,
          .cacheInsufficient = false /*ignored*/,
-         .reason = noReason},
+         .sub_level_err = WT_NONE},
         {.txnTooLarge = false,
          .tempUnavailable = true,
          .cacheInsufficient = false /*ignored*/,
-         .reason = noReason},
+         .sub_level_err = WT_NONE},
         {.txnTooLarge = false,
          .tempUnavailable = false,
          .cacheInsufficient = false /*ignored*/,
-         .reason = noReason},
+         .sub_level_err = WT_NONE},
 
         // Throws WCE for transaction no matter the reason for rollback if both
         // TransactionTooLargeForCache and temporarilyUnavailable are disabled.
         {.txnTooLarge = false,
          .tempUnavailable = false,
          .cacheInsufficient = false /*ignored*/,
-         .reason = reasonEviction},
+         .sub_level_err = WT_OLDEST_FOR_EVICTION},
         {.txnTooLarge = false,
          .tempUnavailable = false,
          .cacheInsufficient = false /*ignored*/,
-         .reason = reasonOverflow},
+         .sub_level_err = WT_CACHE_OVERFLOW},
         {.txnTooLarge = false,
          .tempUnavailable = false,
          .cacheInsufficient = false /*ignored*/,
-         .reason = reasonOverflow},
+         .sub_level_err = WT_CACHE_OVERFLOW},
         {.txnTooLarge = false,
          .tempUnavailable = false,
          .cacheInsufficient = false /*ignored*/,
-         .reason = reasonEviction},
+         .sub_level_err = WT_OLDEST_FOR_EVICTION},
     };
 
     for (auto testCase : writeConflictExceptionTestCases) {
@@ -216,18 +232,18 @@ TEST_F(WiredTigerUtilHelperTest, doesNotThrowCachePressureException) {
         {.txnTooLarge = true,
          .tempUnavailable = false,
          .cacheInsufficient = false,
-         .reason = reasonEviction},
+         .sub_level_err = WT_OLDEST_FOR_EVICTION},
         {.txnTooLarge = true,
          .tempUnavailable = false,
          .cacheInsufficient = false,
-         .reason = reasonOverflow},
+         .sub_level_err = WT_CACHE_OVERFLOW},
     };
 
     for (auto testCase : notCachePressureExceptionTestCases) {
         ASSERT_DOES_NOT_THROW(throwCachePressureExceptionIfAppropriate(testCase.txnTooLarge,
                                                                        testCase.tempUnavailable,
                                                                        testCase.cacheInsufficient,
-                                                                       testCase.reason,
+                                                                       reason,
                                                                        prefix,
                                                                        retCode));
     }

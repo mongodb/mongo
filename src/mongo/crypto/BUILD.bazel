@@ -130,6 +130,7 @@ mongo_cc_library(
         "//src/mongo/db:common",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db:wire_version",
         "//src/mongo/idl:cluster_server_parameter",
         "//src/mongo/shell:kms_idl",
         "//src/mongo/util:testing_options",

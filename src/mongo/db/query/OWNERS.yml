@@ -19,10 +19,7 @@ filters:
       - 10gen/query-execution-index-access-stats
   - "collection_query_info*":
     approvers:
-      # TODO SERVER-96045: This is currently owned by query because the plan cache part is a query
-      # optimization component, while the update and stats tracking components are owned by query
-      # execution. As such, this can be split between the two teams once these files are split up.
-      - 10gen/query
+      - 10gen/query-optimization-plan-cache
   - "eof_node_type*":
     approvers:
       - 10gen/query-optimization
@@ -74,6 +71,9 @@ filters:
   - "partitioned_cache.h":
     approvers:
       - 10gen/query-optimization-plan-cache
+  - "canonical_query*":
+    approvers:
+      - 10gen/query-optimization-logical-models
   - "canonical_query_encoder*":
     approvers:
       - 10gen/query-optimization-plan-cache
@@ -83,6 +83,13 @@ filters:
   - "*.idl":
     approvers:
       - 10gen/query-optimization-parsers
+  - "query_feature_flags.idl":
+    approvers:
+      # Almost every project will create and adjust a feature flag.
+      # These changes are typically straightforward so they don't need
+      # an extra review from query-optimization-parsers; anyone on query
+      # can approve these changes.
+      - 10gen/query
   - "projection_parser*":
     approvers:
       - 10gen/query-optimization-parsers
@@ -92,9 +99,6 @@ filters:
   - "parsed*":
     approvers:
       - 10gen/query-optimization-parsers
-  - "canonical_query*":
-    approvers:
-      - 10gen/query-optimization-logical-models
   - "canonical_distinct*":
     approvers:
       - 10gen/query-optimization-logical-models

@@ -267,7 +267,8 @@ DBCollection.prototype.find = function(filter, projection, limit, skip, batchSiz
     return cursor;
 };
 
-DBCollection.prototype.findOne = function(filter, projection, options, readConcern, collation) {
+DBCollection.prototype.findOne = function(
+    filter, projection, options, readConcern, collation, rawData) {
     var cursor =
         this.find(filter, projection, -1 /* limit */, 0 /* skip*/, 0 /* batchSize */, options);
 
@@ -277,6 +278,10 @@ DBCollection.prototype.findOne = function(filter, projection, options, readConce
 
     if (collation) {
         cursor = cursor.collation(collation);
+    }
+
+    if (rawData) {
+        cursor = cursor.rawData();
     }
 
     if (!cursor.hasNext())
@@ -959,7 +964,12 @@ DBCollection.prototype.convertToCapped = function(bytes) {
     return this._dbCommand({convertToCapped: this._shortName, size: bytes});
 };
 
-DBCollection.prototype.exists = function() {
+/*
+ * Returns metadata for the collection using listCollections.
+ *
+ * If the collection does not exists return null.
+ */
+DBCollection.prototype.getMetadata = function() {
     var res = this._db.runCommand("listCollections", {filter: {name: this._shortName}});
     if (res.ok) {
         const cursor = new DBCommandCursor(this._db, res);
@@ -971,9 +981,21 @@ DBCollection.prototype.exists = function() {
     throw _getErrorWithCode(res, "listCollections failed: " + tojson(res));
 };
 
+DBCollection.prototype.exists = function() {
+    return this.getMetadata();
+};
+
 DBCollection.prototype.isCapped = function() {
-    var e = this.exists();
-    return (e && e.options && e.options.capped) ? true : false;
+    const m = this.getMetadata();
+    return (m && m.options && m.options.capped) ? true : false;
+};
+
+DBCollection.prototype.getUUID = function() {
+    const m = this.getMetadata();
+    if (!m) {
+        throw Error(`Collection '${this}' does not exist.`);
+    }
+    return m.info.uuid;
 };
 
 //
@@ -1548,6 +1570,10 @@ DBCollection.prototype.distinct = function(keyString, query, options) {
 
     if (opts.hint) {
         cmd.hint = opts.hint;
+    }
+
+    if (opts.rawData) {
+        cmd.rawData = opts.rawData;
     }
 
     // Execute distinct command

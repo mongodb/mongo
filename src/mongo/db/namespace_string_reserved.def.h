@@ -59,9 +59,13 @@ NSS_CONSTANT(kSessionTransactionsTableNamespace, DatabaseName::kConfig, "transac
 // state of a specific collection
 NSS_CONSTANT(kShardConfigCollectionsNamespace, DatabaseName::kConfig, "cache.collections"_sd)
 
-// Name for a shard's databases metadata collection, each document of which indicates the state
-// of a specific database
-NSS_CONSTANT(kShardConfigDatabasesNamespace, DatabaseName::kConfig, "cache.databases"_sd)
+// Name for a shard's non-authoritative databases metadata collection, each document of which
+// indicates the state of a specific database.
+NSS_CONSTANT(kConfigCacheDatabasesNamespace, DatabaseName::kConfig, "cache.databases"_sd)
+
+// Name for a shard's authoritative databases metadata collection, each document of which indicates
+// the state of a specific database.
+NSS_CONSTANT(kConfigShardDatabasesNamespace, DatabaseName::kConfig, "shard.databases"_sd)
 
 // Namespace for storing keys for signing and validating cluster times created by the cluster
 // that this node is in.

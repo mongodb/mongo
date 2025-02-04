@@ -39,10 +39,11 @@
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/executor/async_client_factory.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/connection_pool_tl.h"
-#include "mongo/executor/network_interface_tl.h"
+#include "mongo/executor/pooled_async_client_factory.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/idl/idl_parser.h"
@@ -71,14 +72,16 @@ public:
         auto sc = getGlobalServiceContext();
         auto tl = sc->getTransportLayerManager()->getDefaultEgressLayer();
         _reactor = tl->getReactor(transport::TransportLayer::kNewReactor);
-        _reactorThread = stdx::thread([&] { _reactor->run(); });
+        _reactorThread = stdx::thread([&] {
+            _reactor->run();
+            _reactor->drain();
+        });
 
         ConnectionPool::Options connPoolOptions;
         connPoolOptions.minConnections = 0;
-        auto typeFactory = std::make_unique<connection_pool_tl::TLTypeFactory>(
-            _reactor, tl, nullptr, connPoolOptions, nullptr);
-        _pool = std::make_shared<ConnectionPool>(
-            std::move(typeFactory), "ExhaustResponseReader", connPoolOptions);
+        _pool = std::make_shared<PooledAsyncClientFactory>(
+            "ExhaustResponseReader", connPoolOptions, nullptr);
+        _pool->startup(sc, tl, _reactor);
     }
 
     void tearDown() override {
@@ -98,12 +101,12 @@ public:
         return unittest::getFixtureConnectionString().getServers().front();
     }
 
-    ConnectionPool::ConnectionHandle getConnection() {
+    std::shared_ptr<AsyncClientFactory::AsyncClientHandle> getConnection() {
         return _pool->get(getServer(), transport::ConnectSSLMode::kGlobalSSLMode, Seconds(30))
             .get();
     }
 
-    ConnectionPool& getPool() {
+    AsyncClientFactory& getPool() {
         return *_pool;
     }
 
@@ -145,7 +148,7 @@ public:
 
     ConnectionStatsPer getPoolStats() {
         ConnectionPoolStats stats;
-        getPool().appendConnectionStats(&stats);
+        getPool().appendStats(&stats);
         return stats.statsByHost[getServer()];
     }
 
@@ -174,7 +177,7 @@ public:
     }
 
 private:
-    std::shared_ptr<ConnectionPool> _pool;
+    std::shared_ptr<AsyncClientFactory> _pool;
     stdx::thread _reactorThread;
     std::shared_ptr<transport::Reactor> _reactor;
 };
@@ -183,12 +186,12 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, ReceiveMultipleResponses) {
     CancellationSource cancelSource;
 
     auto conn = getConnection();
-    auto client = getClient(conn);
+    auto& client = conn->getClient();
 
     auto request = makeExhaustHello(Milliseconds(150));
     auto rdr = std::make_shared<ExhaustResponseReaderTL>(
         request,
-        assertOK(client->beginExhaustCommandRequest(request).getNoThrow()),
+        assertOK(client.beginExhaustCommandRequest(request).getNoThrow()),
         std::move(conn),
         nullptr,
         getReactor(),
@@ -216,7 +219,7 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, CancelRead) {
     CancellationSource cancelSource;
 
     auto conn = getConnection();
-    auto client = getClient(conn);
+    auto& client = conn->getClient();
 
     // Use longer maxAwaitTimeMS to ensure we start waiting.
     auto request = makeExhaustHello(Seconds(30));
@@ -224,7 +227,7 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, CancelRead) {
 
     auto rdr = std::make_shared<ExhaustResponseReaderTL>(
         request,
-        assertOK(client->beginExhaustCommandRequest(request).getNoThrow()),
+        assertOK(client.beginExhaustCommandRequest(request).getNoThrow()),
         std::move(conn),
         nullptr,
         getReactor(),
@@ -256,21 +259,20 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, CommandSucceeds) {
     const auto nss = NamespaceStringUtil::deserialize(DatabaseName::kMdbTesting, "CommandSucceeds");
 
     auto conn = getConnection();
-    auto client = getClient(conn);
+    auto& client = conn->getClient();
 
-    assertOK(client->runCommandRequest(makeTestRequest(nss.dbName(), BSON("drop" << nss.coll())))
+    assertOK(client.runCommandRequest(makeTestRequest(nss.dbName(), BSON("drop" << nss.coll())))
                  .getNoThrow());
 
     write_ops::InsertCommandRequest insert(nss);
     insert.setDocuments(documents);
-    assertOK(
-        client->runCommandRequest(makeTestRequest(nss.dbName(), insert.toBSON())).getNoThrow());
+    assertOK(client.runCommandRequest(makeTestRequest(nss.dbName(), insert.toBSON())).getNoThrow());
 
     FindCommandRequest find(nss);
     find.setSort(BSON("_id" << 1));
     find.setBatchSize(0);
     auto findResp = assertOK(
-        client->runCommandRequest(makeTestRequest(nss.dbName(), find.toBSON())).getNoThrow());
+        client.runCommandRequest(makeTestRequest(nss.dbName(), find.toBSON())).getNoThrow());
     auto cursorReply = CursorInitialReply::parse(IDLParserContext("findReply"), findResp.data);
 
     GetMoreCommandRequest getMore(cursorReply.getCursor()->getCursorId(), nss.coll().toString());
@@ -279,7 +281,7 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, CommandSucceeds) {
     auto getMoreRequest = makeTestRequest(nss.dbName(), getMore.toBSON());
     auto rdr = std::make_shared<ExhaustResponseReaderTL>(
         getMoreRequest,
-        assertOK(client->beginExhaustCommandRequest(getMoreRequest).getNoThrow()),
+        assertOK(client.beginExhaustCommandRequest(getMoreRequest).getNoThrow()),
         std::move(conn),
         nullptr,
         getReactor());
@@ -321,7 +323,7 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, CommandSucceeds) {
 
 TEST_F(ExhaustResponseReaderIntegrationFixture, RemoteCancel) {
     auto conn = getConnection();
-    auto client = getClient(conn);
+    auto& client = conn->getClient();
 
     // Use long maxAwaitTimeMS to ensure we start waiting.
     auto clientOperationKey = UUID::gen();
@@ -329,7 +331,7 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, RemoteCancel) {
     request.timeout = Seconds(30);
     auto rdr = std::make_shared<ExhaustResponseReaderTL>(
         request,
-        assertOK(client->beginExhaustCommandRequest(request).getNoThrow()),
+        assertOK(client.beginExhaustCommandRequest(request).getNoThrow()),
         std::move(conn),
         nullptr,
         getReactor());
@@ -344,12 +346,11 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, RemoteCancel) {
           "Killing exhaust command remotely",
           "clientOperationKey"_attr = clientOperationKey);
     auto cancelConn = getConnection();
-    auto cancelClient = getClient(cancelConn);
+    auto& cancelClient = cancelConn->getClient();
     KillOperationsRequest killOps({clientOperationKey});
     killOps.setDbName(DatabaseName::kAdmin);
-    assertOK(
-        cancelClient->runCommandRequest(makeTestRequest(DatabaseName::kAdmin, killOps.toBSON()))
-            .getNoThrow());
+    assertOK(cancelClient.runCommandRequest(makeTestRequest(DatabaseName::kAdmin, killOps.toBSON()))
+                 .getNoThrow());
     cancelConn->indicateUsed();
     cancelConn->indicateSuccess();
 
@@ -366,7 +367,7 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, RemoteCancel) {
 
 TEST_F(ExhaustResponseReaderIntegrationFixture, LocalTimeout) {
     auto conn = getConnection();
-    auto client = getClient(conn);
+    auto& client = conn->getClient();
 
     // Use a maxAwaitTimeMS longer than the local timeout.
     auto request = makeExhaustHello(Milliseconds(60000));
@@ -374,7 +375,7 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, LocalTimeout) {
 
     auto rdr = std::make_shared<ExhaustResponseReaderTL>(
         request,
-        assertOK(client->beginExhaustCommandRequest(request).getNoThrow()),
+        assertOK(client.beginExhaustCommandRequest(request).getNoThrow()),
         std::move(conn),
         nullptr,
         getReactor());

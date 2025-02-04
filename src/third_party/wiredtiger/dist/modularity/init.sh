@@ -36,6 +36,8 @@ want_update() {
 }
 
 if want_update; then
-    pip3 -q --disable-pip-version-check install git+"$REPO_URL@$BRANCH"
+    # Force reinstall `layercparse` to ensure the latest changes are applied, 
+    # as `pip install` does not update automatically for new commits.
+    pip3 -q --disable-pip-version-check install --force-reinstall git+"$REPO_URL@$BRANCH"
     echo "$REMOTE_HASH" > "$HASH_FILE"
 fi

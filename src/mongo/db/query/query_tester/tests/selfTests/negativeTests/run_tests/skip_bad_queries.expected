@@ -1,0 +1,19 @@
+skip_bad_queries
+negative_test
+test.coll as coll
+
+// This test should execute successfully and be numbered 0.
+0
+:sortFull { "aggregate" : "coll", "pipeline" : [ { "$addFields" : { "projected" : { "$toString": "$value" } } } ], cursor: {} }
+[
+{"_id":0,"projected":"a","value":"a"},
+{"_id":1,"projected":"b","value":"b"}
+]
+
+// This test should execute successfully and be numbered 2.
+2
+:sortFull { "aggregate" : "coll", "pipeline" : [ { "$addFields" : { "projected" : { "$toLong": "$_id" } } } ], cursor: {} }
+[
+{"_id":0,"projected":0,"value":"a"},
+{"_id":1,"projected":1,"value":"b"}
+]

@@ -72,7 +72,7 @@ public:
                     size_t decisionWorks,
                     std::unique_ptr<PlanStage> root);
 
-    bool isEOF() final;
+    bool isEOF() const final;
 
     StageState doWork(WorkingSetID* out) final;
 

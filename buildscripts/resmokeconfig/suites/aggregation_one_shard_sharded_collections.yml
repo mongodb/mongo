@@ -7,7 +7,7 @@ selector:
     - jstests/aggregation/extras/*.js
     - jstests/aggregation/data/*.js
     # TODO: Remove when SERVER-23229 is fixed.
-    - jstests/aggregation/bugs/groupMissing.js
+    - jstests/aggregation/sources/group/groupMissing.js
     - jstests/aggregation/sources/graphLookup/variables.js
   exclude_with_any_tags:
     # This passthrough implicitly shards the accessed collections. Do not run tests where collections

@@ -36,6 +36,8 @@
 #include <utility>
 #include <vector>
 
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
@@ -43,6 +45,7 @@
 #include "mongo/util/functional.h"
 #include "mongo/util/str.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kProcessHealth
 namespace mongo {
 namespace process_health {
 
@@ -116,16 +119,22 @@ public:
 
     // Define a valid transition.
     // Must be called prior to starting the state machine.
-    void validTransition(State from, State to) noexcept {
-        stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
-        tassertNotStarted();
-        auto& context = _states[from];
-        context.validTransitions.insert(to);
+    void validTransition(State from, State to) {
+        try {
+            stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+            tassertNotStarted();
+            auto& context = _states[from];
+            context.validTransitions.insert(to);
+        } catch (const std::exception& e) {
+            LOGV2_FATAL(9894900,
+                        "Terminating process on invalid state transition",
+                        "except"_attr = e.what());
+        }
     }
 
     // Define valid transitions.
     // Must be called prior to starting the state machine.
-    void validTransitions(const TransitionsContainer& transitions) noexcept {
+    void validTransitions(const TransitionsContainer& transitions) {
         for (const auto& [from, toStates] : transitions) {
             for (auto to : toStates) {
                 validTransition(from, to);
@@ -182,7 +191,7 @@ public:
         // Accepts input message m when state machine is in state _state. Optionally, the
         // state machine transitions to the state specified in the return value. Entry and exit
         // hooks will not fire if this method returns boost::none.
-        virtual boost::optional<State> accept(const OptionalMessageType& message) noexcept = 0;
+        virtual boost::optional<State> accept(const OptionalMessageType& message) = 0;
 
         // The state this handler is defined for
         State state() const {
@@ -194,9 +203,15 @@ public:
             return this;
         }
 
-        void fireEnter(State previous, const OptionalMessageType& m) noexcept {
+        void fireEnter(State previous, const OptionalMessageType& m) {
             for (auto& cb : _onEnter)
-                cb(previous, _state, m);
+                try {
+                    cb(previous, _state, m);
+                } catch (const std::exception& e) {
+                    LOGV2_FATAL(9894901,
+                                "Process health transition handler threw during execution",
+                                "except"_attr = e.what());
+                }
         }
 
         StateEventRegistryPtr exit(StateCallback&& cb) override {
@@ -204,7 +219,7 @@ public:
             return this;
         }
 
-        void fireExit(State newState, const OptionalMessageType& message) noexcept {
+        void fireExit(State newState, const OptionalMessageType& message) {
             for (auto& cb : _onExit)
                 cb(_state, newState, message);
         }
@@ -228,7 +243,7 @@ public:
             : StateHandler(state), _messageHandler(std::move(m)) {}
         ~LambdaStateHandler() override {}
 
-        boost::optional<State> accept(const OptionalMessageType& m) noexcept override {
+        boost::optional<State> accept(const OptionalMessageType& m) override {
             return _messageHandler(m);
         }
 
@@ -329,3 +344,5 @@ protected:
 };
 }  // namespace process_health
 }  // namespace mongo
+
+#undef MONGO_LOGV2_DEFAULT_COMPONENT

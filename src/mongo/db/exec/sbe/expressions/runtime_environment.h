@@ -40,7 +40,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/db/exec/sbe/abt/slots_provider.h"
+#include "mongo/db/exec/sbe/slots_provider.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/util/assert_util.h"
@@ -67,7 +67,7 @@ namespace mongo::sbe {
  * If the runtime environment is used in a serial plan, modification of the slots is allowed.
  */
 using InputParamToSlotMap = stdx::unordered_map<MatchExpression::InputParamId, sbe::value::SlotId>;
-class RuntimeEnvironment final : public optimizer::SlotsProvider {
+class RuntimeEnvironment final : public SlotsProvider {
 public:
     RuntimeEnvironment() = default;
     RuntimeEnvironment(RuntimeEnvironment&&) = delete;

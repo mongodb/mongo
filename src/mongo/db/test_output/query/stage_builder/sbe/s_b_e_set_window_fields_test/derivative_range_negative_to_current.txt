@@ -1,0 +1,25 @@
+# Golden test output of SBESetWindowFieldsTest/DerivativeRangeNegativeToCurrent
+[2] project [s22 = makeBsonObj(MakeObjSpec([speed = Set(0)], Open, NewObj, 0), s2, s21)] 
+[2] project [s21 = 
+    if exists(s7) 
+    then 
+        if (s7 > 0ll) 
+        then aggDerivativeFinalize(3600000ll, s9, s15, s11, s16) 
+        else null 
+    
+    else null 
+] 
+[2] window [s2, s4, s13, s12] [frameFirst[s8, s9, s15, s18], frameLast[s10, s11, s16, s19], lowBound{((s17 <=> dateAdd(s20, s12, "second", -30ll, "UTC")) >= 0)}, highBound{((s17 <=> dateAdd(s20, s12, "second", 0ll, "UTC")) <= 0)}] [s7 = {init{}, add{sum(1ll)}, remove{sum(-1ll)}}] 
+[2] project [s12 = 
+    let [
+        l2.0 = (s13 ?: null) 
+    ] 
+    in 
+        if isDate(l2.0) 
+        then move(l2.0) 
+        else fail(7956500, "Invalid range: Expected the sortBy field to be a date") 
+] 
+[2] project [s13 = s3] 
+[1] project [s3 = getField(s2, "a"), s4 = getField(s2, "b")] 
+[1] project [s2 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"a" : Date(1736467200000), "b" : 100}], [{"a" : Date(1736467230000), "b" : 101}], [{"a" : Date(1736467260000), "b" : 102.5L}], [{"a" : Date(1736467290000), "b" : 103}]]} 

@@ -126,7 +126,7 @@ public:
     ~BatchedDeleteStage() override;
 
     // Returns true when no more work can be done (there are no more deletes to commit).
-    bool isEOF() final;
+    bool isEOF() const final;
 
     std::unique_ptr<mongo::PlanStageStats> getStats() final;
 

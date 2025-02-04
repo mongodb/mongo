@@ -90,7 +90,7 @@ function testResume(mongosColl, collToWatch) {
     const shardWithResumeToken = st.rs1.getPrimary();  // Resume from shard 1.
     const mostRecentOplogEntry = getLatestOp(shardWithResumeToken);
     assert.neq(mostRecentOplogEntry, null);
-    const largeStr = new Array(4 * 1024 * oplogSize).join('abcdefghi');
+    const largeStr = 'abcdefghi'.repeat(4 * 1024 * oplogSize);
     let i = 0;
 
     function oplogIsRolledOver() {

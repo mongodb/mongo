@@ -44,6 +44,16 @@ LINKER_LINKFLAGS = select(
     no_match_error = LINKER_ERROR_MESSAGE,
 )
 
+LINKSTATIC_ENABLED = select({
+    "@//bazel/config:linkstatic_enabled": True,
+    "@//conditions:default": False,
+})
+
+SHARED_ARCHIVE_ENABLED = select({
+    "@//bazel/config:shared_archive_enabled": True,
+    "@//conditions:default": False,
+})
+
 LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS] + LINKER_LINKFLAGS
 
 mongo_cc_toolchain_config(
@@ -68,12 +78,14 @@ mongo_cc_toolchain_config(
         "dwp": "{version}/bin/dwp",
         "objcopy": "{version}/bin/llvm-objcopy",
         "objdump": "{version}/bin/objdump",
-        "gcov": "{version}/bin/gcov",
         "strip": "{version}/bin/strip",
+        "gcov": "{version}/bin/gcov",
         "llvm-cov": "/bin/false",  # /bin/false = we're not using llvm-cov
     },
     toolchain_identifier = "gcc_toolchain",
     verbose = True,
+    linkstatic = LINKSTATIC_ENABLED,
+    shared_archive = SHARED_ARCHIVE_ENABLED,
 )
 
 mongo_cc_toolchain_config(
@@ -103,12 +115,14 @@ mongo_cc_toolchain_config(
         "dwp": "{version}/bin/dwp",
         "objcopy": "{version}/bin/llvm-objcopy",
         "objdump": "{version}/bin/objdump",
-        "gcov": "{version}/bin/gcov",
         "strip": "{version}/bin/strip",
-        "llvm-cov": "/bin/false",  # /bin/false = we're not using llvm-cov
+        "gcov": "{version}/bin/llvm-profdata",
+        "llvm-cov": "{version}/bin/llvm-cov",
     },
     toolchain_identifier = "clang_toolchain",
     verbose = True,
+    linkstatic = LINKSTATIC_ENABLED,
+    shared_archive = SHARED_ARCHIVE_ENABLED,
 )
 
 cc_toolchain(

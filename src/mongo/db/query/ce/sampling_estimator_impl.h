@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/query/ce/sampling_estimator.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 
 namespace mongo::ce {
@@ -84,7 +85,7 @@ public:
      * MEs against the sample.
      */
     std::vector<CardinalityEstimate> estimateCardinality(
-        const std::vector<MatchExpression*>& expr) const override;
+        const std::vector<const MatchExpression*>& expr) const override;
 
     /**
      * Estimates the number of keys scanned for the given IndexBounds. This function extracts all
@@ -92,6 +93,9 @@ public:
      * evaluating the index keys against the given IndexBounds.
      */
     CardinalityEstimate estimateKeysScanned(const IndexBounds& bounds) const override;
+
+    std::vector<CardinalityEstimate> estimateKeysScanned(
+        const std::vector<const IndexBounds*>& bounds) const override;
 
     /**
      * Estimate the number of RIDs which 'bounds' will return. Similar to 'estimateKeysScanned(..)',
@@ -102,6 +106,10 @@ public:
      */
     CardinalityEstimate estimateRIDs(const IndexBounds& bounds,
                                      const MatchExpression* expr) const override;
+
+    std::vector<CardinalityEstimate> estimateRIDs(
+        const std::vector<const IndexBounds*>& bounds,
+        const std::vector<const MatchExpression*>& expressions) const override;
 
     /*
      * Generates a sample using a random cursor. The caller can call this function to draw a sample
@@ -132,7 +140,7 @@ protected:
      */
     static std::unique_ptr<CanonicalQuery> makeCanonicalQuery(const NamespaceString& nss,
                                                               OperationContext* opCtx,
-                                                              size_t sampleSize);
+                                                              boost::optional<size_t> sampleSize);
 
     double getCollCard() const {
         return _collectionCard.cardinality().v();
@@ -201,6 +209,21 @@ private:
      */
     std::pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>
     generateChunkSamplingPlan(PlanYieldPolicy* sbeYieldPolicy);
+
+    /**
+     * Generates a sample by doing a full "CollScan" against the target collection. This sample is
+     * generated when the collection size is smaller than the required sample size.
+     */
+    void generateFullCollScanSample();
+
+    /**
+     * This function executes the sampling query and generates the sample from the documents
+     * produced by the query.
+     */
+    void executeSamplingQueryAndSample(
+        std::pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>& plan,
+        std::unique_ptr<CanonicalQuery> cq,
+        std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy);
 
     /*
      * The SamplingEstimator calculates the size of a sample based on the confidence level and

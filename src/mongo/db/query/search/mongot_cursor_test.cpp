@@ -115,7 +115,8 @@ public:
             // If we have no starting batchSize or idLookupMetrics, use the default GetMoreStrategy.
             mongotGetMoreStrategy = std::make_unique<MongotTaskExecutorCursorGetMoreStrategy>();
         }
-        return Base::makeTec(rcr, {std::move(mongotGetMoreStrategy)});
+        return Base::makeTec(rcr,
+                             {gPinTaskExecCursorConns.load(), std::move(mongotGetMoreStrategy)});
     }
 
     bool hasReadyRequests() {
@@ -886,6 +887,25 @@ TEST_F(NonPinningMongotCursorTestFixture,
        NonStoredSourceExtractableLimitNotAllDocsFoundInLookupTest) {
     NonStoredSourceExtractableLimitNotAllDocsFoundInLookupTest();
 }
+
+TEST(PinConnectionSettingTest, AlwaysSetWithGRPC) {
+    RAIIServerParameterControllerForTest globalPinConn("pinTaskExecCursorConns", false);
+    RAIIServerParameterControllerForTest grpcForSearch("useGrpcForSearch", true);
+    ASSERT_TRUE(mongot_cursor::shouldPinConnection());
+}
+
+TEST(PinConnectionSettingTest, SetFromPinTaskExecCursorConns) {
+    RAIIServerParameterControllerForTest globalPinConn("pinTaskExecCursorConns", true);
+    RAIIServerParameterControllerForTest grpcForSearch("useGrpcForSearch", false);
+    ASSERT_TRUE(mongot_cursor::shouldPinConnection());
+}
+
+TEST(PinConnectionSettingTest, NeitherParamSet) {
+    RAIIServerParameterControllerForTest globalPinConn("pinTaskExecCursorConns", false);
+    RAIIServerParameterControllerForTest grpcForSearch("useGrpcForSearch", false);
+    ASSERT_FALSE(mongot_cursor::shouldPinConnection());
+}
+
 }  // namespace
 }  // namespace executor
 }  // namespace mongo

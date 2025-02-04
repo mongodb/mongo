@@ -1637,33 +1637,29 @@ def _bind_feature_flags(ctxt, param):
 
     ast_param.set_at = "ServerParameterType::kStartupOnly"
 
-    ast_param.cpp_vartype = "::mongo::FeatureFlag"
+    expr = syntax.Expression(param.default.file_name, param.default.line, param.default.column)
 
     # Feature flags that default to false must not have a version
     if param.default.literal == "false" and param.version:
         ctxt.add_feature_flag_default_false_has_version(param)
         return None
 
-    # Feature flags that default to true and should be FCV gated are required to have a version
-    if (
-        param.default.literal == "true"
-        and param.shouldBeFCVGated.literal == "true"
-        and not param.version
-    ):
-        ctxt.add_feature_flag_default_true_missing_version(param)
-        return None
+    if param.shouldBeFCVGated.literal == "true":
+        # Feature flags that default to true and should be FCV gated are required to have a version
+        if param.default.literal == "true" and not param.version:
+            ctxt.add_feature_flag_default_true_missing_version(param)
+            return None
 
-    # Feature flags that should not be FCV gated must not have a version
-    if param.shouldBeFCVGated.literal == "false" and param.version:
-        ctxt.add_feature_flag_fcv_gated_false_has_version(param)
-        return None
+        ast_param.cpp_vartype = "::mongo::FeatureFlagFCVGated"
+        expr.expr = f'{param.default.literal}, "{param.version or ""}"_sd'
+    else:
+        # Feature flags that should not be FCV gated must not have a version
+        if param.version:
+            ctxt.add_feature_flag_fcv_gated_false_has_version(param)
+            return None
 
-    expr = syntax.Expression(param.default.file_name, param.default.line, param.default.column)
-    expr.expr = '%s, "%s"_sd, %s' % (
-        param.default.literal,
-        param.version if (param.shouldBeFCVGated.literal == "true" and param.version) else "",
-        param.shouldBeFCVGated.literal,
-    )
+        ast_param.cpp_vartype = "::mongo::FeatureFlagBinaryCompatible"
+        expr.expr = param.default.literal
 
     ast_param.default = _bind_expression(expr)
     ast_param.default.export = False

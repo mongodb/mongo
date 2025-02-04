@@ -1,0 +1,10 @@
+# Golden test output of SbeTimeseriesTest/TestMatch
+[3] project [s14 = makeBsonObj(MakeObjSpec([a, tag], Closed, RetNothing, 0), s13)] 
+[2] project [s13 = newBsonObj("_id", s10, "a", s11, "tag", s3, "time", s12)] 
+[2] block_to_row blocks[s5, s6, s7] row[s10, s11, s12] s9 
+[2] filter {!(valueBlockNone(s9, true))} 
+[2] project [s9 = valueBlockLogicalAnd(s4, cellFoldValues_F(valueBlockFillEmpty(valueBlockGtScalar(cellBlockGetFlatValuesBlock(s8), Date(1740329258692)), false), s8))] 
+[2] ts_bucket_to_cellblock s2 pathReqs[s5 = ProjectPath(Get(_id)/Id), s6 = ProjectPath(Get(a)/Id), s7 = ProjectPath(Get(time)/Id), s8 = FilterPath(Get(time)/Traverse/Id)] bitmap = s4 
+[1] project [s3 = getField(s2, "meta")] 
+[1] project [s2 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"_id" : bsonObjectId("649f0704230f18da067519c4"), "control" : {"version" : 1}, "meta" : "A", "data" : {"_id" : {"0" : 0, "1" : 1}, "a" : {"0" : 9, "1" : 0}, "time" : {"0" : Date(1736786829512), "1" : Date(1740329229512)}}}], [{"_id" : bsonObjectId("649f0704c3d83a4c3fe91689"), "control" : {"version" : 1}, "meta" : "B", "data" : {"time" : {"0" : Date(1740329258692), "1" : Date(1740329267918)}, "_id" : {"0" : 3, "1" : 4}, "a" : {"0" : 100, "1" : 101}}}]]} 

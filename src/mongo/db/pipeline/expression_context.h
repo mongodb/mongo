@@ -113,6 +113,10 @@ struct ResolvedNamespace {
     std::vector<BSONObj> pipeline;
     boost::optional<UUID> uuid = boost::none;
     bool involvedNamespaceIsAView = false;
+    // TODO (SERVER-100170): Add a LiteParsedPipeline member. We often need this information when
+    // resolving views and currently recompute the object every time it's requested. Once added, go
+    // through the rest of the codebase to ensure that we aren't unnecessarily creating a
+    // LiteParsedPipeline object when it's already being stored here.
 };
 
 enum class ExpressionContextCollationMatchesDefault { kYes, kNo };
@@ -831,11 +835,16 @@ public:
         _params.tailableMode = tailableMode;
     }
 
-    boost::optional<NamespaceString> getViewNS() const {
-        return _params.viewNS;
+    boost::optional<NamespaceString> getViewNSForMongotIndexedView() const {
+        return _featureFlagGuardedMongotIndexedViewNs.get();
     }
 
-    void setViewNS(boost::optional<NamespaceString> viewNS) {
+    bool isFeatureFlagMongotIndexedViewsEnabled() const {
+        return feature_flags::gFeatureFlagMongotIndexedViews.isEnabledUseLatestFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    }
+
+    void setViewNSForMongotIndexedView(boost::optional<NamespaceString> viewNS) {
         _params.viewNS = std::move(viewNS);
     }
 
@@ -892,6 +901,10 @@ public:
 
     bool isFeatureFlagShardFilteringDistinctScanEnabled() const {
         return _featureFlagShardFilteringDistinctScan.get();
+    }
+
+    bool isBasicRankFusionEnabled() const {
+        return _featureFlagRankFusionBasic.get();
     }
 
     bool isFeatureFlagStreamsEnabled() const {
@@ -1005,7 +1018,7 @@ protected:
 
     /**
      * Construct an expression context using ExpressionContextParams. Consider using
-     * ExpressonContextBuilder instead.
+     * ExpressionContextBuilder instead.
      */
     ExpressionContext(ExpressionContextParams&& config);
 
@@ -1097,9 +1110,22 @@ private:
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     }};
 
+    Deferred<bool (*)()> _featureFlagRankFusionBasic{[] {
+        return feature_flags::gFeatureFlagRankFusionBasic.isEnabledUseLastLTSFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    }};
+
     // Initialized in constructor to avoid including server_feature_flags_gen.h
     // in this header file.
     Deferred<bool (*)()> _featureFlagStreams;
+
+    DeferredFn<boost::optional<NamespaceString>> _featureFlagGuardedMongotIndexedViewNs{
+        [this]() -> boost::optional<NamespaceString> {
+            if (isFeatureFlagMongotIndexedViewsEnabled()) {
+                return _params.viewNS;
+            }
+            return boost::none;
+        }};
 };
 
 class ExpressionContextBuilder {

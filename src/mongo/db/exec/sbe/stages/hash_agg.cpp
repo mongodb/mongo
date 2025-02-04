@@ -373,8 +373,10 @@ void HashAggStage::open(bool reOpen) {
             }
 
             auto& ru = *shard_role_details::getRecoveryUnit(_opCtx);
-            _specificStats.spilledDataStorageSize = _recordStore->rs()->storageSize(ru);
-            groupCounters.incrementGroupCountersPerQuery(_specificStats.spilledDataStorageSize);
+            _specificStats.spillingStats.updateSpilledDataStorageSize(
+                _recordStore->rs()->storageSize(ru));
+            groupCounters.incrementGroupCountersPerQuery(
+                _specificStats.spillingStats.getSpilledDataStorageSize());
 
             // Establish a cursor, positioned at the beginning of the record store.
             _rsCursor = _recordStore->getCursor(_opCtx);
@@ -539,10 +541,15 @@ std::unique_ptr<PlanStageStats> HashAggStage::getStats(bool includeDebugInfo) co
 
         // Spilling stats.
         bob.appendBool("usedDisk", _specificStats.usedDisk);
-        bob.appendNumber("spills", _specificStats.spills);
-        bob.appendNumber("spilledBytes", _specificStats.spilledBytes);
-        bob.appendNumber("spilledRecords", _specificStats.spilledRecords);
-        bob.appendNumber("spilledDataStorageSize", _specificStats.spilledDataStorageSize);
+        bob.appendNumber("spills",
+                         static_cast<long long>(_specificStats.spillingStats.getSpills()));
+        bob.appendNumber("spilledBytes",
+                         static_cast<long long>(_specificStats.spillingStats.getSpilledBytes()));
+        bob.appendNumber("spilledRecords",
+                         static_cast<long long>(_specificStats.spillingStats.getSpilledRecords()));
+        bob.appendNumber(
+            "spilledDataStorageSize",
+            static_cast<long long>(_specificStats.spillingStats.getSpilledDataStorageSize()));
 
         ret->debugInfo = bob.obj();
     }

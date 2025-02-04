@@ -29,21 +29,25 @@
 
 #include "mongo/db/query/cost_based_ranker/cardinality_estimator.h"
 
+#include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/query/ce/histogram_estimator.h"
 #include "mongo/db/query/cost_based_ranker/heuristic_estimator.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/stage_types.h"
+#include <absl/container/flat_hash_map.h>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryCE
 
 namespace mongo::cost_based_ranker {
 
-CardinalityEstimator::CardinalityEstimator(const stats::CollectionStatistics& collStats,
+CardinalityEstimator::CardinalityEstimator(const CollectionInfo& collInfo,
                                            const ce::SamplingEstimator* samplingEstimator,
                                            EstimateMap& qsnEstimates,
                                            QueryPlanRankerModeEnum rankerMode)
-    : _collCard{CardinalityEstimate{CardinalityType{collStats.getCardinality()},
+    : _collCard{CardinalityEstimate{CardinalityType{collInfo.collStats->getCardinality()},
                                     EstimationSource::Metadata}},
       _inputCard{_collCard},
-      _collStats(collStats),
+      _collInfo(collInfo),
       _samplingEstimator(samplingEstimator),
       _qsnEstimates{qsnEstimates},
       _rankerMode(rankerMode) {
@@ -53,11 +57,21 @@ CardinalityEstimator::CardinalityEstimator(const stats::CollectionStatistics& co
                 "samplingEstimator cannot be null when ranker mode is samplingCE or automaticCE",
                 _samplingEstimator != nullptr);
     }
+    for (auto&& indexEntry : _collInfo.indexes) {
+        for (auto&& indexedPath : indexEntry.keyPattern) {
+            auto path = indexedPath.fieldNameStringData();
+            if (indexEntry.pathHasMultikeyComponent(path)) {
+                _multikeyPaths.insert(path);
+            } else {
+                _nonMultikeyPaths.insert(path);
+            }
+        }
+    }
 }
 
 CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
     StageType nodeType = node->getType();
-    CEResult ceRes{zeroCE};
+    CEResult ceRes(ErrorCodes::CEFailure, "Unable to estimate expression");
     bool isConjunctionBreaker = false;
 
     switch (nodeType) {
@@ -80,38 +94,65 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
             ceRes = indexIntersectionCard(static_cast<const AndSortedNode*>(node));
             break;
         case STAGE_OR:
+            // Notice that his is not a conjunction breaker because the result can be combined with
+            // the parent's node estimates. Thus indexUnionCard is responsible for replacing the
+            // selectivities of the union's children with the selectivity of the union as a whole.
             ceRes = indexUnionCard(static_cast<const OrNode*>(node));
-            isConjunctionBreaker = true;
             break;
         case STAGE_SORT_MERGE:
+            // See comment for STAGE_OR.
             ceRes = indexUnionCard(static_cast<const MergeSortNode*>(node));
-            isConjunctionBreaker = true;
             break;
         case STAGE_SORT_DEFAULT:
-        case STAGE_SORT_SIMPLE:
+        case STAGE_SORT_SIMPLE: {
+            const SortNode* sortNode = static_cast<const SortNode*>(node);
+            ceRes = estimate(sortNode);
+            if (sortNode->limit > 0) {
+                // If there is no limit, this node is just a sort and doesn't affect cardinality.
+                isConjunctionBreaker = true;
+            }
+            break;
+        }
         case STAGE_PROJECTION_DEFAULT:
         case STAGE_PROJECTION_COVERED:
-        case STAGE_PROJECTION_SIMPLE:
+        case STAGE_PROJECTION_SIMPLE: {
             ceRes = passThroughNodeCard(node);
             break;
-        case STAGE_EOF:
+        }
+        case STAGE_EOF: {
             _qsnEstimates[node] = QSNEstimate{.inCE = zeroCE, .outCE = zeroCE};
             return zeroCE;
-        // TODO SERVER-99072: Implement limit and skip
+        }
         case STAGE_LIMIT:
+            ceRes = estimate(static_cast<const LimitNode*>(node));
+            isConjunctionBreaker = true;
+            break;
         case STAGE_SKIP:
-        // TODO SERVER-99073: Implement shard filter
+            ceRes = estimate(static_cast<const SkipNode*>(node));
+            isConjunctionBreaker = true;
+            break;
         case STAGE_SHARDING_FILTER:
-        // TODO SERVER-99075: Implement distinct scan
-        case STAGE_DISTINCT_SCAN:
-            MONGO_UNIMPLEMENTED_TASSERT(9586709);
+            // TODO SERVER-99073: Implement shard filter
+            MONGO_UNIMPLEMENTED_TASSERT(9907301);
+        case STAGE_DISTINCT_SCAN: {
+            isConjunctionBreaker = true;
+            // TODO SERVER-99075: Implement distinct scan
+            MONGO_UNIMPLEMENTED_TASSERT(9907501);
+        }
+        case STAGE_TEXT_OR:
+        case STAGE_TEXT_MATCH:
+        case STAGE_GEO_NEAR_2D:
+        case STAGE_GEO_NEAR_2DSPHERE:
+        case STAGE_SORT_KEY_GENERATOR:
+        case STAGE_RETURN_KEY: {
+            // These stages will fallback to multiplanning.
+            return Status(ErrorCodes::UnsupportedCbrNode, "encountered unsupported stages");
+        }
         case STAGE_BATCHED_DELETE:
         case STAGE_CACHED_PLAN:
         case STAGE_COUNT:
         case STAGE_COUNT_SCAN:
         case STAGE_DELETE:
-        case STAGE_GEO_NEAR_2D:
-        case STAGE_GEO_NEAR_2DSPHERE:
         case STAGE_IDHACK:
         case STAGE_MATCH:
         case STAGE_MOCK:
@@ -120,13 +161,9 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
         case STAGE_QUEUED_DATA:
         case STAGE_RECORD_STORE_FAST_COUNT:
         case STAGE_REPLACE_ROOT:
-        case STAGE_RETURN_KEY:
         case STAGE_SAMPLE_FROM_TIMESERIES_BUCKET:
-        case STAGE_SORT_KEY_GENERATOR:
         case STAGE_SPOOL:
         case STAGE_SUBPLAN:
-        case STAGE_TEXT_OR:
-        case STAGE_TEXT_MATCH:
         case STAGE_TIMESERIES_MODIFY:
         case STAGE_TRIAL:
         case STAGE_UNKNOWN:
@@ -141,20 +178,93 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
         case STAGE_SENTINEL:
         case STAGE_UNPACK_TS_BUCKET:
             // These stages should never reach the cardinality estimator.
-            MONGO_UNREACHABLE_TASSERT(9902301);
+            tasserted(9902301,
+                      str::stream{}
+                          << "Encountered " << nodeType
+                          << " stage in CardinalityEstimator which should be unreachable");
     }
 
     if (!ceRes.isOK()) {
         return ceRes;
     }
     if (isConjunctionBreaker) {
-        tassert(9586705,
-                "All indirect conjuncts should have been taken into account.",
-                _conjSels.empty());
+        popSelectivities();
         _inputCard = ceRes.getValue();
     }
-
     return ceRes;
+}
+
+/**
+ * Check if a leaf expression can possibly be used to generate an interval. This function checks
+ * for exactly the same expression types as _translatePredicate which is called from
+ * IndexBoundsBuilder::translateAndIntersect via CardinalityEstimator::estimateConjWithHistogram().
+ *
+ * This check cannot determine if the resulting interval will be exact or not. In order to establish
+ * this, one needs to actually create the interval and check the result. Any other solution that
+ * repeats the logic of interval generation would be complex, unreliable and error-prone.
+ */
+bool isSargableLeaf(const MatchExpression* node) {
+    switch (node->matchType()) {
+        case MatchExpression::EQ:
+        case MatchExpression::LT:
+        case MatchExpression::LTE:
+        case MatchExpression::GT:
+        case MatchExpression::GTE:
+        case MatchExpression::INTERNAL_EXPR_EQ:
+        case MatchExpression::INTERNAL_EXPR_GT:
+        case MatchExpression::INTERNAL_EXPR_GTE:
+        case MatchExpression::INTERNAL_EXPR_LT:
+        case MatchExpression::INTERNAL_EXPR_LTE:
+            return static_cast<const ComparisonMatchExpression*>(node)->getData().type() !=
+                BSONType::Array;
+        case MatchExpression::MATCH_IN:
+            return !static_cast<const InMatchExpression*>(node)->hasArray();
+        case MatchExpression::EXISTS:
+        case MatchExpression::MOD:
+        case MatchExpression::REGEX:
+        case MatchExpression::TYPE_OPERATOR:
+        case MatchExpression::GEO:
+        case MatchExpression::INTERNAL_BUCKET_GEO_WITHIN:
+        case MatchExpression::INTERNAL_EQ_HASHED_KEY:
+            return true;
+        default:
+            return false;
+    }
+}
+
+/**
+ * Check if an arbitrary expression can possibly be used to generate an interval.
+ *
+ * This check is cheap but incomplete, and may return false positives. A much more complete check
+ * can be done by reusing QueryPlannerIXSelect::rateIndices() or even
+ * QueryPlannerIXSelect::logicalNodeMayBeSupportedByAnIndex()
+ */
+bool isSargableExpr(const MatchExpression* node) {
+    if (isSargableLeaf(node)) {
+        return true;
+    }
+    auto nodeType = node->matchType();
+    if (nodeType == MatchExpression::NOT) {
+        const auto child = node->getChild(0);
+        return isSargableLeaf(child);
+    }
+    if (nodeType == MatchExpression::MatchExpression::ELEM_MATCH_VALUE) {
+        bool isSargable = true;
+        for (size_t i = 0; i < node->numChildren(); ++i) {
+            isSargable &= isSargableLeaf(node->getChild(i));
+        }
+        return isSargable;
+    }
+    return false;
+}
+
+StringData CardinalityEstimator::getPath(const MatchExpression* node) {
+    if (node->matchType() == MatchExpression::NOT) {
+        return getPath(node->getChild(0));
+    } else if (!_elemMatchPathStack.empty()) {
+        return _elemMatchPathStack.top();
+    }
+    return node->path();
 }
 
 CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool isFilterRoot) {
@@ -170,17 +280,51 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
         return sel * _inputCard;
     }
 
-    const MatchExpression::MatchType nodeType = node->matchType();
-    CEResult ceRes{zeroCE};
+    CEResult ceRes(ErrorCodes::CEFailure, "Unable to estimate expression");
 
-    switch (nodeType) {
-        case MatchExpression::EQ:
-        case MatchExpression::LT:
-        case MatchExpression::LTE:
-        case MatchExpression::GT:
-        case MatchExpression::GTE:
-            ceRes = estimate(static_cast<const ComparisonMatchExpression*>(node));
-            break;
+    bool fallbackToHeuristicCE = true;
+    bool strict = _rankerMode == QueryPlanRankerModeEnum::kHistogramCE;
+    bool useHistogram = _rankerMode == QueryPlanRankerModeEnum::kHistogramCE ||
+        _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE;
+
+    /**
+     * Sargable expressions are those that can be transformed into intervals. They can be estimated
+     * via histogram-CE if this mode is set, and if there are suitable histograms. Most of these
+     * expressions are leaves (have 0-children), but there are few non-leaves that can be estimated
+     * as well (e.g. NOT).
+     */
+    if (useHistogram && isSargableExpr(node)) {
+        ceRes = estimateConjWithHistogram(getPath(node), {node});
+        if (ceRes.isOK()) {
+            fallbackToHeuristicCE = false;
+        } else if (strict) {
+            return ceRes;
+        }
+    }
+
+    /**
+     * Estimate via heuristic CE any leaf match expression. Notice that there are other such nodes
+     * besides LeafMatchExpression subclasses. Heuristic CE doesn't estimate non-leaf nodes. This
+     * is done be the switch statment below.
+     */
+    bool useHeuristic =
+        _rankerMode == QueryPlanRankerModeEnum::kHeuristicCE || fallbackToHeuristicCE;
+    if (useHeuristic && heuristicIsEstimable(node)) {
+        tassert(9902901, "CE reestimation not allowed", !ceRes.isOK());
+        const SelectivityEstimate sel = heuristicLeafMatchExpressionSel(node, _inputCard);
+        ceRes = CEResult(sel * _inputCard);
+    }
+
+    if (ceRes.isOK()) {
+        if (isFilterRoot) {
+            // Add this node's selectivity to the _conjSels so that it can be combined with parent
+            // nodes. For a detailed explanation see the comment to addRootNodeSel().
+            _conjSels.emplace_back(ceRes.getValue() / _inputCard);
+        }
+        return ceRes;
+    }
+
+    switch (node->matchType()) {
         case MatchExpression::NOT:
             ceRes = estimate(static_cast<const NotMatchExpression*>(node), isFilterRoot);
             break;
@@ -190,17 +334,20 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
         case MatchExpression::OR:
             ceRes = estimate(static_cast<const OrMatchExpression*>(node), isFilterRoot);
             break;
+        case MatchExpression::NOR:
+            ceRes = estimate(static_cast<const NorMatchExpression*>(node), isFilterRoot);
+            break;
+        case MatchExpression::ELEM_MATCH_VALUE:
+            ceRes = estimate(static_cast<const ElemMatchValueMatchExpression*>(node), isFilterRoot);
+            break;
+        case MatchExpression::ELEM_MATCH_OBJECT:
+            ceRes =
+                estimate(static_cast<const ElemMatchObjectMatchExpression*>(node), isFilterRoot);
+            break;
         default:
-            if (node->numChildren() == 0) {
-                ceRes = estimateLeafExpression(node, isFilterRoot);
-            } else {
-                MONGO_UNIMPLEMENTED_TASSERT(9586708);
-            }
+            MONGO_UNIMPLEMENTED_TASSERT(9586708);
     }
 
-    if (!ceRes.isOK()) {
-        return ceRes;
-    }
     return ceRes;
 }
 
@@ -208,6 +355,10 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
  * QuerySolutionNodes
  */
 CEResult CardinalityEstimator::estimate(const CollectionScanNode* node) {
+    if (node->isClustered) {
+        // Fallback to multiplanning
+        return Status(ErrorCodes::UnsupportedCbrNode, "clustered scan unsupported");
+    }
     return scanCard(node, _inputCard);
 }
 
@@ -221,6 +372,13 @@ CEResult CardinalityEstimator::scanCard(const QuerySolutionNode* node,
                                         const CardinalityEstimate& card) {
     QSNEstimate est;
     est.inCE = card;
+
+    if (_inputCard == zeroCE) {
+        est.outCE = _inputCard;
+        _qsnEstimates.emplace(node, std::move(est));
+        return _inputCard;
+    }
+
     if (const MatchExpression* filter = node->filter.get()) {
         auto ceRes = estimate(filter, true);
         if (!ceRes.isOK()) {
@@ -236,8 +394,32 @@ CEResult CardinalityEstimator::scanCard(const QuerySolutionNode* node,
     return outCE;
 }
 
+bool isIndexScanSupported(const IndexScanNode& node) {
+    const auto& indexEntry = node.index;
+    return indexEntry.filterExpr == nullptr &&  // prevent partial index
+        indexEntry.type == INDEX_BTREE &&       // prevent hashed, text, wildcard and geo
+        !indexEntry.sparse &&                   // prevent sparse indexes
+        indexEntry.collator == nullptr &&       // collation unsupported
+        indexEntry.version == IndexDescriptor::IndexVersion::kV2;  // prevent old index formats
+}
+
 CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
+    if (!isIndexScanSupported(*node)) {
+        // Fallback to multiplanning
+        return Status(ErrorCodes::UnsupportedCbrNode,
+                      str::stream{} << "encountered unsupported index scan: "
+                                    << node->index.toString());
+    }
+
     QSNEstimate est;
+
+    if (_inputCard == zeroCE) {
+        est.inCE = _inputCard;
+        est.outCE = _inputCard;
+        _qsnEstimates.emplace(node, std::move(est));
+        return _inputCard;
+    }
+
     // Ignore selectivities pushed by other operators up to this point
     size_t selOffset = _conjSels.size();
 
@@ -253,7 +435,7 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
     // from the index scan.
     if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
         auto ridsEst = _samplingEstimator->estimateRIDs(node->bounds, node->filter.get());
-        _conjSels.push_back(ridsEst / _inputCard);
+        _conjSels.emplace_back(ridsEst / _inputCard);
         est.outCE = ridsEst;
         CardinalityEstimate outCE{est.outCE};
         _qsnEstimates.emplace(node, std::move(est));
@@ -294,14 +476,20 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
         return ceRes1;
     }
 
+    if (ceRes1 == zeroCE) {
+        est.outCE = ceRes1.getValue();
+        _qsnEstimates.emplace(node, std::move(est));
+        return ceRes1.getValue();
+    }
+
     if (node->children[0]->getType() == STAGE_IXSCAN &&
         static_cast<const IndexScanNode*>(node->children[0].get())->filter ==
             nullptr &&  // TODO SERVER-98577: Remove this restriction
         _rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
         auto ce = _samplingEstimator->estimateRIDs(
             static_cast<const IndexScanNode*>(node->children[0].get())->bounds, node->filter.get());
-        trimSels(0);
-        _conjSels.push_back(ce / _inputCard);
+        popSelectivities();
+        _conjSels.emplace_back(ce / _inputCard);
         est.outCE = ce;
         _qsnEstimates.emplace(node, std::move(est));
         return ce;
@@ -317,10 +505,6 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
         }
     }
 
-    tassert(9768403,
-            "FetchNode must have direct or indirect children that somehow filter data.",
-            _conjSels.size() > 0);
-
     // Combine the selectivity of this node's filter (if any) with its child selectivities.
     est.outCE = conjCard(0, _inputCard);
     CardinalityEstimate outCE{est.outCE};
@@ -332,11 +516,29 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
 CEResult CardinalityEstimator::passThroughNodeCard(const QuerySolutionNode* node) {
     tassert(9768401, "Pass-through nodes cannot have filters.", !node->filter);
     tassert(9768402, "Pass-through nodes must have a single child.", node->children.size() == 1);
-    QSNEstimate est;
-    est.outCE = estimate(node->children[0].get()).getValue();
-    CardinalityEstimate outCE{est.outCE};
-    _qsnEstimates.emplace(node, std::move(est));
-    return outCE;
+
+    auto ceRes = estimate(node->children[0].get());
+    if (!ceRes.isOK()) {
+        return ceRes;
+    }
+    _qsnEstimates.emplace(node, QSNEstimate{.outCE = ceRes.getValue()});
+    return ceRes.getValue();
+}
+
+CEResult CardinalityEstimator::limitNodeCard(const QuerySolutionNode* node, size_t limit) {
+    auto ceRes = estimate(node->children[0].get());
+    if (!ceRes.isOK()) {
+        return ceRes;
+    }
+    if (ceRes == zeroCE) {
+        _qsnEstimates.emplace(node, QSNEstimate{.outCE = ceRes.getValue()});
+        return ceRes.getValue();
+    }
+    auto limitCE = CardinalityEstimate{CardinalityType{static_cast<double>(limit)},
+                                       EstimationSource::Metadata};
+    auto est = std::min(limitCE, ceRes.getValue());
+    _qsnEstimates.emplace(node, QSNEstimate{.outCE = est});
+    return est;
 }
 
 template <IntersectionType T>
@@ -347,15 +549,24 @@ CEResult CardinalityEstimator::indexIntersectionCard(const T* node) {
     // Ignore selectivities pushed by other operators up to this point.
     size_t selOffset = _conjSels.size();
 
+    bool hasZeroCEChild = false;
     for (auto&& child : node->children) {
         auto ceRes = estimate(child.get());
         if (!ceRes.isOK()) {
             return ceRes;
         }
+        if (ceRes == zeroCE) {
+            hasZeroCEChild = true;
+        }
     }
 
-    // Combine the selectivities of all child nodes.
-    est.outCE = conjCard(selOffset, _inputCard);
+    if (hasZeroCEChild) {
+        est.outCE = zeroCE;
+    } else {
+        // Combine the selectivities of all child nodes.
+        est.outCE = conjCard(selOffset, _inputCard);
+    }
+
     CardinalityEstimate outCE{est.outCE};
     _qsnEstimates.emplace(node, std::move(est));
 
@@ -377,13 +588,23 @@ CEResult CardinalityEstimator::indexUnionCard(const T* node) {
         if (!ceRes.isOK()) {
             return ceRes;
         }
-        trimSels(selOffset);
+        if (ceRes.getValue() == zeroCE) {
+            continue;
+        }
+        popSelectivities(selOffset);
         disjSels.emplace_back(ceRes.getValue() / _inputCard);
     }
-
-    // Combine the selectivities of all child nodes.
-    est.outCE = disjCard(_inputCard, disjSels);
+    if (!disjSels.empty()) {
+        // Combine the selectivities of all child nodes.
+        est.outCE = disjCard(_inputCard, disjSels);
+    } else {
+        est.outCE = zeroCE;
+    }
+    popSelectivities();
     CardinalityEstimate outCE{est.outCE};
+    if (_inputCard != zeroCE) {
+        _conjSels.emplace_back(outCE / _inputCard);
+    }
     _qsnEstimates.emplace(node, std::move(est));
 
     return outCE;
@@ -397,9 +618,16 @@ CEResult CardinalityEstimator::indexUnionCard(const T* node) {
 // histogram estimation for the resulting OIL.
 CEResult CardinalityEstimator::estimateConjWithHistogram(
     StringData path, const std::vector<const MatchExpression*>& nodes) {
-    // Note: We are assuming that the field is non-multikey when building this interval.
-    // TODO SERVER-98374: Once CBR has catalog information, bail out of histogram estimation here if
-    // 'path' is multikey.
+    // Bail out of using a histogram for estimation if 'path' is multikey.
+    if (_multikeyPaths.contains(path) && nodes.size() > 1) {
+        return Status(ErrorCodes::HistogramCEFailure,
+                      str::stream{}
+                          << "cannot use histogram to estimate conjunction on multikey path: "
+                          << path);
+    }
+
+    // At this point, we know that 'path' is non-multikey, so we can safely build an interval for
+    // each conjunct and intersect them.
     IndexEntry fakeIndex(BSON(path << "1") /* keyPattern */,
                          INDEX_BTREE,
                          IndexDescriptor::IndexVersion::kV2,
@@ -421,16 +649,12 @@ CEResult CardinalityEstimator::estimateConjWithHistogram(
     for (auto&& expr : nodes) {
         IndexBoundsBuilder::translateAndIntersect(
             expr, fakeIndex.keyPattern.firstElement(), fakeIndex, &oil, &tightness, nullptr);
+        if (oil.intervals.empty()) {
+            return zeroMetadataCE;
+        }
     }
+    // TODO: SERVER-98094 use tightness depending the context in which a predicate is estimated
 
-    if (!(tightness == IndexBoundsBuilder::EXACT ||
-          tightness == IndexBoundsBuilder::EXACT_MAYBE_COVERED)) {
-        return Status(
-            ErrorCodes::HistogramCEFailure,
-            str::stream{}
-                << "encountered unimplemented case where index bounds tightness are non-exact: "
-                << oil.toString(false));
-    }
     return estimate(&oil, true);
 }
 
@@ -438,48 +662,55 @@ CEResult CardinalityEstimator::tryHistogramAnd(const AndMatchExpression* node) {
     // Set of unique paths references under 'node'
     StringDataSet paths;
     // Map from path to set of MatchExpression* referencing that path
-    std::unordered_multimap<StringData,  // NOLINT
-                            const MatchExpression*,
-                            StringMapHasher,
-                            StringMapEq>
-        exprsByPath;
+    absl::
+        flat_hash_map<StringData, std::vector<const MatchExpression*>, StringMapHasher, StringMapEq>
+            exprsByPath;
+    size_t selOffset = _conjSels.size();
 
     // Iterate over the children of this AndMatchExpression and perform the following:
-    // 1. Verify all children of this AndMatchExpression are ComparisonMatchExpressions and thus can
-    // be converted to index bounds.
+    // 1. Verify all children of this AndMatchExpression are either leaves and thus are likely to be
+    // converted to index bounds, or are AND/OR expressions whose children can be estimated via
+    // histograms.
     // 2. Keep track of unique paths.
-    // 3. Keep track of mapping from path to children which reference that path.
+    // 3. Group all nodes that reference the same path.
     for (size_t i = 0; i < node->numChildren(); ++i) {
         const auto child = node->getChild(i);
-        bool isEstimableViaHistogram = false;
         StringData path;
-        if (ComparisonMatchExpression::isComparisonMatchExpression(child)) {
-            isEstimableViaHistogram = true;
-            path = child->path();
-        } else if (child->matchType() == MatchExpression::NOT &&
-                   ComparisonMatchExpression::isComparisonMatchExpression(child->getChild(0))) {
-            isEstimableViaHistogram = true;
-            path = child->getChild(0)->path();
+        if (isSargableExpr(child)) {
+            // This node may be estimated via a histogram by converting it to an interval.
+            path = getPath(child);
+        } else {
+            // This is a composite node (usually AND/OR). Check if all its children can be estimated
+            // via a histogram.
+            // TODO SERVER-99710: the current approach would combine child estimates via a formula,
+            // do it instead more accurately via constructing an interval.
+            auto ceRes = estimate(node->getChild(i), false);
+            if (!ceRes.isOK()) {
+                return ceRes;
+            }
+            if (ceRes.getValue().source() != EstimationSource::Histogram) {
+                return Status(ErrorCodes::HistogramCEFailure,
+                              str::stream{}
+                                  << "Cannot estimate non-leaf predicates via histogram CE: "
+                                  << child->toString());
+            }
+            _conjSels.emplace_back(ceRes.getValue() / _inputCard);
+            continue;
         }
-        if (!isEstimableViaHistogram) {
-            return CEResult(ErrorCodes::HistogramCEFailure,
-                            str::stream{} << "encountered child of AndMatchExpression that was not "
-                                             "sargable (ComparisonMatchExpression): "
-                                          << child->toString());
-        }
-        paths.insert(path);
-        exprsByPath.insert({path, child});
-    }
 
-    size_t selOffset = _conjSels.size();
+        paths.insert(path);
+        // Group nodes by the same path
+        auto findRes = exprsByPath.find(path);
+        if (findRes == exprsByPath.end()) {
+            exprsByPath.insert({path, {child}});  // New node with this path
+        } else {
+            findRes->second.emplace_back(child);  // There were other nodes with this path
+        }
+    }
 
     for (auto&& path : paths) {
         // Set of expressions referencing the current path
-        std::vector<const MatchExpression*> nodesForPath;
-        auto [start, end] = exprsByPath.equal_range(path);
-        std::transform(start, end, std::back_inserter(nodesForPath), [](const auto& element) {
-            return element.second;
-        });
+        auto nodesForPath = exprsByPath.find(path)->second;
         // Estimate conjunction of all expressions for the current path
         auto ceRes = estimateConjWithHistogram(path, nodesForPath);
         if (!ceRes.isOK()) {
@@ -491,43 +722,45 @@ CEResult CardinalityEstimator::tryHistogramAnd(const AndMatchExpression* node) {
     return conjCard(selOffset, _inputCard);
 }
 
+CEResult CardinalityEstimator::estimate(const SortNode* node) {
+    if (node->limit > 0) {
+        return limitNodeCard(node, node->limit);
+    } else {
+        return passThroughNodeCard(node);
+    }
+}
+
+CEResult CardinalityEstimator::estimate(const LimitNode* node) {
+    return limitNodeCard(node, node->limit);
+}
+
+CEResult CardinalityEstimator::estimate(const SkipNode* node) {
+    auto ceRes = estimate(node->children[0].get());
+    if (!ceRes.isOK()) {
+        return ceRes;
+    }
+    if (ceRes == zeroCE) {
+        _qsnEstimates.emplace(node, QSNEstimate{.outCE = ceRes.getValue()});
+        return ceRes.getValue();
+    }
+    auto childEst = ceRes.getValue();
+    auto skip =
+        CardinalityEstimate{CardinalityType{static_cast<double>(node->skip)}, childEst.source()};
+
+    // If the skip node skips more than the estimate of the child, then this node will return no
+    // results.
+    CardinalityEstimate card{CardinalityType{0}, childEst.source()};
+    if (skip <= childEst) {
+        card = childEst - skip;
+    }
+    _qsnEstimates.emplace(node, QSNEstimate{.outCE = card});
+    _conjSels.push_back(card / _inputCard);
+    return card;
+}
+
 /*
  * MatchExpressions
  */
-CEResult CardinalityEstimator::estimate(const ComparisonMatchExpression* node) {
-    bool fallbackToHeuristicCE = false;
-    bool strict = _rankerMode == QueryPlanRankerModeEnum::kHistogramCE;
-
-    // We can use a histogram to estimate this MatchExpression by constructing the corresponding
-    // interval and estimating that.
-    if (_rankerMode == QueryPlanRankerModeEnum::kHistogramCE ||
-        _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
-        auto ceRes = estimateConjWithHistogram(node->path(), {node});
-        if (ceRes.isOK() || strict) {
-            return ceRes;
-        }
-        fallbackToHeuristicCE = true;
-    }
-
-    if (_rankerMode == QueryPlanRankerModeEnum::kHeuristicCE || fallbackToHeuristicCE) {
-        const SelectivityEstimate sel = estimateLeafMatchExpression(node, _inputCard);
-        return sel * _inputCard;
-    }
-
-    MONGO_UNREACHABLE_TASSERT(9751900);
-}
-
-CEResult CardinalityEstimator::estimateLeafExpression(const MatchExpression* node,
-                                                      bool isFilterRoot) {
-    const SelectivityEstimate sel = estimateLeafMatchExpression(node, _inputCard);
-    if (isFilterRoot) {
-        // Add this node's selectivity to the _conjSels so that it can be combined with parent
-        // nodes. For a detailed explanation see the comment to addRootNodeSel().
-        _conjSels.emplace_back(sel);
-    }
-    return sel * _inputCard;
-}
-
 CEResult CardinalityEstimator::estimate(const NotMatchExpression* node, bool isFilterRoot) {
     auto ceRes = estimate(node->getChild(0), false);
     if (ceRes.isOK()) {
@@ -540,6 +773,9 @@ CEResult CardinalityEstimator::estimate(const NotMatchExpression* node, bool isF
         // subtracting from _inputCard is equivalent to computing the negated selectivity as
         // (1.0 - notChildSelectivity).
         CEResult negatedCE{_inputCard - ce};
+
+        // Estimation of the child will not result in adding child's selectivity to the stack, so
+        // add it here.
         if (isFilterRoot &&
             (node->getChild(0)->numChildren() == 0 ||
              node->getChild(0)->matchType() == MatchExpression::OR)) {
@@ -560,9 +796,8 @@ CEResult CardinalityEstimator::estimate(const AndMatchExpression* node) {
     // TODO: Suppose we have an AND with some predicates on 'a' that can answered with a
     // histogram and some predicates on 'b' that can't. Should we still try to use histogram for
     // 'a'? The code as written will not.
-    if (_rankerMode == QueryPlanRankerModeEnum::kHistogramCE) {
-        return tryHistogramAnd(node);
-    } else if (_rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
+    if (_rankerMode == QueryPlanRankerModeEnum::kHistogramCE ||
+        _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
         auto ceRes = tryHistogramAnd(node);
         if (ceRes.isOK()) {
             return ceRes.getValue();
@@ -589,23 +824,94 @@ CEResult CardinalityEstimator::estimate(const AndMatchExpression* node) {
     return conjCard(selOffset, _inputCard);
 }
 
-CEResult CardinalityEstimator::estimate(const OrMatchExpression* node, bool isFilterRoot) {
-    tassert(9586706, "OrMatchExpression must have children.", node->numChildren() > 0);
+CEResult CardinalityEstimator::estimateDisjunction(
+    const std::vector<std::unique_ptr<MatchExpression>>& disjuncts) {
     std::vector<SelectivityEstimate> disjSels;
     size_t selOffset = _conjSels.size();
+    for (auto&& node : disjuncts) {
+        auto ceRes = estimate(node.get(), false);
+        if (!ceRes.isOK()) {
+            return ceRes;
+        }
+        popSelectivities(selOffset);
+        disjSels.emplace_back(ceRes.getValue() / _inputCard);
+    }
+    return disjCard(_inputCard, disjSels);
+}
+
+CEResult CardinalityEstimator::estimate(const OrMatchExpression* node, bool isFilterRoot) {
+    tassert(9586706, "OrMatchExpression must have children.", node->numChildren() > 0);
+    CEResult disjRes = estimateDisjunction(node->getChildVector());
+    if (!disjRes.isOK()) {
+        return disjRes;
+    }
+    if (isFilterRoot) {
+        addRootNodeSel(disjRes);
+    }
+    return disjRes;
+}
+
+CEResult CardinalityEstimator::estimate(const NorMatchExpression* node, bool isFilterRoot) {
+    tassert(9903001, "NorMatchExpression must have children.", node->numChildren() > 0);
+    // Estimate $nor as a logical negation of OR. First we estimate the selectivity of the children
+    // of 'node' as if they were a $or. Then we negate it to get the resuling selectivity of $nor.
+    CEResult disjRes = estimateDisjunction(node->getChildVector());
+    if (!disjRes.isOK()) {
+        return disjRes;
+    }
+    SelectivityEstimate disjSel = disjRes.getValue() / _inputCard;
+    CEResult res = _inputCard * disjSel.negate();
+    if (isFilterRoot) {
+        addRootNodeSel(res);
+    }
+    return res;
+}
+
+CEResult CardinalityEstimator::estimate(const ElemMatchValueMatchExpression* node,
+                                        bool isFilterRoot) {
+    // Check if we have metadata about this field from the catalog. If the field is non-multikey, we
+    // can immediately return a 0 result.
+    if (_nonMultikeyPaths.contains(node->path())) {
+        return zeroCE;
+    }
+
+    // Sampling and histogram handle this case higher up.
+    tassert(9808601,
+            "direct estimatation of $elemMatch is currently on supported for heuristicCE",
+            _rankerMode == QueryPlanRankerModeEnum::kHeuristicCE);
+
+    size_t selOffset = _conjSels.size();
+
+    // Ensure the original '_inputCard' and '_elemMatchPathStack' are restored at the end of this
+    // function.
+    auto originalCard = _inputCard;
+    ScopeGuard restore([&] {
+        _inputCard = originalCard;
+        _elemMatchPathStack.pop();
+        popSelectivities(selOffset);
+    });
+
+    // Change '_inputCard' to represent the number of unwound array elements. All child
+    // selectivities should be calculated relative to this cardinality, allowing us to model the
+    // semantics of $elemMatch.
+    _inputCard = _inputCard * kAverageElementsPerArray;
+    _elemMatchPathStack.push(node->path());
+
     for (size_t i = 0; i < node->numChildren(); i++) {
         auto ceRes = estimate(node->getChild(i), false);
         if (!ceRes.isOK()) {
             return ceRes;
         }
-        trimSels(selOffset);
-        disjSels.emplace_back(ceRes.getValue() / _inputCard);
+        // Calculate the selectivity relative to number of unwound values.
+        SelectivityEstimate sel = ceRes.getValue() / _inputCard;
+        _conjSels.emplace_back(sel);
     }
-    CEResult disjRes{disjCard(_inputCard, disjSels)};
-    if (isFilterRoot) {
-        addRootNodeSel(disjRes);
-    }
-    return disjRes;
+
+    // Calculate selectivity relative to the original cardinality.
+    auto sel = conjCard(selOffset, originalCard);
+    // The implict 'isArray' predicate of $elemMatch is independent from the selectivity of its
+    // children, so it can be combined by multiplication.
+    return sel * kIsArraySel;
 }
 
 /*
@@ -639,11 +945,8 @@ IndexBounds equalityPrefix(const IndexBounds* node) {
 
 CEResult CardinalityEstimator::estimate(const IndexBounds* node) {
     if (node->isSimpleRange) {
-        MONGO_UNIMPLEMENTED_TASSERT(9586707);  // TODO: SERVER-96816
-    }
-    if (node->isUnbounded()) {
-        _conjSels.emplace_back(oneSel);
-        return _inputCard;
+        // TODO SERVER-96816: Implement support for estimation of simple ranges
+        return Status(ErrorCodes::UnsupportedCbrNode, "simple ranges unsupported");
     }
 
     if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
@@ -695,13 +998,20 @@ CEResult CardinalityEstimator::estimate(const IndexBounds* node) {
 }
 
 CEResult CardinalityEstimator::estimate(const OrderedIntervalList* node, bool forceHistogram) {
+    if (node->isMinToMax() || node->isMaxToMin()) {
+        return _inputCard;
+    }
+    if (node->intervals.empty()) {
+        return zeroMetadataCE;
+    }
+
     auto localRankerMode = _rankerMode;
     const bool strict = _rankerMode == QueryPlanRankerModeEnum::kHistogramCE || forceHistogram;
     const stats::CEHistogram* histogram = nullptr;
 
     if (_rankerMode == QueryPlanRankerModeEnum::kHistogramCE ||
         _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE || forceHistogram) {
-        histogram = _collStats.getHistogram(node->name);
+        histogram = _collInfo.collStats->getHistogram(node->name);
         if (!histogram) {
             if (strict) {
                 return CEResult(ErrorCodes::HistogramCEFailure,

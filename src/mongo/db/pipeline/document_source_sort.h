@@ -156,8 +156,10 @@ public:
         return kStageName.rawData();
     }
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kSort;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
     void serializeToArray(std::vector<Value>& array,
@@ -166,6 +168,28 @@ public:
     GetModPathsReturn getModifiedPaths() const final {
         // A $sort does not modify any paths.
         return {GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{}, {}};
+    }
+
+    /**
+     * Requests that this stage should output the sort key metadata with each result.
+     */
+    void pleaseOutputSortKeyMetadata() {
+        _outputSortKeyMetadata = true;
+    }
+
+    /**
+     * Returns true if the output documents of this $sort stage are supposed to have the sort key
+     * metadata field populated.
+     */
+    bool shouldSetSortKeyMetadata() const {
+        // TODO SERVER-98624 It would be preferable to just set '_outputSortKeyMetadata' based on
+        // 'getNeedsMerge()' in the constructor or some earlier time. Sadly, we can't do this right
+        // now without adding complexity elsewhere to account for mixed-version clusters. If you set
+        // '_outputSortKeyMetadata' to true, then it will possibly mean serializing a new field when
+        // sending a $sort to another node in the cluster (as of the time of this writing). This is
+        // OK today because the callers who set this option during construction first must check the
+        // FCV (and/or a feature flag), which guards against mixed-version scenarios.
+        return _outputSortKeyMetadata || pExpCtx->getNeedsMerge();
     }
 
     StageConstraints constraints(Pipeline::SplitState) const final {
@@ -281,21 +305,6 @@ private:
      * GetNextResult encountered, which may be either kEOF or kPauseExecution.
      */
     GetNextResult populate();
-
-    /**
-     * Returns true if the output documents of this $sort stage are supposed to have the sort key
-     * metadata field populated.
-     */
-    bool shouldSetSortKeyMetadata() const {
-        // TODO SERVER-98624 It would be preferable to just set '_outputSortKeyMetadata' based on
-        // 'getNeedsMerge()' in the constructor or some earlier time. Sadly, we can't do this right
-        // now without adding complexity elsewhere to account for mixed-version clusters. If you set
-        // '_outputSortKeyMetadata' to true, then it will possibly mean serializing a new field when
-        // sending a $sort to another node in the cluster (as of the time of this writing). This is
-        // OK today because the callers who set this option during construction first must check the
-        // FCV (and/or a feature flag), which guards against mixed-version scenarios.
-        return _outputSortKeyMetadata || pExpCtx->getNeedsMerge();
-    }
 
     /**
      * Returns the sort key for 'doc', as well as the document that should be entered into the

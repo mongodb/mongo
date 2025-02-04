@@ -68,6 +68,8 @@ public:
      */
     bool canPushDownFullyCompatibleStages() const;
 
+    int64_t getInternalQuerySpillingMinAvailableDiskSpaceBytes() const;
+
 private:
     QueryFrameworkControlEnum _queryFrameworkControlValue;
     QueryPlanRankerModeEnum _planRankerMode;
@@ -78,5 +80,6 @@ private:
     bool _sbeDisableGroupPushdownValue;
     bool _sbeDisableLookupPushdownValue;
     bool _sbeDisableTimeSeriesValue;
+    int64_t _internalQuerySpillingMinAvailableDiskSpaceBytes;
 };
 }  // namespace mongo

@@ -8,7 +8,6 @@ rst.initiate();
 var sentinelPath =
     (_getEnv("TMPDIR") || _getEnv("TMP_DIR") || "/tmp") + "/inner_level_timeout.js.sentinel";
 removeFile(sentinelPath);
-writeFile(sentinelPath, "");
 
 while (true) {
     print("looping");

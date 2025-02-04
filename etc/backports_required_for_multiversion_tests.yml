@@ -175,7 +175,7 @@ last-continuous:
       ticket: SERVER-90358
     - test_file: jstests/sharding/txn_participant_adds_additional_participants.js
       ticket: SERVER-89806
-    - test_file: jstests/aggregation/match_swapping_renamed_fields.js
+    - test_file: jstests/aggregation/optimization/match_swapping_renamed_fields.js
       ticket: SERVER-90869
     - test_file: jstests/core/timeseries/query/timeseries_ixscan_clusteredidxscan_union.js
       ticket: SERVER-90818
@@ -229,7 +229,7 @@ last-continuous:
       ticket: SERVER-91465
     - test_file: jstests/concurrency/fsm_workloads/random_update_delete_with_resharding.js
       ticket: SERVER-91465
-    - test_file: jstests/aggregation/bugs/add_fields_adds_to_missing_fields.js
+    - test_file: jstests/aggregation/sources/addFields/add_fields_adds_to_missing_fields.js
       ticket: SERVER-91784
     - test_file: jstests/aggregation/group_with_acc_n_to_distinct_scan.js
       ticket: SERVER-90017
@@ -366,6 +366,12 @@ last-continuous:
       ticket: SERVER-97044
     - test_file: jstests/sharding/analyze_shard_key/query_sampling_after_resharding.js
       ticket: SERVER-96783
+    - test_file: jstests/core/timeseries/query/timeseries_explicit_unpack_bucket.js
+      ticket: SERVER-95687
+    - test_file: jstests/sharding/remove_shard_with_unsharded.js
+      ticket: SERVER-89883
+    - test_file: jstests/sharding/metadata_refresh_on_shard_removal.js
+      ticket: SERVER-99277
   suites: null
 last-lts:
   all:
@@ -523,7 +529,7 @@ last-lts:
       ticket: SERVER-90358
     - test_file: jstests/sharding/txn_participant_adds_additional_participants.js
       ticket: SERVER-89806
-    - test_file: jstests/aggregation/match_swapping_renamed_fields.js
+    - test_file: jstests/aggregation/optimization/match_swapping_renamed_fields.js
       ticket: SERVER-90869
     - test_file: jstests/core/timeseries/query/timeseries_ixscan_clusteredidxscan_union.js
       ticket: SERVER-90818
@@ -605,7 +611,7 @@ last-lts:
       ticket: SERVER-91465
     - test_file: jstests/concurrency/fsm_workloads/random_update_delete_with_resharding.js
       ticket: SERVER-91465
-    - test_file: jstests/aggregation/bugs/add_fields_adds_to_missing_fields.js
+    - test_file: jstests/aggregation/sources/addFields/add_fields_adds_to_missing_fields.js
       ticket: SERVER-91784
     - test_file: jstests/aggregation/group_with_acc_n_to_distinct_scan.js
       ticket: SERVER-90017
@@ -663,7 +669,7 @@ last-lts:
       ticket: SERVER-93099
     - test_file: jstests/core/index/index_creation_on_different_collations.js
       ticket: SERVER-93112
-    - test_file: jstests/sharding/write_with_movePartition.js
+    - test_file: jstests/sharding/query/out_merge/out_with_move_primary.js
       ticket: SERVER-92690
     - test_file: jstests/core/index/geo/geonear_key.js
       ticket: SERVER-92843
@@ -779,4 +785,10 @@ last-lts:
       ticket: SERVER-97044
     - test_file: jstests/sharding/analyze_shard_key/query_sampling_after_resharding.js
       ticket: SERVER-96783
+    - test_file: jstests/core/timeseries/query/timeseries_explicit_unpack_bucket.js
+      ticket: SERVER-95687
+    - test_file: jstests/sharding/remove_shard_with_unsharded.js
+      ticket: SERVER-89883
+    - test_file: jstests/sharding/metadata_refresh_on_shard_removal.js
+      ticket: SERVER-99277
   suites: null

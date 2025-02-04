@@ -293,7 +293,7 @@ TEST_F(DocumentSourceMatchTest,
         "       b: {$_internalSchemaObjectMatch: {"
         "           $or: [{c: {$type: 'string'}}, {c: {$gt: 0}}]"
         "       }}}"
-        "    }}}");
+        "    }}");
     auto match = DocumentSourceMatch::create(query, getExpCtx());
     DepsTracker dependencies;
     ASSERT_EQUALS(DepsTracker::State::SEE_NEXT, match->getDependencies(&dependencies));
@@ -440,7 +440,7 @@ TEST_F(DocumentSourceMatchTest, ShouldAddOuterFieldToDependenciesIfElemMatchCont
 }
 
 TEST_F(DocumentSourceMatchTest, ShouldAddNotClausesFieldAsDependency) {
-    auto match = DocumentSourceMatch::create(fromjson("{b: {$not: {$gte: 4}}}}"), getExpCtx());
+    auto match = DocumentSourceMatch::create(fromjson("{b: {$not: {$gte: 4}}}"), getExpCtx());
     DepsTracker dependencies;
     ASSERT_EQUALS(DepsTracker::State::SEE_NEXT, match->getDependencies(&dependencies));
     ASSERT_EQUALS(1U, dependencies.fields.count("b"));
@@ -498,12 +498,13 @@ TEST_F(DocumentSourceMatchTest, MultipleMatchStagesShouldCombineIntoOne) {
     match1->optimizeAt(container.begin(), &container);
 
     ASSERT_EQUALS(container.size(), 1U);
-    ASSERT_BSONOBJ_EQ(match1->getQuery(), fromjson("{'$and': [{a:1}, {b:1}]}"));
+    ASSERT_BSONOBJ_EQ(match1->getQuery(), fromjson("{'$and': [{a:{$eq: 1}}, {b: {$eq: 1}}]}"));
 
     container.push_back(match3);
     match1->optimizeAt(container.begin(), &container);
     ASSERT_EQUALS(container.size(), 1U);
-    ASSERT_BSONOBJ_EQ(match1->getQuery(), fromjson("{'$and': [{a:1}, {b:1}, {c:1}]}"));
+    ASSERT_BSONOBJ_EQ(match1->getQuery(),
+                      fromjson("{'$and': [{a:{$eq: 1}}, {b:{$eq: 1}}, {c:{$eq: 1}}]}"));
 }
 
 TEST_F(DocumentSourceMatchTest, DoesNotPushProjectBeforeSelf) {
@@ -552,7 +553,7 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyJoinWithSubsequentMatch) {
     const auto match = DocumentSourceMatch::create(BSON("a" << 1), getExpCtx());
     const auto secondMatch = DocumentSourceMatch::create(BSON("b" << 1), getExpCtx());
 
-    match->joinMatchWith(secondMatch, "$and"_sd);
+    match->joinMatchWith(secondMatch, MatchExpression::MatchType::AND);
 
     const auto mock = DocumentSourceMock::createForTest({Document{{"a", 1}, {"b", 1}},
                                                          Document{{"a", 2}, {"b", 1}},
@@ -597,9 +598,10 @@ TEST_F(DocumentSourceMatchTest, RepeatedJoinWithShouldNotNestAnds) {
     ASSERT_EQUALS(container.size(), 1U);
     ASSERT_BSONOBJ_EQ(
         match1->getQuery(),
-        fromjson("{'$and': [{}, {}, {a: 1}, {b: 1}, {c: 1}, {d: 1}, {$or: [{e: 1}, {f: 1}]}, {}, "
-                 "{g: 1}, {h: 1}, {$or: [{i: 1}, {j: 1}]}, {k: 1}, {l: 1}, {m: 1}, {$and: [{n: 1}, "
-                 "{o: 1}]}]}"));
+        fromjson("{'$and': [{}, {}, {a: {$eq: 1}}, {b: {$eq: 1}}, {c: {$eq: 1}}, {d: {$eq: 1}}, "
+                 "{$or: [{e: {$eq: 1}}, {f: {$eq: 1}}]}, {}, "
+                 "{g: {$eq: 1}}, {h: {$eq: 1}}, {$or: [{i: {$eq: 1}}, {j: {$eq: 1}}]}, {k: {$eq: "
+                 "1}}, {l: {$eq: 1}}, {m: {$eq: 1}}, {n: {$eq: 1}}, {o: {$eq: 1}}]}"));
 }
 
 DEATH_TEST_REGEX_F(DocumentSourceMatchTest,

@@ -57,9 +57,11 @@ class IndexBuilderInterceptorTest : public CatalogTestFixture {
 protected:
     const IndexCatalogEntry* createIndex(BSONObj spec) {
         WriteUnitOfWork wuow(operationContext());
-        auto* indexCatalog = _coll->getWritableCollection(operationContext())->getIndexCatalog();
+        CollectionWriter writer{operationContext(), *_coll};
+
+        auto* indexCatalog = writer.getWritableCollection(operationContext())->getIndexCatalog();
         uassertStatusOK(indexCatalog->createIndexOnEmptyCollection(
-            operationContext(), _coll->getWritableCollection(operationContext()), spec));
+            operationContext(), writer.getWritableCollection(operationContext()), spec));
         wuow.commit();
 
         return indexCatalog->getEntry(indexCatalog->findIndexByName(

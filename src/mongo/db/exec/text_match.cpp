@@ -58,7 +58,7 @@ TextMatchStage::TextMatchStage(ExpressionContext* expCtx,
 
 TextMatchStage::~TextMatchStage() {}
 
-bool TextMatchStage::isEOF() {
+bool TextMatchStage::isEOF() const {
     return child()->isEOF();
 }
 

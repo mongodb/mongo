@@ -21,7 +21,6 @@ selector:
     - jstests/core/**/geo_update_btree2.js # notablescan.
     - jstests/core/**/index9.js # "local" database.
     - jstests/core/**/queryoptimizera.js # "local" database.
-    - jstests/core/**/stages*.js # stageDebug.
     - jstests/core/**/startup_log.js # "local" database.
     - jstests/core/**/tailable_cursor_invalidation.js # capped collections.
     - jstests/core/**/tailable_getmore_batch_size.js # capped collections.
@@ -185,7 +184,7 @@ selector:
     - jstests/core/failcommand_failpoint.js
 
     # Sets cluster parameters, which do writes with timestamps that will vary b/w clusters.
-    - jstests/core/cluster_parameter_commands.js
+    - jstests/core/cluster_parameters/cluster_parameter_commands.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

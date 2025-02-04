@@ -59,6 +59,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
@@ -105,12 +106,20 @@ public:
                 DatabaseProfileSettings::get(opCtx->getServiceContext())
                     .getDatabaseProfileLevel(ns().dbName()));
 
+            const auto requestVersion =
+                OperationShardingState::get(opCtx).getDbVersion(ns().dbName());
+
+            const bool shardAuthoritativeDbMetadataFeatureFlagEnabled =
+                feature_flags::gShardAuthoritativeDbMetadata.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
             DropDatabaseCoordinatorDocument coordinatorDoc;
             coordinatorDoc.setShardingDDLCoordinatorMetadata(
                 {{ns(), DDLCoordinatorTypeEnum::kDropDatabase}});
+            coordinatorDoc.setAuthoritativeShardCommit(
+                shardAuthoritativeDbMetadataFeatureFlagEnabled);
             auto service = ShardingDDLCoordinatorService::getService(opCtx);
-            const auto requestVersion =
-                OperationShardingState::get(opCtx).getDbVersion(ns().dbName());
+
             auto dropDatabaseCoordinator = [&]() {
                 while (true) {
                     auto currentCoordinator = checked_pointer_cast<DropDatabaseCoordinator>(

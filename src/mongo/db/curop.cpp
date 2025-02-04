@@ -73,9 +73,8 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/rpc/metadata/impersonated_user_metadata.h"
-#include "mongo/rpc/metadata/impersonated_user_metadata_gen.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -114,6 +113,73 @@ BSONObj serializeDollarDbInOpDescription(boost::optional<TenantId> tenantId,
                                          .firstElement());
     return newCmdObj;
 }
+
+template <typename AppendCallback>
+void addSingleSpillingStats(PlanSummaryStats::SpillingStage stage,
+                            const SpillingStats& stats,
+                            size_t sortTotalDataSizeBytes,
+                            const AppendCallback& appendCallback) {
+    // Attributes for logs don't support dynamically generated strings as attribute names, so we
+    // have to hard-code all attribute names.
+    switch (stage) {
+        case PlanSummaryStats::SpillingStage::GRAPH_LOOKUP:
+            appendCallback("graphLookupSpills", static_cast<long long>(stats.getSpills()));
+            appendCallback("graphLookupSpilledBytes",
+                           static_cast<long long>(stats.getSpilledBytes()));
+            appendCallback("graphLookupSpilledRecords",
+                           static_cast<long long>(stats.getSpilledRecords()));
+            appendCallback("graphLookupSpilledDataStorageSize",
+                           static_cast<long long>(stats.getSpilledDataStorageSize()));
+            return;
+        case PlanSummaryStats::SpillingStage::GROUP:
+            appendCallback("groupSpills", static_cast<long long>(stats.getSpills()));
+            appendCallback("groupSpilledBytes", static_cast<long long>(stats.getSpilledBytes()));
+            appendCallback("groupSpilledRecords",
+                           static_cast<long long>(stats.getSpilledRecords()));
+            appendCallback("groupSpilledDataStorageSize",
+                           static_cast<long long>(stats.getSpilledDataStorageSize()));
+            return;
+        case PlanSummaryStats::SpillingStage::SET_WINDOW_FIELDS:
+            appendCallback("setWindowFieldsSpills", static_cast<long long>(stats.getSpills()));
+            appendCallback("setWindowFieldsSpilledBytes",
+                           static_cast<long long>(stats.getSpilledBytes()));
+            appendCallback("setWindowFieldsSpilledRecords",
+                           static_cast<long long>(stats.getSpilledRecords()));
+            appendCallback("setWindowFieldsSpilledDataStorageSize",
+                           static_cast<long long>(stats.getSpilledDataStorageSize()));
+            return;
+        case PlanSummaryStats::SpillingStage::SORT:
+            appendCallback("sortSpills", static_cast<long long>(stats.getSpills()));
+            appendCallback("sortSpilledBytes", static_cast<long long>(stats.getSpilledBytes()));
+            appendCallback("sortSpilledRecords", static_cast<long long>(stats.getSpilledRecords()));
+            appendCallback("sortSpilledDataStorageSize",
+                           static_cast<long long>(stats.getSpilledDataStorageSize()));
+            // Extra sort-specific metric
+            appendCallback("sortTotalDataSizeBytes",
+                           static_cast<long long>(sortTotalDataSizeBytes));
+            return;
+        case PlanSummaryStats::SpillingStage::TEXT_OR:
+            appendCallback("textOrSpills", static_cast<long long>(stats.getSpills()));
+            appendCallback("textOrSpilledBytes", static_cast<long long>(stats.getSpilledBytes()));
+            appendCallback("textOrSpilledRecords",
+                           static_cast<long long>(stats.getSpilledRecords()));
+            appendCallback("textOrSpilledDataStorageSize",
+                           static_cast<long long>(stats.getSpilledDataStorageSize()));
+            return;
+    }
+    MONGO_UNREACHABLE_TASSERT(9851000);
+}
+
+template <typename AppendCallback>
+void addSpillingStats(const absl::flat_hash_map<PlanSummaryStats::SpillingStage, SpillingStats>&
+                          spillingStatsPerStage,
+                      size_t sortTotalDataSizeBytes,
+                      const AppendCallback& appendCallback) {
+    for (const auto& [stage, stats] : spillingStatsPerStage) {
+        addSingleSpillingStats(stage, stats, sortTotalDataSizeBytes, appendCallback);
+    }
+}
+
 }  // namespace
 
 /**
@@ -436,7 +502,7 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
         }
 
         if (_debug.storageStats) {
-            _debug.additiveMetrics.aggregateStorageStats(*_debug.storageStats);
+            metrics.aggregateStorageStats(*_debug.storageStats);
         }
     }
 }
@@ -465,7 +531,7 @@ ProgressMeter& CurOp::setProgress(WithLock lk,
     return _progressMeter.value();
 }
 
-void CurOp::updateStatsOnTransactionUnstash() {
+void CurOp::updateStatsOnTransactionUnstash(ClientLock&) {
     // Store lock stats and storage metrics from the locker and recovery unit after unstashing.
     // These stats have accrued outside of this CurOp instance so we will ignore/subtract them when
     // reporting on this operation.
@@ -475,7 +541,7 @@ void CurOp::updateStatsOnTransactionUnstash() {
     _resourceStatsBase->addForUnstash(getAdditiveResourceStats(boost::none));
 }
 
-void CurOp::updateStatsOnTransactionStash() {
+void CurOp::updateStatsOnTransactionStash(ClientLock&) {
     // Store lock stats and storage metrics that happened during this operation before the locker
     // and recovery unit are stashed. We take the delta of the stats before stashing and the base
     // stats which includes the snapshot of stats when it was unstashed. This stats delta on
@@ -486,7 +552,7 @@ void CurOp::updateStatsOnTransactionStash() {
     _resourceStatsBase->subtractForStash(getAdditiveResourceStats(boost::none));
 }
 
-void CurOp::updateStorageMetricsOnRecoveryUnitChange() {
+void CurOp::updateStorageMetricsOnRecoveryUnitChange(ClientLock&) {
     auto storageMetrics = shard_role_details::getRecoveryUnit(opCtx())->getStorageMetrics();
     if (!storageMetrics.isEmpty()) {
         if (!_resourceStatsBase) {
@@ -1257,15 +1323,15 @@ void OpDebug::report(OperationContext* opCtx,
     pAttrs->add("numYields", curop.numYields());
     OPDEBUG_TOATTR_HELP_OPTIONAL("nreturned", additiveMetrics.nreturned);
 
-    // Add sorter diagnostics only when spills occur.
-    if (sortSpills) {
-        pAttrs->add("sortSpills", sortSpills);
-        pAttrs->add("sortSpillBytes", sortSpillBytes);
-        pAttrs->add("sortTotalDataSizeBytes", sortTotalDataSizeBytes);
-    }
+    addSpillingStats(spillingStatsPerStage,
+                     sortTotalDataSizeBytes,
+                     [&](const auto& name, const auto& value) { pAttrs->add(name, value); });
 
     if (planCacheShapeHash) {
-        pAttrs->addDeepCopy("planCacheShapeHash", zeroPaddedHex(*planCacheShapeHash));
+        // TODO SERVER-93305: Remove deprecated 'queryHash' usages.
+        std::string planCacheShapeHashStr = zeroPaddedHex(*planCacheShapeHash);
+        pAttrs->addDeepCopy("planCacheShapeHash", planCacheShapeHashStr);
+        pAttrs->addDeepCopy("queryHash", planCacheShapeHashStr);
     }
     if (planCacheKey) {
         pAttrs->addDeepCopy("planCacheKey", zeroPaddedHex(*planCacheKey));
@@ -1380,9 +1446,8 @@ void OpDebug::report(OperationContext* opCtx,
     pAttrs->add("workingMillis", workingTimeMillis.count());
 
     // durationMillis should always be present for any operation
-    pAttrs->add(
-        "durationMillis",
-        durationCount<Milliseconds>(additiveMetrics.executionTime.value_or(Microseconds{0})));
+    pAttrs->add("durationMillis",
+                durationCount<Milliseconds>(CurOp::get(opCtx)->elapsedTimeTotal()));
 }
 
 void OpDebug::reportStorageStats(logv2::DynamicAttributes* pAttrs) const {
@@ -1477,15 +1542,15 @@ void OpDebug::append(OperationContext* opCtx,
     b.appendNumber("numYield", curop.numYields());
     OPDEBUG_APPEND_OPTIONAL(b, "nreturned", additiveMetrics.nreturned);
 
-    // Add sorter diagnostics only when spills occur.
-    if (sortSpills) {
-        b.append("sortSpills", sortSpills);
-        b.append("sortSpillBytes", sortSpillBytes);
-        b.append("sortTotalDataSizeBytes", static_cast<long long>(sortTotalDataSizeBytes));
-    }
+    addSpillingStats(spillingStatsPerStage,
+                     sortTotalDataSizeBytes,
+                     [&](const auto& name, const auto& value) { b.append(name, value); });
 
     if (planCacheShapeHash) {
-        b.append("planCacheShapeHash", zeroPaddedHex(*planCacheShapeHash));
+        // TODO SERVER-93305: Remove deprecated 'queryHash' usages.
+        std::string planCacheShapeHashStr = zeroPaddedHex(*planCacheShapeHash);
+        b.append("planCacheShapeHash", planCacheShapeHashStr);
+        b.append("queryHash", planCacheShapeHashStr);
     }
     if (planCacheKey) {
         b.append("planCacheKey", zeroPaddedHex(*planCacheKey));
@@ -1800,6 +1865,12 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
             b.append(field, zeroPaddedHex(*args.op.planCacheShapeHash));
         }
     });
+    // TODO SERVER-93305: Remove deprecated 'queryHash' usages.
+    addIfNeeded("queryHash", [](auto field, auto args, auto& b) {
+        if (args.op.planCacheShapeHash) {
+            b.append(field, zeroPaddedHex(*args.op.planCacheShapeHash));
+        }
+    });
     addIfNeeded("planCacheKey", [](auto field, auto args, auto& b) {
         if (args.op.planCacheKey) {
             b.append(field, zeroPaddedHex(*args.op.planCacheKey));
@@ -1915,14 +1986,10 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     // the profiler (OpDebug::append) and the log file (OpDebug::report), so for the profile filter
     // we support both names.
     addIfNeeded("millis", [](auto field, auto args, auto& b) {
-        b.appendNumber(field,
-                       durationCount<Milliseconds>(
-                           args.op.additiveMetrics.executionTime.value_or(Microseconds{0})));
+        b.appendNumber(field, durationCount<Milliseconds>(args.curop.elapsedTimeTotal()));
     });
     addIfNeeded("durationMillis", [](auto field, auto args, auto& b) {
-        b.appendNumber(field,
-                       durationCount<Milliseconds>(
-                           args.op.additiveMetrics.executionTime.value_or(Microseconds{0})));
+        b.appendNumber(field, durationCount<Milliseconds>(args.curop.elapsedTimeTotal()));
     });
 
     addIfNeeded("workingMillis", [](auto field, auto args, auto& b) {
@@ -2011,8 +2078,8 @@ void OpDebug::setPlanSummaryMetrics(PlanSummaryStats&& planSummaryStats) {
     *additiveMetrics.fromPlanCache =
         *additiveMetrics.fromPlanCache && planSummaryStats.fromPlanCache;
 
-    sortSpills = planSummaryStats.sortSpills;
-    sortSpillBytes = planSummaryStats.sortSpillBytes;
+    spillingStatsPerStage = std::move(planSummaryStats.spillingStatsPerStage);
+
     sortTotalDataSizeBytes = planSummaryStats.sortTotalDataSizeBytes;
     keysSorted = planSummaryStats.keysSorted;
     collectionScans = planSummaryStats.collectionScans;

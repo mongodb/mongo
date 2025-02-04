@@ -28,7 +28,9 @@ const upgradeVersions = {
     "5.0": {"fcv": "6.0", "nextVersion": "6.0"},
     "6.0": {"fcv": "7.0", "nextVersion": "7.0"},
     "7.0": {"fcv": "8.0", "nextVersion": "8.0"},
-    "8.0": {"fcv": "8.1", "nextVersion": "latest"},
+    // Always use latestFCV when upgrading from lastLTS so we future-proof against
+    // lastContinuous releases and don't have to change this fcv value each time.
+    "8.0": {"fcv": latestFCV, "nextVersion": "latest"},
     // TODO (SERVER-66611): Automate modifying this list.
     "latest": {}
 };

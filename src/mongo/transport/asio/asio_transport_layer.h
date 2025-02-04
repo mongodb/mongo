@@ -296,9 +296,9 @@ private:
         SSLParams::SSLModes sslMode,
         bool asyncOCSPStaple) const;
 
-    void _runListener() noexcept;
+    void _runListener();
 
-    void _trySetListenerSocketBacklogQueueDepth(GenericAcceptor& acceptor) noexcept;
+    void _trySetListenerSocketBacklogQueueDepth(GenericAcceptor& acceptor);
 
     stdx::mutex _mutex;
     void stopAcceptingSessionsWithLock(stdx::unique_lock<stdx::mutex> lk);

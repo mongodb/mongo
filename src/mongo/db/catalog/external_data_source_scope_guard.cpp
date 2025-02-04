@@ -40,7 +40,6 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/destructor_guard.h"
 #include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -71,7 +70,7 @@ ExternalDataSourceScopeGuard::ExternalDataSourceScopeGuard(
     dropVcollGuard.dismiss();
 }
 
-void ExternalDataSourceScopeGuard::dropVirtualCollections() noexcept {
+void ExternalDataSourceScopeGuard::dropVirtualCollections() {
     // The move constructor sets '_opCtx' to null when ownership is moved to the other object which
     // means this object must not try to drop collections. There's nothing to drop if '_opCtx' is
     // null.
@@ -81,7 +80,7 @@ void ExternalDataSourceScopeGuard::dropVirtualCollections() noexcept {
 
     // This function is called in a context of destructor or exception and so guard this against any
     // exceptions.
-    DESTRUCTOR_GUARD({
+    try {
         for (auto&& nss : _toBeDroppedVirtualCollections) {
             DropReply reply;
             auto status =
@@ -93,7 +92,9 @@ void ExternalDataSourceScopeGuard::dropVirtualCollections() noexcept {
                 LOGV2_ERROR(6968700, "Failed to drop an external data source", "coll"_attr = nss);
             }
         }
-    });
+    } catch (...) {
+        reportFailedDestructor(MONGO_SOURCE_LOCATION());
+    }
 }
 
 }  // namespace mongo

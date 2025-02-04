@@ -245,7 +245,8 @@ TEST_F(CollModTest, TimeseriesBucketingParameterChanged) {
             WriteUnitOfWork wunit(opCtx.get());
 
             AutoGetCollection collection(opCtx.get(), bucketsColl, MODE_X);
-            auto writableColl = collection.getWritableCollection(opCtx.get());
+            CollectionWriter writer{opCtx.get(), collection};
+            auto writableColl = writer.getWritableCollection(opCtx.get());
             writableColl->setTimeseriesBucketingParametersChanged(opCtx.get(), boost::none);
 
             wunit.commit();

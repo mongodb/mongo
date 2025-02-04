@@ -63,6 +63,7 @@
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/participant_block_gen.h"
+#include "mongo/db/s/shard_database_metadata_client.h"
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_util.h"
@@ -125,7 +126,17 @@ BSONObj makeDatabaseQuery(const DatabaseName& dbName, const DatabaseVersion& dbV
                 << dbVersion.getTimestamp());
 }
 
-void removeDatabaseFromConfigAndUpdatePlacementHistory(
+void removeDatabaseMetadataFromShard(OperationContext* opCtx,
+                                     bool isAuthoritativeShardCommitEnabled,
+                                     const DatabaseName& dbName) {
+    if (isAuthoritativeShardCommitEnabled) {
+        ShardDatabaseMetadataClient dbMetadataClient{
+            opCtx, ShardingState::get(opCtx)->shardId() /* shardId */};
+        dbMetadataClient.remove(dbName);
+    }
+}
+
+void removeDatabaseMetadataFromConfigAndUpdatePlacementHistory(
     OperationContext* opCtx,
     const std::shared_ptr<executor::TaskExecutor>& executor,
     const DatabaseName& dbName,
@@ -508,9 +519,12 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     _clearDatabaseInfoOnPrimary(opCtx);
                     _clearDatabaseInfoOnSecondaries(opCtx);
 
+                    removeDatabaseMetadataFromShard(
+                        opCtx, _doc.getAuthoritativeShardCommit().get_value_or(false), _dbName);
+
                     {
                         const auto& session = getNewSession(opCtx);
-                        removeDatabaseFromConfigAndUpdatePlacementHistory(
+                        removeDatabaseMetadataFromConfigAndUpdatePlacementHistory(
                             opCtx, **executor, _dbName, *metadata().getDatabaseVersion(), session);
                     }
 

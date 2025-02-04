@@ -44,7 +44,8 @@
 
 namespace mongo {
 
-ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx, const NamespaceString& nss) {
+ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx, const NamespaceString& nss)
+    : _disableRuntimeChecks(opCtx) {
     if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         _scopedCss.emplace(CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss));
         _collDesc = (*_scopedCss)->getCollectionDescription(opCtx);

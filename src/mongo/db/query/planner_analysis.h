@@ -182,6 +182,14 @@ public:
      * choose the hash join algorithm for cases when the hash table is unlikely to spill to disk.
      */
     static bool isEligibleForHashJoin(const CollectionInfo& foreignCollInfo);
+
+    /**
+     * Returns 'true' if the provided solution 'soln' can be rewritten to use a fast counting stage.
+     * Mutates the tree in 'soln->root'.
+     *
+     * Otherwise, returns 'false'.
+     */
+    static bool turnIxscanIntoCount(QuerySolution* soln);
 };
 
 }  // namespace mongo

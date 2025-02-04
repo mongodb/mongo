@@ -136,7 +136,7 @@ def get_suites(suite_names_or_paths: list[str], test_files: list[str]) -> List[_
             if using_nested_test_suites:
                 flattened_tests = list(itertools.chain.from_iterable(override_suite.tests))
             else:
-                flattened_tests = override_suite.tests
+                flattened_tests = copy.deepcopy(override_suite.tests)
             for test in flattened_tests:
                 if test in suite.excluded:
                     if _config.FORCE_EXCLUDED_TESTS:

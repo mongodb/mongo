@@ -37,6 +37,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/rewrite_expr.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/logv2/log.h"
@@ -90,6 +91,8 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteExpression(
         return _rewriteOrExpression(expr);
     } else if (auto expr = dynamic_cast<ExpressionCompare*>(currExprNode.get())) {
         return _rewriteComparisonExpression(expr);
+    } else if (auto expr = dynamic_cast<ExpressionIn*>(currExprNode.get())) {
+        return _rewriteInExpression(expr);
     }
 
     return nullptr;
@@ -281,5 +284,75 @@ bool RewriteExpr::_canRewriteComparison(
     }
 
     return hasFieldPath;
+}
+
+std::unique_ptr<MatchExpression> RewriteExpr::_rewriteInExpression(
+    const boost::intrusive_ptr<ExpressionIn>& expr) {
+
+    const auto& operandList = expr->getOperandList();
+    invariant(operandList.size() == 2);
+
+    auto lhs = operandList[0].get();
+    auto rhs = operandList[1].get();
+
+    // Validate lhs, which must be a field path.
+    auto lhsFieldPath = dynamic_cast<ExpressionFieldPath*>(lhs);
+    if (!lhsFieldPath) {
+        return nullptr;
+    } else if (lhsFieldPath->isVariableReference() || lhsFieldPath->isROOT()) {
+        // Rather than a local document field path, this field path refers to either a variable or
+        // the full document itself. Neither of which can be expressed in the match language.
+        return nullptr;
+    }
+
+    // Validate rhs, which must be a static constant array.
+    auto rhsConst = dynamic_cast<ExpressionConstant*>(rhs);
+    if (!rhsConst) {
+        return nullptr;
+    } else {
+        const auto& rhsVal = rhsConst->getValue();
+        if (rhsVal.getType() != BSONType::Array) {
+            return nullptr;
+        }
+
+        // If any of the following types are present in the $in array, the expression is ineligible
+        // for the rewrite because the semantics are different between MatchExpression and agg.
+        //
+        // - Array: MatchExpressions have implicit array traversal semantics, while agg doesn't.
+        // - Null: MatchExpressions will also match on missing values, while agg only matches on an
+        // explicit "null".
+        // - Regex: MatchExpressions will evaluate the regex, while agg only matches the exact regex
+        // (i.e. a field with value /clothing/, but not "clothings").
+        for (const auto& el : rhsVal.getArray()) {
+            switch (el.getType()) {
+                case BSONType::Array:
+                case BSONType::jstNULL:
+                case BSONType::Undefined:
+                case BSONType::RegEx:
+                    return nullptr;
+                default:
+                    break;
+            }
+        }
+    }
+
+    // Store the BSONObj in _matchExprElemStorage to extend its lifetime.
+    auto fieldPath = lhsFieldPath->getFieldPath().tail().fullPath();
+    auto bob = BSONObjBuilder{};
+    bob << fieldPath << rhsConst->getValue();
+    auto inObj = bob.obj();
+    _matchExprElemStorage.push_back(inObj);
+
+    // Create the MatchExpression equivalent of the $expr $in.
+    // {$expr: {$in: ["$lhsFieldPath", rhsConstArray]}} --> {"lhsFieldPath": {$in: rhsConstArray}}
+    // This is the first level of filtering that can take advantage of indexes. It may return a
+    // superset of results because MatchExpressions have implicit array traversal semantics that are
+    // not present in agg. The original predicate is maintained in the second level of filtering for
+    // correctness.
+    auto fieldName = inObj.firstElementFieldNameStringData();
+    auto inMatch = std::make_unique<InMatchExpression>(fieldName);
+    uassertStatusOK(inMatch->setEqualitiesArray(inObj.getField(fieldName).Obj()));
+
+    return inMatch;
 }
 }  // namespace mongo

@@ -57,6 +57,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/egress_connection_closer_manager.h"
 #include "mongo/logv2/log.h"
@@ -94,6 +95,8 @@ auto& totalTimeForEgressConnectionAcquiredToWireMicros =
     *MetricBuilder<Counter64>{"network.totalTimeForEgressConnectionAcquiredToWireMicros"};
 }  // namespace
 
+MONGO_FAIL_POINT_DEFINE(asyncConnectReturnsConnectionError);
+
 Future<std::shared_ptr<AsyncDBClient>> AsyncDBClient::connect(
     const HostAndPort& peer,
     transport::ConnectSSLMode sslMode,
@@ -103,6 +106,9 @@ Future<std::shared_ptr<AsyncDBClient>> AsyncDBClient::connect(
     Milliseconds timeout,
     std::shared_ptr<ConnectionMetrics> connectionMetrics,
     std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext) {
+    if (MONGO_unlikely(asyncConnectReturnsConnectionError.shouldFail())) {
+        return Status{ErrorCodes::ConnectionError, "Failing asyncConnect due to fail-point"};
+    }
     return tl
         ->asyncConnect(peer,
                        sslMode,
@@ -196,9 +202,8 @@ Future<void> AsyncDBClient::authenticate(const BSONObj& params) {
     // We will only have a valid clientName if SSL is enabled.
     std::string clientName;
 #ifdef MONGO_CONFIG_SSL
-    auto& sslManager = _session->getSSLManager();
-    if (sslManager) {
-        clientName = sslManager->getSSLConfiguration().clientSubjectName.toString();
+    if (auto sslConfig = _session->getSSLConfiguration()) {
+        clientName = sslConfig->clientSubjectName.toString();
     }
 #endif
 
@@ -215,9 +220,8 @@ Future<void> AsyncDBClient::authenticateInternal(
     // We will only have a valid clientName if SSL is enabled.
     std::string clientName;
 #ifdef MONGO_CONFIG_SSL
-    auto& sslManager = _session->getSSLManager();
-    if (sslManager) {
-        clientName = sslManager->getSSLConfiguration().clientSubjectName.toString();
+    if (auto sslConfig = _session->getSSLConfiguration()) {
+        clientName = sslConfig->clientSubjectName.toString();
     }
 #endif
 
@@ -299,6 +303,8 @@ Future<void> AsyncDBClient::_call(Message request,
                                   int32_t msgId,
                                   const BatonHandle& baton,
                                   const CancellationToken& token) {
+    networkCounter.hitLogicalOut(NetworkCounter::ConnectionType::kEgress, request.size());
+
     auto swm = _compressorManager.compressMessage(request);
     if (!swm.isOK()) {
         return swm.getStatus();
@@ -335,11 +341,14 @@ Future<Message> AsyncDBClient::_waitForResponse(boost::optional<int32_t> msgId,
                         "sessionId"_attr = _session->id(),
                         "msgId"_attr = response.header().getId(),
                         "responseTo"_attr = response.header().getResponseToMsgId());
-            if (response.operation() == dbCompressed) {
-                return _compressorManager.decompressMessage(response);
-            } else {
-                return response;
+            StatusWith<Message> swMessage = (response.operation() == dbCompressed)
+                ? _compressorManager.decompressMessage(response)
+                : response;
+            if (swMessage.isOK()) {
+                networkCounter.hitLogicalIn(NetworkCounter::ConnectionType::kEgress,
+                                            swMessage.getValue().size());
             }
+            return swMessage;
         });
 }
 

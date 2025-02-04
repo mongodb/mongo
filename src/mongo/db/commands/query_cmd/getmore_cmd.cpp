@@ -572,7 +572,7 @@ public:
                               "getMore command executor error",
                               "error"_attr = exception.toStatus(),
                               "stats"_attr = redact(stats),
-                              "cmd"_attr = cmd.toBSON());
+                              "cmd"_attr = redact(cmd.toBSON()));
 
                 exception.addContext("Executor error during getMore");
                 throw;
@@ -626,10 +626,10 @@ public:
 
             // On early return, typically due to a failed assertion, delete the cursor.
             ScopeGuard cursorDeleter([&] {
+                cursorPin.deleteUnderlying();
                 if (txnResourcesHandler) {
                     txnResourcesHandler->dismissRestoredResources();
                 }
-                cursorPin.deleteUnderlying();
             });
 
             if (cursorPin->getExecutor()->lockPolicy() ==
@@ -638,7 +638,9 @@ public:
                 // collection acquisitions.
                 invariant(!cursorPin->getExecutor()->usesCollectionAcquisitions());
 
-                if (!nss.isCollectionlessCursorNamespace()) {
+                // Profile whole-db/cluster change stream getMore commands.
+                if (!nss.isCollectionlessCursorNamespace() ||
+                    CurOp::get(opCtx)->debug().isChangeStreamQuery) {
                     statsTracker.emplace(opCtx,
                                          nss,
                                          Top::LockType::NotLocked,

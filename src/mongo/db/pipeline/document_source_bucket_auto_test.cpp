@@ -601,16 +601,16 @@ TEST_F(BucketAutoTests, FailsWithNonOrInvalidExpressionGroupBy) {
     spec = fromjson("{$bucketAuto : {groupBy : '', buckets : 1}}");
     ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40239);
 
-    spec = fromjson("{$bucketAuto : {groupBy : {}}, buckets : 1}}");
+    spec = fromjson("{$bucketAuto : {groupBy : {}}, buckets : 1}");
     ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40239);
 
-    spec = fromjson("{$bucketAuto : {groupBy : '$'}, buckets : 1}}");
+    spec = fromjson("{$bucketAuto : {groupBy : '$'}, buckets : 1}");
     ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40239);
 
-    spec = fromjson("{$bucketAuto : {groupBy : []}, buckets : 1}}");
+    spec = fromjson("{$bucketAuto : {groupBy : []}, buckets : 1}");
     ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40239);
 
-    spec = fromjson("{$bucketAuto : {groupBy : null}, buckets : 1}}");
+    spec = fromjson("{$bucketAuto : {groupBy : null}, buckets : 1}");
     ASSERT_THROWS_CODE(createBucketAuto(spec), AssertionException, 40239);
 }
 
@@ -1126,6 +1126,135 @@ TEST_F(BucketAutoTests, BucketAutoWithConcatArraysRespectsMemoryLimit) {
     RAIIServerParameterControllerForTest queryKnobController2("internalQueryMaxConcatArraysBytes",
                                                               9600);
     ASSERT_THROWS_CODE(getResults(spec, docs), AssertionException, ErrorCodes::ExceededMemoryLimit);
+}
+
+TEST_F(BucketAutoTests, PauseBucketAutoWithConcatArrays) {
+    auto spec = fromjson(R"({
+            $bucketAuto: {
+                groupBy: '$_id',
+                buckets: 1,
+                output: {
+                    array: { $concatArrays: '$arr' }
+                }
+            }})");
+    auto bucketAutoStage = createBucketAuto(spec);
+    deque<DocumentSource::GetNextResult> mockInputs{
+        Document(fromjson("{_id: 0, arr: ['string 0']}")),
+        DocumentSource::GetNextResult::makePauseExecution(),
+        Document(fromjson("{_id: 1, arr: ['string 1']}"))};
+    auto source = DocumentSourceMock::createForTest(std::move(mockInputs), getExpCtx());
+    bucketAutoStage->setSource(source.get());
+
+    ASSERT_TRUE(bucketAutoStage->getNext().isPaused());
+    auto next = bucketAutoStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    auto doc = next.releaseDocument();
+    ASSERT_DOCUMENT_EQ(
+        doc, Document(fromjson("{_id: {min: 0, max: 1}, array: ['string 0', 'string 1']}")));
+    ASSERT_TRUE(bucketAutoStage->getNext().isEOF());
+}
+
+TEST_F(BucketAutoTests, PauseBucketAutoWithPush) {
+    auto spec = fromjson(R"({
+            $bucketAuto: {
+                groupBy: '$_id',
+                buckets: 1,
+                output: {
+                    array: { $push: '$arr' }
+                }
+            }})");
+    auto bucketAutoStage = createBucketAuto(spec);
+    deque<DocumentSource::GetNextResult> mockInputs{
+        Document(fromjson("{_id: 0, arr: 'string 0'}")),
+        DocumentSource::GetNextResult::makePauseExecution(),
+        Document(fromjson("{_id: 1, arr: 'string 1'}"))};
+    auto source = DocumentSourceMock::createForTest(std::move(mockInputs), getExpCtx());
+    bucketAutoStage->setSource(source.get());
+
+    ASSERT_TRUE(bucketAutoStage->getNext().isPaused());
+    auto next = bucketAutoStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    auto doc = next.releaseDocument();
+    ASSERT_DOCUMENT_EQ(
+        doc, Document(fromjson("{_id: {min: 0, max: 1}, array: ['string 0', 'string 1']}")));
+    ASSERT_TRUE(bucketAutoStage->getNext().isEOF());
+}
+
+TEST_F(BucketAutoTests, PauseBucketAutoWithMergeObjects) {
+    auto spec = fromjson(R"({
+            $bucketAuto: {
+                groupBy: '$_id',
+                buckets: 1,
+                output: {
+                    obj: { $mergeObjects: '$o' }
+                }
+            }})");
+    auto bucketAutoStage = createBucketAuto(spec);
+    deque<DocumentSource::GetNextResult> mockInputs{
+        Document(fromjson("{_id: 0, o: {a: 1}}")),
+        DocumentSource::GetNextResult::makePauseExecution(),
+        Document(fromjson("{_id: 1, o: {a: 2}}"))};
+    auto source = DocumentSourceMock::createForTest(std::move(mockInputs), getExpCtx());
+    bucketAutoStage->setSource(source.get());
+
+    ASSERT_TRUE(bucketAutoStage->getNext().isPaused());
+    auto next = bucketAutoStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    auto doc = next.releaseDocument();
+    ASSERT_DOCUMENT_EQ(doc, Document(fromjson("{_id: {min: 0, max: 1}, obj: {a: 2}}")));
+    ASSERT_TRUE(bucketAutoStage->getNext().isEOF());
+}
+
+TEST_F(BucketAutoTests, PauseBucketAutoWithFirstN) {
+    auto spec = fromjson(R"({
+            $bucketAuto: {
+                groupBy: '$_id',
+                buckets: 1,
+                output: {
+                    foo: { $firstN: {input: '$a', n: 2 }}
+                }
+            }})");
+    auto bucketAutoStage = createBucketAuto(spec);
+    deque<DocumentSource::GetNextResult> mockInputs{
+        Document(fromjson("{_id: 0, a: 1}")),
+        DocumentSource::GetNextResult::makePauseExecution(),
+        Document(fromjson("{_id: 1, a: 2}")),
+        Document(fromjson("{_id: 1, a: 3}"))};
+    auto source = DocumentSourceMock::createForTest(std::move(mockInputs), getExpCtx());
+    bucketAutoStage->setSource(source.get());
+
+    ASSERT_TRUE(bucketAutoStage->getNext().isPaused());
+    auto next = bucketAutoStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    auto doc = next.releaseDocument();
+    ASSERT_DOCUMENT_EQ(doc, Document(fromjson("{_id: {min: 0, max: 1}, foo: [1, 2]}")));
+    ASSERT_TRUE(bucketAutoStage->getNext().isEOF());
+}
+
+TEST_F(BucketAutoTests, PauseBucketAutoWithLastN) {
+    auto spec = fromjson(R"({
+            $bucketAuto: {
+                groupBy: '$_id',
+                buckets: 1,
+                output: {
+                    foo: { $lastN: {input: '$a', n: 2 }}
+                }
+            }})");
+    auto bucketAutoStage = createBucketAuto(spec);
+    deque<DocumentSource::GetNextResult> mockInputs{
+        Document(fromjson("{_id: 0, a: 1}")),
+        Document(fromjson("{_id: 1, a: 2}")),
+        DocumentSource::GetNextResult::makePauseExecution(),
+        Document(fromjson("{_id: 1, a: 3}"))};
+    auto source = DocumentSourceMock::createForTest(std::move(mockInputs), getExpCtx());
+    bucketAutoStage->setSource(source.get());
+
+    ASSERT_TRUE(bucketAutoStage->getNext().isPaused());
+    auto next = bucketAutoStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    auto doc = next.releaseDocument();
+    ASSERT_DOCUMENT_EQ(doc, Document(fromjson("{_id: {min: 0, max: 1}, foo: [2, 3]}")));
+    ASSERT_TRUE(bucketAutoStage->getNext().isEOF());
 }
 
 }  // namespace

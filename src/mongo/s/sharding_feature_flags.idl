@@ -80,13 +80,6 @@ feature_flags:
     cpp_varname: feature_flags::gBalanceUnshardedCollections
     default: false
     shouldBeFCVGated: true
-  # TODO SERVER-81884: Remove once 8.0 becomes last LTS.
-  featureFlagOneChunkPerShardEmptyCollectionWithHashedShardKey :
-    description: "Feature flag to enable creation of one chunk per shard for empty collections with hashed shard key."
-    cpp_varname: feature_flags::gOneChunkPerShardEmptyCollectionWithHashedShardKey
-    default: true
-    shouldBeFCVGated: true
-    version: 7.2
   # TODO (SERVER-83704): Remove once 8.0 becomes last LTS.
   featureFlagPlacementHistoryPostFCV73 :
     description: "Feature flag that marks a version change in the logic that generates config.placementHistory;
@@ -154,8 +147,7 @@ feature_flags:
   featureFlagCreateDatabaseDDLCoordinator:
     description: "Feature flag for enabling the sharding DDL coordinator for database creation."
     cpp_varname: feature_flags::gCreateDatabaseDDLCoordinator
-    default: true
-    version: 8.1
+    default: false
     shouldBeFCVGated: true
   # TODO (SERVER-95599): remove once 9.0 becomes last LTS.
   featureFlagConfigDebugDumpSupported:
@@ -181,5 +173,16 @@ feature_flags:
     description: "Feature flag to enable the authoritative model to store shard-local information
                   for database metadata."
     cpp_varname: feature_flags::gShardAuthoritativeDbMetadata
+    default: false
+    shouldBeFCVGated: false
+  # TODO (SERVER-99140): Remove once 9.0 becomes last LTS
+  featureFlagProhibitNonEmptyReplicaSetOnAddShard:
+    description: "Feature flag to prohibit adding non-empty replica set to the cluster."
+    cpp_varname: feature_flags::gProhibitNonEmptyReplicaSetOnAddShard
+    default: false
+    shouldBeFCVGated: true
+  featureFlagTerminateSecondaryReadsUponRangeDeletion:
+    description: "Feature flag to enable the termination of secondary reads due to range deletions."
+    cpp_varname: feature_flags::gTerminateSecondaryReadsUponRangeDeletion
     default: false
     shouldBeFCVGated: false

@@ -220,5 +220,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> createInitialSearchPipeline(
 
     return {make_intrusive<TargetSearchDocumentSource>(std::move(remoteSpec), expCtx, executor)};
 }
+
+void validateViewPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx);
 }  // namespace search_helpers
 }  // namespace mongo

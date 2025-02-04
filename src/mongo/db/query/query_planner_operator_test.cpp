@@ -140,7 +140,7 @@ TEST_F(QueryPlannerTest, CoveredWhenMultikeyIndexComponentIsNotRequiredByQuery) 
     assertSolutionExists(
         "{proj: {spec: {a: 1, _id: 0}, node: "
         "{sort: {pattern: {b: 1}, limit: 0, type:'default', node: "
-        "{ixscan: {pattern: {a: 1, b: 1, c: 1}}}}}}}}}");
+        "{ixscan: {pattern: {a: 1, b: 1, c: 1}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CoveredWhenQueryOnNonMultikeyDottedPath) {
@@ -687,7 +687,7 @@ TEST_F(QueryPlannerTest, CantUseHashedIndexToProvideSort) {
     ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists(
         "{sort: {pattern: {x: 1}, limit: 0, type: 'simple', node:"
-        "{cscan: {dir: 1, filter: {}}}}}}}");
+        "{cscan: {dir: 1, filter: {}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CantUseHashedIndexToProvideSortWithIndexablePred) {
@@ -729,7 +729,7 @@ TEST_F(QueryPlannerTest, BasicSortWithIndexablePred) {
     assertSolutionExists(
         "{sort: {pattern: {b: 1}, limit: 0, type: 'simple', node: "
         "{fetch: {filter: null, node: "
-        "{ixscan: {filter: null, pattern: {a: 1}}}}}}}}}");
+        "{ixscan: {filter: null, pattern: {a: 1}}}}}}}");
     assertSolutionExists(
         "{fetch: {filter: {a: 5}, node: {ixscan: "
         "{filter: null, pattern: {b: 1}}}}}");
@@ -771,7 +771,7 @@ TEST_F(QueryPlannerTest, SortLimit) {
     assertNumSolutions(1U);
     assertSolutionExists(
         "{sort: {pattern: {a: 1}, limit: 3, type: 'simple', node:"
-        "{cscan: {dir: 1}}}}}}");
+        "{cscan: {dir: 1}}}}");
 }
 
 TEST_F(QueryPlannerTest, SortSkip) {
@@ -781,7 +781,7 @@ TEST_F(QueryPlannerTest, SortSkip) {
     assertSolutionExists(
         "{skip: {n: 2, node: "
         "{sort: {pattern: {a: 1}, limit: 0, type: 'simple', node: "
-        "{cscan: {dir: 1}}}}}}}}");
+        "{cscan: {dir: 1}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, SortSkipLimit) {
@@ -791,7 +791,7 @@ TEST_F(QueryPlannerTest, SortSkipLimit) {
     assertSolutionExists(
         "{skip: {n: 2, node: "
         "{sort: {pattern: {a: 1}, limit: 5, type: 'simple', node: "
-        "{cscan: {dir: 1}}}}}}}}");
+        "{cscan: {dir: 1}}}}}}");
 }
 
 // Push project behind sort even when there is a skip between them.
@@ -808,7 +808,7 @@ TEST_F(QueryPlannerTest, PushProjectBehindSortWithSkipBetween) {
         "{skip: {n: 2, node: "
         "{sort: {pattern: {a: 1}, limit: 0, type: 'simple', node: "
         "{proj: {spec: {_id: 0, a: 1}, node: "
-        "{cscan: {dir: 1}}}}}}}}}");
+        "{cscan: {dir: 1}}}}}}}}");
 }
 
 //
@@ -823,7 +823,7 @@ TEST_F(QueryPlannerTest, BasicSortElim) {
     ASSERT_EQUALS(getNumSolutions(), 2U);
     assertSolutionExists(
         "{sort: {pattern: {x: 1}, limit: 0, type: 'simple', node:"
-        "{cscan: {dir: 1, filter: {x: {$gt: 1}}}}}}}");
+        "{cscan: {dir: 1, filter: {x: {$gt: 1}}}}}}");
     assertSolutionExists(
         "{fetch: {filter: null, node: {ixscan: {filter: null, pattern: {x: 1}}}}}");
 }
@@ -1418,7 +1418,7 @@ TEST_F(QueryPlannerTest, NENullWithSort) {
     assertNumSolutions(2U);
     assertSolutionExists(
         "{sort: {pattern: {a: 1}, limit: 0, type: 'simple', node: "
-        "{cscan: {filter: {a: {$ne: null}}, dir: 1}}}}}");
+        "{cscan: {filter: {a: {$ne: null}}, dir: 1}}}}");
     assertSolutionExists(
         "{fetch: {filter: null, node: {ixscan: {pattern: {a:1}, "
         "bounds: {a: [['MinKey',null,true,false],"
@@ -1544,7 +1544,7 @@ TEST_F(QueryPlannerTest, InclusionProjectionCannotSwapBeneathSortIfItExcludesSor
     assertSolutionExists(
         "{proj: {spec: {_id: 0, a: 1}, node:"
         "{sort: {pattern: {a: 1, b: 1}, limit: 0, type: 'simple', node: "
-        "{cscan: {dir: 1}}}}}}}}");
+        "{cscan: {dir: 1}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, ExclusionProjectionCannotSwapBeneathSortIfItExcludesSortedOnField) {
@@ -1554,7 +1554,7 @@ TEST_F(QueryPlannerTest, ExclusionProjectionCannotSwapBeneathSortIfItExcludesSor
     assertSolutionExists(
         "{proj: {spec: {b: 0}, node:"
         "{sort: {pattern: {a: 1, b: 1}, limit: 0, type: 'simple', node: "
-        "{cscan: {dir: 1}}}}}}}}");
+        "{cscan: {dir: 1}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, ProjectionDoesNotSwapBeforeSortWithLimit) {
@@ -1566,6 +1566,42 @@ TEST_F(QueryPlannerTest, ProjectionDoesNotSwapBeforeSortWithLimit) {
         "{proj: {spec: {_id: 0, a: 1, b: 1}, node:"
         "{sort: {pattern: {a: 1}, limit: 3, type: 'simple', node: "
         "{cscan: {dir: 1}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, PlanWithReturnKey) {
+    addIndex(BSON("a" << 1));
+    runQueryAsCommand(fromjson(
+        "{find: 'testns', projection: {_id: 0, a: 1,  b: 1}, sort: {a: 1}, returnKey: true}"));
+
+    assertNumSolutions(2U);
+
+    for (auto&& soln : solns) {
+        ASSERT_TRUE(soln->root()->getType() == STAGE_RETURN_KEY);
+    }
+}
+
+TEST_F(QueryPlannerTest, PlanWithReturnKeyAndMetaProjectionSortKey) {
+    addIndex(BSON("a" << 1));
+    runQueryAsCommand(fromjson(
+        "{find: 'testns', projection: {b: {$meta: 'sortKey'}}, sort: {a: 1}, returnKey: true}"));
+
+    assertNumSolutions(2U);
+
+    for (auto&& soln : solns) {
+        ASSERT_TRUE(soln->root()->getType() == STAGE_RETURN_KEY);
+    }
+}
+
+TEST_F(QueryPlannerTest, PlanWithReturnKeyAndMetaProjectionIndexKey) {
+    addIndex(BSON("a" << 1));
+    runQueryAsCommand(fromjson(
+        "{find: 'testns', projection: {b: {$meta: 'indexKey'}}, sort: {a: 1}, returnKey: true}"));
+
+    assertNumSolutions(2U);
+
+    for (auto&& soln : solns) {
+        ASSERT_TRUE(soln->root()->getType() == STAGE_RETURN_KEY);
+    }
 }
 
 }  // namespace

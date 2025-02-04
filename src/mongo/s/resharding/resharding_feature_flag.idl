@@ -88,7 +88,8 @@ feature_flags:
         version: 8.1
         shouldBeFCVGated: true
     featureFlagReshardingVerification:
-        description: "Feature flag to enable data loss and consistency verification steps during resharding to ensure correctness."
+        description: "Feature flag to enable data loss and consistency verification steps during
+                      resharding to ensure correctness."
         cpp_varname: gFeatureFlagReshardingVerification
         default: false
         shouldBeFCVGated: true

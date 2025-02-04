@@ -9,6 +9,8 @@ from functools import lru_cache
 
 import yaml
 
+from buildscripts.validate_codeowners import run_validator
+
 OWNERS_FILE_NAME = "OWNERS.yml"
 
 
@@ -170,6 +172,25 @@ def print_diff_and_instructions(old_codeowners_contents, new_codeowners_contents
     print("python buildscripts/install_bazel.py")
 
 
+def validate_generated_codeowners() -> int:
+    """Validate the generated CODEOWNERS file.
+
+    Returns:
+        int: 0 if validation succeeds, non-zero otherwise.
+    """
+    print("\nValidating generated CODEOWNERS file...")
+    try:
+        validation_result = run_validator("./")
+        if validation_result != 0:
+            print("CODEOWNERS validation failed!", file=sys.stderr)
+            return validation_result
+        print("CODEOWNERS validation successful!")
+        return 0
+    except Exception as exc:
+        print(f"Error during CODEOWNERS validation: {str(exc)}", file=sys.stderr)
+        return 1
+
+
 def main():
     # If we are running in bazel, default the directory to the workspace
     default_dir = os.environ.get("BUILD_WORKSPACE_DIRECTORY")
@@ -245,13 +266,14 @@ def main():
             return 1
 
         print("CODEOWNERS file is up to date")
-        return 0
+        return validate_generated_codeowners()
 
     with open(output_file, "w") as file:
         file.write(new_contents)
         print(f"Successfully wrote to the CODEOWNERS file at: {os.path.abspath(output_file)}")
 
-    return 0
+    # Add validation after generating CODEOWNERS file
+    return validate_generated_codeowners()
 
 
 if __name__ == "__main__":

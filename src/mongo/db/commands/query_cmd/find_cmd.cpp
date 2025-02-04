@@ -121,6 +121,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_stats.h"
+#include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
@@ -677,6 +678,17 @@ public:
 
             boost::optional<CollectionOrViewAcquisition> collectionOrView =
                 acquireCollectionOrViewMaybeLockFree(opCtx, acquisitionRequest);
+            if (_cmdRequest->getRawData()) {
+                auto [isTimeseriesViewRequest, translatedNs] =
+                    timeseries::isTimeseriesViewRequest(opCtx, *_cmdRequest);
+                if (isTimeseriesViewRequest) {
+                    _cmdRequest->setNss(translatedNs);
+                    collectionOrView = acquireCollectionOrViewMaybeLockFree(
+                        opCtx,
+                        CollectionOrViewAcquisitionRequest::fromOpCtx(
+                            opCtx, translatedNs, AcquisitionPrerequisites::kRead));
+                }
+            }
             const NamespaceString nss = collectionOrView->nss();
 
             // It is cheaper to raise the profiling level here, now that a CollectionCatalog
@@ -856,7 +868,7 @@ public:
                               "Plan executor error during find command",
                               "error"_attr = exception.toStatus(),
                               "stats"_attr = redact(stats),
-                              "cmd"_attr = cmdObj);
+                              "cmd"_attr = redact(cmdObj));
 
                 exception.addContext(str::stream() << "Executor error during find command: "
                                                    << nss.toStringForErrorMsg());
@@ -960,9 +972,10 @@ public:
                            const CanonicalQuery& cq,
                            boost::optional<ExplainOptions::Verbosity> verbosity,
                            rpc::ReplyBuilderInterface* replyBuilder) {
-            auto aggRequest =
-                query_request_conversion::asAggregateCommandRequest(cq.getFindCommandRequest());
-            aggRequest.setExplain(verbosity);
+            bool hasExplain = verbosity.has_value();
+            auto aggRequest = query_request_conversion::asAggregateCommandRequest(
+                cq.getFindCommandRequest(), hasExplain);
+
             aggRequest.setQuerySettings(cq.getExpCtx()->getQuerySettings());
 
             // An empty PrivilegeVector for explain is acceptable because these privileges are only
@@ -978,8 +991,8 @@ public:
                                              {aggRequest},
                                              _request.body,
                                              privileges,
-                                             replyBuilder,
-                                             {} /* usedExternalDataSources  */);
+                                             verbosity,
+                                             replyBuilder);
             if (status.code() == ErrorCodes::InvalidPipelineOperator) {
                 uasserted(ErrorCodes::InvalidPipelineOperator,
                           str::stream() << "Unsupported in view pipeline: " << status.reason());

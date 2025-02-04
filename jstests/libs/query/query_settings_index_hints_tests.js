@@ -34,24 +34,17 @@ export class QuerySettingsIndexHintsTests {
         this.indexAB = {a: 1, b: 1};
     }
 
-    /**
-     * Asserts that after executing 'command' the most recent query plan from cache would have
-     * 'querySettings' set.
-     */
-    assertQuerySettingsInCacheForCommand(command,
-                                         querySettings,
-                                         collOrViewName = this._qsutils._collName) {
+    static shouldCheckPlanCache(db, command) {
         const explainCmd = getExplainCommand(command);
         const explain = assert.commandWorked(
-            this._db.runCommand(explainCmd),
+            db.runCommand(explainCmd),
             `Failed running explain command ${
                 tojson(explainCmd)} for checking the query settings plan cache check.`);
         const isIdhackQuery =
-            everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(this._db, winningPlan));
+            everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(db, winningPlan));
         const isMinMaxQuery = "min" in command || "max" in command;
         const isTriviallyFalse = everyWinningPlan(
-            explain,
-            (winningPlan) => isEofPlan(this._db, winningPlan) || isAlwaysFalsePlan(winningPlan));
+            explain, (winningPlan) => isEofPlan(db, winningPlan) || isAlwaysFalsePlan(winningPlan));
         const {defaultReadPreference, defaultReadConcernLevel, networkErrorAndTxnOverrideConfig} =
             TestData;
         const performsSecondaryReads =
@@ -62,12 +55,12 @@ export class QuerySettingsIndexHintsTests {
             networkErrorAndTxnOverrideConfig.retryOnNetworkErrors;
 
         // If the collection used is a view, determine the underlying collection being used.
-        const collName = getCollectionName(this._db, command);
-        const collHasPartialIndexes = this._db[collName].getIndexes().some(
-            (idx) => idx.hasOwnProperty('partialFilterExpression'));
-        const isTimeSeriesColl = isTimeSeriesCollection(this._db, collName);
+        const collName = getCollectionName(db, command);
+        const collHasPartialIndexes =
+            db[collName].getIndexes().some((idx) => idx.hasOwnProperty('partialFilterExpression'));
+        const isTimeSeriesColl = isTimeSeriesCollection(db, collName);
 
-        const shouldCheckPlanCache =
+        const res =
             // Single solution plans are not cached in classic, therefore do not perform plan cache
             // checks for when the classic cache is used. Note that the classic cache is used
             // by default for SBE, except when featureFlagSbeFull is on.
@@ -75,7 +68,7 @@ export class QuerySettingsIndexHintsTests {
             // classic cache with SBE.
             // TODO SERVER-13341: Relax this check to include the case where classic is being used.
             // TODO SERVER-94392: Relax this check when SBE plan cache supports partial indexes.
-            (getEngine(explain) === "sbe" && checkSbeFullFeatureFlagEnabled(this._db) &&
+            (getEngine(explain) === "sbe" && checkSbeFullFeatureFlagEnabled(db) &&
              !collHasPartialIndexes) &&
             // Express or IDHACK optimized queries are not cached.
             !isIdhackQuery &&
@@ -84,11 +77,11 @@ export class QuerySettingsIndexHintsTests {
             // Similarly, trivially false plans are not cached.
             !isTriviallyFalse &&
             // Subplans are cached differently from normal plans.
-            !planHasStage(this._db, explain, "OR") &&
+            !planHasStage(db, explain, "OR") &&
             // If query is executed on secondaries, do not assert the cache.
             !performsSecondaryReads &&
             // Do not check plan cache if causal consistency is enabled.
-            !this._db.getMongo().isCausalConsistency() &&
+            !db.getMongo().isCausalConsistency() &&
             // $planCacheStats can not be run in transactions.
             !isInTxnPassthrough &&
             // Retrying on network errors most likely is related to stepdown, which does not go
@@ -105,10 +98,21 @@ export class QuerySettingsIndexHintsTests {
             // For timeseries collections with featureFlagSbeFull turned on, it is not possible to
             // run the planCacheClear command because it is a view, so we cannot acquire lock.
             !isTimeSeriesColl;
+        return res;
+    }
 
-        if (!shouldCheckPlanCache) {
+    /**
+     * Asserts that after executing 'command' the most recent query plan from cache would have
+     * 'querySettings' set.
+     */
+    assertQuerySettingsInCacheForCommand(command,
+                                         querySettings,
+                                         collOrViewName = this._qsutils._collName) {
+        if (!QuerySettingsIndexHintsTests.shouldCheckPlanCache(this._db, command)) {
             return;
         }
+
+        const collName = getCollectionName(this._db, command);
 
         // Clear the plan cache before running any queries.
         this._db[collName].getPlanCache().clear();

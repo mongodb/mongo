@@ -161,6 +161,18 @@ std::shared_ptr<const ErrorExtraInfo> ResolvedView::parse(const BSONObj& cmdRepl
     return std::make_shared<ResolvedView>(fromBSON(cmdReply));
 }
 
+
+ResolvedView ResolvedView::parseFromBSON(const BSONElement& elem) {
+    uassert(936370, "resolvedView must be an object", elem.type() == BSONType::Object);
+    BSONObjBuilder localBuilder;
+    localBuilder.append("resolvedView", elem.Obj());
+    return fromBSON(localBuilder.done());
+}
+
+void ResolvedView::serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+    serialize(builder);
+}
+
 void ResolvedView::handleTimeseriesRewrites(std::vector<BSONObj>* resolvedPipeline) const {
     // Stages that are constrained to be the first stage of the pipeline ($collStats, $indexStats)
     // require special handling since $_internalUnpackBucket is the first stage.
@@ -227,7 +239,9 @@ AggregateCommandRequest ResolvedView::asExpandedViewAggregation(
     std::vector<BSONObj> resolvedPipeline;
     // Mongot user pipelines are a unique case: $_internalSearchIdLookup applies the view pipeline.
     // For this reason, we do not expand the aggregation request to include the view pipeline.
-    if (search_helper_bson_obj::isMongotPipeline(resolvedPipeline)) {
+    if (search_helper_bson_obj::isMongotPipeline(request.getPipeline()) &&
+        feature_flags::gFeatureFlagMongotIndexedViews.isEnabledUseLatestFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         resolvedPipeline.reserve(request.getPipeline().size());
         resolvedPipeline.insert(
             resolvedPipeline.end(), request.getPipeline().begin(), request.getPipeline().end());

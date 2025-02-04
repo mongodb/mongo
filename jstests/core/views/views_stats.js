@@ -10,6 +10,8 @@
 //     assumes_read_preference_unchanged,
 //     assumes_unsharded_collection,
 //     does_not_support_repeated_reads,
+//     # We do deletes without any query, which is a non-retryable write
+//     requires_non_retryable_writes,
 // ]
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

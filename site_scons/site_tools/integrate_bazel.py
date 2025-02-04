@@ -10,7 +10,6 @@ import queue
 import shlex
 import shutil
 import signal
-import socket
 import stat
 import subprocess
 import sys
@@ -23,7 +22,6 @@ from io import StringIO
 from typing import Any, Dict, List, Set, Tuple
 
 import distro
-import git
 import psutil
 import requests
 import SCons
@@ -31,6 +29,7 @@ from retry import retry
 from retry.api import retry_call
 from SCons.Script import ARGUMENTS
 
+from bazel.wrapper_hook.developer_bes_keywords import write_workstation_bazelrc
 from buildscripts.install_bazel import install_bazel
 from buildscripts.util.read_config import read_config_file
 from evergreen.api import RetryingEvergreenApi
@@ -79,8 +78,8 @@ _DISTRO_PATTERN_MAP = {
 }
 
 _S3_HASH_MAPPING = {
-    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-7.4.1-ppc64le": "f8e95c5a840f18bcec9de689bdeb7c3a4409b0580cbeadf0266534c09332b8d8",
-    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-7.4.1-s390x": "3c48f892520eeeab5a706238c2aaccdb9afd3ed49a3757c23187d4ba089ecb58",
+    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-7.5.0-ppc64le": "8a54bddf927b92876c737926dbbba808c0c9b840c27d118b59503a07a69cc651",
+    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-7.5.0-s390x": "43f75e0a4dc2d377b78e82614335b205629f6bada087f1efb8b76179704f0297",
     "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-darwin-amd64": "f2ba5f721a995b54bab68c6b76a340719888aa740310e634771086b6d1528ecd",
     "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-darwin-arm64": "69fa21cd2ccffc2f0970c21aa3615484ba89e3553ecce1233a9d8ad9570d170e",
     "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-linux-amd64": "d28b588ac0916abd6bf02defb5433f6eddf7cba35ffa808eabb65a44aab226f7",
@@ -412,13 +411,16 @@ def bazel_server_timeout_dumper(jvm_out, proc_pid, project_root):
 
 def bazel_build_subproc_func(**kwargs):
     project_root = os.path.abspath(".")
-    output_base = subprocess.run(
-        [Globals.bazel_executable, "info", "output_base"],
-        capture_output=True,
-        text=True,
-        check=True,
-        env=kwargs["env"],
-    ).stdout.strip()
+    try:
+        output_base = subprocess.run(
+            [Globals.bazel_executable, "info", "output_base"],
+            capture_output=True,
+            text=True,
+            check=True,
+            env=kwargs["env"],
+        ).stdout.strip()
+    except subprocess.CalledProcessError:
+        output_base = ""
 
     if os.environ.get("CI"):
         if os.path.exists(".bazel_real"):
@@ -429,14 +431,15 @@ def bazel_build_subproc_func(**kwargs):
 
     bazel_proc = subprocess.Popen(**kwargs)
 
-    t = threading.Thread(
-        target=bazel_server_timeout_dumper,
-        args=(jvm_out, bazel_proc.pid, project_root),
-    )
+    if output_base:
+        t = threading.Thread(
+            target=bazel_server_timeout_dumper,
+            args=(jvm_out, bazel_proc.pid, project_root),
+        )
 
-    # the bazel calls are wrapped in retries so we can rely on them to restart the attempt.
-    t.daemon = True
-    t.start()
+        # the bazel calls are wrapped in retries so we can rely on them to restart the attempt.
+        t.daemon = True
+        t.start()
 
     return bazel_proc
 
@@ -538,6 +541,17 @@ def perform_non_tty_bazel_build(bazel_cmd: str) -> None:
 
 def run_bazel_command(env, bazel_cmd, tries_so_far=0):
     try:
+        server_pid = subprocess.run(
+            [Globals.bazel_executable, "info", "server_pid"],
+            capture_output=True,
+            text=True,
+            check=True,
+            env={**os.environ.copy(), **Globals.bazel_env_variables},
+        ).stdout.strip()
+    except subprocess.CalledProcessError:
+        server_pid = None
+
+    try:
         tty_import_fail = False
         try:
             retry_call(
@@ -565,13 +579,30 @@ def run_bazel_command(env, bazel_cmd, tries_so_far=0):
                 print(
                     "Killing Bazel between retries on Windows to work around file access deadlock"
                 )
-                subprocess.run(
-                    [os.path.abspath(Globals.bazel_executable), "shutdown"],
-                    check=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    env={**os.environ.copy(), **Globals.bazel_env_variables},
-                )
+                try:
+                    subprocess.run(
+                        [os.path.abspath(Globals.bazel_executable), "shutdown"],
+                        check=True,
+                        text=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        env={**os.environ.copy(), **Globals.bazel_env_variables},
+                    )
+                except subprocess.CalledProcessError as exc:
+                    print(exc.stdout)
+                    print(exc.stderr)
+                    try:
+                        if psutil.pid_exists(int(server_pid)):
+                            proc = psutil.Process(int(server_pid))
+                            if proc.is_running():
+                                proc.terminate()
+                                proc.wait(timeout=10)
+                                proc.kill()
+                    except Exception as kill_exc:
+                        print("Tried to force kill server, but something happened:")
+                        print(kill_exc)
+                        print("Optimistically continuing anyways...")
+
             linker_jobs = 4
             sanitizers = env.GetOption("sanitize")
             if sanitizers is not None and "fuzzer" in sanitizers.split(","):
@@ -614,9 +645,6 @@ def bazel_build_thread_func(env, log_dir: str, verbose: bool, ninja_generate: bo
         extra_args += ["--build_tag_filters=scons_link_lists"]
         bazel_cmd = Globals.bazel_base_build_command + extra_args + ["//src/..."]
 
-    elif SCons.Script.BUILD_TARGETS == ["compiledb"]:
-        extra_args += ["--build_tag_filters=scons_link_lists,compiledb,gen_source"]
-        bazel_cmd = Globals.bazel_base_build_command + extra_args + ["//:compiledb", "//src/..."]
     elif SCons.Script.BUILD_TARGETS == ["compiledb", "+mongo-tidy-tests"]:
         extra_args += [
             "--build_tag_filters=scons_link_lists,compiledb,gen_source,mongo-tidy-tests,mongo-tidy-checks"
@@ -630,6 +658,8 @@ def bazel_build_thread_func(env, log_dir: str, verbose: bool, ninja_generate: bo
             build_tags += ["scons_link_lists", "gen_source"]
             extra_args += [f"--build_tag_filters={','.join(build_tags)}"]
         bazel_cmd = Globals.bazel_base_build_command + extra_args + ["//src/..."]
+        if "compiledb" in SCons.Script.BUILD_TARGETS:
+            bazel_cmd = bazel_cmd + ["//:compiledb"]
 
     if ninja_generate:
         print("Generating bazel link deps...")
@@ -826,10 +856,9 @@ def generate_bazel_info_for_ninja(env: SCons.Environment.Environment) -> None:
     # that bazel will need to construct the correct command line for any given targets
     ninja_bazel_build_json = {
         "bazel_cmd": Globals.bazel_base_build_command,
-        "compiledb_cmd": [Globals.bazel_executable, "run"]
+        "compiledb_cmd": [Globals.bazel_executable, "build"]
         + env["BAZEL_FLAGS_STR"]
-        + ["//:compiledb", "--"]
-        + env["BAZEL_FLAGS_STR"],
+        + ["//:compiledb"],
         "defaults": [str(t) for t in SCons.Script.DEFAULT_TARGETS],
         "targets": Globals.scons2bazel_targets,
         "CC": env.get("CC", ""),
@@ -1177,7 +1206,7 @@ def prefetch_toolchain(env, version):
 def exists(env: SCons.Environment.Environment) -> bool:
     # === Bazelisk ===
 
-    write_workstation_bazelrc()
+    write_workstation_bazelrc(sys.argv)
     cleanup_gitinfo_bazelrc()
     env.AddMethod(prefetch_toolchain, "PrefetchToolchain")
     env.AddMethod(bazel_execroot, "BazelExecroot")
@@ -1249,67 +1278,6 @@ def cleanup_gitinfo_bazelrc():
                 os.remove(gitinfo_bazelrc_file)
             except:
                 pass
-
-
-def write_workstation_bazelrc():
-    if os.environ.get("CI") is None:
-        workstation_file = ".bazelrc.workstation"
-        existing_hash = ""
-        if os.path.exists(workstation_file):
-            with open(workstation_file) as f:
-                existing_hash = hashlib.md5(f.read().encode()).hexdigest()
-
-        try:
-            repo = git.Repo()
-        except Exception:
-            print(
-                "Unable to setup git repo, skipping workstation file generation. This will result in incomplete telemetry data being uploaded."
-            )
-            return
-
-        try:
-            status = "clean" if repo.head.commit.diff(None) is None else "modified"
-        except Exception:
-            status = "Unknown"
-
-        try:
-            hostname = socket.gethostname()
-        except Exception:
-            hostname = "Unknown"
-
-        try:
-            remote = repo.branches.master.repo.remote().url
-        except Exception:
-            try:
-                remote = repo.remotes[0].url
-            except Exception:
-                remote = "Unknown"
-
-        try:
-            branch = repo.active_branch.name
-        except Exception:
-            branch = "Unknown"
-
-        try:
-            commit = repo.commit("HEAD")
-        except Exception:
-            commit = "Unknown"
-
-        bazelrc_contents = f"""\
-# Generated file, do not modify
-common --bes_keywords=developerBuild=True
-common --bes_keywords=workstation={hostname}
-common --bes_keywords=engflow:BuildScmRemote={remote}
-common --bes_keywords=engflow:BuildScmBranch={branch}
-common --bes_keywords=engflow:BuildScmRevision={commit}
-common --bes_keywords=engflow:BuildScmStatus={status}
-    """
-
-        current_hash = hashlib.md5(bazelrc_contents.encode()).hexdigest()
-        if existing_hash != current_hash:
-            print(f"Generating new {workstation_file} file...")
-            with open(workstation_file, "w") as f:
-                f.write(bazelrc_contents)
 
 
 def setup_bazel_env_vars() -> None:
@@ -1403,7 +1371,6 @@ def generate(env: SCons.Environment.Environment) -> None:
         f'--use_wiredtiger={True if env.GetOption("wiredtiger") == "on" else False}',
         f'--use_glibcxx_debug={env.GetOption("use-glibcxx-debug") is not None}',
         f'--use_tracing_profiler={env.GetOption("use-tracing-profiler") == "on"}',
-        f'--build_grpc={True if env["ENABLE_GRPC_BUILD"] else False}',
         f'--build_otel={True if env["ENABLE_OTEL_BUILD"] else False}',
         f'--use_libcxx={env.GetOption("libc++") is not None}',
         f'--detect_odr_violations={env.GetOption("detect-odr-violations") is not None}',
@@ -1422,6 +1389,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         f'--js_engine={env.GetOption("js-engine")}',
         f'--use_sasl_client={env.GetOption("use-sasl-client") is not None}',
         f'--skip_archive={env.GetOption("skip-archive") != "off" and normalized_os == "linux"}',
+        "--bes_keywords=scons_invocation",
         "--define",
         f"MONGO_VERSION={mongo_version}",
         "--define",
@@ -1430,6 +1398,18 @@ def generate(env: SCons.Environment.Environment) -> None:
         "--dynamic_mode=off",
         "--fission=no",
     ]
+
+    if normalized_os == "linux" and os.environ.get("CI") is None:
+        print("""
+    -------- ANNOUNCEMENT -------- 
+    The SCons interface will soon be deprecated on the master branch, please try
+    your workflow with Bazel directly by visiting https://wiki.corp.mongodb.com/display/HGTC/Building+with+Bazel
+
+    If your workflow does not work with Bazel now, please post in #ask-devprod-build with details.
+              
+    Build concurrency is now limited to 100 jobs, please switch over to calling Bazel directly to get full concurrency!
+    ------------------------------""")
+        bazel_internal_flags += ["--jobs=100"]
 
     # Timeout linking at 8 minutes to retry with a lower concurrency.
     if os.environ.get("CI") is not None:
@@ -1660,7 +1640,9 @@ def generate(env: SCons.Environment.Environment) -> None:
         )
     except subprocess.CalledProcessError as ex:
         print("ERROR: bazel thin targets query failed:")
-        print(ex)
+        print(ex.cmd)
+        print(ex.stdout)
+        print(ex.stderr)
         print("Please ask about this in #ask-devprod-build slack channel.")
         sys.exit(1)
 
@@ -1709,6 +1691,17 @@ def generate(env: SCons.Environment.Environment) -> None:
                 "bazel_target": target,
                 "bazel_output": bazel_output_file.replace("\\", "/"),
             }
+    compiledb_nodes = env.ThinTarget(
+        target=env.Alias("compiledb"),
+        source="compile_commands.json",
+        NINJA_GENSOURCE_INDEPENDENT=True,
+    )
+    env.NoCache(compiledb_nodes)
+
+    Globals.scons2bazel_targets["compiledb"] = {
+        "bazel_target": "//:compiledb",
+        "bazel_output": "compile_commands.json",
+    }
 
     globals = Globals()
     env["SCONS2BAZEL_TARGETS"] = globals

@@ -102,6 +102,7 @@ public:
                                                           opCtx->getWriteConcern());
             resharding::validateImplicitlyCreateIndex(request().getImplicitlyCreateIndex(),
                                                       request().getKey());
+            resharding::validatePerformVerification(request().getPerformVerification());
 
             {
                 FixedFCVRegion fixedFcvRegion{opCtx};

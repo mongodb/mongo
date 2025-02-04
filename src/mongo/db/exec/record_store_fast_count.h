@@ -55,7 +55,7 @@ public:
                               long long skip,
                               long long limit);
 
-    bool isEOF() override {
+    bool isEOF() const override {
         return _commonStats.isEOF;
     }
 

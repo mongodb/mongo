@@ -117,15 +117,6 @@ public:
      */
     static void reverseScans(QuerySolutionNode* node, bool reverseCollScans = false);
 
-    /**
-     * Extracts all field names for the sortKey meta-projection and stores them in the returned
-     * array. Returns an empty array if there were no sortKey meta-projection specified in the
-     * given projection 'proj'. For example, given a projection {a:1, b: {$meta: "sortKey"},
-     * c: {$meta: "sortKey"}}, the returned vector will contain two elements ["b", "c"].
-     */
-    static std::vector<FieldPath> extractSortKeyMetaFieldsFromProjection(
-        const projection_ast::Projection& proj);
-
     static bool providesSort(const CanonicalQuery& query, const BSONObj& kp) {
         return query.getFindCommandRequest().getSort().isPrefixOf(
             kp, SimpleBSONElementComparator::kInstance);

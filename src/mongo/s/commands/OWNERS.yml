@@ -1,8 +1,26 @@
 version: 1.0.0
 filters:
+  - "cluster_build_info.cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "cluster_hello_cmd.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "cluster_kill_op.cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "cluster_killoperations_cmd.cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "cluster_shutdown_cmd.cpp":
+    approvers:
+      - 10gen/server-programmability
   - "cluster_user_management_commands.cpp":
     approvers:
       - 10gen/server-security
+  - "cluster_whats_my_uri_cmd.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
   - "cluster_fle2*":
     approvers:
       - 10gen/server-security
@@ -81,9 +99,6 @@ filters:
   - "*placement_history*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "sharding_expressions*":
-    approvers:
-      - 10gen/query-integration-staff-leads
   - "cluster_query_without_shard_key_cmd.cpp":
     approvers:
       - 10gen/query-execution-router-write-exec
@@ -126,9 +141,6 @@ filters:
   - "cluster_set_user_write_block_mode_command.cpp":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "*shard_collection*":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "cluster_update_zone_key_range_cmd.cpp":
     approvers:
       - 10gen/server-catalog-and-routing
@@ -150,3 +162,12 @@ filters:
   - "*shard_collection*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "strategy.*":
+    approvers:
+      - 10gen/server-programmability
+  - "cluster_ftdc_commands.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "cluster_netstat_cmd.cpp":
+    approvers:
+      - 10gen/server-networking-and-observability

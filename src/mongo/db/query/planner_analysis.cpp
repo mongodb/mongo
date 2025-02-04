@@ -59,6 +59,7 @@
 #include "mongo/db/query/distinct_access.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_hint.h"
 #include "mongo/db/query/interval.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
@@ -1063,8 +1064,10 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
             auto elem = kpIt.next();
             if (isn->multikeyFields.find(elem.fieldNameStringData()) != isn->multikeyFields.end()) {
                 // One of the indexed fields providing the sort is multikey. It is not correct for a
-                // field with multikey components to provide a sort, so bail out.
-                return false;
+                // field with multikey components to provide a sort, so break out of this loop and
+                // look to see if the resulting sort we can provide is able to satisfy the desired
+                // sort.
+                break;
             }
             resultingSortBob.append(elem);
         }
@@ -1387,9 +1390,8 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
         // is that the projection is ignored when returnKey is specified.
         solnRoot = std::make_unique<ReturnKeyNode>(
             addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot)),
-            query.getProj()
-                ? QueryPlannerCommon::extractSortKeyMetaFieldsFromProjection(*query.getProj())
-                : std::vector<FieldPath>{});
+            query.getProj() ? query.getProj()->extractSortKeyMetaFields()
+                            : std::vector<FieldPath>{});
     } else if (query.getProj()) {
         solnRoot = analyzeProjection(query, std::move(solnRoot), hasSortStage);
     } else if (isDistinctScanMultiplanningEnabled && query.getDistinct()) {
@@ -1444,6 +1446,76 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     }
 
     return soln;
+}
+
+bool QueryPlannerAnalysis::turnIxscanIntoCount(QuerySolution* soln) {
+    QuerySolutionNode* root = soln->root();
+
+    // Root should be an ixscan or fetch w/o any filters.
+    if (!(STAGE_FETCH == root->getType() || STAGE_IXSCAN == root->getType())) {
+        return false;
+    }
+
+    if (STAGE_FETCH == root->getType() && nullptr != root->filter.get()) {
+        return false;
+    }
+
+    // If the root is a fetch, its child should be an ixscan
+    if (STAGE_FETCH == root->getType() && STAGE_IXSCAN != root->children[0]->getType()) {
+        return false;
+    }
+
+    IndexScanNode* isn = (STAGE_FETCH == root->getType())
+        ? static_cast<IndexScanNode*>(root->children[0].get())
+        : static_cast<IndexScanNode*>(root);
+
+    // No filters allowed and side-stepping isSimpleRange for now.  TODO: do we ever see
+    // isSimpleRange here?  because we could well use it.  I just don't think we ever do see
+    // it.
+
+    if (nullptr != isn->filter.get() || isn->bounds.isSimpleRange) {
+        return false;
+    }
+
+    // Make sure the bounds are OK.
+    BSONObj startKey;
+    bool startKeyInclusive;
+    BSONObj endKey;
+    bool endKeyInclusive;
+
+    auto makeCountScan = [&isn](BSONObj& csnStartKey,
+                                bool startKeyInclusive,
+                                BSONObj& csnEndKey,
+                                bool endKeyInclusive,
+                                std::vector<interval_evaluation_tree::IET> iets) {
+        // Since count scans return no data, they are always forward scans. Index scans, on the
+        // other hand, may need to scan the index in reverse order in order to obtain a sort. If the
+        // index scan direction is backwards, then we need to swap the start and end of the count
+        // scan bounds.
+        if (isn->direction < 0) {
+            csnStartKey.swap(csnEndKey);
+            std::swap(startKeyInclusive, endKeyInclusive);
+        }
+
+        auto csn = std::make_unique<CountScanNode>(isn->index);
+        csn->startKey = csnStartKey;
+        csn->startKeyInclusive = startKeyInclusive;
+        csn->endKey = csnEndKey;
+        csn->endKeyInclusive = endKeyInclusive;
+        csn->iets = std::move(iets);
+        return csn;
+    };
+
+    if (!IndexBoundsBuilder::isSingleInterval(
+            isn->bounds, &startKey, &startKeyInclusive, &endKey, &endKeyInclusive)) {
+        return false;
+    }
+
+    // Make the count node that we replace the fetch + ixscan with.
+    auto csn = makeCountScan(startKey, startKeyInclusive, endKey, endKeyInclusive, isn->iets);
+    // Takes ownership of 'cn' and deletes the old root.
+    soln->setRoot(std::move(csn));
+    return true;
 }
 
 }  // namespace mongo

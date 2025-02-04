@@ -213,8 +213,8 @@ TEST(QueryProjectionTest, ValidPositionalOperatorProjections) {
     createFindProjection("{'a.b.c': 1}", "{'a.b.c.$': 1}");
     createFindProjection("{'a.b.c': 1}", "{'a.e.f.$': 1}");
     createFindProjection("{a: {b: 1}}", "{'a.$': 1}");
-    createFindProjection("{a: 1, b: 1}}", "{'a.$': 1}");
-    createFindProjection("{a: 1, b: 1}}", "{'b.$': 1}");
+    createFindProjection("{a: 1, b: 1}", "{'a.$': 1}");
+    createFindProjection("{a: 1, b: 1}", "{'b.$': 1}");
     createFindProjection("{$and: [{a: 1}, {b: 1}]}", "{'a.$': 1}");
     createFindProjection("{$and: [{a: 1}, {b: 1}]}", "{'b.$': 1}");
     createFindProjection("{$or: [{a: 1}, {b: 1}]}", "{'a.$': 1}");
@@ -567,4 +567,22 @@ TEST(QueryProjectionTest, AssignmentToDottedPathRequiresFirstComponent) {
     ASSERT_EQ(*fields.begin(), "a");
 }
 
+TEST(QueryProjectionTest, ExtractSortKeyMetaFields) {
+    auto proj = createProjection("{}", "{a: 1, b: {$meta: 'sortKey'}, c: {$meta: 'sortKey'}}");
+    auto metaFields = proj.extractSortKeyMetaFields();
+
+    ASSERT_EQ(metaFields.size(), 2);
+    auto fieldsIt = metaFields.begin();
+    ASSERT_EQ(*fieldsIt++, "b");
+    ASSERT_EQ(*fieldsIt++, "c");
+}
+
+TEST(QueryProjectionTest, ExtractNestedSortKeyMetaFields) {
+    auto proj = createProjection("{}", "{a: 1, b: {c: {$meta: 'sortKey'}}}");
+    auto metaFields = proj.extractSortKeyMetaFields();
+
+    ASSERT_EQ(metaFields.size(), 1);
+    auto fieldsIt = metaFields.begin();
+    ASSERT_EQ(*fieldsIt++, "b.c");
+}
 }  // namespace

@@ -25,7 +25,6 @@ selector:
     - jstests/core/**/geo_update_btree2.js # notablescan.
     - jstests/core/**/index9.js # "local" database.
     - jstests/core/**/queryoptimizera.js # "local" database.
-    - jstests/core/**/stages*.js # stageDebug.
     - jstests/core/**/startup_log.js # "local" database.
     - jstests/core/**/query/top/top.js # top.
     # The following tests fail because mongos behaves differently from mongod when testing certain
@@ -48,9 +47,6 @@ selector:
     # This is caused by the pauseMigrationsDuringMultiUpdates cluster parameter and the random migrations failpoint both being enabled for this suite.
     # TODO SERVER-91722: re-enable this test in this suite or potentially in a noPassthrough suite.
     - jstests/core/index/geo/geo_update_btree.js
-    # TODO SERVER-98386: re-enable this test once stale routing information does not miss documents
-    # after re-creating timeseries collections.
-    - jstests/core/timeseries/query/timeseries_union_with.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

@@ -136,7 +136,7 @@ assert.commandWorked(viewsDB.runCommand({
     // Test that an aggregate on a view propagates the 'allowDiskUse' option.
     const extSortLimit = 100 * 1024 * 1024;
     const largeStrSize = 10 * 1024 * 1024;
-    const largeStr = new Array(largeStrSize).join('x');
+    const largeStr = 'x'.repeat(largeStrSize);
     viewsDB.largeColl.drop();
     for (let i = 0; i <= extSortLimit / largeStrSize; ++i) {
         assert.commandWorked(viewsDB.largeColl.insert({x: i, largeStr: largeStr}));

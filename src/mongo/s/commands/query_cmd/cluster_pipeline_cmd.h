@@ -119,13 +119,14 @@ public:
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const override {
-            return _liteParsedPipeline.supportsReadConcern(
-                level, isImplicitDefault, _aggregationRequest.getExplain());
+            bool isExplain = _aggregationRequest.getExplain().get_value_or(false);
+            return _liteParsedPipeline.supportsReadConcern(level, isImplicitDefault, isExplain);
         }
 
         void _runAggCommand(OperationContext* opCtx,
                             const BSONObj& cmdObj,
-                            BSONObjBuilder* result) {
+                            BSONObjBuilder* result,
+                            boost::optional<ExplainOptions::Verbosity> verbosity) {
             const auto& nss = _aggregationRequest.getNamespace();
 
             try {
@@ -135,6 +136,7 @@ public:
                                                    _aggregationRequest,
                                                    _liteParsedPipeline,
                                                    _privileges,
+                                                   verbosity,
                                                    result));
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
                 // If the aggregation failed because the namespace is a view, re-run the command
@@ -144,6 +146,7 @@ public:
                                                                    *ex.extraInfo<ResolvedView>(),
                                                                    nss,
                                                                    _privileges,
+                                                                   verbosity,
                                                                    result));
             }
         }
@@ -155,7 +158,11 @@ public:
             Impl::checkCanRunHere(opCtx);
 
             auto bob = reply->getBodyBuilder();
-            _runAggCommand(opCtx, _request.body, &bob);
+            boost::optional<ExplainOptions::Verbosity> verbosity = boost::none;
+            if (_aggregationRequest.getExplain().get_value_or(false)) {
+                verbosity = ExplainOptions::Verbosity::kQueryPlanner;
+            }
+            _runAggCommand(opCtx, _request.body, &bob, verbosity);
         }
 
         void explain(OperationContext* opCtx,
@@ -163,7 +170,7 @@ public:
                      rpc::ReplyBuilderInterface* result) override {
             Impl::checkCanExplainHere(opCtx);
             auto bodyBuilder = result->getBodyBuilder();
-            _runAggCommand(opCtx, _request.body, &bodyBuilder);
+            _runAggCommand(opCtx, _request.body, &bodyBuilder, verbosity);
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {

@@ -3,6 +3,10 @@
  *
  * @tags: [
  *   requires_fcv_71,
+ *   # This test relies on the behavior that ending a transport session results in a HostUnreachable
+ *   # error code, which is not the case for gRPC. It also isn't relevant for community, as this
+ *   # test was developed to address an issue with the envoy transcoder (SERVER-77230).
+ *   search_community_incompatible,
  * ]
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
@@ -31,11 +35,8 @@ function runStandaloneTest(stageRegex, pipeline, expectedCommand) {
 
     const collectionUUID = getUUIDFromListCollections(conn.getDB(dbName), collName);
     expectedCommand["collectionUUID"] = collectionUUID;
-    const expected = prepMongotResponse(expectedCommand,
-                                        coll,
-                                        mongotConn,
-                                        NumberLong(123) /* cursorId */,
-                                        false /* addVectorSearchScore */);
+    const expected =
+        prepMongotResponse(expectedCommand, coll, mongotConn, NumberLong(123) /* cursorId */);
 
     // Simulate a case where mongot closes the connection after getting a command.
     // Mongod should retry the command and succeed.

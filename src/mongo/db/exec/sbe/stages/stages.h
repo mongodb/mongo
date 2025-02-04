@@ -746,6 +746,16 @@ public:
     virtual void open(bool reOpen) = 0;
 
     /**
+     * The stage spills its data and asks from all its children to spill their data as well.
+     */
+    void forceSpill() {
+        doForceSpill();
+        for (const auto& child : _children) {
+            child->forceSpill();
+        }
+    }
+
+    /**
      * Moves to the next position. If the end is reached then return EOF otherwise ADVANCED. Callers
      * are not required to call getNext until EOF. They can stop consuming results at any time. Once
      * EOF is reached it will stay at EOF unless reopened.
@@ -774,6 +784,13 @@ public:
     friend class CanChangeState<PlanStage>;
     friend class CanTrackStats<PlanStage>;
     friend class CanInterrupt<PlanStage>;
+
+private:
+    /**
+     * Spills the stage's data to disk. Stages that can spill their own data need to override this
+     * method.
+     */
+    virtual void doForceSpill() {}
 
 protected:
     // Derived classes can optionally override these methods.

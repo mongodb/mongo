@@ -534,7 +534,43 @@ jsTestOptions = function() {
     return _jsTestOptions;
 };
 
-jsTestLog = function(msg) {
+/**
+ * @deprecated: This function should not be used for new tests. The new severity API's should be
+ * used instead: jsTest.log.info("message", args).
+ *
+ * Formats a log and prints it to the console.
+ * Depending on the format, it can either be in plain text, or as a stringified JSON.
+ *
+ * @param {string} msg - The message to be printed.
+ * @param {object} args
+ * @param {object} args.attr - An object used to declare extra logging params.
+ * @param {number} args.id - An unique identified to help with filtering logs.
+ * @param {("I"|"D"|"W"|"E")} args.severity - An unique identified to help with filtering logs.
+ */
+jsTestLog = function(
+    msg,
+    {severity, attr, id} = {},
+) {
+    if (TestData?.logFormat === "json") {
+        // New logging format, enabled through the --logFormat resmoke flag.
+        let new_msg = {
+            t: new Date(),
+            "s": severity || "I",
+            "c": "js_test",
+            "ctx": TestData?.testName || "-",  // context (e.g., TestData.testName)
+            "msg": msg,                        // message body
+        };
+        if (attr && typeof attr === "object" && Object.keys(attr).length > 0) {
+            new_msg["attr"] = attr;
+        }
+        if (id && typeof id === "number") {
+            new_msg["id"] = id;
+        }
+        print(JSON.stringify(new_msg));
+        return;
+    }
+
+    // Legacy logging format.
     if (typeof msg === "object") {
         msg = tojson(msg);
     }
@@ -547,10 +583,31 @@ jsTest = {};
 
 jsTest.name = jsTestName;
 jsTest.options = jsTestOptions;
-jsTest.log = jsTestLog;
 jsTest.readOnlyUserRoles = ["read"];
 jsTest.basicUserRoles = ["dbOwner"];
 jsTest.adminUserRoles = ["root"];
+
+/**
+ * @deprecated: This function should not be used for new tests. The new severity API's should be
+ * used instead: jsTest.log.info("message", args).
+ */
+jsTest.log = jsTestLog;
+
+jsTest.log.info = function(msg, {id, attr}) {
+    jsTestLog(msg, {id, attr, severity: "I"});
+};
+
+jsTest.log.debug = function(msg, {id, attr}) {
+    jsTestLog(msg, {id, attr, severity: "D"});
+};
+
+jsTest.log.warning = function(msg, {id, attr}) {
+    jsTestLog(msg, {id, attr, severity: "W"});
+};
+
+jsTest.log.error = function(msg, {id, attr}) {
+    jsTestLog(msg, {id, attr, severity: "E"});
+};
 
 jsTest.authenticate = function(conn) {
     const connOptions = conn.fullOptions || {};

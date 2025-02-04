@@ -148,8 +148,8 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
 
     // Process pools stats.
     {
-        if (strategy) {
-            result.append("replicaSetMatchingStrategy", matchingStrategyToString(*strategy));
+        if (matchingStrategy) {
+            result.append("replicaSetMatchingStrategy", *matchingStrategy);
         }
 
         BSONObjBuilder poolBuilder(result.subobjStart("pools"));

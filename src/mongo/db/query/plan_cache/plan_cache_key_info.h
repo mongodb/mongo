@@ -53,7 +53,7 @@ public:
         : _lengthOfQueryShape{shapeString.size()}, _querySettings{std::move(querySettings)} {
         _key = std::move(shapeString);
         _key += indexabilityString;
-    };
+    }
 
     CanonicalQuery::QueryShapeString getQueryShape() const {
         return std::string(_key, 0, _lengthOfQueryShape);

@@ -37,7 +37,7 @@
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/database_name.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 

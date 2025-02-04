@@ -52,11 +52,6 @@ namespace mongo::timeseries::bucket_catalog {
 
 struct Bucket;
 
-struct CommitInfo {
-    boost::optional<repl::OpTime> opTime;
-    boost::optional<OID> electionId;
-};
-
 struct Sizes {
     // Contains the verified size for:
     // - The meta, control, and field names for previously unaccounted fields in a Bucket.
@@ -127,13 +122,15 @@ struct WriteBatch {
     BSONObj min;  // Batch-local min; full if first batch, updates otherwise.
     BSONObj max;  // Batch-local max; full if first batch, updates otherwise.
 
-    SharedPromise<CommitInfo> promise;
+    SharedPromise<void> promise;
 
     ExecutionStatsController stats;
 
-    // Marginal numbers for this batch only. Uncommitted is a rough estimate of data in this batch,
+    // Marginal numbers for this batch only.
+    // Sizes.uncommittedMeasurementEstimate is a rough estimate of data in this batch,
     // using 0 for anything under threshold, and uncompressed size for anything over threshold.
-    // Committed is 0 until it is populated by intermediate as the delta for committing this batch.
+    // Sizes.uncommittedVerifiedSize is 0 until it is populated by intermediate as the delta
+    // for committing this batch.
     Sizes sizes;
 
     StringMap<std::size_t> newFieldNamesToBeInserted;  // Value is hash of string key
@@ -166,9 +163,8 @@ void setUncompressedBucketDoc(WriteBatch& batch, BSONObj uncompressedBucketDoc);
 bool isWriteBatchFinished(const WriteBatch& batch);
 
 /**
- * Retrieves the result of the write batch commit. Should be called by any interested party
- * that does not have commit rights. Blocking.
+ * Retrieves the status of the write batch commit. Blocking.
  */
-StatusWith<CommitInfo> getWriteBatchResult(WriteBatch& batch);
+Status getWriteBatchStatus(WriteBatch& batch);
 
 }  // namespace mongo::timeseries::bucket_catalog

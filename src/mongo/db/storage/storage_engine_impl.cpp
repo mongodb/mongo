@@ -854,9 +854,8 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
         }
         if (indexesToDrop.size() > 0) {
             WriteUnitOfWork wuow(opCtx);
-            auto collection =
-                CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(
-                    opCtx, entry.nss);
+            CollectionWriter writer{opCtx, entry.nss};
+            auto collection = writer.getWritableCollection(opCtx);
             invariant(collection->getCatalogId() == entry.catalogId);
             collection->replaceMetadata(opCtx, std::move(md));
             wuow.commit();
@@ -970,9 +969,9 @@ Status StorageEngineImpl::_dropCollections(OperationContext* opCtx,
                                            const std::string& collectionNamePrefix) {
     Status firstError = Status::OK();
     WriteUnitOfWork wuow(opCtx);
-    auto collectionCatalog = CollectionCatalog::get(opCtx);
     for (auto& uuid : toDrop) {
-        auto coll = collectionCatalog->lookupCollectionByUUIDForMetadataWrite(opCtx, uuid);
+        CollectionWriter writer{opCtx, uuid};
+        auto coll = writer.getWritableCollection(opCtx);
         if (coll->ns().coll().startsWith(collectionNamePrefix)) {
             // Drop all indexes in the collection.
             coll->getIndexCatalog()->dropAllIndexes(
@@ -1306,6 +1305,12 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
             try {
                 auto uniqueOpCtx = client->makeOperationContext();
                 auto opCtx = uniqueOpCtx.get();
+
+                auto backupCursorHooks = BackupCursorHooks::get(opCtx->getServiceContext());
+                if (backupCursorHooks->isBackupCursorOpen()) {
+                    LOGV2_DEBUG(9810500, 1, "Backup in progress, skipping table drops.");
+                    return;
+                }
 
                 // The TimestampMonitor is an important background cleanup task for the storage
                 // engine and needs to be able to make progress to free up resources.

@@ -281,7 +281,7 @@ tasks:
           resmoke_args: >-
             --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
             --runNoFeatureFlagTests
-          jstestfuzz_vars: --metaSeed 1726779665485 --jstestfuzzGitRev 8ddd8f12cab0
+          jstestfuzz_vars: --metaSeed 1726779665485 --jstestfuzzGitRev e6630c1a41c8fb186544654d27f5c803f01ca3ca
 
   - <<: *task_template
     name: aggregation_one_shard_sharded_collections
@@ -389,6 +389,9 @@ tasks:
           # 'numPipelines' as an argument in the yaml here, but it works as part of the
           # 'jstestfuzz_vars' argument string. If a future reader better understands this evergreen
           # integration, please update this comment and/or move numPipelines to a yaml arg here.
+          #
+          # Generating the tests can use a large amount of memory, so we use a large distro.
+          use_large_distro: "true"
           num_files: 70
           num_tasks: 20
           jstestfuzz_vars: --diffTestingMode timeseries --numPipelines=750
@@ -570,8 +573,6 @@ tasks:
         "default",
         "change_streams",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -584,8 +585,6 @@ tasks:
         "default",
         "change_streams",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -598,8 +597,6 @@ tasks:
         "default",
         "change_streams",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -613,8 +610,6 @@ tasks:
         "replica_set_endpoint",
         "requires_all_feature_flags",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -627,8 +622,6 @@ tasks:
         "default",
         "change_streams",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -699,8 +692,6 @@ tasks:
         "change_streams",
         "secondary_reads",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -732,8 +723,6 @@ tasks:
         "default",
         "change_streams",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -747,8 +736,6 @@ tasks:
         "replica_set_endpoint",
         "requires_all_feature_flags",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -762,8 +749,6 @@ tasks:
         "change_streams",
         "secondary_reads",
       ]
-    depends_on:
-      - name: change_streams_secondary_reads_sharded_collections
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -776,8 +761,6 @@ tasks:
         "default",
         "change_streams",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -791,8 +774,6 @@ tasks:
         "replica_set_endpoint",
         "requires_all_feature_flags",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -806,8 +787,6 @@ tasks:
         "change_streams",
         "secondary_reads",
       ]
-    depends_on:
-      - name: change_streams_secondary_reads_sharded_collections
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -821,8 +800,6 @@ tasks:
         "replica_set_endpoint",
         "requires_all_feature_flags",
       ]
-    depends_on:
-      - name: change_streams
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -1291,6 +1268,25 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *task_template
+    name: search_community
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "experimental",
+        "incompatible_mac",
+        "incompatible_windows",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "requires_large_host",
+        "blocked_in_query_alias",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 10
+
+  - <<: *task_template
     name: search_auth
     tags:
       [
@@ -1322,8 +1318,6 @@ tasks:
       - func: "do setup"
       - func: "get mongot version"
       - func: "run tests"
-        vars:
-          resmoke_jobs_max: 1
 
   - <<: *task_template
     name: search_end_to_end_single_node
@@ -1340,6 +1334,36 @@ tasks:
       - func: "run tests"
         vars:
           resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: search_community_end_to_end_sharded_cluster
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "experimental",
+        "incompatible_windows",
+        "search_community_e2e_tests",
+        "blocked_in_query_alias",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "get mongot version"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: search_community_end_to_end_single_node
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "experimental",
+        "incompatible_windows",
+        "search_community_e2e_tests",
+        "blocked_in_query_alias",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "get mongot version"
+      - func: "run tests"
 
   - <<: *task_template
     name: search_ssl
@@ -1696,8 +1720,6 @@ tasks:
 
   - <<: *task_template
     name: jsCore_wildcard_indexes
-    depends_on:
-      - name: jsCore
     tags:
       ["assigned_to_jira_team_server_query_optimization", "default", "jscore"]
     commands:
@@ -1743,35 +1765,19 @@ tasks:
           suite: query_tester_self_test
 
   - <<: *task_template
-    name: query_tester_generated_test_1
-    patch_only: true # TODO: SERVER-98733 - Remove to run on waterfall.
-    tags: ["assigned_to_jira_team_server_query_optimization", "default"]
+    name: query_correctness_generated_test_1
+    tags:
+      [
+        "assigned_to_jira_team_server_query_optimization",
+        "experimental",
+        "query_correctness",
+      ]
     commands:
       - func: "do setup"
         vars:
           # Set this variable to true so that we clone the mongo git repo, including the
           # .gitattributes file that provides hunk header overrides when running git diff in the
-          # query_tester_generated_test task. This will trigger the "conditionally clone repo"
-          # function during "do setup."
-          clone_repo_for_test: true
-      - func: "setup query_tester test repos"
-        vars:
-          # The name of test repo that we want this task to clone.
-          repo_name: "query-correctness-tests"
-      - func: "run tests"
-        vars:
-          suite: query_tester_generated_test
-
-  - <<: *task_template
-    name: query_tester_generated_test_2
-    patch_only: true # TODO: SERVER-98733 - Remove to run on waterfall.
-    tags: ["assigned_to_jira_team_server_query_optimization", "default"]
-    commands:
-      - func: "do setup"
-        vars:
-          # Set this variable to true so that we clone the mongo git repo, including the
-          # .gitattributes file that provides hunk header overrides when running git diff in the
-          # query_tester_generated_test task. This will trigger the "conditionally clone repo"
+          # query_correctness_generated_test task. This will trigger the "conditionally clone repo"
           # function during "do setup."
           clone_repo_for_test: true
       - func: "setup query_tester test repos"
@@ -1780,18 +1786,23 @@ tasks:
           repo_name: "query-correctness-tests-1"
       - func: "run tests"
         vars:
-          suite: query_tester_generated_test
+          suite: query_correctness_generated_test
+          should_shuffle: false
 
   - <<: *task_template
-    name: query_tester_generated_test_3
-    patch_only: true # TODO: SERVER-98733 - Remove to run on waterfall.
-    tags: ["assigned_to_jira_team_server_query_optimization", "default"]
+    name: query_correctness_generated_test_2
+    tags:
+      [
+        "assigned_to_jira_team_server_query_optimization",
+        "experimental",
+        "query_correctness",
+      ]
     commands:
       - func: "do setup"
         vars:
           # Set this variable to true so that we clone the mongo git repo, including the
           # .gitattributes file that provides hunk header overrides when running git diff in the
-          # query_tester_generated_test task. This will trigger the "conditionally clone repo"
+          # query_correctness_generated_test task. This will trigger the "conditionally clone repo"
           # function during "do setup."
           clone_repo_for_test: true
       - func: "setup query_tester test repos"
@@ -1800,7 +1811,72 @@ tasks:
           repo_name: "query-correctness-tests-2"
       - func: "run tests"
         vars:
-          suite: query_tester_generated_test
+          suite: query_correctness_generated_test
+          should_shuffle: false
+
+  - <<: *task_template
+    name: query_correctness_generated_test_3
+    tags:
+      [
+        "assigned_to_jira_team_server_query_optimization",
+        "experimental",
+        "query_correctness",
+      ]
+    commands:
+      - func: "do setup"
+        vars:
+          # Set this variable to true so that we clone the mongo git repo, including the
+          # .gitattributes file that provides hunk header overrides when running git diff in the
+          # query_correctness_generated_test task. This will trigger the "conditionally clone repo"
+          # function during "do setup."
+          clone_repo_for_test: true
+      - func: "setup query_tester test repos"
+        vars:
+          # The name of test repo that we want this task to clone.
+          repo_name: "query-correctness-tests-3"
+      - func: "run tests"
+        vars:
+          suite: query_correctness_generated_test
+          should_shuffle: false
+
+  - <<: *task_template
+    name: query_correctness_generated_test_4
+    tags:
+      [
+        "assigned_to_jira_team_server_query_optimization",
+        "experimental",
+        "query_correctness",
+      ]
+    commands:
+      - func: "do setup"
+        vars:
+          # Set this variable to true so that we clone the mongo git repo, including the
+          # .gitattributes file that provides hunk header overrides when running git diff in the
+          # query_correctness_generated_test task. This will trigger the "conditionally clone repo"
+          # function during "do setup."
+          clone_repo_for_test: true
+      - func: "setup query_tester test repos"
+        vars:
+          # The name of test repo that we want this task to clone.
+          repo_name: "query-correctness-tests-4"
+      - func: "run tests"
+        vars:
+          suite: query_correctness_generated_test
+          should_shuffle: false
+
+  - <<: *task_template
+    name: query_correctness_manual_test
+    tags:
+      [
+        "assigned_to_jira_team_server_query_optimization",
+        "experimental",
+        "query_correctness",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_tester_manual_test
 
   ################################################
   #           Query Integration tasks            #
@@ -1837,8 +1913,8 @@ tasks:
           suite: benchmarks_query
           install_dir: build/install/bin
           resmoke_jobs_max: 1
-          exec_timeout_secs: 16200 # 4.5 hours
-          timeout_secs: 16200 # 4.5 hours
+          exec_timeout_secs: 19800 # 5.5 hours
+          timeout_secs: 19800 # 5.5 hours
       - command: s3.put
         params:
           aws_key: ${aws_key}

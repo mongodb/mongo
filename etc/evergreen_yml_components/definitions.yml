@@ -27,10 +27,12 @@ variables:
       - rhel93
       - rhel93-arm64
       - enterprise-rhel-8-64-bit
+      - enterprise-rhel-8-64-bit-toolchain-v5
       - enterprise-rhel-8-64-bit-suggested # For testing selinux.
       - enterprise-rhel-8-arm64
       - enterprise-rhel-83-s390x
       - enterprise-rhel-93-64-bit
+      - enterprise-rhel-93-64-bit-toolchain-v5
       - enterprise-rhel-93-arm64
       - suse15
       - enterprise-suse15-64
@@ -156,7 +158,7 @@ functions:
           bash src/evergreen/restore_git_history_and_tags.sh
 
           cd src
-          git reset --hard ${revision}
+          git reset --hard ${github_commit}
 
   "fetch artifacts": &fetch_artifacts
     command: s3.get
@@ -600,6 +602,22 @@ functions:
       updates:
         - key: gather_code_coverage_results
           value: "true"
+
+  "enable bazel test report creation": &enable_bazel_test_report_creation
+    command: expansions.update
+    display_name: "enable bazel test report creation"
+    params:
+      updates:
+        - key: create_bazel_test_report
+          value: "true"
+
+  "set bazel test silent fail": &set_bazel_test_silent_fail
+    command: expansions.update
+    display_name: "set bazel test silent fail"
+    params:
+      updates:
+        - key: bazel_test_silent_fail
+          value: "--silent-fail"
 
   ### Set expansion macros used in each task.
   "set task expansion macros": &set_task_expansion_macros
@@ -1181,6 +1199,18 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/gen_tasks_activate.sh"
+    # This command will never generate any tasks. However, it must be present here in the main body
+    # of the _gen task to ensure that Evergreen prioritizes the task higher in the task queue. The
+    # "generate resmoke tasks" function is responsible for activating the corresponding non _gen
+    # task and any delays in scheduling the _gen task will cascade to the non _gen task also. An
+    # approach of a no-op generate.tasks command is used instead of configuring task priorities
+    # because it leaves the policy of weighting the relative urgency across tasks in the queue as
+    # Evergreen's responsibility.
+    - command: generate.tasks
+      params:
+        optional: true
+        files:
+          - /dev/null
 
   # Used by generator
   "validate resmoke tests runtime":
@@ -1356,6 +1386,7 @@ functions:
         binary: bash
         env:
           evergreen_remote_exec: ${evergreen_remote_exec|off}
+          author_email: ${author_email}
         args:
           - "src/evergreen/scons_compile.sh"
     - command: expansions.update
@@ -1447,6 +1478,7 @@ functions:
       binary: bash
       env:
         evergreen_remote_exec: ${evergreen_remote_exec|off}
+        author_email: ${author_email}
       args:
         - "src/evergreen/bazel_compile.sh"
 
@@ -1504,6 +1536,10 @@ functions:
     - *apply_version_expansions
     - *f_expansions_write
     - *set_code_coverage_expansion
+    - *f_expansions_write
+    - *enable_bazel_test_report_creation
+    - *f_expansions_write
+    - *set_bazel_test_silent_fail # TODO SERVER-99431 Remove once bazel coverage timeouts are under control.
     - *f_expansions_write
     - *bazel_coverage_sh
 
@@ -1800,6 +1836,16 @@ functions:
         include_expansions_in_env:
           - github_token
           - repo_name
+    - command: subprocess.exec
+      display_name: "query_tester test repos sparse checkout sh"
+      params:
+        background: true
+        binary: bash
+        args:
+          - "./src/evergreen/query_tester_test_sparse_checkout.sh"
+          # Pass repo name in as an argument since background process
+          # loses context of environment variables.
+          - ${repo_name}
 
   "lint fuzzer sanity patch":
     - *f_expansions_write
@@ -1956,6 +2002,7 @@ functions:
           - "./src/evergreen/wiki_page_minimized_agg_query_fuzzer.sh"
     - command: attach.artifacts
       params:
+        exact_file_names: true
         files:
           - wiki_page_running_minimized_test_location.json
 
@@ -2332,6 +2379,7 @@ functions:
     command: attach.artifacts
     display_name: "archive mongo coredumps"
     params:
+      exact_file_names: true
       files:
         - src/mongo-coredumps.json
 
@@ -2394,6 +2442,7 @@ functions:
     - command: attach.artifacts
       params:
         optional: true
+        exact_file_names: true
         files:
           - src/core_analyzer_artifact.json
     - command: s3.put
@@ -2650,6 +2699,16 @@ functions:
     - *attach_scons_cache_logs
     - *attach_scons_stdout_logs
 
+  "create bazel test report":
+    command: subprocess.exec
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/run_python_script.sh"
+        - "buildscripts/create_bazel_test_report.py"
+        - "bazel-testlogs/"
+        - "${bazel_test_silent_fail}"
+
   "attach report":
     command: attach.results
     params:
@@ -2755,6 +2814,7 @@ functions:
     command: attach.artifacts
     params:
       optional: true
+      exact_file_names: true
       ignore_artifacts_for_spawn: false
       files:
         - ${archive_file|src/archive.json}
@@ -2768,6 +2828,7 @@ functions:
           - "./src/evergreen/wiki_page.sh"
     - command: attach.artifacts
       params:
+        exact_file_names: true
         files:
           - wiki_page_location.json
 
@@ -3016,3 +3077,22 @@ functions:
           - "evergreen/activate_task.py"
           - "${task_to_activate}"
           - "${skip_for_patch_author}"
+
+  "gen supplementary data":
+    command: subprocess.exec
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/gen_supplementary_data.sh"
+
+  "upload supplementary data":
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/supplementary-data.tgz
+        remote_file: ${project}/${compile_variant}/${version_id}/dsi/supplementary-data.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/x-gzip
+        display_name: supplementary-data.tgz

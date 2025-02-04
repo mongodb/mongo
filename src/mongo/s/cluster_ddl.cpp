@@ -184,7 +184,8 @@ void createCollection(OperationContext* opCtx, ShardsvrCreateCollection request)
     }
 
     if (MONGO_unlikely(createUnshardedCollectionRandomizeDataShard.shouldFail()) &&
-        request.getUnsplittable() && !request.getDataShard()) {
+        request.getUnsplittable() && !request.getDataShard() &&
+        !request.getRegisterExistingCollectionInGlobalCatalog()) {
         // Select a random 'dataShard'.
         const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
         const auto allShardIds = shardRegistry->getAllShardIds(opCtx);

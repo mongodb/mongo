@@ -31,9 +31,9 @@
 
 #include <charconv>
 
-#include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/stage_builder/sbe/abt_holder_impl.h"
+#include "mongo/db/query/stage_builder/sbe/abt_lower.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/expression_const_eval.h"
 #include "mongo/db/query/stage_builder/sbe/type_checker.h"
@@ -280,7 +280,7 @@ std::unique_ptr<sbe::EExpression> SbExpr::lower(StageBuilderState& state,
     auto env = optimizer::VariableEnvironment::build(abt);
     auto& runtimeEnv = *state.env;
 
-    auto varResolver = optimizer::VarResolver([](const optimizer::ProjectionName& var) {
+    auto varResolver = abt::VarResolver([](const optimizer::ProjectionName& var) {
         if (auto slotId = getSbeVariableInfo(var)) {
             return sbe::makeE<sbe::EVariable>(*slotId);
         }
@@ -293,12 +293,12 @@ std::unique_ptr<sbe::EExpression> SbExpr::lower(StageBuilderState& state,
 
     // Invoke 'SBEExpressionLowering' to lower the ABT to SBE.
     auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
-    optimizer::SBEExpressionLowering exprLower{env,
-                                               std::move(varResolver),
-                                               runtimeEnv,
-                                               *state.slotIdGenerator,
-                                               staticData->inputParamToSlotMap,
-                                               state.frameIdGenerator};
+    abt::SBEExpressionLowering exprLower{env,
+                                         std::move(varResolver),
+                                         runtimeEnv,
+                                         *state.slotIdGenerator,
+                                         staticData->inputParamToSlotMap,
+                                         state.frameIdGenerator};
 
     return exprLower.optimize(abt);
 }

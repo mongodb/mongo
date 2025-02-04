@@ -45,7 +45,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/views/view.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

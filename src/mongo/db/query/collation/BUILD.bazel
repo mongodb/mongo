@@ -120,9 +120,3 @@ mongo_cc_unit_test(
         "//src/mongo/db/storage/key_string",
     ],
 )
-
-# TODO(SERVER-96859): Remove cycle created by moving //src/mongo/db/query/collation:collator_interface.h to //src/mongo/db/query/collation:collator_interface
-filegroup(
-    name = "collator_interface_hdrs",
-    srcs = [":collator_interface.h"],
-)

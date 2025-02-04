@@ -505,22 +505,6 @@ public:
     }
 
     /**
-     * The method below guarantees only that the affected key/value(s) already in the cache (or
-     * returned to callers) will be invalidated and removed from the cache. However, any affected
-     * keys, which are in the process of being loaded (i.e., acquireAsync has not yet completed)
-     * will not be interrupted and will eventually end-up on the cache.
-     *
-     * Because the behaviour described above does not provide any guarantees about the in-progress
-     * lookups, it should be considered as "best-effort".
-     */
-    template <typename Pred>
-    void invalidateLatestCachedValueIf_IgnoreInProgress(const Pred& pred) {
-        stdx::lock_guard lg(_mutex);
-        _cache.invalidateIf(
-            [&](const Key& key, const StoredValue* value) { return pred(key, value->value); });
-    }
-
-    /**
      * Returns statistics information about the cache for reporting purposes.
      */
     std::vector<typename Cache::CachedItemInfo> getCacheInfo() const {

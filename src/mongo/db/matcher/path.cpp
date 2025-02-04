@@ -35,7 +35,7 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/matcher/path_internal.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

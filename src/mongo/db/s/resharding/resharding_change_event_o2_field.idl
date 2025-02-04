@@ -33,6 +33,8 @@
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/s/resharding/resharding_util.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -40,7 +42,7 @@ imports:
 structs:
     ReshardBeginChangeEventO2Field:
         description: >-
-            Represents a change event which signifies the beginning of a resharding operation.
+            Represents a change event which signifies the beginning of a resharding operation on a donor shard.
         generate_comparison_operators: true
         strict: false
         fields:
@@ -49,10 +51,27 @@ structs:
             reshardingUUID:
                 type: uuid
                 description: "The UUID for this resharding operation."
+    
+    ReshardBlockingWritesChangeEventO2Field:
+        description: >-
+            Represents a change event which signifies the start of the critical section of a resharding operation on a donor shard.
+        generate_comparison_operators: true
+        strict: false
+        fields:
+            reshardBlockingWrites:
+                type: namespacestring
+            reshardingUUID:
+                type: uuid
+                description: "The UUID for this resharding operation."
+            type:
+                type: string
+                description: "Used to mark this change event as the final oplog entry from this donor shard."
+                validator:
+                    callback: resharding::validateReshardBlockingWritesO2FieldType
 
     ReshardDoneCatchUpChangeEventO2Field:
         description: >-
-            Represents a change event which signifies that the catchup phase is complete.
+            Represents a change event which signifies the end of the catchup phase of a resharding operation on a recipient shard.
         generate_comparison_operators: true
         strict: false
         fields:

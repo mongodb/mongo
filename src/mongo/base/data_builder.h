@@ -41,7 +41,7 @@
 #include "mongo/base/data_type.h"
 #include "mongo/base/status.h"
 #include "mongo/util/allocator.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

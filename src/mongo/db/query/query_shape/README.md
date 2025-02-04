@@ -39,16 +39,15 @@ structure is as follows:
   - [`CountCmdShapeComponents`](count_cmd_shape.h)
   - [`DistinctCmdShapeComponents`](distinct_cmd_shape.h)
   - [`FindCmdShapeComponents`](find_cmd_shape.h)
-  - [`LetShapeComponent`](cmd_with_let_shape.h)
+  - [`LetShapeComponent`](let_shape_component.h)
 
 See more information for the different shapes in their respective classes, structured as follows:
 
 - [`Shape`](query_shape.h)
-  - [`CmdWithLetShape`](cmd_with_let_shape.h)
-    - [`AggCmdShape`](agg_cmd_shape.h)
-    - [`CountCmdShape`](count_cmd_shape.h)
-    - [`DistinctCmdShape`](distinct_cmd_shape.h)
-    - [`FindCmdShape`](find_cmd_shape.h)
+  - [`AggCmdShape`](agg_cmd_shape.h)
+  - [`CountCmdShape`](count_cmd_shape.h)
+  - [`DistinctCmdShape`](distinct_cmd_shape.h)
+  - [`FindCmdShape`](find_cmd_shape.h)
 
 ## Serialization Options
 

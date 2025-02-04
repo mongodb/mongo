@@ -34,19 +34,6 @@ namespace mongo {
 
 namespace exec::expression {
 
-Value evaluate(const ExpressionAnd& expr, const Document& root, Variables* variables) {
-    const auto& children = expr.getChildren();
-    const size_t n = children.size();
-    for (size_t i = 0; i < n; ++i) {
-        Value pValue(children[i]->evaluate(root, variables));
-        if (!pValue.coerceToBool()) {
-            return Value(false);
-        }
-    }
-
-    return Value(true);
-}
-
 Value evaluate(const ExpressionAllElementsTrue& expr, const Document& root, Variables* variables) {
     const Value arr = expr.getChildren()[0]->evaluate(root, variables);
     uassert(17040,
@@ -77,73 +64,6 @@ Value evaluate(const ExpressionAnyElementTrue& expr, const Document& root, Varia
     return Value(false);
 }
 
-Value evaluate(const ExpressionCoerceToBool& expr, const Document& root, Variables* variables) {
-    Value pResult(expr.getExpression()->evaluate(root, variables));
-    bool b = pResult.coerceToBool();
-    if (b) {
-        return Value(true);
-    }
-    return Value(false);
-}
-
-namespace {
-// Lookup table for truth value returns
-struct CmpLookup {
-    const bool truthValue[3];  // truth value for -1, 0, 1
-};
-static const CmpLookup cmpLookup[6] = {
-    /*             -1      0      1      */
-    /* EQ  */ {{false, true, false}},
-    /* NE  */ {{true, false, true}},
-    /* GT  */ {{false, false, true}},
-    /* GTE */ {{false, true, true}},
-    /* LT  */ {{true, false, false}},
-    /* LTE */ {{true, true, false}},
-
-    // We don't require the lookup table for CMP.
-};
-}  // namespace
-
-Value evaluate(const ExpressionCompare& expr, const Document& root, Variables* variables) {
-    Value pLeft(expr.getChildren()[0]->evaluate(root, variables));
-    Value pRight(expr.getChildren()[1]->evaluate(root, variables));
-
-    int cmp = expr.getExpressionContext()->getValueComparator().compare(pLeft, pRight);
-
-    // Make cmp one of 1, 0, or -1.
-    if (cmp == 0) {
-        // leave as 0
-    } else if (cmp < 0) {
-        cmp = -1;
-    } else if (cmp > 0) {
-        cmp = 1;
-    }
-
-    if (expr.getOp() == ExpressionCompare::CmpOp::CMP) {
-        return Value(cmp);
-    }
-
-    bool returnValue = cmpLookup[expr.getOp()].truthValue[cmp + 1];
-    return Value(returnValue);
-}
-
-Value evaluate(const ExpressionCond& expr, const Document& root, Variables* variables) {
-    Value pCond(expr.getChildren()[0]->evaluate(root, variables));
-    int idx = pCond.coerceToBool() ? 1 : 2;
-    return expr.getChildren()[idx]->evaluate(root, variables);
-}
-
-Value evaluate(const ExpressionIfNull& expr, const Document& root, Variables* variables) {
-    const size_t n = expr.getChildren().size();
-    for (size_t i = 0; i < n; ++i) {
-        Value pValue(expr.getChildren()[i]->evaluate(root, variables));
-        if (!pValue.nullish() || i == n - 1) {
-            return pValue;
-        }
-    }
-    return Value();
-}
-
 Value evaluate(const ExpressionIn& expr, const Document& root, Variables* variables) {
     Value argument(expr.getChildren()[0]->evaluate(root, variables));
     Value arrayOfValues(expr.getChildren()[1]->evaluate(root, variables));
@@ -158,41 +78,6 @@ Value evaluate(const ExpressionIn& expr, const Document& root, Variables* variab
         }
     }
     return Value(false);
-}
-
-Value evaluate(const ExpressionNot& expr, const Document& root, Variables* variables) {
-    Value pOp(expr.getChildren()[0]->evaluate(root, variables));
-
-    bool b = pOp.coerceToBool();
-    return Value(!b);
-}
-
-Value evaluate(const ExpressionOr& expr, const Document& root, Variables* variables) {
-    for (size_t i = 0; i < expr.getChildren().size(); ++i) {
-        Value pValue(expr.getChildren()[i]->evaluate(root, variables));
-        if (pValue.coerceToBool()) {
-            return Value(true);
-        }
-    }
-
-    return Value(false);
-}
-
-Value evaluate(const ExpressionSwitch& expr, const Document& root, Variables* variables) {
-    for (int i = 0; i < expr.numBranches(); ++i) {
-        auto [caseExpr, thenExpr] = expr.getBranch(i);
-        Value caseResult = caseExpr->evaluate(root, variables);
-
-        if (caseResult.coerceToBool()) {
-            return thenExpr->evaluate(root, variables);
-        }
-    }
-
-    uassert(40066,
-            "$switch could not find a matching branch for an input, and no default was specified.",
-            expr.defaultExpr());
-
-    return expr.defaultExpr()->evaluate(root, variables);
 }
 
 namespace {

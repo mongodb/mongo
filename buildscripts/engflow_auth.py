@@ -43,7 +43,7 @@ def get_release_tag():
     return tag + f"_{os_sys}_{arch}"
 
 
-def install() -> str:
+def install(verbose: bool) -> str:
     binary_directory = os.path.expanduser("~/.local/bin")
     os.makedirs(binary_directory, exist_ok=True)
     binary_filename = "engflow_auth"
@@ -52,7 +52,8 @@ def install() -> str:
     if "windows" in tag:
         binary_path += ".exe"
     if os.path.exists(binary_path):
-        print(f"{binary_filename} already exists at {binary_path}, skipping download")
+        if verbose:
+            print(f"{binary_filename} already exists at {binary_path}, skipping download")
     else:
         url = GH_URL_PREFIX + tag
         print(f"Downloading {url}...")
@@ -63,11 +64,12 @@ def install() -> str:
     return binary_path
 
 
-def update_bazelrc(binary_path: str):
+def update_bazelrc(binary_path: str, verbose: bool):
     norm_path = os.path.normpath(binary_path).replace("\\", "/")
     lines = []
     bazelrc_path = f"{os.path.expanduser('~')}/.bazelrc"
-    print(f"Updating {bazelrc_path}")
+    if verbose:
+        print(f"Updating {bazelrc_path}")
     if os.path.exists(bazelrc_path):
         with open(bazelrc_path, "r") as bazelrc:
             for line in bazelrc.readlines():
@@ -80,7 +82,7 @@ def update_bazelrc(binary_path: str):
         bazelrc.writelines(lines)
 
 
-def authenticate(binary_path: str):
+def authenticate(binary_path: str, verbose: bool) -> bool:
     need_login = False
     p = subprocess.run(f"{binary_path} export {CLUSTER}", shell=True, capture_output=True)
     if p.returncode != 0:
@@ -90,8 +92,9 @@ def authenticate(binary_path: str):
         if datetime.now() > datetime.fromisoformat(expiry_iso):
             need_login = True
     if not need_login:
-        print("Already authenticated. Skipping authentication.")
-        return
+        if verbose:
+            print("Already authenticated. Skipping authentication.")
+        return True
 
     p = subprocess.Popen(
         f"{binary_path} login -store=file {CLUSTER}",
@@ -112,7 +115,7 @@ def authenticate(binary_path: str):
     if not login_url:
         print("CLI had unexpected output.")
         p.kill()
-        return
+        return False
 
     print(
         f"On any device with a browser, login via the following link to complete EngFlow authentication:\n{login_url}"
@@ -126,12 +129,22 @@ def authenticate(binary_path: str):
             "Timed out waiting for login attempt. Failed to authenticate with EngFlow. Builds will be run locally..."
         )
         p.kill()
+        return False
+
+    return True
+
+
+def setup_auth(verbose: bool = True) -> bool:
+    path = install(verbose)
+    authenticated = authenticate(path, verbose)
+    if not authenticated:
+        return False
+    update_bazelrc(path, verbose)
+    return True
 
 
 def main():
-    path = install()
-    authenticate(path)
-    update_bazelrc(path)
+    return 0 if setup_auth() else 1
 
 
 if __name__ == "__main__":

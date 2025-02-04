@@ -121,6 +121,11 @@ struct InShard : InBoth {
         incrCounter(scannedObjects, am.docsExamined);
         incrCounter(scanAndOrder, am.hasSortStage);
         incrCounter(writeConflicts, am.writeConflicts);
+        // Increment oplog metrics if the current request is a change stream or replication request.
+        if (debug.isChangeStreamQuery || debug.isReplOplogGetMore) {
+            incrCounter(oplogReturned, am.nreturned);
+            incrCounter(oplogScannedObjects, am.docsExamined);
+        }
 
         _updateExternalStats(opCtx);
     }
@@ -145,6 +150,8 @@ public:
     Counter64* scannedObjects{makeCounter("queryExecutor.scannedObjects", role)};
     Counter64* scanAndOrder{makeCounter("operation.scanAndOrder", role)};
     Counter64* writeConflicts{makeCounter("operation.writeConflicts", role)};
+    Counter64* oplogReturned{makeCounter("oplogStats.document.returned", role)};
+    Counter64* oplogScannedObjects{makeCounter("oplogStats.queryExecutor.scannedObjects", role)};
 };
 
 /** Counters that are in the router service (currently none). */

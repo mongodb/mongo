@@ -140,6 +140,8 @@ public:
         return cursor->restore();
     }
 
+    int64_t storageSize(OperationContext* opCtx);
+
     void saveState();
     void restoreState();
 

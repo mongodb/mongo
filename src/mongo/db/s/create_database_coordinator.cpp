@@ -32,6 +32,7 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/create_database_util.h"
 #include "mongo/db/s/participant_block_gen.h"
+#include "mongo/db/s/shard_database_metadata_client.h"
 #include "mongo/db/s/sharding_util.h"
 
 namespace mongo {
@@ -167,6 +168,29 @@ void CreateDatabaseCoordinator::_exitCriticalSection(
         opCtx, opts, {_doc.getPrimaryShard().get()});
 }
 
+DatabaseType CreateDatabaseCoordinator::_commitClusterCatalog(OperationContext* opCtx) {
+    const auto& dbName = nss().dbName();
+    const auto dbNameStr =
+        DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
+
+    if (const auto& existingDatabase = create_database_util::findDatabaseExactMatch(
+            opCtx, dbNameStr, _doc.getPrimaryShard())) {
+        // This means the database was created in a previous run of the same create
+        // database coordinator instance.
+        return existingDatabase.get();
+    }
+    return ShardingCatalogManager::get(opCtx)->commitCreateDatabase(
+        opCtx, dbName, _doc.getPrimaryShard().get(), _doc.getUserSelectedPrimary());
+}
+
+void CreateDatabaseCoordinator::_commitShardLocalCatalog(OperationContext* opCtx,
+                                                         const DatabaseType& db) {
+    if (_doc.getAuthoritativeShardCommit().get_value_or(false)) {
+        ShardDatabaseMetadataClient dbMetadataClient{opCtx, db.getPrimary()};
+        dbMetadataClient.insert(db);
+    }
+}
+
 ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
@@ -186,29 +210,19 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
                                      _setupPrimaryShard(opCtx);
                                      _enterCriticalSection(opCtx, executor, token);
                                  }))
-        .then(_buildPhaseHandler(
-            Phase::kCommitOnShardingCatalog,
-            [this, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
+        .then(_buildPhaseHandler(Phase::kCommitOnShardingCatalog,
+                                 [this, anchor = shared_from_this()] {
+                                     auto opCtxHolder = cc().makeOperationContext();
+                                     auto* opCtx = opCtxHolder.get();
 
-                const auto& dbName = nss().dbName();
-                const auto dbNameStr =
-                    DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
-                auto returnDatabase = [&] {
-                    if (const auto& existingDatabase = create_database_util::findDatabaseExactMatch(
-                            opCtx, dbNameStr, _doc.getPrimaryShard())) {
-                        // This means the database was created in a previous run of the same create
-                        // database coordinator instance.
-                        return existingDatabase.get();
-                    }
-                    return ShardingCatalogManager::get(opCtx)->commitCreateDatabase(
-                        opCtx, dbName, _doc.getPrimaryShard().get(), _doc.getUserSelectedPrimary());
-                }();
-                // Persists the metadata of the created database on the coordinator doc.
-                _storeDBVersion(opCtx, returnDatabase);
-                _result = ConfigsvrCreateDatabaseResponse(returnDatabase.getVersion());
-            }))
+                                     auto db = _commitClusterCatalog(opCtx);
+                                     _commitShardLocalCatalog(opCtx, db);
+
+                                     // Persists the metadata of the created database on the
+                                     // coordinator doc.
+                                     _storeDBVersion(opCtx, db);
+                                     _result = ConfigsvrCreateDatabaseResponse(db.getVersion());
+                                 }))
         .then(_buildPhaseHandler(
             Phase::kExitCriticalSectionOnPrimary,
             [this, token, executor = executor, anchor = shared_from_this()] {

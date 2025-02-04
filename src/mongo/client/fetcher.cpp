@@ -47,7 +47,6 @@
 #include "mongo/logv2/redaction.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/destructor_guard.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
@@ -204,7 +203,12 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
 }
 
 Fetcher::~Fetcher() {
-    DESTRUCTOR_GUARD(shutdown(); _join(););
+    try {
+        shutdown();
+        _join();
+    } catch (...) {
+        reportFailedDestructor(MONGO_SOURCE_LOCATION());
+    }
 }
 
 HostAndPort Fetcher::getSource() const {

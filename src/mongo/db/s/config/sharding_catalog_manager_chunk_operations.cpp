@@ -896,7 +896,10 @@ ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
                                                      collPlacementVersion,
                                                      splitPoints);
 
-    // log changes
+    // Release the _kChunkOpLock to avoid blocking other operations for longer than necessary
+    lk.unlock();
+
+    // Log changes
     BSONObjBuilder logDetail;
     {
         BSONObjBuilder b(logDetail.subobjStart("before"));
@@ -1186,7 +1189,10 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
     _mergeChunksInTransaction(
         opCtx, nss, coll.getUuid(), mergeVersion, validAfter, chunkRange, shardId, chunksToMerge);
 
-    // 5. log changes
+    // 5. release the _kChunkOpLock to avoid blocking other operations for longer than necessary
+    lk.unlock();
+
+    // 6. log changes
     logMergeToChangelog(opCtx,
                         nss,
                         initialVersion,
@@ -1415,21 +1421,23 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                 0};
         }
 
-        // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications
-        Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
+        {
+            // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications
+            Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
-        // Precondition for merges to be safely committed: make sure the current collection
-        // placement version fits the one retrieved before acquiring the lock.
-        const auto [_, versionRetrievedUnderLock] =
-            uassertStatusOK(getCollectionAndVersion(opCtx, _localConfigShard.get(), nss));
+            // Precondition for merges to be safely committed: make sure the current collection
+            // placement version fits the one retrieved before acquiring the lock.
+            const auto [_, versionRetrievedUnderLock] =
+                uassertStatusOK(getCollectionAndVersion(opCtx, _localConfigShard.get(), nss));
 
-        if (originalVersion != versionRetrievedUnderLock) {
-            nRetries++;
-            continue;
+            if (originalVersion != versionRetrievedUnderLock) {
+                nRetries++;
+                continue;
+            }
+
+            // 4. Commit the new routing table changes to the sharding catalog.
+            mergeAllChunksOnShardInTransaction(opCtx, collUuid, shardId, newChunks);
         }
-
-        // 4. Commit the new routing table changes to the sharding catalog.
-        mergeAllChunksOnShardInTransaction(opCtx, collUuid, shardId, newChunks);
 
         // 5. Log changes
         auto prevVersion = originalVersion;

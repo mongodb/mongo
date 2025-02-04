@@ -47,7 +47,7 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

@@ -1,5 +1,7 @@
 # -*- mode: python -*-
 
+import platform
+
 Import(
     [
         "env",
@@ -56,6 +58,12 @@ env.SConscript(
     exports=[
         "env",
     ],
+)
+
+env.CppUnitTest(
+    target="diagnostic_printers_test",
+    source=[],
+    LIBDEPS=[],
 )
 
 env.CppUnitTest(
@@ -224,6 +232,12 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target="multiple_collection_accessor_test",
+    source=[],
+    LIBDEPS=[],
+)
+
+env.CppUnitTest(
     target="vector_clock_test",
     source=[],
     LIBDEPS=[],
@@ -299,3 +313,11 @@ env.CppUnitTest(
     source=[],
     LIBDEPS=[],
 )
+
+if platform.system() == "Linux":
+    env.CppUnitTest(
+        target="throw_hook_impl_test",
+        source=[],
+        LIBDEPS=[],
+        PROVE_ALIASES=["server-programmability"],
+    )

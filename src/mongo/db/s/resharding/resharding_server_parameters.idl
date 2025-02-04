@@ -257,3 +257,15 @@ server_parameters:
         validator:
             gte: 0
         redact: false
+
+    reshardingVerificationChangeStreamsEventsBatchSize:
+        description: >-
+            Number of events to process during validation before updating the number of documents and the resume token for the change stream.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingVerificationChangeStreamsEventsBatchSize
+        default:
+            expr: 1000
+        validator:
+            gte: 0
+        redact: false

@@ -35,14 +35,6 @@ signal:StackTraceSigAltStackTest::tryHandler
 # mongo-c-driver repo itself.
 race:_mongoc_handshake_freeze
 
-# False positive when call AsyncResultsMerger::_askForNextBatch from executor thread.
-# Happens because we miss synchronization in reading OperationContext::comment in
-# RemoteCommandRequest constructor. Acutally, the writing OperationContext::comment
-# in client thread always occurrs before reading instead of in parallel.
-#
-# TODO SERVER-84514: remove this suppression once we clarify the synchronization.
-race:mongo::AsyncResultsMerger::_askForNextBatch
-
 # TODO SERVER-91826
 deadlock:mongo::executor::EgressConnectionCloserManager::add
 deadlock:mongo::executor::EgressConnectionCloserManager::setKeepOpen
@@ -73,3 +65,9 @@ deadlock:mongo::(anonymous namespace)::SSLManagerOpenSSL::SSLManagerOpenSSL
 race:S2Loop::FindVertex
 race:S2EdgeIndex::IncrementQueryCount
 race:S2RegionCoverer::NewCandidate
+
+# TODO SERVER-99702 We have a case of lock inversion between ShardingWriteRouter and 
+# assertNoMovePrimaryInProgress. ShardingWriteRouter holds a CSS lock during its lifetime, and with
+# this lock taken we then acquire a DSS lock. Meanwhile, assertNoMovePrimaryInProgress takes a DSS
+# lock then a CSS lock, conflicting with the previous lock acquisition order.
+deadlock:mongo::(anonymous namespace)::assertNoMovePrimaryInProgress

@@ -948,13 +948,13 @@ tomli = {version = ">=1.1.0", markers = "python_version < \"3.11\""}
 
 [[package]]
 name = "gdbmongo"
-version = "0.15.1"
+version = "0.15.2"
 description = "GDB pretty printers and commands for debugging the MongoDB Server"
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "gdbmongo-0.15.1-py3-none-any.whl", hash = "sha256:92348f382540405b8c2359d13de8b0f6bcaad3b9dd18d9ebcfbef98cf21d3990"},
-    {file = "gdbmongo-0.15.1.tar.gz", hash = "sha256:09764667574705d1bfa1bab5221087d81305a15f7e88745057fc06e0c7b4d439"},
+    {file = "gdbmongo-0.15.2-py3-none-any.whl", hash = "sha256:c061974d8af27c2f552df4034efef934cf78c3eb71411efba95cd57748b290ae"},
+    {file = "gdbmongo-0.15.2.tar.gz", hash = "sha256:64cef74b35ff6417909a8e4e567d31dcdc8ea10861a58916e080dc71cb45890a"},
 ]
 
 [[package]]

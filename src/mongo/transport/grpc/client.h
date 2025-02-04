@@ -47,7 +47,7 @@
 #include "mongo/transport/grpc/serialization.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/net/ssl_util.h"
+#include "mongo/util/net/ssl_types.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo::transport::grpc {
@@ -55,12 +55,21 @@ namespace mongo::transport::grpc {
 constexpr auto kCurrentChannelsFieldName = "currentChannels"_sd;
 constexpr auto kStreamsSubsectionFieldName = "streams"_sd;
 constexpr auto kCurrentStreamsFieldName = "current"_sd;
+constexpr auto kSuccessfulStreamsFieldName = "successful"_sd;
+constexpr auto kFailedStreamsFieldName = "failed"_sd;
 
 class Client : public std::enable_shared_from_this<Client> {
 public:
     static constexpr auto kDefaultChannelTimeout = Minutes(30);
 
-    using CtxAndStream = std::pair<std::shared_ptr<ClientContext>, std::shared_ptr<ClientStream>>;
+    /**
+     * State related to an invocation of one of CommandService's methods.
+     */
+    struct CallContext {
+        std::shared_ptr<ClientContext> ctx;
+        std::shared_ptr<ClientStream> stream;
+        boost::optional<SSLConfiguration> sslConfig;
+    };
 
     explicit Client(TransportLayer* tl, ServiceContext* svcCtx, const BSONObj& clientMetadata);
 
@@ -81,7 +90,9 @@ public:
 
     virtual void appendStats(BSONObjBuilder* section) const = 0;
 
-    virtual Status rotateCertificates() = 0;
+#ifdef MONGO_CONFIG_SSL
+    virtual Status rotateCertificates(const SSLConfiguration& sslConfig) = 0;
+#endif
 
     struct ConnectOptions {
         boost::optional<std::string> authToken = {};
@@ -110,8 +121,9 @@ protected:
      */
     void setMetadataOnClientContext(ClientContext& ctx, const ConnectOptions& options);
 
-    // TODO SERVER-98590 Implement successful streams and failed streams stat.
     Counter64 _numCurrentStreams;
+    Counter64 _numSuccessfulStreams;
+    Counter64 _numFailedStreams;
 
 private:
     enum class ClientState { kUninitialized, kStarted, kShutdown };
@@ -163,11 +175,11 @@ private:
         std::shared_ptr<ReactorTimer> _timer;
     };
 
-    virtual Future<CtxAndStream> _streamFactory(const HostAndPort&,
-                                                const std::shared_ptr<GRPCReactor>&,
-                                                Milliseconds,
-                                                const ConnectOptions&,
-                                                const CancellationToken& token) = 0;
+    virtual Future<CallContext> _streamFactory(const HostAndPort&,
+                                               const std::shared_ptr<GRPCReactor>&,
+                                               Milliseconds,
+                                               const ConnectOptions&,
+                                               const CancellationToken& token) = 0;
 
     /**
      * Returns whether all outstanding sessions created by this client have been destroyed and this
@@ -213,16 +225,19 @@ public:
     void start() override;
     void shutdown() override;
     void appendStats(BSONObjBuilder* section) const override;
-    Status rotateCertificates() override;
+#ifdef MONGO_CONFIG_SSL
+    Status rotateCertificates(const SSLConfiguration& sslConfig) override;
+#endif
     void dropAllChannels_forTest();
 
 
 private:
-    Future<CtxAndStream> _streamFactory(const HostAndPort&,
-                                        const std::shared_ptr<GRPCReactor>&,
-                                        Milliseconds,
-                                        const ConnectOptions&,
-                                        const CancellationToken&) override;
+    Future<CallContext> _streamFactory(const HostAndPort&,
+                                       const std::shared_ptr<GRPCReactor>&,
+                                       Milliseconds,
+                                       const ConnectOptions&,
+                                       const CancellationToken&) override;
+
 
     std::unique_ptr<StubFactory> _stubFactory;
 };

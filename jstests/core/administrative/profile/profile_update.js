@@ -8,6 +8,8 @@
 //   does_not_support_stepdowns,
 //   requires_non_retryable_writes,
 //   requires_profiling,
+//   # The test runs getLatestProfileEntry(). The downstream syncing node affects the profiler.
+//   run_getLatestProfilerEntry,
 // ]
 
 import {

@@ -97,7 +97,7 @@ TimeseriesUpsertStage::TimeseriesUpsertStage(ExpressionContext* expCtx,
 };
 
 // We're done when updating is finished and we have either matched or inserted.
-bool TimeseriesUpsertStage::isEOF() {
+bool TimeseriesUpsertStage::isEOF() const {
     return TimeseriesModifyStage::isEOF() &&
         (_specificStats.nMeasurementsMatched > 0 || _specificStats.nMeasurementsUpserted > 0);
 }

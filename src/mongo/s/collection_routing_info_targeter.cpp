@@ -399,8 +399,7 @@ bool CollectionRoutingInfoTargeter::isExactIdQuery(OperationContext* opCtx,
 }
 
 ShardEndpoint CollectionRoutingInfoTargeter::targetInsert(OperationContext* opCtx,
-                                                          const BSONObj& doc,
-                                                          std::set<ChunkRange>* chunkRanges) const {
+                                                          const BSONObj& doc) const {
     if (!_cri.cm.isSharded()) {
         return targetUnshardedCollection(_nss, _cri);
     }
@@ -435,7 +434,7 @@ ShardEndpoint CollectionRoutingInfoTargeter::targetInsert(OperationContext* opCt
 
 
     // Target the shard key
-    return uassertStatusOK(_targetShardKey(shardKey, CollationSpec::kSimpleSpec, chunkRanges));
+    return uassertStatusOK(_targetShardKey(shardKey, CollationSpec::kSimpleSpec));
 }
 
 bool isRetryableWrite(OperationContext* opCtx) {
@@ -751,12 +750,9 @@ StatusWith<std::vector<ShardEndpoint>> CollectionRoutingInfoTargeter::_targetQue
 }
 
 StatusWith<ShardEndpoint> CollectionRoutingInfoTargeter::_targetShardKey(
-    const BSONObj& shardKey, const BSONObj& collation, std::set<ChunkRange>* chunkRanges) const {
+    const BSONObj& shardKey, const BSONObj& collation) const {
     try {
         auto chunk = _cri.cm.findIntersectingChunk(shardKey, collation);
-        if (chunkRanges) {
-            chunkRanges->insert(chunk.getRange());
-        }
         return ShardEndpoint(
             chunk.getShardId(), _cri.getShardVersion(chunk.getShardId()), boost::none);
     } catch (const DBException& ex) {

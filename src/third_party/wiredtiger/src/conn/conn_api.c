@@ -2224,7 +2224,9 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
       {"eviction", WT_VERB_EVICTION}, {"fileops", WT_VERB_FILEOPS},
       {"generation", WT_VERB_GENERATION}, {"handleops", WT_VERB_HANDLEOPS}, {"log", WT_VERB_LOG},
       {"history_store", WT_VERB_HS}, {"history_store_activity", WT_VERB_HS_ACTIVITY},
-      {"metadata", WT_VERB_METADATA}, {"mutex", WT_VERB_MUTEX}, {"prefetch", WT_VERB_PREFETCH},
+      {"live_restore", WT_VERB_LIVE_RESTORE},
+      {"live_restore_progress", WT_VERB_LIVE_RESTORE_PROGRESS}, {"metadata", WT_VERB_METADATA},
+      {"mutex", WT_VERB_MUTEX}, {"prefetch", WT_VERB_PREFETCH},
       {"out_of_order", WT_VERB_OUT_OF_ORDER}, {"overflow", WT_VERB_OVERFLOW},
       {"read", WT_VERB_READ}, {"reconcile", WT_VERB_RECONCILE}, {"recovery", WT_VERB_RECOVERY},
       {"recovery_progress", WT_VERB_RECOVERY_PROGRESS}, {"rts", WT_VERB_RTS},
@@ -3126,6 +3128,17 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
      */
     WT_ERR(__wt_logmgr_config(session, cfg, false));
     WT_ERR(__conn_version_verify(session));
+
+#ifndef _MSC_VER
+    /*
+     * Recovery replays the log files to rebuild the metadata file that live restore depends on,
+     * because of this we copy them across prior to recovery commencing. This also helps ensure that
+     * the system is in a valid state for the log subsystem as it does some less common file
+     * manipulations.
+     */
+    if (F_ISSET(conn, WT_CONN_LIVE_RESTORE_FS))
+        WT_ERR(__wt_live_restore_setup_recovery(session));
+#endif
 
     /*
      * Configuration completed; optionally write a base configuration file.

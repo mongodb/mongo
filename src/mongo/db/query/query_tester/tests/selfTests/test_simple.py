@@ -1,6 +1,14 @@
 from testlib.test_utils import ExitCode, Mode, assert_exit_code, run_mongotest
 
-test_file_names = ("escapedQuotes", "getMoreTest", "indexOptions", "multiline", "norm", "testA")
+test_file_names = (
+    "escapedQuotes",
+    "getMoreTest",
+    "indexOptions",
+    "multiline",
+    "norm",
+    "testA",
+    "testNums",
+)
 modes = [Mode.RUN, Mode.COMPARE]
 
 # Ensure simple_run and simple_compare are run in serial so that a testfile isn't processed with

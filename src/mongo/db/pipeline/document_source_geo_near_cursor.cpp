@@ -44,7 +44,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
@@ -106,11 +106,11 @@ Document DocumentSourceGeoNearCursor::transformDoc(Document&& objInput) const {
         output.setNestedField(*_locationField, output.peek().metadata().getGeoNearPoint());
     }
 
-    // In a cluster, $geoNear will be merged via $sort, so add the sort key.
-    if (pExpCtx->getNeedsMerge()) {
-        const bool isSingleElementKey = true;
-        output.metadata().setSortKey(Value(distance), isSingleElementKey);
-    }
+    // Always set the sort key. Sometimes it will be needed in a sharded cluster to perform a merge
+    // sort. Other times it will be needed by $rankFusion. It is not expensive, so just make it
+    // unconditionally available.
+    const bool isSingleElementKey = true;
+    output.metadata().setSortKey(Value(distance), isSingleElementKey);
 
     return output.freeze();
 }

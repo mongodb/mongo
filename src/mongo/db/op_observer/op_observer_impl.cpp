@@ -1971,4 +1971,13 @@ void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,
     ReadWriteConcernDefaults::get(opCtx).invalidate();
 }
 
+void OpObserverImpl::onDatabaseMetadataUpdate(OperationContext* opCtx, const DatabaseName& nss) {
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+    oplogEntry.setNss(NamespaceString::makeCommandNamespace(nss));
+    oplogEntry.setObject(BSON("databaseMetadataUpdate"_sd << 1));
+
+    logOperation(opCtx, &oplogEntry, true, _operationLogger.get());
+}
+
 }  // namespace mongo

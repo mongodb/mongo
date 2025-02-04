@@ -79,8 +79,10 @@ public:
     const char* getSourceName() const final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kBucketAuto;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
@@ -211,6 +213,7 @@ private:
     boost::intrusive_ptr<GranularityRounder> _granularityRounder;
     int _nBuckets;
     long long _nDocuments = 0;
+    long long _nDocPositions = 0;
     BucketDetails _currentBucketDetails;
 };
 

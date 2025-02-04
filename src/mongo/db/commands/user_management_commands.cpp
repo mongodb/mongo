@@ -1191,10 +1191,10 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
 #ifdef MONGO_CONFIG_SSL
     // An internal caller of 'createUser' won't have a transport session bound to the client.
     // Instead, we should retrieve the SSL manager from the SSLManagerCoordinator.
-    const auto& sslManager = [&]() -> std::shared_ptr<SSLManagerInterface> {
+    auto sslConfig = [&]() -> const SSLConfiguration* {
         const auto& session = opCtx->getClient()->session();
         if (session) {
-            return session->getSSLManager();
+            return session->getSSLConfiguration();
         }
         // If SSL is supported but disabled, the SSLManagerCoordinator will not exist. We should
         // return an empty pointer.
@@ -1202,11 +1202,10 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
         if (!sslCoord) {
             return nullptr;
         }
-        return sslCoord->getSSLManager();
+        return &sslCoord->getSSLManager()->getSSLConfiguration();
     }();
-    if (isExternal && sslManager && sslGlobalParams.clusterAuthX509ExtensionValue.empty() &&
-        sslManager->getSSLConfiguration().isClusterMember(
-            userName.getUser(), boost::none /* clusterExtensionValue */)) {
+    if (isExternal && sslConfig && sslGlobalParams.clusterAuthX509ExtensionValue.empty() &&
+        sslConfig->isClusterMember(userName.getUser(), boost::none /* clusterExtensionValue */)) {
         if (gEnforceUserClusterSeparation) {
             uasserted(ErrorCodes::BadValue,
                       "Cannot create an x.509 user with a subjectname that would be "

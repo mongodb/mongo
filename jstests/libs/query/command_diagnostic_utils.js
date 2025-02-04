@@ -23,22 +23,24 @@ export function getDiagnosticLogs({description, logFile}) {
     assert.gt(logLines.length, 0, `${description}: no log lines`);
 
     return logLines.filter(function(logLine) {
-        return logLine.includes("ScopedDebugInfo") && logLine.includes("commandDiagnostics");
+        return logLine.includes("ScopedDebugInfo");
     });
 }
 
-// Finds the first ScopedDebugInfo log line in 'logFile', then asserts that it contains every
-// element specified in 'expectedDiagnosticInfo'. 'description' is included in any error messages.
+// Finds all the ScopedDebugInfo log lines in 'logFile', then asserts that at least one contains
+// every element specified in 'expectedDiagnosticInfo'. 'description' is included in any error
+// messages.
 export function assertOnDiagnosticLogContents({description, logFile, expectedDiagnosticInfo}) {
     const commandDiagnostics = getDiagnosticLogs({description, logFile});
     assert(commandDiagnostics.length > 0,
            `${description}: no log line containing command diagnostics`);
 
-    const firstLine = commandDiagnostics[0];
-    for (const diagnosticInfo of expectedDiagnosticInfo) {
-        assert(firstLine.includes(diagnosticInfo),
-               `${description}: missing '${diagnosticInfo}' in ${firstLine}`);
-    }
+    const matchFound = commandDiagnostics.some(
+        line => expectedDiagnosticInfo.every(diagnosticInfo => line.includes(diagnosticInfo)));
+    assert(matchFound,
+           `${description}: Failed to find a log line containing all expected diagnostic info. ` +
+               `Candidate logs: ${tojson(commandDiagnostics)}.` +
+               `Expected diagnostic info: ${tojson(expectedDiagnosticInfo)}.`);
 }
 
 export const planExecutorAlwaysFails = {

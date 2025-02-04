@@ -38,7 +38,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/waitable_atomic.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/tick_source.h"
@@ -205,10 +205,13 @@ private:
     /**
      * Releases a ticket back into the ticket pool and updates queueing statistics. Tickets
      * issued for exempt operations do not get deposited back to the pool.
+     * This function must not throw.
      */
-    void _releaseTicketUpdateStats(Ticket& ticket) noexcept;
-
-    void _releaseNormalPriorityTicket(AdmissionContext* admCtx) noexcept;
+    void _releaseTicketUpdateStats(Ticket& ticket);
+    /**
+     * This function must not throw.
+     */
+    void _releaseNormalPriorityTicket(AdmissionContext* admCtx);
 
     boost::optional<Ticket> _tryAcquireNormalPriorityTicket(AdmissionContext* admCtx);
 

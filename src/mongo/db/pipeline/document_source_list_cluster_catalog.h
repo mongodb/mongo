@@ -99,6 +99,10 @@ public:
         return true;
     }
 
+    bool generatesOwnDataOnce() const final {
+        return true;
+    }
+
 private:
     PrivilegeVector _privileges;
 };

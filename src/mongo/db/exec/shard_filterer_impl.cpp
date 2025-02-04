@@ -35,7 +35,7 @@
 #include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

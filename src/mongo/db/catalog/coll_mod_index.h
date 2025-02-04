@@ -73,7 +73,7 @@ void processCollModIndexRequest(OperationContext* opCtx,
                                 boost::optional<repl::OplogApplication::Mode> mode);
 
 /**
- * Scans index to return the record ids of duplicates.
+ * Scans index to returns up to 16MB of RecordIds of duplicates.
  */
 std::vector<std::vector<RecordId>> scanIndexForDuplicates(OperationContext* opCtx,
                                                           const IndexDescriptor* idx);
@@ -84,6 +84,6 @@ std::vector<std::vector<RecordId>> scanIndexForDuplicates(OperationContext* opCt
  */
 Status buildConvertUniqueErrorStatus(OperationContext* opCtx,
                                      const Collection* collection,
-                                     const std::vector<std::vector<RecordId>>& allDuplicateRecords);
+                                     const std::vector<std::vector<RecordId>>& duplicateRecords);
 
 }  // namespace mongo

@@ -626,7 +626,6 @@ mongo_cc_unit_test(
         "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/rpc:command_status",
         "//src/mongo/transport:transport_layer_common",
-        "//src/mongo/transport:transport_layer_egress_init",
         "//src/mongo/unittest:task_executor_proxy",
         "//src/mongo/util:md5",
         "//src/mongo/util/net:network",

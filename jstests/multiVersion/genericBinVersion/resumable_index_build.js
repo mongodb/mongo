@@ -14,7 +14,7 @@ const dbName = "test";
 // Create large enough docs so the index build will spill to disk.
 const docCount = 200;
 const docs = [];
-const bigStr = new Array(1024 * 1024).join('x');
+const bigStr = 'x'.repeat(1024 * 1024);
 for (let i = 0; i < docCount; ++i) {
     docs.push({a: i, b: -i, padding: bigStr});
 }

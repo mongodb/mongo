@@ -22,3 +22,13 @@ mongo_cc_library(
         "//src/mongo/db/query/datetime:date_time_support",
     ],
 )
+
+mongo_cc_library(
+    name = "query_string_util",
+    srcs = [
+        "string_util.cpp",
+    ],
+    hdrs = [
+        "string_util.h",
+    ],
+)

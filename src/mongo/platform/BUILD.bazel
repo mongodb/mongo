@@ -7,6 +7,23 @@ exports_files(
 )
 
 mongo_cc_library(
+    name = "throw_hook",
+    srcs = ["throw_hook.cpp"],
+    hdrs = ["throw_hook.h"],
+    # Link all calls to __cxa_throw to __wrap___cxa_throw instead. Link
+    # calls to __real___cxa_throw to __cxa_throw. This needs to be included
+    # in every link operation where we want to install our hook, so it
+    # needs to be specified very early in our dependency tree. Fortunately,
+    # Bazel will propagate this option to all targets that depend on this
+    # target.
+    linkopts = ["-Wl,--wrap=__cxa_throw"],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+)
+
+mongo_cc_library(
     name = "visibility_test_libcommon",
     srcs = [
         "visibility_test_libcommon.cpp",
@@ -46,21 +63,6 @@ mongo_cc_library(
     ],
 )
 
-# Run it as an executable:
-#   bazel run //src/mongo/platform:visibility_test1
-#
-# Execute as a test (this will parallelize the runs and accept test-specific options):
-#   bazel test //src/mongo/platform:visibility_test1 --test_output=all
-#
-# Test and collect code coverage (notice the "_with_debug" suffix):
-#   bazel coverage //src/mongo/platform:visibility_test1_with_debug --test_output=all --config=local --combined_report=lcov
-#
-# View coverage reports locally
-#   genhtml --branch-coverage --output coverage "$(bazel info output_path)/_coverage/_coverage_report.dat"
-# That creates a file-tree inside a top-level “coverage” folder. To view the rendered HTML report
-# in VSCode, install the [Live HTML Previewer](https://marketplace.visualstudio.com/items?itemName=hdg.live-html-previewer)
-# VSCode extension. Once installed, open the coverage/index.html file and click the “Show Preview”
-# widget that comes from the extension.
 mongo_cc_unit_test(
     name = "visibility1_test",
     srcs = [
@@ -130,6 +132,22 @@ mongo_cc_unit_test(
     ],
     deps = [
         "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "throw_hook_test",
+    srcs = ["throw_hook_test.cpp"],
+    tags = [
+        "mongo_unittest_fourth_group",
+        "server-programmability",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":throw_hook",
     ],
 )
 

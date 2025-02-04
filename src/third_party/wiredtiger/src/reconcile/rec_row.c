@@ -57,7 +57,7 @@ __rec_key_state_update(WT_RECONCILE *r, bool ovfl_key)
 static int
 __rec_cell_build_int_key(WT_SESSION_IMPL *session, WT_RECONCILE *r, const void *data, size_t size)
 {
-    WT_REC_KV *key;
+    WTI_REC_KV *key;
 
     key = &r->k;
 
@@ -81,7 +81,7 @@ __rec_cell_build_leaf_key(
   WT_SESSION_IMPL *session, WT_RECONCILE *r, const void *data, size_t size, bool *is_ovflp)
 {
     WT_BTREE *btree;
-    WT_REC_KV *key;
+    WTI_REC_KV *key;
     size_t pfx_max;
     uint8_t pfx;
     const uint8_t *a, *b;
@@ -178,7 +178,7 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
     WT_BTREE *btree;
     WT_CURSOR *cursor;
     WT_RECONCILE *r;
-    WT_REC_KV *key, *val;
+    WTI_REC_KV *key, *val;
     WT_TIME_WINDOW tw;
     bool ovfl_key;
 
@@ -222,7 +222,7 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
             WT_RET(__wti_rec_dict_replace(session, r, &tw, 0, val));
         __wti_rec_image_copy(session, r, val);
     }
-    WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &tw);
+    WTI_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &tw);
 
     /* Update compression state. */
     __rec_key_state_update(r, ovfl_key);
@@ -240,7 +240,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     WT_ADDR *addr;
     WT_MULTI *multi;
     WT_PAGE_MODIFY *mod;
-    WT_REC_KV *key, *val;
+    WTI_REC_KV *key, *val;
     uint32_t i;
 
     mod = page->modify;
@@ -265,7 +265,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         /* Copy the key and value onto the page. */
         __wti_rec_image_copy(session, r, key);
         __wti_rec_image_copy(session, r, val);
-        WT_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &addr->ta);
+        WTI_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &addr->ta);
 
         /* Update compression state. */
         __rec_key_state_update(r, false);
@@ -284,12 +284,12 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     WT_BTREE *btree;
     WT_CELL *cell;
     WT_CELL_UNPACK_ADDR *kpack, _kpack, *vpack, _vpack;
-    WT_CHILD_MODIFY_STATE cms;
+    WTI_CHILD_MODIFY_STATE cms;
     WT_DECL_RET;
     WT_IKEY *ikey;
     WT_PAGE *child;
     WT_PAGE_DELETED *page_del;
-    WT_REC_KV *key, *val;
+    WTI_REC_KV *key, *val;
     WT_REF *ref;
     WT_TIME_AGGREGATE ft_ta, *source_ta, ta;
     size_t size;
@@ -355,24 +355,24 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         child = ref->page;
 
         switch (cms.state) {
-        case WT_CHILD_IGNORE:
+        case WTI_CHILD_IGNORE:
             /*
              * Ignored child.
              */
-            WT_CHILD_RELEASE_ERR(session, cms.hazard, ref);
+            WTI_CHILD_RELEASE_ERR(session, cms.hazard, ref);
             continue;
 
-        case WT_CHILD_MODIFIED:
+        case WTI_CHILD_MODIFIED:
             /*
              * Modified child. Empty pages are merged into the parent and discarded.
              */
             switch (child->modify->rec_result) {
             case WT_PM_REC_EMPTY:
-                WT_CHILD_RELEASE_ERR(session, cms.hazard, ref);
+                WTI_CHILD_RELEASE_ERR(session, cms.hazard, ref);
                 continue;
             case WT_PM_REC_MULTIBLOCK:
                 WT_ERR(__rec_row_merge(session, r, child));
-                WT_CHILD_RELEASE_ERR(session, cms.hazard, ref);
+                WTI_CHILD_RELEASE_ERR(session, cms.hazard, ref);
                 continue;
             case WT_PM_REC_REPLACE:
                 /*
@@ -384,10 +384,10 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
                 WT_ERR(__wt_illegal_value(session, child->modify->rec_result));
             }
             break;
-        case WT_CHILD_ORIGINAL:
+        case WTI_CHILD_ORIGINAL:
             /* Original child. */
             break;
-        case WT_CHILD_PROXY:
+        case WTI_CHILD_PROXY:
             /* Fast-delete child where we write a proxy cell. */
             break;
         }
@@ -398,10 +398,10 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
          */
         page_del = NULL;
         if (__wt_off_page(page, addr)) {
-            page_del = cms.state == WT_CHILD_PROXY ? &cms.del : NULL;
+            page_del = cms.state == WTI_CHILD_PROXY ? &cms.del : NULL;
             __wti_rec_cell_build_addr(session, r, addr, NULL, WT_RECNO_OOB, page_del);
             source_ta = &addr->ta;
-        } else if (cms.state == WT_CHILD_PROXY) {
+        } else if (cms.state == WTI_CHILD_PROXY) {
             /* Proxy cells require additional information in the address cell. */
             __wt_cell_unpack_addr(session, page->dsk, ref->addr, vpack);
             page_del = &cms.del;
@@ -412,7 +412,7 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
              * The transaction ids are cleared after restart. Repack the cell with new validity
              * information to flush cleared transaction ids.
              */
-            WT_ASSERT_ALWAYS(session, cms.state == WT_CHILD_ORIGINAL,
+            WT_ASSERT_ALWAYS(session, cms.state == WTI_CHILD_ORIGINAL,
               "Not propagating the original fast-truncate information");
             __wt_cell_unpack_addr(session, page->dsk, ref->addr, vpack);
 
@@ -438,7 +438,7 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         WT_TIME_AGGREGATE_COPY(&ta, source_ta);
         if (page_del != NULL)
             WT_TIME_AGGREGATE_UPDATE_PAGE_DEL(session, &ft_ta, page_del);
-        WT_CHILD_RELEASE_ERR(session, cms.hazard, ref);
+        WTI_CHILD_RELEASE_ERR(session, cms.hazard, ref);
 
         /* Build key cell. Truncate any 0th key, internal pages don't need 0th keys. */
         __wt_ref_key(page, ref, &p, &size);
@@ -455,8 +455,8 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         __wti_rec_image_copy(session, r, key);
         __wti_rec_image_copy(session, r, val);
         if (page_del != NULL)
-            WT_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ft_ta);
-        WT_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ta);
+            WTI_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ft_ta);
+        WTI_REC_CHUNK_TA_MERGE(session, r->cur_ptr, &ta);
 
         /* Update compression state. */
         __rec_key_state_update(r, false);
@@ -467,7 +467,7 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     return (__wti_rec_split_finish(session, r));
 
 err:
-    WT_CHILD_RELEASE(session, cms.hazard, ref);
+    WTI_CHILD_RELEASE(session, cms.hazard, ref);
     return (ret);
 }
 
@@ -499,10 +499,10 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
     WT_CURSOR_BTREE *cbt;
     WT_DECL_ITEM(tmpkey);
     WT_DECL_RET;
-    WT_REC_KV *key, *val;
+    WTI_REC_KV *key, *val;
     WT_TIME_WINDOW tw;
     WT_UPDATE *upd;
-    WT_UPDATE_SELECT upd_select;
+    WTI_UPDATE_SELECT upd_select;
     bool ovfl_key;
 
     btree = S2BT(session);
@@ -625,7 +625,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
                 WT_ERR(__wti_rec_dict_replace(session, r, &tw, 0, val));
             __wti_rec_image_copy(session, r, val);
         }
-        WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &tw);
+        WTI_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, &tw);
 
         /* Update compression state. */
         __rec_key_state_update(r, ovfl_key);
@@ -679,11 +679,11 @@ __wti_rec_row_leaf(
     WT_IKEY *ikey;
     WT_INSERT *ins;
     WT_PAGE *page;
-    WT_REC_KV *key, *val;
+    WTI_REC_KV *key, *val;
     WT_ROW *rip;
     WT_TIME_WINDOW *twp;
     WT_UPDATE *upd;
-    WT_UPDATE_SELECT upd_select;
+    WTI_UPDATE_SELECT upd_select;
     size_t key_size;
     uint64_t slvg_skip;
     uint32_t i;
@@ -994,7 +994,7 @@ slow:
                 WT_ERR(__wti_rec_dict_replace(session, r, twp, 0, val));
             __wti_rec_image_copy(session, r, val);
         }
-        WT_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, twp);
+        WTI_REC_CHUNK_TA_UPDATE(session, r->cur_ptr, twp);
 
         /* Update compression state. */
         __rec_key_state_update(r, ovfl_key);

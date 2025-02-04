@@ -78,6 +78,7 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(_addReshardingResumeId,
                                   LiteParsedDocumentSourceInternal::parse,
                                   DocumentSourceReshardingAddResumeId::createFromBson,
                                   true);
+ALLOCATE_DOCUMENT_SOURCE_ID(_addReshardingResumeId, DocumentSourceReshardingAddResumeId::id)
 
 boost::intrusive_ptr<DocumentSourceReshardingAddResumeId>
 DocumentSourceReshardingAddResumeId::create(const boost::intrusive_ptr<ExpressionContext>& expCtx) {

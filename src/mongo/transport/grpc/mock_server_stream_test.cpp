@@ -61,13 +61,15 @@ namespace mongo::transport::grpc {
 template <class Base>
 class MockServerStreamBase : public Base {
 public:
-    virtual void setUp() override {
+    void setUp() override {
         Base::setUp();
 
         MockStubTestFixtures fixtures;
-        _fixtures = fixtures.makeStreamTestFixtures(
-            Base::getServiceContext()->getFastClockSource()->now() + getTimeout(), _clientMetadata);
         _reactor = std::make_shared<GRPCReactor>();
+        _fixtures = fixtures.makeStreamTestFixtures(
+            Base::getServiceContext()->getFastClockSource()->now() + getTimeout(),
+            _clientMetadata,
+            _reactor);
     }
 
     virtual Milliseconds getTimeout() const {

@@ -61,7 +61,7 @@ MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeReopeningBucket);
 /**
  * Prepares the batch for commit. Sets min/max appropriately, records the number of
  * documents that have previously been committed to the bucket, and renders the batch
- * inactive. Must have commit rights.
+ * inactive.
  */
 void prepareWriteBatchForCommit(TrackingContexts& trackingContexts,
                                 WriteBatch& batch,
@@ -78,12 +78,11 @@ void prepareWriteBatchForCommit(TrackingContexts& trackingContexts,
             it->first,
             it->second);
         bucket.uncommittedFieldNames.erase(fieldName);
-        if (bucket.fieldNames.contains(fieldName)) {
+        if (bucket.measurementMap.containsField(it->first)) {
             batch.newFieldNamesToBeInserted.erase(it++);
             continue;
         }
 
-        bucket.fieldNames.emplace(fieldName);
         ++it;
     }
 
@@ -108,11 +107,11 @@ void prepareWriteBatchForCommit(TrackingContexts& trackingContexts,
 }
 
 /**
- * Reports the result and status of a commit, and notifies anyone waiting on getResult().
- * Must have commit rights. Inactive batches only.
+ * Notifies anyone waiting on the promise.
+ * Inactive batches only.
  */
-void finishWriteBatch(WriteBatch& batch, const CommitInfo& info) {
-    batch.promise.emplaceValue(info);
+void finishWriteBatch(WriteBatch& batch) {
+    batch.promise.emplaceValue();
 }
 
 /**
@@ -139,8 +138,7 @@ void updateBucketFetchAndQueryStats(const ReopeningContext& context,
 }
 }  // namespace
 
-SuccessfulInsertion::SuccessfulInsertion(std::shared_ptr<WriteBatch>&& b, ClosedBuckets&& c)
-    : batch{std::move(b)}, closedBuckets{std::move(c)} {}
+SuccessfulInsertion::SuccessfulInsertion(std::shared_ptr<WriteBatch>&& b) : batch{std::move(b)} {}
 
 Stripe::Stripe(TrackingContexts& trackingContexts)
     : openBucketsById(
@@ -295,7 +293,7 @@ StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
     // If our insert was successful, return a SuccessfulInsertion with our
     // WriteBatch.
     if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
-        return SuccessfulInsertion{std::move(*batch), std::move(insertContext.closedBuckets)};
+        return SuccessfulInsertion{std::move(*batch)};
     }
 
     auto* reason = get_if<RolloverReason>(&insertionResult);
@@ -325,8 +323,7 @@ StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
                                                    ? RolloverAction::kArchive
                                                    : RolloverAction::kSoftClose);
             if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
-                return SuccessfulInsertion{std::move(*batch),
-                                           std::move(insertContext.closedBuckets)};
+                return SuccessfulInsertion{std::move(*batch)};
             }
 
             // We weren't able to insert into the other bucket, so fall through to the regular
@@ -383,53 +380,48 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
     if (rehydratedBucket.isOK()) {
         hangTimeseriesInsertBeforeReopeningBucket.pauseWhileSet();
 
-        StatusWith<std::reference_wrapper<Bucket>> swBucket{ErrorCodes::BadValue, ""};
         auto existingIt = stripe.openBucketsById.find(rehydratedBucket.getValue()->bucketId);
-        if (existingIt != stripe.openBucketsById.end()) {
-            // First let's check the existing bucket if we have one.
-            Bucket* existingBucket = existingIt->second.get();
-            swBucket = internal::reuseExistingBucket(catalog,
-                                                     stripe,
-                                                     stripeLock,
-                                                     insertContext.stats,
-                                                     insertContext.key,
-                                                     *existingBucket,
-                                                     reopeningContext.catalogEra);
-        } else {
-            // No existing bucket to use, go ahead and try to reopen our rehydrated bucket.
-            swBucket = internal::reopenBucket(catalog,
-                                              stripe,
-                                              stripeLock,
-                                              insertContext.stats,
-                                              insertContext.key,
-                                              std::move(rehydratedBucket.getValue()),
-                                              reopeningContext.catalogEra,
-                                              insertContext.closedBuckets);
-        }
+        if (existingIt == stripe.openBucketsById.end()) {
+            // No existing bucket matches this one, go ahead and try to reopen our rehydrated
+            // bucket.
+            auto swBucket = internal::reopenBucket(catalog,
+                                                   stripe,
+                                                   stripeLock,
+                                                   insertContext.stats,
+                                                   insertContext.key,
+                                                   std::move(rehydratedBucket.getValue()),
+                                                   reopeningContext.catalogEra);
 
-        if (swBucket.isOK()) {
-            Bucket& bucket = swBucket.getValue().get();
-            auto insertionResult = insertIntoBucket(catalog,
-                                                    stripe,
-                                                    stripeLock,
-                                                    doc,
-                                                    opId,
-                                                    internal::AllowBucketCreation::kYes,
-                                                    insertContext,
-                                                    bucket,
-                                                    time,
-                                                    storageCacheSizeBytes,
-                                                    comparator);
-            auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
-            invariant(batch);
-            return SuccessfulInsertion{std::move(*batch), std::move(insertContext.closedBuckets)};
-        } else {
-            insertContext.stats.incNumBucketReopeningsFailed();
-            if (swBucket.getStatus().code() == ErrorCodes::WriteConflict) {
-                return swBucket.getStatus();
+            if (swBucket.isOK()) {
+                // We reopened the bucket successfully. Now we'll use it directly as an optimization
+                // to bypass normal bucket selection.
+                Bucket& reopenedBucket = swBucket.getValue().get();
+                auto insertionResult = insertIntoBucket(catalog,
+                                                        stripe,
+                                                        stripeLock,
+                                                        doc,
+                                                        opId,
+                                                        internal::AllowBucketCreation::kYes,
+                                                        insertContext,
+                                                        reopenedBucket,
+                                                        time,
+                                                        storageCacheSizeBytes,
+                                                        comparator);
+                auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
+                invariant(batch);
+                return SuccessfulInsertion{std::move(*batch)};
+            } else {
+                insertContext.stats.incNumBucketReopeningsFailed();
+                if (swBucket.getStatus().code() == ErrorCodes::WriteConflict) {
+                    return swBucket.getStatus();
+                }
+                // If we had a different type of error, then we should fall through to normal bucket
+                // selection/allocation.
             }
-            // If we had a different type of error, then we should fall through and proceed to open
-            // a new bucket.
+        } else {
+            // We tried to reopen a bucket we already had open. Record the metric and then fall
+            // through to normal bucket selection/allocation.
+            insertContext.stats.incNumDuplicateBucketsReopened();
         }
     }
 
@@ -455,7 +447,7 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
                                             comparator);
     auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
     invariant(batch);
-    return SuccessfulInsertion{std::move(*batch), std::move(insertContext.closedBuckets)};
+    return SuccessfulInsertion{std::move(*batch)};
 }
 
 StatusWith<InsertResult> insert(BucketCatalog& catalog,
@@ -491,12 +483,12 @@ StatusWith<InsertResult> insert(BucketCatalog& catalog,
 
     auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
     invariant(batch);
-    return SuccessfulInsertion{std::move(*batch), std::move(insertContext.closedBuckets)};
+    return SuccessfulInsertion{std::move(*batch)};
 }
 
 void waitToInsert(InsertWaiter* waiter) {
     if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(waiter)) {
-        getWriteBatchResult(**batch).getStatus().ignore();
+        getWriteBatchStatus(**batch).ignore();
     } else if (auto* request = get_if<std::shared_ptr<ReopeningRequest>>(waiter)) {
         waitForReopeningRequest(**request);
     }
@@ -506,7 +498,7 @@ Status prepareCommit(BucketCatalog& catalog,
                      std::shared_ptr<WriteBatch> batch,
                      const StringDataComparator* comparator) {
     auto getBatchStatus = [&] {
-        return batch->promise.getFuture().getNoThrow().getStatus();
+        return batch->promise.getFuture().getNoThrow();
     };
 
     if (isWriteBatchFinished(*batch)) {
@@ -547,31 +539,13 @@ Status prepareCommit(BucketCatalog& catalog,
     return Status::OK();
 }
 
-boost::optional<ClosedBucket> finish(
-    BucketCatalog& catalog,
-    std::shared_ptr<WriteBatch> batch,
-    const CommitInfo& info,
-    const std::function<void(const timeseries::bucket_catalog::WriteBatch&, StringData)>&
-        runPostCommitDebugChecks) {
+void finish(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch) {
     invariant(!isWriteBatchFinished(*batch));
 
-    boost::optional<ClosedBucket> closedBucket;
-
-    finishWriteBatch(*batch, info);
+    finishWriteBatch(*batch);
 
     auto& stripe = *catalog.stripes[internal::getStripeNumber(catalog, batch->bucketId)];
     stdx::lock_guard stripeLock{stripe.mutex};
-
-    if (MONGO_unlikely(runPostCommitDebugChecks)) {
-        Bucket* bucket = internal::useBucket(catalog.bucketStateRegistry,
-                                             stripe,
-                                             stripeLock,
-                                             batch->bucketId,
-                                             internal::IgnoreBucketState::kYes);
-        if (bucket) {
-            runPostCommitDebugChecks(*batch, {bucket->timeField.data(), bucket->timeField.size()});
-        }
-    }
 
     Bucket* bucket =
         internal::useBucketAndChangePreparedState(catalog.bucketStateRegistry,
@@ -627,16 +601,11 @@ boost::optional<ClosedBucket> finish(
         switch (bucket->rolloverAction) {
             case RolloverAction::kHardClose:
             case RolloverAction::kSoftClose: {
-                internal::closeOpenBucket(
-                    catalog, stripe, stripeLock, *bucket, stats, closedBucket);
+                internal::closeOpenBucket(catalog, stripe, stripeLock, *bucket, stats);
                 break;
             }
             case RolloverAction::kArchive: {
-                ClosedBuckets closedBuckets;
-                internal::archiveBucket(catalog, stripe, stripeLock, *bucket, stats, closedBuckets);
-                if (!closedBuckets.empty()) {
-                    closedBucket = std::move(closedBuckets[0]);
-                }
+                internal::archiveBucket(catalog, stripe, stripeLock, *bucket, stats);
                 break;
             }
             case RolloverAction::kNone: {
@@ -645,7 +614,6 @@ boost::optional<ClosedBucket> finish(
             }
         }
     }
-    return closedBucket;
 }
 
 void abort(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch, const Status& status) {
@@ -719,17 +687,8 @@ void freeze(BucketCatalog& catalog, const BucketId& bucketId) {
     freezeBucket(catalog.bucketStateRegistry, bucketId);
 }
 
-void freeze(BucketCatalog& catalog,
-            const TimeseriesOptions& options,
-            const StringDataComparator* comparator,
-            const UUID& collectionUUID,
-            const BSONObj& bucket) {
-    freeze(catalog, extractBucketId(catalog, options, comparator, collectionUUID, bucket));
-}
-
 BucketId extractBucketId(BucketCatalog& bucketCatalog,
                          const TimeseriesOptions& options,
-                         const StringDataComparator* comparator,
                          const UUID& collectionUUID,
                          const BSONObj& bucket) {
     const OID bucketOID = bucket[kBucketIdFieldName].OID();
@@ -743,7 +702,6 @@ BucketId extractBucketId(BucketCatalog& bucketCatalog,
 }
 
 BucketKey::Signature getKeySignature(const TimeseriesOptions& options,
-                                     const StringDataComparator* comparator,
                                      const UUID& collectionUUID,
                                      const BSONObj& metadataObj) {
     tracking::Context trackingContext;
@@ -770,13 +728,11 @@ void appendExecutionStats(const BucketCatalog& catalog,
 
 StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catalog,
                                                             const UUID& collectionUUID,
-                                                            const StringDataComparator* comparator,
                                                             const TimeseriesOptions& options,
                                                             const BSONObj& measurementDoc) {
     auto res = internal::extractBucketingParameters(
         getTrackingContext(catalog.trackingContexts, TrackingScope::kOpenBucketsByKey),
         collectionUUID,
-        comparator,
         options,
         measurementDoc);
     if (!res.isOK()) {

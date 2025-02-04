@@ -56,14 +56,14 @@ public:
      *
      * This function blocks until the MirrorMaestro is available.
      */
-    static void init(ServiceContext* serviceContext) noexcept;
+    static void init(ServiceContext* serviceContext);
 
     /**
      * Shutdown the MirrorMaestro for serviceContext
      *
      * This function blocks until the MirrorMaestro is no longer available.
      */
-    static void shutdown(ServiceContext* serviceContext) noexcept;
+    static void shutdown(ServiceContext* serviceContext);
 
     /**
      * Check if the request associated with opCtx should be mirrored to secondaries, and schedule
@@ -71,12 +71,12 @@ public:
      *
      * This function will noop if the MirrorMaestro is currently being initialized or shutdown.
      */
-    static void tryMirrorRequest(OperationContext* opCtx) noexcept;
+    static void tryMirrorRequest(OperationContext* opCtx);
 
     /**
      * Runs custom logic as part of receiving a mirrored operation.
      */
-    static void onReceiveMirroredRead(OperationContext* opCtx) noexcept;
+    static void onReceiveMirroredRead(OperationContext* opCtx);
 
     static constexpr auto kServerStatusSectionName = "mirroredReads"_sd;
 };

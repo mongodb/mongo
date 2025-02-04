@@ -21,6 +21,8 @@
  *   assumes_no_implicit_index_creation,
  *   # This test looks for plan cache hits, which would change with repeated reads.
  *   does_not_support_repeated_reads,
+ *   # The test examines the SBE plan cache, which initial sync may change the contents of.
+ *   examines_sbe_cache,
  *   requires_getmore,
  * ]
  */

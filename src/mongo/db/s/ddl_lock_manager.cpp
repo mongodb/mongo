@@ -137,21 +137,21 @@ void DDLLockManager::_lock(OperationContext* opCtx,
         locker->lock(opCtx, resId, mode, deadline);
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
 
-        std::vector<std::string> lockHoldersArr;
         const auto& lockHolders = locker->getLockInfoFromResourceHolders(resId);
-        for (const auto& lock : lockHolders) {
-            lockHoldersArr.emplace_back(
-                BSON("operation" << lock.debugInfo << "lock mode" << modeName(lock.mode))
-                    .toString());
+        std::stringstream lockHoldersDebugInfo;
+        lockHoldersDebugInfo << "Failed to acquire DDL lock for '" << ns.toString() << "' in mode "
+                             << modeName(mode) << " after "
+                             << duration_cast<Milliseconds>(waitingTime.elapsed()).toString()
+                             << " that is currently locked by '[";
+        for (std::size_t i = 0; i < lockHolders.size(); i++) {
+            const auto& lock = lockHolders[i];
+            if (i > 0)
+                lockHoldersDebugInfo << ", ";
+            lockHoldersDebugInfo << "{ operation: " << lock.debugInfo << ", "
+                                 << "lock mode: " << modeName(lock.mode) << " }";
         }
-
-        uasserted(
-            ErrorCodes::LockBusy,
-            "Failed to acquire DDL lock for '{}' in mode {} after {} that is currently locked by '{}'"_format(
-                ns,
-                modeName(mode),
-                duration_cast<Milliseconds>(waitingTime.elapsed()).toString(),
-                lockHoldersArr));
+        lockHoldersDebugInfo << "]'";
+        uasserted(ErrorCodes::LockBusy, lockHoldersDebugInfo.str());
     }
 
     unregisterResourceExitGuard.dismiss();

@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/sbe/abt/abt_unit_test_literals.h"
-#include "mongo/db/exec/sbe/abt/abt_unit_test_utils.h"
 #include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_literals.h"
+#include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
 #include "mongo/util/debugger.h"
 
 #if defined(__clang__)
@@ -45,7 +45,7 @@
 #pragma GCC optimize("O0")
 
 using namespace mongo::optimizer;
-using namespace mongo::optimizer::unit_test_abt_literals;
+using namespace mongo::stage_builder::abt::unit_test_abt_literals;
 
 int clang_optnone main(int argc, char** argv) {
     ABT testABT =

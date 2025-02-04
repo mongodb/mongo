@@ -10,6 +10,9 @@ in the source code repo
   `CARES_LIB_VERSIONINFO` set to the same value to denote the current shared
   object versioning.
 
+- edit `include/ares_version.h` and set `ARES_VERSION_*` definitions to reflect
+  the current version.
+
 - make sure all relevant changes are committed on the master branch
 
 - tag the git repo in this style: `git tag -a cares-1_14_0` -a annotates the
@@ -25,8 +28,6 @@ in the source code repo
 - gpg sign the tarball
 
 - upload the resulting files to https://c-ares.org/download/
-
-- update `ares_version.h` for the next version
 
 in the c-ares-www repo
 ----------------------

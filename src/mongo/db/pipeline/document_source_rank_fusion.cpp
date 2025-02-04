@@ -27,37 +27,41 @@
  *    it in the license file.
  */
 
-#include "expression_context.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/json.h"
-#include "mongo/db/pipeline/document_source_limit.h"
-#include "mongo/db/pipeline/document_source_replace_root.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
-#include "mongo/db/pipeline/search/document_source_vector_search.h"
+#include "mongo/db/pipeline/document_source_rank_fusion.h"
+
 #include <algorithm>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_group.h"
-#include "mongo/db/pipeline/document_source_rank_fusion.h"
+#include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/document_source_replace_root.h"
+#include "mongo/db/pipeline/document_source_set_metadata.h"
+#include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/util/string_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -129,51 +133,213 @@ static void rankFusionPipelineValidator(const Pipeline& pipeline) {
 }
 
 /**
- * Validates the weights inputs. If weights are specified by the user, there must be exactly one
- * weight per input pipeline.
+ * Computes a suggestion for each invalid / non-existent weight entry in the 'validWeights' array.
+ * The valid / existing pipelines that did not have a matching weight specification are
+ * the set of options that can be suggested from.
+ * The return vector has one entry per invalid weight, with the first entry in pair being
+ * the name of the invalid weight, and the second being a list of suggestions.
  */
-void rankFusionWeightsValidator(
-    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& pipelines,
-    const StringMap<double>& weights) {
-    // The size of weights and pipelines should actually be equal, but if we have more pipelines
-    // than weights, we'll throw a more specific error below that specifies which pipeline is
-    // missing a weight.
-    uassert(9460301,
-            "$rankFusion input has more weights than pipelines. If combination.weights is "
-            "specified, there must be only one weight per named input pipeline.",
-            weights.size() <= pipelines.size());
+std::vector<std::pair<std::string, std::vector<std::string>>> computeWeightsTypoSuggestions(
+    const std::vector<std::string>& unmatchedPipelines,
+    const std::vector<std::string>& invalidWeights) {
+    std::vector<std::pair<std::string, std::vector<std::string>>> suggestions;
+    for (const std::string& invalidWeight : invalidWeights) {
+        // First, check a special, but also likely, case where there is only a single unmatched
+        // pipeline. If so, this is the only possible suggestion, and there is no need to
+        // waste time computing the levenshtein distance.
+        if (unmatchedPipelines.size() == 1) {
+            suggestions.push_back({invalidWeight, {unmatchedPipelines.front()}});
+            continue;
+        }
 
-    for (const auto& pipelineIt : pipelines) {
-        auto pipelineName = pipelineIt.first;
-        uassert(9460302,
-                str::stream()
-                    << "$rankFusion input pipeline \"" << pipelineName
-                    << "\" is missing a weight, even though combination.weights is specified.",
-                weights.contains(pipelineName));
+        // There are multiple unmatched pipelines, so find the best suggestion.
+        // 'shortestDistance' is the levenshtein distance of the best suggestion found so far.
+        // Initialize with the first unmatched pipeline, then compare to the rest.
+        unsigned int shortestDistance =
+            query_string_util::levenshteinDistance(invalidWeight, unmatchedPipelines[0]);
+        std::vector<std::string> bestSuggestions = {unmatchedPipelines[0]};
+        for (std::size_t i = 1; i < unmatchedPipelines.size(); i++) {
+            unsigned int ld =
+                query_string_util::levenshteinDistance(invalidWeight, unmatchedPipelines[i]);
+            if (ld == shortestDistance) {
+                // Equally good suggestion found.
+                bestSuggestions.push_back(unmatchedPipelines[i]);
+            } else if (ld < shortestDistance) {
+                // Better suggestion found.
+                shortestDistance = ld;
+                bestSuggestions = {unmatchedPipelines[i]};
+            }
+        }
+        // Record best suggestion for this invalid weight.
+        suggestions.push_back({invalidWeight, bestSuggestions});
     }
+    return suggestions;
 }
 
+/**
+ * This function will fail the query in the case where non-existent weight(s) were referenced in
+ * 'combinations.weights' in the RankFusionSpec.
+ * Before failing the query outright, the function first computes the best valid, unmatched pipeline
+ * the user could have intended for each non-existent specified weight, and builds it into a user
+ * friendly error message to give the best possible feedback.
+ *
+ * Note: This function needs a list of the unmatched pipelines, but is instead given a list of
+ *       all pipelines and matched pipelines, which can be used to compute the unmatched pipelines.
+ *       This is for performance reasons, because the caller of this function can easily know these
+ *       inputs, and only needs to call this function in error cases.
+ */
+void failWeightsValidationWithPipelineSuggestions(
+    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& allPipelines,
+    const stdx::unordered_set<std::string>& matchedPipelines,
+    const std::vector<std::string>& invalidWeights) {
+    // The list of unmatchedPipelines is first computed to find
+    // the valid set of possible suggestions.
+    std::vector<std::string> unmatchedPipelines;
+    for (const auto& pipeline : allPipelines) {
+        if (!matchedPipelines.contains(pipeline.first)) {
+            unmatchedPipelines.push_back(pipeline.first);
+        }
+    }
+
+    // For each invalid weight, find the best possible suggested unmatched pipeline,
+    // that is, the one with the shortest levenshtein distance.
+    // The first entry in the pair is the name of the invalid weight,
+    // the second entry is the name of the suggested unmatched pipeline.
+    const std::vector<std::pair<std::string, std::vector<std::string>>> suggestions =
+        computeWeightsTypoSuggestions(unmatchedPipelines, invalidWeights);
+
+    // 'i' is the index into the 'suggestions' array.
+    auto convertSingleSuggestionToString = [&](const std::size_t i) -> std::string {
+        std::string s = fmt::format("(provided: '{}' -> ", suggestions[i].first);
+        if (suggestions[i].second.size() == 1) {
+            s += fmt::format("suggested: '{}')", suggestions[i].second.front());
+        } else {
+            s += fmt::format("suggestions: [{}])", fmt::join(suggestions[i].second, ", "));
+        }
+        if (i < suggestions.size() - 1) {
+            s += ", ";
+        }
+        return s;
+    };
+
+    // All best suggestions have been computed.
+    // The build error message that contains all suggestions.
+    std::string errorMsg = fmt::format(
+        "$rankFusion stage contained ({}) weight(s) in "
+        "'combination.weights' that did not reference valid pipeline names. "
+        "Suggestions for valid pipeline names: ",
+        std::to_string(invalidWeights.size()));
+    for (std::size_t i = 0; i < suggestions.size(); i++) {
+        errorMsg += convertSingleSuggestionToString(i);
+    }
+
+    // Fail query.
+    uasserted(9967500, errorMsg);
+}
+
+/**
+ * Parses and validates the weights for pipelines that have been explicitly specified in the
+ * RankFusionSpec. Returns a map from the pipeline name to the specified weight (as a double)
+ * for that pipeline. This function also validates that the weights specification is valid,
+ * and fails the query if for example, a non-existant pipeline is specified, or a pipeline
+ * is specified more than once.
+ * Note: not all pipelines must be in the returned map; it only holds the ones that were explicitly
+ * listed in the stage specification. This means any valid subset from none to all of the pipelines
+ * may be contained in the resulting map. Any pipelines not present in the resulting map have
+ * an implicit default weight of 1.
+ */
 StringMap<double> extractAndValidateWeights(
     const RankFusionSpec& spec,
     const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& pipelines) {
+    // Output map of pipeline name, to weight of pipeline.
     StringMap<double> weights;
 
+    // If no weights specified, no work to do; return empty map.
     const auto& combinationSpec = spec.getCombination();
     if (!combinationSpec.has_value()) {
         return weights;
     }
 
-    for (const auto& elem : combinationSpec->getWeights()) {
-        // elem.Number() throws a uassert if non-numeric.
-        double weight = elem.Number();
+    // Keeps track of the weights in the RankFusionSpec that do not reference a valid pipeline
+    // most often from a misspelling/typo.
+    std::vector<std::string> invalidWeights;
+    // Keeps track of the pipelines that have been successfully matched/taken by specified weights.
+    // We use this to build a list of pipelines that have not been matched later,
+    // if necessary to suggest pipelines that might have been misspelled.
+    stdx::unordered_set<std::string> matchedPipelines;
+
+    for (const auto& weightEntry : combinationSpec->getWeights()) {
+        // First validate that this pipeline exists.
+        if (!pipelines.contains(weightEntry.fieldName())) {
+            // This weight does not reference a valid pipeline.
+            // The query will eventually fail, but we process all the weights first
+            // to give the best suggestions in the error message.
+            invalidWeights.push_back(weightEntry.fieldName());
+            continue;
+        }
+
+        // The pipeline exists, but must not already have been seen; else its a duplicate.
+        // Otherwise, add it to the output map.
+        // Practically, this should never arise because the BSON processing layer filters out
+        // redundant keys, but we leave it in as a defensive programming measure.
+        uassert(
+            9967401,
+            str::stream()
+                << "A pipeline named '" << weightEntry.fieldName()
+                << "' is specified more than once in the $rankFusion 'combinations.weight' object.",
+            !weights.contains(weightEntry.fieldName()));
+
+        // Unique, existing pipeline weight found.
+        // Validate the weight number and add to output map.
+        // weightEntry.Number() throws a uassert if non-numeric.
+        double weight = weightEntry.Number();
         uassert(9460300,
                 str::stream() << "Rank fusion pipeline weight must be non-negative, but given "
-                              << weight,
+                              << weight << " for pipeline '" << weightEntry.fieldName() << "'.",
                 weight >= 0);
-        weights[elem.fieldName()] = weight;
+        weights[weightEntry.fieldName()] = weight;
+        matchedPipelines.insert(weightEntry.fieldName());
     }
-    rankFusionWeightsValidator(pipelines, weights);
+
+    // All weights that the user has specified have been processed.
+    // Check for error cases.
+    if (int(pipelines.size()) < combinationSpec->getWeights().nFields()) {
+        // There are more specified weights than input pipelines.
+        // Give feedback on which possible weights are extraneous.
+        tassert(9967501,
+                "There must be at least some invalid weights when there are more weights "
+                "than input pipelines to $rankFusion",
+                !invalidWeights.empty());
+        // Fail query.
+        uasserted(
+            9460301,
+            fmt::format(
+                "$rankFusion input has more weights ({}) than pipelines ({}). "
+                "If 'combination.weights' is specified, there must be a less or equal number of "
+                "weights as pipelines, each of which is unique and existing. "
+                "Possible extraneous specified weights = [{}]",
+                combinationSpec->getWeights().nFields(),
+                int(pipelines.size()),
+                fmt::join(invalidWeights, ", ")));
+    } else if (!invalidWeights.empty()) {
+        // There are invalid / misspelled weights.
+        // Fail the query with the best pipeline recommendations we can generate.
+        failWeightsValidationWithPipelineSuggestions(pipelines, matchedPipelines, invalidWeights);
+    }
+
+    // Successfully validated weights.
     return weights;
+}
+
+auto makeSureSortKeyIsOutput(const auto& stageList) {
+    DocumentSourceSort* rightMostSort = nullptr;
+    for (auto&& stage : stageList) {
+        if (auto sortStage = dynamic_cast<DocumentSourceSort*>(stage.get())) {
+            rightMostSort = sortStage;
+        }
+    }
+    if (rightMostSort)
+        rightMostSort->pleaseOutputSortKeyMetadata();
 }
 
 std::vector<BSONObj> getPipeline(BSONElement inputPipeElem) {
@@ -189,66 +355,149 @@ BSONObj group() {
     })");
 }
 
-BSONObj unwind(const std::string& prefix) {
-    std::string rank = prefix + "_rank";
-    return fromjson(R"({
-        $unwind: {
-            path: "$docs", includeArrayIndex: ")" +
-                    rank + R"("
+auto stageToBson(const auto stagePtr) {
+    std::vector<Value> array;
+    stagePtr->serializeToArray(array);
+    return array[0].getDocument().toBson();
+}
+
+auto setWindowFields(const auto& expCtx, const std::string& rankFieldName) {
+    // TODO SERVER-98562 We shouldn't need to provide this sort, since it's not used other than to
+    // pass the parse-time validation checks.
+    const SortPattern dummySortPattern{fromjson("{order: 1}"), expCtx};
+    return make_intrusive<DocumentSourceInternalSetWindowFields>(
+        expCtx,
+        boost::none,  // partitionBy
+        dummySortPattern,
+        std::vector<WindowFunctionStatement>{
+            WindowFunctionStatement{rankFieldName,
+                                    window_function::Expression::parse(
+                                        fromjson("{$rank: {}}"), dummySortPattern, expCtx.get())}},
+        internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load(),
+        SbeCompatibility::notCompatible);
+}
+
+/**
+ * Builds and returns an $addFields stage like this one:
+ * {$addFields: {
+ *      prefix_scoreDetails:
+ *          [{$ifNull: [{$meta: "scoreDetails"}, {value: score, details: "Not Calculated"}]}]
+ *      }
+ *  }
+ */
+auto addScoreDetails(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                     const std::string& prefix) {
+    const std::string scoreDetails = fmt::format("{}_scoreDetails", prefix);
+    BSONObjBuilder bob;
+    {
+        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
+        addFieldsBob.append(scoreDetails,
+                            fromjson(
+                                R"({$ifNull: [
+                                    {$meta: "scoreDetails"},
+                                    {value: {$meta: "score"}, details: "Not Calculated"}
+                                ]})"));
+    }
+    const auto spec = bob.obj();
+    return DocumentSourceAddFields::createFromBson(spec.firstElement(), expCtx);
+}
+
+/**
+ * Builds and returns an $addFields stage, like the following:
+ * {$addFields:
+ *     {prefix_score:
+ *         {multiply:
+ *             [{$divide: [1, {$add: [rank, rankConstant]}]}]
+ *         },
+ *     }
+ * }
+ */
+auto addScoreField(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                   const std::string& prefix,
+                   const int rankConstant,
+                   const double weight) {
+    const std::string score = fmt::format("{}_score", prefix);
+    const std::string rankPath = fmt::format("${}_rank", prefix);
+    const std::string scorePath = fmt::format("${}", score);
+
+    BSONObjBuilder bob;
+    {
+        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
+        {
+            BSONObjBuilder scoreField(addFieldsBob.subobjStart(score));
+            {
+                BSONArrayBuilder multiplyArray(scoreField.subarrayStart("$multiply"_sd));
+                // RRF Score = weight * (1 / (rank + rank constant)).
+
+                multiplyArray.append(fromjson(
+                    fmt::format("{{$divide: [1, {{$add: ['{}', {}]}}]}}", rankPath, rankConstant)));
+                multiplyArray.append(weight);
+            }
         }
-    })");
+    }
+
+    const auto spec = bob.obj();
+    return DocumentSourceAddFields::createFromBson(spec.firstElement(), expCtx);
 }
 
-// RRF Score = weight * (1 / (rank + rank constant)).
-BSONObj addScoreField(const std::string& prefix, const int rankConstant, const double weight) {
-    std::string score = prefix + "_score";
-    std::string rank = "$" + prefix + "_rank";
-
-    return BSON(
-        "$addFields" << BSON(
-            score << BSON("$multiply" << BSON_ARRAY(
-                              BSON("$divide" << BSON_ARRAY(
-                                       1 << BSON("$add" << BSON_ARRAY(rank << rankConstant))))
-                              << weight))));
+/**
+ * Builds and returns a $replaceRoot stage: {$replaceWith: {docs: "$$ROOT"}}.
+ * This has the effect of storing the unmodified user's document in the path '$docs'.
+ */
+auto nestUserDocs(const auto& expCtx) {
+    static const BSONObj replaceRootObj = fromjson("{$replaceWith: {docs: \"$$ROOT\"}}");
+    return DocumentSourceReplaceRoot::createFromBson(replaceRootObj.firstElement(), expCtx);
 }
 
-std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
-    const std::string& prefixOne,
-    const int rankConstant,
-    const double weight,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto groupStage = DocumentSourceGroup::createFromBson(group().firstElement(), expCtx);
+auto buildFirstPipelineStages(const std::string& prefixOne,
+                              const int rankConstant,
+                              const double weight,
+                              const bool includeScoreDetails,
+                              const boost::intrusive_ptr<ExpressionContext>& expCtx) {
 
-    auto unwindStage =
-        DocumentSourceUnwind::createFromBson(unwind(prefixOne).firstElement(), expCtx);
-
-    auto addFields = DocumentSourceAddFields::createFromBson(
-        addScoreField(prefixOne, rankConstant, weight).firstElement(), expCtx);
-    return {groupStage, unwindStage, addFields};
+    std::list<boost::intrusive_ptr<DocumentSource>> outputStages = {
+        nestUserDocs(expCtx),
+        setWindowFields(expCtx, fmt::format("{}_rank", prefixOne)),
+        addScoreField(expCtx, prefixOne, rankConstant, weight),
+    };
+    if (includeScoreDetails) {
+        outputStages.push_back(addScoreDetails(expCtx, prefixOne));
+    }
+    return outputStages;
 }
 
 BSONObj groupEachScore(
-    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& pipelines) {
+    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& pipelines,
+    const bool includeScoreDetails) {
+    // For each sub-pipeline, build the following string:
+    // ", name_score: {$max: {ifNull: ["$name_score", 0]}}, name_rank: {$max: {ifNull:
+    // ["$name_rank", 0]}}" These strings are appended to each other
     const auto allScores = [&]() {
         StringBuilder sb;
         for (auto it = pipelines.begin(); it != pipelines.end(); it++) {
             sb << ", ";
-            const auto scoreName = it->first + "_score";
-            sb << scoreName << R"(: {$max: {$ifNull: ["$)" + scoreName + R"(", 0]}})";
+            const auto& pipelineName = it->first;
+            sb << fmt::format("{0}_score: {{$max: {{$ifNull: [\"${0}_score\", NumberLong(0)]}}}}",
+                              pipelineName);
+            // We only need to preserve the rank if we're calculating score details.
+            if (includeScoreDetails) {
+                sb << fmt::format(
+                    ", {0}_rank: {{$max: {{$ifNull: [\"${0}_rank\", NumberLong(0)]}}}}",
+                    pipelineName);
+                sb << fmt::format(", {0}_scoreDetails: {{$mergeObjects: \"${0}_scoreDetails\"}}",
+                                  pipelineName);
+            }
         }
         return sb.str();
     };
-    return fromjson(R"({
-        $group: {
-                _id: "$docs._id",
-                docs: {$first: "$docs"}
-                )" + allScores() +
-                    R"(}
-    })");
+
+    return fromjson(
+        fmt::format("{{$group: {{_id: '$docs._id', docs: {{$first: '$docs'}}{0}}}}}", allScores()));
 }
 
 BSONObj calculateFinalScore(
     const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputs) {
+    // Generate a string with an array of all the fields containing a score for a given pipeline.
     const auto& allInputs = [&] {
         StringBuilder sb;
         sb << "[";
@@ -263,15 +512,32 @@ BSONObj calculateFinalScore(
         sb << "]";
         return sb.str();
     };
-    BSONObj finalScore = fromjson(R"({
-        $addFields: {
-            score: {
-                $add: )" + allInputs() +
-                                  R"(
+    return fromjson(fmt::format(R"({{$addFields: {{score: {{$add: {0}}}}}}})", allInputs()));
+}
+
+BSONObj calculateFinalScoreDetails(
+    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputs) {
+    // Generate the following string for each pipeline:
+    // "name: {rank: $name_rank, details: $name_scoreDetails}""
+    // And add them all to an array to be merged together.
+    BSONObjBuilder bob;
+    BSONArrayBuilder mergeNamedDetailsBob(bob.subarrayStart("$mergeObjects"_sd));
+    for (auto it = inputs.begin(); it != inputs.end(); it++) {
+        mergeNamedDetailsBob.append(fromjson(
+            fmt::format("{{{0}: {{$mergeObjects: [{{rank: '${0}_rank'}}, '${0}_scoreDetails']}}}}",
+                        it->first)));
+    }
+    mergeNamedDetailsBob.done();
+    // Create the following object:
+    /*
+        { $addFields: {
+            calculatedScoreDetails: {
+                $mergeObjects: [<generated above>]
             }
         }
-    })");
-    return finalScore;
+    */
+    return fromjson(
+        fmt::format("{{$addFields: {{calculatedScoreDetails: {0}}}}}", bob.obj().toString()));
 }
 
 boost::intrusive_ptr<DocumentSource> buildUnionWithPipeline(
@@ -279,11 +545,17 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipeline(
     const int rankConstant,
     const double weight,
     std::unique_ptr<Pipeline, PipelineDeleter> oneInputPipeline,
+    const bool includeScoreDetails,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+
+    makeSureSortKeyIsOutput(oneInputPipeline->getSources());
+    oneInputPipeline->pushBack(nestUserDocs(expCtx));
+    oneInputPipeline->pushBack(setWindowFields(expCtx, fmt::format("{}_rank", prefix)));
+    oneInputPipeline->pushBack(addScoreField(expCtx, prefix, rankConstant, weight));
+    if (includeScoreDetails) {
+        oneInputPipeline->pushBack(addScoreDetails(expCtx, prefix));
+    }
     std::vector<BSONObj> bsonPipeline = oneInputPipeline->serializeToBson();
-    bsonPipeline.push_back(group());
-    bsonPipeline.push_back(unwind(prefix));
-    bsonPipeline.push_back(addScoreField(prefix, rankConstant, weight));
 
     auto collName = expCtx->getNamespaceString().coll();
 
@@ -294,23 +566,39 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipeline(
 
 std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
     const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputPipelines,
+    const bool includeScoreDetails,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto group =
-        DocumentSourceGroup::createFromBson(groupEachScore(inputPipelines).firstElement(), expCtx);
+    auto group = DocumentSourceGroup::createFromBson(
+        groupEachScore(inputPipelines, includeScoreDetails).firstElement(), expCtx);
     auto addFields = DocumentSourceAddFields::createFromBson(
         calculateFinalScore(inputPipelines).firstElement(), expCtx);
 
+    // Note that the scoreDetails fields go here in the pipeline. We create them below to be able
+    // to return them immediately once all stages are generated.
     BSONObj sortObj = fromjson(R"({
-        $sort: { score: -1, _id: 1}
+        $sort: {score: -1, _id: 1}
     })");
     auto sort = DocumentSourceSort::createFromBson(sortObj.firstElement(), expCtx);
 
-    BSONObj replaceRootObj = fromjson(R"({
+    static const BSONObj replaceRootObj = fromjson(R"({
         $replaceRoot: {newRoot: "$docs"}
     })");
-    auto replaceRoot =
+    auto restoreUserDocs =
         DocumentSourceReplaceRoot::createFromBson(replaceRootObj.firstElement(), expCtx);
-    return {group, addFields, sort, replaceRoot};
+
+    if (includeScoreDetails) {
+        auto addFieldsDetails = DocumentSourceAddFields::createFromBson(
+            calculateFinalScoreDetails(inputPipelines).firstElement(), expCtx);
+        auto setDetails = DocumentSourceSetMetadata::create(
+            expCtx,
+            Expression::parseObject(
+                expCtx.get(),
+                fromjson("{value: '$score', details: '$calculatedScoreDetails'}"),
+                expCtx->variablesParseState),
+            DocumentMetadataFields::kScoreDetails);
+        return {group, addFields, addFieldsDetails, setDetails, sort, restoreUserDocs};
+    }
+    return {group, addFields, sort, restoreUserDocs};
 }
 
 }  // namespace
@@ -347,7 +635,6 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
     // It's important to use an ordered map here, so that we get stability in the desugaring =>
     // stability in the query shape.
     std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>> inputPipelines;
-
     // Ensure that all pipelines are valid ranked selection pipelines.
     for (const auto& elem : spec.getInput().getPipelines()) {
         auto pipeline = Pipeline::parse(getPipeline(elem), pExpCtx);
@@ -357,6 +644,11 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
         uassertStatusOKWithContext(
             FieldPath::validateFieldName(inputName),
             "$rankFusion pipeline names must follow the naming rules of field path expressions.");
+        uassert(
+            9921000,
+            str::stream() << "$rankFusion pipeline names must be unique, but found duplicate name '"
+                          << inputName << "'.",
+            !inputPipelines.contains(inputName));
         inputPipelines[inputName] = std::move(pipeline);
     }
 
@@ -364,33 +656,40 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
 
     // For now, the rankConstant is always 60.
     static const double rankConstant = 60;
+    const bool includeScoreDetails = spec.getScoreDetails();
     std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
     for (auto it = inputPipelines.begin(); it != inputPipelines.end(); it++) {
         const auto& name = it->first;
         auto& pipeline = it->second;
 
-        // If weights weren't specified, the default weight is 1.
-        double pipelineWeight = weights.empty() ? 1 : weights.at(name);
+        // Check if an explicit weight for this pipeline has been specified.
+        // If not, the default is one.
+        double pipelineWeight = weights.contains(name) ? weights.at(name) : 1;
 
         if (outputStages.empty()) {
             // First pipeline.
+            makeSureSortKeyIsOutput(pipeline->getSources());
             while (!pipeline->getSources().empty()) {
                 outputStages.push_back(pipeline->popFront());
             }
-            auto firstPipelineStages =
-                buildFirstPipelineStages(name, rankConstant, pipelineWeight, pExpCtx);
+            auto firstPipelineStages = buildFirstPipelineStages(
+                name, rankConstant, pipelineWeight, includeScoreDetails, pExpCtx);
             for (const auto& stage : firstPipelineStages) {
                 outputStages.push_back(std::move(stage));
             }
         } else {
-            auto unionWithStage = buildUnionWithPipeline(
-                name, rankConstant, pipelineWeight, std::move(pipeline), pExpCtx);
+            auto unionWithStage = buildUnionWithPipeline(name,
+                                                         rankConstant,
+                                                         pipelineWeight,
+                                                         std::move(pipeline),
+                                                         includeScoreDetails,
+                                                         pExpCtx);
             outputStages.push_back(unionWithStage);
         }
     }
 
     // Build all remaining stages to perform the fusion.
-    auto finalStages = buildScoreAndMergeStages(inputPipelines, pExpCtx);
+    auto finalStages = buildScoreAndMergeStages(inputPipelines, includeScoreDetails, pExpCtx);
     for (const auto& stage : finalStages) {
         outputStages.push_back(stage);
     }

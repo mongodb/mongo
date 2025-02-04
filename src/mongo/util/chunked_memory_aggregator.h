@@ -29,13 +29,33 @@
 
 #pragma once
 
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/util/memory_usage_tracker.h"
 
 namespace mongo {
 
 class ConcurrentMemoryAggregator;
 class ChunkedMemoryAggregator;
+
+// Updatable version of `MemoryUsageTokenImpl`.
+template <typename Tracker>
+class MemoryUsageHandleImpl : public MemoryUsageTokenImpl<Tracker> {
+public:
+    MemoryUsageHandleImpl(Tracker* tracker = nullptr) : MemoryUsageTokenImpl<Tracker>(0, tracker) {}
+    MemoryUsageHandleImpl(int64_t initial, Tracker* tracker = nullptr)
+        : MemoryUsageTokenImpl<Tracker>(initial, tracker) {}
+
+    void add(int64_t diff) {
+        this->_curMemoryUsageBytes += diff;
+        this->_tracker->add(diff);
+    }
+
+    void set(int64_t total) {
+        add(total - this->_curMemoryUsageBytes);
+    }
+};  // class MemoryUsageHandleImpl
+
+using SimpleMemoryUsageHandle = MemoryUsageHandleImpl<SimpleMemoryUsageTracker>;
 
 /**
  * Leaf nodes of the tree, which are allocated from `ChunkedMemoryAggregator` nodes. These are meant
@@ -46,12 +66,6 @@ class ChunkedMemoryAggregator;
  * sent to the `ChunkedMemoryAggregator` every time a child `MemoryUsageHandle` is updated.
  */
 using MemoryUsageHandle = MemoryUsageHandleImpl<ChunkedMemoryAggregator>;
-
-/**
- * Similar to the above `MemoryUsageHandle` except that it reserves a static amount of memory which
- * is released when the token goes out of scope. Tokens are not updatable after they constructed.
- */
-using ChunkedMemoryUsageToken = MemoryUsageTokenImpl<ChunkedMemoryAggregator>;
 
 /**
  * Tracks memory usage in a thread-safe manner through `MemoryUsageHandle`s which are allocated
@@ -109,11 +123,6 @@ public:
      * a single threaded context.
      */
     MemoryUsageHandle createUsageHandle(int64_t initialBytes = 0);
-
-    /**
-     * Similar to `createUsageHandle` except this creates a static token that is not updatable.
-     */
-    ChunkedMemoryUsageToken createUsageToken(int64_t memoryUsageBytes);
 
     /**
      * Returns the current memory usage for this `ChunkedMemoryAggregator`. This will always be

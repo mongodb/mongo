@@ -320,6 +320,30 @@ TEST_F(CanonicalDistinctTest, ExplainNotIncludedWhenConvertingToAggregationComma
                       SimpleBSONObjComparator::kInstance.makeEqualTo()));
 }
 
+TEST_F(CanonicalDistinctTest, CopyMaintainsDistinctProperties) {
+    auto rawCmd = fromjson("{distinct: 'testcoll', key: 'x', $db: 'testdb'}");
+    auto pdc = bsonToParsedDistinct(expCtx, rawCmd);
+    auto canonicalQuery =
+        parsed_distinct_command::parseCanonicalQuery(expCtx, std::move(pdc), nullptr);
+    const auto& originalDistinct = canonicalQuery->getDistinct();
+    originalDistinct->setProjectionSpec(BSON("_id" << 0 << "x" << 1));
+    originalDistinct->setSortRequirement(SortPattern(BSON("x" << 1), expCtx));
+
+    const auto& copyDistinct = CanonicalDistinct(*originalDistinct);
+    ASSERT_NE(&originalDistinct, &copyDistinct);
+
+    ASSERT_EQ(originalDistinct->getKey(), copyDistinct.getKey());
+    ASSERT_EQ(originalDistinct->isMirrored(), copyDistinct.isMirrored());
+    ASSERT_EQ(originalDistinct->getSampleId(), copyDistinct.getSampleId());
+    ASSERT_BSONOBJ_EQ(originalDistinct->getProjectionSpec().get(),
+                      copyDistinct.getProjectionSpec().get());
+    ASSERT_EQ(originalDistinct->isDistinctScanDirectionFlipped(),
+              copyDistinct.isDistinctScanDirectionFlipped());
+    ASSERT_EQ(originalDistinct->getSortRequirement(), copyDistinct.getSortRequirement());
+    ASSERT_BSONOBJ_EQ(originalDistinct->getSerializedSortRequirement(),
+                      copyDistinct.getSerializedSortRequirement());
+}
+
 TEST_F(CanonicalDistinctTest, FailsToParseDistinctWithUnknownFields) {
     BSONObj cmdObj = fromjson(R"({
         distinct: 'testcoll',

@@ -40,7 +40,7 @@
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/str_basic.h"
 

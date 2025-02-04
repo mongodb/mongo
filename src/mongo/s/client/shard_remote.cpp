@@ -468,7 +468,7 @@ Status ShardRemote::runAggregation(
     Fetcher fetcher(executor.get(),
                     host,
                     aggRequest.getNamespace().dbName(),
-                    aggregation_request_helper::serializeToCommandObj(aggRequest),
+                    aggRequest.toBSON(),
                     fetcherCallback,
                     readPrefMetadata,
                     requestTimeout, /* command network timeout */

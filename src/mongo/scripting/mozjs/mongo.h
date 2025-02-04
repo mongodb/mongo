@@ -107,9 +107,10 @@ struct MongoBase : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(_startSession);
         MONGO_DECLARE_JS_FUNCTION(_setOIDCIdPAuthCallback);
         MONGO_DECLARE_JS_FUNCTION(_refreshAccessToken);
+        MONGO_DECLARE_JS_FUNCTION(getShellPort);
     };
 
-    static const JSFunctionSpec methods[31];
+    static const JSFunctionSpec methods[32];
 
     static const char* const className;
     static const unsigned classFlags =

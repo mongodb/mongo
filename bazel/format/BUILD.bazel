@@ -23,7 +23,11 @@ py_binary(
     data = [
         ":prettier",
         "//buildscripts:shellscripts_linters",
+        "@shfmt",
     ],
+    env = {
+        "SHFMT_PATH": "$(execpath @shfmt//:shfmt)",
+    },
     main = "format.py",
     visibility = ["//visibility:public"],
     deps = [

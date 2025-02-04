@@ -36,6 +36,7 @@
 #include "mongo/transport/grpc/client.h"
 #include "mongo/transport/grpc/grpc_session_manager.h"
 #include "mongo/transport/grpc/service.h"
+#include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/socket_utils.h"
@@ -114,10 +115,10 @@ std::unique_ptr<GRPCTransportLayerImpl> GRPCTransportLayerImpl::createWithConfig
     auto sm = options.enableIngress
         ? std::make_unique<GRPCSessionManager>(svcCtx, clientCache, std::move(observers))
         : nullptr;
-
+    bool enableIngress = options.enableIngress;
     auto tl = std::make_unique<GRPCTransportLayerImpl>(svcCtx, std::move(options), std::move(sm));
 
-    if (options.enableIngress) {
+    if (enableIngress) {
         uassertStatusOK(tl->registerService(std::make_unique<CommandService>(
             tl.get(),
             [tlPtr = tl.get()](auto session) {
@@ -341,6 +342,8 @@ void GRPCTransportLayerImpl::shutdown() {
     }
     if (_client) {
         _client->shutdown();
+    }
+    if (_ioThread.joinable()) {
         LOGV2_DEBUG(9715108, 2, "Stopping default egress gRPC reactor");
         _egressReactor->stop();
         LOGV2_DEBUG(9715109, 2, "Joining the default egress gRPC reactor thread");
@@ -373,7 +376,8 @@ Status GRPCTransportLayerImpl::rotateCertificates(std::shared_ptr<SSLManagerInte
     }
 
     if (_client) {
-        if (auto status = _client->rotateCertificates(); !status.isOK()) {
+        if (auto status = _client->rotateCertificates(manager->getSSLConfiguration());
+            !status.isOK()) {
             LOGV2_DEBUG(
                 9886803, 1, "Failed to rotate egress gRPC TLS certificates", "error"_attr = status);
             return status;

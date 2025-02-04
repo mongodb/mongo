@@ -67,24 +67,24 @@ public:
     /**
      *  Notify every listener that there is a new ReplicaSet and initialize the State
      */
-    void onFoundSet(const std::string& replicaSet) noexcept;
+    void onFoundSet(const std::string& replicaSet);
 
     /**
      * Notify every listener that a scan completed without finding a primary and update
      */
-    void onPossibleSet(ConnectionString connectionString) noexcept;
+    void onPossibleSet(ConnectionString connectionString);
 
     /**
      * Notify every listener that a scan completed and found a new primary or config
      */
     void onConfirmedSet(ConnectionString connectionString,
                         HostAndPort primary,
-                        std::set<HostAndPort> passives) noexcept;
+                        std::set<HostAndPort> passives);
 
     /**
      * Notify every listener that a ReplicaSet is no longer in use and drop the State
      */
-    void onDroppedSet(const std::string& replicaSet) noexcept;
+    void onDroppedSet(const std::string& replicaSet);
 
     /**
      * Create a listener of a given type and bind it to this notifier

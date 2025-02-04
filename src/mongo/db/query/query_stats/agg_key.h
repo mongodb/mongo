@@ -62,7 +62,8 @@ struct AggCmdComponents : public SpecificKeyComponents {
     static constexpr StringData kOtherNssFieldName = "otherNss"_sd;
 
     AggCmdComponents(const AggregateCommandRequest&,
-                     stdx::unordered_set<NamespaceString> involvedNamespaces);
+                     stdx::unordered_set<NamespaceString> involvedNamespaces,
+                     const boost::optional<ExplainOptions::Verbosity>& verbosity);
 
     void HashValue(absl::HashState state) const final;
 

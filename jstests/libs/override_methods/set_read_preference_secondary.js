@@ -181,6 +181,10 @@ function runCommandWithReadPreferenceSecondary(
             // will mirror the currentOp server command behavior here and maintain original read
             // preference.
             shouldForceReadPreference = false;
+        } else if (OverrideHelpers.isAggregationWithListClusterCatalog(commandName, commandObj)) {
+            // Can't set a secondary read preference on $listClusterCatalog collection because the
+            // operation is executed by the config server, which doesn't have secondary nodes.
+            shouldForceReadPreference = false;
         }
     }
 

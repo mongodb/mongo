@@ -610,9 +610,7 @@ export function testAnalyzeCurrentShardKeys(conn, st, writeConcern) {
             }
         }
 
-        // TODO SERVER-97056 Remove the condition !testCase.indexOptions.unique for skipping this
-        // test case.
-        if (!skipTestCase && !testCase.indexOptions.unique) {
+        if (!skipTestCase) {
             const result = db.adminCommand({shardCollection: ns, key: currentShardKey});
             // Some suites automatically create indexes that prevent the collection from being
             // sharded with the specified shard key.

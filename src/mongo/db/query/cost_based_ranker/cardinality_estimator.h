@@ -35,8 +35,8 @@
 #include "mongo/db/query/cost_based_ranker/estimates.h"
 #include "mongo/db/query/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/stats/collection_statistics.h"
 
 namespace mongo::cost_based_ranker {
 
@@ -60,7 +60,7 @@ concept UnionType = std::same_as<T, OrNode> || std::same_as<T, MergeSortNode>;
  */
 class CardinalityEstimator {
 public:
-    CardinalityEstimator(const stats::CollectionStatistics& collStats,
+    CardinalityEstimator(const CollectionInfo& collInfo,
                          const ce::SamplingEstimator* samplingEstimator,
                          EstimateMap& qsnEstimates,
                          QueryPlanRankerModeEnum rankerMode);
@@ -90,16 +90,17 @@ private:
     CEResult estimate(const AndSortedNode* node);
     CEResult estimate(const OrNode* node);
     CEResult estimate(const MergeSortNode* node);
+    CEResult estimate(const SortNode* node);
+    CEResult estimate(const LimitNode* node);
+    CEResult estimate(const SkipNode* node);
 
     // MatchExpressions
     CEResult estimate(const MatchExpression* node, bool isFilterRoot);
-    CEResult estimate(const ComparisonMatchExpression* node);
     CEResult estimate(const NotMatchExpression* node, bool isFilterRoot);
     CEResult estimate(const AndMatchExpression* node);
     CEResult estimate(const OrMatchExpression* node, bool isFilterRoot);
-    // Estimate all match expressions without children. Notice that there are other such nodes
-    // besides LeafMatchExpression subclasses.
-    CEResult estimateLeafExpression(const MatchExpression* node, bool isFilterRoot);
+    CEResult estimate(const NorMatchExpression* node, bool isFilterRoot);
+    CEResult estimate(const ElemMatchValueMatchExpression* node, bool isFilterRoot);
 
     // Intervals
     CEResult estimate(const IndexBounds* node);
@@ -132,11 +133,15 @@ private:
     CEResult indexUnionCard(const T* node);
 
     // Cardinality of nodes that do not affect the number of documents - their output cardinality
-    // is the same as their input.
+    // is the same as their input unless the node has a limit.
     CEResult passThroughNodeCard(const QuerySolutionNode* node);
+    CEResult limitNodeCard(const QuerySolutionNode* node, size_t limit);
 
     CardinalityEstimate conjCard(size_t offset, CardinalityEstimate inputCard) {
         std::span selsToEstimate(std::span(_conjSels.begin() + offset, _conjSels.end()));
+        if (selsToEstimate.size() == 0) {
+            return inputCard;
+        }
         SelectivityEstimate conjSel = conjExponentialBackoff(selsToEstimate);
         CardinalityEstimate resultCard = conjSel * inputCard;
         return resultCard;
@@ -148,6 +153,12 @@ private:
         CardinalityEstimate resultCard = disjSel * inputCard;
         return resultCard;
     }
+
+    /**
+     * Estimate the cardinality of the given vector of MatchExpressions as if they were a
+     * disjunction. This is a helper for the implementations of estimation of $or and $nor.
+     */
+    CEResult estimateDisjunction(const std::vector<std::unique_ptr<MatchExpression>>& disjuncts);
 
     /**
      * Leaf nodes and ORs that are the root of a QSN's filter are atomic from conjunction
@@ -166,11 +177,15 @@ private:
     }
 
     // Pop all selectivities from '_conjSels' after the first 'count' elements.
-    void trimSels(size_t count) {
+    void popSelectivities(size_t count = 0) {
         tassert(9586700, "Cannot pop more elements than total size.", count <= _conjSels.size());
         size_t oldSize = _conjSels.size() - count;
         _conjSels.erase(_conjSels.end() - oldSize, _conjSels.end());
     }
+
+    // Get the path of the given node. This function consults the '_elemMatchPathStack' to check if
+    // this node is under an $elemMatch, if so it will return that path.
+    StringData getPath(const MatchExpression* node);
 
     const CardinalityEstimate _collCard;
 
@@ -185,8 +200,8 @@ private:
     // A subsequent conjunction will push again onto this stack.
     std::vector<SelectivityEstimate> _conjSels;
 
-    // Collection statistics contains cached histograms.
-    const stats::CollectionStatistics& _collStats;
+    // Catalog information about the collection including index metadata and cached histograms.
+    const CollectionInfo& _collInfo;
 
     // Sampling estimator used to estimate cardinality using a cache of documents randomly sampled
     // from the collection. We don't own this pointer and it may be null in the case that a sampling
@@ -200,6 +215,21 @@ private:
 
     // The cardinality estimate mode we are using for estimates.
     const QueryPlanRankerModeEnum _rankerMode;
+
+    // Set with the paths we know are multikey which is deduced from the catalog. Note that a field
+    // may be multikey but not reflected in this set because there may not be an index over the
+    // field.
+    StringDataSet _multikeyPaths;
+
+    // Set with the paths we know are non-multikey deduced from the catalog. Like '_multikeyPaths',
+    // a field may be non-multikey but not reflected in this set because there are no indexes over
+    // the field.
+    StringDataSet _nonMultikeyPaths;
+
+    // Keep track of the path associated with the current node in $elemMatch contexts. For example,
+    // ElemMatchValueMatchExpression may have a child which looks like GTMatchExpression with an
+    // empty path.
+    std::stack<StringData> _elemMatchPathStack;
 };
 
 }  // namespace mongo::cost_based_ranker

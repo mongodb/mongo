@@ -6,6 +6,9 @@
 //   does_not_support_stepdowns,
 //   requires_getmore,
 //   requires_profiling,
+//   # The test queries the system.profile collection so it is not compatible with initial sync
+//   # since an initial sync may insert unexpected operations into the profile collection.
+//   queries_system_profile_collection
 // ]
 
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
@@ -38,8 +41,8 @@ const getMoreCollName = cmdRes.cursor.ns.substr(cmdRes.cursor.ns.indexOf(".") + 
 cmdRes = assert.commandWorked(
     testDB.runCommand({getMore: cmdRes.cursor.id, collection: getMoreCollName}));
 
-// A listCollections cursor doesn't really have a namespace to use to record profile entries, so
-// does not get recorded in the profile.
+// We disabled profiling getMore commands that originate from a listCollection command, given that
+// the original command was not profiled either.
 assert.throws(() => getLatestProfilerEntry(testDB, {op: "getmore"}),
               [],
               "Did not expect to find entry for getMore on a listCollections cursor");

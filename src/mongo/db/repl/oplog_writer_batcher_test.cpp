@@ -28,6 +28,9 @@
  */
 
 #include "mongo/db/repl/oplog_applier_batcher_test_fixture.h"
+
+#include <queue>
+
 #include "mongo/db/repl/oplog_batch.h"
 #include "mongo/db/repl/oplog_writer_batcher.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"

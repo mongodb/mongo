@@ -51,7 +51,7 @@ public:
         return HostAndPort("localhost", 1234);
     }
 
-    virtual void setUp() override {
+    void setUp() override {
         _reactor = std::make_shared<GRPCReactor>();
         _ioThread = stdx::thread([&]() {
             _reactor->run();
@@ -59,7 +59,7 @@ public:
         });
     }
 
-    virtual void tearDown() override {
+    void tearDown() override {
         _reactor->stop();
         _ioThread.join();
     }
@@ -287,7 +287,7 @@ TEST_F(MockClientTest, MockClientMetadata) {
 
 TEST_F(MockClientTest, WireVersionGossipping) {
     auto wvProvider = std::make_shared<MockWireVersionProvider>();
-    const auto kServerMaxWireVersion = 24;
+    const auto kServerMaxWireVersion = util::constants::kMinimumWireVersion + 1;
     wvProvider->setClusterMaxWireVersion(kServerMaxWireVersion);
 
     auto serverHandler = [&](HostAndPort local, std::shared_ptr<IngressSession> session) {

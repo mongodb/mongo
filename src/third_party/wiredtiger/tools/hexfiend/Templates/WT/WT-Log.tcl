@@ -31,15 +31,15 @@ proc log_record {} {
 proc log_desc {} {
   globals WT_LOG_*
   ssection record:__wt_log_desc {
-    uint32 -hex log_magic  ; # WT_LOG_MAGIC = 0x101064u
-    uint16 version  ; # = WT_LOG_VERSION = 5
+    uint32 -hex log_magic  ; # WTI_LOG_MAGIC = 0x101064u
+    uint16 version  ; # = WTI_LOG_VERSION = 5
     uint16 unused
     xentry log_size { dx [uint64] }
   }
 }
 
 proc read_record {name} {
-  globals WT_LOG* WT_TXN_*
+  globals WTI_LOG* WT_TXN_*
   ssection -collapsed $name {
     # __log_open_verify
     # __txn_printlog

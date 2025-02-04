@@ -67,7 +67,7 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
 #include "mongo/db/query/client_cursor/collect_query_stats_mongod.h"
-#include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
@@ -87,6 +87,7 @@
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
@@ -136,13 +137,18 @@ public:
         Invocation(OperationContext* opCtx,
                    const Command* command,
                    const OpMsgRequest& opMsgRequest)
-            : InvocationBaseGen(opCtx, command, opMsgRequest),
-              _ns(request().getNamespaceOrUUID().isNamespaceString()
+            : InvocationBaseGen(opCtx, command, opMsgRequest), _ns([&] {
+                  if (request().getRawData()) {
+                      return timeseries::isTimeseriesViewRequest(opCtx, request()).second;
+                  }
+
+                  return request().getNamespaceOrUUID().isNamespaceString()
                       ? request().getNamespaceOrUUID().nss()
                       : CollectionCatalog::get(opCtx)->resolveNamespaceStringFromDBNameAndUUID(
                             opCtx,
                             request().getNamespaceOrUUID().dbName(),
-                            request().getNamespaceOrUUID().uuid())) {
+                            request().getNamespaceOrUUID().uuid());
+              }()) {
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid namespace specified '" << _ns.toStringForErrorMsg()
                                   << "'",
@@ -361,6 +367,7 @@ public:
                 bob->append(CountCommandRequest::kEncryptionInformationFieldName,
                             req.getEncryptionInformation()->toBSON());
             }
+            req.getRawData().serializeToBSON(CountCommandRequest::kRawDataFieldName, bob);
         }
 
         bool canIgnorePrepareConflicts() const override {
@@ -403,7 +410,10 @@ public:
             PlanSummaryStats summaryStats;
             exec.getPlanExplainer().getSummaryStats(&summaryStats);
             if (collection) {
-                CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);
+                CollectionIndexUsageTrackerDecoration::get(collection.get())
+                    .recordCollectionIndexUsage(summaryStats.collectionScans,
+                                                summaryStats.collectionScansNonTailable,
+                                                summaryStats.indexesUsed);
             }
             curOp->debug().setPlanSummaryMetrics(std::move(summaryStats));
             curOp->setEndOfOpMetrics(kNReturned);
@@ -473,7 +483,7 @@ public:
             curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
             const auto vts = auth::ValidatedTenancyScope::get(opCtx);
             auto viewAggRequest =
-                query_request_conversion::asAggregateCommandRequest(req, verbosity);
+                query_request_conversion::asAggregateCommandRequest(req, true /* hasExplain */);
             // An empty PrivilegeVector is acceptable because these privileges are only checked
             // on getMore and explain will not open a cursor.
             auto runStatus = runAggregate(opCtx,
@@ -481,13 +491,14 @@ public:
                                           {viewAggRequest},
                                           req.toBSON(),
                                           PrivilegeVector(),
+                                          verbosity,
                                           replyBuilder);
             uassertStatusOK(runStatus);
         }
 
         CountCommandReply runCountOnView(OperationContext* opCtx, const RequestType& req) {
             const auto vts = auth::ValidatedTenancyScope::get(opCtx);
-            auto aggRequest = query_request_conversion::asAggregateCommandRequest(req, boost::none);
+            auto aggRequest = query_request_conversion::asAggregateCommandRequest(req);
             auto opMsgAggRequest =
                 OpMsgRequestBuilder::create(vts, aggRequest.getDbName(), aggRequest.toBSON());
             BSONObj aggResult = CommandHelpers::runCommandDirectly(opCtx, opMsgAggRequest);

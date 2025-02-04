@@ -49,4 +49,3 @@ echo "common --bes_keywords=engflow:CiCdJobName=${task_name:?}" >> .bazelrc.ever
 echo "common --bes_keywords=engflow:CiCdUri=${uri:?}" >> .bazelrc.evergreen
 echo "common --bes_keywords=evg:project=${project:?}" >> .bazelrc.evergreen
 echo "common --remote_upload_local_results=True" >> .bazelrc.evergreen
-echo "common --workspace_status_command=./evergreen/engflow_workspace_status.sh" >> .bazelrc.evergreen

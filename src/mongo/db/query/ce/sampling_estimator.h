@@ -52,7 +52,7 @@ public:
      * MEs against the sample.
      */
     virtual std::vector<CardinalityEstimate> estimateCardinality(
-        const std::vector<MatchExpression*>& expr) const = 0;
+        const std::vector<const MatchExpression*>& expr) const = 0;
 
     /**
      * Estimates the number of keys scanned for the given IndexBounds.
@@ -60,11 +60,27 @@ public:
     virtual CardinalityEstimate estimateKeysScanned(const IndexBounds& bounds) const = 0;
 
     /**
-     * Estimates the number of RIDs matched the given IndexBounds. 'expr' can be nullptr to indicate
-     * only estimate the index bounds.
+     * Batch estimates the number of keys scanned for the given vector of IndexBounds.
+     */
+    virtual std::vector<CardinalityEstimate> estimateKeysScanned(
+        const std::vector<const IndexBounds*>& bounds) const = 0;
+
+    /**
+     * Estimates the number of RIDs matched the given IndexBounds and an optional MatchExpression.
+     * 'expr' can be nullptr to indicate only estimate the index bounds. When 'expr' is provided
+     * the 'expr' will be evaluated against the documents that fall into the 'bounds'.
      */
     virtual CardinalityEstimate estimateRIDs(const IndexBounds& bounds,
                                              const MatchExpression* expr) const = 0;
+
+    /**
+     * Batch estimates the number of RIDs matched the given IndexBounds. 'expressions' can be
+     * nullptr to indicate only estimate the index bounds. 'bounds' and 'expressions' come in pairs
+     * so they should have the same size.
+     */
+    virtual std::vector<CardinalityEstimate> estimateRIDs(
+        const std::vector<const IndexBounds*>& bounds,
+        const std::vector<const MatchExpression*>& expressions) const = 0;
 };
 
 }  // namespace mongo::ce

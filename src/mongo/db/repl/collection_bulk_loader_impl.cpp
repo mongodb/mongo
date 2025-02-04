@@ -52,7 +52,6 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/destructor_guard.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/shared_buffer_fragment.h"
 
@@ -78,7 +77,11 @@ CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(ServiceContext::UniqueClient 
 
 CollectionBulkLoaderImpl::~CollectionBulkLoaderImpl() {
     AlternativeClientRegion acr(_client);
-    DESTRUCTOR_GUARD({ _releaseResources(); })
+    try {
+        _releaseResources();
+    } catch (...) {
+        reportFailedDestructor(MONGO_SOURCE_LOCATION());
+    }
 }
 
 Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndexSpecs) {

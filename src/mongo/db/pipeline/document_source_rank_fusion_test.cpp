@@ -43,7 +43,10 @@ namespace {
 
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 class DocumentSourceRankFusionTest : service_context_test::WithSetupTransportLayer,
-                                     public AggregationContextFixture {};
+                                     public AggregationContextFixture {
+private:
+    RAIIServerParameterControllerForTest featureFlagController{"featureFlagRankFusionBasic", true};
+};
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfNoInputsField) {
     auto spec = fromjson(R"({
@@ -145,23 +148,27 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineAllowed) {
                 },
                 {
                     "$sort": {
-                        "author": 1
+                        "author": 1,
+                        "$_internalOutputSortKeyMetadata": true
                     }
                 },
                 {
-                    "$group": {
-                        "_id": {
-                            "$const": null
-                        },
-                        "docs": {
-                            "$push": "$$ROOT"
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
                         }
                     }
                 },
                 {
-                    "$unwind": {
-                        "path": "$docs",
-                        "includeArrayIndex": "agatha_rank"
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "order": 1
+                        },
+                        "output": {
+                            "agatha_rank": {
+                                "$rank": {}
+                            }
+                        }
                     }
                 },
                 {
@@ -231,6 +238,24 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineAllowed) {
             ]
         })",
         asOneObj);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfPipelineIsNotArray) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    authorMatch: {
+                        $match : { author : "Agatha Christie" }
+                    }
+                }
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::TypeMismatch);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfUnknownFieldInsideInputs) {
@@ -348,23 +373,27 @@ TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsA
                 },
                 {
                     "$sort": {
-                        "author": 1
+                        "author": 1,
+                        "$_internalOutputSortKeyMetadata": true
                     }
                 },
                 {
-                    "$group": {
-                        "_id": {
-                            "$const": null
-                        },
-                        "docs": {
-                            "$push": "$$ROOT"
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
                         }
                     }
                 },
                 {
-                    "$unwind": {
-                        "path": "$docs",
-                        "includeArrayIndex": "matchAuthor_rank"
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "order": 1
+                        },
+                        "output": {
+                            "matchAuthor_rank": {
+                                "$rank": {}
+                            }
+                        }
                     }
                 },
                 {
@@ -407,19 +436,22 @@ TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsA
                                 }
                             },
                             {
-                                "$group": {
-                                    "_id": {
-                                        "$const": null
-                                    },
-                                    "docs": {
-                                        "$push": "$$ROOT"
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
                                     }
                                 }
                             },
                             {
-                                "$unwind": {
-                                    "path": "$docs",
-                                    "includeArrayIndex": "matchGenres_rank"
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "order": 1
+                                    },
+                                    "output": {
+                                        "matchGenres_rank": {
+                                            "$rank": {}
+                                        }
+                                    }
                                 }
                             },
                             {
@@ -469,19 +501,22 @@ TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsA
                                 }
                             },
                             {
-                                "$group": {
-                                    "_id": {
-                                        "$const": null
-                                    },
-                                    "docs": {
-                                        "$push": "$$ROOT"
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
                                     }
                                 }
                             },
                             {
-                                "$unwind": {
-                                    "path": "$docs",
-                                    "includeArrayIndex": "matchPlot_rank"
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "order": 1
+                                    },
+                                    "output": {
+                                        "matchPlot_rank": {
+                                            "$rank": {}
+                                        }
+                                    }
                                 }
                             },
                             {
@@ -728,26 +763,30 @@ TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleUnionwithAllowed) {
                 },
                 {
                     "$sort": {
-                        "author": 1
+                        "author": 1,
+                        "$_internalOutputSortKeyMetadata": true
                     }
                 },
                 {
                     "$limit": 10
                 },
                 {
-                    "$group": {
-                        "_id": {
-                            "$const": null
-                        },
-                        "docs": {
-                            "$push": "$$ROOT"
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
                         }
                     }
                 },
                 {
-                    "$unwind": {
-                        "path": "$docs",
-                        "includeArrayIndex": "sample_rank"
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "order": 1
+                        },
+                        "output": {
+                            "sample_rank": {
+                                "$rank": {}
+                            }
+                        }
                     }
                 },
                 {
@@ -798,23 +837,27 @@ TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleUnionwithAllowed) {
                             },
                             {
                                 "$sort": {
-                                    "author": 1
+                                    "author": 1,
+                                    "$_internalOutputSortKeyMetadata": true
                                 }
                             },
                             {
-                                "$group": {
-                                    "_id": {
-                                        "$const": null
-                                    },
-                                    "docs": {
-                                        "$push": "$$ROOT"
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
                                     }
                                 }
                             },
                             {
-                                "$unwind": {
-                                    "path": "$docs",
-                                    "includeArrayIndex": "unionWith_rank"
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "order": 1
+                                    },
+                                    "output": {
+                                        "unionWith_rank": {
+                                            "$rank": {}
+                                        }
+                                    }
                                 }
                             },
                             {
@@ -993,23 +1036,27 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocsAndNoDi
                 },
                 {
                     "$sort": {
-                        "author": 1
+                        "author": 1,
+                        "$_internalOutputSortKeyMetadata": true
                     }
                 },
                 {
-                    "$group": {
-                        "_id": {
-                            "$const": null
-                        },
-                        "docs": {
-                            "$push": "$$ROOT"
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
                         }
                     }
                 },
                 {
-                    "$unwind": {
-                        "path": "$docs",
-                        "includeArrayIndex": "agatha_rank"
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "order": 1
+                        },
+                        "output": {
+                            "agatha_rank": {
+                                "$rank": {}
+                            }
+                        }
                     }
                 },
                 {
@@ -1067,19 +1114,22 @@ TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocsAndNoDi
                                 }
                             },
                             {
-                                "$group": {
-                                    "_id": {
-                                        "$const": null
-                                    },
-                                    "docs": {
-                                        "$push": "$$ROOT"
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
                                     }
                                 }
                             },
                             {
-                                "$unwind": {
-                                    "path": "$docs",
-                                    "includeArrayIndex": "geo_rank"
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "order": 1
+                                    },
+                                    "output": {
+                                        "geo_rank": {
+                                            "$rank": {}
+                                        }
+                                    }
                                 }
                             },
                             {
@@ -1347,7 +1397,12 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfWeightsIsNotObject) {
                        ErrorCodes::TypeMismatch);
 }
 
-TEST_F(DocumentSourceRankFusionTest, ErrorsIfEmptyWeights) {
+TEST_F(DocumentSourceRankFusionTest, DoesNotErrorIfEmptyWeights) {
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(
+        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
+                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+
     auto spec = fromjson(R"({
         $rankFusion: {
             input: {
@@ -1375,12 +1430,16 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfEmptyWeights) {
         }
     })");
 
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9460302);
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()));
 }
 
-TEST_F(DocumentSourceRankFusionTest, ErrorsIfOnlySomeWeights) {
+TEST_F(DocumentSourceRankFusionTest, DoesNotErrorIfOnlySomeWeights) {
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(
+        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
+                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+
     auto spec = fromjson(R"({
         $rankFusion: {
             input: {
@@ -1410,9 +1469,8 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfOnlySomeWeights) {
         }
     })");
 
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       9460302);
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()));
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfMisnamedWeight) {
@@ -1448,7 +1506,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfMisnamedWeight) {
 
     ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
-                       9460302);
+                       9967500);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfExtraWeight) {
@@ -1609,23 +1667,27 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsApplied) {
                 },
                 {
                     "$sort": {
-                        "author": 1
+                        "author": 1,
+                        "$_internalOutputSortKeyMetadata": true
                     }
                 },
                 {
-                    "$group": {
-                        "_id": {
-                            "$const": null
-                        },
-                        "docs": {
-                            "$push": "$$ROOT"
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
                         }
                     }
                 },
                 {
-                    "$unwind": {
-                        "path": "$docs",
-                        "includeArrayIndex": "matchAuthor_rank"
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "order": 1
+                        },
+                        "output": {
+                            "matchAuthor_rank": {
+                                "$rank": {}
+                            }
+                        }
                     }
                 },
                 {
@@ -1668,19 +1730,22 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsApplied) {
                                 }
                             },
                             {
-                                "$group": {
-                                    "_id": {
-                                        "$const": null
-                                    },
-                                    "docs": {
-                                        "$push": "$$ROOT"
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
                                     }
                                 }
                             },
                             {
-                                "$unwind": {
-                                    "path": "$docs",
-                                    "includeArrayIndex": "matchGenres_rank"
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "order": 1
+                                    },
+                                    "output": {
+                                        "matchGenres_rank": {
+                                            "$rank": {}
+                                        }
+                                    }
                                 }
                             },
                             {
@@ -1817,23 +1882,27 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedToCorrectPipeline) {
                 },
                 {
                     "$sort": {
-                        "author": 1
+                        "author": 1,
+                        "$_internalOutputSortKeyMetadata": true
                     }
                 },
                 {
-                    "$group": {
-                        "_id": {
-                            "$const": null
-                        },
-                        "docs": {
-                            "$push": "$$ROOT"
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
                         }
                     }
                 },
                 {
-                    "$unwind": {
-                        "path": "$docs",
-                        "includeArrayIndex": "matchAuthor_rank"
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "order": 1
+                        },
+                        "output": {
+                            "matchAuthor_rank": {
+                                "$rank": {}
+                            }
+                        }
                     }
                 },
                 {
@@ -1876,19 +1945,22 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedToCorrectPipeline) {
                                 }
                             },
                             {
-                                "$group": {
-                                    "_id": {
-                                        "$const": null
-                                    },
-                                    "docs": {
-                                        "$push": "$$ROOT"
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
                                     }
                                 }
                             },
                             {
-                                "$unwind": {
-                                    "path": "$docs",
-                                    "includeArrayIndex": "matchGenres_rank"
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "order": 1
+                                    },
+                                    "output": {
+                                        "matchGenres_rank": {
+                                            "$rank": {}
+                                        }
+                                    }
                                 }
                             },
                             {
@@ -2046,23 +2118,27 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                 },
                 {
                     "$sort": {
-                        "author": 1
+                        "author": 1,
+                        "$_internalOutputSortKeyMetadata": true
                     }
                 },
                 {
-                    "$group": {
-                        "_id": {
-                            "$const": null
-                        },
-                        "docs": {
-                            "$push": "$$ROOT"
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
                         }
                     }
                 },
                 {
-                    "$unwind": {
-                        "path": "$docs",
-                        "includeArrayIndex": "matchAuthor_rank"
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "order": 1
+                        },
+                        "output": {
+                            "matchAuthor_rank": {
+                                "$rank": {}
+                            }
+                        }
                     }
                 },
                 {
@@ -2120,19 +2196,22 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                                 }
                             },
                             {
-                                "$group": {
-                                    "_id": {
-                                        "$const": null
-                                    },
-                                    "docs": {
-                                        "$push": "$$ROOT"
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
                                     }
                                 }
                             },
                             {
-                                "$unwind": {
-                                    "path": "$docs",
-                                    "includeArrayIndex": "matchDistance_rank"
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "order": 1
+                                    },
+                                    "output": {
+                                        "matchDistance_rank": {
+                                            "$rank": {}
+                                        }
+                                    }
                                 }
                             },
                             {
@@ -2178,19 +2257,22 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                                 }
                             },
                             {
-                                "$group": {
-                                    "_id": {
-                                        "$const": null
-                                    },
-                                    "docs": {
-                                        "$push": "$$ROOT"
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
                                     }
                                 }
                             },
                             {
-                                "$unwind": {
-                                    "path": "$docs",
-                                    "includeArrayIndex": "matchGenres_rank"
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "order": 1
+                                    },
+                                    "output": {
+                                        "matchGenres_rank": {
+                                            "$rank": {}
+                                        }
+                                    }
                                 }
                             },
                             {
@@ -2240,19 +2322,22 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
                                 }
                             },
                             {
-                                "$group": {
-                                    "_id": {
-                                        "$const": null
-                                    },
-                                    "docs": {
-                                        "$push": "$$ROOT"
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
                                     }
                                 }
                             },
                             {
-                                "$unwind": {
-                                    "path": "$docs",
-                                    "includeArrayIndex": "matchPlot_rank"
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "order": 1
+                                    },
+                                    "output": {
+                                        "matchPlot_rank": {
+                                            "$rank": {}
+                                        }
+                                    }
                                 }
                             },
                             {
@@ -2360,6 +2445,497 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
         asOneObj);
 }
 
+TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    agatha: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ]
+                }
+            },
+            scoreDetails: true
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$match": {
+                        "author": "Agatha Christie"
+                    }
+                },
+                {
+                    "$sort": {
+                        "author": 1,
+                        "$_internalOutputSortKeyMetadata": true
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "order": 1
+                        },
+                        "output": {
+                            "agatha_rank": {
+                                "$rank": {}
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "agatha_score": {
+                            "$multiply": [
+                                {
+                                    "$divide": [
+                                        {
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$add": [
+                                                "$agatha_rank",
+                                                {
+                                                    "$const": 60
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": 1
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "agatha_scoreDetails": {
+                            "$ifNull": [
+                                {
+                                    "$meta": "scoreDetails"
+                                },
+                                {
+                                    "value": {
+                                        "$meta": "score"
+                                    },
+                                    "details": {
+                                        "$const": "Not Calculated"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "agatha_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$agatha_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "agatha_rank": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$agatha_rank",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "agatha_scoreDetails": {
+                            "$mergeObjects": "$agatha_scoreDetails"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "score": {
+                            "$add": [
+                                "$agatha_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "calculatedScoreDetails": {
+                            "$mergeObjects": [
+                                {
+                                    "agatha": {
+                                        "$mergeObjects": [
+                                            {
+                                                "rank": "$agatha_rank"
+                                            },
+                                            "$agatha_scoreDetails"
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "scoreDetails": {
+                            "value": "$score",
+                            "details": "$calculatedScoreDetails"
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "score": -1,
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+}
+
+TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(
+        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
+                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    agatha: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    searchPipe : [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                },
+                                scoreDetails: true
+                            }
+                        }
+                    ]
+                }
+            },
+            scoreDetails: true
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$match": {
+                        "author": "Agatha Christie"
+                    }
+                },
+                {
+                    "$sort": {
+                        "author": 1,
+                        "$_internalOutputSortKeyMetadata": true
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "order": 1
+                        },
+                        "output": {
+                            "agatha_rank": {
+                                "$rank": {}
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "agatha_score": {
+                            "$multiply": [
+                                {
+                                    "$divide": [
+                                        {
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$add": [
+                                                "$agatha_rank",
+                                                {
+                                                    "$const": 60
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": 1
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "agatha_scoreDetails": {
+                            "$ifNull": [
+                                {
+                                    "$meta": "scoreDetails"
+                                },
+                                {
+                                    "value": {
+                                        "$meta": "score"
+                                    },
+                                    "details": {
+                                        "$const": "Not Calculated"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$search": {
+                                    "index": "search_index",
+                                    "text": {
+                                        "query": "mystery",
+                                        "path": "genres"
+                                    },
+                                    "scoreDetails": true
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "order": 1
+                                    },
+                                    "output": {
+                                        "searchPipe_rank": {
+                                            "$rank": {}
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "searchPipe_score": {
+                                        "$multiply": [
+                                            {
+                                                "$divide": [
+                                                    {
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$add": [
+                                                            "$searchPipe_rank",
+                                                            {
+                                                                "$const": 60
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "$const": 1
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "searchPipe_scoreDetails": {
+                                        "$ifNull": [
+                                            {
+                                                "$meta": "scoreDetails"
+                                            },
+                                            {
+                                                "value": {
+                                                    "$meta": "score"
+                                                },
+                                                "details": {
+                                                    "$const": "Not Calculated"
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "agatha_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$agatha_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "agatha_rank": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$agatha_rank",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "agatha_scoreDetails": {
+                            "$mergeObjects": "$agatha_scoreDetails"
+                        },
+                        "searchPipe_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$searchPipe_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "searchPipe_rank": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$searchPipe_rank",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "searchPipe_scoreDetails": {
+                            "$mergeObjects": "$searchPipe_scoreDetails"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "score": {
+                            "$add": [
+                                "$agatha_score",
+                                "$searchPipe_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "calculatedScoreDetails": {
+                            "$mergeObjects": [
+                                {
+                                    "agatha": {
+                                        "$mergeObjects": [
+                                            {
+                                                "rank": "$agatha_rank"
+                                            },
+                                            "$agatha_scoreDetails"
+                                        ]
+                                    }
+                                },
+                                {
+                                    "searchPipe": {
+                                        "$mergeObjects": [
+                                            {
+                                                "rank": "$searchPipe_rank"
+                                            },
+                                            "$searchPipe_scoreDetails"
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "scoreDetails": {
+                            "value": "$score",
+                            "details": "$calculatedScoreDetails"
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "score": -1,
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+}
+
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfPipelineNameEmpty) {
     auto spec = fromjson(R"({
         $rankFusion: {
@@ -2388,6 +2964,39 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfPipelineNameEmpty) {
     ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
                        15998);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfPipelineNameDuplicated) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    foo: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ],
+                    bar: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ],
+                    foo: [
+                        {$sort: {author: 1}}
+                    ]
+                }
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       9921000);
 }
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfPipelineNameStartsWithDollar) {
@@ -2503,21 +3112,27 @@ TEST_F(DocumentSourceRankFusionTest, QueryShapeDebugString) {
                 },
                 {
                     "$sort": {
-                        "HASH<author>": 1
+                        "HASH<author>": 1,
+                        "$_internalOutputSortKeyMetadata": true
                     }
                 },
                 {
-                    "$group": {
-                        "_id": "?null",
-                        "HASH<docs>": {
-                            "$push": "$$ROOT"
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "HASH<docs>": "$$ROOT"
                         }
                     }
                 },
                 {
-                    "$unwind": {
-                        "path": "$HASH<docs>",
-                        "includeArrayIndex": "HASH<matchAuthor_rank>"
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "HASH<order>": 1
+                        },
+                        "output": {
+                            "HASH<matchAuthor_rank>": {
+                                "$rank": {}
+                            }
+                        }
                     }
                 },
                 {
@@ -2557,17 +3172,22 @@ TEST_F(DocumentSourceRankFusionTest, QueryShapeDebugString) {
                                 }
                             },
                             {
-                                "$group": {
-                                    "_id": "?null",
-                                    "HASH<docs>": {
-                                        "$push": "$$ROOT"
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "HASH<docs>": "$$ROOT"
                                     }
                                 }
                             },
                             {
-                                "$unwind": {
-                                    "path": "$HASH<docs>",
-                                    "includeArrayIndex": "HASH<matchDistance_rank>"
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "HASH<order>": 1
+                                    },
+                                    "output": {
+                                        "HASH<matchDistance_rank>": {
+                                            "$rank": {}
+                                        }
+                                    }
                                 }
                             },
                             {
@@ -2696,23 +3316,27 @@ TEST_F(DocumentSourceRankFusionTest, RepresentativeQueryShape) {
                 },
                 {
                     "$sort": {
-                        "author": 1
+                        "author": 1,
+                        "$_internalOutputSortKeyMetadata": true
                     }
                 },
                 {
-                    "$group": {
-                        "_id": {
-                            "$const": null
-                        },
-                        "docs": {
-                            "$push": "$$ROOT"
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
                         }
                     }
                 },
                 {
-                    "$unwind": {
-                        "path": "$docs",
-                        "includeArrayIndex": "matchAuthor_rank"
+                    "$_internalSetWindowFields": {
+                        "sortBy": {
+                            "order": 1
+                        },
+                        "output": {
+                            "matchAuthor_rank": {
+                                "$rank": {}
+                            }
+                        }
                     }
                 },
                 {
@@ -2756,19 +3380,22 @@ TEST_F(DocumentSourceRankFusionTest, RepresentativeQueryShape) {
                                 }
                             },
                             {
-                                "$group": {
-                                    "_id": {
-                                        "$const": null
-                                    },
-                                    "docs": {
-                                        "$push": "$$ROOT"
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
                                     }
                                 }
                             },
                             {
-                                "$unwind": {
-                                    "path": "$docs",
-                                    "includeArrayIndex": "matchDistance_rank"
+                                "$_internalSetWindowFields": {
+                                    "sortBy": {
+                                        "order": 1
+                                    },
+                                    "output": {
+                                        "matchDistance_rank": {
+                                            "$rank": {}
+                                        }
+                                    }
                                 }
                             },
                             {

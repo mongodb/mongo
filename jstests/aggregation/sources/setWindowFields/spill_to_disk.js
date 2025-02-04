@@ -101,7 +101,10 @@ function testSpillWithDifferentAccumulators() {
                     {
                         $setWindowFields: {
                             sortBy: {_id: 1},
-                            output: {res: {$sum: "$price", window: {documents: ["unbounded", 5]}}}
+                            output: {
+                                priceSum: {$sum: "$price", window: {documents: ["unbounded", 5]}},
+                                rank: {$rank: {}},
+                            }
                         },
                     },
                 ],
@@ -255,7 +258,10 @@ function testLargeSpill() {
                     {
                         $setWindowFields: {
                             sortBy: {partition: 1},
-                            output: {arr: {$sum: "$val", window: {documents: [-numDocs, numDocs]}}}
+                            output: {
+                                valSum: {$sum: "$val", window: {documents: [-numDocs, numDocs]}},
+                                rank: {$rank: {}}
+                            }
                         }
                     },
                     {$sort: {_id: 1}}
@@ -266,7 +272,7 @@ function testLargeSpill() {
     // Check that the command succeeded.
     assert.eq(results.length, numDocs);
     for (let i = 0; i < numDocs; i++) {
-        assert.eq(results[i].arr, 616605, results);
+        assert.eq(results[i].valSum, 616605, results);
     }
 
     // Turn off the failpoint for future tests.

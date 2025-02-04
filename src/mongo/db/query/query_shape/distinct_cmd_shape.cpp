@@ -30,7 +30,6 @@
 #include "mongo/db/query/query_shape/distinct_cmd_shape.h"
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/query/query_shape/shape_helpers.h"
 
 namespace mongo::query_shape {
 

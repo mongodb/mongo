@@ -1,4 +1,6 @@
 #!/bin/sh
+# Copyright (C) The c-ares project and its contributors
+# SPDX-License-Identifier: MIT
 set -e
 
 OS=""

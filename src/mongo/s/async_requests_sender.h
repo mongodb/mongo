@@ -166,7 +166,7 @@ public:
     /**
      * Returns true if responses for all requests have been returned via next().
      */
-    bool done() noexcept;
+    bool done() const noexcept;
 
     /**
      * Returns the next available response or error.
@@ -178,7 +178,7 @@ public:
      *
      * Note: Must only be called from one thread at a time, and invalid to call if done() is true.
      */
-    Response next() noexcept;
+    Response next();
 
     /**
      * Stops the ARS from retrying requests.
@@ -214,7 +214,7 @@ private:
          * Additionally this call can trigger a refresh of the ShardRegistry so it could possibly
          * return other network error status related to the refresh.
          */
-        SemiFuture<std::shared_ptr<Shard>> getShard() noexcept;
+        SemiFuture<std::shared_ptr<Shard>> getShard();
 
         /**
          * Returns true if we've already queued a response from the remote.
@@ -290,6 +290,11 @@ private:
 
         // The number of times we've retried sending the command to this remote.
         int _retryCount = 0;
+
+        // Record the last writeConcernError received during any retry attempt and return this
+        // response if a further retry attempt results in an error signaling a write was not
+        // performed.
+        boost::optional<RemoteCommandCallbackArgs> _writeConcernErrorRCR;
     };
 
     OperationContext* _opCtx;

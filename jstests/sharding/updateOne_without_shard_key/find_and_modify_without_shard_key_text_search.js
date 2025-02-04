@@ -9,6 +9,7 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     WriteWithoutShardKeyTestUtil
@@ -30,13 +31,16 @@ const docsToInsert = [
 const dbConn = st.s.getDB(dbName);
 const coll = dbConn.getCollection(collName);
 
-// Sets up a 2 shard cluster using 'x' as a shard key where Shard 0 owns x <
-// splitPoint and Shard 1 splitPoint >= 0.
-WriteWithoutShardKeyTestUtil.setupShardedCollection(
-    st, nss, {x: 1}, [{x: splitPoint}], [{query: {x: splitPoint}, shard: st.shard1.shardName}]);
+function setUpCollection() {
+    coll.drop();
+    // Sets up a 2 shard cluster using 'x' as a shard key where Shard 0 owns x <
+    // splitPoint and Shard 1 splitPoint >= 0.
+    WriteWithoutShardKeyTestUtil.setupShardedCollection(
+        st, nss, {x: 1}, [{x: splitPoint}], [{query: {x: splitPoint}, shard: st.shard1.shardName}]);
 
-assert.commandWorked(coll.insert(docsToInsert));
-assert.commandWorked(coll.createIndex({numbers: "text"}));
+    assert.commandWorked(coll.insert(docsToInsert));
+    assert.commandWorked(coll.createIndex({numbers: "text"}));
+}
 
 function runTest(testCase) {
     let res = assert.commandWorked(coll.runCommand(testCase.cmdObj));
@@ -127,9 +131,45 @@ let testCases = [
     },
 ];
 
+setUpCollection();
 testCases.forEach(testCase => {
     jsTestLog(testCase.logMessage);
     runTest(testCase);
 });
+
+if (FeatureFlagUtil.isPresentAndEnabled(dbConn, 'RankFusionFull')) {
+    // Run tests referencing 'textScore' with 'score'.
+    setUpCollection();
+    [{
+        logMessage: "Running findAndModify update with score sort and projection.",
+        projectTextScore: true,
+        opType: "update",
+        cmdObj: {
+            findAndModify: collName,
+            query: {$text: {$search: "two"}},
+            sort: {score: {$meta: "score"}},
+            fields: {score: {$meta: "score"}},
+            update: [{$set: {a: 1}}],
+        },
+        expectedResult: {numbers: "two"},
+    },
+     {
+         logMessage: "Running findAndModify remove with score sort and projection.",
+         projectTextScore: true,
+         opType: "delete",
+         cmdObj: {
+             findAndModify: collName,
+             query: {$text: {$search: "two"}},
+             fields: {score: {$meta: "score"}},
+             sort: {score: {$meta: "score"}},
+             remove: true,
+         },
+         expectedResult: {numbers: "two"},
+     },
+    ].forEach(testCase => {
+        jsTestLog(testCase.logMessage);
+        runTest(testCase);
+    });
+}
 
 st.stop();

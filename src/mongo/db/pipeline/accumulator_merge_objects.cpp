@@ -46,8 +46,6 @@
 
 namespace mongo {
 
-using boost::intrusive_ptr;
-
 /* ------------------------- AccumulatorMergeObjects ----------------------------- */
 
 template <>
@@ -59,10 +57,6 @@ Value ExpressionFromAccumulator<AccumulatorMergeObjects>::evaluate(const Documen
 REGISTER_ACCUMULATOR(mergeObjects,
                      genericParseSingleExpressionAccumulator<AccumulatorMergeObjects>);
 REGISTER_STABLE_EXPRESSION(mergeObjects, ExpressionFromAccumulator<AccumulatorMergeObjects>::parse);
-
-intrusive_ptr<AccumulatorState> AccumulatorMergeObjects::create(ExpressionContext* const expCtx) {
-    return new AccumulatorMergeObjects(expCtx);
-}
 
 AccumulatorMergeObjects::AccumulatorMergeObjects(ExpressionContext* const expCtx)
     : AccumulatorState(expCtx) {

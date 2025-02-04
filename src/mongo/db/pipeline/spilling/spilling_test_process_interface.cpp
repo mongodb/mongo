@@ -75,7 +75,7 @@ Document SpillingTestMongoProcessInterface::readRecordFromRecordStore(
         expCtx->getOperationContext(), expCtx->getNamespaceString(), MODE_IS);
     auto foundDoc = rs->findRecord(expCtx->getOperationContext(), RecordId(rID), &possibleRecord);
     tassert(5643001, str::stream() << "Could not find document id " << rID, foundDoc);
-    return Document(possibleRecord.toBson());
+    return Document::fromBsonWithMetaData(possibleRecord.toBson());
 }
 
 bool SpillingTestMongoProcessInterface::checkRecordInRecordStore(

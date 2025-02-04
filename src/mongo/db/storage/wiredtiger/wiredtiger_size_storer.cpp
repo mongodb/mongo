@@ -38,9 +38,9 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log.h"
@@ -55,15 +55,14 @@
 
 namespace mongo {
 
-WiredTigerSizeStorer::WiredTigerSizeStorer(WT_CONNECTION* conn, const std::string& storageUri)
+WiredTigerSizeStorer::WiredTigerSizeStorer(WiredTigerConnection* conn,
+                                           const std::string& storageUri)
     : _conn(conn), _storageUri(storageUri), _tableId(WiredTigerUtil::genTableId()) {
     std::string config = WiredTigerCustomizationHooks::get(getGlobalServiceContext())
                              ->getTableCreateConfig(_storageUri);
 
     WiredTigerSession session(_conn);
-    invariantWTOK(
-        session.getSession()->create(session.getSession(), _storageUri.c_str(), config.c_str()),
-        session.getSession());
+    invariantWTOK(session.create(_storageUri.c_str(), config.c_str()), session);
 }
 
 void WiredTigerSizeStorer::store(StringData uri, std::shared_ptr<SizeInfo> sizeInfo) {
@@ -213,8 +212,7 @@ void WiredTigerSizeStorer::flush(bool syncToDisk) {
             invariantWTOK(ret, cursor->session);
         }
         txnOpen.done();
-        invariantWTOK(session.getSession()->commit_transaction(session.getSession(), nullptr),
-                      session.getSession());
+        invariantWTOK(session.commit_transaction(nullptr), session);
         buffer.clear();
     }
 

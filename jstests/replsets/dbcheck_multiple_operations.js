@@ -3,7 +3,7 @@
  * them is running at a time.
  *
  * @tags: [
- *   requires_fcv_81
+ *   requires_fcv_80
  * ]
  */
 

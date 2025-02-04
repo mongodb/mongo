@@ -38,7 +38,7 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/server_options.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
 

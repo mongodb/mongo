@@ -56,6 +56,7 @@ REGISTER_DOCUMENT_SOURCE(skip,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceSkip::createFromBson,
                          AllowedWithApiStrict::kAlways);
+ALLOCATE_DOCUMENT_SOURCE_ID(skip, DocumentSourceSkip::id)
 
 constexpr StringData DocumentSourceSkip::kStageName;
 

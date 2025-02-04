@@ -4,6 +4,7 @@
  * subpipelines on views, doesn't apply the view stages to the top-level agg or to idLookup. This is
  * because mongot returns the full, transformed document for storedSource queries so mongod should
  * never apply the view.
+ * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";

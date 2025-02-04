@@ -97,7 +97,9 @@ AggregateCommandRequest parseFromBSON(const BSONObj& cmdObj,
                 str::stream() << "The '" << AggregateCommandRequest::kExplainFieldName
                               << "' option is illegal when a explain verbosity is also provided",
                 !cmdObj.hasField(AggregateCommandRequest::kExplainFieldName));
-        request.setExplain(explainVerbosity);
+        // The explain field on the aggregate request is a boolean with default value boost::none,
+        // so we set it to true if expainVerbosity is defined.
+        request.setExplain(true);
     }
 
     validate(request, cmdObj, request.getNamespace(), explainVerbosity);
@@ -105,20 +107,12 @@ AggregateCommandRequest parseFromBSON(const BSONObj& cmdObj,
     return request;
 }
 
-BSONObj serializeToCommandObj(const AggregateCommandRequest& request) {
-    return request.toBSON();
-}
-
-Document serializeToCommandDoc(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                               const AggregateCommandRequest& request) {
-    MutableDocument doc(Document(request.toBSON().getOwned()));
-
-    if (auto querySettingsBSON = expCtx->getQuerySettings().toBSON();
-        !querySettingsBSON.isEmpty()) {
-        doc.setField(AggregateCommandRequest::kQuerySettingsFieldName, Value(querySettingsBSON));
+void addQuerySettingsToRequest(AggregateCommandRequest& request,
+                               const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const auto& querySettings = expCtx->getQuerySettings();
+    if (!querySettings.toBSON().isEmpty()) {
+        request.setQuerySettings(querySettings);
     }
-
-    return doc.freeze();
 }
 
 void validate(const AggregateCommandRequest& aggregate,
@@ -271,26 +265,22 @@ void setFromRouter(MutableDocument& doc, mongo::Value value) {
  * IMPORTANT: The method should not be modified, as API version input/output guarantees could
  * break because of it.
  */
-boost::optional<mongo::ExplainOptions::Verbosity> parseExplainModeFromBSON(
-    const BSONElement& explainElem) {
+boost::optional<bool> parseExplainModeFromBSON(const BSONElement& explainElem) {
     uassert(ErrorCodes::TypeMismatch,
             "explain must be a boolean",
             explainElem.type() == BSONType::Bool);
-
     if (explainElem.Bool()) {
-        return ExplainOptions::Verbosity::kQueryPlanner;
+        return true;
+    } else {
+        return boost::none;
     }
-
-    return boost::none;
 }
 
 /**
  * IMPORTANT: The method should not be modified, as API version input/output guarantees could
  * break because of it.
  */
-void serializeExplainToBSON(const mongo::ExplainOptions::Verbosity& explain,
-                            StringData fieldName,
-                            BSONObjBuilder* builder) {
+void serializeExplainToBSON(const bool& explain, StringData fieldName, BSONObjBuilder* builder) {
     // Note that we do not serialize 'explain' field to the command object. This serializer only
     // serializes an empty cursor object for field 'cursor' when it is an explain command.
     builder->append(AggregateCommandRequest::kCursorFieldName, BSONObj());

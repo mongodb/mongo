@@ -181,7 +181,7 @@ TEST_F(UnsetNodeTest, UnsetNestedPath) {
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a.b.c"], expCtx));
 
-    mutablebson::Document doc(fromjson("{a: {b: {c: 6}}}}"));
+    mutablebson::Document doc(fromjson("{a: {b: {c: 6}}}"));
     setPathTaken(makeRuntimeUpdatePathForTest("a.b.c"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]["c"]), getUpdateNodeApplyParams());
@@ -200,7 +200,7 @@ TEST_F(UnsetNodeTest, UnsetObject) {
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"]["a.b"], expCtx));
 
-    mutablebson::Document doc(fromjson("{a: {b: {c: 6}}}}"));
+    mutablebson::Document doc(fromjson("{a: {b: {c: 6}}}"));
     setPathTaken(makeRuntimeUpdatePathForTest("a.b"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());

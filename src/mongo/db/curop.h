@@ -76,7 +76,7 @@
 #include "mongo/logv2/log_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/serialization_context.h"
@@ -371,12 +371,12 @@ public:
     };
     boost::optional<VectorSearchMetrics> vectorSearchMetrics = boost::none;
 
-    long long sortSpills{0};      // The total number of spills from sort stages
-    long long sortSpillBytes{0};  // The total number of bytes spilled from sort stages.
-    // The spilled storage size after compression might be different from the bytes spilled.
+    // The accumulated spilling statistics per stage type.
+    absl::flat_hash_map<PlanSummaryStats::SpillingStage, SpillingStats> spillingStatsPerStage;
     size_t sortTotalDataSizeBytes{0};  // The amount of data we've sorted in bytes
-    long long keysSorted{0};           // The number of keys that we've sorted.
-    long long collectionScans{0};      // The number of collection scans during query execution.
+
+    long long keysSorted{0};       // The number of keys that we've sorted.
+    long long collectionScans{0};  // The number of collection scans during query execution.
     long long collectionScansNonTailable{0};  // The number of non-tailable collection scans.
     std::set<std::string> indexesUsed;        // The indexes used during query execution.
 
@@ -385,6 +385,8 @@ public:
 
     bool cursorExhausted{
         false};  // true if the cursor has been closed at end a find/getMore operation
+
+    bool isChangeStreamQuery{false};
 
     BSONObj execStats;  // Owned here.
 
@@ -877,7 +879,7 @@ public:
      *
      * If this op has not yet been started, returns 0.
      */
-    Microseconds elapsedTimeTotal() {
+    Microseconds elapsedTimeTotal() const {
         auto start = _start.load();
         if (start == 0) {
             return Microseconds{0};
@@ -1031,24 +1033,26 @@ public:
                                int secondsBetween = 3);
 
     /**
-     * Captures stats on the locker after transaction resources are unstashed to the operation
-     * context to be able to correctly ignore stats from outside this CurOp instance. Assumes that
-     * operation will only unstash transaction resources once.
+     * Captures stats on the locker and recovery unit after transaction resources are unstashed to
+     * the operation context to be able to correctly ignore stats from outside this CurOp instance.
+     * Assumes that operation will only unstash transaction resources once. Requires holding the
+     * client lock.
      */
-    void updateStatsOnTransactionUnstash();
+    void updateStatsOnTransactionUnstash(ClientLock&);
 
     /**
-     * Captures stats on the locker that happened during this CurOp instance before transaction
-     * resources are stashed. Also cleans up stats taken when transaction resources were unstashed.
-     * Assumes that operation will only stash transaction resources once.
+     * Captures stats on the locker and recovery unit that happened during this CurOp instance
+     * before transaction resources are stashed. Also cleans up stats taken when transaction
+     * resources were unstashed. Assumes that operation will only stash transaction resources once.
+     * Requires holding the client lock.
      */
-    void updateStatsOnTransactionStash();
+    void updateStatsOnTransactionStash(ClientLock&);
 
     /**
      * Captures metrics from the recovery unit that happened during this CurOp instance before a new
-     * recovery unit is set to the operation.
+     * recovery unit is set to the operation. Requires holding the client lock.
      */
-    void updateStorageMetricsOnRecoveryUnitChange();
+    void updateStorageMetricsOnRecoveryUnitChange(ClientLock&);
 
     /*
      * Gets the message for FailPoints used.
@@ -1067,7 +1071,7 @@ public:
     CurOp* parent() const {
         return _parent;
     }
-    boost::optional<GenericCursor> getGenericCursor(WithLock) const {
+    boost::optional<GenericCursor> getGenericCursor(ClientLock) const {
         return _genericCursor;
     }
 

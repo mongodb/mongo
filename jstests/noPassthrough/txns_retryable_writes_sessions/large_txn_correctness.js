@@ -11,7 +11,7 @@ const DB_NAME = "db_large_txn_correctness";
 const COLL_NAME = "db_large_txn_correctness";
 
 // Make a large document of size 'numMB' so that it can easily fill up an oplog entry.
-const makeLargeDoc = numMB => new Array(numMB * 1024 * 1024).join('a');
+const makeLargeDoc = numMB => 'a'.repeat(numMB * 1024 * 1024);
 
 // Spin up a replica set.
 const replSet = new ReplSetTest({nodes: 1});

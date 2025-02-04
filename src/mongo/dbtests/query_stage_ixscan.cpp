@@ -124,6 +124,19 @@ public:
         return _ws.get(out);
     }
 
+    /**
+     * Works 'ixscan' until the scan ends. Asserts that no new results will be found.
+     */
+    void assertNoNextResult(IndexScan* ixscan) {
+        WorkingSetID out;
+
+        PlanStage::StageState state = PlanStage::NEED_TIME;
+        while (PlanStage::IS_EOF != state) {
+            state = ixscan->work(&out);
+            ASSERT_NE(PlanStage::ADVANCED, state);
+        }
+    }
+
 
     IndexScan* createIndexScanSimpleRange(BSONObj startKey, BSONObj endKey) {
         IndexCatalog* catalog = _coll->getIndexCatalog();
@@ -149,7 +162,9 @@ public:
                                BSONObj endKey,
                                bool startInclusive,
                                bool endInclusive,
-                               int direction = 1) {
+                               int direction = 1,
+                               bool dedup = false,
+                               MatchExpression* filter = nullptr) {
         IndexCatalog* catalog = _coll->getIndexCatalog();
         std::vector<const IndexDescriptor*> indexes;
         catalog->findIndexesByKeyPattern(
@@ -158,6 +173,7 @@ public:
 
         IndexScanParams params(&_opCtx, _collPtr, indexes[0]);
         params.direction = direction;
+        params.shouldDedup = dedup;
 
         OrderedIntervalList oil("x");
         BSONObjBuilder bob;
@@ -166,7 +182,6 @@ public:
         oil.intervals.push_back(Interval(bob.obj(), startInclusive, endInclusive));
         params.bounds.fields.push_back(oil);
 
-        MatchExpression* filter = nullptr;
         return new IndexScan(_expCtx.get(), &_collPtr, params, &_ws, filter);
     }
 
@@ -350,6 +365,57 @@ public:
     }
 };
 
+// SERVER-29667
+class QueryStageIxscanMultikeyFilter : public IndexScanTest {
+public:
+    void run() {
+        setup();
+
+        // Insert some documents where 'x' is an array.
+        insert(fromjson("{_id: 1, x: [2, 1, 3]}"));
+        insert(fromjson("{_id: 2, x: [3, -1, 5]}"));
+        insert(fromjson("{_id: 3, x: [6, 5, 4]}"));
+        insert(fromjson("{_id: 4, x: [2, 4, 6]}"));
+        insert(fromjson("{_id: 5, x: [3, 3, 6]}"));
+        insert(fromjson("{_id: 6, x: [7, 5, 8]}"));
+
+        // Scan the index across the range [1, 7] for even keys.
+        BSONObj bsonObj = BSON("x" << BSON("$mod" << BSON_ARRAY(2 << 0)));
+        StatusWithMatchExpression swMatch = MatchExpressionParser::parse(bsonObj, _expCtx.get());
+        ASSERT_OK(swMatch.getStatus());
+        auto filter = std::move(swMatch.getValue());
+        std::unique_ptr<IndexScan> ixscan(
+            createIndexScan(BSON("x" << 1), BSON("x" << 7), true, true, 1, true, filter.get()));
+
+        // Expect to get records with ids 1, 4, 3, 5, in that order.
+        WorkingSetMember* member = getNext(ixscan.get());
+        ASSERT_EQ(WorkingSetMember::RID_AND_IDX, member->getState());
+        ASSERT_EQ(member->recordId, RecordId{1});
+        ASSERT_BSONOBJ_EQ(member->keyData[0].keyData, BSON("" << 2));
+        member = getNext(ixscan.get());
+        ASSERT_EQ(WorkingSetMember::RID_AND_IDX, member->getState());
+        ASSERT_EQ(member->recordId, RecordId{4});
+        ASSERT_BSONOBJ_EQ(member->keyData[0].keyData, BSON("" << 2));
+        member = getNext(ixscan.get());
+        ASSERT_EQ(WorkingSetMember::RID_AND_IDX, member->getState());
+        ASSERT_EQ(member->recordId, RecordId{3});
+        ASSERT_BSONOBJ_EQ(member->keyData[0].keyData, BSON("" << 4));
+        member = getNext(ixscan.get());
+        ASSERT_EQ(WorkingSetMember::RID_AND_IDX, member->getState());
+        ASSERT_EQ(member->recordId, RecordId{5});
+        ASSERT_BSONOBJ_EQ(member->keyData[0].keyData, BSON("" << 6));
+        assertNoNextResult(ixscan.get());
+
+        // Verify that 15 values were tested and 5 duplicates were dropped.
+        const IndexScanStats* stats =
+            static_cast<const IndexScanStats*>(ixscan->getSpecificStats());
+        ASSERT(stats);
+        ASSERT_TRUE(stats->isMultiKey);
+        ASSERT_EQ(stats->dupsDropped, 5);
+        ASSERT_EQ(stats->dupsTested, 15);
+    }
+};
+
 class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("query_stage_ixscan") {}
@@ -360,6 +426,7 @@ public:
         add<QueryStageIxscanInsertDuringSaveExclusive>();
         add<QueryStageIxscanInsertDuringSaveExclusive2>();
         add<QueryStageIxscanInsertDuringSaveReverse>();
+        add<QueryStageIxscanMultikeyFilter>();
     }
 };
 

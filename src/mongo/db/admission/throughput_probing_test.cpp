@@ -43,7 +43,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/mock_periodic_runner.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/testing_proctor.h"
@@ -259,7 +259,7 @@ TEST_F(ThroughputProbingTest, ProbeDownSucceeds) {
     ASSERT_GT(_readTicketHolder.outof(), size);
     ASSERT_LT(_writeTicketHolder.outof(), initialSize);
     ASSERT_GT(_writeTicketHolder.outof(), size);
-    ASSERT(_statsTester.concurrencyIncreased()) << _statsTester.toString();
+    ASSERT(_statsTester.concurrencyDecreased()) << _statsTester.toString();
 }
 
 TEST_F(ThroughputProbingTest, ProbeDownFails) {

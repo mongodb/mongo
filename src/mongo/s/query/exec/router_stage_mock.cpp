@@ -40,8 +40,8 @@
 
 namespace mongo {
 
-void RouterStageMock::queueResult(const ClusterQueryResult& result) {
-    _resultsQueue.push({result});
+void RouterStageMock::queueResult(ClusterQueryResult&& result) {
+    _resultsQueue.push({std::move(result)});
 }
 
 void RouterStageMock::queueError(Status status) {
@@ -61,7 +61,7 @@ StatusWith<ClusterQueryResult> RouterStageMock::next() {
         return {ClusterQueryResult()};
     }
 
-    auto out = _resultsQueue.front();
+    auto out = std::move(_resultsQueue.front());
     _resultsQueue.pop();
     return out;
 }
@@ -70,7 +70,7 @@ void RouterStageMock::kill(OperationContext* opCtx) {
     // No child to kill.
 }
 
-bool RouterStageMock::remotesExhausted() {
+bool RouterStageMock::remotesExhausted() const {
     return _remotesExhausted;
 }
 

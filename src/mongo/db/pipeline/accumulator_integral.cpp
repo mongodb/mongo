@@ -66,8 +66,4 @@ void AccumulatorIntegral::reset() {
     _memUsageTracker.set(sizeof(*this));
 }
 
-boost::intrusive_ptr<AccumulatorState> AccumulatorIntegral::create(
-    ExpressionContext* const expCtx, boost::optional<long long> unitMillis) {
-    return new AccumulatorIntegral(expCtx, unitMillis);
-}
 }  // namespace mongo

@@ -196,15 +196,15 @@ TEST_F(SpillableDocumentHashMapTest, ReportsMemoryUsageAndSpillingStats) {
         ASSERT_GTE(map.getApproximateSize(), totalAddedDocSize);
     }
 
-    ASSERT_EQ(map.getSpillingStats().spills, 0);
-    ASSERT_EQ(map.getSpillingStats().spilledBytes, 0);
-    ASSERT_EQ(map.getSpillingStats().spilledDataStorageSize, 0);
+    ASSERT_EQ(map.getSpillingStats().getSpills(), 0);
+    ASSERT_EQ(map.getSpillingStats().getSpilledBytes(), 0);
+    ASSERT_EQ(map.getSpillingStats().getSpilledDataStorageSize(), 0);
 
     map.spillToDisk();
     ASSERT_LT(map.getApproximateSize(), totalAddedDocSize);
 
-    ASSERT_EQ(map.getSpillingStats().spills, 1);
-    assertSpilledBytes(map.getSpillingStats().spilledBytes, totalAddedDocSize);
+    ASSERT_EQ(map.getSpillingStats().getSpills(), 1);
+    assertSpilledBytes(map.getSpillingStats().getSpilledBytes(), totalAddedDocSize);
 
     totalAddedDocSize = 0;
     for (const auto& doc : generateDocuments(10, 1024, 10)) {
@@ -256,6 +256,73 @@ TEST_F(SpillableDocumentHashMapTest, CanSpillIterator) {
     }
 
     ASSERT_EQ(iteratedIds, generatedIds);
+}
+
+TEST_F(SpillableDocumentHashMapTest, EraseIfInMemoryFreesMemory) {
+    _expCtx->setAllowDiskUse(true);
+    auto map = createSpillableMap(100 * 1024 * 1024);
+    // Generate and spill 10 documents.
+    for (const auto& doc : generateDocuments(10, 1024)) {
+        map.add(doc);
+    }
+    map.spillToDisk();
+
+    // Generate 10 more documents to be in memory.
+    for (const auto& doc : generateDocuments(10, 1024, 10)) {
+        map.add(doc);
+    }
+
+    auto it = map.begin();
+    // When iterating through in-memory part, we should be able to free memory.
+    for (size_t i = 0; i < 9; ++i) {
+        size_t sizeBeforeErase = map.getApproximateSize();
+        Document erasedDoc = *it;
+        map.eraseIfInMemoryAndAdvance(it);
+        size_t sizeAfterErase = map.getApproximateSize();
+        ASSERT_LTE(sizeAfterErase, sizeBeforeErase - erasedDoc.getApproximateSize());
+    }
+
+    // When memory is exhausted, iterator will buffer data from disk, which will cause
+    // getApproximateSize to increase instead.
+    map.eraseIfInMemoryAndAdvance(it);
+
+    // Iterating through disk should also work.
+    for (size_t i = 0; i < 10; ++i) {
+        map.eraseIfInMemoryAndAdvance(it);
+    }
+
+    ASSERT_EQ(it, map.end());
+}
+
+TEST_F(SpillableDocumentHashMapTest, IteratorCanResumeAfterSwitchingOpCtx) {
+    _expCtx->setAllowDiskUse(true);
+    auto map = createSpillableMap(10 * 1024);
+    const std::vector<Document> docs = generateDocuments(30, 1024);
+    for (const auto& doc : docs) {
+        map.add(doc);
+    }
+
+    auto unseenDocs = _expCtx->getValueComparator().makeFlatUnorderedValueSet();
+    unseenDocs.insert(docs.begin(), docs.end());
+
+    auto it = map.begin();
+    for (size_t i = 0; i < docs.size(); ++i) {
+        if (i % 5 == 4) {
+            _opCtx.reset();
+            _opCtx = makeOperationContext();
+            _expCtx->setOperationContext(_opCtx.get());
+        }
+
+        Value value{*it};
+        auto unseenIt = unseenDocs.find(value);
+        ASSERT_NE(unseenIt, unseenDocs.end())
+            << "Document " << it->toString() << " is found in map but not expected";
+        unseenDocs.erase(unseenIt);
+        ++it;
+    }
+    ASSERT_TRUE(it == map.end());
+    ASSERT_TRUE(unseenDocs.empty())
+        << "Documents not found in map but expected. Example: " << unseenDocs.begin()->toString();
 }
 
 }  // namespace

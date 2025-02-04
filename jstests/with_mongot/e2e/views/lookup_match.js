@@ -9,7 +9,7 @@
  *
  * This test ensures the ordering of stages for a $lookup.$search query, where the foreign coll is a
  * view, is correct.
- *
+ * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";

@@ -207,7 +207,10 @@ AccumulationExpression genericParseSingleExpressionAccumulator(ExpressionContext
                                                                VariablesParseState vps) {
     auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
     auto argument = Expression::parseOperand(expCtx, elem, vps);
-    return {initializer, argument, [expCtx]() { return AccName::create(expCtx); }, AccName::kName};
+    return {initializer,
+            argument,
+            [expCtx]() { return make_intrusive<AccName>(expCtx); },
+            AccName::kName};
 }
 
 /**
@@ -236,7 +239,7 @@ inline AccumulationExpression parseCountAccumulator(ExpressionContext* const exp
     return {initializer,
             argument,
             [expCtx, constantAddend]() {
-                return AccumulatorSum::create(expCtx, boost::make_optional(constantAddend));
+                return make_intrusive<AccumulatorSum>(expCtx, boost::make_optional(constantAddend));
             },
             AccumulatorSum::kName};
 }
@@ -255,8 +258,8 @@ AccumulationExpression parseSumAccumulator(ExpressionContext* const expCtx,
     return {initializer,
             argument,
             [expCtx, argument]() {
-                return AccumulatorSum::create(expCtx,
-                                              AccumulatorSum::getConstantArgument(argument));
+                return make_intrusive<AccumulatorSum>(
+                    expCtx, AccumulatorSum::getConstantArgument(argument));
             },
             AccumulatorSum::kName};
 }

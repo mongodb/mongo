@@ -141,8 +141,8 @@ TEST(AggregationRequestTest, ShouldParseExplicitExplainTrue) {
         fromjson("{aggregate: 'collection', pipeline: [], explain: true, cursor: {}, $db: 'a'}");
     auto request =
         unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(inputBson));
-    ASSERT_TRUE(request.getExplain());
-    ASSERT(*request.getExplain() == ExplainOptions::Verbosity::kQueryPlanner);
+    ASSERT(request.getExplain());
+    ASSERT(request.getExplain().value());
 }
 
 TEST(AggregationRequestTest, ShouldParseExplicitExplainFalseWithCursorOption) {
@@ -164,8 +164,8 @@ TEST(AggregationRequestTest, ShouldParseWithSeparateQueryPlannerExplainModeArg) 
         fromjson("{aggregate: 'collection', pipeline: [], cursor: {}, $db: 'a'}");
     auto request = unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(
         inputBson, boost::none, ExplainOptions::Verbosity::kQueryPlanner));
-    ASSERT_TRUE(request.getExplain());
-    ASSERT(*request.getExplain() == ExplainOptions::Verbosity::kQueryPlanner);
+    ASSERT(request.getExplain());
+    ASSERT(request.getExplain().value());
 }
 
 TEST(AggregationRequestTest, ShouldParseWithSeparateQueryPlannerExplainModeArgAndCursorOption) {
@@ -174,8 +174,8 @@ TEST(AggregationRequestTest, ShouldParseWithSeparateQueryPlannerExplainModeArgAn
         fromjson("{aggregate: 'collection', pipeline: [], cursor: {batchSize: 10}, $db: 'a'}");
     auto request = unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(
         inputBson, boost::none, ExplainOptions::Verbosity::kExecStats));
-    ASSERT_TRUE(request.getExplain());
-    ASSERT(*request.getExplain() == ExplainOptions::Verbosity::kExecStats);
+    ASSERT(request.getExplain());
+    ASSERT(request.getExplain().value());
     ASSERT_EQ(
         request.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
         10);
@@ -190,7 +190,8 @@ TEST(AggregationRequestTest, ShouldParseExplainFlagWithReadConcern) {
         "$db: 'a'}");
     auto request =
         unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(inputBson));
-    ASSERT_TRUE(request.getExplain());
+    ASSERT(request.getExplain());
+    ASSERT(request.getExplain().value());
     ASSERT_BSONOBJ_EQ(request.getReadConcern()->toBSONInner(),
                       BSON("level"
                            << "majority"));
@@ -208,9 +209,7 @@ TEST(AggregationRequestTest, ShouldOnlySerializeRequiredFieldsIfNoOptionalFields
         Document{{AggregateCommandRequest::kCommandName, nss.coll()},
                  {AggregateCommandRequest::kPipelineFieldName, std::vector<Value>{}},
                  {AggregateCommandRequest::kCursorFieldName, Value(kDefaultCursorOptionDocument)}};
-    ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(
-                           make_intrusive<ExpressionContextForTest>(nss), request),
-                       expectedSerialization);
+    ASSERT_DOCUMENT_EQ(Document(request.toBSON()), expectedSerialization);
 }
 
 TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
@@ -265,9 +264,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
         {query_request_helper::cmdOptionMaxTimeMS, 10},
         {repl::ReadConcernArgs::kReadConcernFieldName, readConcernObj},
         {query_request_helper::kUnwrappedReadPrefField, readPrefObj}};
-    ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(
-                           make_intrusive<ExpressionContextForTest>(nss), request),
-                       expectedSerialization);
+    ASSERT_DOCUMENT_EQ(Document(request.toBSON()), expectedSerialization);
 }
 
 TEST(AggregationRequestTest, ShouldSerializeBatchSizeIfSetAndExplainFalse) {
@@ -281,9 +278,7 @@ TEST(AggregationRequestTest, ShouldSerializeBatchSizeIfSetAndExplainFalse) {
         {AggregateCommandRequest::kCommandName, nss.coll()},
         {AggregateCommandRequest::kPipelineFieldName, std::vector<Value>{}},
         {AggregateCommandRequest::kCursorFieldName, Value(Document({{kBatchSizeFieldName, 10}}))}};
-    ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(
-                           make_intrusive<ExpressionContextForTest>(nss), request),
-                       expectedSerialization);
+    ASSERT_DOCUMENT_EQ(Document(request.toBSON()), expectedSerialization);
 }
 
 TEST(AggregationRequestTest, ShouldSerialiseAggregateFieldToOneIfCollectionIsAggregateOneNSS) {
@@ -298,9 +293,7 @@ TEST(AggregationRequestTest, ShouldSerialiseAggregateFieldToOneIfCollectionIsAgg
                   Value(Document({{aggregation_request_helper::kBatchSizeField,
                                    aggregation_request_helper::kDefaultBatchSize}}))}};
 
-    ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(
-                           make_intrusive<ExpressionContextForTest>(nss), request),
-                       expectedSerialization);
+    ASSERT_DOCUMENT_EQ(Document(request.toBSON()), expectedSerialization);
 }
 
 TEST(AggregationRequestTest, ShouldSetBatchSizeToDefaultOnEmptyCursorObject) {
@@ -330,15 +323,13 @@ TEST(AggregationRequestTest, ShouldNotSerializeBatchSizeWhenExplainSet) {
     SimpleCursorOptions cursor;
     cursor.setBatchSize(10);
     request.setCursor(cursor);
-    request.setExplain(ExplainOptions::Verbosity::kQueryPlanner);
+    request.setExplain(true);
 
     auto expectedSerialization =
         Document{{AggregateCommandRequest::kCommandName, nss.coll()},
                  {AggregateCommandRequest::kPipelineFieldName, std::vector<Value>{}},
                  {AggregateCommandRequest::kCursorFieldName, Value(Document())}};
-    ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(
-                           make_intrusive<ExpressionContextForTest>(nss), request),
-                       expectedSerialization);
+    ASSERT_DOCUMENT_EQ(Document(request.toBSON()), expectedSerialization);
 }
 
 //

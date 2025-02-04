@@ -6,6 +6,8 @@
  * @tags: [
  *   # Uses $out, which is non-retryable.
  *   requires_non_retryable_writes,
+ *   requires_getmore,
+ *   uses_getmore_outside_of_transaction,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

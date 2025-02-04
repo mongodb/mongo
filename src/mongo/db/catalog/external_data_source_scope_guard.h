@@ -80,7 +80,11 @@ public:
     }
 
 private:
-    void dropVirtualCollections() noexcept;
+    // Must not throw. This can be called from the guard's destructor, and destructors must not
+    // throw, since the destructor can be invoked when there is already an active exception being
+    // handled. So this function makes a best effort to clean up, but if something goes wrong, the
+    // error should logged but not thrown.
+    void dropVirtualCollections();
 
     OperationContext* _opCtx;
     std::vector<NamespaceString> _toBeDroppedVirtualCollections;

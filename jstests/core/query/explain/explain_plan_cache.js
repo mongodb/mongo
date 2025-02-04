@@ -13,6 +13,8 @@
  *   requires_fcv_80,
  *   # Does not support multiplanning, because it caches more plans
  *   does_not_support_multiplanning_single_solutions,
+ *   # The test examines the SBE plan cache, which initial sync may change the contents of.
+ *   examines_sbe_cache
  * ]
  */
 import {

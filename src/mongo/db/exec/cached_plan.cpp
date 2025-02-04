@@ -304,7 +304,7 @@ Status CachedPlanStage::replan(const QueryPlannerParams& plannerParams,
     return Status::OK();
 }
 
-bool CachedPlanStage::isEOF() {
+bool CachedPlanStage::isEOF() const {
     return _results.empty() && child()->isEOF();
 }
 

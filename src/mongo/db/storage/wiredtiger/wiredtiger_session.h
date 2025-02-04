@@ -35,12 +35,15 @@
 #include <wiredtiger.h>
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
-class WiredTigerSessionCache;
+class StatsCollectionPermit;
+class WiredTigerConnection;
+class OperationContext;
 
 /**
  * This is a structure that caches 1 cursor for each uri.
@@ -50,41 +53,77 @@ class WiredTigerSessionCache;
 class WiredTigerSession {
 public:
     /**
-     * Creates a new WT session on the specified connection.
+     * Creates a new WT session on the specified connection. This session will not be cached.
      *
-     * @param conn WT connection
+     * @param connection Wrapped WT connection
      */
-    WiredTigerSession(WT_CONNECTION* conn);
+    WiredTigerSession(WiredTigerConnection* connection);
 
     /**
-     * Creates a new WT session on the specified connection.
+     * Creates a new WT session on the specified connection. This is for sessions which will be
+     * cached by the WiredTigerConnection.
      *
-     * @param conn WT connection
-     * @param cache The WiredTigerSessionCache that owns this session.
+     * @param connection Wrapped WT connection
      * @param epoch In which session cache cleanup epoch was this session instantiated.
      */
-    WiredTigerSession(WT_CONNECTION* conn, WiredTigerSessionCache* cache, uint64_t epoch = 0);
+    WiredTigerSession(WiredTigerConnection* connection, uint64_t epoch);
 
     /**
-     * Creates a new WT session on the specified connection.
+     * Creates a new WT session on the specified connection. This session will not be cached.
      *
-     * @param conn WT connection
+     * @param connection WT connection
      * @param handler Callback handler that will be invoked by wiredtiger.
      * @param config configuration string used to open the session with.
      */
-    WiredTigerSession(WT_CONNECTION* conn, WT_EVENT_HANDLER* handler, const char* config);
+    WiredTigerSession(WiredTigerConnection* connection,
+                      WT_EVENT_HANDLER* handler,
+                      const char* config);
+
+    /**
+     * Creates a new WT session for collecting statistics possibly during shutdown (but before
+     * wiredtiger itself shuts down).
+     *
+     * @param connection WT connection
+     * @param permit Token showing that you asked the engine for permission to open this session.
+     */
+    WiredTigerSession(WiredTigerConnection* connection, StatsCollectionPermit& permit);
 
     ~WiredTigerSession();
 
-    WT_SESSION* getSession() const {
-        return _session;
+    // Safe accessor for the internal session
+    template <typename Functor>
+    auto with(Functor functor) {
+        return functor(_session);
     }
-    WT_SESSION* operator*() const {
-        return _session;
+
+#define WRAPPED_WT_SESSION_METHOD(name)                               \
+    template <typename... Args>                                       \
+    auto name(Args&&... args) {                                       \
+        return _session->name(_session, std::forward<Args>(args)...); \
     }
-    WT_SESSION* operator->() const {
-        return _session;
-    }
+
+    WRAPPED_WT_SESSION_METHOD(alter)
+    WRAPPED_WT_SESSION_METHOD(begin_transaction)
+    WRAPPED_WT_SESSION_METHOD(checkpoint)
+    WRAPPED_WT_SESSION_METHOD(commit_transaction)
+    WRAPPED_WT_SESSION_METHOD(compact)
+    WRAPPED_WT_SESSION_METHOD(create)
+    WRAPPED_WT_SESSION_METHOD(drop)
+    WRAPPED_WT_SESSION_METHOD(get_last_error)
+    WRAPPED_WT_SESSION_METHOD(get_rollback_reason)
+    WRAPPED_WT_SESSION_METHOD(log_flush)
+    WRAPPED_WT_SESSION_METHOD(open_cursor)
+    WRAPPED_WT_SESSION_METHOD(prepare_transaction)
+    WRAPPED_WT_SESSION_METHOD(query_timestamp)
+    WRAPPED_WT_SESSION_METHOD(reset)
+    WRAPPED_WT_SESSION_METHOD(reconfigure)
+    WRAPPED_WT_SESSION_METHOD(rollback_transaction)
+    WRAPPED_WT_SESSION_METHOD(salvage)
+    WRAPPED_WT_SESSION_METHOD(timestamp_transaction_uint)
+    WRAPPED_WT_SESSION_METHOD(transaction_pinned_range)
+    WRAPPED_WT_SESSION_METHOD(truncate)
+    WRAPPED_WT_SESSION_METHOD(verify)
+#undef WRAPPED_WT_SESSION_METHOD
 
     /**
      * Gets a cursor on the table id 'id' with optional configuration, 'config'.
@@ -93,7 +132,6 @@ public:
      * into the cache by calling releaseCursor().
      */
     WT_CURSOR* getCachedCursor(uint64_t id, const std::string& config);
-
 
     /**
      * Create a new cursor and ignore the cache.
@@ -152,18 +190,13 @@ public:
         return _idleExpireTime;
     }
 
-    void setCompiledConfigurationsPerConnection(CompiledConfigurationsPerConnection* compiled) {
-        _compiled = compiled;
-    }
-
-    CompiledConfigurationsPerConnection* getCompiledConfigurationsPerConnection() {
-        return _compiled;
-    }
+    CompiledConfigurationsPerConnection* getCompiledConfigurationsPerConnection();
 
     /**
-     * Reconfigures the session. Stores the config string that undoes this change.
+     * Reconfigures the session. Stores the config string that undoes this change when
+     * resetSessionConfiguration() is called.
      */
-    void reconfigure(const std::string& newConfig, std::string undoConfig);
+    void modifyConfiguration(const std::string& newConfig, std::string undoConfig);
 
     /**
      * Reset the configurations for this session to the default. This should be done before we
@@ -196,24 +229,31 @@ private:
         std::string _config;  // Cursor config. Do not serve cursors with different configurations
     };
 
-    friend class WiredTigerSessionCache;
+    friend class WiredTigerConnection;
 
     // The cursor cache is a list of pairs that contain an ID and cursor
     typedef std::list<CachedCursor> CursorCache;
 
-    // Used internally by WiredTigerSessionCache
+    // Used internally by WiredTigerConnection
     uint64_t _getEpoch() const {
         return _epoch;
     }
 
+    // Attach an operation context that acts as an interrupt source and contains other relevant
+    // state. WT will periodically use callbacks to check whether specific WT operations should be
+    // interrupted
+    void _attachOperationContext(OperationContext* opCtx);
+    // Remove the interrupt source
+    void _detachOperationContext();
+
     const uint64_t _epoch;
+
     WT_SESSION* _session;  // owned
     CursorCache _cursors;  // owned
     uint64_t _cursorGen;
     int _cursorsOut;
 
-    WiredTigerSessionCache* _cache;                  // not owned
-    CompiledConfigurationsPerConnection* _compiled;  // not owned
+    WiredTigerConnection* const _connection;  // not owned
 
     Date_t _idleExpireTime;
 

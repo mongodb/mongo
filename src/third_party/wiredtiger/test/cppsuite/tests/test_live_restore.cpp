@@ -46,6 +46,7 @@
 #include <vector>
 #include <cstdlib>
 #include <iostream>
+#include <signal.h>
 
 extern "C" {
 #include "wiredtiger.h"
@@ -306,36 +307,52 @@ get_stat(WT_CURSOR *cursor, int stat_field, int64_t *valuep)
     error_check(cursor->get_value(cursor, &desc, &pvalue, valuep));
 }
 
+/* Setup the initial set of collections in the source path. */
+void
+configure_database(scoped_session &session)
+{
+    scoped_cursor cursor = session.open_scoped_cursor("metadata:", "");
+    while (cursor->next(cursor.get()) != WT_NOTFOUND) {
+        const char *key_str = nullptr;
+        testutil_check(cursor->get_key(cursor.get(), &key_str));
+        auto metadata_str = std::string(key_str);
+        auto pos = metadata_str.find("table:");
+        if (pos != std::string::npos) {
+            testutil_assert(pos == 0);
+            db.add_and_open_existing_collection(session, metadata_str);
+            logger::log_msg(LOG_TRACE, "Adding collection: " + metadata_str);
+        }
+    }
+}
+
 static void
 run_restore(const std::string &home, const std::string &source, const int64_t thread_count,
   const int64_t collection_count, const int64_t op_count, const bool background_thread_mode,
-  const int64_t verbose_level, const bool first)
+  const int64_t verbose_level, const bool first, const bool die, const bool recovery)
 {
     /* Create a connection, set the cache size and specify the home directory. */
-    const std::string verbose_string =
-      verbose_level == 0 ? "" : "verbose=[fileops:" + std::to_string(verbose_level) + "]";
-    /*
-     * FIXME-WT-13888 - The "fill_holes_on_close" configuration can be removed once proper work
-     * queuing is implemented. The current implementation skips the turtle and metadata file which
-     * breaks things.
-     */
+    const std::string verbose_string = verbose_level == 0 ?
+      "" :
+      "verbose=[recovery:1,recovery_progress:1,live_restore_progress,live_restore:" +
+        std::to_string(verbose_level) + "]";
     const std::string conn_config = CONNECTION_CREATE +
-      ",live_restore=(enabled=true,debug=(fill_holes_on_close=true),threads_max=" +
-      std::to_string(thread_count) + ",path=\"" + source + "\"),cache_size=5GB," + verbose_string +
-      ",statistics=(all),statistics_log=(json,on_close,wait=1)";
+      ",live_restore=(enabled=true,read_size=2MB,threads_max=" + std::to_string(thread_count) +
+      ",path=\"" + source + "\"),cache_size=5GB," + verbose_string +
+      ",statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=true,path=journal)";
 
     /* Create connection. */
-    if (first)
-        connection_manager::instance().create(conn_config, home);
-    else
-        connection_manager::instance().reopen(conn_config, home);
+    connection_manager::instance().create(conn_config, home, true);
 
     auto crud_session = connection_manager::instance().create_session();
+    if (recovery)
+        configure_database(crud_session);
     if (!background_thread_mode)
         do_random_crud(crud_session, collection_count, op_count, first);
+    if (die)
+        raise(SIGKILL);
 
     // Loop until the state stat is complete!
-    if (thread_count > 0 || (background_thread_mode && !first)) {
+    if (thread_count > 0 || background_thread_mode) {
         logger::log_msg(LOG_INFO, "Waiting for background data transfer to complete...");
         while (true) {
             auto stat_cursor = crud_session.open_scoped_cursor("statistics:");
@@ -371,6 +388,7 @@ usage()
     std::cout << "\t-c The maximum number of collections to run the test with, if unset "
                  "collections are created at random."
               << std::endl;
+    std::cout << "\t-d Die randomly while applying crud operation." << std::endl;
     std::cout << "\t-H Specifies the database home directory." << std::endl;
     std::cout << "\t-h Output a usage message and exit." << std::endl;
     std::cout << "\t-i The number of iterations to run the test program. Note: A value of 1 with "
@@ -383,6 +401,7 @@ usage()
                  "LOG_INFO (2) and LOG_TRACE (3)."
               << std::endl;
     std::cout << "\t-o The number of crud operations to apply while live restoring." << std::endl;
+    std::cout << "\t-r Start from existing data files and run recovery." << std::endl;
     std::cout << "\t-t Thread count for the background thread. A value of 0 is legal in which case "
                  "data files will not be transferred in the background."
               << std::endl;
@@ -427,6 +446,18 @@ main(int argc, char *argv[])
         logger::log_msg(LOG_INFO, "Collection count: " + std::to_string(coll_count));
     }
 
+    // Get the death mode config.
+    auto death_mode = option_exists("-d", argc, argv);
+    logger::log_msg(LOG_INFO, "Death mode: " + std::string(death_mode ? "Y" : "N"));
+
+    // Get the recovery config.
+    auto recovery = option_exists("-r", argc, argv);
+    logger::log_msg(LOG_INFO, "Recovery: " + std::string(recovery ? "Y" : "N"));
+    if (recovery && it_count > 1) {
+        logger::log_msg(LOG_ERROR, "Recovery is only possible for 1 iteration at the moment.");
+        return EXIT_FAILURE;
+    }
+
     // Get the op_count if it exists.
     auto op_count_str = value_for_opt("-o", argc, argv);
     int64_t op_count = op_count_str.empty() ? op_count_default : atoi(op_count_str.c_str());
@@ -451,25 +482,30 @@ main(int argc, char *argv[])
         home_path = HOME_PATH;
     logger::log_msg(LOG_INFO, "Home path: " + home_path);
 
-    // Delete any existing source dir.
-    testutil_recreate_dir(SOURCE_PATH);
-    logger::log_msg(LOG_INFO, "Source path: " + std::string(SOURCE_PATH));
+    if (!recovery) {
+        // Delete any existing source dir and home path.
+        logger::log_msg(LOG_INFO, "Source path: " + std::string(SOURCE_PATH));
+        testutil_recreate_dir(SOURCE_PATH);
+        testutil_remove(home_path.c_str());
+    } else {
+        // Assuming this run is following a -d "death" run then the previous home path will be the
+        // source path.
+        testutil_remove(SOURCE_PATH);
+        testutil_move(home_path.c_str(), SOURCE_PATH);
+    }
 
-    // Recreate the home directory on startup every time.
-    testutil_recreate_dir(home_path.c_str());
-
-    bool first = true;
     /* When setting up the database we don't want to wait for the background threads to complete. */
-    bool background_thread_mode_enabled = (!first && background_thread_debug_mode);
+    int death_it = -1;
+    if (death_mode) {
+        death_it = random_generator::instance().generate_integer(0, (int)it_count - 1);
+        logger::log_msg(LOG_INFO, "Dying on iteration " + std::to_string(death_it));
+    }
     for (int i = 0; i < it_count; i++) {
         logger::log_msg(LOG_INFO, "!!!! Beginning iteration: " + std::to_string(i) + " !!!!");
         run_restore(home_path, SOURCE_PATH, thread_count, coll_count, op_count,
-          background_thread_mode_enabled, verbose_level, first);
+          background_thread_debug_mode, verbose_level, i == 0, i == death_it, recovery);
         testutil_remove(SOURCE_PATH);
-        testutil_move(HOME_PATH, SOURCE_PATH);
-        testutil_recreate_dir(HOME_PATH);
-        first = false;
-        background_thread_mode_enabled = background_thread_debug_mode;
+        testutil_move(home_path.c_str(), SOURCE_PATH);
     }
 
     return (0);

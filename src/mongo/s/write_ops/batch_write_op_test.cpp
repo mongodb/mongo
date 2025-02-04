@@ -3135,5 +3135,56 @@ TEST_F(WriteWithoutShardKeyWithIdFixture, UpdateRetriedAfterWCError) {
     ASSERT_FALSE(clientResponse.isWriteConcernErrorSet());
 }
 
+using BatchWriteLargeTopLevelFieldTest = WriteOpTestFixture;
+
+TEST_F(BatchWriteLargeTopLevelFieldTest, UpdateWithLargeLetField) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+    BatchedCommandRequest request([&] {
+        write_ops::UpdateCommandRequest updateOp(nss,
+                                                 std::vector<mongo::write_ops::UpdateOpEntry>{});
+        updateOp.setLet(BSON("a" << std::string(1000000, 'a')));
+        return updateOp;
+    }());
+    BSONObjBuilder builder;
+    request.serialize(&builder);
+    auto actual = builder.obj().objsize();
+    auto estimate = request.getBaseCommandSizeEstimate(_opCtx);
+    ASSERT_GTE(estimate, actual);
+}
+
+TEST_F(BatchWriteLargeTopLevelFieldTest, DeleteWithLargeLetField) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+    BatchedCommandRequest request([&] {
+        write_ops::DeleteCommandRequest deleteOp(nss,
+                                                 std::vector<mongo::write_ops::DeleteOpEntry>{});
+        deleteOp.setLet(BSON("a" << std::string(1000000, 'a')));
+        return deleteOp;
+    }());
+    BSONObjBuilder builder;
+    request.serialize(&builder);
+    auto actual = builder.obj().objsize();
+    auto estimate = request.getBaseCommandSizeEstimate(_opCtx);
+    ASSERT_GTE(estimate, actual);
+}
+
+TEST_F(BatchWriteLargeTopLevelFieldTest, WriteWithStmtIds) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+    BatchedCommandRequest request([&] {
+        write_ops::UpdateCommandRequest updateOp(nss,
+                                                 std::vector<mongo::write_ops::UpdateOpEntry>{});
+        std::vector<int32_t> stmtIds;
+        updateOp.setStmtIds(std::move(stmtIds));
+        return updateOp;
+    }());
+
+    _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
+    _opCtx->setTxnNumber(100);
+    auto estimate = request.getBaseCommandSizeEstimate(_opCtx);
+
+    BSONObjBuilder builder;
+    request.serialize(&builder);
+    auto actual = builder.obj().objsize();
+    ASSERT_GTE(estimate, actual);
+}
 }  // namespace
 }  // namespace mongo

@@ -71,7 +71,7 @@
 #include "mongo/logv2/ramlog_sink.h"
 #include "mongo/logv2/tagged_severity_filter.h"
 #include "mongo/logv2/uassert_sink.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

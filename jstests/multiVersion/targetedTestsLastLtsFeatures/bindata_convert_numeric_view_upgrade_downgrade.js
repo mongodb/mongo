@@ -259,8 +259,8 @@ testPerformUpgradeDowngradeReplSet({
     setupFn: setupCollection,
     whenFullyDowngraded: assertViewCanBeCreatedButNotExecuted,
     whenSecondariesAreLatestBinary: assertViewCanBeCreatedButNotExecuted,
-    whenFullyUpgraded: assertViewCanBeCreatedAndExecuted,
     whenBinariesAreLatestAndFCVIsLastLTS: assertQueriesOnViewsFail,
+    whenFullyUpgraded: assertViewCanBeCreatedAndExecuted,
 });
 
 testPerformUpgradeDowngradeSharded({
@@ -268,7 +268,7 @@ testPerformUpgradeDowngradeSharded({
     whenFullyDowngraded: assertViewCanBeCreatedButNotExecuted,
     whenOnlyConfigIsLatestBinary: assertViewCanBeCreatedButNotExecuted,
     whenSecondariesAndConfigAreLatestBinary: assertViewCanBeCreatedButNotExecuted,
-    whenFullyUpgraded: assertViewCanBeCreatedAndExecuted,
-    whenBinariesAreLatestAndFCVIsLastLTS: assertQueriesOnViewsFail,
     whenMongosBinaryIsLastLTS: assertQueriesOnViewsFail,
+    whenBinariesAreLatestAndFCVIsLastLTS: assertQueriesOnViewsFail,
+    whenFullyUpgraded: assertViewCanBeCreatedAndExecuted,
 });

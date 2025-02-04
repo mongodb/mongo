@@ -31,7 +31,7 @@
 
 #include "mongo/db/query/parsed_distinct_command.h"
 #include "mongo/db/query/query_shape/query_shape.h"
-#include "mongo/db/query/query_shape/shape_helpers.h"
+
 namespace mongo::query_shape {
 
 /**

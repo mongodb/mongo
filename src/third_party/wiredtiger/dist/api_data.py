@@ -104,7 +104,7 @@ source_meta = [
     Config('type', 'file', r'''
         set the type of data source used to store a column group, index or simple table.
         By default, a \c "file:" URI is derived from the object name. The \c type configuration
-        can be used to switch to a different data source or an extension configured by the 
+        can be used to switch to a different data source or an extension configured by the
         application'''),
 ]
 
@@ -447,7 +447,7 @@ connection_runtime_config = [
         min='1MB', max='10TB'),
     Config('cache_max_wait_ms', '0', r'''
         the maximum number of milliseconds an application thread will wait for space to be
-        available in cache before giving up. Default will wait forever''',
+        available in cache before giving up. Default or 0 will wait forever. 1 will never wait''',
         min=0),
     Config('cache_stuck_timeout_ms', '300000', r'''
         the number of milliseconds to wait before a stuck cache times out in diagnostic mode.
@@ -786,10 +786,11 @@ connection_runtime_config = [
         'checkpoint_handle', 'checkpoint_slow', 'checkpoint_stop', 'commit_transaction_slow',
         'compact_slow', 'evict_reposition', 'failpoint_eviction_split',
         'failpoint_history_store_delete_key_from_ts', 'history_store_checkpoint_delay',
-        'history_store_search', 'history_store_sweep_race', 'prefetch_1', 'prefetch_2',
-        'prefetch_3', 'prefix_compare', 'prepare_checkpoint_delay', 'prepare_resolution_1',
-        'prepare_resolution_2', 'sleep_before_read_overflow_onpage','split_1', 'split_2',
-        'split_3', 'split_4', 'split_5', 'split_6', 'split_7', 'split_8','tiered_flush_finish']),
+        'history_store_search', 'history_store_sweep_race', 'open_index_slow', 'prefetch_1',
+        'prefetch_2', 'prefetch_3', 'prefix_compare', 'prepare_checkpoint_delay',
+        'prepare_resolution_1', 'prepare_resolution_2', 'session_alter_slow',
+        'sleep_before_read_overflow_onpage', 'split_1', 'split_2', 'split_3', 'split_4', 'split_5',
+        'split_6', 'split_7', 'split_8', 'tiered_flush_finish']),
     Config('verbose', '[]', r'''
         enable messages for various subsystems and operations. Options are given as a list,
         where each message type can optionally define an associated verbosity level, such as
@@ -817,6 +818,8 @@ connection_runtime_config = [
             'handleops',
             'history_store',
             'history_store_activity',
+            'live_restore',
+            'live_restore_progress',
             'log',
             'metadata',
             'mutex',
@@ -1021,17 +1024,11 @@ wiredtiger_open_tiered_storage_configuration = [
 wiredtiger_open_live_restore_configuration = [
     Config('live_restore', '', r'''Live restore configuration options. These options control the
     behavior of WiredTiger when live restoring from a backup.''', type='category', subconfig = [
-        Config('debug', '', r'''
-            configure debug specific behavior on live restore. Generally only used for internal
-            testing purposes.''',
-            type='category', subconfig=[
-            Config('fill_holes_on_close', 'false', r'''
-                Copy all missing data from the source to the directory on file close.
-                This can result in very slow file closes.''',
-                type='boolean'),
-        ], undoc=True),
         Config('enabled', 'false', r'''whether live restore is enabled or not.''', type='boolean'),
         Config('path', '', r'''the path to the backup that will be restored from.'''),
+        Config('read_size', '1MB', r'''
+            the read size for data migration, in bytes, must be a power of two. This setting is a
+            best effort. It does not force every read to be this size.''', min='512B', max='16MB'),
         Config('threads_max', '8', r'''
             maximum number of threads WiredTiger will start to migrate data from the backup to the
             running WiredTiger database. Each worker thread uses a session handle from the
@@ -1107,7 +1104,7 @@ session_config = [
     Config('cache_max_wait_ms', '0', r'''
         the maximum number of milliseconds an application thread will wait for space to be
         available in cache before giving up. Default value will be the global setting of the
-        connection config''',
+        connection config. 0 will wait forever. 1 will never wait''',
         min=0),
     Config('ignore_cache_size', 'false', r'''
         when set, operations performed by this session ignore the cache size and are not blocked
@@ -1266,9 +1263,9 @@ wiredtiger_open_common =\
         type='boolean'),
     Config('write_through', '', r'''
         Use \c FILE_FLAG_WRITE_THROUGH on Windows to write to files. Ignored on non-Windows
-        systems. Options are given as a list, such as <code>"write_through=[data]"</code>. 
+        systems. Options are given as a list, such as <code>"write_through=[data]"</code>.
         Configuring \c write_through requires care; see @ref write_through
-        Including \c "data" will cause WiredTiger data files to write through cache, including 
+        Including \c "data" will cause WiredTiger data files to write through cache, including
         \c "log" will cause WiredTiger log files to write through
         cache.''',
         type='list', choices=['data', 'log']),
@@ -1974,7 +1971,7 @@ methods = {
     Config('threads', '4', r'''
         maximum number of threads WiredTiger will start to help RTS. Each
         RTS worker thread uses a session from the configured WT_RTS_MAX_WORKERS''',
-        min=0, 
+        min=0,
         max=10),     # !!! Must match WT_RTS_MAX_WORKERS
 ]),
 

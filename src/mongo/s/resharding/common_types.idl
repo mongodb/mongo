@@ -145,6 +145,9 @@ structs:
                 description: "Whether to create an index on the shard key pattern if the shard key
                               does not already have a support index."
                 default: true
+            performVerification:
+                type: optionalBool
+                description: "Whether to perform data comparison verification."
 
     AbortReason:
         description: "Not meant to be used directly. Only use internal fields."

@@ -145,11 +145,8 @@ public:
         auto solution = makeQuerySolution(std::move(lookupNode));
 
         // Convert logical solution into the physical SBE plan.
-        auto [resultSlots, stage, data, _] = buildPlanStage(std::move(solution),
-                                                            colls,
-                                                            false /*hasRecordId*/,
-                                                            nullptr /*shard filterer*/,
-                                                            nullptr /*collator*/);
+        auto [resultSlots, stage, data, _] =
+            buildPlanStage(std::move(solution), colls, false /*hasRecordId*/);
 
         if (enableDebugOutput) {
             std::cout << std::endl << DebugPrinter{true}.print(stage->debugPrint()) << std::endl;
@@ -780,7 +777,7 @@ TEST_F(LookupStageBuilderTest, ThreeComponentAsPathExtendingExistingObjectOnTwoL
 }
 
 TEST_F(LookupStageBuilderTest, ThreeComponentAsPathReplacingSingleValueInExistingObject) {
-    insertDocuments({fromjson("{_id: 0, one: {a: 1, two: {b: 2, three: 3}}}}")},
+    insertDocuments({fromjson("{_id: 0, one: {a: 1, two: {b: 2, three: 3}}}")},
                     {fromjson("{_id: 0}")});
 
     assertReturnedDocuments("_id",

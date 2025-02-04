@@ -147,6 +147,10 @@ std::string EncryptedDBClientBase::getServerAddress() const {
     return _conn->getServerAddress();
 }
 
+std::string EncryptedDBClientBase::getLocalAddress() const {
+    return _conn->getLocalAddress();
+}
+
 Message EncryptedDBClientBase::_call(Message& toSend, std::string* actualServer) {
     return _conn->call(toSend, actualServer);
 }

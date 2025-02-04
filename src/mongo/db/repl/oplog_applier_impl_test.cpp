@@ -911,6 +911,75 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateChangeStreamPreImages) {
     ASSERT(imageEntry.getInvalidated());
 }
 
+TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateNonModPreImages) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+    CollectionOptions options;
+    createCollection(_opCtx.get(), NamespaceString::kConfigImagesNamespace, options);
+    auto collUUID = createCollectionWithUuid(_opCtx.get(), nss);
+
+    auto document = BSON("_id" << 0);
+
+    const auto sessionId = makeLogicalSessionIdForTest();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(3);
+
+    const BSONObj preImage(BSON("_id" << 2 << "post" << 1));
+    OpTime opTime = OpTime();
+
+    repl::ImageEntry imageEntry;
+    imageEntry.set_id(sessionId);
+    imageEntry.setTxnNumber(2);
+    imageEntry.setTs(opTime.getTimestamp());
+    imageEntry.setImageKind(repl::RetryImageEnum::kPreImage);
+    imageEntry.setImage(preImage);
+    imageEntry.setInvalidated(false);
+
+    ASSERT_OK(getStorageInterface()->insertDocument(
+        _opCtx.get(), NamespaceString::kConfigImagesNamespace, {imageEntry.toBSON()}, 0));
+
+    {
+        AutoGetCollection sideCollection(
+            _opCtx.get(), NamespaceString::kConfigImagesNamespace, MODE_IS);
+        auto imageEntry = ImageEntry::parse(
+            IDLParserContext("test"),
+            Helpers::findOneForTesting(
+                _opCtx.get(), sideCollection.getCollection(), BSON("_id" << sessionId.toBSON())));
+        ASSERT_FALSE(imageEntry.getInvalidated());
+    }
+    OpTime updateOpTime{{2, 1}, 1};
+    auto updateOp = makeOplogEntry(updateOpTime,
+                                   repl::OpTypeEnum::kUpdate,
+                                   nss,
+                                   collUUID,
+                                   update_oplog_entry::makeDeltaOplogEntry(BSON(
+                                       doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}"))),
+                                   BSON("_id" << 0),  // o2
+                                   boost::none,       // fromMigrate
+                                   sessionInfo,
+                                   RetryImageEnum::kPreImage);
+
+    // Apply the oplog entry.
+    {
+        repl::UnreplicatedWritesBlock uwb(_opCtx.get());
+        DisableDocumentValidation validationDisabler(_opCtx.get());
+        ASSERT_NOT_OK(applyOplogEntryOrGroupedInserts(_opCtx.get(),
+                                                      ApplierOperation{&updateOp},
+                                                      OplogApplication::Mode::kInitialSync,
+                                                      /* isDataConsistent */ false));
+    }
+
+    AutoGetCollection sideCollection(
+        _opCtx.get(), NamespaceString::kConfigImagesNamespace, MODE_IS);
+    imageEntry = ImageEntry::parse(IDLParserContext("test"),
+                                   Helpers::findOneForTesting(_opCtx.get(),
+                                                              sideCollection.getCollection(),
+                                                              BSON("_id" << sessionId.toBSON())));
+
+    ASSERT(imageEntry.getInvalidated());
+}
+
+
 // Tests we correctly handle the case in SERVER-79033 where we attempt to invalidate the image
 // collection entry for a given lsid but we have already written an invalidate entry with a later
 // timestamp.
@@ -1033,7 +1102,7 @@ TEST_F(IdempotencyTest, CollModCommandMultitenant) {
     ASSERT_OK(runOpInitialSync(
         buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600), kUuid)));
 
-    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}}");
+    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}");
     auto collModCmd = BSON("collMod" << nss.coll() << "index" << indexChange);
     auto op = makeCommandOplogEntry(nextOpTime(), nss, collModCmd, kUuid);
 
@@ -1074,7 +1143,7 @@ TEST_F(IdempotencyTest, CollModCommandMultitenantWrongTenant) {
     ASSERT_OK(runOpInitialSync(
         buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600), kUuid)));
 
-    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}}");
+    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}");
     auto collModCmd = BSON("collMod" << nssTenant2.coll() << "index" << indexChange);
     auto op = makeCommandOplogEntry(nextOpTime(), nssTenant2, collModCmd, kUuid);
 
@@ -4363,7 +4432,7 @@ TEST_F(IdempotencyTest, CollModNamespaceNotFound) {
     ASSERT_OK(runOpInitialSync(
         buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600), kUuid)));
 
-    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}}");
+    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}");
     auto collModCmd = BSON("collMod" << _nss.coll() << "index" << indexChange);
     auto collModOp = makeCommandOplogEntry(nextOpTime(), _nss, collModCmd, kUuid);
     auto dropCollOp = makeCommandOplogEntry(nextOpTime(), _nss, BSON("drop" << _nss.coll()), kUuid);
@@ -4380,7 +4449,7 @@ TEST_F(IdempotencyTest, CollModIndexNotFound) {
     ASSERT_OK(runOpInitialSync(
         buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600), kUuid)));
 
-    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}}");
+    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}");
     auto collModCmd = BSON("collMod" << _nss.coll() << "index" << indexChange);
     auto collModOp = makeCommandOplogEntry(nextOpTime(), _nss, collModCmd, kUuid);
     auto dropIndexOp = dropIndex("createdAt_index", kUuid);

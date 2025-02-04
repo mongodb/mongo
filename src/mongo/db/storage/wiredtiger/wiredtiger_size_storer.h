@@ -36,10 +36,12 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
+
+class WiredTigerConnection;
 
 /**
  * The WiredTigerSizeStorer class serves as a write buffer to durably store size information for
@@ -76,7 +78,7 @@ public:
         AtomicWord<bool> _dirty;
     };
 
-    WiredTigerSizeStorer(WT_CONNECTION* conn, const std::string& storageUri);
+    WiredTigerSizeStorer(WiredTigerConnection* conn, const std::string& storageUri);
     ~WiredTigerSizeStorer() = default;
 
     /**
@@ -103,7 +105,7 @@ public:
     void flush(bool syncToDisk);
 
 private:
-    WT_CONNECTION* _conn;
+    WiredTigerConnection* _conn;
     const std::string _storageUri;
     const uint64_t _tableId;  // Not persisted
 

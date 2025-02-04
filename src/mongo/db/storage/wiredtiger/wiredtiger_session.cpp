@@ -29,9 +29,9 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 
@@ -39,36 +39,38 @@
 
 namespace mongo {
 
-WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn)
-    : WiredTigerSession(conn, nullptr, "isolation=snapshot") {}
+WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection)
+    : WiredTigerSession(connection, nullptr, "isolation=snapshot") {}
 
-WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn,
-                                     WiredTigerSessionCache* cache,
-                                     uint64_t epoch)
+WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection, uint64_t epoch)
     : _epoch(epoch),
-      _session(nullptr),
+      _session(connection->_openSession(this, nullptr, "isolation=snapshot")),
       _cursorGen(0),
       _cursorsOut(0),
-      _cache(cache),
-      _compiled(nullptr),
-      _idleExpireTime(Date_t::min()) {
-    invariantWTOK(conn->open_session(conn, nullptr, "isolation=snapshot", &_session), nullptr);
-    setCompiledConfigurationsPerConnection(cache->getCompiledConfigurations());
-}
+      _connection(connection),
+      _idleExpireTime(Date_t::min()) {}
 
-WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn,
+WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection,
                                      WT_EVENT_HANDLER* handler,
                                      const char* config)
     : _epoch(0),
-      _session(nullptr),
+      _session(connection->_openSession(this, handler, config)),
       _cursorGen(0),
       _cursorsOut(0),
-      _compiled(nullptr),
-      _idleExpireTime(Date_t::min()) {
-    invariantWTOK(conn->open_session(conn, handler, config, &_session), nullptr);
-}
+      _connection(connection),
+      _idleExpireTime(Date_t::min()) {}
+
+WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection,
+                                     StatsCollectionPermit& permit)
+    : _epoch(0),
+      _session(connection->_openSession(this, permit, "isolation=snapshot")),
+      _cursorGen(0),
+      _cursorsOut(0),
+      _connection(connection),
+      _idleExpireTime(Date_t::min()) {}
 
 WiredTigerSession::~WiredTigerSession() {
+    _detachOperationContext();
     if (_session) {
         invariantWTOK(_session->close(_session, nullptr), nullptr);
     }
@@ -132,13 +134,13 @@ WT_CURSOR* WiredTigerSession::getNewCursor(const std::string& uri, const char* c
 }
 
 void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor, std::string config) {
-    // When releasing the cursor, we would want to check if the session cache is already in shutdown
+    // When cleaning up a cursor, we would want to check if the connection is already in shutdown
     // and prevent the race condition that the shutdown starts after the check.
-    WiredTigerSessionCache::BlockShutdown blockShutdown(_cache);
+    WiredTigerConnection::BlockShutdown blockShutdown(_connection);
 
     // Avoids the cursor already being destroyed during the shutdown. Also, avoids releasing a
     // cursor from an earlier epoch.
-    if (_cache->isShuttingDown() || _getEpoch() < _cache->_epoch.load()) {
+    if (_connection->isShuttingDown() || _getEpoch() < _connection->_epoch.load()) {
         return;
     }
 
@@ -162,6 +164,16 @@ void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor, std::strin
 }
 
 void WiredTigerSession::closeCursor(WT_CURSOR* cursor) {
+    // When cleaning up a cursor, we would want to check if the connection is already in shutdown
+    // and prevent the race condition that the shutdown starts after the check.
+    WiredTigerConnection::BlockShutdown blockShutdown(_connection);
+
+    // Avoids the cursor already being destroyed during the shutdown. Also, avoids releasing a
+    // cursor from an earlier epoch.
+    if (_connection->isShuttingDown() || _getEpoch() < _connection->_epoch.load()) {
+        return;
+    }
+
     invariant(_session);
     invariant(cursor);
     _cursorsOut--;
@@ -183,7 +195,11 @@ void WiredTigerSession::closeAllCursors(const std::string& uri) {
     }
 }
 
-void WiredTigerSession::reconfigure(const std::string& newConfig, std::string undoConfig) {
+CompiledConfigurationsPerConnection* WiredTigerSession::getCompiledConfigurationsPerConnection() {
+    return _connection->getCompiledConfigurations();
+}
+
+void WiredTigerSession::modifyConfiguration(const std::string& newConfig, std::string undoConfig) {
     if (newConfig == undoConfig) {
         // The undoConfig string is the config string that resets our session back to default
         // settings. If our new configuration is the same as the undoConfig string, then that means
@@ -196,16 +212,27 @@ void WiredTigerSession::reconfigure(const std::string& newConfig, std::string un
         // Store the config string that will reset our session to its default configuration.
         _undoConfigStrings.emplace(std::move(undoConfig));
     }
-    auto wtSession = getSession();
-    invariantWTOK(wtSession->reconfigure(wtSession, newConfig.c_str()), wtSession);
+    invariantWTOK(reconfigure(newConfig.c_str()), *this);
 }
 
 void WiredTigerSession::resetSessionConfiguration() {
-    auto wtSession = getSession();
     for (const std::string& undoConfigString : _undoConfigStrings) {
-        invariantWTOK(wtSession->reconfigure(wtSession, undoConfigString.c_str()), wtSession);
+        invariantWTOK(reconfigure(undoConfigString.c_str()), *this);
     }
     _undoConfigStrings.clear();
+}
+
+void WiredTigerSession::_attachOperationContext(OperationContext* opCtx) {
+    invariant(_session);
+    invariant(!_session->app_private);
+    invariant(opCtx);
+    _session->app_private = opCtx;
+}
+
+void WiredTigerSession::_detachOperationContext() {
+    if (_session) {
+        _session->app_private = nullptr;
+    }
 }
 
 }  // namespace mongo

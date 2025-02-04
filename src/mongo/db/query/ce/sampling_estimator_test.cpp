@@ -41,6 +41,7 @@
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 
 namespace mongo::ce {
@@ -252,6 +253,32 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingProcess) {
     testChunkBasedSampling(30, 600);
 }
 
+TEST_F(SamplingEstimatorTest, FullCollScanSamplingProcess) {
+    insertDocuments(kTestNss, createDocuments(50));
+
+    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
+    auto colls = MultipleCollectionAccessor(operationContext(),
+                                            &collPtr.getCollection(),
+                                            kTestNss,
+                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
+                                            {});
+
+    // Require a sample larger than the collection.
+    const int sampleSize = 100;
+    const int collectionSize = 50;
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  sampleSize,
+                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  boost::none, /* numChunks */
+                                                  makeCardinalityEstimate(collectionSize));
+
+    auto sample = samplingEstimator.getSample();
+    // The SamplingEstimator should scan the collection and collect all the documents to generate
+    // the sample.
+    ASSERT_EQUALS(sample.size(), collectionSize);
+}
+
 TEST_F(SamplingEstimatorTest, DrawANewSample) {
     insertDocuments(kTestNss, createDocuments(10));
 
@@ -295,27 +322,6 @@ TEST_F(SamplingEstimatorTest, SampleSize) {
             SamplingEstimatorForTesting::calculateSampleSize(el.first.first, el.first.second);
         ASSERT_EQUALS(size, el.second);
     }
-}
-
-TEST_F(SamplingEstimatorTest, SampleSizeError) {
-    const size_t card = 100;
-    const size_t sampleSize = 400;
-
-    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
-    auto colls = MultipleCollectionAccessor(operationContext(),
-                                            &collPtr.getCollection(),
-                                            kTestNss,
-                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                            {});
-
-    ASSERT_THROWS_CODE(SamplingEstimatorImpl(operationContext(),
-                                             colls,
-                                             sampleSize,
-                                             SamplingEstimatorImpl::SamplingStyle::kRandom,
-                                             numChunks,
-                                             makeCardinalityEstimate(card)),
-                       DBException,
-                       9406300);
 }
 
 TEST_F(SamplingEstimatorTest, EstimateCardinality) {
@@ -487,7 +493,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityMultipleExpressions) {
     orExpr.add(std::move(pred1));
     orExpr.add(std::move(pred2));
 
-    std::vector<MatchExpression*> expressions;
+    std::vector<const MatchExpression*> expressions;
     expressions.push_back(&lt);
     expressions.push_back(&gt);
     expressions.push_back(&orExpr);
@@ -576,6 +582,18 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBounds) {
     nullPointBounds.fields[0].name = "obj.nil";
     ce = samplingEstimator.estimateRIDs(nullPointBounds, nullptr);
     samplingEstimator.assertEstimateInConfidenceInterval(ce, 1.0 * card);
+
+    // Test batch process of multiple IndexBounds.
+    std::vector<const IndexBounds*> boundslist;
+    boundslist.push_back(&boundsA);
+    boundslist.push_back(&boundsAB);
+    boundslist.push_back(&nullPointBounds);
+    std::vector<const MatchExpression*> expressions(3, nullptr);
+    auto estimates = samplingEstimator.estimateRIDs(boundslist, expressions);
+    ASSERT_EQUALS(estimates.size(), 3);
+    samplingEstimator.assertEstimateInConfidenceInterval(estimates[0], 0.2 * card);
+    samplingEstimator.assertEstimateInConfidenceInterval(estimates[1], 0.5 * 0.2 * card);
+    samplingEstimator.assertEstimateInConfidenceInterval(estimates[2], 1.0 * card);
 }
 
 TEST_F(SamplingEstimatorTest, EstimateIndexKeysScanned) {
@@ -623,6 +641,15 @@ TEST_F(SamplingEstimatorTest, EstimateIndexKeysScanned) {
     boundsAArr.fields.push_back(listArr);
     ce = samplingEstimator.estimateKeysScanned(boundsAArr);
     samplingEstimator.assertEstimateInConfidenceInterval(ce, 3 * 0.2 * card);
+
+    // Test batch process of index keys scanned estimate.
+    std::vector<const IndexBounds*> boundslist;
+    boundslist.push_back(&boundsA);
+    boundslist.push_back(&boundsAArr);
+    auto estimates = samplingEstimator.estimateKeysScanned(boundslist);
+    ASSERT_EQUALS(estimates.size(), 2);
+    samplingEstimator.assertEstimateInConfidenceInterval(estimates[0], 3 * card);
+    samplingEstimator.assertEstimateInConfidenceInterval(estimates[1], 3 * 0.2 * card);
 }
 
 TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBoundsAndMatchExpression) {
@@ -657,6 +684,25 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBoundsAndMatchExpression
 
     auto ce = samplingEstimator.estimateRIDs(boundsB, &lt);
     samplingEstimator.assertEstimateInConfidenceInterval(ce, 0.5 * 0.2 * card);
+
+    // Test batch process of multiple IndexBounds and optional MatchExpression.
+    OrderedIntervalList listA("a");
+    listA.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 0 << "" << 10), BoundInclusion::kIncludeBothStartAndEndKeys));
+    listA.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 10 << "" << 20), BoundInclusion::kIncludeEndKeyOnly));
+    IndexBounds boundsA;
+    boundsA.fields.push_back(listA);
+    std::vector<const IndexBounds*> boundslist;
+    boundslist.push_back(&boundsA);
+    boundslist.push_back(&boundsB);
+    std::vector<const MatchExpression*> expressions;
+    expressions.push_back(&lt);
+    expressions.push_back(nullptr);
+    auto estimates = samplingEstimator.estimateRIDs(boundslist, expressions);
+    ASSERT_EQUALS(estimates.size(), 2);
+    samplingEstimator.assertEstimateInConfidenceInterval(estimates[0], 0.2 * card);
+    samplingEstimator.assertEstimateInConfidenceInterval(estimates[1], 0.5 * 0.2 * card);
 }
 
 TEST_F(SamplingEstimatorTest, MatchElementAgainstIntervals) {
@@ -718,5 +764,38 @@ TEST_F(SamplingEstimatorTest, IndexKeysGenerationTest) {
     for (size_t i = 0; i < indexKeys.size(); i++) {
         ASSERT_BSONOBJ_EQ(indexKeys[i], expectedKeys[i]);
     }
+}
+
+DEATH_TEST_F(SamplingEstimatorTest,
+             IndexBoundsAlignedWithMatchExpression,
+             "bounds and expressions should have equal size.") {
+    insertDocuments(kTestNss, createDocuments(10));
+
+    AutoGetCollection collPtr(operationContext(), kTestNss, LockMode::MODE_IX);
+    auto colls = MultipleCollectionAccessor(operationContext(),
+                                            &collPtr.getCollection(),
+                                            kTestNss,
+                                            false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
+                                            {});
+
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  kSampleSize,
+                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(10));
+
+    OrderedIntervalList list("a");
+    list.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 0 << "" << 10), BoundInclusion::kIncludeBothStartAndEndKeys));
+    IndexBounds boundsA;
+    boundsA.fields.push_back(list);
+
+    // There're two IndexBounds but only one MatchExpression, which should hit a tassert.
+    std::vector<const IndexBounds*> boundslist;
+    boundslist.push_back(&boundsA);
+    boundslist.push_back(&boundsA);
+    std::vector<const MatchExpression*> expressions(1, nullptr);
+    auto estimates = samplingEstimator.estimateRIDs(boundslist, expressions);
 }
 }  // namespace mongo::ce

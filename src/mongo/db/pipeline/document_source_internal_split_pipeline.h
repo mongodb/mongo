@@ -77,8 +77,10 @@ public:
         return kStageName.rawData();
     }
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kInternalSplitPipeline;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
@@ -104,6 +106,10 @@ public:
     }
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
+    DepsTracker::State getDependencies(DepsTracker* deps) const override {
+        return DepsTracker::State::SEE_NEXT;
+    }
 
 private:
     DocumentSourceInternalSplitPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,

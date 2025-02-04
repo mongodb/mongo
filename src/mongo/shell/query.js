@@ -445,6 +445,13 @@ DBQuery.prototype.allowDiskUse = function(value) {
     return this;
 };
 
+DBQuery.prototype.rawData = function(value) {
+    this._checkModify();
+    value = (value === undefined) ? true : value;
+    this._additionalCmdParams["rawData"] = value;
+    return this;
+};
+
 /**
  * Sets the read preference for this cursor.
  *

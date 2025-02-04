@@ -287,21 +287,24 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
         // the front.
         if (options.capped) {
             WriteUnitOfWork wunit(opCtx.get());
+            CollectionWriter collWriter{opCtx.get(), coll};
             if (!idIndexSpec.isEmpty()) {
-                auto status =
-                    coll.getWritableCollection(opCtx.get())
-                        ->getIndexCatalog()
-                        ->createIndexOnEmptyCollection(
-                            opCtx.get(), coll.getWritableCollection(opCtx.get()), idIndexSpec);
+                auto status = collWriter.getWritableCollection(opCtx.get())
+                                  ->getIndexCatalog()
+                                  ->createIndexOnEmptyCollection(
+                                      opCtx.get(),
+                                      collWriter.getWritableCollection(opCtx.get()),
+                                      idIndexSpec);
                 if (!status.getStatus().isOK()) {
                     return status.getStatus();
                 }
             }
             for (auto&& spec : secondaryIndexSpecs) {
-                auto status = coll.getWritableCollection(opCtx.get())
-                                  ->getIndexCatalog()
-                                  ->createIndexOnEmptyCollection(
-                                      opCtx.get(), coll.getWritableCollection(opCtx.get()), spec);
+                auto status =
+                    collWriter.getWritableCollection(opCtx.get())
+                        ->getIndexCatalog()
+                        ->createIndexOnEmptyCollection(
+                            opCtx.get(), collWriter.getWritableCollection(opCtx.get()), spec);
                 if (!status.getStatus().isOK()) {
                     return status.getStatus();
                 }
@@ -580,7 +583,8 @@ Status StorageInterfaceImpl::truncateCollection(OperationContext* opCtx,
         }
 
         WriteUnitOfWork wunit(opCtx);
-        auto status = autoColl.getWritableCollection(opCtx)->truncate(opCtx);
+        CollectionWriter collWriter{opCtx, autoColl};
+        auto status = collWriter.getWritableCollection(opCtx)->truncate(opCtx);
         if (!status.isOK()) {
             return status;
         }
@@ -707,13 +711,12 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
         using Result = StatusWith<std::vector<BSONObj>>;
 
         auto collectionAccessMode = isFind ? MODE_IS : MODE_IX;
-        const auto collection = acquireCollection(
+        auto request = CollectionAcquisitionRequest::fromOpCtx(
             opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(opCtx,
-                                                    nsOrUUID,
-                                                    isFind ? AcquisitionPrerequisites::kRead
-                                                           : AcquisitionPrerequisites::kWrite),
-            collectionAccessMode);
+            nsOrUUID,
+            isFind ? AcquisitionPrerequisites::kRead : AcquisitionPrerequisites::kWrite);
+        const auto collection = isFind ? acquireCollectionMaybeLockFree(opCtx, request)
+                                       : acquireCollection(opCtx, request, collectionAccessMode);
         if (!collection.exists()) {
             return Status{ErrorCodes::NamespaceNotFound,
                           str::stream()

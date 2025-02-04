@@ -51,6 +51,7 @@ REGISTER_DOCUMENT_SOURCE(mergeCursors,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceMergeCursors::createFromBson,
                          AllowedWithApiStrict::kInternal);
+ALLOCATE_DOCUMENT_SOURCE_ID(mergeCursors, DocumentSourceMergeCursors::id)
 
 constexpr StringData DocumentSourceMergeCursors::kStageName;
 
@@ -104,6 +105,11 @@ void DocumentSourceMergeCursors::addNewShardCursors(std::vector<RemoteCursor>&& 
     tassert(9535000, "_blockingResultsMerger must be set", _blockingResultsMerger);
     recordRemoteCursorShardIds(newCursors);
     _blockingResultsMerger->addNewShardCursors(std::move(newCursors));
+}
+
+void DocumentSourceMergeCursors::closeShardCursors(const stdx::unordered_set<ShardId>& shardIds) {
+    tassert(8456113, "_blockingResultsMerger must be set", _blockingResultsMerger);
+    _blockingResultsMerger->closeShardCursors(shardIds);
 }
 
 void DocumentSourceMergeCursors::populateMerger() {

@@ -215,11 +215,11 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
 
     uassert(ErrorCodes::ProtocolError,
             "SSL support is required for the MONGODB-X509 mechanism.",
-            opCtx->getClient()->session()->getSSLManager());
+            opCtx->getClient()->session()->getSSLConfiguration());
 
     AuthorizationSession* authorizationSession = AuthorizationSession::get(client);
 
-    auto sslConfiguration = opCtx->getClient()->session()->getSSLManager()->getSSLConfiguration();
+    auto sslConfiguration = opCtx->getClient()->session()->getSSLConfiguration();
 
     uassert(ErrorCodes::ProtocolError,
             "X.509 authentication must always use the $external database.",
@@ -238,7 +238,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
             authorizationSession->addAndAuthorizeUser(opCtx, std::move(request), boost::none));
     };
 
-    if (sslConfiguration.isClusterMember(clientName, sslPeerInfo.getClusterMembership())) {
+    if (sslConfiguration->isClusterMember(clientName, sslPeerInfo.getClusterMembership())) {
         // Handle internal cluster member auth, only applies to server-server connections
         if (!clusterAuthMode.allowsX509()) {
             uassert(ErrorCodes::AuthenticationFailed,
@@ -256,7 +256,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
                     "with cluster membership");
             }
 
-            if (gEnforceUserClusterSeparation && sslConfiguration.isClusterExtensionSet()) {
+            if (gEnforceUserClusterSeparation && sslConfiguration->isClusterExtensionSet()) {
                 auto* am = AuthorizationManager::get(opCtx->getService());
                 BSONObj ignored;
 

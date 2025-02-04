@@ -43,21 +43,21 @@ BSONObj DefaultTaskExecutorCursorGetMoreStrategy::createGetMoreRequest(
     return getMoreRequest.toBSON();
 }
 
-TaskExecutorCursorOptions::TaskExecutorCursorOptions(boost::optional<int64_t> batchSize,
+TaskExecutorCursorOptions::TaskExecutorCursorOptions(bool pinConn,
+                                                     boost::optional<int64_t> batchSize,
                                                      bool preFetchNextBatch,
-                                                     std::shared_ptr<PlanYieldPolicy> yieldPolicy,
-                                                     bool pinConnection)
-    : getMoreStrategy(
+                                                     std::shared_ptr<PlanYieldPolicy> yieldPolicy)
+    : pinConnection(pinConn),
+      getMoreStrategy(
           std::make_shared<DefaultTaskExecutorCursorGetMoreStrategy>(batchSize, preFetchNextBatch)),
-      yieldPolicy(std::move(yieldPolicy)),
-      pinConnection(pinConnection) {}
+      yieldPolicy(std::move(yieldPolicy)) {}
 
 TaskExecutorCursorOptions::TaskExecutorCursorOptions(
+    bool pinConn,
     std::shared_ptr<TaskExecutorCursorGetMoreStrategy> getMoreStrategy,
-    std::shared_ptr<PlanYieldPolicy> yieldPolicy,
-    bool pinConnection)
-    : getMoreStrategy(std::move(getMoreStrategy)),
-      yieldPolicy(std::move(yieldPolicy)),
-      pinConnection(pinConnection) {}
+    std::shared_ptr<PlanYieldPolicy> yieldPolicy)
+    : pinConnection(pinConn),
+      getMoreStrategy(std::move(getMoreStrategy)),
+      yieldPolicy(std::move(yieldPolicy)) {}
 }  // namespace executor
 }  // namespace mongo

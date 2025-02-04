@@ -40,7 +40,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/db/query/client_cursor/collect_query_stats_mongod.h"
-#include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/find_command.h"
@@ -103,7 +103,10 @@ void endQueryOp(OperationContext* opCtx,
     explainer.getSummaryStats(&summaryStats);
 
     if (collection) {
-        CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);
+        CollectionIndexUsageTrackerDecoration::get(collection.get())
+            .recordCollectionIndexUsage(summaryStats.collectionScans,
+                                        summaryStats.collectionScansNonTailable,
+                                        summaryStats.indexesUsed);
     }
 
     curOp->debug().setPlanSummaryMetrics(std::move(summaryStats));

@@ -120,7 +120,7 @@ TEST_F(QueryPlannerDistinctTest, PredicateCovered) {
     addIndex(fromjson("{x: 1}"));
     addIndex(fromjson("{x: 1, y: 1}"));
     addIndex(fromjson("{y: 1, z: 1}"));
-    runDistinctQuery("x", fromjson("{y: 2, x: {$gt: 2}}}"));
+    runDistinctQuery("x", fromjson("{y: 2, x: {$gt: 2}}"));
 
     assertNumSolutions(3);
     // Index {x: 1, y: 1} is transformed since it covers the filter.

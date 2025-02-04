@@ -92,11 +92,6 @@ bool InternalSchemaAllowedPropertiesMatchExpression::equivalent(const MatchExpre
                             });
 }
 
-bool InternalSchemaAllowedPropertiesMatchExpression::matches(const MatchableDocument* doc,
-                                                             MatchDetails* details) const {
-    return _matchesBSONObj(doc->toBSON());
-}
-
 bool InternalSchemaAllowedPropertiesMatchExpression::matchesSingleElement(const BSONElement& elem,
                                                                           MatchDetails*) const {
     if (elem.type() != BSONType::Object) {

@@ -44,7 +44,6 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/destructor_guard.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
@@ -91,7 +90,12 @@ TaskRunner::TaskRunner(ThreadPool* threadPool)
 }
 
 TaskRunner::~TaskRunner() {
-    DESTRUCTOR_GUARD(cancel(); join(););
+    try {
+        cancel();
+        join();
+    } catch (...) {
+        reportFailedDestructor(MONGO_SOURCE_LOCATION());
+    }
 }
 
 std::string TaskRunner::getDiagnosticString() const {

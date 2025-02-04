@@ -82,7 +82,7 @@ public:
      */
     Status recordKey(OperationContext* opCtx,
                      const IndexCatalogEntry* indexCatalogEntry,
-                     const key_string::Value& key);
+                     const key_string::View& key);
 
     /**
      * Returns boost::none if all previously recorded duplicate key constraint violations have been

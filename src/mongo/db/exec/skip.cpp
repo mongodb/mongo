@@ -50,7 +50,7 @@ SkipStage::SkipStage(ExpressionContext* expCtx,
 
 SkipStage::~SkipStage() {}
 
-bool SkipStage::isEOF() {
+bool SkipStage::isEOF() const {
     return child()->isEOF();
 }
 

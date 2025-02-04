@@ -50,12 +50,12 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/curop_diagnostic_printer.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/exec/mutable_bson/algorithm.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/command_diagnostic_printer.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/command_generic_argument.h"
@@ -247,7 +247,7 @@ void CommandHelpers::runCommandInvocation(OperationContext* opCtx,
     // these diagnostics is done lazily during failure handling. This line just creates an RAII
     // object which holds references to objects on this stack frame, which will be used to print
     // diagnostics in the event of a failure.
-    ScopedDebugInfo cmdDiagnostics("commandDiagnostics", command_diagnostics::Printer{opCtx});
+    ScopedDebugInfo cmdDiagnostics("curOpDiagnostics", diagnostic_printers::CurOpPrinter{opCtx});
 
     invocation->run(opCtx, response);
 

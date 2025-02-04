@@ -124,6 +124,11 @@ public:
             return std::move(*this);
         }
 
+        Options addClientObserver(std::unique_ptr<ServiceContext::ClientObserver> observer) {
+            _clientObservers.emplace_back(std::move(observer));
+            return std::move(*this);
+        }
+
     private:
         friend class MongoDScopedGlobalServiceContextForTest;
 
@@ -143,6 +148,7 @@ public:
         std::unique_ptr<IndexBuildsCoordinator> _indexBuildsCoordinator;
         bool _forceDisableTableLogging = false;
         bool _createShardingState = true;
+        std::vector<std::unique_ptr<ServiceContext::ClientObserver>> _clientObservers;
     };
 
     MongoDScopedGlobalServiceContextForTest(Options options, bool shouldSetupTL);

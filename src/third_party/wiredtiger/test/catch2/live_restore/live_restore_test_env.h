@@ -27,7 +27,7 @@ public:
     const std::string DB_SOURCE = "WT_LR_SOURCE";
     const std::string DB_TEMP_BACKUP = "WT_LR_TEMP_BACKUP";
 
-    WT_LIVE_RESTORE_FS *lr_fs;
+    WTI_LIVE_RESTORE_FS *lr_fs;
     std::unique_ptr<connection_wrapper> conn;
     WT_SESSION_IMPL *session;
 

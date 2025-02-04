@@ -101,4 +101,57 @@ TEST(RoaringBitmapTest, Roaring64BTreeAdd) {
         ASSERT_TRUE(roaring64.contains(i));
     }
 }
+
+TEST(RoaringBitmapTest, Roaring64BTreeIterator) {
+    Roaring64BTree roaring64;
+
+    // Generate the numbers to add to the set
+    mongo::stdx::unordered_set<uint64_t> addedNums;
+    uint64_t num = 1;
+    for (uint64_t i = 0; i < 64; ++i) {
+        num <<= 1;
+        for (uint64_t j = 0; j < 10; ++j) {
+            uint64_t number = num + j * 8;
+            addedNums.insert(number);
+        }
+    }
+
+    // Add the numbers to the set
+    for (const auto& number : addedNums) {
+        roaring64.addChecked(number);
+    }
+
+
+    // Check the numbers retrieved are the same that were inserted and they are retrieved in a
+    // sorted order.
+    uint64_t foundNum = 0;
+    uint64_t previousNumber = 0;
+    for (auto it = roaring64.begin(); it != roaring64.end(); ++it) {
+        uint64_t number = *it;
+        ASSERT(addedNums.contains(number));
+        if (foundNum) {
+            ASSERT_GT(number, previousNumber);
+        }
+        previousNumber = number;
+        ++foundNum;
+    }
+
+    // Check that number of values retrieved are the same as the number of values inserted.
+    ASSERT_EQ(foundNum, addedNums.size());
+
+    // Check again using for-each loop to make sure that it works as well.
+    foundNum = 0;
+    previousNumber = 0;
+    for (const auto& number : roaring64) {
+        ASSERT(addedNums.contains(number));
+        if (foundNum) {
+            ASSERT_GT(number, previousNumber);
+        }
+        previousNumber = number;
+        ++foundNum;
+    }
+
+    // Check that number of values retrieved are the same as the number of values inserted.
+    ASSERT_EQ(foundNum, addedNums.size());
+}
 }  // namespace mongo

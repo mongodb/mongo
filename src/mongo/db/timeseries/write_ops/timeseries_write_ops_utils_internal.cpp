@@ -353,17 +353,15 @@ BucketDocument makeNewDocumentForWrite(
 
     invariant(minmax);
 
-    return makeNewDocument(
-        bucketId,
-        metadata,
-        minmax->first,
-        minmax->second,
-        dataBuilders,
-        options.getTimeField(),
-        nss,
-        collectionUUID,
-        bucket_catalog::getKeySignature(
-            options, comparator ? comparator.value() : nullptr, collectionUUID, metadata));
+    return makeNewDocument(bucketId,
+                           metadata,
+                           minmax->first,
+                           minmax->second,
+                           dataBuilders,
+                           options.getTimeField(),
+                           nss,
+                           collectionUUID,
+                           bucket_catalog::getKeySignature(options, collectionUUID, metadata));
 }
 
 BSONObj makeBSONColumnDocDiff(

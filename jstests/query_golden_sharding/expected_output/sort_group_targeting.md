@@ -26,6 +26,7 @@
 ### Summarized explain
 ```json
 {
+	"queryShapeHash" : "A0D809DC5D5E36730AAF02B6B22C243B1DBC2F1F906124AA12E24177FAB2CB96",
 	"sort_group_targeting-rs0" : [
 		{
 			"$cursor" : {
@@ -115,6 +116,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "A0D809DC5D5E36730AAF02B6B22C243B1DBC2F1F906124AA12E24177FAB2CB96",
 	"shardsPart" : [
 		{
 			"$sort" : {
@@ -270,6 +272,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "EA937E2417B3EB3C8886BC96A1516917C2619F47EA8A27F84CADC1686D4B1595",
 	"shardsPart" : [
 		{
 			"$sort" : {
@@ -431,6 +434,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "3A0E17C147F04A6C1D8F3C6BC8305E68EF2C6EE8DD87A6897A0A8C30A51120F4",
 	"shardsPart" : [
 		{
 			"$match" : {
@@ -631,6 +635,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "74ED1BBD174E087FE2E6A8F436E355E9D91AEF6E758095F27C63CFDDABFD1CE9",
 	"shardsPart" : [
 		{
 			"$sort" : {
@@ -783,6 +788,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "B23115C58DB44E45F6DAF98C908D8EA36A23519C7926A2B9098D45BE2146A8F6",
 	"shardsPart" : [
 		{
 			"$project" : {

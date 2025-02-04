@@ -72,7 +72,11 @@ buildvariants:
     tasks:
       - name: compile_ninja_quick_TG
       - name: compile_test_serial_no_unittests_TG
+        distros:
+          - windows-2022-xxlarge-localstorage
       - name: compile_test_parallel_unittest_stream_TG
+        distros:
+          - windows-2022-xxlarge-localstorage
       - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch .requires_execution_on_windows_patch_build
       - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_windows !.stitch .requires_execution_on_windows_patch_build
         distros:

@@ -50,6 +50,7 @@ REGISTER_DOCUMENT_SOURCE(operationMetrics,
                          DocumentSourceOperationMetrics::LiteParsed::parse,
                          DocumentSourceOperationMetrics::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
+ALLOCATE_DOCUMENT_SOURCE_ID(operationMetrics, DocumentSourceOperationMetrics::id)
 
 const char* DocumentSourceOperationMetrics::getSourceName() const {
     return kStageName.rawData();

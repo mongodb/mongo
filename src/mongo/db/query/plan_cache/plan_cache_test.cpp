@@ -1709,7 +1709,7 @@ TEST_F(CachePlanSelectionTest, CachedPlanForIntersectionWithNonMultikeyIndexCanI
     addIndex(BSON("a.b" << 1), "a.b_1", multikey);
     addIndex(BSON("a.c" << 1), "a.c_1", !multikey);
 
-    BSONObj query = fromjson("{'a.b': 2, 'a.c': {$gte: 0, $lt: 10}}}}");
+    BSONObj query = fromjson("{'a.b': 2, 'a.c': {$gte: 0, $lt: 10}}");
     runQuery(query);
 
     assertPlanCacheRecoversSolution(

@@ -406,51 +406,6 @@ BSONObj writeFile(const BSONObj& args, void* data) {
     return undefinedReturn;
 }
 
-/**
- * Writes an array of bson objects one after another. The format is readable by the `bsondump` tool.
- */
-BSONObj writeBsonArrayToFile(const BSONObj& args, void* data) {
-    uassert(7196709, "writeBsonArrayToFile needs 2 arguments", args.nFields() == 2);
-
-    BSONObjIterator it(args);
-    auto filePathElem = it.next();
-    uassert(7196708, "first argument must be a string", filePathElem.type() == BSONType::String);
-
-    auto fileContentElem = it.next();
-    uassert(
-        7196707, "second argument must be a BSON array", fileContentElem.type() == BSONType::Array);
-
-    const boost::filesystem::path originalFilePath{filePathElem.String()};
-    const boost::filesystem::path normalizedFilePath{originalFilePath.lexically_normal()};
-    const boost::filesystem::path absoluteFilePath{boost::filesystem::absolute(normalizedFilePath)};
-
-    uassert(7196706,
-            "bsonArrayToFile() can only write a file in a directory which already exists",
-            boost::filesystem::exists(absoluteFilePath.parent_path()));
-    uassert(7196705,
-            "bsonArrayToFile() can only write to a file which does not yet exist",
-            !boost::filesystem::exists(absoluteFilePath));
-    uassert(7196704,
-            "the file name must be compatible with POSIX and Windows",
-            boost::filesystem::portable_name(absoluteFilePath.filename().string()));
-
-    std::ios::openmode mode = std::ios::out | std::ios::binary;
-    boost::filesystem::ofstream ofs{absoluteFilePath, mode};
-    uassert(7196703,
-            str::stream() << "failed to open file " << normalizedFilePath.string()
-                          << " for writing",
-            ofs);
-
-    for (const auto& obj : fileContentElem.Obj()) {
-        ofs.write(obj.Obj().objdata(), obj.objsize());
-        uassert(7196702, "Error writing to file", !ofs.bad());
-    }
-    ofs.flush();
-    uassert(7196701, str::stream() << "failed to write to file " << absoluteFilePath.string(), ofs);
-
-    return undefinedReturn;
-}
-
 BSONObj appendFile(const BSONObj& args, void* data) {
     // Parse the arguments.
 
@@ -586,70 +541,6 @@ BSONObj dumpBSONAsHex(const BSONObj& a, void* data) {
     return BSON("" << bson_bin_util::toHex(a));
 }
 
-// The name of the file to dump is provided as a string in the first
-// field of the 'a' object. Other arguments in the BSONObj are
-// ignored. The void* argument is unused.
-BSONObj readDumpFile(const BSONObj& a, void*) {
-    uassert(31404,
-            "readDumpFile() takes one argument: the path to a file",
-            a.nFields() == 1 && a.firstElementType() == String);
-
-    // Open the file for reading in binary mode.
-    const auto pathStr = a.firstElement().String();
-    boost::filesystem::ifstream stream(pathStr, std::ios::in | std::ios::binary);
-    uassert(31405,
-            str::stream() << "readDumpFile(): Unable to open file \"" << pathStr
-                          << "\" for reading",
-            stream);
-
-    // Consume the contents of the file into a std::string, or bail out
-    // if there is more data in the file or stream than we can handle.
-    std::string contents;
-    while (stream) {
-        char buffer[4096];
-        stream.read(buffer, sizeof(buffer));
-        contents.append(buffer, stream.gcount());
-
-        // Check that the size of the data can fit into the BSON shape
-        // { "" : [ ... ] }, which has 12 bytes of overhead.
-        uassert(31406,
-                str::stream() << "readDumpFile(): file \"" << pathStr
-                              << "\" too big to load as a variable",
-                contents.size() <= (BSONObj::DefaultSizeTrait::MaxSize - 12));
-    }
-
-    // Construct our return shape
-    BSONObjBuilder builder;
-    BSONArrayBuilder array(builder.subarrayStart(""));
-
-    // Walk the data we read out of the file and interpret it as a series
-    // of contiguous BSON objects. Validate the BSON objects we find and insert
-    // them into the results array.
-    ConstDataRangeCursor cursor(contents.data(), contents.size());
-    while (!cursor.empty()) {
-
-        // Record the amount of valid data ahead of us before
-        // advancing the cursor so we can use it as an argument to
-        // validate below. It would be nice and proper to use
-        // Validated<BSONObj> for all of this instead, but
-        // unfortunately the BSONObj specialization of Validated
-        // depends on a server parameter, so we do it manually.
-        const auto valid = cursor.length();
-
-        const auto swObj = cursor.readAndAdvanceNoThrow<BSONObj>();
-        uassertStatusOK(swObj);
-
-        const auto obj = swObj.getValue();
-        uassertStatusOKWithContext(validateBSON(obj.objdata(), valid),
-                                   str::stream() << " at offset " << cursor.debug_offset());
-
-        array.append(obj);
-    }
-
-    array.doneFast();
-    return builder.obj();
-}
-
 BSONObj generateStorageBSON(const BSONObj& args, void* data) {
     uassert(9492300,
             "generateStorageBSON() requires 4 arguments: generateStorageBSON(dbpath, "
@@ -727,6 +618,216 @@ BSONObj getStringWidth(const BSONObj& a, void* data) {
 
 }  // namespace
 
+/**
+ * Writes an array of bson objects one after another. The format is readable by the `bsondump` tool.
+ */
+BSONObj writeBsonArrayToFile(const BSONObj& args, void* data) {
+    uassert(7196709, "writeBsonArrayToFile needs 2 arguments", args.nFields() == 2);
+
+    BSONObjIterator it(args);
+    auto filePathElem = it.next();
+    uassert(7196708, "first argument must be a string", filePathElem.type() == BSONType::String);
+
+    auto fileContentElem = it.next();
+    uassert(
+        7196707, "second argument must be a BSON array", fileContentElem.type() == BSONType::Array);
+
+    const boost::filesystem::path originalFilePath{filePathElem.String()};
+    const boost::filesystem::path normalizedFilePath{originalFilePath.lexically_normal()};
+    const boost::filesystem::path absoluteFilePath{boost::filesystem::absolute(normalizedFilePath)};
+
+    uassert(7196706,
+            "bsonArrayToFile() can only write a file in a directory which already exists",
+            boost::filesystem::exists(absoluteFilePath.parent_path()));
+    uassert(7196705,
+            "bsonArrayToFile() can only write to a file which does not yet exist",
+            !boost::filesystem::exists(absoluteFilePath));
+    uassert(7196704,
+            "the file name must be compatible with POSIX and Windows",
+            boost::filesystem::portable_name(absoluteFilePath.filename().string()));
+
+    std::ios::openmode mode = std::ios::out | std::ios::binary;
+    boost::filesystem::ofstream ofs{absoluteFilePath, mode};
+    uassert(7196703,
+            str::stream() << "failed to open file " << normalizedFilePath.string()
+                          << " for writing",
+            ofs);
+
+    for (const auto& obj : fileContentElem.Obj()) {
+        ofs.write(obj.Obj().objdata(), obj.objsize());
+        uassert(7196702, "Error writing to file", !ofs.bad());
+    }
+    ofs.flush();
+    uassert(7196701, str::stream() << "failed to write to file " << absoluteFilePath.string(), ofs);
+
+    return undefinedReturn;
+}
+
+// The name of the file to dump is provided as a string in the first
+// field of the 'a' object. Other arguments in the BSONObj are
+// ignored. The void* argument is unused.
+BSONObj readDumpFile(const BSONObj& a, void*) {
+    uassert(31404,
+            "readDumpFile() takes one argument: the path to a file",
+            a.nFields() == 1 && a.firstElementType() == String);
+
+    // Open the file for reading in binary mode.
+    const auto pathStr = a.firstElement().String();
+    boost::filesystem::ifstream stream(pathStr, std::ios::in | std::ios::binary);
+    uassert(31405,
+            str::stream() << "readDumpFile(): Unable to open file \"" << pathStr
+                          << "\" for reading",
+            stream);
+
+    // Consume the contents of the file into a std::string, or bail out
+    // if there is more data in the file or stream than we can handle.
+    std::string contents;
+    while (stream) {
+        char buffer[4096];
+        stream.read(buffer, sizeof(buffer));
+        contents.append(buffer, stream.gcount());
+
+        // Check that the size of the data can fit into the BSON shape
+        // { "" : [ ... ] }, which has 12 bytes of overhead.
+        uassert(31406,
+                str::stream() << "readDumpFile(): file \"" << pathStr
+                              << "\" too big to load as a variable",
+                contents.size() <= (BSONObj::DefaultSizeTrait::MaxSize - 12));
+    }
+
+    // Construct our return shape
+    BSONObjBuilder builder;
+    BSONArrayBuilder array(builder.subarrayStart(""));
+
+    // Walk the data we read out of the file and interpret it as a series
+    // of contiguous BSON objects. Validate the BSON objects we find and insert
+    // them into the results array.
+    ConstDataRangeCursor cursor(contents.data(), contents.size());
+    while (!cursor.empty()) {
+
+        // Record the amount of valid data ahead of us before
+        // advancing the cursor so we can use it as an argument to
+        // validate below. It would be nice and proper to use
+        // Validated<BSONObj> for all of this instead, but
+        // unfortunately the BSONObj specialization of Validated
+        // depends on a server parameter, so we do it manually.
+        const auto expectedValidBytes = cursor.length();
+
+        const auto swObj = cursor.readAndAdvanceNoThrow<BSONObj>();
+        uassertStatusOK(swObj);
+
+        const auto obj = swObj.getValue();
+        uassertStatusOKWithContext(validateBSON(obj.objdata(), expectedValidBytes),
+                                   str::stream() << " at offset " << cursor.debug_offset());
+
+        array.append(obj);
+    }
+
+    array.doneFast();
+    return builder.obj();
+}
+
+// Returns the number of BSON objects present in a dump file.
+// The name of the file to scan is provided as a string in the first
+// field of the 'a' object. Other arguments in the BSONObj are
+// ignored. The void* argument is unused.
+BSONObj numObjsInDumpFile(const BSONObj& a, void*) {
+    uassert(9806101,
+            "numObjsInDumpFile() takes one argument: the path to a file",
+            a.nFields() == 1 && a.firstElementType() == String);
+
+    // Open the file for reading in binary mode.
+    const auto pathStr = a.firstElement().String();
+    boost::filesystem::ifstream stream(pathStr, std::ios::in | std::ios::binary);
+    uassert(9806102,
+            str::stream() << "numObjsInDumpFile(): Unable to open file \"" << pathStr
+                          << "\" for reading",
+            stream);
+
+    // Consume the contents of the file into a std::string, or bail out
+    // if there is more data in the file or stream than we can handle.
+    std::string contents;
+    while (stream) {
+        char buffer[4096];
+        stream.read(buffer, sizeof(buffer));
+        contents.append(buffer, stream.gcount());
+    }
+
+    // Walk the data we read out of the file and interpret it as a series
+    // of contiguous BSON objects. Count the objects without doing validation.
+    ConstDataRangeCursor cursor(contents.data(), contents.size());
+    int numObjs = 0;
+    while (!cursor.empty()) {
+        const auto swObj = cursor.readAndAdvanceNoThrow<BSONObj>();
+        uassertStatusOK(swObj);
+        numObjs++;
+    }
+
+    return BSON("" << numObjs);
+}
+
+// Returns the nth (0-indexed) object in a dump file.
+// The name of the file to scan is provided as a string in the first
+// field of the 'a' object. The only other argument should be an integer
+// specifying which object to fetch.
+BSONObj getObjInDumpFile(const BSONObj& a, void*) {
+    uassert(9806103,
+            "getObjInDumpFile() takes two arguments: the path to a file and the index of the "
+            "object to be fetched",
+            a.nFields() == 2 && a.firstElementType() == String);
+
+    // Open the file for reading in binary mode.
+    BSONObjIterator it(a);
+
+    const std::string pathStr = it.next().str();
+    const int objIndex = it.next().safeNumberInt();
+
+    boost::filesystem::ifstream stream(pathStr, std::ios::in | std::ios::binary);
+    uassert(9806104,
+            str::stream() << "getObjInDumpFile(): Unable to open file \"" << pathStr
+                          << "\" for reading",
+            stream);
+
+    // Consume the contents of the file into a std::string, or bail out
+    // if there is more data in the file or stream than we can handle.
+    std::string contents;
+    while (stream) {
+        char buffer[4096];
+        stream.read(buffer, sizeof(buffer));
+        contents.append(buffer, stream.gcount());
+    }
+
+    // Walk the data we read out of the file and interpret it as a series
+    // of contiguous BSON objects. Skip over objIndex objects and return
+    // the next one.
+    ConstDataRangeCursor cursor(contents.data(), contents.size());
+    for (int i = 0; i < objIndex && !cursor.empty(); ++i) {
+        // We do not perform validation on BSONObj
+        const auto swObj = cursor.readAndAdvanceNoThrow<BSONObj>();
+        uassertStatusOK(swObj);
+    }
+    uassert(9806105,
+            str::stream() << "getObjInDumpFile(): File does not contain an object at "
+                          << "index " << objIndex,
+            !cursor.empty());
+
+    // Record the amount of valid data ahead of us before
+    // advancing the cursor so we can use it as an argument to
+    // validate below. It would be nice and proper to use
+    // Validated<BSONObj> for all of this instead, but
+    // unfortunately the BSONObj specialization of Validated
+    // depends on a server parameter, so we do it manually.
+    const auto expectedValidBytes = cursor.length();
+    BSONObj obj;
+    cursor.readAndAdvance<BSONObj>(&obj);
+    uassertStatusOKWithContext(validateBSON(obj.objdata(), expectedValidBytes),
+                               str::stream() << " at offset " << cursor.debug_offset());
+
+    BSONObjBuilder builder;
+    builder.append("", obj);
+    return builder.obj<BSONObj::LargeSizeTrait>();
+}
+
 BSONObj ls(const BSONObj& args, void* data) {
     BSONArrayBuilder ret;
     BSONObj o = listFiles(args, data);
@@ -780,6 +881,8 @@ void installShellUtilsExtended(Scope& scope) {
     scope.injectNative("dumpBSONAsHex", dumpBSONAsHex);
     scope.injectNative("_copyFileRange", copyFileRange);
     scope.injectNative("_readDumpFile", readDumpFile);
+    scope.injectNative("_numObjsInDumpFile", numObjsInDumpFile);
+    scope.injectNative("_getObjInDumpFile", getObjInDumpFile);
     scope.injectNative("_getEnv", shellGetEnv);
     scope.injectNative("writeBsonArrayToFile", writeBsonArrayToFile);
     scope.injectNative("getStringWidth", getStringWidth);

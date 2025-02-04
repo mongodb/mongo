@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+ALLOCATE_DOCUMENT_SOURCE_ID(mock, DocumentSourceMock::id)
+
 boost::intrusive_ptr<DocumentSourceMock> DocumentSourceMock::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     return make_intrusive<DocumentSourceMock>(std::deque<GetNextResult>{}, expCtx);

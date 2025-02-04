@@ -90,6 +90,7 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/commands/query_cmd/cluster_explain.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
@@ -291,10 +292,33 @@ public:
 
     bool run(OperationContext* opCtx,
              const DatabaseName& dbName,
-             const BSONObj& cmdObj,
+             const BSONObj& originalCmdObj,
              BSONObjBuilder& result) override {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-        const NamespaceString nss(parseNs(dbName, cmdObj));
+        NamespaceString nss(parseNs(dbName, originalCmdObj));
+
+        auto cmdObj = [&] {
+            if (!OptionalBool::parseFromBSON(
+                    originalCmdObj[DistinctCommandRequest::kRawDataFieldName]) ||
+                !CollectionRoutingInfoTargeter{opCtx, nss}.timeseriesNamespaceNeedsRewrite(nss)) {
+                return originalCmdObj;
+            }
+
+            nss = nss.makeTimeseriesBucketsNamespace();
+
+            // Rewrite the command object to use the buckets namespace.
+            BSONObjBuilder builder{originalCmdObj.objsize()};
+            for (auto&& [fieldName, elem] : originalCmdObj) {
+                if (fieldName == DistinctCommandRequest::kCommandName) {
+                    builder.append(fieldName, nss.coll());
+                } else {
+                    builder.append(elem);
+                }
+            }
+
+            return builder.obj();
+        }();
+
         auto canonicalQuery = parseDistinctCmd(opCtx,
                                                nss,
                                                cmdObj,
@@ -448,7 +472,7 @@ public:
         // and without response formatting.
         if (verbosity) {
             uassertStatusOK(ClusterAggregate::retryOnViewError(
-                opCtx, viewAggRequest, resolvedView, nss, PrivilegeVector(), &bob));
+                opCtx, viewAggRequest, resolvedView, nss, PrivilegeVector(), verbosity, &bob));
             return;
         }
 
@@ -458,7 +482,7 @@ public:
                                             viewAggRequest,
                                             true /* isMongos */));
         uassertStatusOK(ClusterAggregate::retryOnViewError(
-            opCtx, viewAggRequest, resolvedView, nss, privileges, &bob));
+            opCtx, viewAggRequest, resolvedView, nss, privileges, verbosity, &bob));
 
         // Copy the result from the aggregate command.
         CommandHelpers::extractOrAppendOk(bob);

@@ -29,7 +29,6 @@
 
 #include <utility>
 
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/baton.h"
@@ -39,7 +38,7 @@
 #include "mongo/s/resource_yielders.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 
 namespace mongo {
@@ -137,14 +136,23 @@ MultiStatementTransactionRequestsSender::~MultiStatementTransactionRequestsSende
     baton->schedule([ars = std::move(_ars)](Status) mutable { ars.reset(); });
 }
 
-bool MultiStatementTransactionRequestsSender::done() {
+bool MultiStatementTransactionRequestsSender::done() const {
     return _ars->done();
 }
 
 AsyncRequestsSender::Response MultiStatementTransactionRequestsSender::next(bool forMergeCursors) {
-    auto response = _ars->next();
-    transaction_request_sender_details::processReplyMetadata(_opCtx, response, forMergeCursors);
+    auto response = nextResponse();
+    validateResponse(response, forMergeCursors);
     return response;
+}
+
+AsyncRequestsSender::Response MultiStatementTransactionRequestsSender::nextResponse() {
+    return _ars->next();
+}
+
+void MultiStatementTransactionRequestsSender::validateResponse(
+    const AsyncRequestsSender::Response& response, bool forMergeCursors) const {
+    transaction_request_sender_details::processReplyMetadata(_opCtx, response, forMergeCursors);
 }
 
 void MultiStatementTransactionRequestsSender::stopRetrying() {

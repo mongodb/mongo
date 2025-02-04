@@ -22,6 +22,7 @@ executor:
           # Other fuzzers test commands against sharded clusters with logical session ids.
           disableImplicitSessions: true
           shardsAddedRemoved: true
+          runningWithBalancer: true
       crashOnInvalidBSONError: ""
       objcheck: ""
   hooks:

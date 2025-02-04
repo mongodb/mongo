@@ -46,12 +46,12 @@
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
@@ -81,7 +81,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     std::string uri = checked_cast<WiredTigerRecordStore*>(rs.get())->getURI();
 
     std::string indexUri = WiredTigerKVEngine::kTableUriPrefix + "myindex";
-    WiredTigerSizeStorer ss(harnessHelper->conn(), indexUri);
+    WiredTigerSizeStorer ss(&harnessHelper->connection(), indexUri);
     checked_cast<WiredTigerRecordStore*>(rs.get())->setSizeStorer(&ss);
 
     int N = 12;
@@ -141,8 +141,8 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
 
         {
             StorageWriteTransaction txn(ru);
-            WT_SESSION* s = ru.getSession()->getSession();
-            invariantWTOK(s->create(s, indexUri.c_str(), ""), s);
+            WiredTigerSession* s = ru.getSession();
+            invariantWTOK(s->create(indexUri.c_str(), ""), *s);
             txn.commit();
         }
 
@@ -150,7 +150,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     }
 
     {
-        WiredTigerSizeStorer ss2(harnessHelper->conn(), indexUri);
+        WiredTigerSizeStorer ss2(&harnessHelper->connection(), indexUri);
         auto info = ss2.load(uri);
         ASSERT_EQUALS(N, info->numRecords.load());
     }
@@ -163,7 +163,7 @@ private:
     void setUp() override {
         harnessHelper.reset(new WiredTigerHarnessHelper());
         sizeStorer.reset(new WiredTigerSizeStorer(
-            harnessHelper->conn(), WiredTigerKVEngine::kTableUriPrefix + "sizeStorer"));
+            &harnessHelper->connection(), WiredTigerKVEngine::kTableUriPrefix + "sizeStorer"));
         rs = harnessHelper->newRecordStore();
         WiredTigerRecordStore* wtRS = checked_cast<WiredTigerRecordStore*>(rs.get());
         wtRS->setSizeStorer(sizeStorer.get());
@@ -286,7 +286,7 @@ TEST_F(SizeStorerUpdateTest, ReloadAfterRollbackAndFlush) {
 
     // Simulate a shutdown and restart, which loads the size storer from disk.
     sizeStorer->flush(true);
-    sizeStorer.reset(new WiredTigerSizeStorer(harnessHelper->conn(),
+    sizeStorer.reset(new WiredTigerSizeStorer(&harnessHelper->connection(),
                                               WiredTigerKVEngine::kTableUriPrefix + "sizeStorer"));
     WiredTigerRecordStore* wtRS = checked_cast<WiredTigerRecordStore*>(rs.get());
     wtRS->setSizeStorer(sizeStorer.get());

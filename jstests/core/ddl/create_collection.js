@@ -10,15 +10,6 @@ import {
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
-// TODO (SERVER-96071): Delete this helper once the namespace length extension for tracked
-// collections is backported to v8.0.
-function is80orBelow(db) {
-    const res = db.getSiblingDB("admin")
-                    .system.version.find({_id: "featureCompatibilityVersion"})
-                    .toArray();
-    return MongoRunner.compareBinVersions(res[0].version, "8.1") < 0;
-}
-
 // "create" command rejects invalid options.
 assert.commandWorked(db.runCommand({drop: "create_collection"}));
 assert.commandFailedWithCode(db.createCollection("create_collection", {unknown: 1}),
@@ -31,15 +22,13 @@ assert.commandFailedWithCode(db.createCollection("ab\0"), ErrorCodes.InvalidName
 
 // The collection name length limit was upped in 4.4, try creating a collection with a longer
 // name than previously allowed.
-const collLength = FixtureHelpers.isMongos(db) && is80orBelow(db) ? 200 : 250;
-const longCollName = 'a'.repeat(collLength);
+const longCollName = 'a'.repeat(250);
 assert.commandWorked(db.runCommand({drop: longCollName}));
 assert.commandWorked(db.createCollection(longCollName));
 
 // The collection name for internal db collections is longer then 255 but still capped to 512.
 if (!FixtureHelpers.isMongos(db) && !TestData.testingReplicaSetEndpoint) {
-    const internalCollLength = is80orBelow(db) ? 245 : 500;
-    const internalLongCollName = 'a'.repeat(internalCollLength);
+    const internalLongCollName = 'a'.repeat(500);
     assert.commandWorked(db.runCommand({drop: internalLongCollName}));
     assert.commandWorked(db.getSiblingDB("config").runCommand({drop: internalLongCollName}));
     assert.commandWorked(db.getSiblingDB("config").createCollection(internalLongCollName));

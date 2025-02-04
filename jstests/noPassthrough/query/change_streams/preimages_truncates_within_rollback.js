@@ -125,13 +125,6 @@ const runTestCase = (expireAfterSeconds) => {
     const nodes = rollbackTest.getTestFixture().nodes;
 
     jsTest.log(`Pre-images for all nodes ${tojson(getPreImagesForAllNodes(nodes))}`);
-
-    if (expireAfterSeconds != "off") {
-        // All pre-images should eventually expire. However, due to SERVER-97243, we cannot enforce
-        // that in this test.
-        //
-        // TODO SERVER-97243 - Enforce all pre-images are removed.
-    }
     rollbackTest.stop({}, false /* skipDataConsistencyCheck */);
 };
 

@@ -317,10 +317,10 @@ key_string::Value makeFirstKeyString(const SortedDataInterface& sortedDataInterf
 /**
  * Extracts KeyString without RecordId.
  */
-key_string::Value makeKeyStringWithoutRecordId(const key_string::Value& keyStringWithRecordId,
+key_string::Value makeKeyStringWithoutRecordId(const key_string::View& keyStringWithRecordId,
                                                key_string::Version version) {
     BufBuilder bufBuilder;
-    keyStringWithRecordId.serializeWithoutRecordIdLong(bufBuilder);
+    keyStringWithRecordId.serializeWithoutRecordId(bufBuilder);
     auto builderSize = bufBuilder.len();
 
     auto buffer = bufBuilder.release();

@@ -64,17 +64,19 @@ ClusterClientCursorGuard ClusterClientCursorImpl::make(
     OperationContext* opCtx,
     std::shared_ptr<executor::TaskExecutor> executor,
     ClusterClientCursorParams&& params) {
-    std::unique_ptr<ClusterClientCursor> cursor(new ClusterClientCursorImpl(
-        opCtx, std::move(executor), std::move(params), opCtx->getLogicalSessionId()));
-    return ClusterClientCursorGuard(opCtx, std::move(cursor));
+    return ClusterClientCursorGuard(
+        opCtx,
+        std::make_unique<ClusterClientCursorImpl>(
+            opCtx, std::move(executor), std::move(params), opCtx->getLogicalSessionId()));
 }
 
 ClusterClientCursorGuard ClusterClientCursorImpl::make(OperationContext* opCtx,
                                                        std::unique_ptr<RouterExecStage> root,
                                                        ClusterClientCursorParams&& params) {
-    std::unique_ptr<ClusterClientCursor> cursor(new ClusterClientCursorImpl(
-        opCtx, std::move(root), std::move(params), opCtx->getLogicalSessionId()));
-    return ClusterClientCursorGuard(opCtx, std::move(cursor));
+    return ClusterClientCursorGuard(
+        opCtx,
+        std::make_unique<ClusterClientCursorImpl>(
+            opCtx, std::move(root), std::move(params), opCtx->getLogicalSessionId()));
 }
 
 ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
@@ -91,7 +93,8 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
       _queryStatsKeyHash(CurOp::get(opCtx)->debug().queryStatsInfo.keyHash),
       _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key)),
-      _queryStatsWillNeverExhaust(CurOp::get(opCtx)->debug().queryStatsInfo.willNeverExhaust) {
+      _queryStatsWillNeverExhaust(CurOp::get(opCtx)->debug().queryStatsInfo.willNeverExhaust),
+      _isChangeStreamQuery(CurOp::get(opCtx)->debug().isChangeStreamQuery) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -112,8 +115,8 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
       _queryStatsKeyHash(CurOp::get(opCtx)->debug().queryStatsInfo.keyHash),
       _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key)),
-      _queryStatsWillNeverExhaust(
-          std::move(CurOp::get(opCtx)->debug().queryStatsInfo.willNeverExhaust)) {
+      _queryStatsWillNeverExhaust(CurOp::get(opCtx)->debug().queryStatsInfo.willNeverExhaust),
+      _isChangeStreamQuery(CurOp::get(opCtx)->debug().isChangeStreamQuery) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -138,7 +141,7 @@ StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() {
         auto front = std::move(_stash.front());
         _stash.pop();
         ++_numReturnedSoFar;
-        return {front};
+        return {std::move(front)};
     }
 
     auto next = _root->next();
@@ -213,19 +216,19 @@ long long ClusterClientCursorImpl::getNumReturnedSoFar() const {
     return _numReturnedSoFar;
 }
 
-void ClusterClientCursorImpl::queueResult(const ClusterQueryResult& result) {
+void ClusterClientCursorImpl::queueResult(ClusterQueryResult&& result) {
     auto resultObj = result.getResult();
     if (resultObj) {
         invariant(resultObj->isOwned());
     }
-    _stash.push(result);
+    _stash.push(std::move(result));
 }
 
-bool ClusterClientCursorImpl::remotesExhausted() {
+bool ClusterClientCursorImpl::remotesExhausted() const {
     return _root->remotesExhausted();
 }
 
-bool ClusterClientCursorImpl::hasBeenKilled() {
+bool ClusterClientCursorImpl::hasBeenKilled() const {
     return _hasBeenKilled;
 }
 

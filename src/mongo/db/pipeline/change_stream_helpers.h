@@ -72,6 +72,7 @@ static const std::set<StringData> kClassicOperationTypes =
                          DocumentSourceChangeStream::kDropDatabaseOpType,
                          DocumentSourceChangeStream::kInvalidateOpType,
                          DocumentSourceChangeStream::kReshardBeginOpType,
+                         DocumentSourceChangeStream::kReshardBlockingWritesOpType,
                          DocumentSourceChangeStream::kReshardDoneCatchUpOpType,
                          DocumentSourceChangeStream::kNewShardDetectedOpType};
 

@@ -127,8 +127,13 @@ public:
     void markAsJumbo();
 
 private:
-    const ChunkRange _range;
+    // IMPORTANT: The order of the members here mattters,
+    // as it affects the performance of ChunkManager.
+    // '_maxKeyString' must remain first member of this class because it is frequently
+    // accessed by the ChunkManager.
     const std::string _maxKeyString;
+
+    const ChunkRange _range;
 
     const ShardId _shardId;
 

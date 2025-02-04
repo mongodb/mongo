@@ -48,6 +48,7 @@
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/temp_dir.h"
+#include "mongo/util/clock_source_mock.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWiredTiger
 
@@ -79,18 +80,20 @@ protected:
     }
 
     void openConnectionAndCreateSession() {
-        ASSERT_WT_OK(
-            wiredtiger_open(_path.path().c_str(), nullptr, "create,statistics=(fast),", &_conn));
-        _session = std::make_unique<WiredTigerSession>(_conn);
-        ASSERT_WT_OK(
-            (*_session)->create(_session->getSession(),
-                                _uri.c_str(),
-                                "type=file,key_format=q,value_format=u,log=(enabled=false)"));
+        WT_CONNECTION* wtConnection;
+        ASSERT_WT_OK(wiredtiger_open(
+            _path.path().c_str(), nullptr, "create,statistics=(fast),", &wtConnection));
+        _conn = std::make_unique<WiredTigerConnection>(wtConnection, &_clockSource);
+        _session = std::make_unique<WiredTigerSession>(_conn.get());
+        ASSERT_WT_OK(_session->create(_uri.c_str(),
+                                      "type=file,key_format=q,value_format=u,log=(enabled=false)"));
     }
 
     void closeConnection() {
         _session.reset();
-        ASSERT_EQ(_conn->close(_conn, nullptr), 0);
+        WT_CONNECTION* wtConnection = _conn->conn();
+        _conn.reset();
+        ASSERT_EQ(wtConnection->close(wtConnection, nullptr), 0);
     }
 
     /**
@@ -115,11 +118,10 @@ protected:
      * Writes at the specified key to WT.
      */
     void writeAtKey(const std::string& data, int64_t key) {
-        ASSERT_WT_OK((*_session)->begin_transaction(_session->getSession(), nullptr));
+        ASSERT_WT_OK(_session->begin_transaction(nullptr));
 
         WT_CURSOR* cursor;
-        ASSERT_WT_OK((*_session)->open_cursor(
-            _session->getSession(), _uri.c_str(), nullptr, nullptr, &cursor));
+        ASSERT_WT_OK(_session->open_cursor(_uri.c_str(), nullptr, nullptr, &cursor));
 
         cursor->set_key(cursor, key);
 
@@ -128,21 +130,20 @@ protected:
 
         ASSERT_WT_OK(cursor->insert(cursor));
         ASSERT_WT_OK(cursor->close(cursor));
-        ASSERT_WT_OK((*_session)->commit_transaction(_session->getSession(), nullptr));
+        ASSERT_WT_OK(_session->commit_transaction(nullptr));
 
         // Without a checkpoint, an operation is not guaranteed to write to disk.
-        ASSERT_WT_OK((*_session)->checkpoint(_session->getSession(), nullptr));
+        ASSERT_WT_OK(_session->checkpoint(nullptr));
     }
 
     /**
      * Reads at the specified key from WT.
      */
     void readAtKey(int64_t key) {
-        ASSERT_WT_OK((*_session)->begin_transaction(_session->getSession(), nullptr));
+        ASSERT_WT_OK(_session->begin_transaction(nullptr));
 
         WT_CURSOR* cursor;
-        ASSERT_WT_OK((*_session)->open_cursor(
-            _session->getSession(), _uri.c_str(), nullptr, nullptr, &cursor));
+        ASSERT_WT_OK(_session->open_cursor(_uri.c_str(), nullptr, nullptr, &cursor));
 
         cursor->set_key(cursor, key);
         ASSERT_WT_OK(cursor->search(cursor));
@@ -151,7 +152,7 @@ protected:
         ASSERT_WT_OK(cursor->get_value(cursor, &value));
 
         ASSERT_WT_OK(cursor->close(cursor));
-        ASSERT_WT_OK((*_session)->commit_transaction(_session->getSession(), nullptr));
+        ASSERT_WT_OK(_session->commit_transaction(nullptr));
     }
 
     /**
@@ -166,7 +167,8 @@ protected:
 
     unittest::TempDir _path{"wiredtiger_operation_stats_test"};
     std::string _uri{"table:wiredtiger_operation_stats_test"};
-    WT_CONNECTION* _conn;
+    ClockSourceMock _clockSource;
+    std::unique_ptr<WiredTigerConnection> _conn;
     std::unique_ptr<WiredTigerSession> _session;
     /* Number of reads the fixture will prepare in setUp(), consequently max amount of times read()
      * can be called in a test.  */
@@ -182,7 +184,8 @@ TEST_F(WiredTigerStatsTest, EmptySession) {
     auto verbosityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kWiredTiger,
                                                                logv2::LogSeverity::Debug(5)};
     auto verboseConfig = WiredTigerUtil::generateWTVerboseConfiguration();
-    ASSERT_OK(wtRCToStatus(_conn->reconfigure(_conn, verboseConfig.c_str()), nullptr));
+    ASSERT_OK(
+        wtRCToStatus(_conn->conn()->reconfigure(_conn->conn(), verboseConfig.c_str()), nullptr));
 
     // Read and write statistics should be empty. Check "data" field does not exist. "wait" fields
     // such as the schemaLock might have some value.
@@ -190,8 +193,7 @@ TEST_F(WiredTigerStatsTest, EmptySession) {
 
     {
         BSONObjBuilder bob;
-        ASSERT_OK(
-            WiredTigerUtil::exportTableToBSON(_session->getSession(), "statistics:", "", bob));
+        ASSERT_OK(WiredTigerUtil::exportTableToBSON(*_session, "statistics:", "", bob));
         LOGV2(9032000, "Connection statistics", "stats"_attr = bob.obj());
     }
 

@@ -402,11 +402,10 @@ void _initializeGlobalShardingState(OperationContext* opCtx,
     // List of hooks which will be called by the ShardRegistry when it discovers a shard has been
     // removed.
     std::vector<ShardRegistry::ShardRemovalHook> shardRemovalHooks = {
-        // Invalidate appropriate entries in the CatalogCache when a shard is removed. It's safe to
-        // capture the CatalogCache pointer since the Grid (and therefore CatalogCache and
-        // ShardRegistry) are never destroyed.
+        // It's safe to capture the CatalogCache pointer since the Grid (and therefore CatalogCache
+        // and ShardRegistry) are never destroyed.
         [catCache = catalogCache.get()](const ShardId& removedShard) {
-            catCache->invalidateEntriesThatReferenceShard(removedShard);
+            catCache->advanceTimeInStoreForEntriesThatReferenceShard(removedShard);
         }};
 
     auto shardRegistry = std::make_unique<ShardRegistry>(
@@ -459,11 +458,16 @@ void _initializeGlobalShardingStateForConfigServer(OperationContext* opCtx) {
         return boost::none;
     }();
 
-    // TODO SERVER-84243 replace the line below with the initialisation of the routing information
-    // cache on the Grid.
-    RoutingInformationCache::set(service);
-
     _initializeGlobalShardingState(opCtx, configCS);
+
+    // (Ignore FCV check): this feature flag is not FCV-gated.
+    if (feature_flags::gDualCatalogCache.isEnabledAndIgnoreFCVUnsafe()) {
+        // With the feature flag enabled, there is a separate routing and filtering cache, so this
+        // cache and the routing cache can be the same.
+        RoutingInformationCache::setOverride(service, Grid::get(service)->catalogCache());
+    } else {
+        RoutingInformationCache::set(service);
+    }
 
     ShardingInitializationMongoD::get(opCtx)->installReplicaSetChangeListener(service);
 

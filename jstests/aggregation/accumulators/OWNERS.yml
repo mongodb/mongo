@@ -1,0 +1,25 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query-execution-aggregation
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads
+      - 10gen/query-optimization-staff-leads
+      - 10gen/query-integration-staff-leads
+  - "accumulator_js*":
+    approvers:
+      - 10gen/query-integration-javascript
+  - "internal_js*":
+    approvers:
+      - 10gen/query-integration-javascript
+  - "percentiles*":
+    approvers:
+      - 10gen/query-integration-analytic-extensions
+  - "median*":
+    approvers:
+      - 10gen/query-integration-analytic-extensions
+  - "percentiles_syntax.js":
+    approvers:
+      - 10gen/query-optimization-parsers

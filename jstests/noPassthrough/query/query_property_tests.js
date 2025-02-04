@@ -4,9 +4,10 @@
  */
 
 import {
-    concreteQueryFromFamily
+    concreteQueryFromFamily,
+    defaultPbtDocuments,
 } from "jstests/libs/property_test_helpers/property_testing_utils.js";
-import {listOfIndexesModel} from "jstests/libs/property_test_helpers/query_models.js";
+import {indexModel, timeseriesIndexModel} from "jstests/libs/property_test_helpers/query_models.js";
 import {propertyTests} from "jstests/libs/property_test_helpers/query_properties.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
@@ -26,26 +27,6 @@ const experimentDb = experimentConn.getDB(jsTestName());
 const experimentPlainColl = experimentDb.experiment_collection;
 const experimentTsColl = experimentDb.experiment_ts_collection;
 
-const datePrefix = 1680912440;
-const alphabet = 'abcdefghijklmnopqrstuvwxyz';
-const docs = [];
-let id = 0;
-for (let m = 0; m < 10; m++) {
-    let currentDate = 0;
-    for (let i = 0; i < 10; i++) {
-        docs.push({
-            _id: id,
-            t: new Date(datePrefix + currentDate - 100),
-            m: {m1: m, m2: 2 * m},
-            array: [i, i + 1, 2 * i],
-            a: NumberInt(10 - i),
-            b: alphabet.charAt(i)
-        });
-        currentDate += 25;
-        id += 1;
-    }
-}
-
 // Setup our control collection, as well as our experiment control and experiment TS collections.
 assert.commandWorked(
     controlDb.adminCommand({configureFailPoint: 'disablePipelineOptimization', mode: 'alwaysOn'}));
@@ -53,6 +34,7 @@ assert.commandWorked(experimentDb.createCollection(experimentTsColl.getName(), {
     timeseries: {timeField: 't', metaField: 'm'},
 }));
 
+const docs = defaultPbtDocuments();
 assert.commandWorked(controlColl.insert(docs));
 assert.commandWorked(experimentPlainColl.insert(docs));
 assert.commandWorked(experimentTsColl.insert(docs));
@@ -110,33 +92,6 @@ function reporter(propertyFn) {
     };
 }
 
-function isWildcardIndex(index) {
-    for (const field of Object.keys(index.def)) {
-        if (field.includes('$**')) {
-            return true;
-        }
-    }
-    return false;
-}
-
-function isHashedIndex(index) {
-    for (const field of Object.keys(index.def)) {
-        if (index.def[field] === 'hashed') {
-            return true;
-        }
-    }
-    return false;
-}
-
-function isMultikey(index) {
-    for (const field of Object.keys(index.def)) {
-        if (field === 'array') {
-            return true;
-        }
-    }
-    return false;
-}
-
 // Test a property, given the property function (from query_properties.js). We construct a pipeline
 // model from some metadata about the property, and call `runProperty` to clear state and call the
 // property function correctly. On failure, `runProperty` is called again in the reporter, and
@@ -145,24 +100,20 @@ function testProperty(propertyFn, aggModel, numQueriesNeeded, numRuns) {
     const nPipelinesArb =
         fc.array(aggModel, {minLength: numQueriesNeeded, maxLength: numQueriesNeeded});
 
-    const scenarioArb = fc.tuple(fc.boolean(), listOfIndexesModel, nPipelinesArb)
-                            .filter(([isTs, indexes, pipelines]) => {
-                                // --- Permanent conditions ---
-                                // TS collections don't support Wildcard, Hashed, or Sparse indexes.
-                                // Also multikey indexes on measurement fields are not allowed.
-                                if (isTs) {
-                                    for (const index of indexes) {
-                                        if (index.options.sparse || isWildcardIndex(index) ||
-                                            isHashedIndex(index) || isMultikey(index)) {
-                                            return false;
-                                        }
-                                    }
-                                }
-                                return true;
-                            });
+    const regularScenarioArb = fc.record({
+        isTs: fc.constant(false),
+        indexes: fc.array(indexModel, {minLength: 0, maxLength: 7}),
+        pipelines: nPipelinesArb
+    });
+    const timeSeriesScenarioArb = fc.record({
+        isTs: fc.constant(true),
+        indexes: fc.array(timeseriesIndexModel, {minLength: 0, maxLength: 7}),
+        pipelines: nPipelinesArb
+    });
+    const scenarioArb = fc.oneof(regularScenarioArb, timeSeriesScenarioArb);
 
     fc.assert(fc.property(scenarioArb,
-                          ([isTs, indexes, pipelines]) => {
+                          ({isTs, indexes, pipelines}) => {
                               // Only return if the property passed or not. On failure,
                               // `runProperty` is called again and more details are exposed.
                               return runProperty(propertyFn, isTs, indexes, pipelines).passed;

@@ -121,6 +121,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "09EC87EC1562264EEBD9FFB4AFCA462B420CE9D7D84761393C1EDFF22CC0DC52",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -301,6 +302,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "478B6A0368D57A8E91672794B842019CD3599311CF35C5BF57ADC37B3B32D884",
 	"shardsPart" : [
 		{
 			"$match" : {
@@ -411,6 +413,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "9A81DF86B99921BDA452D7B2B1C281B4DD92D7793B7A41490B713E2E6240ABA8",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -518,6 +521,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "2383D49B22274AFD9D150CAAF21DEE74D13CECD29F757749126D14AB6A8A1259",
 	"shardsPart" : [
 		{
 			"$project" : {
@@ -606,6 +610,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "09640F28D8AD9D13A38E9B0AD3B6639B815174E1C2D6EA8056C9C98F379C4304",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -759,6 +764,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "744ECBEB61B075559F88DC0388215DE156259BB0F0064E78DDA8F8941EE745BA",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -894,6 +900,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "78D76645B1D16F553E5F8EE2980FAB231DCC0EF7F8EF99C7A4F9CEE10F0E5460",
 	"shardsPart" : [
 		{
 			"$project" : {
@@ -1032,6 +1039,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "C605458B8E6E7334D2C90BC2104F144FD6F0C35D1D81B1AD224B21D9569B3346",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -1227,6 +1235,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "01FA23646F5D8B9B4431EE11F599E449A1C20E7F13511FF8A8A3D584334FDBB9",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -1376,6 +1385,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "7D37D6CBCE761BFCFC3A2C9573ACFCF7D1A4AA1FAECBB63DBA95DCC5848764CC",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -1482,6 +1492,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "801173738BA7069D3C0E0D81881FD43C5B89488ABF1BFFE408F46A06BBD3C6F6",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -1598,6 +1609,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "F3459C97A782CC2BD58165A9EE9BB0E1F2CCC8D51597AABBF3C54BD884203868",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -1719,6 +1731,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "8815C6186EC271EF6EAD8060BE52DEA1E3BD053F10839B00FDA354341E8F59B4",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -1814,6 +1827,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "6270E1992E2C5A949A3BF78D8A05435A314BD09755ABC29677C048A700397834",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -1919,6 +1933,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "F8083EDFC37C8CC3733CEDD935E4B3C831389D112C8EE226B709FAF053BD938B",
 	"shardsPart" : [
 		{
 			"$project" : {
@@ -2027,6 +2042,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "B1196288FCD6D08D7BCD65966BBBDE65B135237A5052F14820D01F6407A0F3A6",
 	"shardsPart" : [
 		{
 			"$project" : {
@@ -2151,6 +2167,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "1D7219367D726673E808E9ADABBA76A609AC8A44D104676C049DBCF4D99004B2",
 	"shardsPart" : [
 		{
 			"$addFields" : {
@@ -2243,6 +2260,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "212EE000EB2F7C3432078C9D533F87A72EB238E2129907C7F4A4D2A699947658",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -2375,6 +2393,7 @@
 			}
 		}
 	],
+	"queryShapeHash" : "09DBC64EC8B53958B982EBE3BD1BE19E71C1317D623AC79678873C14E1403B14",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -2485,6 +2504,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 			}
 		}
 	],
+	"queryShapeHash" : "B41F2EC9172F6DC814DF78027338CF30B2DAB99831594593CFEF245E4A09DF0E",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -2620,6 +2640,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 			}
 		}
 	],
+	"queryShapeHash" : "B3C864E3B979A9C1B9204E3ED19C34C7FF2F405B7160A775B41011C9C1814BC4",
 	"shardsPart" : [
 		{
 			"$project" : {
@@ -2720,6 +2741,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 			}
 		}
 	],
+	"queryShapeHash" : "24ED0D35376542D41F0864F8C9CA57CEEB2C5349BC4D4B19E604D676D6F03ED2",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -2819,6 +2841,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 			}
 		}
 	],
+	"queryShapeHash" : "DAEAFF96C282BD9AD9C46355BBF7CC957C9F1422034E2A9628230E3418D1F7AA",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -2928,6 +2951,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 			}
 		}
 	],
+	"queryShapeHash" : "E14ADCE7FE8E28132D87B7342B3646B56A17778A7C09920810A13809BF0D0D5C",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -3057,6 +3081,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 			}
 		}
 	],
+	"queryShapeHash" : "4A506A9019D292BBC65C1580E7334C4734704B2505A8D7E6D32DA2B49BE95CB3",
 	"shardsPart" : [
 		{
 			"$project" : {
@@ -3209,6 +3234,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 			}
 		}
 	],
+	"queryShapeHash" : "B02FCF28584D92BB14174CAC9DA5147AAA724016A998B55B7C44231BCCFBE901",
 	"shardsPart" : [
 		{
 			"$project" : {
@@ -3318,6 +3344,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 			}
 		}
 	],
+	"queryShapeHash" : "E59D43DD14125FE5B51043359F995E95C252781A68D114AAFE19CB6EA235C1AA",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -3442,6 +3469,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 			}
 		}
 	],
+	"queryShapeHash" : "F914DD4E873964214B07A5ABD513F7CB3EDD9B0BF67E25A3C1B527974ADB64D6",
 	"shardsPart" : [
 		{
 			"$project" : {
@@ -3562,6 +3590,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 			}
 		}
 	],
+	"queryShapeHash" : "02C301C10BD18B30DE4781D29D1010E2929142A43962083EC483BE52763D2099",
 	"shardsPart" : [
 		{
 			"$group" : {
@@ -3723,6 +3752,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 			}
 		}
 	],
+	"queryShapeHash" : "C259DE523DB4694D046A9B1A41F3EE34A56E621DA571DAEF926E0DF41E45542E",
 	"shardsPart" : [
 		{
 			"$addFields" : {

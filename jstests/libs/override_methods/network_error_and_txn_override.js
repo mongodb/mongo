@@ -161,7 +161,6 @@ const kNonFailoverTolerantCommands = new Set([
     "planCacheSetFilter",
     "profile",       // Not replicated, so can't tolerate failovers.
     "setParameter",  // Not replicated, so can't tolerate failovers.
-    "stageDebug",
     "startSession",  // Sessions are flushed to disk asynchronously.
 ]);
 
@@ -351,7 +350,7 @@ function validateCmdNetworkErrorCompatibility(cmdName, cmdObj) {
         }
 
         const hasExplain = cmdObj.hasOwnProperty("explain");
-        if (hasExplain) {
+        if (hasExplain && cmdObj.explain) {
             throw new Error(
                 "Refusing to run a test that issues an aggregation command with explain" +
                 " because it may return incomplete results if interrupted by a stepdown." +
@@ -400,6 +399,7 @@ function appendReadAndWriteConcern(conn, dbName, cmdName, cmdObj) {
             shouldForceWriteConcern = false;
         }
     } else if (cmdName === "aggregate") {
+        // TODO (SERVER-98658) Reconsider if $listClusterCatalog still needs a local read concern
         if (OverrideHelpers.isAggregationWithListLocalSessionsStage(cmdName, cmdObj) ||
             OverrideHelpers.isAggregationWithChangeStreamStage(cmdName, cmdObj) ||
             OverrideHelpers.isAggregationWithCurrentOpStage(cmdName, cmdObj) ||

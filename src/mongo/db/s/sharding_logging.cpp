@@ -54,7 +54,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/transport/session.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"

@@ -154,6 +154,7 @@ public:
 
     const boost::optional<LegacyRuntimeConstants>& getLegacyRuntimeConstants() const;
     const boost::optional<BSONObj>& getLet() const;
+    void setLet(boost::optional<mongo::BSONObj> value);
     const OptionalBool& getBypassEmptyTsReplacement() const;
 
     /**
@@ -167,6 +168,11 @@ public:
     void serialize(BSONObjBuilder* builder) const;
     BSONObj toBSON() const;
     std::string toString() const;
+
+    /**
+     * Gets an estimate of the size, in bytes, of the top-level fields in the command.
+     */
+    int getBaseCommandSizeEstimate(OperationContext* opCtx) const;
 
     /**
      * Generates a new request, the same as the old, but with insert _ids if required.

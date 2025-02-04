@@ -134,9 +134,6 @@ def mongod_program(
         suite_set_parameters, "defaultConfigCommandTimeoutMS", bin_version, "7.3.0"
     )
 
-    if "grpcPort" not in mongod_options and suite_set_parameters.get("featureFlagGRPC"):
-        mongod_options["grpcPort"] = network.PortAllocator.next_fixture_port(job_num)
-
     remove_set_parameter_if_before_version(
         suite_set_parameters, "internalQueryStatsRateLimit", bin_version, "7.3.0"
     )
@@ -201,9 +198,6 @@ def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos
     remove_set_parameter_if_before_version(
         suite_set_parameters, "defaultConfigCommandTimeoutMS", bin_version, "7.3.0"
     )
-
-    if "grpcPort" not in mongos_options and suite_set_parameters.get("featureFlagGRPC"):
-        mongos_options["grpcPort"] = network.PortAllocator.next_fixture_port(job_num)
 
     remove_set_parameter_if_before_version(
         suite_set_parameters, "internalQueryStatsRateLimit", bin_version, "7.3.0"
@@ -304,6 +298,9 @@ def mongo_shell_program(
                 continue
 
             test_data[opt_name] = config.CONFIG_FUZZER_ENCRYPTION_OPTS[opt_name]
+
+    if config.LOG_FORMAT:
+        test_data["logFormat"] = config.LOG_FORMAT
 
     if config.SHELL_TLS_ENABLED:
         test_data["shellTlsEnabled"] = True
@@ -479,7 +476,9 @@ def mongo_shell_program(
         if config.SHELL_TLS_CERTIFICATE_KEY_FILE:
             kwargs["tlsCertificateKeyFile"] = config.SHELL_TLS_CERTIFICATE_KEY_FILE
 
-    if config.SHELL_GRPC:
+    # mongotmock testing with gRPC requires that the shell establish a connection with mongotmock
+    # over gRPC.
+    if config.SHELL_GRPC or mongod_set_parameters.get("useGrpcForSearch"):
         args.append("--gRPC")
 
     if connection_string is not None:
@@ -493,7 +492,7 @@ def mongo_shell_program(
             kwargs.pop("host")
 
     # if featureFlagQETextSearchPreview is enabled in setParameter, enable it in the shell also
-    # TODO: SERVER-94394 remove once FF is enabled by default
+    # TODO: SERVER-65769 remove once FF is enabled by default
     if mongod_set_parameters.get("featureFlagQETextSearchPreview"):
         args.append("--setShellParameter=featureFlagQETextSearchPreview=true")
 

@@ -76,13 +76,65 @@
 namespace mongo {
 namespace AccumulatorTests {
 
+namespace {
+/**
+ * Creates an expression given by 'expressionName' and evaluates it using
+ * 'operands' as inputs, returning the result.
+ */
+Value evaluateExpression(const std::string& expressionName,
+                         const std::vector<ImplicitValue>& operands) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    const BSONObj obj = BSON(expressionName << Value(ImplicitValue::convertToValues(operands)));
+    auto expression = Expression::parseExpression(&expCtx, obj, vps);
+    Value result = expression->evaluate({}, &expCtx.variables);
+    return result;
+}
+
+/**
+ * Takes the name of an expression as its first argument and a list of pairs of arguments and
+ * expected results as its second argument, and asserts that for the given expression the arguments
+ * evaluate to the expected results.
+ */
+void assertExpectedResults(
+    const std::string& expression,
+    std::initializer_list<std::pair<std::initializer_list<ImplicitValue>, ImplicitValue>>
+        operations) {
+    for (auto&& op : operations) {
+        try {
+            Value result = evaluateExpression(expression, op.first);
+            ASSERT_VALUE_EQ(op.second, result);
+            ASSERT_EQUALS(op.second.getType(), result.getType());
+        } catch (...) {
+            LOGV2(9949806, "failed", "argument"_attr = ImplicitValue::convertToValues(op.first));
+            throw;
+        }
+    }
+}
+
+/**
+ * Given 'parseFn', parses and evaluates 'spec' and verifies that the result is equal to
+ * 'expected'. Useful when the parser for an expression is unavailable in certain contexts (for
+ * instance, when evaluating an expression that's guarded by a feature flag that's off by default).
+ */
+void parseAndVerifyResults(
+    const std::function<boost::intrusive_ptr<Expression>(
+        ExpressionContext* const, BSONElement, const VariablesParseState&)>& parseFn,
+    const BSONElement& elem,
+    Value expected) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    auto expr = parseFn(&expCtx, elem, vps);
+    ASSERT_VALUE_EQ(expr->evaluate({}, &expCtx.variables), expected);
+}
+
 /**
  * Asserts that all elements contained in the array 'result' are contained in the array 'expected'
  * and vice versa.
  */
-static void assertArrayValueEqualityWithoutOrdering(ExpressionContext* const expCtx,
-                                                    Value result,
-                                                    Value expected) {
+void assertArrayValueEqualityWithoutOrdering(ExpressionContext* const expCtx,
+                                             Value result,
+                                             Value expected) {
     ASSERT(result.isArray());
     ASSERT(expected.isArray());
     ASSERT_EQUALS(result.getArrayLength(), expected.getArrayLength());
@@ -104,7 +156,7 @@ static void assertArrayValueEqualityWithoutOrdering(ExpressionContext* const exp
  */
 using OperationsType = std::vector<std::pair<std::vector<Value>, Value>>;
 
-static void assertExpectedResults(
+void assertExpectedResults(
     ExpressionContext* const expCtx,
     OperationsType operations,
     std::function<boost::intrusive_ptr<AccumulatorState>(ExpressionContext* const)>
@@ -175,14 +227,13 @@ static void assertExpectedResults(
  * arguments evaluate to the expected results.
  */
 template <typename AccName>
-static void assertExpectedResults(
-    ExpressionContext* const expCtx,
-    std::initializer_list<std::pair<std::vector<Value>, Value>> operations,
-    bool skipMerging = false,
-    boost::optional<Value> newGroupValue = boost::none) {
+void assertExpectedResults(ExpressionContext* const expCtx,
+                           std::initializer_list<std::pair<std::vector<Value>, Value>> operations,
+                           bool skipMerging = false,
+                           boost::optional<Value> newGroupValue = boost::none) {
     auto initializeAccumulator =
         [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-        auto accum = AccName::create(expCtx);
+        auto accum = make_intrusive<AccName>(expCtx);
         if (newGroupValue) {
             accum->startNewGroup(*newGroupValue);
         }
@@ -190,6 +241,8 @@ static void assertExpectedResults(
     };
     assertExpectedResults(expCtx, OperationsType(operations), initializeAccumulator, skipMerging);
 }
+
+}  // namespace
 
 TEST(Accumulators, Avg) {
     auto expCtx = ExpressionContextForTest{};
@@ -671,7 +724,7 @@ TEST(Accumulators, TopBottomNRespectsCollation) {
         expCtx.get(),
         bottomCasesAscending,
         [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
+            auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kBottom, false>>(
                 expCtx, BSON("a" << 1));
             acc->startNewGroup(n);
             return acc;
@@ -684,7 +737,7 @@ TEST(Accumulators, TopBottomNRespectsCollation) {
         expCtx.get(),
         bottomCasesDescending,
         [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
+            auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kBottom, false>>(
                 expCtx, BSON("a" << -1));
             acc->startNewGroup(n);
             return acc;
@@ -697,8 +750,8 @@ TEST(Accumulators, TopBottomNRespectsCollation) {
         expCtx.get(),
         topCasesAscending,
         [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc =
-                AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(expCtx, BSON("a" << 1));
+            auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kTop, false>>(
+                expCtx, BSON("a" << 1));
             acc->startNewGroup(n);
             return acc;
         });
@@ -710,8 +763,8 @@ TEST(Accumulators, TopBottomNRespectsCollation) {
         expCtx.get(),
         topCasesDescending,
         [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc =
-                AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(expCtx, BSON("a" << -1));
+            auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kTop, false>>(
+                expCtx, BSON("a" << -1));
             acc->startNewGroup(n);
             return acc;
         });
@@ -797,7 +850,7 @@ TEST(Accumulators, TopNDescendingBottomNAscending) {
     try {
         auto accumInit =
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
+            auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kBottom, false>>(
                 expCtx, BSON("a" << 1));
             acc->startNewGroup(n3);
             return acc;
@@ -844,8 +897,8 @@ TEST(Accumulators, TopNDescendingBottomNAscending) {
     try {
         auto accInit =
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc =
-                AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(expCtx, BSON("a" << -1));
+            auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kTop, false>>(
+                expCtx, BSON("a" << -1));
             acc->startNewGroup(n3);
             return acc;
         };
@@ -945,7 +998,7 @@ TEST(Accumulators, TopNAscendingBottomNDescending) {
     try {
         auto accInit =
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
+            auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kBottom, false>>(
                 expCtx, BSON("a" << -1));
             acc->startNewGroup(n3);
             return acc;
@@ -992,8 +1045,8 @@ TEST(Accumulators, TopNAscendingBottomNDescending) {
     try {
         auto accInit =
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc =
-                AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(expCtx, BSON("a" << 1));
+            auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kTop, false>>(
+                expCtx, BSON("a" << 1));
             acc->startNewGroup(n3);
             return acc;
         };
@@ -1046,7 +1099,7 @@ TEST(Accumulators, TopBottomNMultiSortPattern) {
     try {
         auto accInit =
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
+            auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kBottom, false>>(
                 expCtx, BSON("a" << -1 << "b" << -1));
             acc->startNewGroup(n);
             return acc;
@@ -1068,7 +1121,7 @@ TEST(Accumulators, TopBottomNMultiSortPattern) {
     try {
         auto accInit =
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc = AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(
+            auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kTop, false>>(
                 expCtx, BSON("a" << 1 << "b" << 1));
             acc->startNewGroup(n);
             return acc;
@@ -1088,7 +1141,8 @@ void runTopBottomAccumulatorTest(ExpressionContext* const expCtx,
     try {
         auto accInit =
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-            auto acc = AccumulatorTopBottomN<Sense, false>::create(expCtx, BSON("a" << dir));
+            auto acc =
+                make_intrusive<AccumulatorTopBottomN<Sense, false>>(expCtx, BSON("a" << dir));
             acc->startNewGroup(n);
             return acc;
         };
@@ -1148,7 +1202,7 @@ void testSingle(OperationsType cases, ExpressionContext* const expCtx, const BSO
             expCtx,
             cases,
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-                auto acc = AccumulatorTopBottomN<s, true>::create(expCtx, sortPattern);
+                auto acc = make_intrusive<AccumulatorTopBottomN<s, true>>(expCtx, sortPattern);
                 acc->startNewGroup(Value(1));
                 return acc;
             });
@@ -1188,8 +1242,8 @@ TEST(Accumulators, TopBottomSingle) {
             expCtx.get(),
             bottomAscTopDescCases,
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-                auto acc =
-                    AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(expCtx, ascSort);
+                auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kBottom, false>>(
+                    expCtx, ascSort);
                 acc->startNewGroup(n);
                 return acc;
             });
@@ -1204,7 +1258,7 @@ TEST(Accumulators, TopBottomSingle) {
             expCtx.get(),
             bottomAscTopDescCases,
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-                auto acc = AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(
+                auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kTop, false>>(
                     expCtx, BSON("a" << -1));
                 acc->startNewGroup(n);
                 return acc;
@@ -1231,7 +1285,7 @@ TEST(Accumulators, TopBottomSingle) {
             expCtx.get(),
             bottomDescTopAscCases,
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-                auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
+                auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kBottom, false>>(
                     expCtx, BSON("a" << -1));
                 acc->startNewGroup(n);
                 return acc;
@@ -1248,7 +1302,7 @@ TEST(Accumulators, TopBottomSingle) {
             expCtx.get(),
             bottomDescTopAscCases,
             [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-                auto acc = AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(
+                auto acc = make_intrusive<AccumulatorTopBottomN<TopBottomSense::kTop, false>>(
                     expCtx, BSON("a" << 1));
                 acc->startNewGroup(n);
                 return acc;
@@ -1266,7 +1320,7 @@ struct TopBottomNRemoveTest : public AggregationContextFixture {
         auto expCtx = getExpCtxRaw();
         expCtx->setCollator(std::make_unique<CollatorInterfaceMock>(
             CollatorInterfaceMock::MockType::kToLowerString));
-        auto accState = T::create(expCtx, sortBy, /* isRemovable */ true);
+        auto accState = make_intrusive<T>(expCtx, sortBy, /* isRemovable */ true);
         _acc = boost::dynamic_pointer_cast<T>(accState);
         _acc->startNewGroup(Value(n.value_or(1)));
     }
@@ -1687,11 +1741,13 @@ TEST_F(BottomRemoveTest, BottomRemoveNoUnderflow) {
     testNoRemoveUnderflow();
 }
 
+template <typename RankType>
+auto makeLegacyRank(ExpressionContext* const expCtx) {
+    return make_intrusive<RankType>(expCtx, true /* isAscending */);
+}
+
 TEST(Accumulators, Rank) {
     auto expCtx = ExpressionContextForTest{};
-    auto accInit = [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-        return AccumulatorRank::create(expCtx, true /* isAscending */);
-    };
     assertExpectedResults(
         &expCtx,
         {
@@ -1710,15 +1766,12 @@ TEST(Accumulators, Rank) {
             {{Value{}, Value{}}, Value(1)},
 
         },
-        accInit,
+        makeLegacyRank<AccumulatorRank>,
         true /* rank can't be merged */);
 }
 
 TEST(Accumulators, DenseRank) {
     auto expCtx = ExpressionContextForTest{};
-    auto accInit = [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-        return AccumulatorDenseRank::create(expCtx, true /* isAscending */);
-    };
     assertExpectedResults(
         &expCtx,
         {
@@ -1734,15 +1787,12 @@ TEST(Accumulators, DenseRank) {
             {{Value(1), Value(1), Value(1), Value(3), Value(3), Value(7)}, Value(3)},
 
         },
-        accInit,
+        makeLegacyRank<AccumulatorDenseRank>,
         true /* denseRank can't be merged */);
 }
 
 TEST(Accumulators, DocumentNumberRank) {
     auto expCtx = ExpressionContextForTest{};
-    auto accInit = [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-        return AccumulatorDocumentNumber::create(expCtx, true /* isAscending */);
-    };
     assertExpectedResults(
         &expCtx,
         {
@@ -1757,8 +1807,8 @@ TEST(Accumulators, DocumentNumberRank) {
             {{Value(1), Value(1), Value(1), Value(3), Value(3), Value(7)}, Value(6)},
 
         },
-        accInit,
-        true /* denseRank can't be merged */);
+        makeLegacyRank<AccumulatorDocumentNumber>,
+        true /* documentNumber can't be merged */);
 }
 
 TEST(Accumulators, AddToSetRespectsCollation) {
@@ -1829,7 +1879,7 @@ template <typename AccName>
 static void assertCovariance(ExpressionContext* const expCtx,
                              const std::vector<Value>& input,
                              boost::optional<double> result = boost::none) {
-    auto accum = AccName::create(expCtx);
+    auto accum = make_intrusive<AccName>(expCtx);
     for (auto&& val : input) {
         accum->process(val, false);
     }
@@ -2221,6 +2271,77 @@ TEST(AccumulatorMergeObjects, RoundTripSerializationLiteral) {
         roundTrip);
 }
 
+/* ------------------------- ExpressionMergeObjects -------------------------- */
+
+TEST(ExpressionMergeObjects, MergingWithSingleObjectShouldLeaveUnchanged) {
+    assertExpectedResults("$mergeObjects", {{{}, Document({})}});
+
+    auto doc = Document({{"a", 1}, {"b", 1}});
+    assertExpectedResults("$mergeObjects", {{{doc}, doc}});
+}
+
+TEST(ExpressionMergeObjects, MergingDisjointObjectsShouldIncludeAllFields) {
+    auto first = Document({{"a", 1}, {"b", 1}});
+    auto second = Document({{"c", 1}});
+    assertExpectedResults("$mergeObjects",
+                          {{{first, second}, Document({{"a", 1}, {"b", 1}, {"c", 1}})}});
+}
+
+TEST(ExpressionMergeObjects, MergingIntersectingObjectsShouldOverrideInOrderReceived) {
+    auto first = Document({{"a", "oldValue"_sd}, {"b", 0}, {"c", 1}});
+    auto second = Document({{"a", "newValue"_sd}});
+    assertExpectedResults(
+        "$mergeObjects", {{{first, second}, Document({{"a", "newValue"_sd}, {"b", 0}, {"c", 1}})}});
+}
+
+TEST(ExpressionMergeObjects, MergingIntersectingEmbeddedObjectsShouldOverrideInOrderReceived) {
+    auto firstSubDoc = Document({{"a", 1}, {"b", 2}, {"c", 3}});
+    auto secondSubDoc = Document({{"a", 2}, {"b", 1}});
+    auto first = Document({{"d", 1}, {"subDoc", firstSubDoc}});
+    auto second = Document({{"subDoc", secondSubDoc}});
+    auto expected = Document({{"d", 1}, {"subDoc", secondSubDoc}});
+    assertExpectedResults("$mergeObjects", {{{first, second}, expected}});
+}
+
+TEST(ExpressionMergeObjects, MergingWithEmptyDocumentShouldIgnore) {
+    auto first = Document({{"a", 0}, {"b", 1}, {"c", 1}});
+    auto second = Document({});
+    auto expected = Document({{"a", 0}, {"b", 1}, {"c", 1}});
+    assertExpectedResults("$mergeObjects", {{{first, second}, expected}});
+}
+
+TEST(ExpressionMergeObjects, MergingSingleArgumentArrayShouldUnwindAndMerge) {
+    std::vector<Document> first = {Document({{"a", 1}}), Document({{"a", 2}})};
+    auto expected = Document({{"a", 2}});
+    assertExpectedResults("$mergeObjects", {{{first}, expected}});
+}
+
+TEST(ExpressionMergeObjects, MergingArrayWithDocumentShouldThrowException) {
+    std::vector<Document> first = {Document({{"a", 1}}), Document({{"a", 2}})};
+    auto second = Document({{"b", 2}});
+    ASSERT_THROWS_CODE(
+        evaluateExpression("$mergeObjects", {first, second}), AssertionException, 40400);
+}
+
+TEST(ExpressionMergeObjects, MergingArrayContainingInvalidTypesShouldThrowException) {
+    std::vector<Value> first = {Value(Document({{"validType", 1}})), Value("invalidType"_sd)};
+    ASSERT_THROWS_CODE(evaluateExpression("$mergeObjects", {first}), AssertionException, 40400);
+}
+
+TEST(ExpressionMergeObjects, MergingNonObjectsShouldThrowException) {
+    ASSERT_THROWS_CODE(
+        evaluateExpression("$mergeObjects", {"invalidArg"_sd}), AssertionException, 40400);
+
+    ASSERT_THROWS_CODE(
+        evaluateExpression("$mergeObjects", {"invalidArg"_sd, Document({{"validArg", 1}})}),
+        AssertionException,
+        40400);
+
+    ASSERT_THROWS_CODE(evaluateExpression("$mergeObjects", {1, Document({{"validArg", 1}})}),
+                       AssertionException,
+                       40400);
+}
+
 /* ------------------------- AccumulatorConcatArrays -------------------------- */
 
 TEST(AccumulatorConcatArrays, ConcatArraysRespectsMaxMemoryContraint) {
@@ -2333,7 +2454,7 @@ static void assertSetUnionResults(
     std::initializer_list<std::pair<std::vector<Value>, Value>> operations) {
     auto initializeAccumulator =
         [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
-        auto accum = AccumulatorSetUnion::create(expCtx);
+        auto accum = make_intrusive<AccumulatorSetUnion>(expCtx);
         return accum;
     };
     assertExpectedResults(expCtx,
@@ -2467,6 +2588,156 @@ TEST(AccumulatorSetUnion, DoubleNestedArraysShouldReturnNestedArrays) {
     };
 
     assertSetUnionResults(&expCtx, {{values, Value{expected}}});
+}
+
+TEST(ExpressionFromAccumulators, Avg) {
+    assertExpectedResults("$avg",
+                          {// $avg ignores non-numeric inputs.
+                           {{Value("string"_sd), Value(BSONNULL), Value(), Value(3)}, Value(3.0)},
+                           // $avg always returns a double.
+                           {{Value(10LL), Value(20LL)}, Value(15.0)},
+                           // $avg returns null when no arguments are provided.
+                           {{}, Value(BSONNULL)}});
+}
+
+TEST(ExpressionFromAccumulators, FirstNLastN) {
+    using Sense = AccumulatorFirstLastN::Sense;
+
+    // $firstN
+    auto firstNFn = [&](const BSONObj& spec, const BSONArray& expected) {
+        parseAndVerifyResults(AccumulatorFirstLastN::parseExpression<Sense::kFirst>,
+                              spec.firstElement(),
+                              Value(expected));
+    };
+    firstNFn(fromjson("{$firstN: {n: 3, input: [19, 7, 28, 3, 5]}}"),
+             BSONArray(fromjson("[19, 7, 28]")));
+    firstNFn(fromjson("{$firstN: {n: 6, input: [19, 7, 28, 3, 5]}}"),
+             BSONArray(fromjson("[19, 7, 28, 3, 5]")));
+    firstNFn(fromjson("{$firstN: {n: 3, input: [1,2,3,4,5,6]}}"), BSONArray(fromjson("[1,2,3]")));
+    firstNFn(fromjson("{$firstN: {n: 3, input: [1,2,null,null]}}"),
+             BSONArray(fromjson("[1,2,null]")));
+    firstNFn(fromjson("{$firstN: {n: 3, input: [1.1, 2.713, 3, 3.4]}}"),
+             BSONArray(fromjson("[1.1, 2.713, 3]")));
+
+    // $lastN
+    auto lastNFn = [&](const BSONObj& spec, const BSONArray& expected) {
+        parseAndVerifyResults(AccumulatorFirstLastN::parseExpression<Sense::kLast>,
+                              spec.firstElement(),
+                              Value(expected));
+    };
+    lastNFn(fromjson("{$lastN: {n: 3, input: [19, 7, 28, 3, 5]}}"),
+            BSONArray(fromjson("[28,3,5]")));
+    lastNFn(fromjson("{$lastN: {n: 6, input: [19, 7, 28, 3, 5]}}"),
+            BSONArray(fromjson("[19, 7, 28, 3, 5]")));
+    lastNFn(fromjson("{$lastN: {n: 3, input: [3,2,1,4,5,6]}}"), BSONArray(fromjson("[4,5,6]")));
+    lastNFn(fromjson("{$lastN: {n: 3, input: [1,2,null,3]}}"), BSONArray(fromjson("[2,null,3]")));
+    lastNFn(fromjson("{$lastN: {n: 3, input: [3, 2.713, 1.1, 2.7]}}"),
+            BSONArray(fromjson("[2.713, 1.1, 2.7]")));
+}
+
+TEST(ExpressionFromAccumulators, Max) {
+    assertExpectedResults("$max",
+                          {// $max treats non-numeric inputs as valid arguments.
+                           {{Value(1), Value(BSONNULL), Value(), Value("a"_sd)}, Value("a"_sd)},
+                           {{Value("a"_sd), Value("b"_sd)}, Value("b"_sd)},
+                           // $max always preserves the type of the result.
+                           {{Value(10LL), Value(0.0), Value(5)}, Value(10LL)},
+                           // $max returns null when no arguments are provided.
+                           {{}, Value(BSONNULL)}});
+}
+
+TEST(ExpressionFromAccumulators, Min) {
+    assertExpectedResults("$min",
+                          {// $min treats non-numeric inputs as valid arguments.
+                           {{Value("string"_sd)}, Value("string"_sd)},
+                           {{Value(1), Value(BSONNULL), Value(), Value("a"_sd)}, Value(1)},
+                           {{Value("a"_sd), Value("b"_sd)}, Value("a"_sd)},
+                           // $min always preserves the type of the result.
+                           {{Value(0LL), Value(20.0), Value(10)}, Value(0LL)},
+                           // $min returns null when no arguments are provided.
+                           {{}, Value(BSONNULL)}});
+}
+
+TEST(ExpressionFromAccumulators, MinNMaxN) {
+    using Sense = AccumulatorMinMax::Sense;
+    auto maxNFn = [&](const BSONObj& spec, const BSONArray& expected) {
+        parseAndVerifyResults(
+            AccumulatorMinMaxN::parseExpression<Sense::kMax>, spec.firstElement(), Value(expected));
+    };
+
+    // $maxN
+    maxNFn(fromjson("{$maxN: {n: 3, input: [19, 7, 28, 3, 5]}}"),
+           BSONArray(fromjson("[28, 19, 7]")));
+    maxNFn(fromjson("{$maxN: {n: 6, input: [19, 7, 28, 3, 5]}}"),
+           BSONArray(fromjson("[28, 19, 7, 5, 3]")));
+    maxNFn(fromjson("{$maxN: {n: 3, input: [1,2,3]}}"), BSONArray(fromjson("[3,2,1]")));
+    maxNFn(fromjson("{$maxN: {n: 3, input: [1,2,null]}}"), BSONArray(fromjson("[2,1]")));
+    maxNFn(fromjson("{$maxN: {n: 3, input: [1.1, 2.713, 3]}}"),
+           BSONArray(fromjson("[3, 2.713, 1.1]")));
+
+    auto minNFn = [&](const BSONObj& spec, const BSONArray& expected) {
+        parseAndVerifyResults(
+            AccumulatorMinMaxN::parseExpression<Sense::kMin>, spec.firstElement(), Value(expected));
+    };
+
+    // $minN
+    minNFn(fromjson("{$minN: {n: 3, input: [19, 7, 28, 3, 5]}}"), BSONArray(fromjson("[3,5,7]")));
+    minNFn(fromjson("{$minN: {n: 6, input: [19, 7, 28, 3, 5]}}"),
+           BSONArray(fromjson("[3,5,7,19, 28]")));
+    minNFn(fromjson("{$minN: {n: 3, input: [3,2,1]}}"), BSONArray(fromjson("[1,2,3]")));
+    minNFn(fromjson("{$minN: {n: 3, input: [1,2,null]}}"), BSONArray(fromjson("[1,2]")));
+    minNFn(fromjson("{$minN: {n: 3, input: [3, 2.713, 1.1]}}"),
+           BSONArray(fromjson("[1.1, 2.713, 3]")));
+}
+
+TEST(ExpressionFromAccumulators, Sum) {
+    assertExpectedResults(
+        "$sum",
+        {// $sum ignores non-numeric inputs.
+         {{Value("string"_sd), Value(BSONNULL), Value(), Value(3)}, Value(3)},
+         // If any argument is a double, $sum returns a double
+         {{Value(10LL), Value(10.0)}, Value(20.0)},
+         // If no arguments are doubles and an argument is a long, $sum returns a long
+         {{Value(10LL), Value(10)}, Value(20LL)},
+         // $sum returns 0 when no arguments are provided.
+         {{}, Value(0)}});
+}
+
+TEST(ExpressionFromAccumulators, StdDevPop) {
+    assertExpectedResults("$stdDevPop",
+                          {// $stdDevPop ignores non-numeric inputs.
+                           {{Value("string"_sd), Value(BSONNULL), Value(), Value(3)}, Value(0.0)},
+                           // $stdDevPop always returns a double.
+                           {{Value(1LL), Value(3LL)}, Value(1.0)},
+                           // $stdDevPop returns null when no arguments are provided.
+                           {{}, Value(BSONNULL)}});
+}
+
+TEST(ExpressionFromAccumulators, StdDevSamp) {
+    assertExpectedResults(
+        "$stdDevSamp",
+        {// $stdDevSamp ignores non-numeric inputs.
+         {{Value("string"_sd), Value(BSONNULL), Value(), Value(3)}, Value(BSONNULL)},
+         // $stdDevSamp always returns a double.
+         {{Value(1LL), Value(2LL), Value(3LL)}, Value(1.0)},
+         // $stdDevSamp returns null when no arguments are provided.
+         {{}, Value(BSONNULL)}});
+}
+
+TEST(ExpressionFromAccumulators, StdDevSampRepeated) {
+    ExpressionContextForTest expCtx;
+    AccumulatorStdDevPop mergedAcc(&expCtx);
+
+    for (int i = 0; i < 100; i++) {
+        AccumulatorStdDevPop acc(&expCtx);
+        acc.process(Value(std::exp(14.0)), false /*merging*/);
+        Value mergedValue = acc.getValue(true /*toBeMerged*/);
+        mergedAcc.process(mergedValue, true /*merging*/);
+    }
+
+    Value result = mergedAcc.getValue(false /*toBeMerged*/);
+    const double doubleVal = result.coerceToDouble();
+    ASSERT_EQ(0.0, doubleVal);
 }
 
 }  // namespace AccumulatorTests

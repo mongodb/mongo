@@ -40,9 +40,9 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_event_handler.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
@@ -59,11 +59,11 @@
 namespace mongo {
 namespace {
 
-class WiredTigerConnection {
+class WiredTigerConnectionTest {
 public:
-    WiredTigerConnection(StringData dbpath,
-                         StringData extraStrings,
-                         WT_EVENT_HANDLER* eventHandler = nullptr)
+    WiredTigerConnectionTest(StringData dbpath,
+                             StringData extraStrings,
+                             WT_EVENT_HANDLER* eventHandler = nullptr)
         : _conn(nullptr) {
         std::stringstream ss;
         ss << "create,";
@@ -74,7 +74,7 @@ public:
         ASSERT_OK(wtRCToStatus(ret, nullptr));
         ASSERT(_conn);
     }
-    ~WiredTigerConnection() {
+    ~WiredTigerConnectionTest() {
         _conn->close(_conn, nullptr);
     }
     WT_CONNECTION* getConnection() const {
@@ -93,29 +93,29 @@ class WiredTigerUtilHarnessHelper {
 public:
     explicit WiredTigerUtilHarnessHelper(StringData extraStrings,
                                          WiredTigerEventHandler* eventHandler = nullptr)
-        : _connection(_dbpath.path(),
-                      extraStrings,
-                      eventHandler == nullptr ? nullptr : eventHandler->getWtEventHandler()),
-          _sessionCache(_connection.getConnection(), _connection.getClockSource()) {}
+        : _connectionTest(_dbpath.path(),
+                          extraStrings,
+                          eventHandler == nullptr ? nullptr : eventHandler->getWtEventHandler()),
+          _connection(_connectionTest.getConnection(), _connectionTest.getClockSource()) {}
 
-    WiredTigerSessionCache* getSessionCache() {
-        return &_sessionCache;
+    WiredTigerConnection* getConnection() {
+        return &_connection;
     }
 
     WiredTigerSession openSession() {
-        return WiredTigerSession(getSessionCache()->conn());
+        return WiredTigerSession(getConnection());
     }
 
 private:
     unittest::TempDir _dbpath{"wt_test"};
+    WiredTigerConnectionTest _connectionTest;
     WiredTigerConnection _connection;
-    WiredTigerSessionCache _sessionCache;
 };
 
 class WiredTigerUtilMetadataTest : public ServiceContextTest {
 protected:
     WiredTigerUtilMetadataTest() : _harnessHelper("") {
-        _ru = std::make_unique<WiredTigerRecoveryUnit>(_harnessHelper.getSessionCache(), nullptr);
+        _ru = std::make_unique<WiredTigerRecoveryUnit>(_harnessHelper.getConnection(), nullptr);
     }
 
     const char* getURI() const {
@@ -127,8 +127,8 @@ protected:
     }
 
     void createSession(const char* config) {
-        WT_SESSION* wtSession = _ru->getSession()->getSession();
-        ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, getURI(), config), wtSession));
+        WiredTigerSession* wtSession = _ru->getSession();
+        ASSERT_OK(wtRCToStatus(wtSession->create(getURI(), config), *wtSession));
     }
 
 private:
@@ -292,56 +292,45 @@ class WiredTigerUtilTest : public ServiceContextTest {};
 
 TEST_F(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
-    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(), nullptr);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
     WiredTigerSession* session = ru->getSession();
-    auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
-                                                     "statistics:table:no_such_table",
-                                                     "statistics=(fast)",
-                                                     WT_STAT_DSRC_BLOCK_SIZE);
+    auto result = WiredTigerUtil::getStatisticsValue(
+        *session, "statistics:table:no_such_table", "statistics=(fast)", WT_STAT_DSRC_BLOCK_SIZE);
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::CursorNotFound, result.getStatus().code());
 }
 
 TEST_F(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(none)");
-    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(), nullptr);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
     WiredTigerSession* session = ru->getSession();
-    WT_SESSION* wtSession = session->getSession();
-    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr), wtSession));
-    auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
-                                                     "statistics:table:mytable",
-                                                     "statistics=(fast)",
-                                                     WT_STAT_DSRC_BLOCK_SIZE);
+    ASSERT_OK(wtRCToStatus(session->create("table:mytable", nullptr), *session));
+    auto result = WiredTigerUtil::getStatisticsValue(
+        *session, "statistics:table:mytable", "statistics=(fast)", WT_STAT_DSRC_BLOCK_SIZE);
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::CursorNotFound, result.getStatus().code());
 }
 
 TEST_F(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
-    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(), nullptr);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
     WiredTigerSession* session = ru->getSession();
-    WT_SESSION* wtSession = session->getSession();
-    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr), wtSession));
+    ASSERT_OK(wtRCToStatus(session->create("table:mytable", nullptr), *session));
     // Use connection statistics key which does not apply to a table.
-    auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
-                                                     "statistics:table:mytable",
-                                                     "statistics=(fast)",
-                                                     WT_STAT_CONN_SESSION_OPEN);
+    auto result = WiredTigerUtil::getStatisticsValue(
+        *session, "statistics:table:mytable", "statistics=(fast)", WT_STAT_CONN_SESSION_OPEN);
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.getStatus().code());
 }
 
 TEST_F(WiredTigerUtilTest, GetStatisticsValueValidKey) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
-    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(), nullptr);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
     WiredTigerSession* session = ru->getSession();
-    WT_SESSION* wtSession = session->getSession();
-    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr), wtSession));
+    ASSERT_OK(wtRCToStatus(session->create("table:mytable", nullptr), *session));
     // Use connection statistics key which does not apply to a table.
-    auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
-                                                     "statistics:table:mytable",
-                                                     "statistics=(fast)",
-                                                     WT_STAT_DSRC_BTREE_ENTRIES);
+    auto result = WiredTigerUtil::getStatisticsValue(
+        *session, "statistics:table:mytable", "statistics=(fast)", WT_STAT_DSRC_BTREE_ENTRIES);
     ASSERT_OK(result.getStatus());
     // Expect statistics value to be zero as there are no entries in the Btree.
     ASSERT_EQUALS(0U, result.getValue());
@@ -359,13 +348,12 @@ TEST_F(WiredTigerUtilTest, ParseAPIMessages) {
     WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
 
     // Create a session.
-    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(), nullptr);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
     WiredTigerSession* session = ru->getSession();
-    WT_SESSION* wtSession = session->getSession();
 
     // Perform simple WiredTiger operations while capturing the generated logs.
     startCapturingLogMessages();
-    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:ev_api", nullptr), wtSession));
+    ASSERT_OK(wtRCToStatus(session->create("table:ev_api", nullptr), *session));
     stopCapturingLogMessages();
 
     // Verify there is at least one message from WiredTiger and their content.
@@ -397,8 +385,8 @@ TEST_F(WiredTigerUtilTest, ParseCompactMessages) {
     // Perform simple WiredTiger operations while capturing the generated logs.
     const std::string uri = "table:ev_compact";
     startCapturingLogMessages();
-    ASSERT_OK(wtRCToStatus(wtSession->create(*wtSession, uri.c_str(), nullptr), *wtSession));
-    ASSERT_OK(wtRCToStatus(wtSession->compact(*wtSession, uri.c_str(), nullptr), *wtSession));
+    ASSERT_OK(wtRCToStatus(wtSession.create(uri.c_str(), nullptr), wtSession));
+    ASSERT_OK(wtRCToStatus(wtSession.compact(uri.c_str(), nullptr), wtSession));
     stopCapturingLogMessages();
 
     // Verify there is at least one message from WiredTiger and their content.
@@ -563,19 +551,18 @@ TEST_F(WiredTigerUtilTest, SkipPreparedUpdateBounded) {
     WiredTigerSession session2 = harnessHelper.openSession();
 
     const std::string uri = "table:test";
-    ASSERT_OK(wtRCToStatus(session1->create(*session1, uri.c_str(), "key_format=S,value_format=S"),
-                           *session1));
+    ASSERT_OK(wtRCToStatus(session1.create(uri.c_str(), "key_format=S,value_format=S"), session1));
     WT_CURSOR* cursor1;
-    ASSERT_EQ(0, session1->begin_transaction(*session1, "ignore_prepare=false"));
-    ASSERT_EQ(0, session1->open_cursor(*session1, uri.c_str(), nullptr, nullptr, &cursor1));
+    ASSERT_EQ(0, session1.begin_transaction("ignore_prepare=false"));
+    ASSERT_EQ(0, session1.open_cursor(uri.c_str(), nullptr, nullptr, &cursor1));
     cursor1->set_key(cursor1, "abc");
     cursor1->set_value(cursor1, "test");
     ASSERT_EQ(0, cursor1->insert(cursor1));
-    session1->prepare_transaction(*session1, "prepare_timestamp=1");
+    session1.prepare_transaction("prepare_timestamp=1");
 
     WT_CURSOR* cursor2;
-    ASSERT_EQ(0, session2->begin_transaction(*session2, "ignore_prepare=false"));
-    ASSERT_EQ(0, session2->open_cursor(*session2, uri.c_str(), nullptr, nullptr, &cursor2));
+    ASSERT_EQ(0, session2.begin_transaction("ignore_prepare=false"));
+    ASSERT_EQ(0, session2.open_cursor(uri.c_str(), nullptr, nullptr, &cursor2));
 
     cursor2->set_key(cursor2, "abc");
     cursor2->bound(cursor2, "bound=lower");
@@ -583,7 +570,7 @@ TEST_F(WiredTigerUtilTest, SkipPreparedUpdateBounded) {
     ASSERT_EQ(WT_PREPARE_CONFLICT, cursor2->next(cursor2));
     ASSERT_EQ(WT_PREPARE_CONFLICT, cursor2->next(cursor2));
 
-    session1->commit_transaction(*session1, "durable_timestamp=1,commit_timestamp=1");
+    session1.commit_transaction("durable_timestamp=1,commit_timestamp=1");
     ASSERT_EQ(0, cursor2->next(cursor2));
 }
 
@@ -596,26 +583,25 @@ TEST_F(WiredTigerUtilTest, SkipPreparedUpdateNoBound) {
     WiredTigerSession session2 = harnessHelper.openSession();
 
     const std::string uri = "table:test";
-    ASSERT_OK(wtRCToStatus(session1->create(*session1, uri.c_str(), "key_format=S,value_format=S"),
-                           *session1));
+    ASSERT_OK(wtRCToStatus(session1.create(uri.c_str(), "key_format=S,value_format=S"), session1));
     WT_CURSOR* cursor1;
-    ASSERT_EQ(0, session1->begin_transaction(*session1, "ignore_prepare=false"));
-    ASSERT_EQ(0, session1->open_cursor(*session1, uri.c_str(), nullptr, nullptr, &cursor1));
+    ASSERT_EQ(0, session1.begin_transaction("ignore_prepare=false"));
+    ASSERT_EQ(0, session1.open_cursor(uri.c_str(), nullptr, nullptr, &cursor1));
     cursor1->set_key(cursor1, "abc");
     cursor1->set_value(cursor1, "test");
     ASSERT_EQ(0, cursor1->insert(cursor1));
-    session1->prepare_transaction(*session1, "prepare_timestamp=1");
+    session1.prepare_transaction("prepare_timestamp=1");
 
     WT_CURSOR* cursor2;
-    ASSERT_EQ(0, session2->begin_transaction(*session2, "ignore_prepare=false"));
-    ASSERT_EQ(0, session2->open_cursor(*session2, uri.c_str(), nullptr, nullptr, &cursor2));
+    ASSERT_EQ(0, session2.begin_transaction("ignore_prepare=false"));
+    ASSERT_EQ(0, session2.open_cursor(uri.c_str(), nullptr, nullptr, &cursor2));
 
     // Continuously return WT_PREPARE_CONFLICT
     ASSERT_EQ(WT_PREPARE_CONFLICT, cursor2->next(cursor2));
     ASSERT_EQ(WT_PREPARE_CONFLICT, cursor2->next(cursor2));
     ASSERT_EQ(WT_PREPARE_CONFLICT, cursor2->next(cursor2));
 
-    session1->commit_transaction(*session1, "durable_timestamp=1,commit_timestamp=1");
+    session1.commit_transaction("durable_timestamp=1,commit_timestamp=1");
     ASSERT_EQ(0, cursor2->next(cursor2));
 }
 
@@ -873,6 +859,278 @@ DEATH_TEST_REGEX(WiredTigerConfigParserTest,
     ASSERT_EQUALS(value.val, 123);
 
     parser.isTableLoggingSettingValid();
+}
+
+TEST_F(WiredTigerUtilTest, ReconfigureBackgroundCompaction) {
+    WiredTigerEventHandler eventHandler;
+
+    // Define a WiredTiger connection configuration that enables JSON encoding for all messages
+    // related to the WT_VERB_COMPACT category.
+    const std::string connection_cfg =
+        "json_output=[error,message],verbose=[compact],statistics=(all)";
+
+    // Initialize WiredTiger.
+    WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
+    WiredTigerSession* wtSession = ru->getSession();
+
+    // Turn on background compaction.
+    const std::string uri = "table:ev_compact";
+    startCapturingLogMessages();
+    ASSERT_OK(wtRCToStatus(wtSession->create(uri.c_str(), nullptr), *wtSession));
+    ASSERT_OK(wtRCToStatus(wtSession->compact(nullptr, "background=true,timeout=0"), *wtSession));
+
+    // Starting compaction requires setting up background threads, which may take some time. We
+    // query WiredTiger Statistics to ensure these threads have started before we continue.
+    StatusWith<int64_t> backgroundCompactionRunning = WiredTigerUtil::getStatisticsValue(
+        *wtSession, "statistics:", "statistics=(fast)", WT_STAT_CONN_BACKGROUND_COMPACT_RUNNING);
+    ASSERT_OK(backgroundCompactionRunning);
+
+    // A value of 0 here indicates that the background threads are not set up yet.
+    while (backgroundCompactionRunning.getValue() == 0) {
+        sleepmillis(100);
+        backgroundCompactionRunning =
+            WiredTigerUtil::getStatisticsValue(*wtSession,
+                                               "statistics:",
+                                               "statistics=(fast)",
+                                               WT_STAT_CONN_BACKGROUND_COMPACT_RUNNING);
+        ASSERT_OK(backgroundCompactionRunning);
+    }
+
+    // We should get an error when we try reconfigure background compaction
+    // while it is already running.
+    ASSERT_EQUALS(
+        ErrorCodes::AlreadyInitialized,
+        wtRCToStatus(wtSession->compact(nullptr, "background=true,timeout=0,run_once=true"),
+                     *wtSession));
+
+    // WT_SESSION::get_last_error should give us more information about reconfiguring background
+    // compaction while it is already running.
+    int err, sub_level_err;
+    const char* err_msg;
+    wtSession->get_last_error(&err, &sub_level_err, &err_msg);
+
+    ASSERT_EQUALS(EINVAL, err);
+    ASSERT_EQUALS(WT_BACKGROUND_COMPACT_ALREADY_RUNNING, sub_level_err);
+    ASSERT_EQUALS("Cannot reconfigure background compaction while it's already running."_sd,
+                  StringData(err_msg));
+
+    stopCapturingLogMessages();
+}
+
+TEST_F(WiredTigerUtilTest, GetLastErrorFromSuccessfulCall) {
+    WiredTigerEventHandler eventHandler;
+    const std::string connection_cfg = "json_output=[error,message],verbose=[compact]";
+
+    WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
+    WiredTigerSession* wtSession = ru->getSession();
+
+
+    const std::string uri = "table:get_last_err_on_success";
+
+    ASSERT_OK(wtRCToStatus(wtSession->create(uri.c_str(), nullptr), *wtSession));
+
+    WT_CURSOR* cursor;
+    ASSERT_EQUALS(0, wtSession->open_cursor(uri.c_str(), nullptr, nullptr, &cursor));
+
+    // The previous session api call to open the cursor was successful, so we should expect no
+    // error code and a WT_NONE sub-level error code
+    int err, sub_level_err;
+    const char* err_msg;
+    wtSession->get_last_error(&err, &sub_level_err, &err_msg);
+
+    ASSERT_EQUALS(0, err);
+    ASSERT_EQUALS(WT_NONE, sub_level_err);
+    ASSERT_EQUALS("last API call was successful"_sd, StringData(err_msg));
+}
+
+TEST_F(WiredTigerUtilTest, GetLastErrorFromFailedCall) {
+    WiredTigerEventHandler eventHandler;
+    const std::string connection_cfg = "json_output=[error,message],verbose=[compact]";
+
+    WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
+    WiredTigerSession* wtSession = ru->getSession();
+
+    const std::string uri = "table:get_last_err_from_failed_call";
+
+    ASSERT_OK(wtRCToStatus(wtSession->create(uri.c_str(), nullptr), *wtSession));
+
+    WT_CURSOR* cursor;
+    ASSERT_NOT_EQUALS(0, wtSession->open_cursor(nullptr, nullptr, nullptr, &cursor));
+
+    int err, sub_level_err;
+    const char* err_msg;
+    wtSession->get_last_error(&err, &sub_level_err, &err_msg);
+
+    // The last session api call to open the cursor failed, but no sub-level error code is
+    // defined for this case. Thus we should get EINVAL and WT_NONE as the error code, and
+    // sub-level error code respectively.
+    ASSERT_EQUALS(EINVAL, err);
+    ASSERT_EQUALS(WT_NONE, sub_level_err);
+    ASSERT_EQUALS("should be passed either a URI or a cursor to duplicate, but not both"_sd,
+                  StringData(err_msg));
+}
+
+TEST_F(WiredTigerUtilTest, GetLastErrorFromLatestAPICall) {
+    WiredTigerEventHandler eventHandler;
+    const std::string connection_cfg = "json_output=[error,message],verbose=[compact]";
+
+    WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
+    auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
+    WiredTigerSession* wtSession = ru->getSession();
+
+    const std::string uri = "table:get_last_err_from_last_call";
+
+    ASSERT_OK(wtRCToStatus(wtSession->create(uri.c_str(), nullptr), *wtSession));
+
+    // The last session API call to create the table was successful, so we should expect no
+    // error code and a WT_NONE sub-level error code.
+    int err, sub_level_err;
+    const char* err_msg;
+    wtSession->get_last_error(&err, &sub_level_err, &err_msg);
+
+    ASSERT_EQUALS(0, err);
+    ASSERT_EQUALS(WT_NONE, sub_level_err);
+    ASSERT_EQUALS("last API call was successful"_sd, StringData(err_msg));
+
+    WT_CURSOR* cursor;
+    ASSERT_NOT_EQUALS(0, wtSession->open_cursor(nullptr, nullptr, nullptr, &cursor));
+
+    // Now the last API call has failed, so we should make sure we get the right errors.
+    wtSession->get_last_error(&err, &sub_level_err, &err_msg);
+    ASSERT_EQUALS(EINVAL, err);
+    ASSERT_EQUALS(WT_NONE, sub_level_err);
+    ASSERT_EQUALS("should be passed either a URI or a cursor to duplicate, but not both"_sd,
+                  StringData(err_msg));
+
+    ASSERT_EQUALS(0, wtSession->open_cursor(uri.c_str(), nullptr, nullptr, &cursor));
+
+    // Now the last API call has succeeded, so we should make sure we get no error code and a
+    // WT_NONE sub-level error code.
+    wtSession->get_last_error(&err, &sub_level_err, &err_msg);
+    ASSERT_EQUALS(0, err);
+    ASSERT_EQUALS(WT_NONE, sub_level_err);
+    ASSERT_EQUALS("last API call was successful"_sd, StringData(err_msg));
+}
+
+TEST_F(WiredTigerUtilTest, CursorWriteConflict) {
+    WiredTigerEventHandler eventHandler;
+    const std::string connection_cfg = "json_output=[error,message],verbose=[compact]";
+
+    WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
+
+    WiredTigerSession session1 = harnessHelper.openSession();
+    WiredTigerSession session2 = harnessHelper.openSession();
+
+    const std::string uri = "table:cursor_write_conflict";
+    ASSERT_OK(wtRCToStatus(session1.create(uri.c_str(), "key_format=S,value_format=S"), session1));
+
+    // Session 1 uses cursor 1 to create an entry in the table.
+    WT_CURSOR* cursor1;
+    ASSERT_EQ(0, session1.begin_transaction("ignore_prepare=false"));
+    ASSERT_EQ(0, session1.open_cursor(uri.c_str(), nullptr, nullptr, &cursor1));
+    cursor1->set_key(cursor1, "abc");
+    cursor1->set_value(cursor1, "test");
+    ASSERT_EQ(0, cursor1->insert(cursor1));
+    ASSERT_EQ(0, session1.commit_transaction(nullptr));
+    ASSERT_EQ(0, cursor1->close(cursor1));
+
+    // Session 1 opens a transaction with cursor1 but does not commit it to yield an error.
+    WT_CURSOR* cursor2;
+    ASSERT_EQ(0, session1.begin_transaction("ignore_prepare=false"));
+    ASSERT_EQ(0, session1.open_cursor(uri.c_str(), nullptr, nullptr, &cursor2));
+
+    cursor2->set_key(cursor2, "abc");
+    cursor2->set_value(cursor2, "test");
+    ASSERT_EQ(0, cursor2->update(cursor2));
+
+    // Session 2 opens a separate transaction with cursor 2 and try write to the same key.
+    WT_CURSOR* cursor3;
+    ASSERT_EQ(0, session2.begin_transaction("ignore_prepare=false"));
+    ASSERT_EQ(0, session2.open_cursor(uri.c_str(), nullptr, nullptr, &cursor3));
+
+    cursor3->set_key(cursor3, "abc");
+    cursor3->set_value(cursor3, "test");
+
+    // We should get WT_ROLLBACK here because the other transaction has not been committed.
+    ASSERT_EQ(WT_ROLLBACK, cursor3->update(cursor3));
+
+    // Check that the sub-level error codes from this case is correct.
+    int err, sub_level_err;
+    const char* err_msg;
+    session2.get_last_error(&err, &sub_level_err, &err_msg);
+
+    ASSERT_EQUALS(WT_ROLLBACK, err);
+    ASSERT_EQUALS(WT_WRITE_CONFLICT, sub_level_err);
+    ASSERT_EQUALS("Write conflict between concurrent operations"_sd, StringData(err_msg));
+}
+
+TEST_F(WiredTigerUtilTest, CursorOldestForEviction) {
+    // This test depends on sleeping to recreate the error, so we sleep for tryCount seconds the
+    // test and retry if it fails, up till kRetryLimit seconds.
+    int tryCount = 1;
+    const int kRetryLimit = 5;
+    do {
+        WiredTigerEventHandler eventHandler;
+
+        // Configure to have extremely low cache to force eviction.
+        const std::string connection_cfg =
+            "json_output=[error,message],verbose=[compact],cache_size=1MB";
+
+        WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
+        auto ru = std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getConnection(), nullptr);
+
+        WiredTigerSession wtSession = harnessHelper.openSession();
+
+        const std::string uri = "table:oldest_for_eviction";
+
+        ASSERT_OK(
+            wtRCToStatus(wtSession.create(uri.c_str(), "key_format=S,value_format=S"), wtSession));
+
+        // Start a new transaction and insert a record too large for cache.
+        WT_CURSOR* cursor;
+        ASSERT_EQ(0, wtSession.begin_transaction("ignore_prepare=false"));
+        ASSERT_EQ(0, wtSession.open_cursor(uri.c_str(), nullptr, nullptr, &cursor));
+        cursor->set_key(cursor, "dummy_key_1");
+        std::string s1(1024 * 1000, 'a');
+        cursor->set_value(cursor, s1.c_str());
+        ASSERT_EQ(0, cursor->update(cursor));
+
+        // Let WT's accounting catch up after the large insertion by sleeping for an increasing
+        // amount of time based on how many times we've retried.
+        sleepsecs(tryCount);
+
+        // In the same transaction, try and insert a new record that would require evicting the
+        // previous record trying to be inserted in this same transaction.
+        cursor->set_key(cursor, "dummy_key_2");
+        std::string s2(1024, 'b');
+        cursor->set_value(cursor, s2.c_str());
+
+        // We should get WT_ROLLBACK in this case because the cache has been configured to be
+        // only 1MB, and is not large enough to fit both values. We might not get WT_ROLLBACK if we
+        // didn't sleep for long enough, so retry with a longer sleep if needed.
+        int ret = cursor->update(cursor);
+        if (ret != WT_ROLLBACK) {
+            tryCount++;
+            continue;
+        }
+
+        // Check that the sub-level error codes from this case is correct.
+        int err, sub_level_err;
+        const char* err_msg;
+        wtSession.get_last_error(&err, &sub_level_err, &err_msg);
+
+        ASSERT_EQUALS(WT_ROLLBACK, err);
+        ASSERT_EQUALS(WT_OLDEST_FOR_EVICTION, sub_level_err);
+        ASSERT_EQUALS("Transaction has the oldest pinned transaction ID"_sd, StringData(err_msg));
+        break;
+    } while (tryCount <= kRetryLimit);
+
+    // If we tried more times than the limit, then we were not able to successfully recreate the
+    // error and should fail.
+    ASSERT(tryCount <= kRetryLimit);
 }
 
 }  // namespace

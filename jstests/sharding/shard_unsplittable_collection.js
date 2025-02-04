@@ -6,7 +6,6 @@
  * ]
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
@@ -204,13 +203,8 @@ function runTests(dataShard) {
         checkIndexes(kColl, 2);
     }
 
-    let expectedNumChunks = 2;
-    // TODO SERVER-81884: update once 8.0 becomes last LTS
-    if (!FeatureFlagUtil.isPresentAndEnabled(st.s.getDB(kDbName),
-                                             "OneChunkPerShardEmptyCollectionWithHashedShardKey")) {
-        expectedNumChunks = 4;
-    }
-
+    // Number of expected chunks for a hashed sharded collection in a 2-shards cluster
+    const expectedNumChunks = 2;
     jsTest.log("Unsplittable --> Hashed shard key, _id");
     {
         const kColl = getNewCollName();

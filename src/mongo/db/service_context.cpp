@@ -312,17 +312,19 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
     auto lk = _storageChangeMutex.readLock();
 
     onCreate(opCtx.get(), _clientObservers);
-    ScopeGuard onCreateGuard([&] { onDestroy(opCtx.get(), _clientObservers); });
-
-    if (!opCtx->recoveryUnit_DO_NOT_USE()) {
-        opCtx->setRecoveryUnit_DO_NOT_USE(std::make_unique<RecoveryUnitNoop>(),
-                                          WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-    }
-
-    ScopeGuard batonGuard([&] { opCtx->getBaton()->detach(); });
+    ScopeGuard onCreateAndBatonGuard([&] {
+        onDestroy(opCtx.get(), _clientObservers);
+        opCtx->getBaton()->detach();
+    });
 
     {
         ClientLock lk(client);
+
+        if (!opCtx->recoveryUnit_DO_NOT_USE()) {
+            opCtx->setRecoveryUnit_DO_NOT_USE(std::make_unique<RecoveryUnitNoop>(),
+                                              WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
+                                              lk);
+        }
 
         // If we have a previous operation context, it's not worth crashing the process in
         // production. However, we do want to prevent it from doing more work and complain
@@ -338,8 +340,7 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
         client->_setOperationContext(opCtx.get());
     }
 
-    onCreateGuard.dismiss();
-    batonGuard.dismiss();
+    onCreateAndBatonGuard.dismiss();
 
     return UniqueOperationContext(opCtx.release());
 };

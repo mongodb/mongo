@@ -55,7 +55,7 @@
 #include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
@@ -77,8 +77,10 @@ public:
     // virtuals from DocumentSource
     const char* getSourceName() const final;
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kSingleDocumentTransformation;
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
     }
 
     boost::intrusive_ptr<DocumentSource> optimize() final;

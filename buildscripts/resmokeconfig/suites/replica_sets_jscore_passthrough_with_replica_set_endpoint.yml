@@ -84,7 +84,7 @@ selector:
     # TODO (SERVER-80416): cloneCollectionAsCapped command stops working after a replica set
     # is bootstrapped as a sharded cluster.
     - jstests/core/query/collation/collation.js
-    - jstests/core/ddl/capped_convertToCapped1.js
+    - jstests/core/ddl/clone_collection_as_capped.js
     - jstests/core/replicate_record_ids/disallow_capped.js
     # TODO (SERVER-84243): Separate Shard-Role Catalog Cache and Loader.
     - jstests/core/txns/speculative_snapshot_includes_all_writes.js

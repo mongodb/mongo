@@ -154,15 +154,13 @@ bool SaslX509ServerMechanism::isClusterMember(Client* client) const {
     }
 
     std::shared_ptr<transport::Session> session = client->session();
-
-    if (!session || !session->getSSLManager()) {
+    if (!session || !session->getSSLConfiguration()) {
         return false;
     }
 
     const auto& sslPeerInfo = SSLPeerInfo::forSession(session);
-    auto sslConfiguration = session->getSSLManager()->getSSLConfiguration();
-    if (!sslConfiguration.isClusterMember(this->getPrincipalName(),
-                                          sslPeerInfo.getClusterMembership())) {
+    if (!session->getSSLConfiguration()->isClusterMember(this->getPrincipalName(),
+                                                         sslPeerInfo.getClusterMembership())) {
         return false;
     }
 
@@ -224,8 +222,8 @@ StatusWith<std::tuple<bool, std::string>> SaslX509ServerMechanism::stepImpl(
                       "with cluster membership");
     }
 
-    auto sslConfiguration = client->session()->getSSLManager()->getSSLConfiguration();
-    if (gEnforceUserClusterSeparation && sslConfiguration.isClusterExtensionSet()) {
+    auto sslConfiguration = client->session()->getSSLConfiguration();
+    if (gEnforceUserClusterSeparation && sslConfiguration->isClusterExtensionSet()) {
         auto* am = AuthorizationManager::get(opCtx->getService());
         BSONObj ignored;
 

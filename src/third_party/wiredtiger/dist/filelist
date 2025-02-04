@@ -52,6 +52,7 @@ src/btree/row_srch.c
 src/call_log/call_log.c
 src/checkpoint/checkpoint_ckptlist.c
 src/checkpoint/checkpoint_conn.c
+src/checkpoint/checkpoint_stats.c
 src/checkpoint/checkpoint_txn.c
 src/checksum/arm64/crc32-arm64.c                ARM64_HOST
 src/checksum/loongarch64/crc32-loongarch64.c    LOONGARCH64_HOST

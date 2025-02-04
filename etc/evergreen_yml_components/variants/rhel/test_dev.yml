@@ -190,6 +190,8 @@ buildvariants:
       # Explicitly include instead of using tags to avoid pulling in replica_sets_multiversion_gen. This
       # variant will be removed when config shards become the default, so this is only temporary.
       - name: sharding_multiversion_gen
+      - name: sharding_jscore_multiversion_gen
+      - name: sharding_jscore_kill_primary_multiversion_gen
       - name: .sharding .txns
       # Skip csrs stepdown suite because most tests can't handle the first shard stepping down.
       - name: .sharding .common !.csrs !.feature_flag_guarded
@@ -271,6 +273,7 @@ buildvariants:
             variant: *linux_x86_dynamic_compile_variant_name
       - name: check_feature_flag_tags
       - name: check_for_todos
+      - name: check_for_legacy_command_types
       - name: disk_wiredtiger
       - name: initial_sync_fuzzer_gen
       - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen

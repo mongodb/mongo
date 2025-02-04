@@ -77,9 +77,15 @@ void NetworkInterfaceIntegrationFixture::createNet(
 #else
     options.maxConnections = 256u;
 #endif
-    _net = makeNetworkInterface(
-        "NetworkInterfaceIntegrationFixture", std::move(connectHook), nullptr, std::move(options));
-    _fixtureNet = makeNetworkInterface("FixtureNet", nullptr, nullptr);
+    auto protocol = unittest::shouldUseGRPCEgress() ? transport::TransportProtocol::GRPC
+                                                    : transport::TransportProtocol::MongoRPC;
+    _net = makeNetworkInterface("NetworkInterfaceIntegrationFixture",
+                                std::move(connectHook),
+                                nullptr,
+                                std::move(options),
+                                protocol);
+    _fixtureNet =
+        makeNetworkInterface("FixtureNet", nullptr, nullptr, ConnectionPool::Options(), protocol);
 }
 
 void NetworkInterfaceIntegrationFixture::startNet(

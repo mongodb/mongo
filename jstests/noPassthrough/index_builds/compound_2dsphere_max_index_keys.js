@@ -52,9 +52,9 @@ const runTest = (indexDefinition) => {
     assert.commandFailed(coll.insert(
         {x: polygon, y: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]}));
 
-    // We should also get a warning when we try to validate.
+    // We should also get errors when we try to validate.
     const validation = assert.commandWorked(coll.validate());
-    assert.eq(validation.warnings.length, 1);
+    assert.gt(validation.errors.length, 1);
 
     // We should be able to remove a problem document.
     assert.commandWorked(coll.deleteOne({_id: 'problem1'}));

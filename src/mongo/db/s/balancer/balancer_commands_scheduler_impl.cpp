@@ -404,6 +404,13 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
     Client::initThread("BalancerCommandsScheduler",
                        getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 
+    // This worker thread may perform remote request, so that its operation context must be
+    // interruptible. Marking it so here is safe, since the replica set changes are also notified by
+    // the Balancer (a PrimaryOnlyService) and tracked through the _state field (which is checked
+    // right after).
+    auto opCtxHolder = cc().makeOperationContext();
+    opCtxHolder.get()->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
     bool stopWorkerRequested = false;
     LOGV2(5847205, "Balancer scheduler thread started");
 
@@ -445,7 +452,6 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
 
         // 2. Serve the picked up requests, submitting their related commands.
         for (auto& submissionInfo : commandsToSubmit) {
-            auto opCtxHolder = cc().makeOperationContext();
             if (submissionInfo.commandInfo) {
                 submissionInfo.commandInfo.get()->attachOperationMetadataTo(opCtxHolder.get());
             }

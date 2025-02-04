@@ -67,6 +67,15 @@ idl_generator(
 )
 
 idl_generator(
+    name = "cleanup_orphaned_gen",
+    src = "cleanup_orphaned.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
     name = "clone_catalog_data_gen",
     src = "clone_catalog_data.idl",
     deps = [
@@ -234,6 +243,7 @@ idl_generator(
     src = "remove_shard.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/s:remove_shard_draining_progress_gen",
         "//src/mongo/idl:generic_argument_gen",
         "//src/mongo/s:sharding_types_gen",
     ],
@@ -302,9 +312,9 @@ idl_generator(
     name = "transition_to_dedicated_config_server_gen",
     src = "transition_to_dedicated_config_server.idl",
     deps = [
+        ":remove_shard_gen",
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/idl:generic_argument_gen",
-        "//src/mongo/s:remove_shard_gen",
     ],
 )
 
@@ -340,6 +350,25 @@ idl_generator(
     src = "add_shard_to_zone.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "update_zone_key_range_gen",
+    src = "update_zone_key_range.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "add_shard_gen",
+    src = "add_shard.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/s:type_shard_identity_gen",
         "//src/mongo/idl:generic_argument_gen",
     ],
 )

@@ -7,6 +7,8 @@
 //   assumes_no_implicit_index_creation,
 //   requires_fcv_70,
 //   requires_profiling,
+//   # The test runs getLatestProfileEntry(). The downstream syncing node affects the profiler.
+//   run_getLatestProfilerEntry,
 // ]
 
 import {

@@ -39,7 +39,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::doc_validation_error {
 // The default maximum allowed size for a single doc validation error.
@@ -53,7 +53,9 @@ public:
     static constexpr auto code = ErrorCodes::DocumentValidationFailure;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj);
     explicit DocumentValidationFailureInfo(const BSONObj& err) : _details(err.getOwned()) {
-        invariant(!err.isEmpty());
+        tassert(9740340,
+                "Cannot construct 'DocumentValidationFailureInfo' with non-empty error",
+                !err.isEmpty());
     }
     const BSONObj& getDetails() const;
     void serialize(BSONObjBuilder* bob) const override;

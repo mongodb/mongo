@@ -103,7 +103,6 @@ MONGO_FAIL_POINT_DEFINE(asioTransportLayerAsyncConnectTimesOut);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerDelayConnection);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerHangBeforeAcceptCallback);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerHangDuringAcceptCallback);
-MONGO_FAIL_POINT_DEFINE(asioTransportLayerAsyncConnectReturnsConnectionError);
 
 #ifdef MONGO_CONFIG_SSL
 SSLConnectionContext::~SSLConnectionContext() = default;
@@ -185,7 +184,7 @@ class AsioReactor final : public Reactor {
 public:
     AsioReactor() : _clkSource(this), _stats(&_clkSource), _ioContext() {}
 
-    void run() noexcept override {
+    void run() override {
         ThreadIdGuard threadIdGuard(this);
         asio::io_context::work work(_ioContext);
         _ioContext.run();
@@ -722,9 +721,6 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
     Milliseconds timeout,
     std::shared_ptr<ConnectionMetrics> connectionMetrics,
     std::shared_ptr<const SSLConnectionContext> transientSSLContext) {
-    if (MONGO_unlikely(asioTransportLayerAsyncConnectReturnsConnectionError.shouldFail()))
-        return Status{ErrorCodes::ConnectionError, "Failing asyncConnect due to fail-point"};
-
     invariant(connectionMetrics);
     connectionMetrics->onConnectionStarted();
 
@@ -1134,7 +1130,7 @@ void AsioTransportLayer::appendStatsForFTDC(BSONObjBuilder& bob) const {
     queueDepthsArrayBuilder.done();
 }
 
-void AsioTransportLayer::_runListener() noexcept {
+void AsioTransportLayer::_runListener() {
     setThreadName("listener");
 
     stdx::unique_lock lk(_mutex);
@@ -1371,8 +1367,7 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
     acceptor.async_accept(*_ingressReactor, std::move(acceptCb));
 }
 
-void AsioTransportLayer::_trySetListenerSocketBacklogQueueDepth(
-    GenericAcceptor& acceptor) noexcept {
+void AsioTransportLayer::_trySetListenerSocketBacklogQueueDepth(GenericAcceptor& acceptor) {
 #ifdef __linux__
     try {
         if (!isTcp(acceptor.local_endpoint().protocol()))

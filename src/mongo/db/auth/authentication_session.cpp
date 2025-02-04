@@ -62,7 +62,7 @@ constexpr auto kDiagnosticLogLevel = 3;
 
 Status crossVerifyUserNames(const UserName& oldUser,
                             const UserName& newUser,
-                            const bool isMechX509) noexcept {
+                            const bool isMechX509) {
     if (oldUser.empty()) {
         return Status::OK();
     }

@@ -6,6 +6,9 @@
  *   not_allowed_with_signed_security_token,
  *   assumes_unsharded_collection,
  *   requires_getmore,
+ *   # The test does not expect concurrent reads against its test collections (e.g. the checks
+ *   # aren't expecting concurrent reads but initial sync will be reading those collections).
+ *   does_not_support_concurrent_reads,
  * ]
  */
 

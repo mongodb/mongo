@@ -30,7 +30,7 @@
 
 #include "mongo/db/exec/record_store_fast_count.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

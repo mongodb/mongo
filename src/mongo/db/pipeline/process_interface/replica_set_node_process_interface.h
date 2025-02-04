@@ -67,6 +67,11 @@ public:
 
     std::unique_ptr<WriteSizeEstimator> getWriteSizeEstimator(
         OperationContext* opCtx, const NamespaceString& ns) const override {
+        // TODO SERVER-99709: This method gets called after acquiring the global lock. As a result,
+        // instead of going through the hierarchy of RSTL -> Global locks this method acquires the
+        // RSTL after acquiring the Global lock. We should investigate if there's any potential
+        // safety concerns since it might lead to a deadlock.
+        DisableLockerRuntimeOrderingChecks disable{opCtx};
         if (_canWriteLocally(opCtx, ns)) {
             return std::make_unique<LocalWriteSizeEstimator>();
         } else {

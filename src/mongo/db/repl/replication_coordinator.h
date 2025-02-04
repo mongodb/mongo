@@ -263,6 +263,12 @@ public:
     virtual SharedSemiFuture<void> awaitReplicationAsyncNoWTimeout(
         const OpTime& opTime, const WriteConcernOptions& writeConcern) = 0;
 
+
+    /**
+     * Sets oldest timestamp value
+     */
+    virtual void setOldestTimestamp(const Timestamp& timestamp);
+
     /**
      * Causes this node to relinquish being primary for at least 'stepdownTime'.  If 'force' is
      * false, before doing so it will wait for 'waitTime' for one other electable node to be caught

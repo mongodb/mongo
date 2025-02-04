@@ -43,7 +43,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/match_details.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -80,9 +80,7 @@ public:
      * field whose name is given by getPlaceholder(). If the placeholder name does not exist, then
      * the filter expression does not refer to any specific paths.
      */
-    bool matchesBSONElement(BSONElement elem, MatchDetails* details = nullptr) const {
-        return _filter->matchesBSONElement(elem, details);
-    }
+    bool matchesBSONElement(BSONElement elem, MatchDetails* details = nullptr) const;
 
     /**
      * If this object has a placeholder, returns a view of the placeholder as a StringData.

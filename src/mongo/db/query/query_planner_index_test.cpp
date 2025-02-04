@@ -155,7 +155,7 @@ TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanWhenMultikeyIndexSatisfiesNullA
 TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanFindWhenIndexSatisfiesNullQuery) {
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(fromjson("{x: 1, _id: 1}"));
-    runQuerySortProj(fromjson("{x: null}}"), BSONObj(), fromjson("{_id: 1}}"));
+    runQuerySortProj(fromjson("{x: null}"), BSONObj(), fromjson("{_id: 1}"));
     ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 1}, node:"
@@ -167,7 +167,7 @@ TEST_F(QueryPlannerTest, PlannerAddsFetchForFindWhenMultikeyIndexSatisfiesNullQu
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     MultikeyPaths multikeyPaths{{0U}, MultikeyComponents{}};
     addIndex(fromjson("{x: 1, _id: 1}"), multikeyPaths);
-    runQuerySortProj(fromjson("{x: null}}"), BSONObj(), fromjson("{_id: 1}}"));
+    runQuerySortProj(fromjson("{x: null}"), BSONObj(), fromjson("{_id: 1}"));
     ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 1}, node: {ixscan: {pattern: {x: 1, _id: 1}, bounds: "
@@ -178,7 +178,7 @@ TEST_F(QueryPlannerTest, PlannerAddsFetchFindWhenMultikeyIndexSatisfiesNullEmpty
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     MultikeyPaths multikeyPaths{{0U}, MultikeyComponents{}};
     addIndex(fromjson("{x: 1, _id: 1}"), multikeyPaths);
-    runQuerySortProj(fromjson("{x: {$in: [null, []]}}}"), BSONObj(), fromjson("{_id: 1}}"));
+    runQuerySortProj(fromjson("{x: {$in: [null, []]}}"), BSONObj(), fromjson("{_id: 1}"));
     ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 1}, node:"
@@ -191,7 +191,7 @@ TEST_F(QueryPlannerTest,
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     MultikeyPaths multikeyPaths{{0U}, MultikeyComponents{}};
     addIndex(fromjson("{x: 1, _id: 1}"), multikeyPaths);
-    runQuerySortProj(fromjson("{x: {$in: [null, 2]}}}"), BSONObj(), fromjson("{_id: 1}}"));
+    runQuerySortProj(fromjson("{x: {$in: [null, 2]}}"), BSONObj(), fromjson("{_id: 1}"));
     ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 1}, node:"
@@ -1303,7 +1303,7 @@ TEST_F(QueryPlannerTest, PlansForMultipleIndexesOnTheSameKeyPatternAreGenerated)
     assertNumSolutions(3U);
     assertSolutionExists("{fetch: {node: {ixscan: {name: 'reverse'}}}}");
     assertSolutionExists("{fetch: {node: {ixscan: {name: 'forward'}}}}");
-    assertSolutionExists("{cscan: {dir: 1}}}}");
+    assertSolutionExists("{cscan: {dir: 1}}");
 }
 
 
@@ -1311,7 +1311,7 @@ TEST_F(QueryPlannerTest, EmptyQueryWithoutProjectionUsesCollscan) {
     addIndex(BSON("a" << 1));
     runQuery(BSONObj());
     assertNumSolutions(1);
-    assertSolutionExists("{cscan: {dir: 1}}}");
+    assertSolutionExists("{cscan: {dir: 1}}");
 }
 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCoveredIxscanIfEnabled) {

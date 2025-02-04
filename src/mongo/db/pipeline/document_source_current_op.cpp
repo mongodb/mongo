@@ -67,6 +67,7 @@ REGISTER_DOCUMENT_SOURCE(currentOp,
                          DocumentSourceCurrentOp::LiteParsed::parse,
                          DocumentSourceCurrentOp::createFromBson,
                          AllowedWithApiStrict::kNeverInVersion1);
+ALLOCATE_DOCUMENT_SOURCE_ID(currentOp, DocumentSourceCurrentOp::id)
 
 constexpr StringData DocumentSourceCurrentOp::kStageName;
 

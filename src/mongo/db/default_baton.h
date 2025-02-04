@@ -54,7 +54,7 @@ public:
 
     ~DefaultBaton() override;
 
-    void schedule(Task func) noexcept override;
+    void schedule(Task func) override;
 
     Future<void> waitUntil(Date_t expiration, const CancellationToken& token) override;
 
@@ -69,7 +69,7 @@ private:
         size_t id;
         Promise<void> promise;
     };
-    void detachImpl() noexcept override;
+    void detachImpl() override;
 
     using Job = unique_function<void(stdx::unique_lock<stdx::mutex>)>;
 

@@ -441,6 +441,7 @@ public:
             case EncryptedBinDataType::kFLE2RangeIndexedValue:
             case EncryptedBinDataType::kFLE2EqualityIndexedValueV2:
             case EncryptedBinDataType::kFLE2RangeIndexedValueV2:
+            case EncryptedBinDataType::kFLE2TextIndexedValue:
             case EncryptedBinDataType::kFLE2UnindexedEncryptedValue:
             case EncryptedBinDataType::kFLE2UnindexedEncryptedValueV2: {
                 // Verify the type of the encrypted data.

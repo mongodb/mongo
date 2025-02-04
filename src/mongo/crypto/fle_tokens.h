@@ -408,7 +408,7 @@ public:
             uassert(
                 ErrorCodes::BadValue,
                 "Invalid length for EncryptedStateCollectionTokensV2, expected {} or {}, got {}"_format(
-                    sizeof(PrfBlock), sizeof(PrfBlock) + 1, sz),
+                    kCipherLengthESCOnly, kCipherLengthESCAndLeafFlag, sz),
                 (sz == kCipherLengthESCOnly) || (sz == kCipherLengthESCAndLeafFlag));
         }
 

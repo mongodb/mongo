@@ -25,7 +25,7 @@ const bsonMaxSizeLimit = 16 * 1024 * 1024;
 
 const maxSizeDoc = {
     _id: 1,
-    x: Array(bsonMaxSizeLimit - 25).join("a")
+    x: "a".repeat(bsonMaxSizeLimit - 26),
 };
 assert.eq(Object.bsonsize(maxSizeDoc), bsonMaxSizeLimit);
 assert.commandWorked(coll.insert(maxSizeDoc));
@@ -48,7 +48,7 @@ assert.eq(db[identityViewName].distinct("x").length, 1);
 
 // Insert another document. We'll accumulate both documents into one large document that surpasses
 // the size limit.
-assert.commandWorked(coll.insert({_id: 2, x: Array(1024).join("b")}));
+assert.commandWorked(coll.insert({_id: 2, x: "b".repeat(1023)}));
 
 // Return a document that is just over 16MB (by ~1KB).
 const results = coll.aggregate({$group: {_id: null, xlField: {$addToSet: "$x"}}}).toArray();
@@ -72,6 +72,6 @@ assert.eq(db[xlFieldViewName].distinct("xlField").length, 2);
 // The normal distinct path actually doesn't allow returning 16MB values. Do one final pass
 // verifying that it gets close.
 coll.drop();
-assert.commandWorked(coll.insert({_id: 1, x: Array(bsonMaxSizeLimit - 4096 - 100).join("a")}));
+assert.commandWorked(coll.insert({_id: 1, x: "a".repeat(bsonMaxSizeLimit - 4096 - 101)}));
 
 assert.eq(coll.distinct("x").length, 1);

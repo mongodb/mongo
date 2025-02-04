@@ -45,7 +45,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/visibility.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/safe_num.h"
 #include "mongo/util/time_support.h"
 

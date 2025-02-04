@@ -53,15 +53,10 @@ if (isBatchingVectoredInserts) {
     assert.commandWorked(st.s.adminCommand({shardCollection: ns2, key: {x: 'hashed'}}));
 }
 
-// TODO SERVER-81884: update once 8.0 becomes last LTS.
-if (FeatureFlagUtil.isPresentAndEnabled(testDB,
-                                        "OneChunkPerShardEmptyCollectionWithHashedShardKey")) {
-    // Docs are expected to go to the same shards but different chunks.
-    assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: convertShardKeyToHashed(10)}}));
-    if (isBatchingVectoredInserts) {
-        assert.commandWorked(
-            st.s.adminCommand({split: ns2, middle: {x: convertShardKeyToHashed(10)}}));
-    }
+// Docs are expected to go to the same shards but different chunks.
+assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: convertShardKeyToHashed(10)}}));
+if (isBatchingVectoredInserts) {
+    assert.commandWorked(st.s.adminCommand({split: ns2, middle: {x: convertShardKeyToHashed(10)}}));
 }
 
 let docs = [{x: -1000}, {x: 10}];

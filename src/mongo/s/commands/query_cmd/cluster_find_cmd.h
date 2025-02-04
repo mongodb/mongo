@@ -376,16 +376,16 @@ public:
             boost::optional<mongo::ExplainOptions::Verbosity> verbosity = boost::none) {
             auto bodyBuilder = result->getBodyBuilder();
             bodyBuilder.resetToEmpty();
-
+            bool hasExplain = verbosity.has_value();
             auto aggRequestOnView =
-                query_request_conversion::asAggregateCommandRequest(findCommand);
-            aggRequestOnView.setExplain(verbosity);
+                query_request_conversion::asAggregateCommandRequest(findCommand, hasExplain);
+
             if (!query_settings::utils::isDefault(querySettings)) {
                 aggRequestOnView.setQuerySettings(querySettings);
             }
 
             uassertStatusOK(ClusterAggregate::retryOnViewError(
-                opCtx, aggRequestOnView, resolvedView, ns(), privileges, &bodyBuilder));
+                opCtx, aggRequestOnView, resolvedView, ns(), privileges, verbosity, &bodyBuilder));
         }
 
         void setReadConcern(OperationContext* opCtx) {

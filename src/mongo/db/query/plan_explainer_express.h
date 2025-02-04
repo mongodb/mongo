@@ -145,7 +145,7 @@ public:
 
     void incUpdatedStats(size_t numDocsMatched) {
         _docsMatched += numDocsMatched;
-    };
+    }
 
     void setIsModUpdate(bool val) {
         _isModUpdate = val;
@@ -171,7 +171,7 @@ public:
 
     void incDeletedStats(size_t numDocsDeleted) {
         _docsDeleted += numDocsDeleted;
-    };
+    }
 
 private:
     std::string _stageName;

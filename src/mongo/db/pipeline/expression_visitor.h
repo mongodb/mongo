@@ -111,6 +111,7 @@ class ExpressionSlice;
 class ExpressionIsArray;
 class ExpressionInternalFindAllValuesAtPath;
 class ExpressionRandom;
+class ExpressionCurrentDate;
 class ExpressionRound;
 class ExpressionSecond;
 class ExpressionSplit;
@@ -157,6 +158,7 @@ class ExpressionInternalFindPositional;
 class ExpressionInternalFindElemMatch;
 class ExpressionInternalFLEBetween;
 class ExpressionInternalFLEEqual;
+class ExpressionInternalRawSortKey;
 class ExpressionInternalIndexKey;
 class ExpressionInternalJsEmit;
 class ExpressionInternalOwningShard;
@@ -266,6 +268,7 @@ public:
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionLog10>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionInternalFLEBetween>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionInternalFLEEqual>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionInternalRawSortKey>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionMap>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionMeta>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionMod>) = 0;
@@ -291,6 +294,7 @@ public:
     virtual void visit(
         expression_walker::MaybeConstPtr<IsConst, ExpressionInternalFindAllValuesAtPath>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionRandom>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionCurrentDate>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionRound>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSplit>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSqrt>) = 0;
@@ -462,6 +466,7 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionLog10*) override {}
     void visit(const ExpressionInternalFLEBetween*) override {}
     void visit(const ExpressionInternalFLEEqual*) override {}
+    void visit(const ExpressionInternalRawSortKey*) override {}
     void visit(const ExpressionMap*) override {}
     void visit(const ExpressionMeta*) override {}
     void visit(const ExpressionMod*) override {}
@@ -555,6 +560,7 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionInternalFindElemMatch*) override {}
     void visit(const ExpressionFunction*) override {}
     void visit(const ExpressionRandom*) override {}
+    void visit(const ExpressionCurrentDate*) override {}
     void visit(const ExpressionToHashedIndexKey*) override {}
     void visit(const ExpressionDateAdd*) override {}
     void visit(const ExpressionDateSubtract*) override {}

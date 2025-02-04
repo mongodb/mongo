@@ -43,7 +43,7 @@ namespace {
 bool dupKeyCheck(SortedDataInterface& sorted,
                  OperationContext* opCtx,
                  const key_string::Value& keyString) {
-    return sorted.dupKeyCheck(opCtx, SortedDataKeyValueView::fromValue(keyString)).has_value();
+    return sorted.dupKeyCheck(opCtx, keyString).has_value();
 }
 bool dupKeyCheck(SortedDataInterface& sorted, OperationContext* opCtx, BSONObj bsonKey) {
     return dupKeyCheck(sorted, opCtx, makeKeyString(&sorted, bsonKey));

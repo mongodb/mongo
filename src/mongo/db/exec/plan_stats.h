@@ -37,6 +37,7 @@
 #include "mongo/db/exec/plan_stats_visitor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/pipeline/spilling/spilling_stats.h"
 #include "mongo/db/query/eof_node_type.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
@@ -72,6 +73,13 @@ struct SpecificStats {
 
     virtual void acceptVisitor(PlanStatsConstVisitor* visitor) const = 0;
     virtual void acceptVisitor(PlanStatsMutableVisitor* visitor) = 0;
+
+    /**
+     * Subclasses that have the ability to fetch should override this to return 'true'.
+     */
+    virtual bool doesFetch() const {
+        return false;
+    }
 };
 
 // Every stage has CommonStats.
@@ -476,11 +484,18 @@ struct DistinctScanStats : public SpecificStats {
         visitor->visit(this);
     }
 
+    bool doesFetch() const final {
+        return isFetching;
+    }
+
     // How many keys did we look at while distinct-ing?
     size_t keysExamined = 0;
     // The total number of full documents touched by the embedded fetch stage, if one exists.
     size_t docsExamined = 0;
-    // How many chunk skips were performed while distinct-ing?
+    // Tracks how many times we skipped past orphan chunks.
+    size_t orphanChunkSkips = 0;
+    // Tracks the number of time we filtered out an orphan document (symmetric to
+    // 'ShardingFilterStats').
     size_t chunkSkips = 0;
 
     BSONObj keyPattern;
@@ -529,6 +544,10 @@ struct FetchStats : public SpecificStats {
 
     void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
         visitor->visit(this);
+    }
+
+    bool doesFetch() const final {
+        return true;
     }
 
     // Have we seen anything that already had an object?
@@ -820,11 +839,7 @@ struct SortStats : public SpecificStats {
     // The number of keys that we've sorted.
     uint64_t keysSorted = 0u;
 
-    // The number of times that we spilled data to disk during the execution of this query.
-    uint64_t spills = 0u;
-
-    // The maximum size of the spill file written to disk, or 0 if no spilling occurred.
-    uint64_t spilledDataStorageSize = 0u;
+    SpillingStats spillingStats;
 };
 
 struct MergeSortStats : public SpecificStats {
@@ -1024,6 +1039,7 @@ struct TextOrStats : public SpecificStats {
     }
 
     size_t fetches;
+    SpillingStats spillingStats;
 };
 
 struct TrialStats : public SpecificStats {
@@ -1073,18 +1089,7 @@ struct GroupStats : public SpecificStats {
     // Tracks an estimate of the total size of all documents output by the group stage in bytes.
     size_t totalOutputDataSizeBytes = 0;
 
-    // The size of the file spilled to disk. Note that this is not the same as the number of bytes
-    // spilled to disk, as any data spilled to disk will be compressed before being written to a
-    // file.
-    uint64_t spilledDataStorageSize = 0u;
-
-    // The number of bytes evicted from memory and spilled to disk.
-    uint64_t numBytesSpilledEstimate = 0u;
-
-    // The number of times that we spilled data to disk while grouping the data.
-    uint64_t spills = 0u;
-
-    uint64_t spilledRecords = 0u;
+    SpillingStats spillingStats;
 };
 
 struct DocumentSourceCursorStats : public SpecificStats {
@@ -1301,17 +1306,7 @@ struct SpoolStats : public SpecificStats {
     // The amount of data we've spooled in bytes.
     uint64_t totalDataSizeBytes = 0u;
 
-    // The number of times that we spilled data to disk during the execution of this query.
-    uint64_t spills = 0u;
-
-    // The maximum size of the spill file written to disk, or 0 if no spilling occurred.
-    uint64_t spilledDataStorageSize = 0u;
-
-    // The number of individual records spilled to disk.
-    uint64_t spilledRecords = 0u;
-
-    // The amount of data that has been spilled to the spill file, or 0 if no spilling occurred.
-    uint64_t spilledUncompressedDataSize = 0u;
+    SpillingStats spillingStats;
 };
 
 struct EofStats : public SpecificStats {
@@ -1357,4 +1352,32 @@ struct DocumentSourceIdLookupStats : public SpecificStats {
     // Tracks the cumulative summary stats for the idLookup sub-pipeline.
     PlanSummaryStats planSummaryStats;
 };
+
+struct DocumentSourceGraphLookupStats : public SpecificStats {
+    std::unique_ptr<SpecificStats> clone() const override {
+        return std::make_unique<DocumentSourceGraphLookupStats>(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const override {
+        return sizeof(*this) +
+            (planSummaryStats.estimateObjectSizeInBytes() - sizeof(planSummaryStats));
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    // The peak amount of RAM used by the stage during execution.
+    uint64_t maxMemoryUsageBytes = 0;
+
+    SpillingStats spillingStats;
+
+    // Tracks the summary stats in aggregate across all executions of the subpipeline.
+    PlanSummaryStats planSummaryStats;
+};
+
 }  // namespace mongo

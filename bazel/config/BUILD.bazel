@@ -5,9 +5,10 @@ load(
     "allocator",
     "asan",
     "build_enterprise",
-    "build_grpc",
     "build_otel",
+    "clang_tidy_toolchain_version",
     "compiler_type",
+    "compress_debug_compile",
     "dbg",
     "dbg_level",
     "debug_symbols",
@@ -302,17 +303,75 @@ mongo_toolchain_version(
 )
 
 config_setting(
-    name = "mongo_toolchain_v4",
+    name = "mongo_toolchain_v4_user",
     flag_values = {
         "//bazel/config:mongo_toolchain_version": "v4",
     },
 )
 
 config_setting(
-    name = "mongo_toolchain_v5",
+    name = "mongo_toolchain_v5_user",
     flag_values = {
         "//bazel/config:mongo_toolchain_version": "v5",
     },
+)
+
+clang_tidy_toolchain_version(
+    name = "clang_tidy_toolchain_version",
+    build_setting_default = "auto",
+)
+
+config_setting(
+    name = "clang_tidy_toolchain_version_auto",
+    flag_values = {
+        "//bazel/config:clang_tidy_toolchain_version": "auto",
+    },
+)
+
+config_setting(
+    name = "clang_tidy_toolchain_version_v4",
+    flag_values = {
+        "//bazel/config:clang_tidy_toolchain_version": "v4",
+    },
+)
+
+config_setting(
+    name = "clang_tidy_toolchain_version_v5",
+    flag_values = {
+        "//bazel/config:clang_tidy_toolchain_version": "v5",
+    },
+)
+
+selects.config_setting_group(
+    name = "clang_tidy_toolchain_version_auto_or_v5",
+    match_any = [
+        ":clang_tidy_toolchain_version_auto",
+        ":clang_tidy_toolchain_version_v5",
+    ],
+)
+
+selects.config_setting_group(
+    name = "mongo_toolchain_v4_override",
+    match_all = [
+        ":mongo_toolchain_v5_user",
+        ":clang_tidy_toolchain_version_v4",
+    ],
+)
+
+selects.config_setting_group(
+    name = "mongo_toolchain_v4",
+    match_any = [
+        ":mongo_toolchain_v4_user",
+        ":mongo_toolchain_v4_override",
+    ],
+)
+
+selects.config_setting_group(
+    name = "mongo_toolchain_v5",
+    match_all = [
+        ":mongo_toolchain_v5_user",
+        ":clang_tidy_toolchain_version_auto_or_v5",
+    ],
 )
 
 # ==========
@@ -1205,18 +1264,13 @@ selects.config_setting_group(
 # grpc options
 # --------------------------------------
 
-build_grpc(
-    name = "build_grpc",
-    build_setting_default = False,
-)
-
 config_setting(
     name = "build_grpc_enabled",
     constraint_values = [
         "@platforms//os:linux",
     ],
     flag_values = {
-        "//bazel/config:build_grpc": "True",
+        "//bazel/config:ssl": "True",
     },
 )
 
@@ -2482,6 +2536,37 @@ selects.config_setting_group(
     match_all = [
         "@platforms//cpu:aarch64",
         ":linux_gcc_fission",
+    ],
+)
+
+# --------------------------------------
+# compress_debug_compile
+# --------------------------------------
+
+bool_flag(
+    name = "compress_debug_compile",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "compress_debug_compile_enabled",
+    flag_values = {
+        "//bazel/config:compress_debug_compile": "True",
+    },
+)
+
+config_setting(
+    name = "compress_debug_compile_disabled",
+    flag_values = {
+        "//bazel/config:compress_debug_compile": "False",
+    },
+)
+
+selects.config_setting_group(
+    name = "compress_debug_compile_disabled_linux_gcc",
+    match_all = [
+        ":linux_gcc",
+        ":compress_debug_compile_disabled",
     ],
 )
 

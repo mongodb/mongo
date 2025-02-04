@@ -7,3 +7,7 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing
       - 10gen/server-cluster-scalability
+  - "refine_collection_shard_key*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+      - 10gen/server-cluster-scalability

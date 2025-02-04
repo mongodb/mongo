@@ -440,6 +440,31 @@ TEST_F(SessionWorkflowTest, OneNormalCommand) {
     joinSessions();
 }
 
+TEST_F(SessionWorkflowTest, IngressLogicalNetworkMetricsTest) {
+    Message req = makeOpMsg();
+    Message resp = []() {
+        auto omb = OpMsgBuilder{};
+        omb.setBody(BSONObjBuilder{}.append("ok", 1).append("msg", "command result").obj());
+        return omb.finish();
+    }();
+
+    startSession();
+    auto stats = test::NetworkConnectionStats::get(NetworkCounter::ConnectionType::kIngress);
+    expect<Event::sessionSourceMessage>(req);
+    expect<Event::sepHandleRequest>(makeResponse(resp));
+    expect<Event::sessionSinkMessage>(Status::OK());
+    auto diff = test::NetworkConnectionStats::get(NetworkCounter::ConnectionType::kIngress)
+                    .getDifference(stats);
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+    joinSessions();
+
+    // Verify logical metrics of the ingress connection.
+    ASSERT_EQ(diff.logicalBytesIn, req.size());
+    ASSERT_EQ(diff.logicalBytesOut, resp.size());
+    ASSERT_EQ(diff.numRequests, 1);
+}
+
 TEST_F(SessionWorkflowTest, OnClientDisconnectCalledOnCleanup) {
     int disconnects = 0;
     onClientDisconnectCb = [&](Client*) {

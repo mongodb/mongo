@@ -136,14 +136,14 @@ public:
      *
      * This function is valid to invoke either on the Client thread or with the Client lock.
      */
-    static ServiceExecutorContext* get(Client* client) noexcept;
+    static ServiceExecutorContext* get(Client* client);
 
     /**
      * Set the ServiceExecutorContext for a given client.
      *
      * This function may only be invoked once and only while under the Client lock.
      */
-    static void set(Client* client, std::unique_ptr<ServiceExecutorContext> seCtx) noexcept;
+    static void set(Client* client, std::unique_ptr<ServiceExecutorContext> seCtx);
 
 
     /**
@@ -151,7 +151,7 @@ public:
      *
      * This function may only be invoked once and only while under the Client lock.
      */
-    static void reset(Client* client) noexcept;
+    static void reset(Client* client);
 
     ServiceExecutorContext() = default;
     /** Test only */

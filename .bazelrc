@@ -39,6 +39,14 @@ common --remote_download_regex=.*\.(dwo|h|cpp)$
 
 common:macos --repo_env=BAZEL_NO_APPLE_CPP_TOOLCHAIN=1
 
+common:windows --features=-compiler_param_file
+
+# Restrict local actions to 20% to prevent linking from hitting OOM issues, but give the
+# freedom to remote execution to schedule more compilation actions.
+common --local_resources=cpu=HOST_CPUS*.2
+common:windows --local_resources=cpu=HOST_CPUS
+common:macos --local_resources=cpu=HOST_CPUS
+
 # while in hybrid build state, using local unsandboxed linking should be faster. When most of our link
 # targets have been converted (i.e. unittest binaries) and we can BWOB, remote linking should be faster
 # in those cases:
@@ -70,7 +78,6 @@ common --flag_alias=use_disable_ref_track=//bazel/config:use_disable_ref_track
 common --flag_alias=use_wiredtiger=//bazel/config:use_wiredtiger
 common --flag_alias=use_glibcxx_debug=//bazel/config:use_glibcxx_debug
 common --flag_alias=use_tracing_profiler=//bazel/config:use_tracing_profiler
-common --flag_alias=build_grpc=//bazel/config:build_grpc
 common --flag_alias=build_otel=//bazel/config:build_otel
 common --flag_alias=use_libcxx=//bazel/config:use_libcxx
 common --flag_alias=detect_odr_violations=//bazel/config:detect_odr_violations
@@ -89,6 +96,7 @@ common --flag_alias=js_engine=//bazel/config:js_engine
 common --flag_alias=use_sasl_client=//bazel/config:use_sasl_client
 common --flag_alias=enterprise_feature_all=//bazel/config:enterprise_feature_all
 common --flag_alias=link_timeout=//bazel/config:link_timeout
+common --flag_alias=compress_debug_compile=//bazel/config:compress_debug_compile
 
 common --flag_alias=dwarf_version=//bazel/config:dwarf_version
 common --flag_alias=http_client=//bazel/config:http_client
@@ -100,6 +108,7 @@ common --flag_alias=lsan=//bazel/config:lsan
 common --flag_alias=tsan=//bazel/config:tsan
 common --flag_alias=ubsan=//bazel/config:ubsan
 common --flag_alias=dbg_level=//bazel/config:dbg_level
+common --flag_alias=mongo_toolchain_version=//bazel/config:mongo_toolchain_version
 
 #############################################################################################################################
 # BUILD 'PROFILES' - this is the area to set up configurations of flags to be used by developers.
@@ -124,10 +133,14 @@ common --flag_alias=dbg_level=//bazel/config:dbg_level
 # dbg_tsan
 # opt
 
+# Bazel will by default strip on fastbuild, if we want stripping we will handle it ourselves
+common --strip=never
+
 # Current default profile - fastbuild - this matches the config options of fastbuild. It does not just set --config=fastbuild
 # To avoid the bazel warning about passing multiple configs
 common -c fastbuild
 common --fission=yes
+common --//bazel/config:compress_debug_compile=True
 common --//bazel/config:opt=off
 common --//bazel/config:dbg=True
 common --//bazel/config:dbg_level=1
@@ -143,15 +156,16 @@ common --//bazel/config:asan=False
 common --//bazel/config:tsan=False
 common --//bazel/config:ubsan=False
 common --//bazel/config:libunwind=auto
-common --enable_platform_specific_config=true
-common --jobs=200
+common --jobs=300
 common:macos --jobs=auto
 common:windows --jobs=auto
+common --enable_platform_specific_config=true
 
 # Profile for building fast with minimal debuggability - the build is fast ##################################################
 --config=fastbuild
 common:fastbuild -c fastbuild
 common:fastbuild --fission=yes
+common:fastbuild --//bazel/config:compress_debug_compile=True
 common:fastbuild --//bazel/config:opt=off
 common:fastbuild --//bazel/config:dbg=True
 common:fastbuild --//bazel/config:dbg_level=1
@@ -173,6 +187,7 @@ common:fastbuild --enable_platform_specific_config=true
 --config=dbg
 common:dbg -c dbg
 common:dbg --fission=yes
+common:dbg --//bazel/config:compress_debug_compile=True
 common:dbg --//bazel/config:opt=off
 common:dbg --//bazel/config:dbg=True
 common:dbg --//bazel/config:dbg_level=2
@@ -198,6 +213,7 @@ common:dbg_aubsan --//bazel/config:linkstatic=False
 common:dbg_aubsan --//bazel/config:allocator=system
 common:dbg_aubsan --//bazel/config:asan=True
 common:dbg_aubsan --//bazel/config:ubsan=True
+common:dbg_aubsan --local_resources=cpu=HOST_CPUS
 common:dbg_aubsan --enable_platform_specific_config=true
 
 # Build with thread sanitizers
@@ -216,6 +232,7 @@ common:dbg_tsan --enable_platform_specific_config=true
 --config=opt
 common:opt -c opt
 common:opt --fission=yes
+common:opt --//bazel/config:compress_debug_compile=True
 common:opt --//bazel/config:opt=on
 common:opt --//bazel/config:dbg=False
 common:opt --//bazel/config:dbg_level=2
@@ -250,6 +267,17 @@ common:remote_link --strategy=ExtractDebugInfo=remote
 common:remote_link --strategy=StripDebugInfo=remote
 common:remote_link --features=-thin_archive
 
+# Coverage
+coverage --config=dbg
+coverage --compiler_type=clang
+coverage --linkstatic=False
+coverage --combined_report=lcov
+coverage --experimental_use_llvm_covmap
+coverage --experimental_generate_llvm_lcov
+coverage --remote_download_outputs=all
+coverage --config=no-remote-exec
+coverage --fission=no
+
 # Don't detect the native toolchain on linux, only use the hermetic toolchains.
 # Opt out of this by passing --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=0 on the command line.
 common:linux --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
@@ -262,9 +290,11 @@ common:windows --features=-dbg
 common:windows --features=-fastbuild
 common:windows --features=-dynamic_link_msvcrt
 
-# Only use fission on Linux
+# Only use fission and debug compression on Linux
 common:windows --fission=no
+common:windows --//bazel/config:compress_debug_compile=False
 common:macos --fission=no
+common:macos --//bazel/config:compress_debug_compile=False
 
 # Dynamic linking on Windows (DLL generation) is currently not supported.
 common:windows --//bazel/config:linkstatic=True
@@ -291,10 +321,6 @@ common:windows --cxxopt=-UCOMPILER_MSVC
 # Enable remote build execution:
 common:linux --remote_executor=grpcs://sodalite.cluster.engflow.com
 
-# Restrict local actions to 20% to prevent linking from hitting OOM issues, but give the
-# freedom to remote execution to schedule more compilation actions.
-common:linux --local_resources=cpu=HOST_CPUS*.2
-
 # Enable remote cache (also necessary for remote build execution):
 common --remote_cache=grpcs://sodalite.cluster.engflow.com
 common --bes_backend=grpcs://sodalite.cluster.engflow.com
@@ -307,12 +333,13 @@ common --remote_upload_local_results=False
 
 # Settings specific for clang-tidy
 --config=clang-tidy
+common:clang-tidy --//bazel/config:clang_tidy_toolchain_version=v4
 common:clang-tidy --config=dbg
 common:clang-tidy --build_tag_filters=-third_party,-mongo-tidy-tests
 common:clang-tidy --//bazel/config:compiler_type=clang
 common:clang-tidy --aspects @bazel_clang_tidy//clang_tidy:clang_tidy.bzl%clang_tidy_aspect
 common:clang-tidy --output_groups=report
-common:clang-tidy --@bazel_clang_tidy//:clang_tidy_config=//:clang_tidy_config
+common:clang-tidy --@bazel_clang_tidy//:clang_tidy_config=//:clang_tidy_config_strict
 common:clang-tidy --@bazel_clang_tidy//:clang_tidy_executable=//:clang_tidy
 common:clang-tidy --@bazel_clang_tidy//:clang_tidy_additional_deps=//:toolchain_files
 common:clang-tidy --@bazel_clang_tidy//:clang_tidy_plugin_deps=//src/mongo/tools/mongo_tidy_checks:mongo_tidy_checks
@@ -326,6 +353,7 @@ common:clang-tidy --//bazel/config:mongo_toolchain_version=v4
 --config=clang-tidy-v5
 common:clang-tidy-v5 --config=clang-tidy
 common:clang-tidy-v5 --//bazel/config:mongo_toolchain_version=v5
+common:clang-tidy-v5 --//bazel/config:clang_tidy_toolchain_version=v5
 
 # if you don't have access to the remote execution cluster above, use the local config
 # described below.
@@ -389,7 +417,7 @@ try-import %workspace%/.bazelrc.evergreen
 try-import %workspace%/.bazelrc.xcode
 
 # local default dev settings
-try-import %workspace%/.bazelrc.workstation
+try-import %workspace%/.bazelrc.common_bes
 
 # local git version info
 try-import %workspace%/.bazelrc.git

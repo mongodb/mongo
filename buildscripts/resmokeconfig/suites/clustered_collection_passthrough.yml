@@ -9,12 +9,12 @@ selector:
     - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_files:
     # Assumes the _id index is real.
-    - jstests/core/**/collmod_convert_to_ttl.js
+    - jstests/core/ddl/coll_mod_convert_to_ttl.js
     - jstests/core/**/index_create_too_many.js
     # Uses returnKey().
     - jstests/core/**/index_diag.js
     # Expects 'idIndex' field in the listCollections output.
-    - jstests/core/**/list_collections1.js
+    - jstests/core/catalog/list_collections.js
     - jstests/core/**/explain_shell_helpers.js
     - jstests/core/txns/list_collections_not_blocked_by_txn.js
     # Assumes the collection is not clustered by default.

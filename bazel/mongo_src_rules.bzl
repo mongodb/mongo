@@ -1248,19 +1248,14 @@ GCC_OR_CLANG_LINKFLAGS = select({
 })
 
 COMPRESS_DEBUG_COPTS = select({
-    # Disable debug compression in assembler by default unless using debug fission.
-    # Debug compression significantly reduces .o, .dwo, and .a sizes, and with
-    # fission enabled, the linker sees so little of the dwarf that decompression
-    # isn't a problem.
-    "//bazel/config:fission_enabled": [
+    # Debug compression significantly reduces .o, .dwo, and .a sizes
+    "//bazel/config:compress_debug_compile_enabled": [
         "-Wa,--compress-debug-sections",
     ],
-    "//bazel/config:linux_gcc": [
+    # explicitly disable compression if its not enabled or else not passing the flag
+    # by default still compresses on x86/x86_64 - nocompress is only a flag in gcc not clang
+    "//bazel/config:compress_debug_compile_disabled_linux_gcc": [
         "-Wa,--nocompress-debug-sections",
-    ],
-    # subsumes both of the two above - if both are true, we want compression
-    "//bazel/config:linux_gcc_fission": [
-        "-Wa,--compress-debug-sections",
     ],
     "//conditions:default": [],
 })
@@ -1399,6 +1394,18 @@ Error:
 
   python buildscripts/install_bazel.py
 """)
+
+# These are warnings are disabled globally at the toolchain level to allow external repository compilation.
+# Re-enable them for MongoDB source code.
+RE_ENABLE_DISABLED_3RD_PARTY_WARNINGS_FEATURES = select({
+    "//bazel/config:compiler_type_clang": [
+        "-disable_warnings_for_third_party_libraries_clang",
+    ],
+    "//bazel/config:compiler_type_gcc": [
+        "-disable_warnings_for_third_party_libraries_gcc",
+    ],
+    "//conditions:default": [],
+})
 
 MONGO_GLOBAL_INCLUDE_DIRECTORIES = [
     "-Isrc",
@@ -1716,6 +1723,7 @@ def mongo_cc_library(
             deps += MONGO_GLOBAL_SRC_DEPS
             if name != "_global_header_bypass":
                 deps += ["//src/mongo:_global_header_bypass"]
+        features = features + RE_ENABLE_DISABLED_3RD_PARTY_WARNINGS_FEATURES
 
     if "modules/enterprise" in native.package_name():
         enterprise_compatible = select({
@@ -1848,7 +1856,7 @@ def mongo_cc_library(
         local_defines = MONGO_GLOBAL_DEFINES + visibility_support_defines + local_defines,
         defines = defines,
         includes = includes,
-        features = MONGO_GLOBAL_FEATURES + ["supports_pic", "pic"] + features,
+        features = MONGO_GLOBAL_FEATURES + features,
         target_compatible_with = select({
             "//bazel/config:shared_archive_enabled": [],
             "//conditions:default": ["@platforms//:incompatible"],
@@ -1879,11 +1887,7 @@ def mongo_cc_library(
         local_defines = MONGO_GLOBAL_DEFINES + local_defines,
         defines = defines,
         includes = includes,
-        features = MONGO_GLOBAL_FEATURES + SKIP_ARCHIVE_FEATURE + select({
-            "//bazel/config:linkstatic_disabled": ["supports_pic", "pic"],
-            "//bazel/config:shared_archive_enabled": ["supports_pic", "pic"],
-            "//conditions:default": ["-pic", "pie"],
-        }) + features,
+        features = MONGO_GLOBAL_FEATURES + SKIP_ARCHIVE_FEATURE + features,
         target_compatible_with = target_compatible_with + enterprise_compatible,
         additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
         exec_properties = exec_properties,
@@ -2010,6 +2014,7 @@ def _mongo_cc_binary_and_test(
         srcs = srcs + ["//src/mongo:mongo_config_header"]
         deps += MONGO_GLOBAL_SRC_DEPS
         deps += ["//src/mongo:_global_header_bypass"]
+        features = features + RE_ENABLE_DISABLED_3RD_PARTY_WARNINGS_FEATURES
 
     if "modules/enterprise" in native.package_name():
         enterprise_compatible = select({
@@ -2102,6 +2107,16 @@ def _mongo_cc_binary_and_test(
         "//conditions:default": {},
     })
 
+    # This is used as a tool in part of the shared archive build, so it needs to be marked
+    # as compatible with a shared archive build.
+    if name in ["grpc_cpp_plugin", "protobuf_compiler"]:
+        features = features + ["-pie", "pic"]
+    else:
+        target_compatible_with += select({
+            "//bazel/config:shared_archive_enabled": ["@platforms//:incompatible"],
+            "//conditions:default": [],
+        })
+
     args = {
         "name": name + WITH_DEBUG_SUFFIX,
         "srcs": srcs + fincludes_hdr + SANITIZER_DENYLIST_HEADERS,
@@ -2124,10 +2139,7 @@ def _mongo_cc_binary_and_test(
             "//bazel/config:linkstatic_disabled": deps,
             "//conditions:default": [],
         }),
-        "target_compatible_with": target_compatible_with + enterprise_compatible + select({
-            "//bazel/config:shared_archive_enabled": ["@platforms//:incompatible"],
-            "//conditions:default": [],
-        }),
+        "target_compatible_with": target_compatible_with + enterprise_compatible,
         "additional_linker_inputs": additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
         "exec_properties": exec_properties,
         "env": env | SANITIZER_ENV,
@@ -2555,6 +2567,7 @@ strip_deps = rule(
         "input": attr.label(
             providers = [CcInfo],
         ),
+        "linkstatic": attr.bool(),
     },
     provides = [CcInfo],
     toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
@@ -2606,12 +2619,12 @@ def mongo_cc_proto_library(
     native.cc_proto_library(
         name = name + "_raw",
         deps = deps,
-        tags = tags + ["gen_source"],
         **kwargs
     )
     strip_deps(
         name = name,
         input = name + "_raw",
+        tags = tags + ["gen_source"],
     )
 
 def mongo_cc_grpc_library(
@@ -2627,6 +2640,17 @@ def mongo_cc_grpc_library(
         no_undefined_ref_DO_NOT_USE = True,
         **kwargs):
     codegen_grpc_target = "_" + name + "_grpc_codegen"
+
+    # TODO(SERVER-100148): Re-enable sandboxing on protobuf compilation
+    # once we can rely on //external:grpc_cpp_plugin.
+    #
+    # TSAN is currently being applied to protoc which is failing to run
+    # under Bazel's sandbox due to the system call to disable ASLR
+    # failing.
+    #
+    # To workaround this issue, disable the sandbox only when compiling
+    # protobufs, since we don't care about threading issues in the
+    # proto compiler itself.
     generate_cc(
         name = codegen_grpc_target,
         srcs = srcs,
@@ -2634,6 +2658,10 @@ def mongo_cc_grpc_library(
         well_known_protos = well_known_protos,
         generate_mocks = generate_mocks,
         tags = tags + ["gen_source"],
+        disable_sandbox = select({
+            "//bazel/config:tsan_enabled": True,
+            "//conditions:default": False,
+        }),
         **kwargs
     )
 

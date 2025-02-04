@@ -230,6 +230,7 @@ static int
 __schema_open_index(
   WT_SESSION_IMPL *session, WT_TABLE *table, const char *idxname, size_t len, WT_INDEX **indexp)
 {
+    struct timespec tsp;
     WT_CURSOR *cursor;
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
@@ -242,6 +243,11 @@ __schema_open_index(
     cursor = NULL;
     idx = NULL;
     match = false;
+
+    /* Add a 2 second wait to simulate open index slowness. */
+    tsp.tv_sec = 2;
+    tsp.tv_nsec = 0;
+    __wt_timing_stress(session, WT_TIMING_STRESS_OPEN_INDEX_SLOW, &tsp);
 
     /* Build a search key. */
     tablename = table->iface.name;

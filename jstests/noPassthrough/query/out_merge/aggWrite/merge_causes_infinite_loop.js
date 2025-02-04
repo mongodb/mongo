@@ -31,7 +31,7 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldPer
 function insertDocuments(collObject) {
     const bulk = collObject.initializeUnorderedBulkOp();
     for (let i = 1; i < nDocs; i++) {
-        bulk.insert({_id: i, a: i * largeNum, largeArray: (new Array(1024 * 1024).join("a"))});
+        bulk.insert({_id: i, a: i * largeNum, largeArray: "a".repeat(1024 * 1024)});
     }
     assert.commandWorked(bulk.execute());
 }

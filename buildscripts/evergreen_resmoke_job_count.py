@@ -14,6 +14,10 @@ import yaml
 
 LOGGER = structlog.get_logger(__name__)
 
+BURN_IN_TASK_PREFIX = "burn_in:"
+BURN_IN_VARIANT_SUFFIX = "-generated-by-burn-in-tags"
+GEN_TASK_SUFFIX = "_gen"
+
 CPU_COUNT = psutil.cpu_count()
 PLATFORM_MACHINE = platform.machine()
 SYS_PLATFORM = sys.platform
@@ -135,18 +139,34 @@ GLOBAL_TASK_FACTOR_OVERRIDES = {
 }
 
 
-def get_original_task_name(task_name):
+def get_original_task_name(task_name, variant_name):
     """
+    Return the original task name.
+
     The task name after going through the task generator may have the form
-    /<task name>_[0-9]+-<platform>/. This function returns the original task
-    name.
+    /<task name>_[0-9]+-<platform>/ or /burn_in:<task name>_gen-<variant>_[0-9]+/
 
-    For example, "sharding_0-linux-debug" -> "sharding".
+    For example, "sharding_0-linux-debug" -> "sharding" or
+    "burn_in:sharding_gen-enterprise-amazon-linux2-arm64-all-feature-flags-generated-by-burn-in-tags_0" -> "sharding".
     """
-    return re.compile("_[0-9]+").split(task_name)[0]
+    return (
+        re.compile("_[0-9]+")
+        .split(task_name)[0]
+        .removeprefix(BURN_IN_TASK_PREFIX)
+        .removesuffix(f"{GEN_TASK_SUFFIX}-{variant_name}")
+    )
 
 
-def global_task_factor(generated_task_name, overrides, factor):
+def get_original_variant_name(variant_name):
+    """
+    Return the original variant name.
+
+    For example, "amazon-linux2-generated-by-burn-in-tags" -> "amazon-linux2".
+    """
+    return variant_name.removesuffix(BURN_IN_VARIANT_SUFFIX)
+
+
+def global_task_factor(task_name, overrides, factor):
     """
     Check for a global task override and return factor.
 
@@ -155,7 +175,6 @@ def global_task_factor(generated_task_name, overrides, factor):
     :param factor: Default factor if there is no override.
     :return: Factor that should be used based on global overrides.
     """
-    task_name = get_original_task_name(generated_task_name)
     for task_re, task_factor in overrides.items():
         if re.compile(task_re).search(task_name):
             return task_factor
@@ -163,9 +182,8 @@ def global_task_factor(generated_task_name, overrides, factor):
     return factor
 
 
-def get_task_factor(generated_task_name, overrides, override_type, factor):
+def get_task_factor(task_name, overrides, override_type, factor):
     """Check for task override and return factor."""
-    task_name = get_original_task_name(generated_task_name)
     for task_override in overrides.get(override_type, []):
         if re.compile(task_override["task"]).search(task_name):
             return task_override["factor"]
@@ -332,10 +350,18 @@ def main():
         cpu_count=CPU_COUNT,
     )
 
-    jobs = determine_jobs(
-        options.task, options.variant, options.distro, options.jobs_max, options.jobs_factor
+    original_task = get_original_task_name(options.task, options.variant)
+    original_variant = get_original_variant_name(options.variant)
+    LOGGER.info(
+        "Original task and variant names",
+        original_task=original_task,
+        original_variant=original_variant,
     )
-    jobs = maybe_override_num_jobs_on_required(options.task, options.variant, jobs)
+
+    jobs = determine_jobs(
+        original_task, original_variant, options.distro, options.jobs_max, options.jobs_factor
+    )
+    jobs = maybe_override_num_jobs_on_required(original_task, original_variant, jobs)
 
     if jobs < CPU_COUNT:
         print("Reducing number of jobs to run from {} to {}".format(CPU_COUNT, jobs))

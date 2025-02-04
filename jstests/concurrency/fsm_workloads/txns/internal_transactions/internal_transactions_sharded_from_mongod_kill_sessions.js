@@ -130,7 +130,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 print("killSessions error " + tojsononeline(e));
                 if (isNetworkError(e) || isRetryableError(e)) {
                     print("Starting new sessions after listSessions or killSessions error");
-                    this.startSessions();
+                    this.startSessions(db);
                     // When causal consistency is required, the verifyDocuments state would perform
                     // reads against mongos with afterClusterTime equal to the max of the
                     // clusterTimes of all sessions that it has created on the shard that it uses to

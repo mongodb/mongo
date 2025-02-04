@@ -31,6 +31,7 @@
 
 #include <absl/container/node_hash_map.h>
 #include <algorithm>
+#include <array>
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -1159,6 +1160,11 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          }
          return Status::OK();
      }}},
+    {"databaseMetadataUpdate",
+     {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
+          -> Status {
+         return Status::OK();
+     }}},
 };
 
 // Writes a change stream pre-image 'preImage' associated with oplog entry 'oplogEntry' and a write
@@ -1405,7 +1411,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
     if (op.getObject2())
         o2 = op.getObject2().value();
 
-    const IndexCatalog* indexCatalog = !collection ? nullptr : collection->getIndexCatalog();
     const bool haveWrappingWriteUnitOfWork =
         shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork();
     uassert(ErrorCodes::CommandNotSupportedOnView,
@@ -1468,8 +1473,9 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         "Cannot apply an array insert with applyOps",
                         !opCtx->writesAreReplicated());
 
-                std::vector<InsertStatement> insertObjs;
                 const auto insertOps = opOrGroupedInserts.getGroupedInserts();
+                std::vector<InsertStatement> insertObjs;
+                insertObjs.reserve(insertOps.size());
                 WriteUnitOfWork wuow(opCtx);
                 for (const auto& iOp : insertOps) {
                     invariant(iOp->getTerm());
@@ -1762,6 +1768,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             // We can still get a write conflict on the primary as a delete done as part of expired
             // session cleanup can race with a use of the expired session.
             auto status = writeConflictRetryWithLimit(opCtx, "applyOps_update", op.getNss(), [&] {
+                auto write_status = Status::OK();
                 WriteUnitOfWork wuow(opCtx);
                 if (timestamp != Timestamp::min()) {
                     uassertStatusOK(
@@ -1792,35 +1799,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                     2,
                                     "couldn't find doc in capped collection",
                                     "op"_attr = redact(op.toBSONForLogging()));
-                    } else if (ur.modifiers) {
-                        if (updateCriteria.nFields() == 1) {
-                            // was a simple { _id : ... } update criteria
-                            static constexpr char msg[] = "Failed to apply update";
-                            LOGV2_ERROR(21258, msg, "op"_attr = redact(op.toBSONForLogging()));
-                            return Status(ErrorCodes::UpdateOperationFailed,
-                                          str::stream()
-                                              << msg << ": " << redact(op.toBSONForLogging()));
-                        }
 
-                        // Need to check to see if it isn't present so we can exit early with a
-                        // failure. Note that adds some overhead for this extra check in some
-                        // cases, such as an updateCriteria of the form { _id:..., { x :
-                        // {$size:...} } thus this is not ideal.
-                        if (!collection ||
-                            (indexCatalog->haveIdIndex(opCtx) &&
-                             Helpers::findById(opCtx, collection, updateCriteria).isNull()) ||
-                            // capped collections won't have an _id index
-                            (!indexCatalog->haveIdIndex(opCtx) &&
-                             Helpers::findOne(opCtx, collection, updateCriteria).isNull())) {
-                            static constexpr char msg[] = "Couldn't find document";
-                            LOGV2_ERROR(21259, msg, "op"_attr = redact(op.toBSONForLogging()));
-                            return Status(ErrorCodes::UpdateOperationFailed,
-                                          str::stream()
-                                              << msg << ": " << redact(op.toBSONForLogging()));
-                        }
-
-                        // Otherwise, it's present; zero objects were updated because of
-                        // additional specifiers in the query for idempotence
                     } else {
                         // this could happen benignly on an oplog duplicate replay of an upsert
                         // (because we are idempotent), if a regular non-mod update fails the
@@ -1828,9 +1807,9 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         if (!upsert) {
                             static constexpr char msg[] = "Update of non-mod failed";
                             LOGV2_ERROR(21260, msg, "op"_attr = redact(op.toBSONForLogging()));
-                            return Status(ErrorCodes::UpdateOperationFailed,
-                                          str::stream()
-                                              << msg << ": " << redact(op.toBSONForLogging()));
+                            write_status = Status(ErrorCodes::UpdateOperationFailed,
+                                                  str::stream() << msg << ": "
+                                                                << redact(op.toBSONForLogging()));
                         }
                     }
                 } else if (!upsertOplogEntry && !ur.upsertedId.isEmpty() &&
@@ -1891,7 +1870,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 }
 
                 wuow.commit();
-                return Status::OK();
+                return write_status;
             });
 
             if (!status.isOK()) {
@@ -2134,14 +2113,14 @@ Status applyCommand_inlock(OperationContext* opCtx,
     // for each collection dropped. 'applyOps' and 'commitTransaction' will try to apply each
     // individual operation, and those will be caught then if they are a problem. 'abortTransaction'
     // won't ever change the server configuration collection.
-    std::vector<std::string> allowlistedOps{"dropDatabase",
-                                            "applyOps",
-                                            "dbCheck",
-                                            "commitTransaction",
-                                            "abortTransaction",
-                                            "startIndexBuild",
-                                            "commitIndexBuild",
-                                            "abortIndexBuild"};
+    constexpr std::array<StringData, 8> allowlistedOps{"dropDatabase",
+                                                       "applyOps",
+                                                       "dbCheck",
+                                                       "commitTransaction",
+                                                       "abortTransaction",
+                                                       "startIndexBuild",
+                                                       "commitIndexBuild",
+                                                       "abortIndexBuild"};
     if ((mode == OplogApplication::Mode::kInitialSync) &&
         (std::find(allowlistedOps.begin(), allowlistedOps.end(), o.firstElementFieldName()) ==
          allowlistedOps.end()) &&

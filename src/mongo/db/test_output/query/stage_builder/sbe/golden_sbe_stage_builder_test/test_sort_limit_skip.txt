@@ -1,0 +1,15 @@
+# Golden test output of GoldenSbeStageBuilderTest/TestSortLimitSkip
+[4] limitskip s6 s1 
+[2] sort [s5] [desc] [s3] 
+    let [
+        l2.0 = (s6 + s1) 
+    ] 
+    in 
+        if typeMatch(l2.0, 262144) 
+        then makeOwn(move(l2.0)) 
+        else 9223372036854775807ll 
+
+[2] project [s5 = getSortKeyDesc(s4)] 
+[1] project [s4 = getField(s3, "a")] 
+[1] project [s3 = getElement(s2, 0)] 
+[1] virtualscan s2 {[[{"a" : 1, "b" : 2}], [{"a" : 2, "b" : 2}], [{"a" : 3, "b" : 2}]]} 

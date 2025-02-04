@@ -27,7 +27,7 @@ const testColl = testDB.getCollection(collName);
 // 16MB limit, but that three such arrays in the same document are greater than 16MB. This will
 // be helpful in recreating an idempotency issue that exists when applying the operations from
 // a transaction after the data already reflects the transaction.
-const largeArray = new Array(7 * 1024 * 1024).join('x');
+const largeArray = 'x'.repeat(7 * 1024 * 1024);
 assert.commandWorked(testColl.insert([{_id: 1, "a": largeArray}]));
 
 // Start a transaction in a session that will be prepared and committed before node restart.

@@ -130,7 +130,7 @@ public:
      */
     Status recordDuplicateKey(OperationContext* opCtx,
                               const IndexCatalogEntry* indexCatalogEntry,
-                              const key_string::Value& key) const;
+                              const key_string::View& key) const;
 
     /**
      * Returns Status::OK if all previously recorded duplicate key constraint violations have been

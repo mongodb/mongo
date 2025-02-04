@@ -107,18 +107,17 @@ public:
 
     void end() override;
 
-    StatusWith<Message> sourceMessage() noexcept override;
+    StatusWith<Message> sourceMessage() override;
 
-    Future<Message> asyncSourceMessage(const BatonHandle& baton = nullptr) noexcept override;
+    Future<Message> asyncSourceMessage(const BatonHandle& baton = nullptr) override;
 
-    Status waitForData() noexcept override;
+    Status waitForData() override;
 
-    Future<void> asyncWaitForData() noexcept override;
+    Future<void> asyncWaitForData() override;
 
-    Status sinkMessage(Message message) noexcept override;
+    Status sinkMessage(Message message) override;
 
-    Future<void> asyncSinkMessage(Message message,
-                                  const BatonHandle& baton = nullptr) noexcept override;
+    Future<void> asyncSinkMessage(Message message, const BatonHandle& baton = nullptr) override;
 
     void cancelAsyncOperations(const BatonHandle& baton = nullptr) override;
 
@@ -138,11 +137,12 @@ public:
     }
 
 #ifdef MONGO_CONFIG_SSL
-    const std::shared_ptr<SSLManagerInterface>& getSSLManager() const override;
+    const SSLConfiguration* getSSLConfiguration() const override;
 #endif
 
 protected:
 #ifdef MONGO_CONFIG_SSL
+    const std::shared_ptr<SSLManagerInterface>& getSSLManager() const;
     /** Constructs a SSL socket required to initiate SSL handshake for egress connections. */
     Status buildSSLSocket(const HostAndPort& target) override;
     Future<void> handshakeSSLForEgress(const HostAndPort& target,

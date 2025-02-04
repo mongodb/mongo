@@ -57,7 +57,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/future.h"
 
@@ -379,7 +379,7 @@ public:
      * Tailable cursors are a possible exception to this: they may have further results even if
      * isEOF() returns true.
      */
-    virtual bool isEOF() = 0;
+    virtual bool isEOF() const = 0;
 
     /**
      * If this plan executor was constructed to execute a count implementation, e.g. it was obtained
@@ -471,6 +471,11 @@ public:
     virtual void dispose(OperationContext* opCtx) = 0;
 
     /**
+     * Forces all stages in the execution plan that are able to spill their data.
+     */
+    virtual void forceSpill() = 0;
+
+    /**
      * Stash the BSONObj so that it gets returned from the PlanExecutor a subsequent call to
      * getNext(). Implementations should NOT support returning stashed BSON objects using
      * 'getNextDocument()'. Only 'getNext()' should return the stashed BSON objects.
@@ -483,7 +488,7 @@ public:
     virtual void stashResult(const BSONObj& obj) = 0;
 
     virtual bool isMarkedAsKilled() const = 0;
-    virtual Status getKillStatus() = 0;
+    virtual Status getKillStatus() const = 0;
 
     virtual bool isDisposed() const = 0;
 

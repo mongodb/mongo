@@ -82,7 +82,7 @@ IDHackStage::IDHackStage(ExpressionContext* expCtx,
 
 IDHackStage::~IDHackStage() {}
 
-bool IDHackStage::isEOF() {
+bool IDHackStage::isEOF() const {
     return _done;
 }
 

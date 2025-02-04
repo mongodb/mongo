@@ -74,6 +74,8 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalReshardingIterateTransaction,
                                   LiteParsedDocumentSourceInternal::parse,
                                   DocumentSourceReshardingIterateTransaction::createFromBson,
                                   true);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalReshardingIterateTransaction,
+                            DocumentSourceReshardingIterateTransaction::id)
 
 boost::intrusive_ptr<DocumentSourceReshardingIterateTransaction>
 DocumentSourceReshardingIterateTransaction::create(

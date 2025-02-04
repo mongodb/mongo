@@ -215,6 +215,10 @@ function mapListCatalogToListIndexesEntry(listCatalogEntry) {
             delete mdIndexSpec.min;
             delete mdIndexSpec.max;
         }
+        if (indexPlugin !== "2dsphere") {
+            delete mdIndexSpec.coarsestIndexedLevel;
+            delete mdIndexSpec.finestIndexedLevel;
+        }
         if (indexPlugin !== "text") {
             delete mdIndexSpec.textIndexVersion;
         }
@@ -283,6 +287,14 @@ function removeDuplicateDocuments(docList) {
                               index === 0 || bsonWoCompare(docList[index - 1], item) !== 0);
 }
 
+// Some tests create a large amount and/or very bloated collection/index definitions,
+// so that comparing it all at once fails due to it exceeding the BSON document size limit.
+// This works around the issue by running the comparison element by element.
+function bsonUnorderedFieldArrayEquals(a, b) {
+    return a.length === b.length &&
+        a.every((item, index) => bsonUnorderedFieldsCompare(item, b[index]) === 0);
+}
+
 function validateListCatalogToListCollectionsConsistency(
     listCatalog, listCollections, isDbReadOnly, shouldAssert) {
     // Sorting function to ignore irrelevant ordering differences while comparing.
@@ -299,7 +311,8 @@ function validateListCatalogToListCollectionsConsistency(
             ci => mapListCatalogToListCollectionsEntry(ci, listCatalogMap, isDbReadOnly))));
     const sortedListCollections = sortCollectionsInPlace([...listCollections]);
 
-    const equals = bsonWoCompare(listCollectionsFromListCatalog, sortedListCollections) === 0;
+    const equals =
+        bsonUnorderedFieldArrayEquals(listCollectionsFromListCatalog, sortedListCollections);
     if (!equals) {
         const message = "$listCatalog to listCollections consistency check failed.\n" +
             "expected (from $listCatalog): " + tojson(listCollectionsFromListCatalog) + "\n" +
@@ -320,14 +333,6 @@ function validateListCatalogToListIndexesConsistency(listCatalog, listIndexes, s
         indexList.forEach(  // Sort the indexes of each collection.
             ci => ci.indexes.sort((ia, ib) => ia.name.localeCompare(ib.name)));
         return indexList;
-    }
-
-    // Some tests create a large amount of collections or indexes, and/or very bloated indexes,
-    // so that comparing it all at once fails due to it exceeding the BSON document size limit.
-    // This works around the issue by running the comparison element by element.
-    function bsonUnorderedFieldArrayEquals(a, b) {
-        return a.length === b.length &&
-            a.every((item, index) => bsonUnorderedFieldsCompare(item, b[index]) === 0);
     }
 
     const listIndexesFromListCatalog = removeDuplicateDocuments(sortCollectionIndexesInPlace(

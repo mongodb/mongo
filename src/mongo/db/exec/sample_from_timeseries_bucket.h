@@ -84,7 +84,7 @@ public:
         return STAGE_SAMPLE_FROM_TIMESERIES_BUCKET;
     }
 
-    bool isEOF() final {
+    bool isEOF() const final {
         return _nSampledSoFar >= _sampleSize;
     }
 

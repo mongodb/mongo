@@ -49,7 +49,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/unittest/assert.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

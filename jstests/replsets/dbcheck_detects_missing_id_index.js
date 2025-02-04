@@ -2,7 +2,7 @@
  * Tests that dbCheck reports an error when the _id index is missing in a collection.
  *
  * @tags: [
- *   requires_fcv_81
+ *   requires_fcv_80
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

@@ -1,5 +1,11 @@
 // This tests that metadata commands run against the system.profile collection are not replicated
 // to the secondary.
+//
+// @tags: [
+//   # The test queries the system.profile collection so it is not compatible with initial sync
+//   # since an initial sync may insert unexpected operations into the profile collection.
+//   queries_system_profile_collection
+// ]
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 

@@ -215,15 +215,13 @@ public:
             // Rewrite the count command as an aggregation.
             auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
             auto aggRequestOnView =
-                query_request_conversion::asAggregateCommandRequest(countRequest, boost::none);
+                query_request_conversion::asAggregateCommandRequest(countRequest);
             auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView);
-            auto resolvedAggCmd =
-                aggregation_request_helper::serializeToCommandObj(resolvedAggRequest);
 
             BSONObj aggResult = CommandHelpers::runCommandDirectly(
                 opCtx,
                 OpMsgRequestBuilder::create(
-                    auth::ValidatedTenancyScope::get(opCtx), dbName, std::move(resolvedAggCmd)));
+                    auth::ValidatedTenancyScope::get(opCtx), dbName, resolvedAggRequest.toBSON()));
 
             result.resetToEmpty();
             ViewResponseFormatter formatter(aggResult);
@@ -347,8 +345,8 @@ public:
             } catch (...) {
                 return exceptionToStatus();
             }
-            auto aggRequestOnView =
-                query_request_conversion::asAggregateCommandRequest(countRequest, verbosity);
+            auto aggRequestOnView = query_request_conversion::asAggregateCommandRequest(
+                countRequest, true /* hasExplain */);
             auto bodyBuilder = result->getBodyBuilder();
             // An empty PrivilegeVector is acceptable because these privileges are only checked
             // on getMore and explain will not open a cursor.
@@ -357,6 +355,7 @@ public:
                                                       *ex.extraInfo<ResolvedView>(),
                                                       nss,
                                                       PrivilegeVector(),
+                                                      verbosity,
                                                       &bodyBuilder);
         }
 

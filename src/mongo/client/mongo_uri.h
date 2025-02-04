@@ -266,7 +266,6 @@ public:
         _helloOk.emplace(helloOk);
     }
 
-    // TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
 #ifdef MONGO_CONFIG_GRPC
     void setIsGRPC(bool isGRPC) {
         _gRPC = isGRPC;
@@ -325,7 +324,6 @@ private:
           _helloOk(helloOk),
           _options(std::move(options)) {}
 
-// TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
 #ifdef MONGO_CONFIG_GRPC
     MongoURI(ConnectionString connectString,
              const std::string& user,
@@ -356,7 +354,6 @@ private:
     boost::optional<bool> _retryWrites;
     transport::ConnectSSLMode _sslMode = transport::kGlobalSSLMode;
     boost::optional<bool> _helloOk;
-// TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
 #ifdef MONGO_CONFIG_GRPC
     boost::optional<bool> _gRPC;
 #endif

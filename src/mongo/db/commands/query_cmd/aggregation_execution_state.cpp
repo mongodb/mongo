@@ -81,9 +81,19 @@ public:
             _collections.getMainCollection());
     }
 
-    const AutoGetCollectionForReadCommandMaybeLockFree& getCtx() const override {
+    const CollectionPtr& getPrimaryCollection() const override {
         invariant(lockAcquired());
-        return *_ctx;
+        return _ctx->getCollection();
+    }
+
+    query_shape::CollectionType getPrimaryCollectionType() const override {
+        invariant(lockAcquired());
+        return _ctx->getCollectionType();
+    }
+
+    const ViewDefinition* getPrimaryView() const override {
+        invariant(lockAcquired());
+        return _ctx->getView();
     }
 
     void getStatsTrackerIfNeeded(boost::optional<AutoStatsTracker>& statsTracker) const override {
@@ -95,8 +105,11 @@ public:
         return _collections;
     }
 
-    std::shared_ptr<const CollectionCatalog> getCatalog() const override {
-        return _catalog;
+    StatusWith<ResolvedView> resolveView(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<BSONObj> timeSeriesCollator) const override {
+        return view_catalog_helpers::resolveView(opCtx, _catalog, nss, timeSeriesCollator);
     }
 
     boost::optional<UUID> getUUID() const override {
@@ -246,7 +259,15 @@ public:
             CollectionPtr());
     }
 
-    const AutoGetCollectionForReadCommandMaybeLockFree& getCtx() const override {
+    const CollectionPtr& getPrimaryCollection() const override {
+        MONGO_UNREACHABLE;
+    }
+
+    query_shape::CollectionType getPrimaryCollectionType() const override {
+        MONGO_UNREACHABLE;
+    }
+
+    const ViewDefinition* getPrimaryView() const override {
         MONGO_UNREACHABLE;
     }
 
@@ -254,8 +275,11 @@ public:
         return _emptyMultipleCollectionAccessor;
     }
 
-    std::shared_ptr<const CollectionCatalog> getCatalog() const override {
-        return _catalog;
+    StatusWith<ResolvedView> resolveView(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<BSONObj> timeSeriesCollator) const override {
+        return view_catalog_helpers::resolveView(opCtx, _catalog, nss, timeSeriesCollator);
     }
 
     boost::optional<UUID> getUUID() const override {
@@ -375,7 +399,7 @@ StatusWith<StringMap<ResolvedNamespace>> AggExState::resolveInvolvedNamespaces()
     return resolvedNamespaces;
 }
 
-void AggExState::setView(std::shared_ptr<const CollectionCatalog> catalog,
+void AggExState::setView(std::unique_ptr<AggCatalogState>& aggCatalogStage,
                          const ViewDefinition* view) {
     // Queries on timeseries views may specify non-default collation whereas queries
     // on all other types of views must match the default collator (the collation used
@@ -384,12 +408,12 @@ void AggExState::setView(std::shared_ptr<const CollectionCatalog> catalog,
     auto timeSeriesCollator =
         view->timeseries() ? _aggReqDerivatives->request.getCollation() : boost::none;
 
-    auto resolvedView = uassertStatusOK(view_catalog_helpers::resolveView(
-        _opCtx, catalog, _aggReqDerivatives->request.getNamespace(), timeSeriesCollator));
-
+    auto resolvedView = uassertStatusOK(aggCatalogStage->resolveView(
+        _opCtx, _aggReqDerivatives->request.getNamespace(), timeSeriesCollator));
+    bool isExplain = _aggReqDerivatives->request.getExplain().get_value_or(false);
     uassert(std::move(resolvedView),
             "Explain of a resolved view must be executed by mongos",
-            !ShardingState::get(_opCtx)->enabled() || !_aggReqDerivatives->request.getExplain());
+            !ShardingState::get(_opCtx)->enabled() || !isExplain);
 
     _resolvedView = resolvedView;
 
@@ -398,7 +422,7 @@ void AggExState::setView(std::shared_ptr<const CollectionCatalog> catalog,
     _resolvedViewLiteParsedPipeline = _resolvedViewRequest.value();
     _aggReqDerivatives = std::make_unique<AggregateRequestDerivatives>(
         _resolvedViewRequest.value(), _resolvedViewLiteParsedPipeline.value(), [this]() {
-            return aggregation_request_helper::serializeToCommandObj(_resolvedViewRequest.value());
+            return _resolvedViewRequest.value().toBSON();
         });
 
     _executionNss = _aggReqDerivatives->request.getNamespace();
@@ -414,9 +438,10 @@ void AggExState::performValidationChecks() {
 
     // If we are in a transaction, check whether the parsed pipeline supports being in
     // a transaction and if the transaction's read concern is supported.
+    bool isExplain = request.getExplain().get_value_or(false);
     if (_opCtx->inMultiDocumentTransaction()) {
-        liteParsedPipeline.assertSupportsMultiDocumentTransaction(request.getExplain());
-        liteParsedPipeline.assertSupportsReadConcern(_opCtx, request.getExplain());
+        liteParsedPipeline.assertSupportsMultiDocumentTransaction(isExplain);
+        liteParsedPipeline.assertSupportsReadConcern(_opCtx, isExplain);
     }
 }
 
@@ -591,6 +616,7 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
                       .resolvedNamespace(uassertStatusOK(_aggExState.resolveInvolvedNamespaces()))
                       .tmpDir(storageGlobalParams.dbpath + "/_tmp")
                       .collationMatchesDefault(collationMatchesDefault)
+                      .explain(_aggExState.getVerbosity())
                       .build();
     // If any involved collection contains extended-range data, set a flag which individual
     // DocumentSource parsers can check.
@@ -606,8 +632,8 @@ void AggCatalogState::validate() const {
     if (_aggExState.getRequest().getResumeAfter()) {
         uassert(ErrorCodes::InvalidPipelineOperator,
                 "$_resumeAfter is not supported on view",
-                !getCtx().getView());
-        const auto& collection = getCtx().getCollection();
+                !getPrimaryView());
+        const auto& collection = getPrimaryCollection();
         const bool isClusteredCollection = collection && collection->isClustered();
         uassertStatusOK(query_request_helper::validateResumeInput(
             _aggExState.getOpCtx(),
@@ -650,7 +676,7 @@ query_shape::CollectionType AggCatalogState::determineCollectionType() const {
     if (_aggExState.hasChangeStream()) {
         return query_shape::CollectionType::kChangeStream;
     }
-    return lockAcquired() ? getCtx().getCollectionType() : query_shape::CollectionType::kUnknown;
+    return lockAcquired() ? getPrimaryCollectionType() : query_shape::CollectionType::kUnknown;
 }
 
 std::unique_ptr<AggCatalogState> AggCatalogStateFactory::createDefaultAggCatalogState(

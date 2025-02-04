@@ -84,7 +84,7 @@
 namespace mongo {
 
 class RecoveryUnit;
-class WiredTigerSessionCache;
+class WiredTigerConnection;
 class WiredTigerSizeStorer;
 class WiredTigerOplogData;
 class WiredTigerOplogTruncateMarkers;
@@ -345,7 +345,6 @@ private:
                         const AboutToDeleteRecordCallback&) override;
 
     virtual void _handleTruncateAfter(WiredTigerRecoveryUnit&,
-                                      WT_SESSION*,
                                       const RecordId& lastKeptId,
                                       const RecordId& firstRemovedId,
                                       int64_t recordsRemoved,
@@ -408,7 +407,6 @@ private:
     Status _checkUpdateSize(int64_t oldSize, int64_t newSize) override;
 
     void _handleTruncateAfter(WiredTigerRecoveryUnit&,
-                              WT_SESSION*,
                               const RecordId& lastKeptId,
                               const RecordId& firstRemovedId,
                               int64_t recordsRemoved,

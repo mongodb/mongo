@@ -47,7 +47,6 @@
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
-using boost::intrusive_ptr;
 
 template <>
 Value ExpressionFromAccumulator<AccumulatorStdDevPop>::evaluate(const Document& root,
@@ -122,14 +121,6 @@ Value AccumulatorStdDev::getValue(bool toBeMerged) {
     } else {
         return Value(DOC("m2" << _m2 << "mean" << _mean << "count" << _count));
     }
-}
-
-intrusive_ptr<AccumulatorState> AccumulatorStdDevSamp::create(ExpressionContext* const expCtx) {
-    return new AccumulatorStdDevSamp(expCtx);
-}
-
-intrusive_ptr<AccumulatorState> AccumulatorStdDevPop::create(ExpressionContext* const expCtx) {
-    return new AccumulatorStdDevPop(expCtx);
 }
 
 AccumulatorStdDev::AccumulatorStdDev(ExpressionContext* const expCtx, bool isSamp)

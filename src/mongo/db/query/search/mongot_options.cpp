@@ -30,10 +30,17 @@
 #include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/query/search/mongot_options_gen.h"
 
+
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/ssl_options.h"
+#include "mongo/util/options_parser/startup_option_init.h"
+#include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/text.h"
+
+namespace moe = mongo::optionenvironment;
 
 namespace mongo {
 
@@ -41,6 +48,8 @@ MongotParams globalMongotParams;
 
 MongotParams::MongotParams() {
     host = kMongotHostDefault;
+    // TODO SERVER-99787 Change default to kGlobalSSL.
+    sslMode = transport::ConnectSSLMode::kDisableSSL;
 }
 
 Status MongotParams::onSetHost(const std::string&) {
@@ -60,6 +69,51 @@ Status MongotParams::onValidateHost(StringData str, const boost::optional<Tenant
 
     globalMongotParams.enabled = true;
     return Status::OK();
+}
+
+MONGO_STARTUP_OPTIONS_STORE(SearchTLSModeOptions)(InitializerContext*) {
+    auto& params = moe::startupOptionsParsed;
+
+    if (!params.count("setParameter")) {
+        return;
+    }
+
+    std::map<std::string, std::string> parameters =
+        params["setParameter"].as<std::map<std::string, std::string>>();
+
+    const auto searchTLSModeParameter = parameters.find("searchTLSMode");
+    if (searchTLSModeParameter == parameters.end()) {
+        return;
+    }
+    const auto& searchTLSMode = searchTLSModeParameter->second;
+
+    if (searchTLSMode == "globalTLS") {
+        globalMongotParams.sslMode = transport::ConnectSSLMode::kGlobalSSLMode;
+        return;
+    }
+
+    auto swMode = SSLParams::tlsModeParse(searchTLSMode);
+    uassert(ErrorCodes::BadValue,
+            "searchTLSMode must be one of: (globalTLS|disabled|allowTLS|preferTLS|requireTLS). "
+            "Input was: " +
+                searchTLSMode,
+            swMode.isOK());
+
+    auto mode = swMode.getValue();
+    if ((mode == SSLParams::SSLMode_disabled) || (mode == SSLParams::SSLMode_allowSSL)) {
+        // 'allowSSL' mode makes unecrypted outgoing connections, so we disable SSL for connecting
+        // to mongot.
+        globalMongotParams.sslMode = transport::ConnectSSLMode::kDisableSSL;
+    } else {
+        // Ensure certificate is provided for 'preferTLS' and 'requireTLS'.
+        uassert(
+            ErrorCodes::BadValue,
+            "searchTLSMode set to enable TLS for connecting to mongot (preferTLS or requireTLS), "
+            "but no TLS certificate provided. Please specify net.tls.certificateKeyFile.",
+            params.count("net.tls.certificateKeyFile"));
+
+        globalMongotParams.sslMode = transport::ConnectSSLMode::kEnableSSL;
+    }
 }
 
 }  // namespace mongo

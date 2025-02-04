@@ -295,7 +295,10 @@ protected:
                 for (auto& stmt : stmts) {
                     ops.push_back(ApplierOperation(&stmt));
                 }
-                shard_role_details::releaseAndReplaceRecoveryUnit(&_opCtx);
+                {
+                    ClientLock clientLock(_opCtx.getClient());
+                    shard_role_details::releaseAndReplaceRecoveryUnit(&_opCtx, clientLock);
+                }
                 uassertStatusOK(
                     OplogApplierUtils::applyOplogBatchCommon(&_opCtx,
                                                              &ops,
@@ -332,9 +335,8 @@ protected:
             OldClientContext ctx(&_opCtx, nss);
             WriteUnitOfWork wunit(&_opCtx);
             Database* db = ctx.db();
-            Collection* coll =
-                CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespaceForMetadataWrite(
-                    &_opCtx, nss);
+            CollectionWriter writer{&_opCtx, nss};
+            Collection* coll = writer.getWritableCollection(&_opCtx);
             if (!coll) {
                 coll = db->createCollection(&_opCtx, nss);
             }

@@ -112,9 +112,11 @@ public:
         return writeConflictRetry(opCtx, "replSetResizeOplog", coll->ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
 
+            CollectionWriter writer{opCtx, coll};
+
             if (auto sizeMB = params.getSize()) {
                 const long long sizeBytes = *sizeMB * 1024 * 1024;
-                uassertStatusOK(coll.getWritableCollection(opCtx)->updateCappedSize(
+                uassertStatusOK(writer.getWritableCollection(opCtx)->updateCappedSize(
                     opCtx, sizeBytes, /*newCappedMax=*/boost::none));
             }
 

@@ -61,7 +61,6 @@ PreImagesTruncateStats PreImagesTruncateManager::truncateExpiredPreImages(
 
         return tenantTruncateMarkers->truncateExpiredPreImages(opCtx);
     } catch (const ExceptionFor<ErrorCodes::InterruptedDueToStorageChange>& ex) {
-        // TODO SERVER-90305: Revisit handling truncate markers generated on stale data.
         LOGV2_INFO(9023601,
                    "Pre-image truncation process interrupted due to storage change. Clearing "
                    "stale in-memory state",

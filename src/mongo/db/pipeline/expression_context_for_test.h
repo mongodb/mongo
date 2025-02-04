@@ -140,7 +140,6 @@ public:
               .opCtx = opCtx,
               .ns = request.getNamespace(),
               .serializationContext = request.getSerializationContext(),
-              .explain = request.getExplain(),
               .runtimeConstants = request.getLegacyRuntimeConstants(),
               .letParameters = request.getLet(),
               .fromRouter = aggregation_request_helper::getFromRouter(request),
@@ -152,6 +151,10 @@ public:
           _serviceContext(opCtx->getServiceContext()) {
         // Resolve the TimeZoneDatabase to be used by this ExpressionContextForTest.
         _setTimeZoneDatabase();
+        // In cases where explain = true, use the kQueryPlanner verbosity.
+        if (request.getExplain().get_value_or(false)) {
+            setExplain(ExplainOptions::Verbosity::kQueryPlanner);
+        }
     }
 
     /**
@@ -191,6 +194,9 @@ public:
             }
         };
         return visit(Visitor{}, _serviceContext);
+    }
+    void setExplain(boost::optional<ExplainOptions::Verbosity> verbosity) {
+        _params.explain = std::move(verbosity);
     }
 
 private:

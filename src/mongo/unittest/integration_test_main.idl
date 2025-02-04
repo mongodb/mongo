@@ -49,3 +49,8 @@ configs:
     fileNameFilter:
         description: 'Filter test cases by source file name by partial-matching regex.'
         arg_vartype: String
+    useEgressGRPC:
+        description: Whether or not the integration test is configured to use gRPC.
+        arg_vartype: Bool
+        default: false
+

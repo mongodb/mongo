@@ -42,7 +42,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

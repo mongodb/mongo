@@ -161,20 +161,21 @@ class TestTimeout(_ResmokeSelftest):
         # Since this test is designed to start remoke, wait for it to be up-and-running, and then
         # kill resmoke, we use a sentinel file to accomplish this.
 
-        # Form sentinel path, and make sure it's absent:
+        # Form sentinel path, remove any leftover version, and create the file that will be removed by the jstest.
         sentinel_path = f"{os.environ.get('TMPDIR') or os.environ.get('TMP_DIR') or '/tmp'}/{sentinel_file}.js.sentinel"
         if os.path.isfile(sentinel_path):
             os.remove(sentinel_path)
+        open(sentinel_path, "w").close()
 
         # Spawn resmoke (async):
         super(TestTimeout, self).execute_resmoke(resmoke_args, **kwargs)
 
-        # Wait for sentinel file to appear; bail if it takes too long:
+        # Wait for sentinel file to disappear; bail if it takes too long:
         started_polling_datetime = datetime.datetime.now()
-        while not os.path.isfile(sentinel_path):
+        while os.path.isfile(sentinel_path):
             time.sleep(0.1)
             if datetime.datetime.now() - started_polling_datetime > datetime.timedelta(minutes=5):
-                self.fail("SUT is not available within 99 seconds; aborting test")
+                self.fail("SUT is not available within 5 minutes; aborting test")
 
         # Kill resmoke:
         self.signal_resmoke()

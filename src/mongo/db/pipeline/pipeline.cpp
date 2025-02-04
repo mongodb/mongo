@@ -479,6 +479,12 @@ void Pipeline::dispose(OperationContext* opCtx) {
     }
 }
 
+void Pipeline::forceSpill() {
+    if (!_sources.empty()) {
+        _sources.back()->forceSpill();
+    }
+}
+
 bool Pipeline::usedDisk() {
     return std::any_of(
         _sources.begin(), _sources.end(), [](const auto& stage) { return stage->usedDisk(); });
@@ -748,7 +754,6 @@ DepsTracker Pipeline::getDependenciesForContainer(
             deps.requestMetadata(localDeps.metadataDeps());
             knowAllMeta = status & DepsTracker::State::EXHAUSTIVE_META;
         }
-        deps.requestMetadata(localDeps.searchMetadataDeps());
     }
 
     if (!knowAllFields)
@@ -1001,7 +1006,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipelineFromViewDefinit
         return Pipeline::makePipeline(currentPipeline, subPipelineExpCtx, opts);
     }
 
-    if (search_helper_bson_obj::isMongotPipeline(currentPipeline)) {
+    if (search_helper_bson_obj::isMongotPipeline(currentPipeline) &&
+        subPipelineExpCtx->isFeatureFlagMongotIndexedViewsEnabled()) {
         return Pipeline::viewPipelineHelperForSearch(
             subPipelineExpCtx, resolvedNs, currentPipeline, opts, originalNs);
     }

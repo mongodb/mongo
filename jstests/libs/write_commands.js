@@ -257,10 +257,18 @@ export function getWriteCommands(coll, setupType, preSetup) {
         },
     });
 
+    // TODO SERVER-98603: Fix behavior differences between replica sets and sharded clusters,
+    // and run the following tests unconditionally.
     if (setupType !== "sharding-unsharded" && setupType !== "sharding-sharded") {
-        // TODO SERVER-98602 fix missing WCE; remove above condition
         // 'findAndModify' where the document to update does not exist.
+        // In both replica sets and sharded clusters, running the 'findAndModify' on a
+        // non-existing document internally produces this 'UpdateResult':
+        //     { lastErrorObject: { n: 0, updatedExisting: false }, value: null }
+        // However, even though no document is being updated, the replica set waits for the
+        // replication to complete and thus also reports a WCE in this test. The sharded cluster
+        // immediately returns and does not produce a WCE.
         commands.push({
+            // Note: the search document does not exist.
             req: {findAndModify: collName, query: {a: 1}, update: {b: 2}},
             setupFunc: () => {
                 assert.commandWorked(coll.insert({a: 1}));
@@ -275,8 +283,14 @@ export function getWriteCommands(coll, setupType, preSetup) {
             },
         });
 
-        // TODO SERVER-98602 fix missing WCE; remove above condition
         // 'findAndModify' where the update has already been done.
+        // In both replica sets and unsharded cluster collections, running the 'findAndModify'
+        // on a document which exists, but is already in the desired target state, the internal
+        // 'UpdateResult' is:
+        //     { lastErrorObject: { n: 1, updatedExisting: true }, value: { _id: ..., a: 1.0, c: 2.0
+        //     } }
+        // In the replica set case, the update attempt produces a WCE. In the cluster case, the
+        // document is actually not being updated and thus no WCE is produced.
         commands.push({
             req: {findAndModify: collName, query: {a: 1}, update: {$set: {c: 2}}},
             setupFunc: () => {
@@ -289,7 +303,7 @@ export function getWriteCommands(coll, setupType, preSetup) {
                 if (setupType === "rs") {
                     assert.eq(res.lastErrorObject.updatedExisting, true);
                 } else {
-                    // TODO SERVER-98603 remove this test conditional
+                    // TODO SERVER-98603: remove this test conditional
                     assert.eq(setupType, "sharding-sharded");
                     assert.eq(res.lastErrorObject.updatedExisting, false);
                 }
@@ -318,7 +332,7 @@ export function getWriteCommands(coll, setupType, preSetup) {
         });
     }
 
-    // TODO SERVER-98602 Fix missing WCE; remove the "sharding-(un)sharded" conditions below.
+    // TODO SERVER-98603: Fix missing WCE; remove the "sharding-(un)sharded" conditions below.
     if (setupType.startsWith("sharding") && setupType !== "sharding-unsharded" &&
         setupType !== "sharding-sharded") {
         // 'findAndModify' causing a unique index key violation. Only works in a sharded cluster.
@@ -348,7 +362,7 @@ export function getWriteCommands(coll, setupType, preSetup) {
     }
 
     if (setupType !== "sharding-unsharded" && setupType !== "sharding-sharded") {
-        // TODO SERVER-98602 no WCE for unsharded collection on sharded cluster
+        // TODO SERVER-98603 no: WCE for unsharded collection on sharded cluster
         // 'findAndModify' with immutable field error.
         commands.push({
             req: {findAndModify: collName, query: {_id: 1}, update: {$set: {_id: 2}}},
@@ -368,7 +382,7 @@ export function getWriteCommands(coll, setupType, preSetup) {
             },
         });
 
-        // TODO SERVER-98602 no WCE for unsharded collection on sharded cluster
+        // TODO SERVER-98603 no WCE for unsharded collection on sharded cluster
         // 'findAndModify' where the document to delete does not exist.
         commands.push({
             req: {findAndModify: collName, query: {a: 1}, remove: true},

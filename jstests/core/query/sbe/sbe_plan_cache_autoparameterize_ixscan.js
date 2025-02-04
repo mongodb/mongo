@@ -14,6 +14,8 @@
  *   # This test is specifically verifying the behavior of the SBE plan cache, which is only enabled
  *   # when SBE is enabled.
  *   featureFlagSbeFull,
+ *   # The test examines the SBE plan cache, which initial sync may change the contents of.
+ *   examines_sbe_cache
  * ]
  */
 import {

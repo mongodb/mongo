@@ -97,6 +97,12 @@ Value evaluate(const ExpressionMeta& expr, const Document& root, Variables* vari
     MONGO_UNREACHABLE;
 }
 
+Value evaluate(const ExpressionInternalRawSortKey& expr,
+               const Document& root,
+               Variables* variables) {
+    return root.metadata().getSortKey();
+}
+
 Value evaluate(const ExpressionType& expr, const Document& root, Variables* variables) {
     Value val(expr.getChildren()[0]->evaluate(root, variables));
     return Value(StringData(typeName(val.getType())));

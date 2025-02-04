@@ -14,7 +14,7 @@
  *     Handle big- and little-endian transformation of the log file description block.
  */
 static WT_INLINE void
-__wti_log_desc_byteswap(WT_LOG_DESC *desc)
+__wti_log_desc_byteswap(WTI_LOG_DESC *desc)
 {
 #ifdef WORDS_BIGENDIAN
     desc->log_magic = __wt_bswap32(desc->log_magic);

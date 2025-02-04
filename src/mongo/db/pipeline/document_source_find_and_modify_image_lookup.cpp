@@ -162,6 +162,8 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalFindAndModifyImageLookup,
                                   LiteParsedDocumentSourceInternal::parse,
                                   DocumentSourceFindAndModifyImageLookup::createFromBson,
                                   true);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalFindAndModifyImageLookup,
+                            DocumentSourceFindAndModifyImageLookup::id)
 
 boost::intrusive_ptr<DocumentSourceFindAndModifyImageLookup>
 DocumentSourceFindAndModifyImageLookup::create(

@@ -3,6 +3,7 @@
 import os.path
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Optional
 
 import bson
 import pymongo
@@ -70,6 +71,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         initial_sync_uninitialized_fcv=False,
         hide_initial_sync_node_from_conn_string=False,
         launch_mongot=False,
+        router_endpoint_for_mongot: Optional[int] = None,
     ):
         """Initialize ReplicaSetFixture."""
 
@@ -105,6 +107,8 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         self.fcv = None
         # Used by suites that run search integration tests.
         self.launch_mongot = launch_mongot
+        # Used to set --mongoHostAndPort startup option on mongot.
+        self.router_endpoint_for_mongot = router_endpoint_for_mongot
         # Use the values given from the command line if they exist for linear_chain and num_nodes.
         linear_chain_option = self.fixturelib.default_if_none(
             self.config.LINEAR_CHAIN, linear_chain
@@ -145,8 +149,11 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         self.initial_sync_node = None
         self.initial_sync_node_idx = -1
         self.use_auto_bootstrap_procedure = use_auto_bootstrap_procedure
-        # This will be set in setup() after the MongoTFixture has been launched.
+        # The below ports will be set in setup() after the MongoTFixture has been launched.
         self.mongot_port = None
+        # mongot_grpc_port is the ingress grpc port on mongot that is configured for the search
+        # in community architecture. See setup_mongot_params and MongoDFixture.__init__ for more details.
+        self.mongot_grpc_port = None
         # Track the fixture removal [teardown] performed during removeShard testing.
         # This is needed, because we expect the fixture to be in the 'running' state
         # when the evergeen job performs the final teardown. Therefore if the fixture was
@@ -307,15 +314,6 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             # single voting member at a time.
             for ind in range(2, len(members) + 1):
                 self._add_node_to_repl_set(client, repl_config, ind, members)
-
-        if self.launch_mongot:
-            # To model Atlas Search's coupled architecture, resmoke deploys a mongot for each
-            # mongod node in a replica set.
-            for node in self.nodes:
-                node.setup_mongot()
-            # Saving the mongot port to the ReplicaSetFixture allows the ShardedClusterFixture
-            # to spin up a mongos with a connection to the last launched mongot.
-            self.mongot_port = node.mongot_port
 
         self.removeshard_teardown_marker = False
 

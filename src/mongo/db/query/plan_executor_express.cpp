@@ -67,8 +67,10 @@
 #include "mongo/db/shard_role.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 namespace {
@@ -212,9 +214,9 @@ public:
         return state;
     }
 
-    bool isEOF() override {
+    bool isEOF() const override {
         return _plan.exhausted();
-    };
+    }
 
     long long executeCount() override {
         MONGO_UNREACHABLE_TASSERT(8375802);
@@ -248,6 +250,10 @@ public:
         _isDisposed = true;
     }
 
+    void forceSpill() override {
+        LOGV2_ERROR(9819200, "An attempt was made to force PlanExecutorExpress to spill.");
+    }
+
     void stashResult(const BSONObj& obj) override {
         MONGO_UNREACHABLE_TASSERT(8375808);
     }
@@ -256,7 +262,7 @@ public:
         return !_killStatus.isOK();
     }
 
-    Status getKillStatus() override {
+    Status getKillStatus() const override {
         invariant(isMarkedAsKilled());
         return _killStatus;
     }
@@ -300,7 +306,7 @@ public:
     }
 
     bool usesCollectionAcquisitions() const override {
-        return std::is_same_v<std::decay<typename Plan::CollectionType>, CollectionAcquisition>;
+        return std::is_same_v<std::decay_t<typename Plan::CollectionType>, CollectionAcquisition>;
     }
 
     const Plan& getPlan() const {
@@ -846,9 +852,8 @@ boost::optional<IndexEntry> getIndexForExpressEquality(const CanonicalQuery& cq,
         const auto currNFields = e.keyPattern.nFields();
         if (
             // We cannot guarantee that the result has at most one result doc.
-            ((!e.unique || currNFields != 1) && !hasLimitOne) ||
             // TODO SERVER-87016: Support shard filtering for limitOne query with non-unique index.
-            (!e.unique && needsShardFilter) ||
+            ((!e.unique || currNFields != 1) && (!hasLimitOne || needsShardFilter)) ||
             // This index is suitable but has more fields than the best so far.
             (bestEntry && numFields <= currNFields)) {
             continue;

@@ -66,9 +66,3 @@ env.Benchmark(
     LIBDEPS=[],
     BAZEL_BENCHMARK_TAG="query_bm",
 )
-
-env.Benchmark(
-    target="expression_bm",
-    source=[],
-    LIBDEPS=[],
-)

@@ -31,6 +31,8 @@
 
 namespace mongo {
 
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalReplaceRoot, DocumentSourceInternalReplaceRoot::id)
+
 const char* DocumentSourceInternalReplaceRoot::getSourceName() const {
     return kStageNameInternal.rawData();
 }

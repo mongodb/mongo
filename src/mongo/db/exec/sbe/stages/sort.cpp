@@ -151,10 +151,12 @@ std::unique_ptr<PlanStageStats> SortStage::getStats(bool includeDebugInfo) const
         bob.appendNumber("memLimit", static_cast<long long>(_specificStats.maxMemoryUsageBytes));
         bob.appendNumber("totalDataSizeSorted",
                          static_cast<long long>(_specificStats.totalDataSizeBytes));
-        bob.appendBool("usedDisk", _specificStats.spills > 0);
-        bob.appendNumber("spills", static_cast<long long>(_specificStats.spills));
-        bob.appendNumber("spilledDataStorageSize",
-                         static_cast<long long>(_specificStats.spilledDataStorageSize));
+        bob.appendBool("usedDisk", _specificStats.spillingStats.getSpills() > 0);
+        bob.appendNumber("spills",
+                         static_cast<long long>(_specificStats.spillingStats.getSpills()));
+        bob.appendNumber(
+            "spilledDataStorageSize",
+            static_cast<long long>(_specificStats.spillingStats.getSpilledDataStorageSize()));
 
         BSONObjBuilder childrenBob(bob.subobjStart("orderBySlots"));
         for (size_t idx = 0; idx < _obs.size(); ++idx) {
@@ -360,10 +362,15 @@ void SortStage::SortImpl<KeyRow, ValueRow>::open(bool reOpen) {
 
     _stage._specificStats.totalDataSizeBytes += _sorter->stats().bytesSorted();
     _mergeIt = _sorter->done();
-    _stage._specificStats.spills += _sorter->stats().spilledRanges();
+    _stage._specificStats.spillingStats.incrementSpills(_sorter->stats().spilledRanges());
+    _stage._specificStats.spillingStats.incrementSpilledRecords(
+        _sorter->stats().spilledKeyValuePairs());
     _stage._specificStats.keysSorted += _sorter->stats().numSorted();
     if (_stage._sorterFileStats) {
-        _stage._specificStats.spilledDataStorageSize += _stage._sorterFileStats->bytesSpilled();
+        _stage._specificStats.spillingStats.incrementSpilledDataStorageSize(
+            _stage._sorterFileStats->bytesSpilled());
+        _stage._specificStats.spillingStats.incrementSpilledBytes(
+            _stage._sorterFileStats->bytesSpilledUncompressed());
     }
 
     _stage._children[0]->close();

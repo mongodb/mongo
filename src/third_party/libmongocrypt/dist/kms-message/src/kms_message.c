@@ -24,7 +24,7 @@
 #include <stdio.h>
 
 void
-set_error (char *error, size_t size, const char *fmt, ...)
+kms_set_error (char *error, size_t size, const char *fmt, ...)
 {
    va_list va;
 

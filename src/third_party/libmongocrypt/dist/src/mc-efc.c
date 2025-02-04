@@ -32,6 +32,12 @@ static bool _parse_query_type_string(const char *queryType, supported_query_type
         *out = SUPPORTS_RANGE_QUERIES;
     } else if (mstr_eq_ignore_case(mstrv_lit(MONGOCRYPT_QUERY_TYPE_RANGEPREVIEW_DEPRECATED_STR), qtv)) {
         *out = SUPPORTS_RANGE_PREVIEW_DEPRECATED_QUERIES;
+    } else if (mstr_eq_ignore_case(mstrv_lit(MONGOCRYPT_QUERY_TYPE_SUBSTRINGPREVIEW_STR), qtv)) {
+        *out = SUPPORTS_SUBSTRING_PREVIEW_QUERIES;
+    } else if (mstr_eq_ignore_case(mstrv_lit(MONGOCRYPT_QUERY_TYPE_SUFFIXPREVIEW_STR), qtv)) {
+        *out = SUPPORTS_SUFFIX_PREVIEW_QUERIES;
+    } else if (mstr_eq_ignore_case(mstrv_lit(MONGOCRYPT_QUERY_TYPE_PREFIXPREVIEW_STR), qtv)) {
+        *out = SUPPORTS_PREFIX_PREVIEW_QUERIES;
     } else {
         return false;
     }

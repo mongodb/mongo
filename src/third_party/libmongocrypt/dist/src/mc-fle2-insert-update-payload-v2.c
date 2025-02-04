@@ -21,11 +21,63 @@
 #include "mongocrypt-util-private.h" // mc_bson_type_to_string
 #include "mongocrypt.h"
 
+#define DEF_TEXT_SEARCH_TOKEN_SET_INIT_CLEANUP(Type)                                                                   \
+    void mc_Text##Type##TokenSet_init(mc_Text##Type##TokenSet_t *ts) {                                                 \
+        BSON_ASSERT_PARAM(ts);                                                                                         \
+        memset(ts, 0, sizeof(mc_Text##Type##TokenSet_t));                                                              \
+    }                                                                                                                  \
+    void mc_Text##Type##TokenSet_cleanup(mc_Text##Type##TokenSet_t *ts) {                                              \
+        BSON_ASSERT_PARAM(ts);                                                                                         \
+        _mongocrypt_buffer_cleanup(&ts->edcDerivedToken);                                                              \
+        _mongocrypt_buffer_cleanup(&ts->escDerivedToken);                                                              \
+        _mongocrypt_buffer_cleanup(&ts->serverDerivedFromDataToken);                                                   \
+        _mongocrypt_buffer_cleanup(&ts->encryptedTokens);                                                              \
+    }
+
+DEF_TEXT_SEARCH_TOKEN_SET_INIT_CLEANUP(Exact)
+DEF_TEXT_SEARCH_TOKEN_SET_INIT_CLEANUP(Substring)
+DEF_TEXT_SEARCH_TOKEN_SET_INIT_CLEANUP(Suffix)
+DEF_TEXT_SEARCH_TOKEN_SET_INIT_CLEANUP(Prefix)
+#undef DEF_TEXT_SEARCH_TOKEN_SET_INIT_CLEANUP
+
+void mc_TextSearchTokenSets_init(mc_TextSearchTokenSets_t *tsts) {
+    BSON_ASSERT_PARAM(tsts);
+    mc_TextExactTokenSet_init(&tsts->exact);
+    _mc_array_init(&tsts->substringArray, sizeof(mc_TextSubstringTokenSet_t));
+    _mc_array_init(&tsts->suffixArray, sizeof(mc_TextSuffixTokenSet_t));
+    _mc_array_init(&tsts->prefixArray, sizeof(mc_TextPrefixTokenSet_t));
+}
+
+void mc_TextSearchTokenSets_cleanup(mc_TextSearchTokenSets_t *tsts) {
+    BSON_ASSERT_PARAM(tsts);
+    mc_TextExactTokenSet_cleanup(&tsts->exact);
+
+    for (size_t i = 0; i < tsts->substringArray.len; i++) {
+        mc_TextSubstringTokenSet_t *entry = &_mc_array_index(&tsts->substringArray, mc_TextSubstringTokenSet_t, i);
+        mc_TextSubstringTokenSet_cleanup(entry);
+    }
+    _mc_array_destroy(&tsts->substringArray);
+
+    for (size_t i = 0; i < tsts->suffixArray.len; i++) {
+        mc_TextSuffixTokenSet_t *entry = &_mc_array_index(&tsts->suffixArray, mc_TextSuffixTokenSet_t, i);
+        mc_TextSuffixTokenSet_cleanup(entry);
+    }
+    _mc_array_destroy(&tsts->suffixArray);
+
+    // Free all prefix token set entries.
+    for (size_t i = 0; i < tsts->prefixArray.len; i++) {
+        mc_TextPrefixTokenSet_t *entry = &_mc_array_index(&tsts->prefixArray, mc_TextPrefixTokenSet_t, i);
+        mc_TextPrefixTokenSet_cleanup(entry);
+    }
+    _mc_array_destroy(&tsts->prefixArray);
+}
+
 void mc_FLE2InsertUpdatePayloadV2_init(mc_FLE2InsertUpdatePayloadV2_t *payload) {
     BSON_ASSERT_PARAM(payload);
 
     memset(payload, 0, sizeof(mc_FLE2InsertUpdatePayloadV2_t));
     _mc_array_init(&payload->edgeTokenSetArray, sizeof(mc_EdgeTokenSetV2_t));
+    mc_TextSearchTokenSets_init(&payload->textSearchTokenSets.tsts);
 }
 
 static void mc_EdgeTokenSetV2_cleanup(mc_EdgeTokenSetV2_t *etc) {
@@ -56,6 +108,7 @@ void mc_FLE2InsertUpdatePayloadV2_cleanup(mc_FLE2InsertUpdatePayloadV2_t *payloa
     _mc_array_destroy(&payload->edgeTokenSetArray);
     bson_value_destroy(&payload->indexMin);
     bson_value_destroy(&payload->indexMax);
+    mc_TextSearchTokenSets_cleanup(&payload->textSearchTokenSets.tsts);
 }
 
 #define IF_FIELD(Name)                                                                                                 \
@@ -348,7 +401,111 @@ bool mc_FLE2InsertUpdatePayloadV2_serializeForRange(const mc_FLE2InsertUpdatePay
     return true;
 }
 
+#define SERIALIZE_TEXT_TOKEN_SET_FOR_TYPE_IMPL(Type)                                                                   \
+    static bool _fle2_serialize_Text##Type##TokenSet(bson_t *parent,                                                   \
+                                                     const char *field_name,                                           \
+                                                     const mc_Text##Type##TokenSet_t *ts) {                            \
+        BSON_ASSERT_PARAM(parent);                                                                                     \
+        BSON_ASSERT_PARAM(field_name);                                                                                 \
+        BSON_ASSERT_PARAM(ts);                                                                                         \
+        bson_t child;                                                                                                  \
+        if (!BSON_APPEND_DOCUMENT_BEGIN(parent, field_name, &child)) {                                                 \
+            return false;                                                                                              \
+        }                                                                                                              \
+        IUPS_APPEND_BINDATA(&child, "d", BSON_SUBTYPE_BINARY, ts->edcDerivedToken);                                    \
+        IUPS_APPEND_BINDATA(&child, "s", BSON_SUBTYPE_BINARY, ts->escDerivedToken);                                    \
+        IUPS_APPEND_BINDATA(&child, "l", BSON_SUBTYPE_BINARY, ts->serverDerivedFromDataToken);                         \
+        IUPS_APPEND_BINDATA(&child, "p", BSON_SUBTYPE_BINARY, ts->encryptedTokens);                                    \
+        if (!bson_append_document_end(parent, &child)) {                                                               \
+            return false;                                                                                              \
+        }                                                                                                              \
+        return true;                                                                                                   \
+    }
+SERIALIZE_TEXT_TOKEN_SET_FOR_TYPE_IMPL(Exact)
+SERIALIZE_TEXT_TOKEN_SET_FOR_TYPE_IMPL(Substring)
+SERIALIZE_TEXT_TOKEN_SET_FOR_TYPE_IMPL(Suffix)
+SERIALIZE_TEXT_TOKEN_SET_FOR_TYPE_IMPL(Prefix)
+#undef SERIALIZE_TEXT_TOKEN_SET_FOR_TYPE_IMPL
+
 #undef IUPS_APPEND_BINDATA
+
+#define SERIALIZE_ARRAY_OF_TEXT_TOKEN_SET_FOR_TYPE_IMPL(Type)                                                          \
+    static bool _fle2_serialize_array_of_Text##Type##TokenSet(bson_t *parent,                                          \
+                                                              const char *array_name,                                  \
+                                                              const mc_array_t *array) {                               \
+        BSON_ASSERT_PARAM(parent);                                                                                     \
+        BSON_ASSERT_PARAM(array_name);                                                                                 \
+        BSON_ASSERT_PARAM(array);                                                                                      \
+        bson_t arr_bson;                                                                                               \
+        if (!BSON_APPEND_ARRAY_BEGIN(parent, array_name, &arr_bson)) {                                                 \
+            return false;                                                                                              \
+        }                                                                                                              \
+                                                                                                                       \
+        const char *index_string = NULL;                                                                               \
+        char storage[16];                                                                                              \
+        uint32_t index = 0;                                                                                            \
+        uint32_t limit = (array->len > UINT32_MAX) ? UINT32_MAX : (uint32_t)array->len;                                \
+        for (; index < limit; index++) {                                                                               \
+            mc_Text##Type##TokenSet_t ts = _mc_array_index(array, mc_Text##Type##TokenSet_t, index);                   \
+            bson_uint32_to_string(index, &index_string, storage, sizeof(storage));                                     \
+                                                                                                                       \
+            if (!_fle2_serialize_Text##Type##TokenSet(&arr_bson, index_string, &ts)) {                                 \
+                return false;                                                                                          \
+            }                                                                                                          \
+        }                                                                                                              \
+        if (!bson_append_array_end(parent, &arr_bson)) {                                                               \
+            return false;                                                                                              \
+        }                                                                                                              \
+        return true;                                                                                                   \
+    }
+SERIALIZE_ARRAY_OF_TEXT_TOKEN_SET_FOR_TYPE_IMPL(Substring)
+SERIALIZE_ARRAY_OF_TEXT_TOKEN_SET_FOR_TYPE_IMPL(Suffix)
+SERIALIZE_ARRAY_OF_TEXT_TOKEN_SET_FOR_TYPE_IMPL(Prefix)
+#undef SERIALIZE_ARRAY_OF_TEXT_TOKEN_SET_FOR_TYPE_IMPL
+
+bool mc_FLE2InsertUpdatePayloadV2_serializeForTextSearch(const mc_FLE2InsertUpdatePayloadV2_t *payload, bson_t *out) {
+    BSON_ASSERT_PARAM(out);
+    BSON_ASSERT_PARAM(payload);
+    BSON_ASSERT(payload->textSearchTokenSets.set);
+
+    if (!mc_FLE2InsertUpdatePayloadV2_serialize(payload, out)) {
+        return false;
+    }
+
+    const mc_TextSearchTokenSets_t *tsts = &payload->textSearchTokenSets.tsts;
+
+    // Start serializing "b", the TextSearchTokenSets
+    bson_t b_bson;
+    if (!BSON_APPEND_DOCUMENT_BEGIN(out, "b", &b_bson)) {
+        return false;
+    }
+
+    // Serialize "b.e", the TextExactTokenSet
+    if (!_fle2_serialize_TextExactTokenSet(&b_bson, "e", &tsts->exact)) {
+        return false;
+    }
+
+    // Serialize "b.s", the array of TextSubstringTokenSet
+    if (!_fle2_serialize_array_of_TextSubstringTokenSet(&b_bson, "s", &tsts->substringArray)) {
+        return false;
+    }
+
+    // Serialize "b.u", the array of TextSuffixTokenSet
+    if (!_fle2_serialize_array_of_TextSuffixTokenSet(&b_bson, "u", &tsts->suffixArray)) {
+        return false;
+    }
+
+    // Serialize "b.p", the array of TextPrefixTokenSet
+    if (!_fle2_serialize_array_of_TextPrefixTokenSet(&b_bson, "p", &tsts->prefixArray)) {
+        return false;
+    }
+
+    // End serializing "b", the TextSearchTokenSets
+    if (!bson_append_document_end(out, &b_bson)) {
+        return false;
+    }
+    return true;
+}
 
 const _mongocrypt_buffer_t *mc_FLE2InsertUpdatePayloadV2_decrypt(_mongocrypt_crypto_t *crypto,
                                                                  mc_FLE2InsertUpdatePayloadV2_t *iup,

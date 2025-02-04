@@ -41,6 +41,11 @@
 namespace mongo {
 
 /**
+ * Restores the default signal handlers and ends the process.
+ */
+void endProcessWithSignal(int signalNum);
+
+/**
  * Sets up handlers for synchronous events, like segv, abort, terminate and malloc-failure.
  *
  * Call this very early in main(), before runGlobalInitializers().

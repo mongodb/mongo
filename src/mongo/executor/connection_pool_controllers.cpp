@@ -33,7 +33,7 @@
 #include <fmt/format.h>
 
 #include "mongo/executor/connection_pool_controllers.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::executor {
 namespace {

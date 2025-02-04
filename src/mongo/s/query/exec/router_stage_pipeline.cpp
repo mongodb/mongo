@@ -122,7 +122,7 @@ BSONObj RouterStagePipeline::_validateAndConvertToBSON(const Document& event) {
     return eventBSON;
 }
 
-bool RouterStagePipeline::remotesExhausted() {
+bool RouterStagePipeline::remotesExhausted() const {
     return !_mergeCursorsStage || _mergeCursorsStage->remotesExhausted();
 }
 

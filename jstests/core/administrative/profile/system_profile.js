@@ -11,6 +11,7 @@
 //   requires_non_retryable_writes,
 //   requires_profiling,
 //   uses_map_reduce_with_temp_collections,
+//   queries_system_profile_collection
 // ]
 
 var testDB = db.getSiblingDB("system_profile");

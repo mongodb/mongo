@@ -1,6 +1,7 @@
 # -*- mode: python -*-
 
 Import("env")
+Import("get_option")
 Import("wiredtiger")
 
 env = env.Clone()
@@ -13,7 +14,7 @@ env.SConscript(
 
 
 def shouldBuildGRPC(myEnv):
-    return myEnv.TargetOSIs("linux") and myEnv["ENABLE_GRPC_BUILD"]
+    return myEnv.TargetOSIs("linux") and get_option("ssl") == "on"
 
 
 clientDriverEnv = env.Clone()

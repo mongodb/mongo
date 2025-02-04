@@ -301,19 +301,13 @@ private:
      *
      * Throws an error if the inserts fail with any other error.
      */
-    void _flush(OperationContext* opCtx, Buffer* buffer);
+    void _flush(OperationContext* opCtx, stdx::unique_lock<stdx::mutex>& lk, Buffer* buffer);
 
     /**
      * Returns true if the total size of the buffered queries and diffs has exceeded the maximum
      * amount of memory that the writer is allowed to use.
      */
     bool _exceedsMaxSizeBytes();
-
-    /**
-     * Returns true if the writer should not retry inserting the document(s) that failed with the
-     * given error again.
-     */
-    bool _isNonRetryableInsertError(const ErrorCodes::Error& errorCode);
 
     mutable stdx::mutex _mutex;
 

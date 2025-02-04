@@ -38,6 +38,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/background.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/testing_proctor.h"
@@ -146,10 +148,93 @@ constexpr Milliseconds kMaxWaitTime = Milliseconds(500);
 
 }  // namespace
 
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+namespace {
+const auto hasDisabledLockerRuntimeOrderingChecks = OperationContext::declareDecoration<bool>();
+}
+
+DisableLockerRuntimeOrderingChecks::DisableLockerRuntimeOrderingChecks(OperationContext* opCtx)
+    : _opCtx(opCtx) {
+    _oldValue = hasDisabledLockerRuntimeOrderingChecks(opCtx);
+    hasDisabledLockerRuntimeOrderingChecks(opCtx) = true;
+}
+
+DisableLockerRuntimeOrderingChecks::~DisableLockerRuntimeOrderingChecks() {
+    hasDisabledLockerRuntimeOrderingChecks(_opCtx) = _oldValue;
+}
+
+namespace locker_internals {
+/**
+ * A class used to identify potential deadlock cycles in the server.
+ *
+ * To solve this problem we can't naively assume that all operations lock resources in increasing
+ * ResourceId order. This is because ResourceMutex have an arbitrary ResourceId that may depend on
+ * runtime initialisation order and it potentially would invalidate lock orderings that are
+ * completely fine. Instead we have to abstract the order into the actual order used. That is, we
+ * want to ensure there are no lock cycles with the lock orderings we really use.
+ *
+ * The way this class works is by building a lock ordering graph of dependencies across all
+ * operations. Consider the following graph of lock dependencies constructed from two operations
+ * that have locked A -> B -> C and A -> B -> D:
+ *
+ * ┌───┐   ┌───┐   ┌───┐
+ * │   │   │   │   │   │
+ * │ A ┼───► B ┼───► C │
+ * │   │   │   │   │   │
+ * └───┘   └─┬─┘   └───┘
+ *           │
+ *           │     ┌───┐
+ *           │     │   │
+ *           └─────► D │
+ *                 │   │
+ *                 └───┘
+ * Now, if we have an operation that has locked D and attempts to lock A this should be caught. If
+ * we were to store the graph above as is this would require a graph path algorithm to detect the
+ * dependency.
+ *
+ * Instead what we do is that for all nodes we record which are their ancestors. In the graph above
+ * this would map to:
+ * - A -> []
+ * - B -> [A]
+ * - C -> [A, B]
+ * - D -> [A, B]
+ *
+ * So answering if there's a lock cycle by an operation locking a resource is just checking if any
+ * of the locks we have has as an ancestor the one we're trying to lock. If not, then we record the
+ * new dependency.
+ */
+class LockOrderingsSet {
+public:
+    void add(ResourceId from, ResourceId to) {
+        stdx::lock_guard lk{_mutex};
+        _precomputedPaths[to].emplace(from);
+    }
+    bool hasPath(ResourceId from, ResourceId to) {
+        stdx::lock_guard lk{_mutex};
+        return _precomputedPaths[to].contains(from);
+    }
+
+private:
+    stdx::mutex _mutex;
+    // As the only question we have to answer is whether there exists a path that goes from a source
+    // node to a target node we just store all nodes that can lead to the target node.
+    stdx::unordered_map<ResourceId, stdx::unordered_set<ResourceId>> _precomputedPaths;
+};
+}  // namespace locker_internals
+
+namespace {
+const auto globalLockOrderingsSet =
+    ServiceContext::declareDecoration<locker_internals::LockOrderingsSet>();
+}
+#endif
+
 Locker::Locker(ServiceContext* serviceContext)
     : _id(idCounter.addAndFetch(1)),
       _lockManager(LockManager::get(serviceContext)),
       _ticketHolderManager(admission::TicketHolderManager::get(serviceContext)) {
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+    _lockOrderingsSet = &globalLockOrderingsSet(serviceContext);
+#endif
     updateThreadIdToCurrentThread();
 }
 
@@ -801,6 +886,50 @@ LockResult Locker::_lockBegin(OperationContext* opCtx, ResourceId resId, LockMod
         itNew->initNew(this, &_notify);
 
         request = itNew.objAddr();
+
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+        // We only do these checks for operations that don't release all locks in case of
+        // lock acquisition failure. This is a perfect match with multi-document transactions since
+        // all lock acquisitions have a timeout and we release all locks in case of failure. Using
+        // the fact the operation is in a multi-document transaction is a layering violation but we
+        // acknowledge it here as an acceptable case since there's no other case of acting like
+        // them.
+        //
+        // One alternative that may initially make sense but doesn't is to look at whether the
+        // operation has a deadline for the acquisition or not. This is wrong because we could end
+        // up with the following scenario:
+        // * T1: lock A MODE_IX
+        // * T2: lock B MODE_IX
+        // * T1: lock B MODE_X (blocks on T2)
+        // * T2: trylock A MODE_X ad infinitum (blocks on T1, deadlock)
+        if (hasDisabledLockerRuntimeOrderingChecks(opCtx) || opCtx->inMultiDocumentTransaction()) {
+            // Nothing to check here since we don't want to participate in lock ordering or the
+            // operation cannot incur a deadlock as it has a timeout.
+        } else {
+            for (auto it = _requests.begin(); it; it.next()) {
+                const auto& lockRequest = *it;
+                if (lockRequest.mode == MODE_NONE ||
+                    lockRequest.status != LockRequest::STATUS_GRANTED) {
+                    continue;
+                }
+                const auto& from = it.key();
+                // If there is a lock ordering path it means there's a potential deadlock in the
+                // codebase. This is because if we have locked A before locking B, there should have
+                // been no other operation that locked B before A.
+                const auto hasLockCycle = _lockOrderingsSet->hasPath(resId, from);
+                if (hasLockCycle) {
+                    LOGV2_FATAL(9915000,
+                                "Detected potential lock cycle for operation, the from resource "
+                                "eventually locks the target resource. There has been at least one "
+                                "other operation that has locked the target resource before "
+                                "locking from, which is the inverse order of locking",
+                                "from"_attr = from,
+                                "target"_attr = resId);
+                }
+                _lockOrderingsSet->add(from, resId);
+            }
+        }
+#endif
     } else {
         request = it.objAddr();
         invariant(isModeCovered(mode, request->mode), "Lock upgrade is disallowed");

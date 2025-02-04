@@ -227,11 +227,7 @@ void PlanExecutorImpl::restoreState(const RestoreContext& context) {
 
 void PlanExecutorImpl::restoreStateWithoutRetrying(const RestoreContext& context,
                                                    const Yieldable* yieldable) {
-    // If a StorageUnavailableException has been caught, this call can be a retry. Depending on
-    // where the exception was thrown, the state may not have been saved, in which case NO-OP.
-    if (_currentState != kSaved) {
-        return;
-    }
+    invariant(_currentState == kSaved);
 
     if (!_yieldPolicy->usesCollectionAcquisitions()) {
         _yieldPolicy->setYieldable(yieldable);
@@ -337,7 +333,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
 
     if (!_stash.empty()) {
         invariant(objOut && !dlOut);
-        *objOut = {SnapshotId(), _stash.front()};
+        *objOut = {SnapshotId(), std::move(_stash.front())};
         _stash.pop_front();
         return PlanExecutor::ADVANCED;
     }
@@ -616,7 +612,7 @@ size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) 
     return numResults;
 }
 
-bool PlanExecutorImpl::isEOF() {
+bool PlanExecutorImpl::isEOF() const {
     invariant(_currentState == kUsable);
     return isMarkedAsKilled() || (_stash.empty() && _root->isEOF());
 }
@@ -773,7 +769,7 @@ void PlanExecutorImpl::stashResult(const BSONObj& obj) {
     _stash.push_front(Document{obj.getOwned()});
 }
 
-Status PlanExecutorImpl::getKillStatus() {
+Status PlanExecutorImpl::getKillStatus() const {
     invariant(isMarkedAsKilled());
     return _killStatus;
 }

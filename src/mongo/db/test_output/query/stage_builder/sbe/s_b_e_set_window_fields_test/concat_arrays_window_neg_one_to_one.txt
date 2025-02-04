@@ -1,0 +1,20 @@
+# Golden test output of SBESetWindowFieldsTest/ConcatArraysWindowNegOneToOne
+[2] project [s11 = makeBsonObj(MakeObjSpec([result = Set(0)], Open, NewObj, 0), s2, s10)] 
+[2] project [s10 = 
+    if exists(s7) 
+    then aggRemovableConcatArraysFinalize(s7) 
+    else null 
+] 
+[2] window [s2, s4, s8] [frameFirst[], frameLast[], lowBound{((s9 <=> (s8 + -1)) >= 0)}, highBound{((s9 <=> (s8 + 1)) <= 0)}] [s7 = {init{aggRemovableConcatArraysInit()}, add{aggRemovableConcatArraysAdd(
+    if isArray(s4) 
+    then s4 
+    else fail(14, "Expected new value for $concatArrays to be an array") 
+, 104857600)}, remove{aggRemovableConcatArraysRemove(
+    if isArray(s4) 
+    then s4 
+    else fail(14, "Expected value to remove for $concatArrays to be an array") 
+)}}] 
+[2] agg_project [s8 = sum(1)] 
+[1] project [s3 = getField(s2, "a"), s4 = getField(s2, "b")] 
+[1] project [s2 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"a" : 1, "b" : [1, 2]}], [{"a" : 2, "b" : [3, 4]}], [{"a" : 2, "b" : [5, 6]}], [{"a" : 2}], [{"a" : 1, "b" : [5, 6]}]]} 

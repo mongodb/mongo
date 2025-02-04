@@ -539,7 +539,7 @@ boost::optional<ClientMetadata> ClientMetadata::readFromMetadata(const BSONEleme
     return uassertStatusOK(ClientMetadata::parse(element));
 }
 
-void ClientMetadata::writeToMetadata(BSONObjBuilder* builder) const noexcept {
+void ClientMetadata::writeToMetadata(BSONObjBuilder* builder) const {
     auto& document = getDocument();
     if (document.isEmpty()) {
         // Skip appending metadata if there is none

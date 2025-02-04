@@ -60,10 +60,10 @@
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_event_handler.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
 #include "mongo/db/tenant_id.h"
@@ -80,7 +80,7 @@ class ClockSource;
 class JournalListener;
 
 class WiredTigerRecordStore;
-class WiredTigerSessionCache;
+class WiredTigerConnection;
 class WiredTigerSizeStorer;
 
 class WiredTigerEngineRuntimeConfigParameter;
@@ -330,7 +330,7 @@ public:
     void cleanShutdown() override;
 
     SnapshotManager* getSnapshotManager() const final {
-        return &_sessionCache->snapshotManager();
+        return &_connection->snapshotManager();
     }
 
     void setJournalListener(JournalListener* jl) final;
@@ -399,7 +399,11 @@ public:
     // held by this class
     int reconfigure(const char* str);
 
-    WT_CONNECTION* getConnection() {
+    WiredTigerConnection& getConnection() {
+        return *_connection;
+    }
+
+    WT_CONNECTION* getConn() {
         return _conn;
     }
 
@@ -423,7 +427,7 @@ public:
     }
 
     /**
-     * Specifies what data will get flushed to disk in a WiredTigerSessionCache::waitUntilDurable()
+     * Specifies what data will get flushed to disk in a WiredTigerConnection::waitUntilDurable()
      * call.
      */
     enum class Fsync {
@@ -438,7 +442,7 @@ public:
     };
 
     /**
-     * Controls whether or not WiredTigerSessionCache::waitUntilDurable() updates the
+     * Controls whether or not WiredTigerConnection::waitUntilDurable() updates the
      * JournalListener.
      */
     enum class UseJournalListener { kUpdate, kSkip };
@@ -585,9 +589,9 @@ private:
         StorageEngine::DropIdentCallback callback;
     };
 
-    void _checkpoint(WT_SESSION* session);
+    void _checkpoint(WiredTigerSession& session);
 
-    void _checkpoint(WT_SESSION* session, bool useTimestamp);
+    void _checkpoint(WiredTigerSession& session, bool useTimestamp);
 
     /**
      * Opens a connection on the WiredTiger database 'path' with the configuration 'wtOpenConfig'.
@@ -612,9 +616,9 @@ private:
      * Returns DataModifiedByRepair if the rebuild was successful, and any other error on failure.
      * This will never return Status::OK().
      */
-    Status _rebuildIdent(WT_SESSION* session, const char* uri);
+    Status _rebuildIdent(WiredTigerSession& session, const char* uri);
 
-    bool _hasUri(WT_SESSION* session, const std::string& uri) const;
+    bool _hasUri(WiredTigerSession& session, const std::string& uri) const;
 
     std::string _uri(StringData ident) const;
 
@@ -662,7 +666,7 @@ private:
     WT_CONNECTION* _conn;
     WiredTigerFileVersion _fileVersion;
     WiredTigerEventHandler _eventHandler;
-    std::unique_ptr<WiredTigerSessionCache> _sessionCache;
+    std::unique_ptr<WiredTigerConnection> _connection;
     ClockSource* const _clockSource;
 
     const std::unique_ptr<WiredTigerOplogManager> _oplogManager;

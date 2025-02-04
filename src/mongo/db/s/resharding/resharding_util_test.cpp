@@ -389,6 +389,47 @@ TEST_F(ReshardingUtilTest, SetNumSamplesPerChunkThroughConfigsvrReshardCollectio
     ASSERT_EQ(*numSamplesPerChunkOptional, numSamplesPerChunk);
 }
 
+TEST_F(ReshardingUtilTest, CreateCoordinatorDocPerformVerification) {
+    for (auto performVerification : std::vector<boost::optional<bool>>{true, false, boost::none}) {
+        for (bool enableVerification : {true, false}) {
+            LOGV2(9849102,
+                  "Running case",
+                  "test"_attr = _agent.getTestName(),
+                  "performVerification"_attr = performVerification,
+                  "enableVerification"_attr = enableVerification);
+            RAIIServerParameterControllerForTest featureFlagController(
+                "featureFlagReshardingVerification", enableVerification);
+
+
+            const CollectionType collEntry(
+                nss(),
+                OID::gen(),
+                Timestamp(static_cast<unsigned int>(std::time(nullptr)), 1),
+                Date_t::now(),
+                UUID::gen(),
+                keyPattern());
+
+            ConfigsvrReshardCollection configsvrReshardCollection(nss(), BSON(shardKey() << 1));
+            configsvrReshardCollection.setDbName(nss().dbName());
+            configsvrReshardCollection.setPerformVerification(performVerification);
+
+            ReshardingCoordinatorDocument coordinatorDoc = createReshardingCoordinatorDoc(
+                operationContext(), configsvrReshardCollection, collEntry, nss(), true);
+
+            auto actualPerformVerification = coordinatorDoc.getPerformVerification();
+            if (performVerification.has_value()) {
+                ASSERT(actualPerformVerification.has_value());
+                ASSERT_EQ(actualPerformVerification, *performVerification);
+            } else if (enableVerification) {
+                ASSERT(actualPerformVerification.has_value());
+                ASSERT_EQ(actualPerformVerification, true);
+            } else {
+                ASSERT_FALSE(actualPerformVerification.has_value());
+            }
+        }
+    }
+}
+
 class ReshardingTxnCloningPipelineTest : public AggregationContextFixture {
 
 protected:

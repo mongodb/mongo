@@ -44,6 +44,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/list_collections_gen.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/document_source_coll_stats.h"
@@ -68,6 +69,7 @@ REGISTER_DOCUMENT_SOURCE(_internalListCollections,
                          DocumentSourceInternalListCollections::LiteParsed::parse,
                          DocumentSourceInternalListCollections::createFromBson,
                          AllowedWithApiStrict::kInternal);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalListCollections, DocumentSourceInternalListCollections::id)
 
 DocumentSource::GetNextResult DocumentSourceInternalListCollections::doGetNext() {
     if (!_databases) {
@@ -135,7 +137,8 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalListCollections::doOpt
             _absorbedMatch = std::move(matchRelatedToDb);
         } else {
             // We have already absorbed a $match. We need to join it.
-            _absorbedMatch->joinMatchWith(std::move(matchRelatedToDb), "$and"_sd);
+            _absorbedMatch->joinMatchWith(std::move(matchRelatedToDb),
+                                          MatchExpression::MatchType::AND);
         }
     }
 
@@ -179,7 +182,8 @@ void DocumentSourceInternalListCollections::_buildCollectionsToReplyForDb(
 
     // Avoid computing a database that doesn't match the absorbed filter on the 'db' field.
     if (_absorbedMatch &&
-        !_absorbedMatch->getMatchExpression()->matchesBSON(BSON("db" << dbNameStr))) {
+        !exec::matcher::matchesBSON(_absorbedMatch->getMatchExpression(),
+                                    BSON("db" << dbNameStr))) {
         return;
     }
 

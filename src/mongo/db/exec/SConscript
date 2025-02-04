@@ -8,6 +8,7 @@ env.SConscript(
     must_exist=1,
     dirs=[
         "document_value",
+        "mutable_bson",
         "sbe",
     ],
     exports=[
@@ -23,6 +24,12 @@ env.CppUnitTest(
 
 env.Benchmark(
     target="distinct_scan_bm",
+    source=[],
+    LIBDEPS=[],
+)
+
+env.Benchmark(
+    target="expression_bm",
     source=[],
     LIBDEPS=[],
 )

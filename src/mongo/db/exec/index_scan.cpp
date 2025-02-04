@@ -75,6 +75,7 @@ IndexScan::IndexScan(ExpressionContext* expCtx,
       _forward(params.direction == 1),
       _addKeyMetadata(params.addKeyMetadata),
       _dedup(params.shouldDedup),
+      _recordIdDeduplicator(expCtx),
       _startKeyInclusive(IndexBounds::isStartIncludedInBound(_bounds.boundInclusion)),
       _endKeyInclusive(IndexBounds::isEndIncludedInBound(_bounds.boundInclusion)) {
     _specificStats.indexName = params.name;
@@ -232,9 +233,15 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     if (_dedup) {
         ++_specificStats.dupsTested;
 
-        // ...and we've seen the RecordId before
-        if (!_recordIdDeduplicator.insert(kv->loc)) {
-            // ...skip it.
+        // ... check whether we have seen the record id.
+        // Do not add the recordId to recordIdDeduplicator unless we know that the
+        // scan will return the recordId.
+        bool duplicate = _filter == nullptr ? !_recordIdDeduplicator.insert(kv->loc)
+                                            : _recordIdDeduplicator.contains(kv->loc);
+
+        // If we've seen the RecordId before
+        if (duplicate) {
+            // ...skip it
             ++_specificStats.dupsDropped;
             return PlanStage::NEED_TIME;
         }
@@ -242,6 +249,12 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
 
     if (!Filter::passes(kv->key, _keyPattern, _filter)) {
         return PlanStage::NEED_TIME;
+    }
+
+    // If we're deduping and the record matches a non-null filter
+    if (_dedup && _filter != nullptr) {
+        // ... now we can add the RecordId to the Deduplicator.
+        _recordIdDeduplicator.insert(kv->loc);
     }
 
     if (!kv->key.isOwned())
@@ -266,7 +279,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     return PlanStage::ADVANCED;
 }
 
-bool IndexScan::isEOF() {
+bool IndexScan::isEOF() const {
     return _commonStats.isEOF;
 }
 

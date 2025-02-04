@@ -682,7 +682,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
     } else {
         LOGV2_WARNING(20954,
                       "Unknown indexing for given node and field",
-                      "node"_attr = node->debugString(),
+                      "node"_attr = redact(node->debugString()),
                       "field"_attr = keyPatternElt.toString());
         MONGO_verify(0);
     }

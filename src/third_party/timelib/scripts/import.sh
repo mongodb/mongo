@@ -9,7 +9,7 @@
 #
 # Usage: ./src/third_party/timelib/scripts/import.sh
 
-VERSION=2022.10
+VERSION=2022.13
 NAME=timelib
 
 set -o verbose

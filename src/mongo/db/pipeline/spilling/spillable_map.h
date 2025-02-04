@@ -34,11 +34,11 @@
 #include <memory>
 
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/spilling/spilling_stats.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/temporary_record_store.h"
-#include "mongo/util/memory_usage_tracker.h"
 
 namespace mongo {
 
@@ -90,7 +90,7 @@ public:
     }
 
     bool usedDisk() const {
-        return _stats.spills > 0;
+        return _stats.getSpills() > 0;
     }
 
     /**
@@ -190,6 +190,20 @@ public:
 
     ConstIterator end() const {
         return ConstIterator{this, ConstIterator::EndTag{}};
+    }
+
+    /**
+     * If the element that it is pointing to is stored in memory, removes it.
+     * Advances the iterator to the next element. Illegal to call on end().
+     */
+    void eraseIfInMemoryAndAdvance(Iterator& it) {
+        if (it.memoryExhausted()) {
+            ++it;
+        } else {
+            auto itToErase = it._memIt;
+            ++it;
+            _memMap.erase(itToErase);
+        }
     }
 
 private:

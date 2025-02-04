@@ -304,16 +304,10 @@ public:
     void printStacks(StackTraceSink& sink);
     void printStacks();
 
-    /*
-     * This function is currently prone to deadlocks and should not be used.
-     * For more information, refer to SERVER-90775.
-     * TODO (SERVER-90775): Verify that this function is no longer deadlock prone and remove the
-     * usage warnings.
-     */
-    void printAllThreadStacksBlocking_UNSAFE();
+    void printAllThreadStacksBlocking();
 
     /**
-     * We need signals for two purpposes in the stack tracing system.
+     * We need signals for two purposes in the stack tracing system.
      *
      * An external process sends a signal to initiate stack tracing.  When that's received,
      * we *also* need a signal to send to each thread to cause to dump its backtrace.
@@ -321,7 +315,7 @@ public:
      *
      * Since all threads are open to receiving this signal, any of them can be selected to
      * receive it when it comes from outside. So we arrange for any thread that receives the
-     * undirected stack trace signal to re-issue it directy at the signal processing thread.
+     * undirected stack trace signal to re-issue it directly at the signal processing thread.
      *
      * The signal processing thread will have the signal blocked, and handle it
      * synchronously with sigwaitinfo, so this handler only applies to the other
@@ -506,7 +500,7 @@ void State::printStacks() {
     printToEmitter(emitter);
 }
 
-void State::printAllThreadStacksBlocking_UNSAFE() {
+void State::printAllThreadStacksBlocking() {
     auto waiter = _printAllStacksSession.waiter();
     kill(getpid(), _signal);  // The SignalHandler thread calls printAllThreadStacks.
 }
@@ -666,15 +660,11 @@ void printAllThreadStacks() {
     stack_trace_detail::stateSingleton->printStacks();
 }
 
-/*
- * This function is intended for usage of printing stacktraces when the caller is not the
- * SignalHandler. This function is currently prone to deadlocks and should not be used. For more
- * information, refer to SERVER-90775.
- * TODO (SERVER-90775): Verify that this function is no longer deadlock prone and remove the
- * usage warnings.
+/**
+ * For use by threads other than the SignalHandler thread.
  */
-void printAllThreadStacksBlocking_UNSAFE() {
-    stack_trace_detail::stateSingleton->printAllThreadStacksBlocking_UNSAFE();
+void printAllThreadStacksBlocking() {
+    stack_trace_detail::stateSingleton->printAllThreadStacksBlocking();
 }
 
 void setupStackTraceSignalAction(int signal) {

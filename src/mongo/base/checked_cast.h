@@ -32,9 +32,8 @@
 #include <memory>
 #include <type_traits>
 
-#include "mongo/util/debug_util.h"
-
 #include "mongo/util/assert_util_core.h"
+#include "mongo/util/debug_util.h"
 
 namespace mongo {
 

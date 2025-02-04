@@ -41,6 +41,7 @@
 #include <vector>
 
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -49,7 +50,6 @@
 #include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/memory_usage_tracker.h"
 
 namespace mongo {
 

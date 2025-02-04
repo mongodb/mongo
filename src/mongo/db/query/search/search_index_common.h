@@ -43,7 +43,7 @@ BSONObj getSearchIndexManagerResponse(
     const NamespaceString& nss,
     const UUID& uuid,
     const BSONObj& userCmd,
-    boost::optional<StringData> viewName = boost::none,
+    boost::optional<NamespaceString> viewName = boost::none,
     boost::optional<std::vector<BSONObj>> viewPipeline = boost::none);
 
 /**

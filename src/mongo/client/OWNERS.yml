@@ -24,6 +24,3 @@ filters:
   - "native_*":
     approvers:
       - 10gen/server-security
-  - "authenticate*":
-    approvers:
-      - 10gen/server-security

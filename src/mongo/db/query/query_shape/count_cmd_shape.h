@@ -29,7 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/query/query_shape/cmd_with_let_shape.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 
 namespace mongo::query_shape {

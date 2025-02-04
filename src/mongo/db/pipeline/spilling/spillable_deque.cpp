@@ -107,7 +107,7 @@ void SpillableDeque::clear() {
 
 void SpillableDeque::spillToDisk() {
     if (!_diskCache) {
-        tassert(5643008,
+        uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
                 "Exceeded memory limit and can't spill to disk. Set allowDiskUse: true to allow "
                 "spilling",
                 _expCtx->getAllowDiskUse());
@@ -136,24 +136,24 @@ void SpillableDeque::spillToDisk() {
     RecordStoreBatchWriter writer{_expCtx, _diskCache->rs()};
     for (auto& memoryTokenWithDoc : _memCache) {
         RecordId recordId{++_diskWrittenIndex};
-        auto bsonDoc = memoryTokenWithDoc.value().toBson();
+        auto bsonDoc = memoryTokenWithDoc.value().toBsonWithMetaData();
         writer.write(recordId, std::move(bsonDoc));
     }
     _memCache.clear();
     // Write final batch.
     writer.flush();
 
-    _stats.spills++;
-    _stats.spilledBytes += writer.writtenBytes();
-    _stats.spilledRecords += writer.writtenRecords();
-    updateStorageSizeStat();
+    _stats.updateSpillingStats(
+        1,
+        writer.writtenBytes(),
+        writer.writtenRecords(),
+        static_cast<uint64_t>(_diskCache->rs()->storageSize(
+            *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext()))));
 }
 
 void SpillableDeque::updateStorageSizeStat() {
-    _stats.spilledDataStorageSize =
-        std::max(_stats.spilledDataStorageSize,
-                 static_cast<uint64_t>(_diskCache->rs()->storageSize(
-                     *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext()))));
+    _stats.updateSpilledDataStorageSize(_diskCache->rs()->storageSize(
+        *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext())));
 }
 
 Document SpillableDeque::readDocumentFromDiskById(int desired) {

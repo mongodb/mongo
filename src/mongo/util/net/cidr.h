@@ -55,14 +55,14 @@ public:
      * constructs and returns the CIDR.
      * Otherwise returns an error.
      */
-    static StatusWith<CIDR> parse(BSONElement from) noexcept;
+    static StatusWith<CIDR> parse(BSONElement from);
 
     /**
      * If the given string represents a valid CIDR range,
      * constructs and returns the CIDR.
      * Otherwise returns an error.
      */
-    static StatusWith<CIDR> parse(StringData from) noexcept;
+    static StatusWith<CIDR> parse(StringData from);
 
     /**
      * Returns true if the provided address range is contained

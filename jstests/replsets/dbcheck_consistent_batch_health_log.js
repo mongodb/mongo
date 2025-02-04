@@ -2,7 +2,7 @@
  * Tests dbCheck health log entries are consistent for all nodes in the replica sets.
  *
  * @tags: [
- *   requires_fcv_81
+ *   requires_fcv_80
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -29,9 +29,11 @@ const secondary = replSet.getSecondary();
 const primaryHealthlog = primary.getDB("local").system.healthlog;
 const secondaryHealthlog = secondary.getDB("local").system.healthlog;
 const db = primary.getDB(dbName);
+const secondarydb = secondary.getDB(dbName);
 
 // Only run this test for debug=off, because we log all batches in debug builds.
-const debugBuild = db.adminCommand("buildInfo").debug;
+const debugBuild =
+    db.adminCommand("buildInfo").debug || secondarydb.adminCommand("buildInfo").debug;
 if (debugBuild) {
     jsTestLog("Skipping the test because debug is on.");
     replSet.stopSet();

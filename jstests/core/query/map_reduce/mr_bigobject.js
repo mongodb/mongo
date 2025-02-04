@@ -15,7 +15,7 @@ coll.drop();
 const outputColl = db.mr_bigobject_out;
 outputColl.drop();
 
-const largeString = Array.from({length: 6 * 1024 * 1024}, _ => "a").join("");
+const largeString = "a".repeat(6 * 1024 * 1024);
 
 const bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < 5; i++)

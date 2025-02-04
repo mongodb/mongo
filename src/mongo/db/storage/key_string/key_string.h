@@ -66,7 +66,6 @@
 
 namespace mongo {
 namespace key_string {
-
 class BuilderInterface {
 public:
     virtual ~BuilderInterface() = default;
@@ -439,6 +438,31 @@ private:
     StackBufBuilderBase<SmallStackSize> _buf;
 };
 
+/**
+ * A compact type which fits a keystring version and a record id size into four bytes.
+ */
+class VersionAndSize {
+public:
+    constexpr VersionAndSize() = default;
+    constexpr VersionAndSize(Version version, int32_t size) : _value(_encode(version, size)) {}
+
+    constexpr Version version() const {
+        return (_value & (1 << 31)) ? Version::V1 : Version::V0;
+    }
+
+    constexpr int32_t size() const {
+        return static_cast<int32_t>(_value & ~(1 << 31));
+    }
+
+private:
+    // The high bit is the encoded version, and the lower 32 bits store the size.
+    uint32_t _value = _encode(Version::kLatestVersion, 0);
+
+    static constexpr uint32_t _encode(Version version, int32_t ridSize) {
+        uint32_t versionBit = (version == Version::V1) ? 1 << 31 : 0;
+        return versionBit | ridSize;
+    }
+};
 
 /**
  * Value owns a buffer that corresponds to a completely generated key_string::Builder with the
@@ -449,8 +473,7 @@ private:
  */
 class Value {
 public:
-    Value()
-        : _versionAndRidSize(_encodeVersionAndRidSize(Version::kLatestVersion, 0)), _ksSize(0) {}
+    Value() = default;
 
     Value(Version version,
           // The size of the KeyString including the RecordId part (if present)
@@ -459,9 +482,7 @@ public:
           // or 0, if the RecordId is not present.
           int32_t ridSize,
           SharedBufferFragment buffer)
-        : _versionAndRidSize(_encodeVersionAndRidSize(version, ridSize)),
-          _ksSize(ksSize),
-          _buffer(std::move(buffer)) {
+        : _versionAndRidSize(version, ridSize), _ksSize(ksSize), _buffer(std::move(buffer)) {
         invariant(ridSize >= 0);
         invariant(ksSize >= ridSize);
         invariant(ksSize <= static_cast<int32_t>(_buffer.size()));
@@ -516,7 +537,7 @@ public:
 
     // Returns the size of the RecordId part if present, or 0 otherwise.
     int32_t getRecordIdSize() const {
-        return static_cast<int32_t>(_versionAndRidSize & ~(1 << 31));
+        return _versionAndRidSize.size();
     }
 
     // Returns the size of the KeyString without RecordId.
@@ -549,6 +570,10 @@ public:
     std::span<const char> getTypeBitsView() const {
         return getViewWithTypeBits().subspan(_ksSize);
     }
+    // Get the span containing the record id and typebits
+    std::span<const char> getRecordIdAndTypeBitsView() const {
+        return getViewWithTypeBits().subspan(getSizeWithoutRecordId());
+    }
 
     // Returns the stored TypeBits.
     TypeBits getTypeBits() const {
@@ -571,17 +596,12 @@ public:
     // format takes the following form:
     //   [keystring size][keystring encoding][typebits encoding]
     void serialize(BufBuilder& buf) const {
-        buf.appendNum(_ksSize);                        // Serialize size of Keystring
-        buf.appendBuf(_buffer.get(), _buffer.size());  // Serialize Keystring + Typebits
+        buf.appendNum(_ksSize);                                // Serialize size of Keystring
+        buf.appendBuf(_buffer.get(), _buffer.size());          // Serialize Keystring + Typebits
+        if (_buffer.size() == static_cast<size_t>(_ksSize)) {  // Serialize AllZeroes Typebits
+            buf.appendChar(0);
+        }
     }
-
-    /**
-     * Serializes this Value, excluding the RecordId, into a storable format with TypeBits
-     * information. The serialized format takes the following form:
-     *   [keystring size][keystring encoding][typebits encoding]
-     */
-    void serializeWithoutRecordIdLong(BufBuilder& buf) const;
-    void serializeWithoutRecordIdStr(BufBuilder& buf) const;
 
     // Deserialize the Value from a serialized format.
     // The caller must pass an ridFormat the indicates the RecordId encoding format, or boost::none
@@ -622,7 +642,7 @@ public:
     void makeOwned() {}
 
     Version getVersion() const {
-        return (_versionAndRidSize & (1 << 31)) ? Version::V1 : Version::V0;
+        return _versionAndRidSize.version();
     }
 
     size_t getApproximateSize() const;
@@ -631,22 +651,141 @@ public:
 
 private:
     static_assert(Version::kLatestVersion == Version::V1);
-    uint32_t _encodeVersionAndRidSize(Version version, int32_t ridSize) {
-        uint32_t versionBit = (version == Version::V1) ? 1 << 31 : 0;
-        return versionBit | ridSize;
-    }
 
-    // To keep this struct small, the high bit is the encoded version.
-    // The lower 31 bits store the size of the encoded RecordId.
-    // (RidSize == 0) indicates that there is no RecordId.
-    uint32_t _versionAndRidSize;
+    VersionAndSize _versionAndRidSize;
 
     // _ksSize is the total length that the KeyString takes up in the buffer.
-    int32_t _ksSize;
+    int32_t _ksSize = 0;
     SharedBufferFragment _buffer;
 };
 
 static_assert(sizeof(Value) == 32);
+
+/**
+ * A non-owning view into a buffer populated by a completed key_string::Builder.
+ *
+ * This is functionally the same as Value, except it does not own the buffer and it is the user's
+ * responsibility to ensure that it remains valid for as long as the view is in use.
+ */
+class View {
+public:
+    /**
+     * Constructs a zero-length view pointing at a null buffer. All member functions work sensibly
+     * on a default-constructed View.
+     */
+    constexpr View() = default;
+
+    /**
+     * Constructs a view from an explicit buffer. The buffer must contain a keystring-serialized
+     * key, followed by an optional recordid, followed by the type bits. If a record id is present
+     * ridSize must be non-zero.
+     */
+    View(Version version,
+         std::span<const char> buffer,
+         // The size of the RecordId part or 0 if there is no RecordId.
+         uint32_t ridSize,
+         // The size of the typebits part
+         uint32_t tbSize) noexcept
+        : _buffer(buffer.data()),
+          _versionAndRidSize(version, ridSize),
+          _ksSize(static_cast<uint32_t>(buffer.size() - tbSize)),
+          _tbSize(tbSize) {
+        // keystrings use 32-bit sizes
+        invariant(buffer.size() <= std::numeric_limits<uint32_t>::max());
+        // Sizes must all be zero if the buffer is a null pointer
+        invariant(_buffer || (!buffer.size() && !ridSize && !tbSize));
+    }
+
+    /**
+     * Constructs a View from a Value. The produced view will remain valid only as long as the
+     * underlying Value exists.
+     */
+    /* implicit */ View(const Value& value)
+        : View(value.getVersion(),
+               value.getViewWithTypeBits(),
+               value.getRecordIdSize(),
+               value.getTypeBitsView().size()) {}
+
+    // Returns whether the size of the stored KeyString is 0.
+    bool isEmpty() const {
+        return _ksSize == 0;
+    }
+
+    // Gets the span containing all three components
+    std::span<const char> getCompleteView() const {
+        return std::span<const char>(_buffer, _ksSize + _tbSize);
+    }
+    // Gets the span containing the key and record id, but not typebits
+    std::span<const char> getKeyAndRecordIdView() const {
+        return std::span<const char>(_buffer, _ksSize);
+    }
+    // Gets the span containing just the key
+    std::span<const char> getKeyView() const {
+        return getKeyAndRecordIdView().first(getSizeWithoutRecordId());
+    }
+    // Gets the span containing just the record id
+    std::span<const char> getRecordIdView() const {
+        return getKeyAndRecordIdView().last(_versionAndRidSize.size());
+    }
+    // Gets the span containing just the typebits
+    std::span<const char> getTypeBitsView() const {
+        return getCompleteView().subspan(_ksSize);
+    }
+    // Gets the span containing the record id and typebits, but not key
+    std::span<const char> getRecordIdAndTypeBitsView() const {
+        return getCompleteView().subspan(getSizeWithoutRecordId());
+    }
+
+    Version getVersion() const {
+        return _versionAndRidSize.version();
+    }
+
+    /**
+     * Returns a hex encoding of this key.
+     */
+    std::string toString() const;
+
+    /**
+     * Serializes this keystring, excluding the RecordId, into a storable format with TypeBits
+     * information. The serialized format takes the following form:
+     *     [keystring size][keystring encoding][typebits encoding]
+     */
+    template <typename Builder>
+    void serializeWithoutRecordId(Builder& buf) const {
+        auto keyView = getKeyView();
+        auto tbView = getTypeBitsView();
+        buf.appendNum(static_cast<int32_t>(keyView.size()));
+        buf.appendBuf(keyView.data(), keyView.size());
+        buf.appendBuf(tbView.data(), tbView.size());
+        if (tbView.empty()) {
+            buf.appendChar(0);
+        }
+    }
+
+    /**
+     * Deserialize a keystring from the serialized format produced by
+     * serialize() or serializeWithoutRecordId(). The given ridFormat must match
+     * the one used when serializing, or boost::none if
+     * serializeWithoutRecordId() was used.
+     *
+     * The returned View points into the buffer backing the given BufReader.
+     */
+    static View deserialize(BufReader& buf,
+                            key_string::Version version,
+                            boost::optional<KeyFormat> ridFormat);
+
+private:
+    const char* _buffer = nullptr;
+    VersionAndSize _versionAndRidSize;
+    uint32_t _ksSize = 0;
+    uint32_t _tbSize = 0;
+
+    int32_t getSizeWithoutRecordId() const {
+        return _ksSize - _versionAndRidSize.size();
+    }
+};
+static_assert(sizeof(View) == 24);
+static_assert(std::is_trivially_copyable_v<View>);
 
 enum class Discriminator {
     kInclusive,  // Anything to be stored in an index must use this.
@@ -735,9 +874,7 @@ public:
         // Create a new buffer that is a concatenation of the KeyString and its TypeBits.
         BufBuilder newBuf(_buffer().len() + _typeBits.getSize());
         newBuf.appendBuf(_buffer().buf(), _buffer().len());
-        if (_typeBits.isAllZeros()) {
-            newBuf.appendChar(0);
-        } else {
+        if (!_typeBits.isAllZeros()) {
             newBuf.appendBuf(_typeBits.getBuffer(), _typeBits.getSize());
         }
         // Note: this variable is needed to make sure that no method is called on 'newBuf'
@@ -992,9 +1129,7 @@ protected:
 
         // append the TypeBits.
         int32_t ksSize = _buffer().len();
-        if (_typeBits.isAllZeros()) {
-            _buffer().appendChar(0);
-        } else {
+        if (!_typeBits.isAllZeros()) {
             _buffer().appendBuf(_typeBits.getBuffer(), _typeBits.getSize());
         }
         return ksSize;
@@ -1192,6 +1327,13 @@ Discriminator decodeDiscriminator(std::span<const char> data,
 template <class T>
 BSONObj toBson(const T& keyString, Ordering ord) noexcept {
     return toBson(keyString.getView(), ord, keyString.getTypeBits());
+}
+
+inline BSONObj toBson(const View& keyString, Ordering ord) {
+    return toBson(keyString.getKeyAndRecordIdView(),
+                  ord,
+                  keyString.getTypeBitsView(),
+                  keyString.getVersion());
 }
 
 /**

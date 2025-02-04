@@ -9,6 +9,7 @@
 #pragma once
 
 #include <string>
+#include "wt_internal.h"
 
 #define DB_HOME "test_db"
 

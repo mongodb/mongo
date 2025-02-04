@@ -47,7 +47,6 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
-#include "mongo/db/timeseries/bucket_catalog/closed_bucket.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_catalog/reopening.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
@@ -69,7 +68,7 @@ enum class AllowBucketCreation { kYes, kNo };
  * state change.
  */
 enum class RemovalMode {
-    kClose,    // Normal closure, pending compression
+    kClose,    // Normal closure
     kArchive,  // Archive bucket, no state change
     kAbort,    // Bucket is being cleared, possibly due to error, erase state
 };
@@ -103,7 +102,6 @@ StripeNumber getStripeNumber(const BucketCatalog& catalog, const BucketId& bucke
 StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(
     tracking::Context&,
     const UUID& collectionUUID,
-    const StringDataComparator* comparator,
     const TimeseriesOptions& options,
     const BSONObj& doc);
 
@@ -148,6 +146,25 @@ Bucket* useBucket(BucketCatalog& catalog,
                   const StringDataComparator* comparator);
 
 /**
+ * Retrieve an open bucket from 'stripe' given a bucket key.
+ */
+Bucket* findOpenBucket(BucketCatalog& catalog,
+                       Stripe& stripe,
+                       WithLock stripeLock,
+                       const BucketKey& bucketKey);
+
+/**
+ * Check if a given bucket is eligible for new inserts.
+ * Return true if the bucket can accept new inserts. Mark the bucket not idle.
+ * Return false if the bucket is rolled over or has a state that conflicts with inserts. Clean up
+ * the bucket from the catalog.
+ */
+bool checkBucketInsertEligibility(BucketCatalog& catalog,
+                                  Stripe& stripe,
+                                  WithLock stripeLock,
+                                  Bucket* bucket);
+
+/**
  * Retrieve a previously closed bucket for write use if one exists in the catalog. Considers buckets
  * that are pending closure or archival but which are still eligible to receive new measurements.
  */
@@ -158,10 +175,10 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
                            const Date_t& time);
 
 /**
- * Given a bucket to reopen, performs validation and constructs the in-memory representation of the
- * bucket. If specified, 'expectedKey' is matched against the key extracted from the document to
- * validate that the bucket is expected (i.e. to help resolve hash collisions for archived buckets).
- * Does *not* hand ownership of the bucket to the catalog.
+ * Given a compressed bucket to reopen, performs validation and constructs the in-memory
+ * representation of the bucket. If specified, 'expectedKey' is matched against the key extracted
+ * from the document to validate that the bucket is expected (i.e. to help resolve hash collisions
+ * for archived buckets). Does *not* hand ownership of the bucket to the catalog.
  */
 StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
                                                          ExecutionStatsController& stats,
@@ -182,22 +199,7 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(BucketCatalog& catalog,
                                                         ExecutionStatsController& stats,
                                                         const BucketKey& key,
                                                         tracking::unique_ptr<Bucket>&& bucket,
-                                                        std::uint64_t targetEra,
-                                                        ClosedBuckets& closedBuckets);
-
-/**
- * Check to see if 'insert' can use existing bucket rather than reopening a candidate bucket. If
- * true, chances are the caller raced with another thread to reopen the same bucket, but if false,
- * there might be another bucket that had been cleared, or that has the same _id in a different
- * namespace.
- */
-StatusWith<std::reference_wrapper<Bucket>> reuseExistingBucket(BucketCatalog& catalog,
-                                                               Stripe& stripe,
-                                                               WithLock stripeLock,
-                                                               ExecutionStatsController& stats,
-                                                               const BucketKey& key,
-                                                               Bucket& existingBucket,
-                                                               std::uint64_t targetEra);
+                                                        std::uint64_t targetEra);
 
 /**
  * Given an already-selected 'bucket', inserts 'doc' to the bucket if possible. If not, and 'mode'
@@ -245,8 +247,7 @@ void archiveBucket(BucketCatalog& catalog,
                    Stripe& stripe,
                    WithLock stripeLock,
                    Bucket& bucket,
-                   ExecutionStatsController& stats,
-                   ClosedBuckets& closedBuckets);
+                   ExecutionStatsController& stats);
 
 /**
  * Identifies a previously archived bucket that may be able to accommodate the measurement
@@ -289,8 +290,7 @@ void abort(BucketCatalog& catalog,
 
 /**
  * Aborts any unprepared batches for the given bucket, then removes the bucket if there is no
- * prepared batch. If 'batch' is non-null, it is assumed that the caller has commit rights for that
- * batch.
+ * prepared batch.
  */
 void abort(BucketCatalog& catalog,
            Stripe& stripe,
@@ -318,8 +318,7 @@ void expireIdleBuckets(BucketCatalog& catalog,
                        Stripe& stripe,
                        WithLock stripeLock,
                        const UUID& collectionUUID,
-                       ExecutionStatsController& collectioStats,
-                       ClosedBuckets& closedBuckets);
+                       ExecutionStatsController& collectionStats);
 
 /**
  * Generates an OID for the bucket _id field, setting the timestamp portion to a value determined by
@@ -428,17 +427,8 @@ void closeOpenBucket(BucketCatalog& catalog,
                      Stripe& stripe,
                      WithLock stripeLock,
                      Bucket& bucket,
-                     ExecutionStatsController& stats,
-                     ClosedBuckets& closedBuckets);
-/**
- * Close an open bucket, setting the state appropriately and removing it from the catalog.
- */
-void closeOpenBucket(BucketCatalog& catalog,
-                     Stripe& stripe,
-                     WithLock stripeLock,
-                     Bucket& bucket,
-                     ExecutionStatsController& stats,
-                     boost::optional<ClosedBucket>& closedBucket);
+                     ExecutionStatsController& stats);
+
 /**
  * Close an archived bucket, setting the state appropriately and removing it from the catalog.
  */

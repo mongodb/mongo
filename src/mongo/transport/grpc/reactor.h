@@ -55,17 +55,17 @@ class GRPCReactorTimer : public ReactorTimer {
 public:
     GRPCReactorTimer(std::weak_ptr<GRPCReactor> reactor) : _reactor(reactor) {}
 
-    ~GRPCReactorTimer() {
+    ~GRPCReactorTimer() override {
         cancel();
     }
 
-    void cancel(const BatonHandle& baton = nullptr) {
+    void cancel(const BatonHandle& baton = nullptr) override {
         if (_alarm) {
             _alarm->Cancel();
         }
     };
 
-    Future<void> waitUntil(Date_t deadline, const BatonHandle& baton = nullptr);
+    Future<void> waitUntil(Date_t deadline, const BatonHandle& baton = nullptr) override;
 
 private:
     std::shared_ptr<::grpc::Alarm> _alarm;
@@ -110,30 +110,18 @@ public:
 
     public:
         friend class GRPCReactor;
-        friend class MockClientStream;
 
         CompletionQueueEntry() = delete;
         CompletionQueueEntry(Passkey, Promise<void> promise) : _promise(std::move(promise)) {}
 
     private:
-        /**
-         * This function will fulfill the Promise associated with a tag, but does not remove it from
-         * the _cqTaskStash. This is a workaround to introducing a mock grpc::CompletionQueue that
-         * the MockClientStream interacts with, because at the MockClientStream layer we have no
-         * access to which reactor this tag is associated with and just care about filling the
-         * promise.
-         */
-        void _setPromise_forTest(Status s) {
-            _promise.setFrom(s);
-        }
-
         Promise<void> _promise;
         std::list<std::unique_ptr<CompletionQueueEntry>>::iterator _iter;
     };
 
     GRPCReactor() : _clkSource(this), _stats(&_clkSource), _cq() {}
 
-    void run() noexcept override;
+    void run() override;
 
     /**
      * Once stop() is called, all calls to schedule() will fail the task with a ShutdownInProgress

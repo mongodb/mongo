@@ -346,6 +346,13 @@ __wt_session_close_internal(WT_SESSION_IMPL *session)
         WT_TRET(__wt_call_log_close_session(session));
 #endif
 
+    /* Free the memory allocated to the error message buffer. */
+    __wt_free(session, session->err_info.err_msg_buf.mem);
+
+    /* Make sure no new error messages are saved during the close call. */
+    memset(&(session->err_info), 0, sizeof(WT_ERROR_INFO));
+    F_CLR(session, WT_SESSION_SAVE_ERRORS);
+
     /* Close all open cursors while the cursor cache is disabled. */
     F_CLR(session, WT_SESSION_CACHE_CURSORS);
 
@@ -402,9 +409,6 @@ __wt_session_close_internal(WT_SESSION_IMPL *session)
      * RTS looks at it.
      */
     __wt_txn_destroy(session);
-
-    /* Free the last stored error information. */
-    __wt_free(session, session->err_info.err_msg);
 
     /* Decrement the count of open sessions. */
     WT_STAT_CONN_DECR(session, session_open);
@@ -545,8 +549,14 @@ __session_config_int(WT_SESSION_IMPL *session, const char *config)
     }
     WT_RET_NOTFOUND_OK(ret);
 
-    if ((ret = __wt_config_getones(session, config, "cache_max_wait_ms", &cval)) == 0)
-        session->cache_max_wait_us = (uint64_t)(cval.val * WT_THOUSAND);
+    if ((ret = __wt_config_getones(session, config, "cache_max_wait_ms", &cval)) == 0) {
+        if (cval.val > 1)
+            session->cache_max_wait_us = (uint64_t)(cval.val * WT_THOUSAND);
+        else if (cval.val == 1)
+            session->cache_max_wait_us = 1;
+        else
+            session->cache_max_wait_us = 0;
+    }
     WT_RET_NOTFOUND_OK(ret);
 
     return (0);
@@ -883,7 +893,7 @@ __session_blocking_checkpoint(WT_SESSION_IMPL *session)
     uint64_t txn_gen;
     const char *checkpoint_cfg[] = {WT_CONFIG_BASE(session, WT_SESSION_checkpoint), NULL};
 
-    if ((ret = __wt_txn_checkpoint(session, checkpoint_cfg, false)) == 0)
+    if ((ret = __wt_checkpoint_db(session, checkpoint_cfg, false)) == 0)
         return (0);
     WT_RET_BUSY_OK(ret);
 
@@ -2231,7 +2241,6 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 
     session = (WT_SESSION_IMPL *)wt_session;
     WT_STAT_CONN_INCR(session, checkpoints_api);
-    WT_STAT_CONN_SET(session, checkpoint_state, WT_CHECKPOINT_STATE_ACTIVE);
     SESSION_API_CALL_PREPARE_NOT_ALLOWED(session, ret, checkpoint, config, cfg);
 
     WT_ERR(__wt_inmem_unsupported_op(session, NULL));
@@ -2248,7 +2257,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
      */
     WT_ERR(__wt_txn_context_check(session, false));
 
-    ret = __wt_txn_checkpoint(session, cfg, true);
+    ret = __wt_checkpoint_db(session, cfg, true);
 
     /*
      * Release common session resources (for example, checkpoint may acquire significant
@@ -2485,16 +2494,17 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
     if (config != NULL)
         WT_ERR(__session_reconfigure((WT_SESSION *)session_ret, config));
 
+    /* Initialize the default error info, including a buffer for the error message. */
+    F_SET(session_ret, WT_SESSION_SAVE_ERRORS);
+    session_ret->err_info.err_msg = NULL;
+    WT_ERR(__wt_buf_initsize(session, &(session_ret->err_info.err_msg_buf), 128));
+    __wt_session_set_last_error(session_ret, 0, WT_NONE, WT_ERROR_INFO_EMPTY);
+
     /*
      * Release write to ensure structure fields are set before any other thread will consider the
      * session.
      */
     WT_RELEASE_WRITE_WITH_BARRIER(session_ret->active, 1);
-
-    /* Initialize the default error info. */
-    F_SET(session_ret, WT_SESSION_SAVE_ERRORS);
-    session_ret->err_info.err_msg = NULL;
-    WT_ERR(__wt_session_set_last_error(session_ret, 0, WT_NONE, ""));
 
     *sessionp = session_ret;
 

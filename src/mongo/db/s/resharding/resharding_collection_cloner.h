@@ -80,6 +80,7 @@ public:
                                ShardId recipientShard,
                                Timestamp atClusterTime,
                                NamespaceString outputNss,
+                               bool storeProgress,
                                bool relaxed);
 
     std::pair<std::vector<BSONObj>, boost::intrusive_ptr<ExpressionContext>> makeRawPipeline(
@@ -109,7 +110,14 @@ public:
      * Returns true if there are more documents to be fetched and inserted, and returns false
      * otherwise.
      */
-    bool doOneBatch(OperationContext* opCtx, Pipeline& pipeline, TxnNumber& txnNum);
+    bool doOneBatch(OperationContext* opCtx,
+                    Pipeline& pipeline,
+                    TxnNumber& txnNum,
+                    ShardId donorShard,
+                    HostAndPort donorHost,
+                    BSONObj resumeToken,
+                    // TODO(SERVER-77873): remove the useNaturalOrderCloner parameter.
+                    bool useNaturalOrderCloner);
 
     /**
      * Inserts a single batch of documents and its resume information if provided.
@@ -117,11 +125,11 @@ public:
     void writeOneBatch(OperationContext* opCtx,
                        TxnNumber& txnNum,
                        std::vector<InsertStatement>& batch,
-                       ShardId donorShard = ShardId(),
-                       HostAndPort donorHost = HostAndPort(),
-                       BSONObj resumeToken = BSONObj(),
+                       ShardId donorShard,
+                       HostAndPort donorHost,
+                       BSONObj resumeToken,
                        // TODO(SERVER-77873): remove the useNaturalOrderCloner parameter.
-                       bool useNaturalOrderCloner = false);
+                       bool useNaturalOrderCloner);
 
 private:
     std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(
@@ -154,6 +162,7 @@ private:
     const ShardId _recipientShard;
     const Timestamp _atClusterTime;
     const NamespaceString _outputNss;
+    const bool _storeProgress;
     const bool _relaxed;
 };
 

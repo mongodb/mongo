@@ -442,6 +442,26 @@ Users of `Collection` instances have a few responsibilities to keep the object v
 2. Use an AutoGetCollection helper.
 3. Explicitly hold a reference to the `CollectionCatalog`.
 
+#### ConsistentCollection and stale reference protection for instantiated Collections
+
+To avoid potential stale reference errors by holding `Collection` instances past their lifetime
+calls to `CollectionCatalog::establishConsistentCollection` will result in the creation of a
+`ConsistentCollection`. This special object should be understood as a reference-counted `Collection`
+pointer to the instance used by the catalog that protects against staleness.
+
+This is only an issue with instances created and stored in the `OpenedCollections` object since
+abandoning the snapshot will destroy the container and all instances in it. However, this is
+transparent to the user so we have to be pessimistic and treat equally all the collections acquired
+this way.
+
+The ConsistentCollection instance ensures that whenever we abandon the snapshot there are no users
+of the returned `Collection` pointer left. Doing so is a programmer failure and will invariant and
+crash the server to avoid dereferencing invalid memory. It is the programmer's responsibility to
+address the issue in their code so that they do not hold stale references.
+
+These checks are not present in release builds since they would otherwise introduce unnecessary
+overhead across all operations. Only debug builds are susceptible to these checks.
+
 ### Index Catalog
 
 Each `Collection` object owns an `IndexCatalog` object, which in turn has shared ownership of

@@ -63,6 +63,11 @@ TOOLCHAIN_MAP_V4 = {
         "sha": "ba2cf2efd68805eec11580e0276f2f4bde6a94735b0375cae901bcb7099daebe",
         "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_rhel90_acdc1709a01126c67dbd4f0f37491e171f64ec29_24_10_11_23_01_02.tar.gz",
     },
+    "rhel9_s390x": {
+        "platform_name": "rhel9-s390x",
+        "sha": "d9ed95872e8d85aed91f66eb7cdde08937fc0516b3bec66a92b7a584b75400db",
+        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/rhel9-zseries/acdc1709a01126c67dbd4f0f37491e171f64ec29/bazel_v4_toolchain_builder_rhel9_zseries_patch_acdc1709a01126c67dbd4f0f37491e171f64ec29_679ae0d4f30860000769a65d_25_01_30_02_15_49.tar.gz",
+    },
     "suse15_x86_64": {
         "platform_name": "suse15",
         "sha": "f7ac487d2ace8d4b8793de712f9e7d7cf3bec35bd82da39b30f42db76f59b919",

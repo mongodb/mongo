@@ -46,7 +46,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/s/add_shard_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -55,6 +54,7 @@
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/add_shard_gen.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -66,9 +66,12 @@ namespace {
 /**
  * Internal sharding command run on mongod to initialize itself as a shard in the cluster.
  */
-class AddShardCommand : public TypedCommand<AddShardCommand> {
+class ShardsvrAddShardCommand : public TypedCommand<ShardsvrAddShardCommand> {
 public:
-    using Request = AddShard;
+    using Request = ShardsvrAddShard;
+
+    ShardsvrAddShardCommand() : TypedCommand(Request::kCommandName, Request::kCommandAlias) {}
+
     class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;
@@ -148,7 +151,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(AddShardCommand).forShard();
+MONGO_REGISTER_COMMAND(ShardsvrAddShardCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -242,11 +242,19 @@ conn_stats = [
     ##########################################
     BlockStat('block_byte_map_read', 'mapped bytes read', 'size'),
     BlockStat('block_byte_read', 'bytes read', 'size'),
+    BlockStat('block_byte_read_intl', 'bytes read for internal pages', 'size'),
+    BlockStat('block_byte_read_intl_disk', 'bytes read for internal pages before decompression and decryption', 'size'),
+    BlockStat('block_byte_read_leaf', 'bytes read for leaf pages', 'size'),
+    BlockStat('block_byte_read_leaf_disk', 'bytes read for leaf pages before decompression and decryption', 'size'),
     BlockStat('block_byte_read_mmap', 'bytes read via memory map API', 'size'),
     BlockStat('block_byte_read_syscall', 'bytes read via system call API', 'size'),
     BlockStat('block_byte_write', 'bytes written', 'size'),
     BlockStat('block_byte_write_checkpoint', 'bytes written for checkpoint', 'size'),
     BlockStat('block_byte_write_compact', 'bytes written by compaction', 'size'),
+    BlockStat('block_byte_write_intl', 'bytes written for internal pages before compression and encryption', 'size'),
+    BlockStat('block_byte_write_intl_disk', 'bytes written for internal pages after compression and encryption', 'size'),
+    BlockStat('block_byte_write_leaf', 'bytes written for leaf pages before compression and encryption', 'size'),
+    BlockStat('block_byte_write_leaf_disk', 'bytes written for leaf pages after compression and encryption', 'size'),
     BlockStat('block_byte_write_mmap', 'bytes written via memory map API', 'size'),
     BlockStat('block_byte_write_syscall', 'bytes written via system call API', 'size'),
     BlockStat('block_map_read', 'mapped blocks read'),
@@ -528,8 +536,8 @@ conn_stats = [
     ##########################################
     # Live Restore statistics
     ##########################################
-    LiveRestoreStat('live_restore_queue_length', 'the number of files remaining for live restore completion', 'no_clear,no_scale'),
     LiveRestoreStat('live_restore_state', 'live restore state', 'no_clear,no_scale'),
+    LiveRestoreStat('live_restore_work_remaining', 'the number of files remaining for live restore completion', 'no_clear,no_scale'),
 
     ##########################################
     # Locking statistics
@@ -776,6 +784,10 @@ conn_stats = [
     ##########################################
     # Yield statistics
     ##########################################
+    YieldStat('application_cache_busy_ops', 'application thread operations waiting for mandatory cache eviction'),
+    YieldStat('application_cache_busy_time', 'application thread time waiting for mandatory cache eviction (usecs)'),
+    YieldStat('application_cache_idle_ops', 'application thread operations waiting for cache eviction while idle'),
+    YieldStat('application_cache_idle_time', 'application thread time waiting for cache eviction while idle (usecs)'),
     YieldStat('application_cache_ops', 'application thread operations waiting for cache'),
     YieldStat('application_cache_time', 'application thread time waiting for cache (usecs)'),
     YieldStat('application_evict_snapshot_refreshed', 'application thread snapshot refreshed for eviction'),
@@ -1163,6 +1175,8 @@ session_stats = [
     SessionStat('bytes_read', 'bytes read into cache'),
     SessionStat('bytes_write', 'bytes written from cache'),
     SessionStat('cache_time', 'time waiting for cache (usecs)'),
+    SessionStat('cache_time_busy', 'time waiting for mandatory cache eviction (usecs)'),
+    SessionStat('cache_time_idle', 'time waiting for cache eviction while idle (usecs)'),
     SessionStat('lock_dhandle_wait', 'dhandle lock wait time (usecs)'),
     SessionStat('lock_schema_wait', 'schema lock wait time (usecs)'),
     SessionStat('read_time', 'page read from disk to cache time (usecs)'),

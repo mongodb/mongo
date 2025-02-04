@@ -41,8 +41,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/rpc/metadata/impersonated_user_metadata.h"
-#include "mongo/rpc/metadata/impersonated_user_metadata_gen.h"
+#include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

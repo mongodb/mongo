@@ -833,8 +833,7 @@ Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx
             _consistencyMarkers->setAppliedThrough(opCtx, applyThroughOpTime);
             replCoord->getServiceContext()->getStorageEngine()->setStableTimestamp(
                 applyThroughOpTime.getTimestamp(), false /*force*/);
-            replCoord->getServiceContext()->getStorageEngine()->setOldestTimestamp(
-                applyThroughOpTime.getTimestamp(), false /*force*/);
+            replCoord->setOldestTimestamp(applyThroughOpTime.getTimestamp());
         }
     }
     stats.complete(applyThroughOpTime);

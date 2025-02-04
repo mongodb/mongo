@@ -47,8 +47,8 @@ public:
         return DocumentSourceTestOptimizations::kStageName.rawData();
     }
 
-    DocumentSourceType getType() const override {
-        return DocumentSourceType::kTestOptimizations;
+    Id getId() const override {
+        return kUnallocatedId;
     }
 
     GetNextResult doGetNext() override {

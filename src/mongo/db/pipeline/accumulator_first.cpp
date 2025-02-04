@@ -37,8 +37,6 @@
 
 namespace mongo {
 
-using boost::intrusive_ptr;
-
 REGISTER_ACCUMULATOR(first, genericParseSingleExpressionAccumulator<AccumulatorFirst>);
 
 void AccumulatorFirst::processInternal(const Value& input, bool merging) {
@@ -67,8 +65,4 @@ void AccumulatorFirst::reset() {
     _memUsageTracker.set(sizeof(*this));
 }
 
-
-intrusive_ptr<AccumulatorState> AccumulatorFirst::create(ExpressionContext* const expCtx) {
-    return new AccumulatorFirst(expCtx);
-}
 }  // namespace mongo

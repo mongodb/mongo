@@ -56,7 +56,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 

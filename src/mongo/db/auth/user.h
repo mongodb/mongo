@@ -56,7 +56,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/read_through_cache.h"
 
@@ -427,7 +427,7 @@ public:
     /**
      * Gets any set authentication restrictions.
      */
-    const RestrictionDocuments& getRestrictions() const& noexcept {
+    const RestrictionDocuments& getRestrictions() const& {
         return _restrictions;
     }
 
@@ -439,7 +439,7 @@ public:
     /**
      * Gets any set authentication restrictions.
      */
-    const RestrictionDocuments& getIndirectRestrictions() const& noexcept {
+    const RestrictionDocuments& getIndirectRestrictions() const& {
         return _indirectRestrictions;
     }
 

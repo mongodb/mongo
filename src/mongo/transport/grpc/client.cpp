@@ -39,8 +39,8 @@
 #include <grpcpp/security/tls_credentials_options.h>
 #include <grpcpp/support/async_stream.h>
 
-#include "src/core/tsi/ssl_transport_security.h"
-#include "src/core/tsi/transport_security_interface.h"
+#include <src/core/tsi/ssl_transport_security.h>
+#include <src/core/tsi/transport_security_interface.h>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/service_context.h"
@@ -54,6 +54,8 @@
 #include "mongo/transport/grpc/util.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/net/ssl_types.h"
 #include "mongo/util/net/ssl_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/synchronized_value.h"
@@ -149,7 +151,7 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
     // TODO SERVER-98254: this implementation currently acquires _mutex twice, which will have
     // negative performance implications. Egress performance is not a priority at the moment, but we
     // should revisit how lock contention can be reduced here in the future.
-    auto streamState = std::make_shared<PendingStreamState>();
+    std::shared_ptr<PendingStreamState> streamState;
     {
         std::lock_guard lk(_mutex);
         invariant(_state != ClientState::kUninitialized,
@@ -159,6 +161,7 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
                 makeShutdownTerminationStatus());
         }
 
+        streamState = std::make_shared<PendingStreamState>();
         auto iter = _pendingStreamStates.insert(_pendingStreamStates.end(), streamState);
         _pendingStreamStates.back()->iter = iter;
     }
@@ -167,13 +170,13 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
                 3,
                 "Establishing gRPC stream",
                 "remote"_attr = remote,
-                "sslMode"_attr = options.sslMode,
+                "sslMode"_attr = connectSSLModeToString(options.sslMode),
                 "timeout"_attr = timeout);
     if (connectionMetrics) {
         connectionMetrics->onConnectionStarted();
     }
 
-    if (timeout > Milliseconds(0)) {
+    if (timeout > Milliseconds(0) && timeout < Milliseconds::max()) {
         streamState->setTimer(reactor->makeTimer());
         streamState->getTimer()
             ->waitUntil(reactor->now() + timeout)
@@ -191,8 +194,7 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
                _streamFactory(
                    remote, reactor, timeout, options, streamState->getCancellationToken())
                    .then([this, reactor, connMetrics = std::move(connectionMetrics)](
-                             CtxAndStream ctxAndStream)
-                             -> StatusWith<std::shared_ptr<EgressSession>> {
+                             CallContext call) -> StatusWith<std::shared_ptr<EgressSession>> {
                        if (connMetrics) {
                            // We don't have visibility into these events in gRPC, so mark them
                            // all as complete once the rpc call has been started.
@@ -201,9 +203,13 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
                            connMetrics->onTLSHandshakeFinished();
                        }
 
-                       auto [ctx, stream] = ctxAndStream;
-                       auto session = std::make_shared<EgressSession>(
-                           _tl, reactor, std::move(ctx), std::move(stream), _id, _sharedState);
+                       auto session = std::make_shared<EgressSession>(_tl,
+                                                                      reactor,
+                                                                      std::move(call.ctx),
+                                                                      std::move(call.stream),
+                                                                      std::move(call.sslConfig),
+                                                                      _id,
+                                                                      _sharedState);
 
                        stdx::lock_guard lk(_mutex);
                        if (MONGO_unlikely(_state == ClientState::kShutdown)) {
@@ -215,18 +221,25 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
                        auto it = _sessions.insert(_sessions.begin(), session);
                        _numCurrentStreams.increment();
 
-                       session->setCleanupCallback(
-                           [this, client = weak_from_this(), it = std::move(it)]() {
-                               if (auto anchor = client.lock()) {
-                                   stdx::lock_guard lk(_mutex);
-                                   _sessions.erase(it);
-                                   _numCurrentStreams.decrement();
+                       session->setCleanupCallback([this,
+                                                    client = weak_from_this(),
+                                                    it = std::move(it)](Status terminationStatus) {
+                           if (terminationStatus.isOK()) {
+                               _numSuccessfulStreams.increment();
+                           } else {
+                               _numFailedStreams.increment();
+                           }
 
-                                   if (MONGO_unlikely(_isShutdownComplete_inlock())) {
-                                       _shutdownCV.notify_one();
-                                   }
+                           if (auto anchor = client.lock()) {
+                               stdx::lock_guard lk(_mutex);
+                               _sessions.erase(it);
+                               _numCurrentStreams.decrement();
+
+                               if (MONGO_unlikely(_isShutdownComplete_inlock())) {
+                                   _shutdownCV.notify_one();
                                }
-                           });
+                           }
+                       });
 
                        return session;
                    })
@@ -300,21 +313,29 @@ private:
 }  // namespace
 
 class StubFactoryImpl : public GRPCClient::StubFactory {
+    struct Channel {
+        std::shared_ptr<::grpc::Channel> grpcChannel;
+        boost::optional<SSLConfiguration> sslConfig;
+
+        Channel(std::shared_ptr<::grpc::Channel> ch, boost::optional<SSLConfiguration> ssl)
+            : grpcChannel(std::move(ch)), sslConfig(std::move(ssl)) {}
+    };
+
     class Stub {
     public:
         using ReadMessageType = SharedBuffer;
         using WriteMessageType = ConstSharedBuffer;
 
-        Stub(const std::shared_ptr<::grpc::Channel>& channel)
+        explicit Stub(const std::shared_ptr<Channel>& channel)
             : _channel(channel),
               _unauthenticatedCommandStreamMethod(
                   util::constants::kUnauthenticatedCommandStreamMethodName,
                   ::grpc::internal::RpcMethod::BIDI_STREAMING,
-                  channel),
+                  channel->grpcChannel),
               _authenticatedCommandStreamMethod(
                   util::constants::kAuthenticatedCommandStreamMethodName,
                   ::grpc::internal::RpcMethod::BIDI_STREAMING,
-                  channel) {}
+                  channel->grpcChannel) {}
 
         Future<std::shared_ptr<ClientStream>> authenticatedCommandStream(
             GRPCClientContext* context, const std::shared_ptr<GRPCReactor>& reactor) {
@@ -324,6 +345,10 @@ class StubFactoryImpl : public GRPCClient::StubFactory {
         Future<std::shared_ptr<ClientStream>> unauthenticatedCommandStream(
             GRPCClientContext* context, const std::shared_ptr<GRPCReactor>& reactor) {
             return _makeStream(_unauthenticatedCommandStreamMethod, context, reactor);
+        }
+
+        boost::optional<SSLConfiguration>& getSSLConfiguration() {
+            return _channel->sslConfig;
         }
 
     private:
@@ -346,7 +371,7 @@ class StubFactoryImpl : public GRPCClient::StubFactory {
                 readerWriter = std::unique_ptr<StreamType>(
                     ::grpc::internal::
                         ClientAsyncReaderWriterFactory<ConstSharedBuffer, SharedBuffer>::Create(
-                            &*_channel,
+                            _channel->grpcChannel.get(),
                             reactor->_getCompletionQueue(),
                             method,
                             context->getGRPCClientContext(),
@@ -360,7 +385,7 @@ class StubFactoryImpl : public GRPCClient::StubFactory {
                 });
         }
 
-        std::shared_ptr<::grpc::Channel> _channel;
+        std::shared_ptr<Channel> _channel;
         ::grpc::internal::RpcMethod _unauthenticatedCommandStreamMethod;
         ::grpc::internal::RpcMethod _authenticatedCommandStreamMethod;
     };
@@ -373,14 +398,15 @@ public:
         // destroying gRPC stubs (i.e., on threads running user operations), it is important to use
         // `FastClockSource` to minimize the performance implications of recording time on user
         // operations.
-        _pool = std::make_shared<ChannelPool<std::shared_ptr<::grpc::Channel>, Stub>>(
+        _pool = std::make_shared<ChannelPool<std::shared_ptr<Channel>, Stub>>(
             svcCtx->getFastClockSource(),
-            [](ConnectSSLMode sslMode) {
+            [](ConnectSSLMode sslMode) -> bool {
 #ifndef MONGO_CONFIG_SSL
                 if (sslMode == kEnableSSL) {
                     uasserted(ErrorCodes::InvalidSSLConfiguration,
                               "SSL requested but not supported");
                 }
+                return false;
 #else
                 auto globalSSLMode =
                     static_cast<SSLParams::SSLModes>(getSSLGlobalParams().sslMode.load());
@@ -393,9 +419,17 @@ public:
             },
             [&](const HostAndPort& remote, bool useSSL) {
                 auto uri = util::toGRPCFormattedURI(remote);
-                auto credentials = !useSSL || util::isUnixSchemeGRPCFormattedURI(uri)
-                    ? ::grpc::InsecureChannelCredentials()
-                    : ::grpc::experimental::TlsCredentials(_makeTlsOptions());
+                auto [credentials,
+                      sslConfig] = [&]() -> std::pair<std::shared_ptr<::grpc::ChannelCredentials>,
+                                                      boost::optional<SSLConfiguration>> {
+                    if (!useSSL || util::isUnixSchemeGRPCFormattedURI(uri)) {
+                        return {::grpc::InsecureChannelCredentials(), boost::none};
+                    }
+                    auto tlsCache = _tlsCache.synchronize();
+                    invariant(tlsCache->has_value());
+                    return {::grpc::experimental::TlsCredentials(_makeTlsOptions(**tlsCache)),
+                            (*tlsCache)->sslConfig};
+                }();
 
                 ::grpc::ChannelArguments channel_args;
                 channel_args.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS,
@@ -406,15 +440,20 @@ public:
                 channel_args.SetMaxSendMessageSize(MaxMessageSizeBytes);
                 channel_args.SetCompressionAlgorithm(
                     ::grpc_compression_algorithm::GRPC_COMPRESS_NONE);
-                return ::grpc::CreateCustomChannel(uri, credentials, channel_args);
+                return std::make_shared<StubFactoryImpl::Channel>(
+                    ::grpc::CreateCustomChannel(uri, credentials, channel_args), sslConfig);
             },
-            [](std::shared_ptr<::grpc::Channel>& channel, Milliseconds connectTimeout) {
+            [](std::shared_ptr<Channel>& channel, Milliseconds connectTimeout) {
                 return Stub(channel);
             });
     }
 
     void start() {
-        _loadTlsCertificates();
+        std::shared_ptr<SSLManagerInterface> manager = nullptr;
+        if (SSLManagerCoordinator::get() &&
+            (manager = SSLManagerCoordinator::get()->getSSLManager())) {
+            _loadTlsCertificates(manager->getSSLConfiguration());
+        }
         _prunerService.start(_svcCtx, _pool);
     }
 
@@ -433,19 +472,26 @@ public:
         _pool->dropAllChannels();
     }
 
-    Status rotateCertificates() try {
+#ifdef MONGO_CONFIG_SSL
+    Status rotateCertificates(const SSLConfiguration& sslConfig) try {
         LOGV2_DEBUG(9886801, 3, "Rotating certificates used for creating gRPC channels");
-        _loadTlsCertificates();
+        _loadTlsCertificates(sslConfig);
         return Status::OK();
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
+#endif
 
     void dropAllChannels_forTest() {
         _pool->dropAllChannels();
     }
 
 private:
+    struct TLSCache {
+        std::shared_ptr<::grpc::experimental::CertificateProviderInterface> certificateProvider;
+        SSLConfiguration sslConfig;
+    };
+
     /**
      * Utilize gRPC's ssl_client_handshaker_factory to verify that the user has provided valid TLS
      * certificates. Throws an exception if the provided certificates are not valid.
@@ -470,17 +516,24 @@ private:
 
         tsi_result result =
             tsi_create_ssl_client_handshaker_factory_with_options(&options, &handshakerFactory);
-        uassert(ErrorCodes::InvalidSSLConfiguration,
-                "Invalid certificates provided.",
-                result == TSI_OK);
+
+        if (result != TSI_OK) {
+            if (_options.tlsAllowInvalidCertificates) {
+                LOGV2_WARNING(9977700, "Invalid certificates provided");
+                return;
+            } else {
+                uasserted(ErrorCodes::InvalidSSLConfiguration, "Invalid certificates provided");
+            }
+        }
+
         tsi_ssl_client_handshaker_factory_unref(handshakerFactory);
     }
 
-    void _loadTlsCertificates() {
-        auto provider =
-            [&]() -> std::shared_ptr<::grpc::experimental::CertificateProviderInterface> {
+#ifdef MONGO_CONFIG_SSL
+    void _loadTlsCertificates(const SSLConfiguration& sslConfig) {
+        auto cache = [&]() -> boost::optional<TLSCache> {
             if (!_options.tlsCAFile && !_options.tlsCertificateKeyFile) {
-                return nullptr;
+                return boost::none;
             }
 
             std::vector<::grpc::experimental::IdentityKeyCertPair> certKeyPairs;
@@ -500,19 +553,24 @@ private:
                 certPair = certKeyPairs.front();
             }
             _verifyTLSCertificates(certPair, caCert);
-            return std::make_shared<::grpc::experimental::StaticDataCertificateProvider>(
-                caCert.get_value_or(""), certKeyPairs);
+
+            TLSCache cache{};
+            cache.certificateProvider =
+                std::make_shared<::grpc::experimental::StaticDataCertificateProvider>(
+                    caCert.get_value_or(""), certKeyPairs);
+            cache.sslConfig = sslConfig;
+
+            return cache;
         }();
 
-        _certificateProvider.synchronize() = std::move(provider);
+        _tlsCache.synchronize() = std::move(cache);
     }
+#endif
 
-    ::grpc::experimental::TlsChannelCredentialsOptions _makeTlsOptions() {
+    ::grpc::experimental::TlsChannelCredentialsOptions _makeTlsOptions(const TLSCache& tlsInfo) {
         ::grpc::experimental::TlsChannelCredentialsOptions tlsOps;
 
-        if (auto provider = _certificateProvider.get()) {
-            tlsOps.set_certificate_provider(std::move(provider));
-        }
+        tlsOps.set_certificate_provider(tlsInfo.certificateProvider);
 
         if (_options.tlsCertificateKeyFile) {
             tlsOps.watch_identity_key_cert_pairs();
@@ -552,10 +610,11 @@ private:
 
     GRPCClient::Options _options;
     ServiceContext* const _svcCtx;
-    std::shared_ptr<ChannelPool<std::shared_ptr<::grpc::Channel>, Stub>> _pool;
+
+    std::shared_ptr<ChannelPool<std::shared_ptr<Channel>, Stub>> _pool;
     ChannelPrunerService<decltype(_pool)> _prunerService;
-    synchronized_value<std::shared_ptr<::grpc::experimental::CertificateProviderInterface>>
-        _certificateProvider;
+
+    synchronized_value<boost::optional<TLSCache>> _tlsCache;
 };
 
 GRPCClient::GRPCClient(TransportLayer* tl,
@@ -584,22 +643,26 @@ void GRPCClient::appendStats(BSONObjBuilder* section) const {
     {
         BSONObjBuilder streamSection(section->subobjStart(kStreamsSubsectionFieldName));
         streamSection.append(kCurrentStreamsFieldName, _numCurrentStreams.get());
+        streamSection.append(kSuccessfulStreamsFieldName, _numSuccessfulStreams.get());
+        streamSection.append(kFailedStreamsFieldName, _numFailedStreams.get());
     }
 }
 
-Status GRPCClient::rotateCertificates() {
-    return static_cast<StubFactoryImpl&>(*_stubFactory).rotateCertificates();
+#ifdef MONGO_CONFIG_SSL
+Status GRPCClient::rotateCertificates(const SSLConfiguration& config) {
+    return static_cast<StubFactoryImpl&>(*_stubFactory).rotateCertificates(config);
 }
+#endif
 
 void GRPCClient::dropAllChannels_forTest() {
     static_cast<StubFactoryImpl&>(*_stubFactory).dropAllChannels_forTest();
 }
 
-Future<Client::CtxAndStream> GRPCClient::_streamFactory(const HostAndPort& remote,
-                                                        const std::shared_ptr<GRPCReactor>& reactor,
-                                                        Milliseconds connectTimeout,
-                                                        const ConnectOptions& options,
-                                                        const CancellationToken& token) {
+Future<Client::CallContext> GRPCClient::_streamFactory(const HostAndPort& remote,
+                                                       const std::shared_ptr<GRPCReactor>& reactor,
+                                                       Milliseconds connectTimeout,
+                                                       const ConnectOptions& options,
+                                                       const CancellationToken& token) {
     auto stub = static_cast<StubFactoryImpl&>(*_stubFactory)
                     .createStub(std::move(remote), options.sslMode, connectTimeout);
     auto ctx = std::make_shared<GRPCClientContext>();
@@ -616,19 +679,20 @@ Future<Client::CtxAndStream> GRPCClient::_streamFactory(const HostAndPort& remot
             ctx->tryCancel();
         });
     });
-    if (options.authToken) {
-        return stub->stub()
-            .authenticatedCommandStream(ctx.get(), reactor)
-            .then([clientContext = std::move(ctx)](std::shared_ptr<ClientStream> stream) {
-                return Client::CtxAndStream(std::move(clientContext), std::move(stream));
-            });
-    } else {
-        return stub->stub()
-            .unauthenticatedCommandStream(ctx.get(), reactor)
-            .then([clientContext = std::move(ctx)](std::shared_ptr<ClientStream> stream) {
-                return Client::CtxAndStream(std::move(clientContext), std::move(stream));
-            });
-    }
+
+    auto fut = [&]() {
+        if (options.authToken) {
+            return stub->stub().authenticatedCommandStream(ctx.get(), reactor);
+        } else {
+            return stub->stub().unauthenticatedCommandStream(ctx.get(), reactor);
+        }
+    }();
+
+    return std::move(fut).then(
+        [clientContext = std::move(ctx),
+         sslConfig = stub->stub().getSSLConfiguration()](std::shared_ptr<ClientStream> stream) {
+            return Client::CallContext{std::move(clientContext), std::move(stream), sslConfig};
+        });
 }
 
 }  // namespace mongo::transport::grpc

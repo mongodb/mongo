@@ -30,6 +30,7 @@
 #include <charconv>
 
 #include "mongo/config.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/transport/grpc/grpc_session.h"
@@ -64,7 +65,7 @@ GRPCSession::GRPCSession(TransportLayer* tl, HostAndPort remote)
     _restrictionEnvironment = RestrictionEnvironment(std::move(remoteAddr), SockAddr());
 }
 
-StatusWith<Message> GRPCSession::sourceMessage() noexcept {
+StatusWith<Message> GRPCSession::sourceMessage() {
     if (auto s = _verifyNotTerminated(); !s.isOK()) {
         return s.withContext("Could not read from gRPC stream");
     }
@@ -72,7 +73,7 @@ StatusWith<Message> GRPCSession::sourceMessage() noexcept {
     return _readFromStream();
 }
 
-Status GRPCSession::sinkMessage(Message m) noexcept {
+Status GRPCSession::sinkMessage(Message m) {
     if (auto s = _verifyNotTerminated(); !s.isOK()) {
         return s.withContext("Could not write to gRPC stream");
     }
@@ -80,7 +81,7 @@ Status GRPCSession::sinkMessage(Message m) noexcept {
     return _writeToStream(std::move(m));
 }
 
-Future<Message> GRPCSession::asyncSourceMessage(const BatonHandle&) noexcept {
+Future<Message> GRPCSession::asyncSourceMessage(const BatonHandle&) {
     if (auto s = _verifyNotTerminated(); !s.isOK()) {
         return Future<Message>::makeReady(s.withContext("Could not read from gRPC stream"));
     }
@@ -88,7 +89,7 @@ Future<Message> GRPCSession::asyncSourceMessage(const BatonHandle&) noexcept {
     return _asyncReadFromStream();
 }
 
-Future<void> GRPCSession::asyncSinkMessage(Message m, const BatonHandle&) noexcept {
+Future<void> GRPCSession::asyncSinkMessage(Message m, const BatonHandle&) {
     if (auto s = _verifyNotTerminated(); !s.isOK()) {
         return Future<void>::makeReady(s.withContext("Could not write to gRPC stream"));
     }
@@ -120,7 +121,7 @@ boost::optional<Status> GRPCSession::terminationStatus() const {
 
 bool GRPCSession::_setTerminationStatus(Status status) {
     auto ts = _terminationStatus.synchronize();
-    if (MONGO_unlikely(ts->has_value() || _isCancelled()))
+    if (ts->has_value() || _isCancelled())
         return false;
     ts->emplace(std::move(status));
     return true;
@@ -164,8 +165,10 @@ IngressSession::~IngressSession() {
                 "status"_attr = terminationStatus());
 }
 
-StatusWith<Message> IngressSession::_readFromStream() noexcept {
+StatusWith<Message> IngressSession::_readFromStream() {
     if (auto maybeBuffer = _stream->read()) {
+        networkCounter.hitPhysicalIn(NetworkCounter::ConnectionType::kIngress,
+                                     MsgData::ConstView(maybeBuffer->get()).getLen());
         return Message(std::move(*maybeBuffer));
     }
 
@@ -179,8 +182,9 @@ StatusWith<Message> IngressSession::_readFromStream() noexcept {
     }
 }
 
-Status IngressSession::_writeToStream(Message message) noexcept {
+Status IngressSession::_writeToStream(Message message) {
     if (_stream->write(message.sharedBuffer())) {
+        networkCounter.hitPhysicalOut(NetworkCounter::ConnectionType::kIngress, message.size());
         return Status::OK();
     }
 
@@ -226,6 +230,7 @@ EgressSession::EgressSession(TransportLayer* tl,
                              const std::shared_ptr<GRPCReactor>& reactor,
                              std::shared_ptr<ClientContext> ctx,
                              std::shared_ptr<ClientStream> stream,
+                             boost::optional<SSLConfiguration> sslConfig,
                              UUID clientId,
                              std::shared_ptr<EgressSession::SharedState> sharedState)
     : GRPCSession(tl, ctx->getRemote()),
@@ -233,7 +238,8 @@ EgressSession::EgressSession(TransportLayer* tl,
       _ctx(std::move(ctx)),
       _stream(std::move(stream)),
       _clientId(clientId),
-      _sharedState(std::move(sharedState)) {
+      _sharedState(std::move(sharedState)),
+      _sslConfig(std::move(sslConfig)) {
     LOGV2_DEBUG(7401401, 2, "Constructed a new gRPC egress session", "session"_attr = toBSON());
 }
 
@@ -249,7 +255,7 @@ EgressSession::~EgressSession() {
                 "status"_attr = status);
 
     if (_cleanupCallback)
-        (*_cleanupCallback)();
+        (*_cleanupCallback)(*status);
 }
 
 Future<Message> EgressSession::_asyncReadFromStream() {
@@ -257,35 +263,36 @@ Future<Message> EgressSession::_asyncReadFromStream() {
     auto pf = makePromiseFuture<void>();
     _stream->read(msg.get(), _reactor->_registerCompletionQueueEntry(std::move(pf.promise)));
 
-    return _withCancellation<Message>(
-        _asyncCancelSource.token(),
-        std::move(pf.future)
-            .onError([this](Status s) {
-                // If _stream->read() fails, then the server
-                // has no more messages to send and a final RPC
-                // status should be available. Set the
-                // termination status to that and return it
-                // here.
-                return asyncFinish().onCompletion([&](Status termStatus) {
-                    return termStatus.isOK()
-                        ? Status(ErrorCodes::StreamTerminated,
-                                 "Could not read from gRPC client stream: remote done writing")
-                        : termStatus;
-                });
-            })
-            .then([this, msg = std::move(msg)]() {
-                _updateWireVersion();
-                return Message(std::move(*msg));
-            }));
+    return std::move(pf.future)
+        .onError([this](Status s) {
+            // If _stream->read() fails, then the server
+            // has no more messages to send and a final RPC
+            // status should be available. Set the
+            // termination status to that and return it
+            // here.
+            return asyncFinish().onCompletion([&](Status termStatus) {
+                return termStatus.isOK()
+                    ? Status(ErrorCodes::StreamTerminated,
+                             "Could not read from gRPC client stream: remote done writing")
+                    : termStatus;
+            });
+        })
+        .then([this, msg = std::move(msg)]() {
+            _updateWireVersion();
+            networkCounter.hitPhysicalIn(NetworkCounter::ConnectionType::kEgress,
+                                         MsgData::ConstView(msg->get()).getLen());
+            return Message(std::move(*msg));
+        });
 }
 
 Future<void> EgressSession::_asyncWriteToStream(Message message) {
+    auto const msgLen = message.size();
     auto pf = makePromiseFuture<void>();
     _stream->write(message.sharedBuffer(),
                    _reactor->_registerCompletionQueueEntry(std::move(pf.promise)));
 
-    return _withCancellation<void>(
-        _asyncCancelSource.token(), std::move(pf.future).onError([this](Status s) {
+    return std::move(pf.future)
+        .onError([this](Status s) {
             // If _stream->write() fails, then the RPC has been terminated and a final
             // RPC status should be available. Set the termination status to that and
             // return it here.
@@ -295,30 +302,14 @@ Future<void> EgressSession::_asyncWriteToStream(Message message) {
                              "Could not write to gRPC client stream: RPC terminated")
                     : termStatus;
             });
-        }));
+        })
+        .then([msgLen]() {
+            networkCounter.hitPhysicalOut(NetworkCounter::ConnectionType::kEgress, msgLen);
+        });
 }
 
 void EgressSession::_cancelAsyncOperations() {
-    // Try to cancel outstanding gRPC calls.
     _tryCancel();
-
-    auto doCancel = [this](Status s) {
-        if (!s.isOK()) {
-            return;
-        }
-
-        // Mark outstanding futures as cancelled.
-        _asyncCancelSource.cancel();
-    };
-
-    // Save a schedule if we are already on the reactor thread.
-    if (_reactor->onReactorThread()) {
-        doCancel(Status::OK());
-    }
-
-    // Ensure the cancel token is cancelled on the reactor thread so that cancellation work
-    // is run on the reactor as well.
-    _reactor->schedule(doCancel);
 }
 
 Future<void> EgressSession::asyncFinish() {
@@ -329,30 +320,28 @@ Future<void> EgressSession::asyncFinish() {
     auto writesDonePF = makePromiseFuture<void>();
     _stream->writesDone(_reactor->_registerCompletionQueueEntry(std::move(writesDonePF.promise)));
 
-    return _withCancellation<void>(
-        _asyncCancelSource.token(),
-        std::move(writesDonePF.future)
-            .onError([this](Status s) {
-                _setTerminationStatus(s);
-                return s.withContext("Failed to half-close the gRPC client stream");
-            })
-            .then([this]() {
-                auto pf = makePromiseFuture<void>();
-                auto finishStatus = std::make_unique<::grpc::Status>();
-                _stream->finish(finishStatus.get(),
-                                _reactor->_registerCompletionQueueEntry(std::move(pf.promise)));
+    return std::move(writesDonePF.future)
+        .onError([this](Status s) {
+            _setTerminationStatus(s);
+            return s.withContext("Failed to half-close the gRPC client stream");
+        })
+        .then([this]() {
+            auto pf = makePromiseFuture<void>();
+            auto finishStatus = std::make_unique<::grpc::Status>();
+            _stream->finish(finishStatus.get(),
+                            _reactor->_registerCompletionQueueEntry(std::move(pf.promise)));
 
-                return std::move(pf.future)
-                    .onError([this](Status s) {
-                        _setTerminationStatus(s);
-                        return s.withContext("Failed to retrieve gRPC call's termination status");
-                    })
-                    .then([this, finishStatus = std::move(finishStatus)]() {
-                        Status finalStatus = util::convertStatus(*finishStatus);
-                        _setTerminationStatus(finalStatus);
-                        return finalStatus;
-                    });
-            }));
+            return std::move(pf.future)
+                .onError([this](Status s) {
+                    _setTerminationStatus(s);
+                    return s.withContext("Failed to retrieve gRPC call's termination status");
+                })
+                .then([this, finishStatus = std::move(finishStatus)]() {
+                    Status finalStatus = util::convertStatus(*finishStatus);
+                    _setTerminationStatus(finalStatus);
+                    return finalStatus;
+                });
+        });
 }
 
 void EgressSession::appendToBSON(BSONObjBuilder& bb) const {
@@ -401,5 +390,11 @@ void EgressSession::_updateWireVersion() {
         _sharedState->clusterMaxWireVersion.store(wireVersion);
     }
 }
+
+#ifdef MONGO_CONFIG_SSL
+const SSLConfiguration* EgressSession::getSSLConfiguration() const {
+    return _sslConfig ? &*_sslConfig : nullptr;
+}
+#endif
 
 }  // namespace mongo::transport::grpc

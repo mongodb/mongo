@@ -50,8 +50,6 @@
 
 namespace mongo {
 
-using boost::intrusive_ptr;
-
 REGISTER_ACCUMULATOR(percentile, AccumulatorPercentile::parseArgs);
 REGISTER_STABLE_EXPRESSION(percentile, AccumulatorPercentile::parseExpression);
 
@@ -218,7 +216,7 @@ AccumulationExpression AccumulatorPercentile::parseArgs(ExpressionContext* const
     const PercentileMethodEnum method = methodNameToEnum(spec.getMethod());
 
     auto factory = [expCtx, ps, method] {
-        return AccumulatorPercentile::create(expCtx, ps, method);
+        return make_intrusive<AccumulatorPercentile>(expCtx, ps, method);
     };
 
     return {ExpressionConstant::create(expCtx, Value(BSONNULL)) /*initializer*/,
@@ -361,12 +359,6 @@ void AccumulatorPercentile::serializeHelper(const boost::intrusive_ptr<Expressio
                 Value(percentileMethodEnumToString(method)));
 }
 
-intrusive_ptr<AccumulatorState> AccumulatorPercentile::create(ExpressionContext* const expCtx,
-                                                              const std::vector<double>& ps,
-                                                              PercentileMethodEnum method) {
-    return new AccumulatorPercentile(expCtx, ps, method);
-}
-
 AccumulationExpression AccumulatorMedian::parseArgs(ExpressionContext* const expCtx,
                                                     BSONElement elem,
                                                     VariablesParseState vps) {
@@ -383,7 +375,8 @@ AccumulationExpression AccumulatorMedian::parseArgs(ExpressionContext* const exp
     const PercentileMethodEnum method = methodNameToEnum(spec.getMethod());
 
     auto factory = [expCtx, method] {
-        return AccumulatorMedian::create(expCtx, {} /* unused */, method);
+        return make_intrusive<AccumulatorMedian>(
+            expCtx, std::vector<double>{} /* unused */, method);
     };
 
     return {ExpressionConstant::create(expCtx, Value(BSONNULL)) /*initializer*/,
@@ -430,12 +423,6 @@ AccumulatorMedian::AccumulatorMedian(ExpressionContext* expCtx,
           {0.5} /* Median is equivalent to asking for the 50th percentile */,
           method,
           maxMemoryUsageBytes.value_or(internalQueryMaxPercentileAccumulatorBytes.load())) {}
-
-intrusive_ptr<AccumulatorState> AccumulatorMedian::create(ExpressionContext* expCtx,
-                                                          const std::vector<double>& /* unused */,
-                                                          PercentileMethodEnum method) {
-    return new AccumulatorMedian(expCtx, {} /* unused */, method);
-}
 
 Value AccumulatorMedian::formatFinalValue(int nPercentiles, const std::vector<double>& pctls) {
     if (pctls.empty()) {

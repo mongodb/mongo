@@ -124,6 +124,11 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     extra_args="$extra_args --skipSymbolization"
   fi
 
+  # Add test selection flag based on patch parameter
+  if [ "${enable_evergreen_api_test_selection}" = "true" ]; then
+    extra_args="$extra_args --enableEvergreenApiTestSelection"
+  fi
+
   path_value="$PATH:/data/multiversion"
 
   # Set the suite name to be the task name by default; unless overridden with the `suite` expansion.

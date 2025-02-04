@@ -37,17 +37,17 @@
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/cluster_identity_loader.h"
+#include "mongo/s/request_types/add_shard_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
 
 namespace add_shard_util {
 
-AddShard createAddShardCmd(OperationContext* opCtx, const ShardId& shardName) {
-    AddShard addShardCmd;
+ShardsvrAddShard createAddShardCmd(OperationContext* opCtx, const ShardId& shardName) {
+    ShardsvrAddShard addShardCmd;
     addShardCmd.setDbName(DatabaseName::kAdmin);
 
     ShardIdentity shardIdentity;
@@ -60,7 +60,7 @@ AddShard createAddShardCmd(OperationContext* opCtx, const ShardId& shardName) {
     return addShardCmd;
 }
 
-BSONObj createShardIdentityUpsertForAddShard(const AddShard& addShardCmd,
+BSONObj createShardIdentityUpsertForAddShard(const ShardsvrAddShard& addShardCmd,
                                              const WriteConcernOptions& wc) {
     // TODO SERVER-88742 Just use write_ops::UpdateCommandRequest
     BatchedCommandRequest request([&] {

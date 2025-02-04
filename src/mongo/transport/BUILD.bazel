@@ -281,7 +281,7 @@ mongo_cc_library(
 )
 
 # This library will initialize an egress transport layer in a mongo initializer
-# for C++ tests that require networking.
+# for C++ integration tests that require networking.
 mongo_cc_library(
     name = "transport_layer_egress_init",
     srcs = [
@@ -289,7 +289,14 @@ mongo_cc_library(
     ],
     deps = [
         ":transport_layer_manager",
-    ],
+        "//src/mongo/unittest:integration_test_main",
+    ] + select({
+        "//bazel/config:build_grpc_enabled": [
+            "//src/mongo/transport/grpc:grpc_transport_layer",
+            "//src/mongo/util:periodic_runner_factory",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 mongo_cc_library(
@@ -307,6 +314,25 @@ mongo_cc_library(
         "//src/mongo/rpc:client_metadata",
         "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_cc_library(
+    name = "transport_layer_integration_test_fixture",
+    srcs = [
+        "test_fixtures.h",
+        "transport_layer_integration_test_fixture.cpp",
+        "transport_layer_mock.h",
+    ],
+    hdrs = [
+        "transport_layer_integration_test_fixture.h",
+    ],
+    deps = [
+        "//src/mongo/client:async_client",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/unittest:integration_test_main",
+        "//src/mongo/util:version_impl",
+        "//src/mongo/util/net:network",
     ],
 )
 
@@ -334,8 +360,6 @@ mongo_cc_unit_test(
     }),
     data = ["//jstests/libs:test_pem_files"],
     tags = [
-        "code_coverage_quarantine",
-        "code_coverage_quarantine-SERVER_99060",
         "mongo_unittest_second_group",
     ],
     deps = [
@@ -363,7 +387,7 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_integration_test(
-    name = "transport_integration_test",
+    name = "asio_transport_integration_test",
     srcs = [
         "//src/mongo/transport/asio:asio_transport_layer_integration_test.cpp",
     ],
@@ -380,11 +404,8 @@ mongo_cc_integration_test(
     }),
     deps = [
         ":transport_layer_egress_init",
+        ":transport_layer_integration_test_fixture",
         "//src/mongo:base",
-        "//src/mongo/client:async_client",
-        "//src/mongo/executor:task_executor_interface",
-        "//src/mongo/util:version_impl",
-        "//src/mongo/util/net:network",
         "//src/third_party/asio-master:asio",
     ],
 )

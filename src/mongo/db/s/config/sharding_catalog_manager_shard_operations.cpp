@@ -58,6 +58,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connection_string.h"
@@ -99,10 +100,10 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/resource_yielder.h"
-#include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/s/add_shard_util.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/s/remove_shard_draining_progress_gen.h"
 #include "mongo/db/s/replica_set_endpoint_feature_flag.h"
 #include "mongo/db/s/sharding_config_server_parameters_gen.h"
 #include "mongo/db/s/sharding_ddl_util.h"
@@ -143,7 +144,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/remove_shard_gen.h"
+#include "mongo/s/request_types/add_shard_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/request_types/shardsvr_join_ddl_coordinators_request_gen.h"
 #include "mongo/s/request_types/shardsvr_join_migrations_request_gen.h"
@@ -159,6 +160,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/scopeguard.h"
@@ -181,6 +183,7 @@ MONGO_FAIL_POINT_DEFINE(hangRemoveShardBeforeUpdatingClusterCardinalityParameter
 MONGO_FAIL_POINT_DEFINE(skipUpdatingClusterCardinalityParameterAfterAddShard);
 MONGO_FAIL_POINT_DEFINE(skipUpdatingClusterCardinalityParameterAfterRemoveShard);
 MONGO_FAIL_POINT_DEFINE(skipBlockingDDLCoordinatorsDuringAddAndRemoveShard);
+MONGO_FAIL_POINT_DEFINE(changeBSONObjMaxUserSize);
 
 using CallbackHandle = executor::TaskExecutor::CallbackHandle;
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
@@ -395,83 +398,185 @@ void resetDDLBlockingForTopologyChangeIfNeeded(OperationContext* opCtx) {
     LOGV2(5687907, "Resetted addOrRemoveShardInProgress cluster parameter after failure");
 }
 
-}  // namespace
+AggregateCommandRequest makeUnshardedCollectionsOnSpecificShardAggregation(OperationContext* opCtx,
+                                                                           const ShardId& shardId,
+                                                                           bool isCount = false) {
+    BSONObj listStage = BSON("$listClusterCatalog" << BSON("shards" << true));
+    BSONObj matchStage =
+        BSON("$match" << BSON("$and" << BSON_ARRAY(BSON("sharded" << false << "shards" << shardId)
+                                                   << BSON("db" << BSON("$ne"
+                                                                        << "config"))
+                                                   << BSON("db" << BSON("$ne"
+                                                                        << "admin")))));
+    BSONObj countStage = BSON("$count"
+                              << "totalCount");
 
-StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShard(
-    OperationContext* opCtx,
-    RemoteCommandTargeter* targeter,
-    const DatabaseName& dbName,
-    const BSONObj& cmdObj) {
-    auto swHost = targeter->findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
-    if (!swHost.isOK()) {
-        return swHost.getStatus();
-    }
-    auto host = std::move(swHost.getValue());
+    auto dbName = NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin);
 
-    executor::RemoteCommandRequest request(
-        host, dbName, cmdObj, rpc::makeEmptyMetadata(), opCtx, kRemoteCommandTimeout);
-
-    executor::RemoteCommandResponse response(
-        host, Status(ErrorCodes::InternalError, "Internal error running command"));
-
-    auto swCallbackHandle = _executorForAddShard->scheduleRemoteCommand(
-        request, [&response](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
-            response = args.response;
-        });
-    if (!swCallbackHandle.isOK()) {
-        return swCallbackHandle.getStatus();
+    std::vector<mongo::BSONObj> pipeline;
+    pipeline.reserve(isCount ? 3 : 2);
+    pipeline.push_back(listStage);
+    pipeline.push_back(matchStage);
+    if (isCount) {
+        pipeline.push_back(countStage);
     }
 
-    // Block until the command is carried out
-    _executorForAddShard->wait(swCallbackHandle.getValue());
-
-    if (response.status == ErrorCodes::ExceededTimeLimit) {
-        LOGV2(21941, "Operation timed out", "error"_attr = redact(response.status));
-    }
-
-    if (!response.isOK()) {
-        if (!Shard::shouldErrorBePropagated(response.status.code())) {
-            return {ErrorCodes::OperationFailed,
-                    str::stream() << "failed to run command " << cmdObj
-                                  << " when attempting to add shard "
-                                  << targeter->connectionString().toString()
-                                  << causedBy(response.status)};
-        }
-        return response.status;
-    }
-
-    BSONObj result = response.data.getOwned();
-
-    Status commandStatus = getStatusFromCommandResult(result);
-    if (!Shard::shouldErrorBePropagated(commandStatus.code())) {
-        commandStatus = {
-            ErrorCodes::OperationFailed,
-            str::stream() << "failed to run command " << cmdObj << " when attempting to add shard "
-                          << targeter->connectionString().toString() << causedBy(commandStatus)};
-    }
-
-    Status writeConcernStatus = getWriteConcernStatusFromCommandResult(result);
-    if (!Shard::shouldErrorBePropagated(writeConcernStatus.code())) {
-        writeConcernStatus = {ErrorCodes::OperationFailed,
-                              str::stream() << "failed to satisfy writeConcern for command "
-                                            << cmdObj << " when attempting to add shard "
-                                            << targeter->connectionString().toString()
-                                            << causedBy(writeConcernStatus)};
-    }
-
-    return Shard::CommandResponse(std::move(host),
-                                  std::move(result),
-                                  std::move(commandStatus),
-                                  std::move(writeConcernStatus));
+    AggregateCommandRequest aggRequest{dbName, pipeline};
+    aggRequest.setReadConcern(repl::ReadConcernArgs::kLocal);
+    aggRequest.setWriteConcern({});
+    return aggRequest;
 }
 
-StatusWith<boost::optional<ShardType>> ShardingCatalogManager::_checkIfShardExists(
+AggregateCommandRequest makeChunkCountAggregation(OperationContext* opCtx, const ShardId& shardId) {
+    std::vector<BSONObj> pipeline;
+
+    // Match documents in the chunks collection where shard is "shard01"
+    pipeline.emplace_back(BSON("$match" << BSON("shard" << shardId)));
+    // Perform a $group to count chunks by uuid
+    pipeline.emplace_back(fromjson(R"(
+            { $group: {
+                '_id': '$uuid',
+                'count': { $sum: 1 }
+            }})"));
+    // Fetch the collection global catalog
+    pipeline.emplace_back(fromjson(R"(
+            { $lookup: {
+                from: {
+                    db: "config",
+                    coll: "collections"
+                },
+                localField: "_id",
+                foreignField: "uuid",
+                as: "collectionInfo"
+            }})"));
+    pipeline.emplace_back(fromjson(R"(
+            { $unwind: "$collectionInfo"})"));
+    pipeline.emplace_back(fromjson(R"(
+            { $match: {
+                "collectionInfo.unsplittable": {$ne: true}
+            }})"));
+    // Deliver a single document with the aggregation of all the chunks
+    pipeline.emplace_back(fromjson(R"(
+            { $group: {
+                '_id': null,
+                'totalChunks': {$sum: '$count'}
+            }})"));
+
+    AggregateCommandRequest aggRequest{NamespaceString::kConfigsvrChunksNamespace, pipeline};
+    aggRequest.setReadConcern(repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern));
+    return aggRequest;
+}
+
+std::vector<NamespaceString> getCollectionsToMoveForShard(OperationContext* opCtx,
+                                                          Shard* shard,
+                                                          const ShardId& shardId) {
+
+    auto listCollectionAggReq = makeUnshardedCollectionsOnSpecificShardAggregation(opCtx, shardId);
+
+    std::vector<NamespaceString> collections;
+
+    uassertStatusOK(
+        shard->runAggregation(opCtx,
+                              listCollectionAggReq,
+                              [&collections](const std::vector<BSONObj>& batch,
+                                             const boost::optional<BSONObj>& postBatchResumeToken) {
+                                  for (const auto& doc : batch) {
+                                      collections.push_back(NamespaceStringUtil::deserialize(
+                                          boost::none,
+                                          doc.getField("ns").String(),
+                                          SerializationContext::stateDefault()));
+                                  }
+                                  return true;
+                              }));
+
+    return collections;
+}
+
+long long getCollectionsToMoveForShardCount(OperationContext* opCtx,
+                                            Shard* shard,
+                                            const ShardId& shardId) {
+
+    auto listCollectionAggReq =
+        makeUnshardedCollectionsOnSpecificShardAggregation(opCtx, shardId, true);
+
+    long long collectionsCounter = 0;
+
+    uassertStatusOK(shard->runAggregation(
+        opCtx,
+        listCollectionAggReq,
+        [&collectionsCounter](const std::vector<BSONObj>& batch,
+                              const boost::optional<BSONObj>& postBatchResumeToken) {
+            if (batch.size() > 0) {
+                tassert(8988300, "totalCount field is missing", batch[0].hasField("totalCount"));
+                collectionsCounter = batch[0].getField("totalCount").safeNumberLong();
+            }
+            return true;
+        }));
+
+    return collectionsCounter;
+}
+
+long long getChunkForShardCount(OperationContext* opCtx, Shard* shard, const ShardId& shardId) {
+
+    auto chunkCounterAggReq = makeChunkCountAggregation(opCtx, shardId);
+
+    long long chunkCounter = 0;
+
+    uassertStatusOK(shard->runAggregation(
+        opCtx,
+        chunkCounterAggReq,
+        [&chunkCounter](const std::vector<BSONObj>& batch,
+                        const boost::optional<BSONObj>& postBatchResumeToken) {
+            if (batch.size() > 0) {
+                chunkCounter = batch[0].getField("totalChunks").safeNumberLong();
+            }
+            return true;
+        }));
+
+    return chunkCounter;
+}
+
+bool appendToArrayIfRoom(int offset,
+                         BSONArrayBuilder& arrayBuilder,
+                         const std::string& toAppend,
+                         const int maxUserSize) {
+    if (static_cast<int>(offset + arrayBuilder.len() + toAppend.length()) < maxUserSize) {
+        arrayBuilder.append(toAppend);
+        return true;
+    }
+    return false;
+}
+
+}  // namespace
+
+namespace topology_change_helpers {
+
+long long getRangeDeletionCount(OperationContext* opCtx) {
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+    return static_cast<long long>(store.count(opCtx, BSONObj()));
+}
+
+void joinMigrations(OperationContext* opCtx) {
+    // Join migrations to make sure there's no ongoing MigrationDestinationManager. New ones
+    // will observe the draining state and abort before performing any work that could re-create
+    // local catalog collections/dbs.
+    DBDirectClient client(opCtx);
+    BSONObj resultInfo;
+    ShardsvrJoinMigrations shardsvrJoinMigrations;
+    shardsvrJoinMigrations.setDbName(DatabaseName::kAdmin);
+    const auto result =
+        client.runCommand(DatabaseName::kAdmin, shardsvrJoinMigrations.toBSON(), resultInfo);
+    uassert(8955101, "Failed to await ongoing migrations before removing catalog shard", result);
+}
+
+StatusWith<boost::optional<ShardType>> checkIfShardExists(
     OperationContext* opCtx,
     const ConnectionString& proposedShardConnectionString,
-    const std::string* proposedShardName) {
+    const boost::optional<StringData>& proposedShardName,
+    ShardingCatalogClient& localCatalogClient) {
     // Check whether any host in the connection is already part of the cluster.
     const auto existingShards =
-        _localCatalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+        localCatalogClient.getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
     if (!existingShards.isOK()) {
         return existingShards.getStatus().withContext(
             "Failed to load existing shards during addShard");
@@ -489,7 +594,7 @@ StatusWith<boost::optional<ShardType>> ShardingCatalogManager::_checkIfShardExis
         // Function for determining if the options for the shard that is being added match the
         // options of an existing shard that conflicts with it.
         auto shardsAreEquivalent = [&]() {
-            if (proposedShardName && *proposedShardName != existingShard.getName()) {
+            if (proposedShardName && proposedShardName.value() != existingShard.getName()) {
                 return false;
             }
             if (proposedShardConnectionString.type() != existingShardConnStr.type()) {
@@ -566,16 +671,102 @@ StatusWith<boost::optional<ShardType>> ShardingCatalogManager::_checkIfShardExis
             return hostsAreEquivalent;
         }
 
-        if (proposedShardName && *proposedShardName == existingShard.getName()) {
+        if (proposedShardName && proposedShardName.value() == existingShard.getName()) {
             // If we get here then we're trying to add a shard with the same name as an
             // existing shard, but there was no overlap in the hosts between the existing
             // shard and the proposed connection string for the new shard.
             return {ErrorCodes::IllegalOperation,
-                    str::stream() << "A shard named " << *proposedShardName << " already exists"};
+                    str::stream() << "A shard named " << proposedShardName.value()
+                                  << " already exists"};
         }
     }
 
     return {boost::none};
+}
+
+std::string getRemoveShardMessage(const ShardDrainingStateEnum& status) {
+    switch (status) {
+        case ShardDrainingStateEnum::kStarted:
+            return "draining started successfully";
+        case ShardDrainingStateEnum::kOngoing:
+            return "draining ongoing";
+        case ShardDrainingStateEnum::kPendingDataCleanup:
+            return "waiting for data to be cleaned up";
+        case ShardDrainingStateEnum::kCompleted:
+            return "removeshard completed successfully";
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+}  // namespace topology_change_helpers
+
+StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShard(
+    OperationContext* opCtx,
+    RemoteCommandTargeter* targeter,
+    const DatabaseName& dbName,
+    const BSONObj& cmdObj) {
+    auto swHost = targeter->findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
+    if (!swHost.isOK()) {
+        return swHost.getStatus();
+    }
+    auto host = std::move(swHost.getValue());
+
+    executor::RemoteCommandRequest request(
+        host, dbName, cmdObj, rpc::makeEmptyMetadata(), opCtx, kRemoteCommandTimeout);
+
+    executor::RemoteCommandResponse response(
+        host, Status(ErrorCodes::InternalError, "Internal error running command"));
+
+    auto swCallbackHandle = _executorForAddShard->scheduleRemoteCommand(
+        request, [&response](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
+            response = args.response;
+        });
+    if (!swCallbackHandle.isOK()) {
+        return swCallbackHandle.getStatus();
+    }
+
+    // Block until the command is carried out
+    _executorForAddShard->wait(swCallbackHandle.getValue());
+
+    if (response.status == ErrorCodes::ExceededTimeLimit) {
+        LOGV2(21941, "Operation timed out", "error"_attr = redact(response.status));
+    }
+
+    if (!response.isOK()) {
+        if (!Shard::shouldErrorBePropagated(response.status.code())) {
+            return {ErrorCodes::OperationFailed,
+                    str::stream() << "failed to run command " << cmdObj
+                                  << " when attempting to add shard "
+                                  << targeter->connectionString().toString()
+                                  << causedBy(response.status)};
+        }
+        return response.status;
+    }
+
+    BSONObj result = response.data.getOwned();
+
+    Status commandStatus = getStatusFromCommandResult(result);
+    if (!Shard::shouldErrorBePropagated(commandStatus.code())) {
+        commandStatus = {
+            ErrorCodes::OperationFailed,
+            str::stream() << "failed to run command " << cmdObj << " when attempting to add shard "
+                          << targeter->connectionString().toString() << causedBy(commandStatus)};
+    }
+
+    Status writeConcernStatus = getWriteConcernStatusFromCommandResult(result);
+    if (!Shard::shouldErrorBePropagated(writeConcernStatus.code())) {
+        writeConcernStatus = {ErrorCodes::OperationFailed,
+                              str::stream() << "failed to satisfy writeConcern for command "
+                                            << cmdObj << " when attempting to add shard "
+                                            << targeter->connectionString().toString()
+                                            << causedBy(writeConcernStatus)};
+    }
+
+    return Shard::CommandResponse(std::move(host),
+                                  std::move(result),
+                                  std::move(commandStatus),
+                                  std::move(writeConcernStatus));
 }
 
 StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
@@ -1080,7 +1271,11 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     // Check if this shard has already been added (can happen in the case of a retry after a network
     // error, for example) and thus this addShard request should be considered a no-op.
-    auto existingShard = _checkIfShardExists(opCtx, shardConnectionString, shardProposedName);
+    const auto existingShard = topology_change_helpers::checkIfShardExists(
+        opCtx,
+        shardConnectionString,
+        shardProposedName ? boost::optional<StringData>(*shardProposedName) : boost::none,
+        *_localCatalogClient);
     if (!existingShard.isOK()) {
         return existingShard.getStatus();
     }
@@ -1196,7 +1391,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     };
 
     if (!isConfigShard) {
-        AddShard addShardCmd = add_shard_util::createAddShardCmd(opCtx, shardType.getName());
+        ShardsvrAddShard addShardCmd =
+            add_shard_util::createAddShardCmd(opCtx, shardType.getName());
 
         // Use the _addShard command to add the shard, which in turn inserts a shardIdentity
         // document into the shard and triggers sharding state initialization.
@@ -1280,11 +1476,29 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         clusterCardinalityParameterLock.lock();
         shardMembershipLock.lock();
 
-        _addShardInTransaction(
-            opCtx, shardType, std::move(dbNamesStatus.getValue()), std::move(collList));
+        {
+            // Execute the transaction with a local write concern to make sure `stopMonitorGuard` is
+            // dimissed only when the transaction really fails.
+            const auto originalWC = opCtx->getWriteConcern();
+            ScopeGuard resetWCGuard([&] { opCtx->setWriteConcern(originalWC); });
+            opCtx->setWriteConcern(ShardingCatalogClient::kLocalWriteConcern);
+
+            _addShardInTransaction(
+                opCtx, shardType, std::move(dbNamesStatus.getValue()), std::move(collList));
+        }
         // Once the transaction has committed, we must immediately dismiss the guard to avoid
         // incorrectly removing the RSM after persisting the shard addition.
         stopMonitoringGuard.dismiss();
+
+        // Wait for majority can only be done after dismissing the `stopMonitoringGuard`.
+        if (opCtx->getWriteConcern().isMajority()) {
+            WaitForMajorityService::get(opCtx->getServiceContext())
+                .waitUntilMajorityForWrite(
+                    repl::ReplicationCoordinator::get(opCtx->getServiceContext())
+                        ->getMyLastAppliedOpTime(),
+                    opCtx->getCancellationToken())
+                .get();
+        }
 
         // Record in changelog
         BSONObjBuilder shardDetails;
@@ -1313,6 +1527,14 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         // Unblock ShardingDDLCoordinators on the cluster.
         if (feature_flags::gStopDDLCoordinatorsDuringTopologyChanges.isEnabled(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            // TODO SERVER-99708: Investigate if we can remove this. unblockDDLCoordinators ends up
+            // calling the configSvrSetClusterParameter command which takes the FCV lock. At this
+            // point we are still holding the clusterCardinalityParameterLock. Other operations
+            // proceed to take the locks in the inverse order, that is, they first take the FCV lock
+            // followed by the clusterCardinalityParameterLock. We should review if we must unlock
+            // the clusterCardinalityParameterLock here to prevent a lock cycle or see if this can
+            // be refactored to prevent it.
+            DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
             unblockDDLCoordinators(opCtx);
         }
         unblockDDLCoordinatorsGuard.dismiss();
@@ -1353,8 +1575,10 @@ boost::optional<RemoveShardProgress> checkCollectionsAreEmpty(
 
         if (!autoColl->isEmpty(opCtx)) {
             LOGV2(9022300, "removeShard: found non-empty local collection", logAttrs(nss));
-            RemoveShardProgress progress{
-                RemoveShardProgress::PENDING_DATA_CLEANUP, boost::none, 0, nss};
+            RemoveShardProgress progress(ShardDrainingStateEnum::kPendingDataCleanup);
+            progress.setFirstNonEmptyCollection(nss);
+            progress.setPendingRangeDeletions(
+                0);  // Set this to 0 so that it is serialized in the response
             return {progress};
         }
     }
@@ -1455,8 +1679,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                        ShardingCatalogClient::kLocalWriteConcern),
                                    "error starting removeShard");
 
-        return {RemoveShardProgress::STARTED,
-                boost::optional<RemoveShardProgress::DrainingShardUsage>(boost::none)};
+        return {ShardDrainingStateEnum::kStarted};
     }
 
     shardMembershipLock.unlock();
@@ -1466,9 +1689,15 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
 
     // Draining has already started, now figure out how many chunks and databases are still on the
     // shard.
-    const auto getDrainingProgress = [&]() -> RemoveShardProgress::DrainingShardUsage {
-        const auto chunkCount = uassertStatusOK(_runCountCommandOnConfig(
+    const auto getDrainingProgress = [&]() -> DrainingShardUsage {
+        const auto totalChunkCount = uassertStatusOK(_runCountCommandOnConfig(
             opCtx, NamespaceString::kConfigsvrChunksNamespace, BSON(ChunkType::shard(shardName))));
+
+        const auto shardedChunkCount =
+            getChunkForShardCount(opCtx, _localConfigShard.get(), shardName);
+
+        const auto unshardedCollectionsCount =
+            getCollectionsToMoveForShardCount(opCtx, _localConfigShard.get(), shardName);
 
         const auto databaseCount = uassertStatusOK(
             _runCountCommandOnConfig(opCtx,
@@ -1480,51 +1709,49 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                      NamespaceString::kConfigsvrChunksNamespace,
                                      BSON(ChunkType::shard(shardName) << ChunkType::jumbo(true))));
 
-        return {chunkCount, databaseCount, jumboCount};
+        return {RemainingCounts(
+                    shardedChunkCount, unshardedCollectionsCount, databaseCount, jumboCount),
+                totalChunkCount};
     };
 
     auto drainingProgress = getDrainingProgress();
-    if (drainingProgress.totalChunks > 0 || drainingProgress.databases > 0) {
+    // The counters: `shardedChunks`, `totalCollections`, and `databases` are used to present
+    // the ongoing status to the user. Additionally, `totalChunks` on the shard is checked for
+    // safety, as it is a critical point in the removeShard process, to ensure that a non-empty
+    // shard is not removed. For example the number of unsharded collections might be inaccurate due
+    // to $listClusterCatalog potentially returning an incorrect list of shards during concurrent
+    // DDL operations.
+    if (drainingProgress.removeShardCounts.getChunks() > 0 ||
+        drainingProgress.removeShardCounts.getCollectionsToMove() > 0 ||
+        drainingProgress.removeShardCounts.getDbs() > 0 || drainingProgress.totalChunks > 0) {
         // Still more draining to do
         LOGV2(21946,
               "removeShard: draining",
               "chunkCount"_attr = drainingProgress.totalChunks,
-              "databaseCount"_attr = drainingProgress.databases,
-              "jumboCount"_attr = drainingProgress.jumboChunks);
-
-        return {RemoveShardProgress::ONGOING, drainingProgress, boost::none};
+              "shardedChunkCount"_attr = drainingProgress.removeShardCounts.getChunks(),
+              "unshardedCollectionsCount"_attr =
+                  drainingProgress.removeShardCounts.getCollectionsToMove(),
+              "databaseCount"_attr = drainingProgress.removeShardCounts.getDbs(),
+              "jumboCount"_attr = drainingProgress.removeShardCounts.getJumboChunks());
+        RemoveShardProgress progress(ShardDrainingStateEnum::kOngoing);
+        progress.setRemaining(drainingProgress.removeShardCounts);
+        return progress;
     }
 
     if (shardId == ShardId::kConfigServerId) {
-        // Join migrations to make sure there's no ongoing MigrationDestinationManager. New ones
-        // will observe the draining state and abort before performing any work that could re-create
-        // local catalog collections/dbs.
-        {
-            DBDirectClient client(opCtx);
-            BSONObj resultInfo;
-            ShardsvrJoinMigrations shardsvrJoinMigrations;
-            shardsvrJoinMigrations.setDbName(DatabaseName::kAdmin);
-            const auto result = client.runCommand(
-                DatabaseName::kAdmin, shardsvrJoinMigrations.toBSON(), resultInfo);
-            uassert(8955101,
-                    "Failed to await ongoing migrations before removing catalog shard",
-                    result);
-        }
-
+        topology_change_helpers::joinMigrations(opCtx);
         // The config server may be added as a shard again, so we locally drop its drained
         // sharded collections to enable that without user intervention. But we have to wait for
         // the range deleter to quiesce to give queries and stale routers time to discover the
         // migration, to match the usual probabilistic guarantees for migrations.
-        auto pendingRangeDeletions = [opCtx]() {
-            PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-            return static_cast<long long>(store.count(opCtx, BSONObj()));
-        }();
+        auto pendingRangeDeletions = topology_change_helpers::getRangeDeletionCount(opCtx);
         if (pendingRangeDeletions > 0) {
             LOGV2(7564600,
                   "removeShard: waiting for range deletions",
                   "pendingRangeDeletions"_attr = pendingRangeDeletions);
-
-            return {RemoveShardProgress::PENDING_DATA_CLEANUP, boost::none, pendingRangeDeletions};
+            RemoveShardProgress progress(ShardDrainingStateEnum::kPendingDataCleanup);
+            progress.setPendingRangeDeletions(pendingRangeDeletions);
+            return progress;
         }
     }
 
@@ -1540,15 +1767,27 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // Now that DDL operations are not executing, recheck that this shard truly does not own any
     // chunks nor database.
     drainingProgress = getDrainingProgress();
-    if (drainingProgress.totalChunks > 0 || drainingProgress.databases > 0) {
+    // The counters: `shardedChunks`, `totalCollections`, and `databases` are used to present
+    // the ongoing status to the user. Additionally, `totalChunks` on the shard is checked for
+    // safety, as it is a critical point in the removeShard process, to ensure that a non-empty
+    // shard is not removed. For example the number of unsharded collections might be inaccurate due
+    // to $listClusterCatalog potentially returning an incorrect list of shards during concurrent
+    // DDL operations.
+    if (drainingProgress.removeShardCounts.getChunks() > 0 ||
+        drainingProgress.removeShardCounts.getCollectionsToMove() > 0 ||
+        drainingProgress.removeShardCounts.getDbs() > 0 || drainingProgress.totalChunks > 0) {
         // Still more draining to do
         LOGV2(5687909,
               "removeShard: more draining to do after having blocked DDLCoordinators",
               "chunkCount"_attr = drainingProgress.totalChunks,
-              "databaseCount"_attr = drainingProgress.databases,
-              "jumboCount"_attr = drainingProgress.jumboChunks);
-
-        return {RemoveShardProgress::ONGOING, drainingProgress, boost::none};
+              "shardedChunkCount"_attr = drainingProgress.removeShardCounts.getChunks(),
+              "unshardedCollectionsCount"_attr =
+                  drainingProgress.removeShardCounts.getCollectionsToMove(),
+              "databaseCount"_attr = drainingProgress.removeShardCounts.getDbs(),
+              "jumboCount"_attr = drainingProgress.removeShardCounts.getJumboChunks());
+        RemoveShardProgress progress(ShardDrainingStateEnum::kOngoing);
+        progress.setRemaining(drainingProgress.removeShardCounts);
+        return progress;
     }
 
     if (shardId == ShardId::kConfigServerId) {
@@ -1649,6 +1888,14 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // has already waited for the commit to be majority-acknowledged.
     if (feature_flags::gStopDDLCoordinatorsDuringTopologyChanges.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        // TODO SERVER-99708: Investigate if we can remove this. unblockDDLCoordinators ends up
+        // calling the configSvrSetClusterParameter command which takes the FCV lock. At this point
+        // we are still holding the clusterCardinalityParameterLock. Other operations proceed to
+        // take the locks in the inverse order, that is, they first take the FCV lock followed by
+        // the clusterCardinalityParameterLock. We should review if we must unlock the
+        // clusterCardinalityParameterLock here to prevent a lock cycle or see if this can be
+        // refactored to prevent it.
+        DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
         unblockDDLCoordinators(opCtx);
     }
     unblockDDLCoordinatorsGuard.dismiss();
@@ -1676,85 +1923,95 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     uassertStatusOK(_updateClusterCardinalityParameterAfterRemoveShardIfNeeded(
         clusterCardinalityParameterLock, opCtx));
 
-    return {RemoveShardProgress::COMPLETED,
-            boost::optional<RemoveShardProgress::DrainingShardUsage>(boost::none)};
+    return RemoveShardProgress(ShardDrainingStateEnum::kCompleted);
+}
+
+void ShardingCatalogManager::appendDBAndCollDrainingInfo(OperationContext* opCtx,
+                                                         BSONObjBuilder& result,
+                                                         ShardId shardId) {
+    const auto databases =
+        uassertStatusOK(_localCatalogClient->getDatabasesForShard(opCtx, shardId));
+
+    const auto collections = getCollectionsToMoveForShard(opCtx, _localConfigShard.get(), shardId);
+
+    // Get BSONObj containing:
+    // 1) note about moving or dropping databases in a shard
+    // 2) list of databases (excluding 'local' database) that need to be moved
+    std::vector<DatabaseName> userDatabases;
+    for (const auto& dbName : databases) {
+        if (!dbName.isLocalDB()) {
+            userDatabases.push_back(dbName);
+        }
+    }
+
+    if (!userDatabases.empty() || !collections.empty()) {
+        result.append("note",
+                      "you need to call moveCollection for collectionsToMove and "
+                      "afterwards movePrimary for the dbsToMove");
+    }
+
+    // Note the `dbsToMove` field could be excluded if we have no user database to move but we
+    // enforce it for backcompatibilty.
+    BSONArrayBuilder dbs(result.subarrayStart("dbsToMove"));
+    bool canAppendToDoc = true;
+    // The dbsToMove and collectionsToMove arrays will be truncated accordingly if they exceed
+    // the 16MB BSON limitation. The offset for calculation is set to 10K to reserve place for
+    // other attributes.
+    int reservationOffsetBytes = 10 * 1024 + dbs.len();
+
+    const auto maxUserSize = std::invoke([&] {
+        if (auto failpoint = changeBSONObjMaxUserSize.scoped();
+            MONGO_unlikely(failpoint.isActive())) {
+            return failpoint.getData()["maxUserSize"].Int();
+        } else {
+            return BSONObjMaxUserSize;
+        }
+    });
+
+    for (const auto& dbName : userDatabases) {
+        canAppendToDoc = appendToArrayIfRoom(
+            reservationOffsetBytes,
+            dbs,
+            DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault()),
+            maxUserSize);
+        if (!canAppendToDoc)
+            break;
+    }
+    dbs.doneFast();
+    reservationOffsetBytes += dbs.len();
+
+    BSONArrayBuilder collectionsToMove(result.subarrayStart("collectionsToMove"));
+    if (canAppendToDoc) {
+        for (const auto& collectionName : collections) {
+            canAppendToDoc =
+                appendToArrayIfRoom(reservationOffsetBytes,
+                                    collectionsToMove,
+                                    NamespaceStringUtil::serialize(
+                                        collectionName, SerializationContext::stateDefault()),
+                                    maxUserSize);
+            if (!canAppendToDoc)
+                break;
+        }
+    }
+    collectionsToMove.doneFast();
+    if (!canAppendToDoc) {
+        result.appendElements(BSON("truncated" << true));
+    }
 }
 
 void ShardingCatalogManager::appendShardDrainingStatus(OperationContext* opCtx,
                                                        BSONObjBuilder& result,
                                                        RemoveShardProgress shardDrainingStatus,
                                                        ShardId shardId) {
-    const auto databases =
-        uassertStatusOK(_localCatalogClient->getDatabasesForShard(opCtx, shardId));
-
-    // Get BSONObj containing:
-    // 1) note about moving or dropping databases in a shard
-    // 2) list of databases (excluding 'local' database) that need to be moved
-    const auto dbInfo = [&] {
-        std::vector<DatabaseName> userDatabases;
-        for (const auto& dbName : databases) {
-            if (!dbName.isLocalDB()) {
-                userDatabases.push_back(dbName);
-            }
-        }
-
-        BSONObjBuilder dbInfoBuilder;
-        if (!userDatabases.empty()) {
-            dbInfoBuilder.append("note", "you need to drop or movePrimary these databases");
-        }
-
-        // Note the `dbsToMove` field could be excluded if we have no user database to move but we
-        // enforce it for backcompatibilty.
-        BSONArrayBuilder dbs(dbInfoBuilder.subarrayStart("dbsToMove"));
-        for (const auto& dbName : userDatabases) {
-            dbs.append(DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault()));
-        }
-        dbs.doneFast();
-
-        return dbInfoBuilder.obj();
-    }();
-
-    switch (shardDrainingStatus.status) {
-        case RemoveShardProgress::STARTED:
-            result.append("msg", "draining started successfully");
-            result.append("state", ShardDrainingState_serializer(ShardDrainingStateEnum::kStarted));
-            result.append("shard", shardId);
-            result.appendElements(dbInfo);
-            break;
-        case RemoveShardProgress::ONGOING: {
-            const auto& remainingCounts = shardDrainingStatus.remainingCounts;
-            result.append("msg", "draining ongoing");
-            result.append("state", ShardDrainingState_serializer(ShardDrainingStateEnum::kOngoing));
-            result.append("remaining",
-                          BSON("chunks" << remainingCounts->totalChunks << "dbs"
-                                        << remainingCounts->databases << "jumboChunks"
-                                        << remainingCounts->jumboChunks));
-            result.appendElements(dbInfo);
-            break;
-        }
-        case RemoveShardProgress::PENDING_DATA_CLEANUP: {
-            result.append("msg", "waiting for data to be cleaned up");
-            result.append(
-                "state",
-                ShardDrainingState_serializer(ShardDrainingStateEnum::kPendingDataCleanup));
-            result.append("pendingRangeDeletions", *shardDrainingStatus.pendingRangeDeletions);
-            if (shardDrainingStatus.firstNonEmptyCollection) {
-                // We only check for non-empty collections if there are no pending range deletions,
-                // so only include it if it's set to avoid reporting false negatives.
-                result.append(
-                    "firstNonEmptyCollection",
-                    NamespaceStringUtil::serialize(*shardDrainingStatus.firstNonEmptyCollection,
-                                                   SerializationContext::stateDefault()));
-            }
-            break;
-        }
-        case RemoveShardProgress::COMPLETED:
-            result.append("msg", "removeshard completed successfully");
-            result.append("state",
-                          ShardDrainingState_serializer(ShardDrainingStateEnum::kCompleted));
-            result.append("shard", shardId);
-            break;
+    const auto& state = shardDrainingStatus.getState();
+    if (state == ShardDrainingStateEnum::kStarted || state == ShardDrainingStateEnum::kOngoing) {
+        appendDBAndCollDrainingInfo(opCtx, result, shardId);
     }
+    if (state == ShardDrainingStateEnum::kStarted || state == ShardDrainingStateEnum::kCompleted) {
+        result.append("shard", shardId);
+    }
+    result.append("msg", topology_change_helpers::getRemoveShardMessage(state));
+    shardDrainingStatus.serialize(&result);
 }
 
 Lock::SharedLock ShardingCatalogManager::enterStableTopologyRegion(OperationContext* opCtx) {
