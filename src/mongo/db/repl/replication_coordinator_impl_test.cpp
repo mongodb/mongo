@@ -3641,9 +3641,9 @@ TEST_F(ReplCoordTest, AwaitHelloResponseReturnsOnStepDown) {
         // 'topologyVersionAfterDisablingWrites' should get a response immediately since that
         // TopologyVersion is now stale.
         expectedCounter = topologyVersionAfterDisablingWrites->getCounter() + 1;
-        deadline = getNet()->now() + maxAwaitTime;
+        auto newDeadline = getNet()->now() + maxAwaitTime;
         const auto responseStepdownComplete = awaitHelloWithNewOpCtx(
-            getReplCoord(), topologyVersionAfterDisablingWrites.value(), {}, deadline);
+            getReplCoord(), topologyVersionAfterDisablingWrites.value(), {}, newDeadline);
         const auto topologyVersionStepDownComplete = responseStepdownComplete->getTopologyVersion();
         ASSERT_EQUALS(topologyVersionStepDownComplete->getCounter(), expectedCounter);
         ASSERT_EQUALS(topologyVersionStepDownComplete->getProcessId(), expectedProcessId);
@@ -4597,7 +4597,7 @@ TEST_F(ReplCoordTest, AwaitHelloUsesDefaultHorizonWhenRequestedHorizonNotFound) 
     replyToReceivedHeartbeatV1();
     reconfigThread.join();
 
-    stdx::thread getHelloDefaultHorizonThread([&] {
+    stdx::thread getHelloDefaultHorizonThread([&, deadline] {
         const auto expectedTopologyVersion = getTopoCoord().getTopologyVersion();
         // Sending a hello request with a removed horizon should return the default horizon.
         const auto response =
@@ -4692,7 +4692,7 @@ TEST_F(ReplCoordTest, AwaitHelloRespondsWithNewHorizon) {
     replyToReceivedHeartbeatV1();
     reconfigThread.join();
 
-    stdx::thread getHelloNewHorizonThread([&] {
+    stdx::thread getHelloNewHorizonThread([&, deadline] {
         const auto expectedTopologyVersion = getTopoCoord().getTopologyVersion();
         // The hello response should now use the newly configured horizon.
         const auto response =
@@ -4826,7 +4826,7 @@ TEST_F(ReplCoordTest, HelloOnRemovedNode) {
     AtomicWord<bool> helloReturned{false};
     // A request with an equal TopologyVersion should wait and timeout once the deadline is reached.
     const auto halfwayToDeadline = getNet()->now() + maxAwaitTime / 2;
-    stdx::thread getHelloThread([&] {
+    stdx::thread getHelloThread([&, deadline] {
         // Sending a hello request on a removed node should wait.
         const auto response =
             awaitHelloWithNewOpCtx(getReplCoord(), currentTopologyVersion, {}, deadline);
@@ -4983,7 +4983,7 @@ TEST_F(ReplCoordTest, AwaitHelloRespondsCorrectlyWhenNodeRemovedAndReadded) {
                        DBException,
                        ErrorCodes::SplitHorizonChange);
 
-    stdx::thread getHelloThreadNewHorizon([&] {
+    stdx::thread getHelloThreadNewHorizon([&, deadline] {
         const auto expectedTopologyVersion = getTopoCoord().getTopologyVersion();
         // Sending a hello on the rejoined node should return the appropriate horizon view.
         const auto response =
