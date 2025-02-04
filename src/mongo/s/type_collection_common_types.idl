@@ -39,3 +39,10 @@ structs:
         inline_chained_structs: true
         chained_structs:
             TimeseriesOptions: TimeseriesOptions
+        fields:
+            timeseriesBucketsMayHaveMixedSchemaData:
+                type: optionalBool
+                description: "Indicates if time-series buckets may have mixed schema data."
+            timeseriesBucketingParametersHaveChanged:
+                type: optionalBool
+                description: "Indicates if bucketing parameters have changed for this time-series collection."
