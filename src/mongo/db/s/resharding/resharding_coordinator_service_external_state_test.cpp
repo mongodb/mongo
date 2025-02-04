@@ -35,9 +35,11 @@
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/resharding/recipient_resume_document_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/executor/mock_async_rpc.h"
+#include "mongo/executor/network_interface_factory.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/unittest/assert.h"
-
+#include "mongo/util/future_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -76,6 +78,25 @@ public:
                     return targeter;
                 }());
         }
+
+        // Set up the task executor.
+        ThreadPool::Options threadPoolOptions;
+        threadPoolOptions.poolName = "ReshardingCoordinatorExternalStateTest";
+
+        executor = executor::ThreadPoolTaskExecutor::create(
+            std::make_unique<ThreadPool>(threadPoolOptions),
+            executor::makeNetworkInterface("ReshardingCoordinatorExternalStateTest"));
+        executor->startup();
+        taskExecutor = std::make_shared<executor::ScopedTaskExecutor>(executor);
+
+        // Set up the async RPC mock.
+        auto asyncRPCMock = std::make_unique<async_rpc::AsyncMockAsyncRPCRunner>();
+        async_rpc::detail::AsyncRPCRunner::set(getServiceContext(), std::move(asyncRPCMock));
+    }
+
+    void tearDown() override {
+        ConfigServerTestFixture::tearDown();
+        executor->shutdown();
     }
 
     // This is a map from each donor shard id to the number of documents to copy from that donor
@@ -106,7 +127,7 @@ public:
 
         ReshardingCoordinatorDocument coordinatorDoc;
         coordinatorDoc.setCommonReshardingMetadata(
-            {_reshardingUUID, _sourceNss, _sourceUUID, _tempNss, _shardKey});
+            {reshardingUUID, sourceNss, sourceUUID, tempNss, shardKey});
         coordinatorDoc.setState(CoordinatorStateEnum::kCloning);
         coordinatorDoc.setDonorShards(donorShards);
         coordinatorDoc.setRecipientShards(recipientShards);
@@ -134,7 +155,7 @@ public:
 
         ReshardingCoordinatorDocument coordinatorDoc;
         coordinatorDoc.setCommonReshardingMetadata(
-            {_reshardingUUID, _sourceNss, _sourceUUID, _tempNss, _shardKey});
+            {reshardingUUID, sourceNss, sourceUUID, tempNss, shardKey});
         coordinatorDoc.setState(CoordinatorStateEnum::kApplying);
         coordinatorDoc.setDonorShards(donorShards);
         coordinatorDoc.setRecipientShards(recipientShards);
@@ -142,62 +163,99 @@ public:
         return coordinatorDoc;
     }
 
-    std::vector<BSONObj> makeRecipientResumeDataDocuments(
+    std::vector<BSONObj> makeRecipientCloningMetricsAggregateDocuments(
         const UUID& reshardingUUID, const RecipientDocumentsCopiedMap& docsCopied) {
-        std::vector<BSONObj> docs;
+        BSONObjBuilder bob;
 
         for (auto donorIter = docsCopied.begin(); donorIter != docsCopied.end(); ++donorIter) {
             auto donorShardId = donorIter->first;
             auto donorDocsCopied = donorIter->second;
-
-            ReshardingRecipientResumeDataId resumeDataId({reshardingUUID, donorShardId});
-            ReshardingRecipientResumeData resumeDataDoc(resumeDataId);
             if (donorDocsCopied) {
-                resumeDataDoc.setDocumentsCopied(*donorDocsCopied);
+                bob.append(donorShardId.toString(), *donorDocsCopied);
+            } else {
+                bob.appendNull(donorShardId.toString());
             }
-            docs.push_back(resumeDataDoc.toBSON());
         }
 
-        return docs;
+        return {BSON("documentsCopied" << bob.obj())};
     }
 
     auto mockRecipientCloningMetricsResponses(const UUID& reshardingUUID,
                                               const DocumentsCopiedMap& docsCopied) {
-        return launchAsync([&]() {
-            for (auto recipientIter = docsCopied.begin(); recipientIter != docsCopied.end();
-                 ++recipientIter) {
-                auto recipientShardId = recipientIter->first;
-                auto recipientDocsCopied = recipientIter->second;
+        std::vector<Future<void>> expectations;
 
-                onCommand([&](const auto& request) {
-                    auto nss = NamespaceString::kRecipientReshardingResumeDataNamespace;
+        for (auto recipientIter = docsCopied.begin(); recipientIter != docsCopied.end();
+             ++recipientIter) {
+            auto recipientShardId = recipientIter->first;
+            auto recipientDocsCopied = recipientIter->second;
 
-                    auto aggRequest = AggregateCommandRequest::parse(
-                        IDLParserContext("mockRecipientCloningMetricsResponses"),
-                        request.cmdObj.addFields(BSON("$db" << nss.db_forTest())));
-                    ASSERT_EQ(aggRequest.getNamespace(), nss);
-                    auto pipeline = aggRequest.getPipeline();
-                    ASSERT_EQ(pipeline.size(), 1);
-                    ASSERT_BSONOBJ_EQ(
-                        pipeline[0],
-                        BSON("$match"
-                             << BSON((ReshardingRecipientResumeData::kIdFieldName + "." +
-                                      ReshardingRecipientResumeDataId::kReshardingUUIDFieldName)
-                                     << reshardingUUID)));
-                    ASSERT_BSONOBJ_EQ(aggRequest.getReadConcern()->toBSON(),
-                                      repl::ReadConcernArgs::kMajority.toBSON());
-                    ASSERT_BSONOBJ_EQ(
-                        *aggRequest.getUnwrappedReadPref(),
-                        BSON("$readPreference"
-                             << ReadPreferenceSetting{ReadPreference::PrimaryOnly}.toInnerBSON()));
+            auto asyncRPCRunner = dynamic_cast<async_rpc::AsyncMockAsyncRPCRunner*>(
+                async_rpc::detail::AsyncRPCRunner::get(operationContext()->getServiceContext()));
 
-                    std::vector<BSONObj> docs =
-                        makeRecipientResumeDataDocuments(reshardingUUID, recipientDocsCopied);
-                    CursorResponse response(nss, 0 /* cursorId */, docs);
-                    return response.toBSON(CursorResponse::ResponseType::InitialResponse);
-                });
-            }
-        });
+            auto matcher = [&reshardingUUID, recipientShardId = recipientShardId](
+                               const async_rpc::AsyncMockAsyncRPCRunner::Request& req) {
+                ShardId shardId{req.target.host()};
+
+                if (shardId != recipientShardId) {
+                    return false;
+                }
+
+                auto aggRequest = AggregateCommandRequest::parse(
+                    IDLParserContext("mockRecipientCloningMetricsResponses"),
+                    req.cmdBSON.addFields(BSON("$db" << req.dbName)));
+
+                ASSERT_EQ(aggRequest.getNamespace(),
+                          NamespaceString::kRecipientReshardingResumeDataNamespace);
+
+                auto pipeline = aggRequest.getPipeline();
+                ASSERT_EQ(pipeline.size(), 3);
+                ASSERT_BSONOBJ_EQ(
+                    pipeline[0],
+                    BSON(
+                        "$match" << BSON((ReshardingRecipientResumeData::kIdFieldName + "." +
+                                          ReshardingRecipientResumeDataId::kReshardingUUIDFieldName)
+                                         << reshardingUUID)));
+                ASSERT_BSONOBJ_EQ(
+                    pipeline[1],
+                    BSON("$group" << BSON(
+                             "_id"
+                             << BSONNULL << "pairs"
+                             << BSON("$push" << BSON(
+                                         "k" << ("$" + ReshardingRecipientResumeData::kIdFieldName +
+                                                 "." +
+                                                 ReshardingRecipientResumeDataId::kShardIdFieldName)
+                                             << "v"
+                                             << ("$" +
+                                                 ReshardingRecipientResumeData::
+                                                     kDocumentsCopiedFieldName))))));
+                ASSERT_BSONOBJ_EQ(pipeline[2],
+                                  BSON("$project" << BSON("_id" << 0 << "documentsCopied"
+                                                                << BSON("$arrayToObject"
+                                                                        << "$pairs"))));
+
+                ASSERT_BSONOBJ_EQ(aggRequest.getReadConcern()->toBSON(),
+                                  repl::ReadConcernArgs::kMajority.toBSON());
+                ASSERT_BSONOBJ_EQ(
+                    *aggRequest.getUnwrappedReadPref(),
+                    BSON("$readPreference"
+                         << ReadPreferenceSetting{ReadPreference::PrimaryOnly}.toInnerBSON()));
+
+                return true;
+            };
+
+            std::vector<BSONObj> docs =
+                makeRecipientCloningMetricsAggregateDocuments(reshardingUUID, recipientDocsCopied);
+            CursorResponse cursorResponse(
+                NamespaceString::kRecipientReshardingResumeDataNamespace, 0 /* cursorId */, docs);
+            auto response = cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+
+            expectations.push_back(
+                asyncRPCRunner
+                    ->expect(matcher, std::move(response), "mockRecipientCloningMetricsResponses")
+                    .unsafeToInlineFuture());
+        }
+
+        return whenAllSucceed(std::move(expectations));
     }
 
     auto mockDonorShardDocumentCountResponse(const std::vector<BSONObj>& responseDocuments,
@@ -226,24 +284,35 @@ public:
         });
     }
 
+    auto getTaskExecutor() {
+        return **taskExecutor;
+    }
+
+    auto getCancellationToken() {
+        return operationContext()->getCancellationToken();
+    }
+
 protected:
     const ShardId shardId0{"shard0"};
     const ShardId shardId1{"shard1"};
     const ShardId shardId2{"shard2"};
 
-    const UUID _reshardingUUID = UUID::gen();
-    const NamespaceString _sourceNss =
+    const UUID reshardingUUID = UUID::gen();
+    const NamespaceString sourceNss =
         NamespaceString::createNamespaceString_forTest("testDb", "testColl");
-    const UUID _sourceUUID = UUID::gen();
-    const NamespaceString _tempNss =
-        resharding::constructTemporaryReshardingNss(_sourceNss, _sourceUUID);
-    const BSONObj _shardKey = BSON("skey" << 1);
+    const UUID sourceUUID = UUID::gen();
+    const NamespaceString tempNss =
+        resharding::constructTemporaryReshardingNss(sourceNss, sourceUUID);
+    const BSONObj shardKey = BSON("skey" << 1);
     const Timestamp cloneTimestamp = Timestamp(220, 220);
 
     const ShardVersion shardVersion = ShardVersionFactory::make(
         ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(224, 224)},
                      CollectionPlacement(10, 1)),
         boost::optional<CollectionIndexes>(boost::none));
+
+    std::shared_ptr<executor::ScopedTaskExecutor> taskExecutor;
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> executor;
 };
 
 TEST_F(ReshardingCoordinatorServiceExternalStateTest, VerifyClonedCollectionSuccess_Basic) {
@@ -259,8 +328,9 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest, VerifyClonedCollectionSucc
         mockRecipientCloningMetricsResponses(coordinatorDoc.getReshardingUUID(), docsCopied);
 
     ReshardingCoordinatorExternalStateImpl externalState;
-    externalState.verifyClonedCollection(operationContext(), coordinatorDoc);
-    future.default_timed_get();
+    externalState.verifyClonedCollection(
+        operationContext(), getTaskExecutor(), getCancellationToken(), coordinatorDoc);
+    future.get();
 }
 
 TEST_F(ReshardingCoordinatorServiceExternalStateTest,
@@ -279,8 +349,9 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest,
         mockRecipientCloningMetricsResponses(coordinatorDoc.getReshardingUUID(), docsCopied);
 
     ReshardingCoordinatorExternalStateImpl externalState;
-    externalState.verifyClonedCollection(operationContext(), coordinatorDoc);
-    future.default_timed_get();
+    externalState.verifyClonedCollection(
+        operationContext(), getTaskExecutor(), getCancellationToken(), coordinatorDoc);
+    future.get();
 }
 
 TEST_F(ReshardingCoordinatorServiceExternalStateTest,
@@ -300,8 +371,9 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest,
         mockRecipientCloningMetricsResponses(coordinatorDoc.getReshardingUUID(), docsCopied);
 
     ReshardingCoordinatorExternalStateImpl externalState;
-    externalState.verifyClonedCollection(operationContext(), coordinatorDoc);
-    future.default_timed_get();
+    externalState.verifyClonedCollection(
+        operationContext(), getTaskExecutor(), getCancellationToken(), coordinatorDoc);
+    future.get();
 }
 
 TEST_F(ReshardingCoordinatorServiceExternalStateTest, VerifyClonedCollectionSuccess_Mixed) {
@@ -323,8 +395,9 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest, VerifyClonedCollectionSucc
         mockRecipientCloningMetricsResponses(coordinatorDoc.getReshardingUUID(), docsCopied);
 
     ReshardingCoordinatorExternalStateImpl externalState;
-    externalState.verifyClonedCollection(operationContext(), coordinatorDoc);
-    future.default_timed_get();
+    externalState.verifyClonedCollection(
+        operationContext(), getTaskExecutor(), getCancellationToken(), coordinatorDoc);
+    future.get();
 }
 
 TEST_F(ReshardingCoordinatorServiceExternalStateTest,
@@ -341,10 +414,12 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest,
         mockRecipientCloningMetricsResponses(coordinatorDoc.getReshardingUUID(), docsCopied);
 
     ReshardingCoordinatorExternalStateImpl externalState;
-    ASSERT_THROWS_CODE(externalState.verifyClonedCollection(operationContext(), coordinatorDoc),
-                       DBException,
-                       9929901);
-    future.default_timed_get();
+    ASSERT_THROWS_CODE(
+        externalState.verifyClonedCollection(
+            operationContext(), getTaskExecutor(), getCancellationToken(), coordinatorDoc),
+        DBException,
+        9929901);
+    future.get();
 }
 
 TEST_F(ReshardingCoordinatorServiceExternalStateTest,
@@ -363,10 +438,12 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest,
         mockRecipientCloningMetricsResponses(coordinatorDoc.getReshardingUUID(), docsCopied);
 
     ReshardingCoordinatorExternalStateImpl externalState;
-    ASSERT_THROWS_CODE(externalState.verifyClonedCollection(operationContext(), coordinatorDoc),
-                       DBException,
-                       9929901);
-    future.default_timed_get();
+    ASSERT_THROWS_CODE(
+        externalState.verifyClonedCollection(
+            operationContext(), getTaskExecutor(), getCancellationToken(), coordinatorDoc),
+        DBException,
+        9929901);
+    future.get();
 }
 
 TEST_F(ReshardingCoordinatorServiceExternalStateTest,
@@ -384,10 +461,12 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest,
         mockRecipientCloningMetricsResponses(coordinatorDoc.getReshardingUUID(), docsCopied);
 
     ReshardingCoordinatorExternalStateImpl externalState;
-    ASSERT_THROWS_CODE(externalState.verifyClonedCollection(operationContext(), coordinatorDoc),
-                       DBException,
-                       9929901);
-    future.default_timed_get();
+    ASSERT_THROWS_CODE(
+        externalState.verifyClonedCollection(
+            operationContext(), getTaskExecutor(), getCancellationToken(), coordinatorDoc),
+        DBException,
+        9929901);
+    future.get();
 }
 
 TEST_F(ReshardingCoordinatorServiceExternalStateTest,
@@ -404,10 +483,12 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest,
         mockRecipientCloningMetricsResponses(coordinatorDoc.getReshardingUUID(), docsCopied);
 
     ReshardingCoordinatorExternalStateImpl externalState;
-    ASSERT_THROWS_CODE(externalState.verifyClonedCollection(operationContext(), coordinatorDoc),
-                       DBException,
-                       9929902);
-    future.default_timed_get();
+    ASSERT_THROWS_CODE(
+        externalState.verifyClonedCollection(
+            operationContext(), getTaskExecutor(), getCancellationToken(), coordinatorDoc),
+        DBException,
+        9929902);
+    future.get();
 }
 
 TEST_F(ReshardingCoordinatorServiceExternalStateTest,
@@ -424,9 +505,11 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest,
     // the steps to fetch those metrics.
 
     ReshardingCoordinatorExternalStateImpl externalState;
-    ASSERT_THROWS_CODE(externalState.verifyClonedCollection(operationContext(), coordinatorDoc),
-                       DBException,
-                       9929907);
+    ASSERT_THROWS_CODE(
+        externalState.verifyClonedCollection(
+            operationContext(), getTaskExecutor(), getCancellationToken(), coordinatorDoc),
+        DBException,
+        9929907);
 }
 
 TEST_F(ReshardingCoordinatorServiceExternalStateTest,
@@ -444,9 +527,11 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest,
     // the steps to fetch those metrics.
 
     ReshardingCoordinatorExternalStateImpl externalState;
-    ASSERT_THROWS_CODE(externalState.verifyClonedCollection(operationContext(), coordinatorDoc),
-                       DBException,
-                       9929907);
+    ASSERT_THROWS_CODE(
+        externalState.verifyClonedCollection(
+            operationContext(), getTaskExecutor(), getCancellationToken(), coordinatorDoc),
+        DBException,
+        9929907);
 }
 
 TEST_F(ReshardingCoordinatorServiceExternalStateTest,
@@ -463,10 +548,12 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest,
         mockRecipientCloningMetricsResponses(coordinatorDoc.getReshardingUUID(), docsCopied);
 
     ReshardingCoordinatorExternalStateImpl externalState;
-    ASSERT_THROWS_CODE(externalState.verifyClonedCollection(operationContext(), coordinatorDoc),
-                       DBException,
-                       9929909);
-    future.default_timed_get();
+    ASSERT_THROWS_CODE(
+        externalState.verifyClonedCollection(
+            operationContext(), getTaskExecutor(), getCancellationToken(), coordinatorDoc),
+        DBException,
+        9929909);
+    future.get();
 }
 
 TEST_F(ReshardingCoordinatorServiceExternalStateTest,
@@ -483,10 +570,12 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest,
         mockRecipientCloningMetricsResponses(coordinatorDoc.getReshardingUUID(), docsCopied);
 
     ReshardingCoordinatorExternalStateImpl externalState;
-    ASSERT_THROWS_CODE(externalState.verifyClonedCollection(operationContext(), coordinatorDoc),
-                       DBException,
-                       9929909);
-    future.default_timed_get();
+    ASSERT_THROWS_CODE(
+        externalState.verifyClonedCollection(
+            operationContext(), getTaskExecutor(), getCancellationToken(), coordinatorDoc),
+        DBException,
+        9929909);
+    future.get();
 }
 
 TEST_F(ReshardingCoordinatorServiceExternalStateTest, VerifyFinalCollectionSuccess_Basic) {
@@ -684,13 +773,13 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest, GetDocumentsToCopyFromShar
 
     std::vector<BSONObj> responseDocuments = {builder.obj()};
 
-    auto future = mockDonorShardDocumentCountResponse(responseDocuments, _sourceNss);
+    auto future = mockDonorShardDocumentCountResponse(responseDocuments, sourceNss);
 
     auto opCtx = operationContext();
 
     ReshardingCoordinatorExternalStateImpl externalState;
     StatusWith<int64_t> result = externalState.getDocumentsToCopyFromShard(
-        opCtx, shardId0, shardVersion, _sourceNss, cloneTimestamp);
+        opCtx, shardId0, shardVersion, sourceNss, cloneTimestamp);
     ASSERT_TRUE(result.isOK());
     ASSERT_EQUALS(result.getValue(), 656);
     future.default_timed_get();
@@ -701,14 +790,14 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest,
 
     std::vector<BSONObj> responseDocuments = {};
 
-    auto future = mockDonorShardDocumentCountResponse(responseDocuments, _sourceNss);
+    auto future = mockDonorShardDocumentCountResponse(responseDocuments, sourceNss);
 
     auto opCtx = operationContext();
 
     ReshardingCoordinatorExternalStateImpl externalState;
 
     StatusWith<int64_t> result = externalState.getDocumentsToCopyFromShard(
-        opCtx, shardId0, shardVersion, _sourceNss, cloneTimestamp);
+        opCtx, shardId0, shardVersion, sourceNss, cloneTimestamp);
     ASSERT_TRUE(result.isOK());
     ASSERT_EQUALS(result.getValue(), 0);
     future.default_timed_get();

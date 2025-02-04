@@ -81,10 +81,11 @@ public:
                                                                        const NamespaceString& nss);
 
     template <typename CommandType>
-    void sendCommandToShards(OperationContext* opCtx,
-                             std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts,
-                             const std::vector<ShardId>& shardIds) {
-        sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
+    std::vector<AsyncRequestsSender::Response> sendCommandToShards(
+        OperationContext* opCtx,
+        std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts,
+        const std::vector<ShardId>& shardIds) {
+        return sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
     }
 
     /**
@@ -95,6 +96,8 @@ public:
      *   copied from that donor across all the recipients.
      */
     virtual void verifyClonedCollection(OperationContext* opCtx,
+                                        const std::shared_ptr<executor::TaskExecutor>& executor,
+                                        CancellationToken token,
                                         const ReshardingCoordinatorDocument& coordinatorDoc) = 0;
 
     /**
@@ -117,10 +120,24 @@ public:
                                                     const Timestamp& cloneTimestamp) override;
 
     void verifyClonedCollection(OperationContext* opCtx,
+                                const std::shared_ptr<executor::TaskExecutor>& executor,
+                                CancellationToken token,
                                 const ReshardingCoordinatorDocument& coordinatorDoc) override;
 
     void verifyFinalCollection(OperationContext* opCtx,
                                const ReshardingCoordinatorDocument& coordinatorDoc) override;
+
+private:
+    /**
+     * Returns a map from each donor shard id to the number of documents copied from that donor
+     * shard based on the metrics in the recipient collection cloner resume data documents.
+     */
+    std::map<ShardId, int64_t> _getDocumentsCopiedFromRecipients(
+        OperationContext* opCtx,
+        const std::shared_ptr<executor::TaskExecutor>& executor,
+        CancellationToken token,
+        const UUID& reshardingUUID,
+        const std::vector<ShardId>& shardIds);
 };
 
 }  // namespace mongo

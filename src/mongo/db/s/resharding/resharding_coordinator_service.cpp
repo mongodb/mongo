@@ -1352,7 +1352,7 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedCloning(
                _reshardingCoordinatorObserver->awaitAllRecipientsFinishedCloning(),
                _ctHolder->getAbortToken())
         .thenRunOn(**executor)
-        .then([this](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
+        .then([this, executor](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
             if (_metadata.getPerformVerification()) {
                 auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                 // Fetch the coordinator doc from disk since the 'coordinatorDocChangedOnDisk' above
@@ -1363,7 +1363,10 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedCloning(
                 coordinatorDocChangedOnDisk = resharding::getCoordinatorDoc(
                     opCtx.get(), coordinatorDocChangedOnDisk.getReshardingUUID());
                 _reshardingCoordinatorExternalState->verifyClonedCollection(
-                    opCtx.get(), coordinatorDocChangedOnDisk);
+                    opCtx.get(),
+                    **executor,
+                    _ctHolder->getAbortToken(),
+                    coordinatorDocChangedOnDisk);
             }
 
             return coordinatorDocChangedOnDisk;

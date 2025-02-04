@@ -148,6 +148,8 @@ public:
     }
 
     void verifyClonedCollection(OperationContext* opCtx,
+                                const std::shared_ptr<executor::TaskExecutor>& executor,
+                                CancellationToken token,
                                 const ReshardingCoordinatorDocument& coordinatorDoc) override {
         if (_options.verifyClonedErrorCode) {
             uasserted(*_options.verifyClonedErrorCode, "Failing cloned collection verification");

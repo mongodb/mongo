@@ -77,8 +77,8 @@ std::vector<RecipientShardEntry> constructRecipientShardEntries(
  * Returns a map from each the donor shard id to the number of documents to copy from that donor
  * shard based on the metrics in the coordinator document.
  */
-std::map<ShardId, int64_t> getDocumentsToCopy(OperationContext* opCtx,
-                                              const ReshardingCoordinatorDocument& coordinatorDoc) {
+std::map<ShardId, int64_t> extractDocumentsToCopy(
+    const ReshardingCoordinatorDocument& coordinatorDoc) {
     std::map<ShardId, int64_t> docsToCopy;
     // This is used for logging.
     BSONObjBuilder reportBuilder;
@@ -99,80 +99,6 @@ std::map<ShardId, int64_t> getDocumentsToCopy(OperationContext* opCtx,
           "documentsToCopy"_attr = reportBuilder.obj());
 
     return docsToCopy;
-}
-
-/**
- * Returns a map from each donor shard id to the number of documents copied from that donor shard
- * based on the metrics in the recipient collection cloner resume data documents.
- */
-std::map<ShardId, int64_t> getDocumentsCopied(OperationContext* opCtx,
-                                              const UUID& reshardingUUID,
-                                              const std::vector<ShardId>& recipientShardIds) {
-    std::map<ShardId, int64_t> docsCopied;
-
-    std::vector<BSONObj> pipeline;
-    pipeline.push_back(
-        BSON("$match" << BSON((ReshardingRecipientResumeData::kIdFieldName + "." +
-                               ReshardingRecipientResumeDataId::kReshardingUUIDFieldName)
-                              << reshardingUUID)));
-
-    AggregateCommandRequest aggRequest(NamespaceString::kRecipientReshardingResumeDataNamespace,
-                                       pipeline);
-    aggRequest.setWriteConcern(WriteConcernOptions());
-    aggRequest.setReadConcern(repl::ReadConcernArgs::kMajority);
-    aggRequest.setUnwrappedReadPref(BSON(
-        "$readPreference" << ReadPreferenceSetting{ReadPreference::PrimaryOnly}.toInnerBSON()));
-
-    for (const auto& recipientShardId : recipientShardIds) {
-        auto recipientShard =
-            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, recipientShardId));
-        auto numResumeDataDocs = 0;
-        // This is used for logging.
-        BSONObjBuilder reportBuilder;
-
-        uassertStatusOK(recipientShard->runAggregation(
-            opCtx,
-            aggRequest,
-            [&](const std::vector<BSONObj>& docs, const boost::optional<BSONObj>&) -> bool {
-                numResumeDataDocs += docs.size();
-
-                for (const auto& doc : docs) {
-                    auto parsedDoc = ReshardingRecipientResumeData::parse(
-                        IDLParserContext("getDocumentsCopied"), doc);
-                    auto donorShardId = parsedDoc.getId().getShardId();
-
-                    uassert(9929909,
-                            str::stream()
-                                << "Expected the recipient collection cloner resume data document "
-                                   "for the donor shard '"
-                                << donorShardId << "' to have the number of documents copied",
-                            parsedDoc.getDocumentsCopied());
-
-                    if (docsCopied.find(donorShardId) == docsCopied.end()) {
-                        docsCopied.emplace(donorShardId, 0);
-                    }
-                    docsCopied[donorShardId] += *parsedDoc.getDocumentsCopied();
-                    reportBuilder.append(donorShardId, *parsedDoc.getDocumentsCopied());
-                }
-                return true;
-            }));
-
-        if (numResumeDataDocs == 0) {
-            LOGV2_WARNING(9929910,
-                          "Could not find the collection cloner resume data documents on a "
-                          "recipient shard. This is expected when there are no documents for this "
-                          "recipient to copy.",
-                          "reshardingUUID"_attr = reshardingUUID,
-                          "shardId"_attr = recipientShardId);
-        }
-
-        LOGV2(9929911,
-              "Fetched cloning metrics for recipient shard",
-              "shardId"_attr = recipientShardId,
-              "documentsCopied"_attr = reportBuilder.obj());
-    }
-
-    return docsCopied;
 }
 
 }  // namespace
@@ -407,18 +333,142 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
             initialChunks};
 }
 
+std::map<ShardId, int64_t>
+ReshardingCoordinatorExternalStateImpl::_getDocumentsCopiedFromRecipients(
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    CancellationToken token,
+    const UUID& reshardingUUID,
+    const std::vector<ShardId>& shardIds) {
+    std::vector<BSONObj> pipeline;
+    // For each recipient, get the per-donor collection cloner resume data docs for this resharding
+    // operation.
+    // [
+    //    {_id: {reshardingUUID: <uuid>, shardId: <string>}, documentsCopied: <long>, ...},
+    //    ...
+    // ]
+    pipeline.push_back(
+        BSON("$match" << BSON((ReshardingRecipientResumeData::kIdFieldName + "." +
+                               ReshardingRecipientResumeDataId::kReshardingUUIDFieldName)
+                              << reshardingUUID)));
+    // Combine the docs into one doc with an array of donorShardId and documentsCopied pairs. This
+    // is to avoid needing to run getMore commands when there are more than 'batchSize' (defaults to
+    // 100) donor shards.
+    // [
+    //    {k: <donorShardId>, v: <documentsCopied>},
+    //    ...,
+    // ]
+    pipeline.push_back(BSON(
+        "$group" << BSON(
+            "_id" << BSONNULL << "pairs"
+                  << BSON(
+                         "$push" << BSON(
+                             "k" << ("$" + ReshardingRecipientResumeData::kIdFieldName + "." +
+                                     ReshardingRecipientResumeDataId::kShardIdFieldName)
+                                 << "v"
+                                 << ("$" +
+                                     ReshardingRecipientResumeData::kDocumentsCopiedFieldName))))));
+    // Transform the array of pairs into an object.
+    // {
+    //    documentsCopied: {
+    //        <donorShardId>: <documentsCopied>,
+    //        ...
+    //    }
+    // }
+    pipeline.push_back(BSON("$project" << BSON("_id" << 0 << "documentsCopied"
+                                                     << BSON("$arrayToObject"
+                                                             << "$pairs"))));
+
+    AggregateCommandRequest aggRequest(NamespaceString::kRecipientReshardingResumeDataNamespace,
+                                       pipeline);
+    aggRequest.setWriteConcern(WriteConcernOptions());
+    aggRequest.setReadConcern(repl::ReadConcernArgs::kMajority);
+    aggRequest.setUnwrappedReadPref(BSON(
+        "$readPreference" << ReadPreferenceSetting{ReadPreference::PrimaryOnly}.toInnerBSON()));
+
+    const auto opts = std::make_shared<async_rpc::AsyncRPCOptions<AggregateCommandRequest>>(
+        executor, token, aggRequest);
+    opts->cmd.setDbName(DatabaseName::kConfig);
+    auto responses = sendCommandToShards(opCtx, opts, shardIds);
+
+    std::map<ShardId, int64_t> docsCopied;
+
+    for (auto&& response : responses) {
+        const auto& recipientShardId = response.shardId;
+
+        uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
+        auto cursorReply =
+            CursorInitialReply::parse(IDLParserContext("_getDocumentsCopiedFromRecipients"),
+                                      response.swResponse.getValue().data);
+        auto firstBatch = cursorReply.getCursor()->getFirstBatch();
+
+        uassert(1003561,
+                str::stream() << "The aggregation result from fetching the number of "
+                                 "documents copied from the recipient shard '"
+                              << recipientShardId
+                              << "' should contain at most one document but it contains "
+                              << firstBatch.size() << " documents .",
+                firstBatch.size() <= 1);
+
+        if (firstBatch.empty()) {
+            LOGV2_WARNING(9929910,
+                          "Could not find the collection cloner resume data documents on a "
+                          "recipient shard. This is expected when there are no documents for this "
+                          "recipient to copy.",
+                          "reshardingUUID"_attr = reshardingUUID,
+                          "shardId"_attr = recipientShardId);
+            continue;
+        }
+
+        uassert(1003562,
+                str::stream() << "The aggregation result from fetching the number of "
+                                 "documents from the recipient shard '"
+                              << recipientShardId
+                              << "' does not have the field 'documentsCopied' set.",
+                firstBatch[0].hasField("documentsCopied"));
+
+        auto obj = firstBatch[0].getObjectField("documentsCopied");
+        for (const auto& element : obj) {
+            const auto fieldName = element.fieldNameStringData();
+            ShardId donorShardId(fieldName.toString());
+
+            uassert(
+                9929909,
+                str::stream() << "Expected the recipient collection cloner resume data document "
+                                 "for the donor shard '"
+                              << donorShardId << "' to have the number of documents copied",
+                !element.isNull());
+
+            if (docsCopied.find(donorShardId) == docsCopied.end()) {
+                docsCopied.emplace(donorShardId, 0);
+            }
+            docsCopied[donorShardId] += element.numberLong();
+        }
+
+        LOGV2(9929911,
+              "Fetched cloning metrics for recipient shard",
+              "shardId"_attr = recipientShardId,
+              "documentsCopied"_attr = obj);
+    }
+
+    return docsCopied;
+}
+
 void ReshardingCoordinatorExternalStateImpl::verifyClonedCollection(
-    OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    CancellationToken token,
+    const ReshardingCoordinatorDocument& coordinatorDoc) {
     LOGV2(9929900,
           "Start verifying the temporary resharding collection after cloning",
           "reshardingUUID"_attr = coordinatorDoc.getReshardingUUID());
 
-    auto docsToCopy = getDocumentsToCopy(opCtx, coordinatorDoc);
+    auto docsToCopy = extractDocumentsToCopy(coordinatorDoc);
 
     auto recipientShardIds =
         resharding::extractShardIdsFromParticipantEntries(coordinatorDoc.getRecipientShards());
-    auto docsCopied =
-        getDocumentsCopied(opCtx, coordinatorDoc.getReshardingUUID(), recipientShardIds);
+    auto docsCopied = _getDocumentsCopiedFromRecipients(
+        opCtx, executor, token, coordinatorDoc.getReshardingUUID(), recipientShardIds);
 
     for (auto donorIter = docsToCopy.begin(); donorIter != docsToCopy.end(); ++donorIter) {
         auto donorShardId = donorIter->first;
