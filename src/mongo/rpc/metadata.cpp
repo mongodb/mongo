@@ -52,8 +52,8 @@
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
@@ -109,7 +109,7 @@ void readRequestMetadata(OperationContext* opCtx,
         opCtx->setRoutedByReplicaSetEndpoint(true);
     }
 
-    setImpersonatedUserMetadata(opCtx, requestArgs.getDollarAudit());
+    setAuditMetadata(opCtx, requestArgs.getDollarAudit());
 
     // We check for "$client" but not "client" here, because currentOp can filter on "client" as
     // a top-level field.

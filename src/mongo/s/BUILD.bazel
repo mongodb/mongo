@@ -490,7 +490,7 @@ mongo_cc_library(
         "//src/mongo/executor:async_rpc_retry_policy.h",
         "//src/mongo/executor:async_rpc_util.h",
         "//src/mongo/executor:task_executor_pool.h",
-        "//src/mongo/rpc/metadata:impersonated_user_metadata.h",
+        "//src/mongo/rpc/metadata:audit_metadata.h",
         "//src/mongo/s/client:shard.h",
         "//src/mongo/s/client:shard_factory.h",
         "//src/mongo/s/client:shard_registry.h",

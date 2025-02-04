@@ -32,7 +32,7 @@ global:
 imports:
      - "mongo/db/basic_types.idl"
      - "mongo/rpc/metadata/audit_client_attrs.idl"
-     - "mongo/rpc/metadata/impersonated_user_metadata.idl"
+     - "mongo/rpc/metadata/audit_metadata.idl"
 
 structs:
     AuthenticationMetadata:

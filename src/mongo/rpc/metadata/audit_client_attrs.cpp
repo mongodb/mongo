@@ -50,6 +50,28 @@ void AuditClientAttrs::set(Client* client, AuditClientAttrs clientAttrs) {
     *getAuditClientAttrs(client) = std::move(clientAttrs);
 }
 
+void AuditClientAttrs::reset(Client* client) {
+    *getAuditClientAttrs(client) = boost::none;
+}
+
+ImpersonatedClientMetadata AuditClientAttrs::generateClientMetadataObj() {
+    ImpersonatedClientMetadata clientMetadata;
+
+    std::vector<HostAndPort> hosts;
+    hosts.push_back(getRemote());
+    hosts.push_back(getLocal());
+
+    if (const auto& intermediates = getProxiedEndpoints(); !intermediates.empty()) {
+        for (const auto& address : intermediates) {
+            hosts.push_back(address);
+        }
+    }
+
+    clientMetadata.setHosts(std::move(hosts));
+
+    return clientMetadata;
+}
+
 AuditClientAttrs AuditClientAttrs::parseFromBSON(BSONObj obj) {
     std::bitset<3> usedFields;
     constexpr size_t kLocalFieldBit = 0;

@@ -143,16 +143,17 @@ mongo_cc_library(
     srcs = [
         "//src/mongo/rpc/metadata:audit_client_attrs.cpp",
         "//src/mongo/rpc/metadata:audit_client_attrs_gen",
-        "//src/mongo/rpc/metadata:impersonated_user_metadata.cpp",
+        "//src/mongo/rpc/metadata:audit_metadata.cpp",
     ],
     hdrs = [
         "//src/mongo/rpc/metadata:audit_client_attrs.h",
+        "//src/mongo/rpc/metadata:audit_metadata.h",
         "//src/mongo/rpc/metadata:audit_user_attrs.h",
-        "//src/mongo/rpc/metadata:impersonated_user_metadata.h",
     ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_feature_flags",  # TODO(SERVER-83990): Remove.
         "//src/mongo/db:server_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth",
@@ -231,6 +232,7 @@ mongo_cc_unit_test(
         "op_msg_test.h",
         "reply_builder_test.cpp",
         "rewrite_state_change_errors_test.cpp",
+        "//src/mongo/rpc/metadata:audit_metadata_test.cpp",
         "//src/mongo/rpc/metadata:client_metadata_test.cpp",
         "//src/mongo/rpc/metadata:egress_metadata_hook_list_test.cpp",
         "//src/mongo/rpc/metadata:oplog_query_metadata_test.cpp",

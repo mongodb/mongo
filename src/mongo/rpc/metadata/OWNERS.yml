@@ -1,12 +1,6 @@
 version: 1.0.0
 filters:
-  - "audit_client_attrs.*":
-    approvers:
-      - 10gen/server-security
-  - "audit_user_attrs.h":
-    approvers:
-      - 10gen/server-security
-  - "impersonated_user_metadata.*":
+  - "audit*":
     approvers:
       - 10gen/server-security
   - "security_token*":

@@ -315,7 +315,7 @@ mongo_cc_library(
         "//src/mongo/idl:generic_argument.h",
         "//src/mongo/idl:generic_argument_gen",
         "//src/mongo/rpc:get_status_from_command_result.h",
-        "//src/mongo/rpc/metadata:impersonated_user_metadata_gen",
+        "//src/mongo/rpc/metadata:audit_metadata_gen",
         "//src/mongo/s:chunk_version.h",
         "//src/mongo/s:database_version.h",
         "//src/mongo/s:database_version_base_gen",

@@ -251,7 +251,7 @@ mongo_cc_library(
         "//src/mongo/idl:cluster_server_parameter_gen",
         "//src/mongo/idl:generic_argument_gen",
         "//src/mongo/rpc:topology_version_gen",
-        "//src/mongo/rpc/metadata:impersonated_user_metadata_gen",
+        "//src/mongo/rpc/metadata:audit_metadata_gen",
         "//src/mongo/s:chunk_version_gen",
         "//src/mongo/s:database_version_base_gen",
         "//src/mongo/s:gossiped_routing_cache_gen",

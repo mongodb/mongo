@@ -48,8 +48,7 @@
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/metadata/audit_client_attrs.h"
-#include "mongo/rpc/metadata/impersonated_user_metadata.h"
-#include "mongo/rpc/metadata/impersonated_user_metadata_gen.h"
+#include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

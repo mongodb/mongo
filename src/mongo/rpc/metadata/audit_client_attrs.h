@@ -35,6 +35,7 @@
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/rpc/metadata/audit_metadata_gen.h"
 
 namespace mongo::rpc {
 
@@ -48,6 +49,7 @@ public:
 
     static boost::optional<AuditClientAttrs> get(Client* client);
     static void set(Client* client, AuditClientAttrs clientAttrs);
+    static void reset(Client* client);
 
     const HostAndPort& getLocal() const {
         return _local;
@@ -60,6 +62,8 @@ public:
     const std::vector<HostAndPort>& getProxiedEndpoints() const {
         return _proxies;
     }
+
+    ImpersonatedClientMetadata generateClientMetadataObj();
 
     // Allows this type to be used in IDL and converted directly to/from BSON in commands.
     static AuditClientAttrs parseFromBSON(BSONObj obj);

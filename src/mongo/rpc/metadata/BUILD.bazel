@@ -10,11 +10,12 @@ exports_files(
 )
 
 idl_generator(
-    name = "impersonated_user_metadata_gen",
-    src = "impersonated_user_metadata.idl",
+    name = "audit_metadata_gen",
+    src = "audit_metadata.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/auth:auth_types_gen",
+        "//src/mongo/util/net:hostandport_gen",
     ],
 )
 

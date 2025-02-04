@@ -68,7 +68,6 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/rpc/metadata/impersonated_user_metadata_gen.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/time_support.h"

@@ -28,7 +28,7 @@
  */
 
 #include "mongo/db/operation_context.h"
-#include "mongo/rpc/metadata/impersonated_user_metadata.h"
+#include "mongo/rpc/metadata/audit_metadata.h"
 
 namespace mongo {
 class OperationContext;

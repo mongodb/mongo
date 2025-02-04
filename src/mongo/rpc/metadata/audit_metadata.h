@@ -36,13 +36,14 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/rpc/metadata/impersonated_user_metadata_gen.h"
+#include "mongo/rpc/metadata/audit_metadata_gen.h"
 
 namespace mongo {
 namespace rpc {
 
 /*
- * The name of the BSON element in message metadata that contains the impersonated user data
+ * The name of the BSON element in message metadata that contains the impersonated user and the
+ * client address data.
  *
  * This is called "$audit" because in pre-4.2 the enterprise audit subsystem already passed
  * the impersonated users info around in metadata for auditing purposes. This has been lifted
@@ -57,32 +58,44 @@ static constexpr auto kImpersonationMetadataSectionName = "$audit"_sd;
  * Gets the current impersonation data from the OpCtx (assumes readImpersonatedUserMetadata
  * has already been called)
  */
-boost::optional<ImpersonatedUserMetadata> getImpersonatedUserMetadata(OperationContext* opCtx);
+boost::optional<AuditMetadata> getImpersonatedUserMetadata(OperationContext* opCtx);
 
 /*
- * Sets the provided impersonated user metadata on the opCtx only if there are actually impersonated
- * users/roles.
+ * Sets the provided audit metadata on the AuditClientAtrrs decorator or AuditUserAttrs decorator
+ * respectively only if their data is present.
  */
-void setImpersonatedUserMetadata(OperationContext* opCtx,
-                                 const boost::optional<ImpersonatedUserMetadata>& data);
+
+void setAuditMetadata(OperationContext* opCtx, const boost::optional<AuditMetadata>& data);
+
+/*
+ * Helper function that sets the provided impersonated user metadata on the opCtx AuditUserAttrs
+ * decorator only if there are actually impersonated users/roles.
+ */
+void setImpersonatedUserMetadataHelper(OperationContext* opCtx,
+                                       const boost::optional<AuditMetadata>& data);
+/*
+ * Helper function that sets the provided audit client metadata on the AuditClientAtrrs decorator
+ * only if there is client metadata.
+ */
+void setAuditClientMetadataHelper(OperationContext* opCtx,
+                                  const boost::optional<AuditMetadata>& data);
 
 /*
  * Get impersonation metadata off the opCtx
  */
-boost::optional<ImpersonatedUserMetadata> getAuthDataToImpersonatedUserMetadata(
-    OperationContext* opCtx);
+boost::optional<AuditMetadata> getAuditAttrsToAuditMetadata(OperationContext* opCtx);
 
 /*
  * Writes the current impersonation metadata off the opCtx and into a BSONObjBuilder
  */
-void writeAuthDataToImpersonatedUserMetadata(OperationContext* opCtx, BSONObjBuilder* out);
+void writeAuditMetadata(OperationContext* opCtx, BSONObjBuilder* out);
 
 /*
  * Estimates the size of impersonation metadata which will be written by
- * writeAuthDataToImpersonatedUserMetadata.
+ * writeAuditMetadata.
  */
-std::size_t estimateImpersonatedUserMetadataSize(const ImpersonatedUserMetadata& md);
-std::size_t estimateImpersonatedUserMetadataSize(OperationContext* opCtx);
+std::size_t estimateAuditMetadataSize(const AuditMetadata& md);
+std::size_t estimateAuditMetadataSize(OperationContext* opCtx);
 
 }  // namespace rpc
 }  // namespace mongo
