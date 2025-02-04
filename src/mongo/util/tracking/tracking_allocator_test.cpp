@@ -28,7 +28,6 @@
  */
 
 #include <map>
-#include <scoped_allocator>
 #include <vector>
 
 #include "mongo/base/string_data.h"
@@ -40,7 +39,18 @@
 
 namespace mongo::tracking {
 
-class AllocatorTest : public unittest::Test {};
+class AllocatorTest : public unittest::Test {
+protected:
+    class MockClass {
+    private:
+        int64_t u;
+        int64_t v;
+        int64_t w;
+        int64_t x;
+        int64_t y;
+        int64_t z;
+    };
+};
 
 TEST_F(AllocatorTest, STLContainerSimple) {
 #if _ITERATOR_DEBUG_LEVEL >= 2
@@ -186,16 +196,6 @@ TEST_F(AllocatorTest, STLContainerNested) {
 }
 
 TEST_F(AllocatorTest, ManagedObject) {
-    class MockClass {
-    private:
-        int64_t u;
-        int64_t v;
-        int64_t w;
-        int64_t x;
-        int64_t y;
-        int64_t z;
-    };
-
     Context Context;
     ASSERT_EQ(0, Context.allocated());
 
@@ -214,4 +214,103 @@ TEST_F(AllocatorTest, ManagedObject) {
     ASSERT_EQ(0, Context.allocated());
 }
 
+TEST_F(AllocatorTest, TrackOwnedObjectNull) {
+    Context Context;
+    ASSERT_EQ(0, Context.allocated());
+
+    {
+        unique_ptr<MockClass> mockClass = tracking::unique_ptr<MockClass>(Context, nullptr);
+        ASSERT_EQ(0, Context.allocated());
+    }
+
+    ASSERT_EQ(0, Context.allocated());
+}
+
+TEST_F(AllocatorTest, TrackOwnedObjectMoveConstruction) {
+    Context Context;
+    ASSERT_EQ(0, Context.allocated());
+
+    {
+        unique_ptr<MockClass> mockClass1 = tracking::make_unique<MockClass>(Context);
+        auto allocatedMemory = Context.allocated();
+        ASSERT_GTE(allocatedMemory, sizeof(MockClass));
+
+        // Allocation doesn't increase by moving.
+        unique_ptr<MockClass> mockClass2(std::move(mockClass1));
+        ASSERT_EQ(Context.allocated(), allocatedMemory);
+    }
+
+    ASSERT_EQ(0, Context.allocated());
+}
+
+TEST_F(AllocatorTest, TrackOwnedObjectMoveAssignment) {
+    Context Context1;
+    Context Context2;
+    Context Context3;
+    ASSERT_EQ(0, Context1.allocated());
+    ASSERT_EQ(0, Context2.allocated());
+    ASSERT_EQ(0, Context3.allocated());
+
+    {
+        unique_ptr<MockClass> mockClass1 = tracking::make_unique<MockClass>(Context1);
+        unique_ptr<MockClass> mockClass2 = tracking::make_unique<MockClass>(Context2);
+        ASSERT_GTE(Context1.allocated(), sizeof(MockClass));
+        auto allocatedMemory2 = Context2.allocated();
+        ASSERT_GTE(allocatedMemory2, sizeof(MockClass));
+
+        // mockClass1 deallocates the original object and takes over mockClass2's allocator.
+        mockClass1 = std::move(mockClass2);
+        ASSERT_EQ(0, Context1.allocated());
+        // Allocation doesn't increase by moving.
+        ASSERT_EQ(Context2.allocated(), allocatedMemory2);
+
+        // mockClass1 deallocates the object from mockClass2 and takes over mockClass3's allocator.
+        unique_ptr<MockClass> mockClass3 = tracking::make_unique<MockClass>(Context3);
+        auto allocatedMemory3 = Context3.allocated();
+        ASSERT_GTE(allocatedMemory3, sizeof(MockClass));
+        mockClass1 = std::move(mockClass3);
+        ASSERT_EQ(0, Context1.allocated());
+        ASSERT_EQ(0, Context2.allocated());
+        // Allocation doesn't increase by moving.
+        ASSERT_EQ(Context3.allocated(), allocatedMemory3);
+    }
+
+    ASSERT_EQ(0, Context1.allocated());
+    ASSERT_EQ(0, Context2.allocated());
+    ASSERT_EQ(0, Context3.allocated());
+
+    {
+        unique_ptr<MockClass> mockClass1 = tracking::unique_ptr<MockClass>(Context1, nullptr);
+        unique_ptr<MockClass> mockClass2 = tracking::make_unique<MockClass>(Context2);
+        ASSERT_EQ(0, Context1.allocated());
+        ASSERT_GTE(Context2.allocated(), sizeof(MockClass));
+
+        // mockClass1 deallocates the original object and takes over mockClass2's allocator.
+        mockClass1 = std::move(mockClass2);
+        ASSERT_EQ(0, Context1.allocated());
+        ASSERT_GTE(Context2.allocated(), sizeof(MockClass));
+    }
+
+    ASSERT_EQ(0, Context1.allocated());
+    ASSERT_EQ(0, Context2.allocated());
+    ASSERT_EQ(0, Context3.allocated());
+}
+
+TEST_F(AllocatorTest, TrackOwnedObjectRelease) {
+    Context Context;
+    ASSERT_EQ(0, Context.allocated());
+
+    {
+        unique_ptr<MockClass> mockClass = tracking::make_unique<MockClass>(Context);
+        ASSERT_GTE(Context.allocated(), sizeof(MockClass));
+
+        MockClass* rawMockClass = mockClass.release();
+        ASSERT_GTE(Context.allocated(), sizeof(MockClass));
+
+        delete rawMockClass;
+    }
+
+    // The memory is no longer tracked after the pointer is released.
+    ASSERT_GTE(Context.allocated(), sizeof(MockClass));
+}
 }  // namespace mongo::tracking
