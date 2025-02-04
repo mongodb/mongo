@@ -139,7 +139,7 @@ export var RoutingTableConsistencyChecker = (function() {
                     ]
                 }
             },
-            // 2. Outer join with config.placementHistory to retrieve the most recent document 
+            // 2. Outer join with config.placementHistory to retrieve the most recent document
             //    for each logged namespace.
             {
                 $unionWith: {
@@ -166,7 +166,7 @@ export var RoutingTableConsistencyChecker = (function() {
                                 }
                             }
                         },
-                        // 2.2 Namespaces that are recorded as "dropped" are also skipped.      
+                        // 2.2 Namespaces that are recorded as "dropped" are also skipped.
                         { $match: { "placement.shards": { $not: { $size: 0 } } } },
                         {
                             $project: {
@@ -197,7 +197,7 @@ export var RoutingTableConsistencyChecker = (function() {
         // - when forged by the test code (usually through shardCollection()) they behave as a
         // regular collection. The pipeline needs hence to be modified as follows:
         const tempReshardingCollectionsFilter = {
-            $match: {_id: {$not: {$regex: /^[^.]+\.system\.resharding\..+$/}}}
+            $match: {_id: {$not: {$regex: /^[^.]+\.system(\.buckets)?\.resharding\..+$/}}}
         };
         if (TestData.mayForgeReshardingTempCollections) {
             // Perform no check on the temporary collections by adding a filter to
