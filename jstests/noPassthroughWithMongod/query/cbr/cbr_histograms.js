@@ -3,7 +3,6 @@
  */
 
 import {
-    canonicalizePlan,
     getRejectedPlans,
     getWinningPlanFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
@@ -29,6 +28,11 @@ for (let i = 0; i < 100; i++) {
         docs.push({a: j, b: i % 5, c: i % 7});
     }
 }
+
+// Include infinity values, ensure the counts remain correct.
+docs.push({a: Number.NEGATIVE_INFINITY});
+docs.push({a: Number.POSITIVE_INFINITY});
+
 assert.commandWorked(coll.insertMany(docs));
 
 coll.createIndex({a: 1});
@@ -46,7 +50,6 @@ function assertQueryUsesHistograms({query, expectedCE}) {
         assert.eq(plan.estimatesMetadata.ceSource, "Histogram", plan);
         assert(plan.hasOwnProperty("cardinalityEstimate"));
         const gotCE = plan.cardinalityEstimate;
-        assert.gt(gotCE, 0);
         assert(ceEqual(gotCE, expectedCE),
                `Got CE: ${gotCE} and expected CE: ${expectedCE} for query: ${tojson(query)}`);
     });
@@ -58,22 +61,30 @@ try {
     const testCases = [
         // IndexScan should use histogram
         {query: {a: 5}, expectedCE: 94},
-        {query: {a: {$gt: 5}}, expectedCE: 4371},
-        {query: {a: {$lt: 5}}, expectedCE: 485},
+        {query: {a: 90}, expectedCE: 46},
+        {query: {a: {$gt: 5}}, expectedCE: 4372},
+        {query: {a: {$lt: 5}}, expectedCE: 486},
+        // Check non existing value (max value in dataset: 98)
+        {query: {a: 250}, expectedCE: 0},
         // CollScan with sargable filter should use histogram
         {query: {b: 4}, expectedCE: 1030},
         {query: {b: {$gt: 3}}, expectedCE: 1030},
         {query: {b: {$lt: 3}}, expectedCE: 2910},
+        // all values (except +inf).
+        {query: {a: {$lt: 100}}, expectedCE: 4951},
         // Conjunctions
         {query: {b: {$gte: 1, $lt: 3}}, expectedCE: 1960},
         {query: {a: 5, b: {$gte: 1, $lt: 3}}, expectedCE: 59.1},
-        {query: {b: {$gte: 1, $lte: 3}, c: {$gt: 0, $lt: 5}}, expectedCE: 2158.8},
+        {query: {b: {$gte: 1, $lte: 3}, c: {$gt: 0, $lt: 5}}, expectedCE: 2158.4},
         {
             query: {$and: [{b: {$gte: 1}}, {c: {$gt: 0}}, {b: {$lte: 3}}, {c: {$lt: 5}}]},
-            expectedCE: 2158.8,
+            expectedCE: 2158.4,
         },
         // Negations
-        {query: {a: {$lt: 5, $ne: 6}}, expectedCE: 485.0}
+        {query: {a: {$lt: 5, $ne: 6}}, expectedCE: 485.99},
+        // not equal: (total size: 4952, max value: 98)
+        {query: {a: {$ne: -1}}, expectedCE: 4952},
+        {query: {a: {$ne: 90}}, expectedCE: 4906},
     ];
     testCases.forEach(tc => assertQueryUsesHistograms(tc));
 } finally {
@@ -108,7 +119,7 @@ try {
 }
 
 try {
-    // Test CE module makse us of multikey metadata
+    // Test CE module makes us of multikey metadata
     coll.drop();
     histogramColl.drop();
     let docs = [];

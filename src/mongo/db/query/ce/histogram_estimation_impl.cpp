@@ -197,7 +197,8 @@ EstimationResult interpolateEstimateInBucket(const ScalarHistogram& h,
     double ratio = 0.5;
     if (bucketIndex > 0) {
         const auto [lowBoundTag, lowBoundVal] = h.getBounds().getAt(bucketIndex - 1);
-        if (sameTypeBracket(lowBoundTag, boundTag)) {
+        if (sameTypeBracket(lowBoundTag, boundTag) &&
+            !mongo::sbe::value::isInfinity(lowBoundTag, lowBoundVal)) {
             double doubleLowBound = valueToDouble(lowBoundTag, lowBoundVal);
             double doubleUpperBound = valueToDouble(boundTag, boundVal);
             double doubleVal = valueToDouble(tag, val);
