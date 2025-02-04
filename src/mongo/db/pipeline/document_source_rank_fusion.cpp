@@ -372,7 +372,7 @@ auto setWindowFields(const auto& expCtx, const std::string& rankFieldName) {
  * Builds and returns an $addFields stage like this one:
  * {$addFields: {
  *      prefix_scoreDetails:
- *          [{$ifNull: [{$meta: "scoreDetails"}, {value: score, details: "Not Calculated"}]}]
+ *          {$ifNull: [{$meta: "scoreDetails"}, {value: score, details: "Not Calculated"}]}
  *      }
  *  }
  */
@@ -463,30 +463,40 @@ auto buildFirstPipelineStages(const std::string& prefixOne,
 BSONObj groupEachScore(
     const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& pipelines,
     const bool includeScoreDetails) {
-    // For each sub-pipeline, build the following string:
-    // ", name_score: {$max: {ifNull: ["$name_score", 0]}}, name_rank: {$max: {ifNull:
-    // ["$name_rank", 0]}}" These strings are appended to each other
-    const auto allScores = [&]() {
-        StringBuilder sb;
+    // For each sub-pipeline, build the following obj:
+    // name_score: {$max: {ifNull: ["$name_score", 0]}}
+    // If scoreDetails is enabled, build:
+    // name_rank: {$max: {ifNull: ["$name_rank", 0]}}
+    // name_scoreDetails: {$mergeObjects: $name_scoreDetails}
+    BSONObjBuilder bob;
+    {
+        BSONObjBuilder groupBob(bob.subobjStart("$group"_sd));
+        groupBob.append("_id", "$docs._id");
+        groupBob.append("docs",
+                        BSON("$first"
+                             << "$docs"));
+
         for (auto it = pipelines.begin(); it != pipelines.end(); it++) {
-            sb << ", ";
             const auto& pipelineName = it->first;
-            sb << fmt::format("{0}_score: {{$max: {{$ifNull: [\"${0}_score\", NumberLong(0)]}}}}",
-                              pipelineName);
+            const std::string scoreName = fmt::format("{}_score", pipelineName);
+            groupBob.append(
+                scoreName,
+                BSON("$max" << BSON("$ifNull" << BSON_ARRAY(fmt::format("${}", scoreName) << 0))));
             // We only need to preserve the rank if we're calculating score details.
             if (includeScoreDetails) {
-                sb << fmt::format(
-                    ", {0}_rank: {{$max: {{$ifNull: [\"${0}_rank\", NumberLong(0)]}}}}",
-                    pipelineName);
-                sb << fmt::format(", {0}_scoreDetails: {{$mergeObjects: \"${0}_scoreDetails\"}}",
-                                  pipelineName);
+                const std::string rankName = fmt::format("{}_rank", pipelineName);
+                groupBob.append(rankName,
+                                BSON("$max" << BSON("$ifNull" << BSON_ARRAY(
+                                                        fmt::format("${}", rankName) << 0))));
+                const std::string scoreDetailsName = fmt::format("{}_scoreDetails", pipelineName);
+                groupBob.append(scoreDetailsName,
+                                BSON("$mergeObjects" << fmt::format("${}", scoreDetailsName)));
             }
         }
-        return sb.str();
-    };
-
-    return fromjson(
-        fmt::format("{{$group: {{_id: '$docs._id', docs: {{$first: '$docs'}}{0}}}}}", allScores()));
+        groupBob.done();
+    }
+    bob.done();
+    return bob.obj();
 }
 
 BSONObj calculateFinalScore(
