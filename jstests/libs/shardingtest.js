@@ -222,7 +222,7 @@ export class ShardingTest {
 
         this.stopAllMongos(opts);
 
-        if (TestData.runningWithConfigStepdowns && this.isConfigShardMode) {
+        if (jsTestOptions().runningWithConfigStepdowns && this.isConfigShardMode) {
             // In case of a cluster with a config shard, the config server replica set is stopped
             // via stopAllShards, which doesn't stop the continuous stepdown stop.
             this.configRS.stopContinuousFailover();
@@ -1496,7 +1496,7 @@ export class ShardingTest {
 
             if (setDefaultTransactionLockTimeout) {
                 // Clean up TestData.setParameters to avoid affecting other tests.
-                delete TestData.setParameters.maxTransactionLockRequestTimeoutMillis;
+                delete jsTest.options().setParameters.maxTransactionLockRequestTimeoutMillis;
             }
 
             //
