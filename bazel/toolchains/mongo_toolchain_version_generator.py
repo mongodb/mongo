@@ -27,6 +27,8 @@ PLATFORM_NAME_MAP = {
     "rhel8_s390x": "rhel80-zseries",
     "rhel8_x86_64": "rhel80",
     "rhel9_aarch64": "rhel90-arm64",
+    "rhel9_ppc64le": "rhel90-ppc64le",
+    "rhel9_s390x": "rhel90-zseries",
     "rhel9_x86_64": "rhel90",
     "suse15_x86_64": "suse15",
     "ubuntu18_x86_64": "ubuntu1804",
