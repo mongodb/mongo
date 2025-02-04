@@ -320,6 +320,61 @@ TEST_F(MapReduceFixture, InternalJsReduceFailsIfDataArgumentDoesNotContainExpect
     assertProcessFailsWithCode<AccumulatorInternalJsReduce>(getExpCtx(), eval, argument, 31251);
 }
 
+/* ------------------------- AccumulatorJs ------------------------------------------------------ */
+
+TEST_F(MapReduceFixture, AccumulatorJs) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx =
+        make_intrusive<ExpressionContextForTest>();
+    AccumulatorJs acc{
+        expCtx.get(),
+        "function() {}" /* init */,
+        "function(state, str1, str2) {return str1 + str2;}" /* accumulate */,
+        "function(s1, s2) {return s1 || s2;}" /* merge */,  // returns the first non-empty string
+        boost::optional<std::string>{"function(state) {return state.toUpperCase();}"}};
+
+    // The constructor does not initialize 'AccumulatorJs._state'. AccumulatorJs's invariants
+    // require that the first thing called after the constructor must be StartNewGroup(), which
+    // requires a const Value containing an array (of what?). BSON_ARRAY cannot construct an empty
+    // array.
+    const Value valAaaBbb{BSON_ARRAY("Aaa_"
+                                     << "Bbb_")};
+    acc.startNewGroup(valAaaBbb);
+
+    // Process a string input. Should uassert that the input must be an array when 'merging'
+    // argument is false.
+    ASSERT_THROWS_CODE(
+        acc.processInternal(Value("xxx_"_sd), false /* merging */), AssertionException, 4544712);
+
+    // Process an array input, which must be const. Should succeed. This will be queued in
+    // 'AccumulateorJs::_pendingCalls' until getValue() is called.
+    const Value valYyyZzz{BSON_ARRAY("Yyy_"
+                                     << "Zzz_")};
+    acc.processInternal(valYyyZzz, false /* merging */);
+
+    // Call reduceMemoryConcuptionIfAble() while 'AccumulateorJs::_pendingCalls' is non-empty. This
+    // exercises the main body of the method.
+    acc.reduceMemoryConsumptionIfAble();
+
+    // Get the current accumulated value with 'toBeMerged' arg false, which means it will produce a
+    // finalized (merged) value. Returning a string literal from the "finalize" function oddly
+    // includes the surrounding double quotes in the value.
+    Value resultVal = acc.getValue(false /* toBeMerged */);
+    ASSERT_EQ("\"YYY_ZZZ_\"", resultVal.toString());
+
+    // Get the current accumulated value with 'toBeMerged' arg true, which means the value has not
+    // been finalized yet.
+    resultVal = acc.getValue(true);
+    ASSERT_EQ("\"Yyy_Zzz_\"", resultVal.toString());
+
+    // Call reduceMemoryConcuptionIfAble() while 'AccumulateorJs::_pendingCalls' is empty. This
+    // exercises the short-circuit return at the top of the method.
+    acc.reduceMemoryConsumptionIfAble();
+
+    // Exercise reset(). All we can do is check that it does not crash, because it nulls the state,
+    // so AccumulatorJs::getValue()'s invariant(_state) call will crash if we call acc.getValue().
+    acc.reset();
+}
+
 }  // namespace InternalJsReduce
 }  // namespace
 }  // namespace mongo
