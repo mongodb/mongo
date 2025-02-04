@@ -44,7 +44,6 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/processinfo.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -52,19 +51,13 @@
 
 namespace mongo {
 
-namespace {
-
-const size_t numRegistryPartitions = 2 * ProcessInfo::getNumLogicalCores();
-
-}  // namespace
-
 WiredTigerConnection::WiredTigerConnection(WiredTigerKVEngine* engine)
     : WiredTigerConnection(engine->getConn(), engine->getClockSource(), engine) {}
 
 WiredTigerConnection::WiredTigerConnection(WT_CONNECTION* conn,
                                            ClockSource* cs,
                                            WiredTigerKVEngine* engine)
-    : _conn(conn), _clockSource(cs), _engine(engine), _registry(numRegistryPartitions) {
+    : _conn(conn), _clockSource(cs), _engine(engine) {
     uassertStatusOK(_compiledConfigurations.compileAll(_conn));
     uassert(9728400,
             "wiredTigerCursorCacheSize parameter value must be <= 0",
@@ -251,24 +244,6 @@ void WiredTigerConnection::WiredTigerSessionDeleter::operator()(WiredTigerSessio
     session->_connection->_releaseSession(session);
 }
 
-WiredTigerSession* WiredTigerConnection::getSessionById(const SessionId& id) {
-    RegistryPartition& partition = _registry[id % numRegistryPartitions];
-    stdx::lock_guard<stdx::mutex> lock(partition.mtx);
-    return partition.map[id];
-}
-
-void WiredTigerConnection::_addSession(const SessionId& id, WiredTigerSession* session) {
-    RegistryPartition& partition = _registry[id % numRegistryPartitions];
-    stdx::lock_guard<stdx::mutex> lock(partition.mtx);
-    invariant(partition.map.insert({id, session}).second);
-}
-
-bool WiredTigerConnection::_removeSession(const SessionId& id) {
-    RegistryPartition& partition = _registry[id % numRegistryPartitions];
-    stdx::lock_guard<stdx::mutex> lock(partition.mtx);
-    return partition.map.erase(id);
-}
-
 WT_SESSION* WiredTigerConnection::_openSession(WiredTigerSession* session,
                                                WT_EVENT_HANDLER* handler,
                                                const char* config) {
@@ -288,7 +263,6 @@ WT_SESSION* WiredTigerConnection::_openSessionInternal(WiredTigerSession* sessio
                                                        WT_CONNECTION* conn) {
     WT_SESSION* rawSession;
     invariantWTOK(conn->open_session(conn, handler, config, &rawSession), nullptr);
-    // TODO(SERVER-99353): _addSession(id, session).
     return rawSession;
 }
 
