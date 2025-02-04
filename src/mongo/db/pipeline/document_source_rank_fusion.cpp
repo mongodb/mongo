@@ -346,15 +346,6 @@ std::vector<BSONObj> getPipeline(BSONElement inputPipeElem) {
     return parsePipelineFromBSON(inputPipeElem);
 }
 
-BSONObj group() {
-    return fromjson(R"({
-        $group: {
-            _id: null,
-            docs: { $push: "$$ROOT" }
-        }
-    })");
-}
-
 auto stageToBson(const auto stagePtr) {
     std::vector<Value> array;
     stagePtr->serializeToArray(array);
@@ -364,15 +355,15 @@ auto stageToBson(const auto stagePtr) {
 auto setWindowFields(const auto& expCtx, const std::string& rankFieldName) {
     // TODO SERVER-98562 We shouldn't need to provide this sort, since it's not used other than to
     // pass the parse-time validation checks.
-    const SortPattern dummySortPattern{fromjson("{order: 1}"), expCtx};
+    const SortPattern dummySortPattern{BSON("order" << 1), expCtx};
     return make_intrusive<DocumentSourceInternalSetWindowFields>(
         expCtx,
         boost::none,  // partitionBy
         dummySortPattern,
-        std::vector<WindowFunctionStatement>{
-            WindowFunctionStatement{rankFieldName,
-                                    window_function::Expression::parse(
-                                        fromjson("{$rank: {}}"), dummySortPattern, expCtx.get())}},
+        std::vector<WindowFunctionStatement>{WindowFunctionStatement{
+            rankFieldName,
+            window_function::Expression::parse(
+                BSON("$rank" << BSONObj()), dummySortPattern, expCtx.get())}},
         internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load(),
         SbeCompatibility::notCompatible);
 }
@@ -392,11 +383,12 @@ auto addScoreDetails(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     {
         BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
         addFieldsBob.append(scoreDetails,
-                            fromjson(
-                                R"({$ifNull: [
-                                    {$meta: "scoreDetails"},
-                                    {value: {$meta: "score"}, details: "Not Calculated"}
-                                ]})"));
+                            BSON("$ifNull" << BSON_ARRAY(BSON("$meta"
+                                                              << "scoreDetails")
+                                                         << BSON("value" << BSON("$meta"
+                                                                                 << "score")
+                                                                         << "details"
+                                                                         << "Not Calculated"))));
     }
     const auto spec = bob.obj();
     return DocumentSourceAddFields::createFromBson(spec.firstElement(), expCtx);
@@ -428,9 +420,9 @@ auto addScoreField(const boost::intrusive_ptr<ExpressionContext>& expCtx,
             {
                 BSONArrayBuilder multiplyArray(scoreField.subarrayStart("$multiply"_sd));
                 // RRF Score = weight * (1 / (rank + rank constant)).
-
-                multiplyArray.append(fromjson(
-                    fmt::format("{{$divide: [1, {{$add: ['{}', {}]}}]}}", rankPath, rankConstant)));
+                multiplyArray.append(
+                    BSON("$divide"
+                         << BSON_ARRAY(1 << BSON("$add" << BSON_ARRAY(rankPath << rankConstant)))));
                 multiplyArray.append(weight);
             }
         }
@@ -445,8 +437,10 @@ auto addScoreField(const boost::intrusive_ptr<ExpressionContext>& expCtx,
  * This has the effect of storing the unmodified user's document in the path '$docs'.
  */
 auto nestUserDocs(const auto& expCtx) {
-    static const BSONObj replaceRootObj = fromjson("{$replaceWith: {docs: \"$$ROOT\"}}");
-    return DocumentSourceReplaceRoot::createFromBson(replaceRootObj.firstElement(), expCtx);
+    return DocumentSourceReplaceRoot::createFromBson(BSON("$replaceWith" << BSON("docs"
+                                                                                 << "$$ROOT"))
+                                                         .firstElement(),
+                                                     expCtx);
 }
 
 auto buildFirstPipelineStages(const std::string& prefixOne,
@@ -575,26 +569,27 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
 
     // Note that the scoreDetails fields go here in the pipeline. We create them below to be able
     // to return them immediately once all stages are generated.
-    BSONObj sortObj = fromjson(R"({
-        $sort: {score: -1, _id: 1}
-    })");
-    auto sort = DocumentSourceSort::createFromBson(sortObj.firstElement(), expCtx);
+    const SortPattern sortingPattern{BSON("score" << -1 << "_id" << 1), expCtx};
+    auto sort = DocumentSourceSort::create(expCtx, sortingPattern);
 
-    static const BSONObj replaceRootObj = fromjson(R"({
-        $replaceRoot: {newRoot: "$docs"}
-    })");
     auto restoreUserDocs =
-        DocumentSourceReplaceRoot::createFromBson(replaceRootObj.firstElement(), expCtx);
+        DocumentSourceReplaceRoot::create(expCtx,
+                                          ExpressionFieldPath::createPathFromString(
+                                              expCtx.get(), "docs", expCtx->variablesParseState),
+                                          "documents",
+                                          SbeCompatibility::noRequirements);
 
     if (includeScoreDetails) {
         auto addFieldsDetails = DocumentSourceAddFields::createFromBson(
             calculateFinalScoreDetails(inputPipelines).firstElement(), expCtx);
         auto setDetails = DocumentSourceSetMetadata::create(
             expCtx,
-            Expression::parseObject(
-                expCtx.get(),
-                fromjson("{value: '$score', details: '$calculatedScoreDetails'}"),
-                expCtx->variablesParseState),
+            Expression::parseObject(expCtx.get(),
+                                    BSON("value"
+                                         << "$score"
+                                         << "details"
+                                         << "$calculatedScoreDetails"),
+                                    expCtx->variablesParseState),
             DocumentMetadataFields::kScoreDetails);
         return {group, addFields, addFieldsDetails, setDetails, sort, restoreUserDocs};
     }
