@@ -134,7 +134,7 @@ WT_CURSOR* WiredTigerSession::getNewCursor(const std::string& uri, const char* c
 }
 
 void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor, std::string config) {
-    // When releasing the cursor, we would want to check if the connection is already in shutdown
+    // When cleaning up a cursor, we would want to check if the connection is already in shutdown
     // and prevent the race condition that the shutdown starts after the check.
     WiredTigerConnection::BlockShutdown blockShutdown(_connection);
 
@@ -164,6 +164,16 @@ void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor, std::strin
 }
 
 void WiredTigerSession::closeCursor(WT_CURSOR* cursor) {
+    // When cleaning up a cursor, we would want to check if the connection is already in shutdown
+    // and prevent the race condition that the shutdown starts after the check.
+    WiredTigerConnection::BlockShutdown blockShutdown(_connection);
+
+    // Avoids the cursor already being destroyed during the shutdown. Also, avoids releasing a
+    // cursor from an earlier epoch.
+    if (_connection->isShuttingDown() || _getEpoch() < _connection->_epoch.load()) {
+        return;
+    }
+
     invariant(_session);
     invariant(cursor);
     _cursorsOut--;

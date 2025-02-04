@@ -48,11 +48,14 @@ public:
      * If 'allowOverwrite' is true, insert operations will not return an error if the record
      * already exists, and update/remove operations will not return error if the record does not
      * exist.
+     *
+     * If 'random' is true, every next calls will yield records in a random order.
      */
     WiredTigerCursor(WiredTigerRecoveryUnit& ru,
                      const std::string& uri,
                      uint64_t tableID,
-                     bool allowOverwrite);
+                     bool allowOverwrite,
+                     bool random = false);
 
     // Prevent duplication of the logical owned-ness of the cursors via move or copy.
     WiredTigerCursor(WiredTigerCursor&&) = delete;

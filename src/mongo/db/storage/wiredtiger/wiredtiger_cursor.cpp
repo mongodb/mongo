@@ -53,7 +53,8 @@ static constexpr StringData kOverwriteFalse = "overwrite=false"_sd;
 WiredTigerCursor::WiredTigerCursor(WiredTigerRecoveryUnit& ru,
                                    const std::string& uri,
                                    uint64_t tableID,
-                                   bool allowOverwrite) {
+                                   bool allowOverwrite,
+                                   bool random) {
     _tableID = tableID;
     _session = ru.getSession();
     _isCheckpoint =
@@ -63,10 +64,14 @@ WiredTigerCursor::WiredTigerCursor(WiredTigerRecoveryUnit& ru,
     const char* configStr = nullptr;
 
     // If we have uncommon cursor options, use a costlier string builder.
-    if (ru.getReadOnce() || _isCheckpoint) {
+    if (ru.getReadOnce() || _isCheckpoint || random) {
         str::stream builder;
         if (ru.getReadOnce()) {
             builder << "read_once=true,";
+        }
+
+        if (random) {
+            builder << "next_random,";
         }
 
         if (_isCheckpoint) {
