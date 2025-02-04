@@ -2412,13 +2412,6 @@ void OpDebug::AdditiveMetrics::incrementNUpserted(long long n) {
     *nUpserted += n;
 }
 
-void OpDebug::AdditiveMetrics::incrementExecutionTime(Microseconds n) {
-    if (!executionTime) {
-        executionTime = Microseconds{0};
-    }
-    *executionTime += n;
-}
-
 std::string OpDebug::AdditiveMetrics::report() const {
     StringBuilder s;
 

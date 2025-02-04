@@ -199,7 +199,6 @@ TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
     additiveMetrics.writeConflicts.store(1);
     additiveMetrics.keysInserted = 2;
     additiveMetrics.nreturned = 3;
-    additiveMetrics.executionTime = Microseconds{160};
 
     // Increment the fields.
     additiveMetrics.incrementWriteConflicts(1);
@@ -209,7 +208,6 @@ TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
     additiveMetrics.incrementNUpserted(6);
     additiveMetrics.incrementNreturned(2);
     additiveMetrics.incrementNBatches();
-    additiveMetrics.incrementExecutionTime(Microseconds{120});
 
     ASSERT_EQ(additiveMetrics.writeConflicts.load(), 2);
     ASSERT_EQ(*additiveMetrics.keysInserted, 7);
@@ -218,7 +216,6 @@ TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
     ASSERT_EQ(*additiveMetrics.nUpserted, 6);
     ASSERT_EQ(*additiveMetrics.nreturned, 5);
     ASSERT_EQ(*additiveMetrics.nBatches, 1);
-    ASSERT_EQ(*additiveMetrics.executionTime, Microseconds{280});
 }
 
 TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {

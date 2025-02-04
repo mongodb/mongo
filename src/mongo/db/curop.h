@@ -195,11 +195,6 @@ public:
         void incrementNUpserted(long long n);
 
         /**
-         * Increments executionTime by n.
-         */
-        void incrementExecutionTime(Microseconds n);
-
-        /**
          * Generates a string showing all non-empty fields. For every non-empty field field1,
          * field2, ..., with corresponding values value1, value2, ..., we will output a string in
          * the format: "<field1>:<value1> <field2>:<value2> ...".
