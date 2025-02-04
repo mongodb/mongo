@@ -85,7 +85,9 @@ namespace mongo::logv2 {
     X(kWiredTigerCheckpoint,   , "wtCheckpoint"          , "WTCHKPT" , kWiredTiger) \
     X(kWiredTigerCompact,      , "wtCompact"             , "WTCMPCT" , kWiredTiger) \
     X(kWiredTigerEviction,     , "wtEviction"            , "WTEVICT" , kWiredTiger) \
+    X(kWiredTigerFileOps,      , "wtFileOps"             , "WTFILEOPS", kWiredTiger) \
     X(kWiredTigerHS,           , "wtHS"                  , "WTHS"    , kWiredTiger) \
+    X(kWiredTigerLiveRestore,  , "wtLiveRestore"         , "WTLR"    , kWiredTiger) \
     X(kWiredTigerRecovery,     , "wtRecovery"            , "WTRECOV" , kWiredTiger) \
     X(kWiredTigerRTS,          , "wtRTS"                 , "WTRTS"   , kWiredTiger) \
     X(kWiredTigerSalvage,      , "wtSalvage"             , "WTSLVG"  , kWiredTiger) \

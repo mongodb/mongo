@@ -1573,6 +1573,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/live_import/OWNERS.yml
 /src/mongo/db/modules/enterprise/jstests/live_import/**/* @10gen/server-backup-restore @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/live_restore/OWNERS.yml
+/src/mongo/db/modules/enterprise/jstests/live_restore/**/* @10gen/server-backup-restore @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/no_passthrough/OWNERS.yml
 /src/mongo/db/modules/enterprise/jstests/no_passthrough/**/* @10gen/query-integration-fle @10gen/server-security @svc-auto-approve-bot
 

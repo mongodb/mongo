@@ -75,4 +75,21 @@ Status WiredTigerGlobalOptions::validateWiredTigerCompressor(const std::string& 
     return Status::OK();
 }
 
+Status WiredTigerGlobalOptions::validateWiredTigerLiveRestoreReadSizeMB(const int value) {
+    if (value < 1) {
+        return {ErrorCodes::BadValue,
+                "Live restore read size must be greater than or equal to 1MB."};
+    }
+
+    if (value > 16) {
+        return {ErrorCodes::BadValue, "Live restore read size must be less than or equal to 16MB."};
+    }
+
+    if ((value & (value - 1)) != 0) {
+        return {ErrorCodes::BadValue, "Live restore read size must be a power of two."};
+    }
+
+    return Status::OK();
+}
+
 }  // namespace mongo

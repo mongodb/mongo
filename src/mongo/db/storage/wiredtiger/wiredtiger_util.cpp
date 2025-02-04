@@ -530,9 +530,14 @@ logv2::LogComponent getWTLogComponent(const BSONObj& obj) {
             return logv2::LogComponent::kWiredTigerCompact;
         case WT_VERB_EVICTION:
             return logv2::LogComponent::kWiredTigerEviction;
+        case WT_VERB_FILEOPS:
+            return logv2::LogComponent::kWiredTigerFileOps;
         case WT_VERB_HS:
         case WT_VERB_HS_ACTIVITY:
             return logv2::LogComponent::kWiredTigerHS;
+        case WT_VERB_LIVE_RESTORE:
+        case WT_VERB_LIVE_RESTORE_PROGRESS:
+            return logv2::LogComponent::kWiredTigerLiveRestore;
         case WT_VERB_RECOVERY:
         case WT_VERB_RECOVERY_PROGRESS:
             return logv2::LogComponent::kWiredTigerRecovery;
@@ -1165,7 +1170,9 @@ std::string WiredTigerUtil::generateWTVerboseConfiguration() {
         {logv2::LogComponent::kWiredTigerCheckpoint, "checkpoint"},
         {logv2::LogComponent::kWiredTigerCompact, "compact"},
         {logv2::LogComponent::kWiredTigerEviction, "eviction"},
+        {logv2::LogComponent::kWiredTigerFileOps, "fileops"},
         {logv2::LogComponent::kWiredTigerHS, "history_store"},
+        {logv2::LogComponent::kWiredTigerLiveRestore, "live_restore"},
         {logv2::LogComponent::kWiredTigerRecovery, "recovery"},
         {logv2::LogComponent::kWiredTigerRTS, "rts"},
         {logv2::LogComponent::kWiredTigerSalvage, "salvage"},
@@ -1182,7 +1189,7 @@ std::string WiredTigerUtil::generateWTVerboseConfiguration() {
     cfg << "verbose=[";
 
     // Enable WiredTiger progress messages.
-    cfg << "recovery_progress:1,checkpoint_progress:1,compact_progress:1";
+    cfg << "recovery_progress:1,checkpoint_progress:1,compact_progress:1,live_restore_progress:1";
 
     // Process each LOGV2 WiredTiger component and set the desired verbosity level.
     for (const auto& [component, componentStr] : *wtVerboseComponents) {
