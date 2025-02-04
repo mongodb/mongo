@@ -126,6 +126,8 @@ DEFAULTS = {
     "user_friendly_output": None,
     # Output log format.
     "log_format": None,
+    # Level of log severity.
+    "log_level": None,
     "mixed_bin_versions": None,
     "old_bin_version": None,
     "linear_chain": None,

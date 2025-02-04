@@ -552,10 +552,22 @@ jsTestLog = function(
     {severity, attr, id} = {},
 ) {
     if (TestData?.logFormat === "json") {
+        severity = severity === undefined ? "I" : severity;
+        const severityLevel = {E: 1, W: 2, I: 3, D: 4}[severity];
+        const logLevel = TestData?.logLevel;
+        if (!logLevel || typeof logLevel !== "number" || ![1, 2, 3, 4].includes(logLevel) ||
+            !severityLevel) {
+            throw new Error(`Invalid log severity (${severity}) and/or log level (${logLevel}).`);
+        }
+        // If log level is smaller than the current severity level and both values are defined with
+        // expected values, skip printing.
+        if (severityLevel > logLevel) {
+            return;
+        }
         // New logging format, enabled through the --logFormat resmoke flag.
         let new_msg = {
             t: new Date(),
-            "s": severity || "I",
+            "s": severity,
             "c": "js_test",
             "ctx": TestData?.testName || "-",  // context (e.g., TestData.testName)
             "msg": msg,                        // message body

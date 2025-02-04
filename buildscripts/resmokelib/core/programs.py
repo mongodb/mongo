@@ -302,6 +302,10 @@ def mongo_shell_program(
     if config.LOG_FORMAT:
         test_data["logFormat"] = config.LOG_FORMAT
 
+    level_names_to_numbers = {"ERROR": 1, "WARNING": 2, "INFO": 3, "DEBUG": 4}
+    # Convert Log Level from string to numbered values. Defaults to using "INFO".
+    test_data["logLevel"] = level_names_to_numbers.get(config.LOG_LEVEL, 3)
+
     if config.SHELL_TLS_ENABLED:
         test_data["shellTlsEnabled"] = True
 
