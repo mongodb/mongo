@@ -40,7 +40,7 @@ def verify_requirements(silent: bool = False, executable=sys.executable):
     try:
         import poetry  # noqa: F401
     except ModuleNotFoundError as ex:
-        raiseSuggestion(ex, "'poetry==1.8.3'")
+        raiseSuggestion(ex, "'poetry==2.0.0'")
 
     verbose("Checking required python packages...")
 

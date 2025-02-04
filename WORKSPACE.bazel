@@ -135,16 +135,16 @@ http_archive(
 # Poetry rules for managing Python dependencies
 http_archive(
     name = "rules_poetry",
-    sha256 = "dbabea2a3829aa5885ba46d612b269956d0227b503147a5e1a2cfd635165fcb5",
-    strip_prefix = "rules_poetry-441f4365f7cafce345083a6325bc6712a2ce5c93",
+    sha256 = "48001b928488e78f03a47bcc712c56432a471fc6cdd90fe57c884efbfcd13696",
+    strip_prefix = "rules_poetry-917630033c736c188605cf0f558c34afc1eca540",
     urls = [
         # Implements retry by relisting each url multiple times to be used as a failover.
         # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://github.com/mongodb-forks/rules_poetry/archive/441f4365f7cafce345083a6325bc6712a2ce5c93.tar.gz",
-        "https://github.com/mongodb-forks/rules_poetry/archive/441f4365f7cafce345083a6325bc6712a2ce5c93.tar.gz",
-        "https://github.com/mongodb-forks/rules_poetry/archive/441f4365f7cafce345083a6325bc6712a2ce5c93.tar.gz",
-        "https://github.com/mongodb-forks/rules_poetry/archive/441f4365f7cafce345083a6325bc6712a2ce5c93.tar.gz",
-        "https://github.com/mongodb-forks/rules_poetry/archive/441f4365f7cafce345083a6325bc6712a2ce5c93.tar.gz",
+        "https://github.com/mongodb-forks/rules_poetry/archive/917630033c736c188605cf0f558c34afc1eca540.tar.gz",
+        "https://github.com/mongodb-forks/rules_poetry/archive/917630033c736c188605cf0f558c34afc1eca540.tar.gz",
+        "https://github.com/mongodb-forks/rules_poetry/archive/917630033c736c188605cf0f558c34afc1eca540.tar.gz",
+        "https://github.com/mongodb-forks/rules_poetry/archive/917630033c736c188605cf0f558c34afc1eca540.tar.gz",
+        "https://github.com/mongodb-forks/rules_poetry/archive/917630033c736c188605cf0f558c34afc1eca540.tar.gz",
     ],
 )
 

@@ -1,8 +1,10 @@
-[tool.poetry]
+[project]
 name = "mdb-python-deps"
 version = "1.0.0"
+requires-python = ">=3.10,<4.0"
+#dynamic = [ "dependencies" ]
 description = "MongoDB python dependencies"
-authors = ["MongoDB"]
+authors = [ { name = "MongoDB" } ]
 readme = "README.md"
 # These packages are included as a TODO if we want to run resmoke with pex
 # Currently this does nothing
@@ -13,6 +15,18 @@ packages = [
     { include = "buildscripts/resmokelib" },
     { include = "buildscripts/idl" },
     { include = "buildscripts/util" },
+]
+dependencies = [
+    "networkx",                               # This is also used as a part of build_metrics so it is sort of required
+    "pyright==1.1.380",
+    "flask",
+    "flask-cors",
+    "lxml",
+    "eventlet",
+    "gevent",
+    "progressbar2",
+    "cxxfilt",
+    "pympler",
 ]
 
 [tool.poetry.dependencies]
@@ -28,7 +42,7 @@ gevent = { version = "*", optional = true }
 progressbar2 = { version = "*", optional = true }
 cxxfilt = { version = "*", optional = true }
 pympler = { version = "*", optional = true }
-pyright = "1.1.382"
+pyright = "1.1.380"
 
 [tool.poetry.group.aws.dependencies]
 boto3 = "^1.34.156"
@@ -43,7 +57,7 @@ tabulate = "^0.9.0"
 
 [tool.poetry.group.compile.dependencies]
 cheetah3 = "<=3.2.6.post1" # src/mongo/base/generate_error_codes.py
-packaging = "^23.1"
+packaging = "^24.0"
 regex = "^2021.11.10"
 setuptools = "^58.1.0"
 wheel = "0.37.0"
@@ -62,7 +76,7 @@ tenacity = "^9.0.0"
 pipx = "1.6.0"
 # TODO: Add in pex as we move forward with this
 # pex = "^2.1.137"
-poetry = "1.8.3"
+poetry = "2.0.0"
 
 [tool.poetry.group.evergreen.dependencies]
 click = "^8.1.7"
@@ -86,7 +100,7 @@ ldaptor = "19.0.0"
 
 [tool.poetry.group.idl.dependencies]
 unittest-xml-reporting = "3.0.4" # Pinned because newer versions require lxml which fails to install
-packaging = "^23.1"
+packaging = "^24.0"
 
 [tool.poetry.group.jira-client.dependencies]
 jira = "<=3.1.1"
@@ -105,7 +119,7 @@ types-requests = "^2.32.0.20240712"
 tqdm = "*"
 colorama = "^0.4.6"
 evergreen-lint = "^0.1.9"
-ruff = "^0.5.6"
+ruff = "^0.6.7"
 
 [tool.poetry.group.platform.dependencies]
 pypiwin32 = { version = ">=223", markers = "sys_platform == 'win32'" }
@@ -143,7 +157,7 @@ proxy-protocol = "^0.11.3"
 pkce = "^1.0.3"
 oauthlib = "^3.1.1"
 requests-oauthlib = "^2.0.0"
-packaging = "^23.1"
+packaging = "^24.0"
 docker = "^7.1.0"
 mongomock = "^4.1.2"
 pyjwt = "^2.9.0"
@@ -161,7 +175,7 @@ opentelemetry-exporter-otlp-proto-common = "*"
 mongo-tooling-metrics = "1.0.8"
 
 # This can be installed with "poetry install -E libdeps"
-[tool.poetry.extras]
+[project.optional-dependencies]
 libdeps = [
     "flask",
     "flask-cors",
@@ -175,7 +189,7 @@ libdeps = [
 
 # This entrypoint is included as a TODO if we want to run resmoke with pex
 # Currently this does nothing
-[tool.poetry.scripts]
+[project.scripts]
 resmoke = "buildscripts.resmoke:entrypoint"
 
 [tool.ruff]
