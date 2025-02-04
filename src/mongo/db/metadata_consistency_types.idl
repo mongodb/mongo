@@ -424,3 +424,9 @@ structs:
                 description: "Enable index consistency checks"
                 type: safeBool
                 default: false
+            dbMetadataLockMaxTimeMS:
+                description: "Max time in milliseconds that the operation is allowed to block other
+                              DDL operations on a database"
+                type: exactInt64
+                validator: { gte: 0, lte: 2147483647 } # [0, 2^31 - 1]
+                optional: true

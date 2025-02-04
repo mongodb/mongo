@@ -108,6 +108,7 @@ MONGO_FAIL_POINT_DEFINE(hangShardCheckMetadataBeforeDDLLock);
 MONGO_FAIL_POINT_DEFINE(tripwireShardCheckMetadataAfterDDLLock);
 
 MONGO_FAIL_POINT_DEFINE(hangShardCheckMetadataBeforeEstablishCursors);
+MONGO_FAIL_POINT_DEFINE(throwExceededTimeLimitOnCheckMetadataBeforeEstablishCursors);
 MONGO_FAIL_POINT_DEFINE(tripwireShardCheckMetadataAfterEstablishCursors);
 
 constexpr StringData kDDLLockReason = "checkMetadataConsistency"_sd;
@@ -201,6 +202,28 @@ public:
         }
 
     private:
+        template <typename Callback>
+        decltype(auto) _runWithDbMetadaLockDeadline(OperationContext* opCtx,
+                                                    Milliseconds timeout,
+                                                    const NamespaceString& nss,
+                                                    Callback&& cb) {
+            const auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+            const auto deadline = now + timeout;
+            const auto guard = opCtx->makeDeadlineGuard(deadline, ErrorCodes::ExceededTimeLimit);
+            try {
+                return std::forward<Callback>(cb)();
+            } catch (const ExceptionFor<ErrorCodes::ExceededTimeLimit>&) {
+                const auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+                if (now >= deadline) {
+                    uasserted(9944001,
+                              str::stream()
+                                  << "Exceeded maximum time " << timeout
+                                  << " while processing namespace " << nss.toStringForErrorMsg());
+                }
+                throw;
+            }
+        }
+
         Response _runClusterLevel(OperationContext* opCtx, const NamespaceString& nss) {
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << Request::kCommandName
@@ -259,10 +282,20 @@ public:
                     }
                 };
 
+                const auto dbCheckStatus = [&] {
+                    if (request().getDbMetadataLockMaxTimeMS().is_initialized()) {
+                        const auto timeout =
+                            Milliseconds(request().getDbMetadataLockMaxTimeMS().value());
+                        return _runWithDbMetadaLockDeadline(
+                            opCtx, timeout, dbNss, checkMetadataForDb);
+                    } else {
+                        return checkMetadataForDb();
+                    }
+                }();
+
                 bool skippedMetadataChecks = false;
-                auto status = checkMetadataForDb();
-                if (!status.isOK()) {
-                    auto extraInfo = status.extraInfo<StaleDbRoutingVersion>();
+                if (!dbCheckStatus.isOK()) {
+                    auto extraInfo = dbCheckStatus.extraInfo<StaleDbRoutingVersion>();
                     if (!extraInfo || extraInfo->getVersionWanted()) {
                         // In case there is a wanted shard version means that the metadata is stale
                         // and we are going to skip the checks.
@@ -291,7 +324,7 @@ public:
         }
 
         Response _runDatabaseLevel(OperationContext* opCtx, const NamespaceString& nss) {
-            auto dbCursors = [&]() {
+            auto establishDBCursors = [&]() {
                 hangShardCheckMetadataBeforeDDLLock.pauseWhileSet();
                 DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
                     opCtx, nss.dbName(), kDDLLockReason, MODE_S};
@@ -299,6 +332,16 @@ public:
                         "Expected interrupt before tripwireShardCheckMetadataAfterDDLLock",
                         !tripwireShardCheckMetadataAfterDDLLock.shouldFail());
                 return _establishCursorOnParticipants(opCtx, nss);
+            };
+
+            auto dbCursors = [&]() {
+                if (request().getDbMetadataLockMaxTimeMS().is_initialized()) {
+                    const auto timeout =
+                        Milliseconds(request().getDbMetadataLockMaxTimeMS().value());
+                    return _runWithDbMetadaLockDeadline(opCtx, timeout, nss, establishDBCursors);
+                } else {
+                    return establishDBCursors();
+                }
             }();
 
             return _mergeCursors(opCtx, nss, std::move(dbCursors));
@@ -325,6 +368,12 @@ public:
         std::vector<RemoteCursor> _establishCursorOnParticipants(OperationContext* opCtx,
                                                                  const NamespaceString& nss) {
             hangShardCheckMetadataBeforeEstablishCursors.pauseWhileSet();
+            if (throwExceededTimeLimitOnCheckMetadataBeforeEstablishCursors.shouldFail()) {
+                uasserted(ErrorCodes::ExceededTimeLimit,
+                          str::stream() << "Timing out before establishing cursors on "
+                                           "checkMetadataConsistency for nss "
+                                        << nss.toStringForErrorMsg());
+            }
 
             // Shard requests
             const auto shardOpKey = UUID::gen();
