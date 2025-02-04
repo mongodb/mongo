@@ -303,7 +303,12 @@ const newShardName =
     assert(!configPrimary.getCollection(ns).exists());
     assert(!configPrimary.getCollection(indexedNs).exists());
     assert.sameMembers(configPrimary.getCollection(indexedNs).getIndexKeys(), []);
-    assert(!configPrimary.getCollection("config.system.sessions").exists());
+    if (FeatureFlagUtil.isPresentAndEnabled(configPrimary,
+                                            "SessionsCollectionCoordinatorOnConfigServer")) {
+        assert(configPrimary.getCollection("config.system.sessions").exists());
+    } else {
+        assert(!configPrimary.getCollection("config.system.sessions").exists());
+    }
 
     // Basic CRUD and sharded DDL work.
     basicCRUD(st.s);
@@ -414,6 +419,8 @@ const newShardName =
         st.configRS.getPrimary().getDB(dbName)["newOrphanCollection"].remove({x: 1}));
 
     // Logical sessions collection.
+    assert.commandWorked(st.configRS.getPrimary().adminCommand(
+        {_flushRoutingTableCacheUpdates: "config.system.sessions"}));
     assert.commandWorked(
         st.configRS.getPrimary().getCollection("config.system.sessions").insert({x: 1}));
     removeRes = assert.commandWorked(st.s.adminCommand({transitionToDedicatedConfigServer: 1}));

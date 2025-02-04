@@ -52,8 +52,12 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
 
 /**
  * Creates the specified collection.
+ *
+ * TODO (SERVER-100309): remove `againstFirstShard` once 9.0 becomes last LTS.
  */
-void createCollection(OperationContext* opCtx, ShardsvrCreateCollection request);
+CreateCollectionResponse createCollection(OperationContext* opCtx,
+                                          ShardsvrCreateCollection request,
+                                          bool againstFirstShard = false);
 
 /**
  * Creates a collection with the options specified in `request`. Calls the above createCollection

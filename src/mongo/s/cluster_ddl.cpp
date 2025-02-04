@@ -85,6 +85,7 @@ std::vector<AsyncRequestsSender::Request> buildUnshardedRequestsForAllShards(
     return requests;
 }
 
+// TODO (SERVER-100309): remove once 9.0 becomes last LTS.
 AsyncRequestsSender::Response executeCommandAgainstFirstShard(OperationContext* opCtx,
                                                               const DatabaseName& dbName,
                                                               const CachedDatabaseInfo& dbInfo,
@@ -158,7 +159,9 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
     return uassertStatusOK(std::move(dbStatus));
 }
 
-void createCollection(OperationContext* opCtx, ShardsvrCreateCollection request) {
+CreateCollectionResponse createCollection(OperationContext* opCtx,
+                                          ShardsvrCreateCollection request,
+                                          bool againstFirstShard) {
     const auto& nss = request.getNamespace();
     const auto dbInfo = createDatabase(opCtx, nss.dbName());
 
@@ -203,8 +206,7 @@ void createCollection(OperationContext* opCtx, ShardsvrCreateCollection request)
                     "dataShard"_attr = *requestWithRandomDataShard.getDataShard());
 
         try {
-            createCollection(opCtx, std::move(requestWithRandomDataShard));
-            return;
+            return createCollection(opCtx, std::move(requestWithRandomDataShard));
         } catch (const ExceptionFor<ErrorCodes::AlreadyInitialized>&) {
             // If the collection already exists but we randomly selected a dataShard that turns out
             // to be different than the current one, then createCollection will fail with
@@ -249,7 +251,8 @@ void createCollection(OperationContext* opCtx, ShardsvrCreateCollection request)
         return request.toBSON();
     }();
     auto cmdResponse = [&]() {
-        if (isSharded && nss.isConfigDB())
+        // TODO (SERVER-100309): remove againstFirstShard option once 9.0 becomes last LTS.
+        if (againstFirstShard)
             return executeCommandAgainstFirstShard(
                 opCtx,
                 nss.dbName(),
@@ -276,6 +279,8 @@ void createCollection(OperationContext* opCtx, ShardsvrCreateCollection request)
 
     auto catalogCache = Grid::get(opCtx)->catalogCache();
     catalogCache->onStaleCollectionVersion(nss, createCollResp.getCollectionVersion());
+
+    return createCollResp;
 }
 
 void createCollectionWithRouterLoop(OperationContext* opCtx,

@@ -108,3 +108,11 @@ structs:
                     shard if the collection does not yet exist. Only guaranteed to be set after the
                     enterWriteCSOnDataShardAndCheckEmpty phase completes.
                 optional: true
+            # TODO (SERVER-100309): remove once 9.0 becomes last LTS
+            createSessionsCollectionRemotelyOnFirstShard:
+                type: bool
+                description: >-
+                    When true, the coordinator will set the first shard as the data shard for the
+                    config.system.sessions collection. When false, the coordinator will create the
+                    chunk for the sessions collection locally (pre-8.1 behavior).
+                optional: true

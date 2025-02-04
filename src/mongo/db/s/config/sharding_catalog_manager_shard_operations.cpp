@@ -1349,15 +1349,18 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         }
     }
 
-    // Check that the shard candidate does not have a local config.system.sessions collection
-    auto res = _dropSessionsCollection(opCtx, targeter);
-    if (!res.isOK()) {
-        return res.withContext(
-            "can't add shard with a local copy of config.system.sessions, please drop this "
-            "collection from the shard manually and try again.");
-    }
-
+    // Check that the shard candidate does not have a local config.system.sessions collection. We do
+    // not want to drop this once featureFlagSessionsCollectionCoordinatorOnConfigServer is enabled
+    // but we do not have stability yet. We optimistically do not drop it here and then double check
+    // later under the fixed FCV region.
     if (!isConfigShard) {
+        auto res = _dropSessionsCollection(opCtx, targeter);
+        if (!res.isOK()) {
+            return res.withContext(
+                "can't add shard with a local copy of config.system.sessions, please drop this "
+                "collection from the shard manually and try again.");
+        }
+
         // If the shard is also the config server itself, there is no need to pull the keys since
         // the keys already exists in the local admin.system.keys collection.
         auto pullKeysStatus = _pullClusterTimeKeys(opCtx, targeter);
@@ -1439,6 +1442,16 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         invariant(currentFCV == multiversion::GenericFCV::kLatest ||
                   currentFCV == multiversion::GenericFCV::kLastContinuous ||
                   currentFCV == multiversion::GenericFCV::kLastLTS);
+
+        if (isConfigShard &&
+            !feature_flags::gSessionsCollectionCoordinatorOnConfigServer.isEnabled(fcvSnapshot)) {
+            auto res = _dropSessionsCollection(opCtx, targeter);
+            if (!res.isOK()) {
+                return res.withContext(
+                    "can't add shard with a local copy of config.system.sessions, please drop this "
+                    "collection from the shard manually and try again.");
+            }
+        }
 
         if (!isConfigShard) {
             SetFeatureCompatibilityVersion setFcvCmd(currentFCV);
@@ -1790,140 +1803,158 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         return progress;
     }
 
-    if (shardId == ShardId::kConfigServerId) {
-        // Drop all tracked databases locally now that all user data has been drained so the config
-        // server can transition back to catalog shard mode without requiring users to manually drop
-        // them.
+    {
+        // Keep the FCV stable across the commit of the shard removal. This allows us to only drop
+        // the sessions collection when needed.
+        //
+        // NOTE: We don't use a Global IX lock here, because we don't want to hold the global lock
+        // while blocking on the network).
+        FixedFCVRegion fcvRegion(opCtx);
 
-        // First, verify all collections we would drop are empty. In normal operation, a collection
-        // may still have data because of a sharded drop (which non-atomically updates metadata
-        // before dropping user data). If this state persists, manual intervention will be required
-        // to complete the transition, so we don't accidentally delete real data.
-        auto trackedDBs =
-            _localCatalogClient->getAllDBs(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+        if (shardId == ShardId::kConfigServerId) {
+            // Drop all tracked databases locally now that all user data has been drained so the
+            // config server can transition back to catalog shard mode without requiring users to
+            // manually drop them.
 
-        LOGV2(9022301, "Checking all local collections are empty", "shardId"_attr = shardName);
+            // First, verify all collections we would drop are empty. In normal operation, a
+            // collection may still have data because of a sharded drop (which non-atomically
+            // updates metadata before dropping user data). If this state persists, manual
+            // intervention will be required to complete the transition, so we don't accidentally
+            // delete real data.
+            auto trackedDBs =
+                _localCatalogClient->getAllDBs(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
 
-        for (auto&& db : trackedDBs) {
-            tassert(7783700,
-                    "Cannot drop admin or config database from the config server",
-                    !db.getDbName().isConfigDB() && !db.getDbName().isAdminDB());
+            LOGV2(9022301, "Checking all local collections are empty", "shardId"_attr = shardName);
 
-            auto collections = [&] {
-                Lock::DBLock dbLock(opCtx, db.getDbName(), MODE_S);
-                auto catalog = CollectionCatalog::get(opCtx);
-                return catalog->getAllCollectionNamesFromDb(opCtx, db.getDbName());
-            }();
-            if (auto pendingDataCleanupState = checkCollectionsAreEmpty(opCtx, collections)) {
+            for (auto&& db : trackedDBs) {
+                tassert(7783700,
+                        "Cannot drop admin or config database from the config server",
+                        !db.getDbName().isConfigDB() && !db.getDbName().isAdminDB());
+
+                auto collections = [&] {
+                    Lock::DBLock dbLock(opCtx, db.getDbName(), MODE_S);
+                    auto catalog = CollectionCatalog::get(opCtx);
+                    return catalog->getAllCollectionNamesFromDb(opCtx, db.getDbName());
+                }();
+                if (auto pendingDataCleanupState = checkCollectionsAreEmpty(opCtx, collections)) {
+                    return *pendingDataCleanupState;
+                }
+            }
+
+            // Now actually drop the databases; each request must either succeed or resolve into a
+            // no-op.
+            LOGV2(7509600, "Locally dropping drained databases", "shardId"_attr = shardName);
+
+            for (auto&& db : trackedDBs) {
+                const auto dropStatus =
+                    dropDatabase(opCtx, db.getDbName(), true /*markFromMigrate*/);
+                if (dropStatus != ErrorCodes::NamespaceNotFound) {
+                    uassertStatusOK(dropStatus);
+                }
+                hangAfterDroppingDatabaseInTransitionToDedicatedConfigServer.pauseWhileSet(opCtx);
+            }
+
+            // Also drop the sessions collection, which we assume is the only sharded collection in
+            // the config database. Only do this if
+            // featureFlagSessionsCollectionCoordinatorOnConfigServer is disabled. We don't have
+            // synchronization with setFCV here, so it is still possible for rare interleavings to
+            // drop the collection when they shouldn't, but the create coordinator will re-create it
+            // on the next periodic refresh.
+            if (auto pendingDataCleanupState =
+                    checkCollectionsAreEmpty(opCtx, {NamespaceString::kLogicalSessionsNamespace})) {
                 return *pendingDataCleanupState;
             }
-        }
-
-        // Now actually drop the databases; each request must either succeed or resolve into a
-        // no-op.
-        LOGV2(7509600, "Locally dropping drained databases", "shardId"_attr = shardName);
-
-        for (auto&& db : trackedDBs) {
-            const auto dropStatus = dropDatabase(opCtx, db.getDbName(), true /*markFromMigrate*/);
-            if (dropStatus != ErrorCodes::NamespaceNotFound) {
-                uassertStatusOK(dropStatus);
-            }
-            hangAfterDroppingDatabaseInTransitionToDedicatedConfigServer.pauseWhileSet(opCtx);
-        }
-
-        // Also drop the sessions collection, which we assume is the only sharded collection in the
-        // config database.
-        if (auto pendingDataCleanupState =
-                checkCollectionsAreEmpty(opCtx, {NamespaceString::kLogicalSessionsNamespace})) {
-            return *pendingDataCleanupState;
-        }
-
-        DBDirectClient client(opCtx);
-        BSONObj result;
-        if (!client.dropCollection(NamespaceString::kLogicalSessionsNamespace,
-                                   ShardingCatalogClient::kLocalWriteConcern,
-                                   &result)) {
-            uassertStatusOK(getStatusFromCommandResult(result));
-        }
-    }
-
-    // Draining is done, now finish removing the shard.
-    LOGV2(21949, "Going to remove shard", "shardId"_attr = shardName);
-
-    // Synchronize the control shard selection, the shard's document removal, and the topology time
-    // update to exclude potential race conditions in case of concurrent add/remove shard
-    // operations.
-    clusterCardinalityParameterLock.lock();
-    shardMembershipLock.lock();
-
-    // Find a controlShard to be updated.
-    auto controlShardQueryStatus = _localConfigShard->exhaustiveFindOnConfig(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        repl::ReadConcernLevel::kLocalReadConcern,
-        NamespaceString::kConfigsvrShardsNamespace,
-        BSON(ShardType::name.ne(shardName)),
-        {},
-        1);
-    auto controlShardResponse = uassertStatusOK(controlShardQueryStatus);
-    // Since it's not possible to remove the last shard, there should always be a control shard.
-    uassert(4740601,
-            "unable to find a controlShard to update during removeShard",
-            !controlShardResponse.docs.empty());
-    const auto controlShardStatus = ShardType::fromBSON(controlShardResponse.docs.front());
-    uassertStatusOKWithContext(controlShardStatus, "unable to parse control shard");
-    std::string controlShardName = controlShardStatus.getValue().getName();
-
-    // Tick clusterTime to get a new topologyTime for this mutation of the topology.
-    auto newTopologyTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);
-
-    // Remove the shard's document and update topologyTime within a transaction.
-    _removeShardInTransaction(opCtx, shardName, controlShardName, newTopologyTime.asTimestamp());
-
-    // Release the shard membership lock since the set cluster parameter operation below
-    // require taking this lock.
-    shardMembershipLock.unlock();
-
-    // Unset the addOrRemoveShardInProgress cluster parameter. Note that _removeShardInTransaction
-    // has already waited for the commit to be majority-acknowledged.
-    if (feature_flags::gStopDDLCoordinatorsDuringTopologyChanges.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        // TODO SERVER-99708: Investigate if we can remove this. unblockDDLCoordinators ends up
-        // calling the configSvrSetClusterParameter command which takes the FCV lock. At this point
-        // we are still holding the clusterCardinalityParameterLock. Other operations proceed to
-        // take the locks in the inverse order, that is, they first take the FCV lock followed by
-        // the clusterCardinalityParameterLock. We should review if we must unlock the
-        // clusterCardinalityParameterLock here to prevent a lock cycle or see if this can be
-        // refactored to prevent it.
-        DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
-        unblockDDLCoordinators(opCtx);
-    }
-    unblockDDLCoordinatorsGuard.dismiss();
-
-    // The shard which was just removed must be reflected in the shard registry, before the replica
-    // set monitor is removed, otherwise the shard would be referencing a dropped RSM.
-    Grid::get(opCtx)->shardRegistry()->reload(opCtx);
-
-    if (shardId != ShardId::kConfigServerId) {
-        // Don't remove the config shard's RSM because it is used to target the config server.
-        ReplicaSetMonitor::remove(replicaSetName);
-    }
-
-    // Record finish in changelog
-    ShardingLogging::get(opCtx)->logChange(opCtx,
-                                           "removeShard",
-                                           NamespaceString::kEmpty,
-                                           BSON("shard" << shardName),
+            if (!feature_flags::gSessionsCollectionCoordinatorOnConfigServer.isEnabled(
+                    fcvRegion->acquireFCVSnapshot())) {
+                DBDirectClient client(opCtx);
+                BSONObj result;
+                if (!client.dropCollection(NamespaceString::kLogicalSessionsNamespace,
                                            ShardingCatalogClient::kLocalWriteConcern,
-                                           _localConfigShard,
-                                           _localCatalogClient.get());
+                                           &result)) {
+                    uassertStatusOK(getStatusFromCommandResult(result));
+                }
+            }
+        }
 
-    hangRemoveShardBeforeUpdatingClusterCardinalityParameter.pauseWhileSet(opCtx);
+        // Draining is done, now finish removing the shard.
+        LOGV2(21949, "Going to remove shard", "shardId"_attr = shardName);
 
-    uassertStatusOK(_updateClusterCardinalityParameterAfterRemoveShardIfNeeded(
-        clusterCardinalityParameterLock, opCtx));
+        // Synchronize the control shard selection, the shard's document removal, and the topology
+        // time update to exclude potential race conditions in case of concurrent add/remove shard
+        // operations.
+        clusterCardinalityParameterLock.lock();
+        shardMembershipLock.lock();
 
-    return RemoveShardProgress(ShardDrainingStateEnum::kCompleted);
+        // Find a controlShard to be updated.
+        auto controlShardQueryStatus = _localConfigShard->exhaustiveFindOnConfig(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kLocalReadConcern,
+            NamespaceString::kConfigsvrShardsNamespace,
+            BSON(ShardType::name.ne(shardName)),
+            {},
+            1);
+        auto controlShardResponse = uassertStatusOK(controlShardQueryStatus);
+        // Since it's not possible to remove the last shard, there should always be a control shard.
+        uassert(4740601,
+                "unable to find a controlShard to update during removeShard",
+                !controlShardResponse.docs.empty());
+        const auto controlShardStatus = ShardType::fromBSON(controlShardResponse.docs.front());
+        uassertStatusOKWithContext(controlShardStatus, "unable to parse control shard");
+        std::string controlShardName = controlShardStatus.getValue().getName();
+
+        // Tick clusterTime to get a new topologyTime for this mutation of the topology.
+        auto newTopologyTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);
+
+        // Remove the shard's document and update topologyTime within a transaction.
+        _removeShardInTransaction(
+            opCtx, shardName, controlShardName, newTopologyTime.asTimestamp());
+
+        // Release the shard membership lock since the set cluster parameter operation below
+        // require taking this lock.
+        shardMembershipLock.unlock();
+
+        // Unset the addOrRemoveShardInProgress cluster parameter. Note that
+        // _removeShardInTransaction has already waited for the commit to be majority-acknowledged.
+        if (feature_flags::gStopDDLCoordinatorsDuringTopologyChanges.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            // TODO SERVER-99708: Investigate if we can remove this. unblockDDLCoordinators ends up
+            // calling the configSvrSetClusterParameter command which takes the FCV lock. At this
+            // point we are still holding the clusterCardinalityParameterLock. Other operations
+            // proceed to take the locks in the inverse order, that is, they first take the FCV lock
+            // followed by the clusterCardinalityParameterLock. We should review if we must unlock
+            // the clusterCardinalityParameterLock here to prevent a lock cycle or see if this can
+            // be refactored to prevent it.
+            DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
+            unblockDDLCoordinators(opCtx);
+        }
+        unblockDDLCoordinatorsGuard.dismiss();
+
+        // The shard which was just removed must be reflected in the shard registry, before the
+        // replica set monitor is removed, otherwise the shard would be referencing a dropped RSM.
+        Grid::get(opCtx)->shardRegistry()->reload(opCtx);
+
+        if (shardId != ShardId::kConfigServerId) {
+            // Don't remove the config shard's RSM because it is used to target the config server.
+            ReplicaSetMonitor::remove(replicaSetName);
+        }
+
+        // Record finish in changelog
+        ShardingLogging::get(opCtx)->logChange(opCtx,
+                                               "removeShard",
+                                               NamespaceString::kEmpty,
+                                               BSON("shard" << shardName),
+                                               ShardingCatalogClient::kLocalWriteConcern,
+                                               _localConfigShard,
+                                               _localCatalogClient.get());
+
+        hangRemoveShardBeforeUpdatingClusterCardinalityParameter.pauseWhileSet(opCtx);
+
+        uassertStatusOK(_updateClusterCardinalityParameterAfterRemoveShardIfNeeded(
+            clusterCardinalityParameterLock, opCtx));
+
+        return RemoveShardProgress(ShardDrainingStateEnum::kCompleted);
+    }
 }
 
 void ShardingCatalogManager::appendDBAndCollDrainingInfo(OperationContext* opCtx,

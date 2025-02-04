@@ -175,6 +175,14 @@ feature_flags:
     cpp_varname: feature_flags::gShardAuthoritativeDbMetadata
     default: false
     shouldBeFCVGated: false
+  # TODO (SERVER-100309): remove once 9.0 becomes last LTS.
+  featureFlagSessionsCollectionCoordinatorOnConfigServer:
+    description: Feature flag for running the shard collection coordinator on the config server for 
+                 config.system.sessions.
+    cpp_varname: feature_flags::gSessionsCollectionCoordinatorOnConfigServer
+    default: true
+    version: 8.1
+    shouldBeFCVGated: true
   # TODO (SERVER-99140): Remove once 9.0 becomes last LTS
   featureFlagProhibitNonEmptyReplicaSetOnAddShard:
     description: "Feature flag to prohibit adding non-empty replica set to the cluster."

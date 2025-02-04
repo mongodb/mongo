@@ -271,8 +271,7 @@ bool _collectionMustExistLocallyButDoesnt(OperationContext* opCtx,
     // The DBPrimary shard must always have the collection created locally regardless if it owns
     // chunks or not.
     //
-    // TODO: (SERVER-86949) Check if collection is present on the primary performing DDL operations
-    // for the `config` database.
+    // TODO: (SERVER-XYZ) Remove exclusion for configDB once 9.0 becomes lastLTS.
     if (currentShard == primaryShard && !nss.isConfigDB()) {
         return true;
     }

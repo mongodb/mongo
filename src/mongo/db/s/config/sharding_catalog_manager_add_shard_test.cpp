@@ -672,6 +672,71 @@ protected:
         networkForAddShard()->exitNetwork();
     }
 
+    // TODO (SERVER-100309): move into SuccessfullyAddConfigShard test once 9.0 becomes LastLTS.
+    void runSuccessfulConfigShardTest(bool expectDropSessionsCollection) {
+        std::unique_ptr<RemoteCommandTargeterMock> targeter(
+            std::make_unique<RemoteCommandTargeterMock>());
+        ConnectionString connString =
+            assertGet(ConnectionString::parse("mySet/host1:12345,host2:12345"));
+        targeter->setConnectionStringReturnValue(connString);
+        HostAndPort shardTarget = connString.getServers().front();
+        targeter->setFindHostReturnValue(shardTarget);
+        targeterFactory()->addTargeterToReturn(connString, std::move(targeter));
+
+        std::string expectedShardName = "mySet";
+
+        // The shard doc inserted into the config.shards collection on the config server.
+        ShardType expectedShard;
+        expectedShard.setName(expectedShardName);
+        expectedShard.setHost(connString.toString());
+        expectedShard.setState(ShardType::ShardState::kShardAware);
+
+        DatabaseType discoveredDB(DatabaseName::createDatabaseName_forTest(boost::none, "shardDB"),
+                                  ShardId(expectedShardName),
+                                  DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+
+        auto future = launchAsync([this, &expectedShardName, &connString] {
+            ThreadClient tc(getServiceContext()->getService());
+            auto opCtx = Client::getCurrent()->makeOperationContext();
+            auto shardName = assertGet(
+                ShardingCatalogManager::get(opCtx.get())
+                    ->addShard(opCtx.get(), nullptr, connString, true /* isConfigShard */));
+            ASSERT_EQUALS(expectedShardName, shardName);
+        });
+
+        BSONArrayBuilder hosts;
+        hosts.append("host1:12345");
+        hosts.append("host2:12345");
+        BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "setName"
+                                            << "mySet"
+                                            << "hosts" << hosts.arr() << "maxWireVersion"
+                                            << WireVersion::LATEST_WIRE_VERSION);
+        expectHello(shardTarget, commandResponse);
+
+        // Get databases list from new shard
+        expectListDatabases(
+            shardTarget,
+            std::vector<BSONObj>{BSON("name" << discoveredDB.getDbName().toString_forTest())});
+
+        if (expectDropSessionsCollection) {
+            expectCollectionDrop(shardTarget, NamespaceString::kLogicalSessionsNamespace);
+        }
+
+        // Should not run _addShard command, touch user_writes_critical_sections, setParameter,
+        // setFCV
+
+        // Wait for the addShard to complete before checking the config database
+        future.timed_get(kLongFutureTimeout);
+
+        // Ensure that the shard document was properly added to config.shards.
+        assertShardExists(expectedShard);
+
+        // Ensure that the databases detected from the shard were properly added to config.database.
+        assertDatabaseExists(discoveredDB);
+
+        assertChangeWasLogged(expectedShard);
+    }
+
     OID _clusterId;
 
     ReadWriteConcernDefaultsLookupMock _lookupMock;
@@ -1596,65 +1661,17 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     checkLocalClusterParametersAfterPull();
 }
 
+// TODO (SERVER-100309): remove once 9.0 becomes last LTS.
+TEST_F(AddShardTest, SuccessfullyAddConfigShardOldPath) {
+    // Since unit tests always run with all feature flags enabled, manually disable the feature flag
+    // to maintain testing for old FCV.
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagSessionsCollectionCoordinatorOnConfigServer", false);
+    runSuccessfulConfigShardTest(true);
+}
+
 TEST_F(AddShardTest, SuccessfullyAddConfigShard) {
-    std::unique_ptr<RemoteCommandTargeterMock> targeter(
-        std::make_unique<RemoteCommandTargeterMock>());
-    ConnectionString connString =
-        assertGet(ConnectionString::parse("mySet/host1:12345,host2:12345"));
-    targeter->setConnectionStringReturnValue(connString);
-    HostAndPort shardTarget = connString.getServers().front();
-    targeter->setFindHostReturnValue(shardTarget);
-    targeterFactory()->addTargeterToReturn(connString, std::move(targeter));
-
-    std::string expectedShardName = "mySet";
-
-    // The shard doc inserted into the config.shards collection on the config server.
-    ShardType expectedShard;
-    expectedShard.setName(expectedShardName);
-    expectedShard.setHost(connString.toString());
-    expectedShard.setState(ShardType::ShardState::kShardAware);
-
-    DatabaseType discoveredDB(DatabaseName::createDatabaseName_forTest(boost::none, "shardDB"),
-                              ShardId(expectedShardName),
-                              DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
-
-    auto future = launchAsync([this, &expectedShardName, &connString] {
-        ThreadClient tc(getServiceContext()->getService());
-        auto opCtx = Client::getCurrent()->makeOperationContext();
-        auto shardName =
-            assertGet(ShardingCatalogManager::get(opCtx.get())
-                          ->addShard(opCtx.get(), nullptr, connString, true /* isConfigShard */));
-        ASSERT_EQUALS(expectedShardName, shardName);
-    });
-
-    BSONArrayBuilder hosts;
-    hosts.append("host1:12345");
-    hosts.append("host2:12345");
-    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "setName"
-                                        << "mySet"
-                                        << "hosts" << hosts.arr() << "maxWireVersion"
-                                        << WireVersion::LATEST_WIRE_VERSION);
-    expectHello(shardTarget, commandResponse);
-
-    // Get databases list from new shard
-    expectListDatabases(
-        shardTarget,
-        std::vector<BSONObj>{BSON("name" << discoveredDB.getDbName().toString_forTest())});
-
-    expectCollectionDrop(shardTarget, NamespaceString::kLogicalSessionsNamespace);
-
-    // Should not run _addShard command, touch user_writes_critical_sections, setParameter, setFCV
-
-    // Wait for the addShard to complete before checking the config database
-    future.timed_get(kLongFutureTimeout);
-
-    // Ensure that the shard document was properly added to config.shards.
-    assertShardExists(expectedShard);
-
-    // Ensure that the databases detected from the shard were properly added to config.database.
-    assertDatabaseExists(discoveredDB);
-
-    assertChangeWasLogged(expectedShard);
+    runSuccessfulConfigShardTest(false);
 }
 
 TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
