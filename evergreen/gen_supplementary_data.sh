@@ -12,7 +12,7 @@ if [ -z "${build_patch_id}" ] || [ -z "${reuse_compile_from}" ] || [ "${is_patch
   mkdir -p mongodb/
 
   # Generate feature flag list
-  $python buildscripts/idl/gen_all_feature_flag_list.py
+  $python buildscripts/idl/gen_all_feature_flag_list.py turned-off-by-default
   mkdir -p mongodb/feature_flags
   cp ./all_feature_flags.txt mongodb/feature_flags
 

@@ -99,6 +99,10 @@ py_binary(
     visibility = ["//visibility:public"],
     deps = [
         "//buildscripts/resmokelib",
+        dependency(
+            "typer",
+            group = "core",
+        ),
     ],
 )
 

@@ -59,10 +59,14 @@ def get_tests_missing_fcv_tag(tests):
 def main(diff_file, ent_path):
     """Run the main function."""
     with open("base_all_feature_flags.txt", "r") as fh:
-        base_feature_flags = fh.read().split()
+        base_feature_flags_turned_on_by_default = fh.read().split()
     with open("patch_all_feature_flags.txt", "r") as fh:
-        patch_feature_flags = fh.read().split()
-    enabled_feature_flags = [flag for flag in base_feature_flags if flag not in patch_feature_flags]
+        patch_feature_flags_turned_on_by_default = fh.read().split()
+    enabled_feature_flags = [
+        flag
+        for flag in patch_feature_flags_turned_on_by_default
+        if flag not in base_feature_flags_turned_on_by_default
+    ]
 
     if not enabled_feature_flags:
         print(

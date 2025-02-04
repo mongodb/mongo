@@ -6,4 +6,4 @@ cd src
 set -o errexit
 set -o verbose
 activate_venv
-$python buildscripts/idl/gen_all_feature_flag_list.py
+$python buildscripts/idl/gen_all_feature_flag_list.py turned-off-by-default
