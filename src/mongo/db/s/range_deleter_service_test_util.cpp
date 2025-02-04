@@ -222,6 +222,36 @@ void verifyRangeDeletionTasks(OperationContext* opCtx,
     }
 }
 
+void verifyProcessingFlag(OperationContext* opCtx,
+                          UUID uuidColl,
+                          const ChunkRange& range,
+                          bool processingExpected) {
+    DBDirectClient client(opCtx);
+
+    const auto query = BSON(
+        RangeDeletionTask::kCollectionUuidFieldName
+        << uuidColl << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName
+        << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName
+        << range.getMax());
+
+    FindCommandRequest findRequest{NamespaceString::kRangeDeletionNamespace};
+    findRequest.setFilter(query);
+    auto doc = client.findOne(std::move(findRequest));
+
+    ASSERT(!doc.isEmpty()) << "Chunk '" << query << "' not found";
+
+    if (processingExpected) {
+        ASSERT_EQ(true, doc.getField(RangeDeletionTask::kProcessingFieldName).booleanSafe())
+            << "The `processing` field was expected to be true for that chunk. Chunk doc found: "
+            << doc;
+    } else {
+        ASSERT(!doc.hasField(RangeDeletionTask::kProcessingFieldName))
+            << "The `processing` field was not expected to be present for that chunk. Chunk doc "
+               "found: "
+            << doc;
+    }
+}
+
 void _clearFilteringMetadataByUUID(OperationContext* opCtx, const UUID& uuid) {
     NamespaceString nss = RangeDeleterServiceTest::nssWithUuid[uuid];
 

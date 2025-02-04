@@ -64,6 +64,7 @@
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -908,6 +909,41 @@ TEST_F(RangeDeleterServiceTest, WaitForOngoingQueriesInvalidatedOnStepDown) {
     } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
         // Future must have been set to an interruption error because the service was disabled
     }
+}
+
+TEST_F(RangeDeleterServiceTest, ProcessingFlagIsSetWhenRangeDeletionExecutionStarts) {
+    auto rds = RangeDeleterService::get(opCtx);
+    auto taskWithOngoingQueries = rangeDeletionTask0ForCollA;
+
+    auto completionFuture =
+        registerAndCreatePersistentTask(opCtx,
+                                        taskWithOngoingQueries->getTask(),
+                                        taskWithOngoingQueries->getOngoingQueriesFuture());
+
+    // Check the `ongoing` flag is still not present since the range deletion hasn't started yet.
+    verifyProcessingFlag(opCtx,
+                         uuidCollA,
+                         rangeDeletionTask0ForCollA->getTask().getRange(),
+                         /*processingExpected=*/false);
+
+    {
+        // Add a failpoint to pause the range deletion execution after setting the `ongoing` flag.
+        FailPointEnableBlock hangBeforeDoingDeletionFp("hangBeforeDoingDeletion");
+
+        // Mark ongoing queries as drained and check the `ongoing` flag is present
+        taskWithOngoingQueries->drainOngoingQueries();
+
+        hangBeforeDoingDeletionFp->waitForTimesEntered(
+            hangBeforeDoingDeletionFp.initialTimesEntered() + 1);
+        verifyProcessingFlag(opCtx,
+                             uuidCollA,
+                             rangeDeletionTask0ForCollA->getTask().getRange(),
+                             /*processingExpected=*/true);
+    }
+
+    // Complete the range deletion execution
+    completionFuture.get(opCtx);
+    ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
 }
 
 }  // namespace mongo

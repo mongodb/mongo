@@ -28,7 +28,7 @@ const coll = db['test'];
 const nss = coll.getFullName();
 assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {_id: 1}}));
 
-function assertOrphanCountIsCorrect(conn, ns, numOrphans) {
+function assertRangeDeletionDoc(conn, ns, orphanCount, processing) {
     const rangeDeletionDoc =
         conn.getDB("config").getCollection("rangeDeletions").findOne({nss: ns});
     assert.neq(null,
@@ -36,12 +36,18 @@ function assertOrphanCountIsCorrect(conn, ns, numOrphans) {
                "did not find document for namespace " + ns +
                    ", contents of config.rangeDeletions on " + conn + ": " +
                    tojson(conn.getDB("config").getCollection("rangeDeletions").find().toArray()));
-    assert.eq(numOrphans,
+    assert.eq(orphanCount,
               rangeDeletionDoc.numOrphanDocs,
               "Incorrect count of orphaned documents in config.rangeDeletions on " + conn +
-                  ": expected " + numOrphans +
+                  ": expected " + orphanCount +
                   " orphaned documents but found range deletion document " +
                   tojson(rangeDeletionDoc));
+
+    if (processing) {
+        assert.eq(true, rangeDeletionDoc.processing);
+    } else {
+        assert(!rangeDeletionDoc.hasOwnProperty('processing'));
+    }
 }
 
 // Insert some docs into the collection.
@@ -62,7 +68,8 @@ const numBatches = numDocs / rangeDeleterBatchSize;
 for (let i = 0; i < numBatches; i++) {
     // Wait for failpoint and check num orphans
     beforeDeletionFailpoint.wait();
-    assertOrphanCountIsCorrect(st.shard0, nss, numDocs - rangeDeleterBatchSize * i);
+    assertRangeDeletionDoc(
+        st.shard0, nss, /*orphanCount=*/ numDocs - rangeDeleterBatchSize * i, /*processing=*/ true);
     // Unset and reset failpoint without allowing any batches deleted in the meantime
     afterDeletionFailpoint = configureFailPoint(st.shard0, "hangAfterDoingDeletion");
     beforeDeletionFailpoint.off();

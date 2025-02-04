@@ -136,6 +136,11 @@ void verifyRangeDeletionTasks(OperationContext* opCtx,
                               UUID uuidColl,
                               std::vector<ChunkRange> expectedChunkRanges);
 
+void verifyProcessingFlag(OperationContext* opCtx,
+                          UUID uuidColl,
+                          const ChunkRange& range,
+                          bool processingExpected);
+
 /* Unset any filtering metadata associated with the specified collection */
 void _clearFilteringMetadataByUUID(OperationContext* opCtx, const UUID& uuid);
 

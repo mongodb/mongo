@@ -62,7 +62,7 @@ function assertEventuallyDoesNotHaveMigrationCoordinatorDoc(conn) {
     });
 }
 
-function assertHasRangeDeletionDoc({conn, pending, whenToClean, ns, uuid}) {
+function assertHasRangeDeletionDoc({conn, pending, whenToClean, ns, uuid, processing}) {
     const query = {
         nss: ns,
         collectionUuid: uuid,
@@ -70,7 +70,8 @@ function assertHasRangeDeletionDoc({conn, pending, whenToClean, ns, uuid}) {
         "range.min._id": MinKey,
         "range.max._id": MaxKey,
         pending: (pending ? true : {$exists: false}),
-        whenToClean: whenToClean
+        whenToClean: whenToClean,
+        processing: (processing ? true : {$exists: false})
     };
     assert.neq(null,
                conn.getDB("config").getCollection("rangeDeletions").findOne(query),
@@ -112,8 +113,10 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
     // Assert that the durable state for coordinating the migration was written correctly.
     step4Failpoint.wait();
     assertHasMigrationCoordinatorDoc({conn: st.shard0, ns, uuid, epoch});
-    assertHasRangeDeletionDoc({conn: st.shard0, pending: true, whenToClean: "delayed", ns, uuid});
-    assertHasRangeDeletionDoc({conn: st.shard1, pending: true, whenToClean: "now", ns, uuid});
+    assertHasRangeDeletionDoc(
+        {conn: st.shard0, pending: true, whenToClean: "delayed", ns, uuid, processing: false});
+    assertHasRangeDeletionDoc(
+        {conn: st.shard1, pending: true, whenToClean: "now", ns, uuid, processing: false});
     step4Failpoint.off();
 
     // Allow the moveChunk to finish.
@@ -167,8 +170,10 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
     // Assert that the durable state for coordinating the migration was written correctly.
     step4Failpoint.wait();
     assertHasMigrationCoordinatorDoc({conn: st.shard0, ns, uuid, epoch});
-    assertHasRangeDeletionDoc({conn: st.shard0, pending: true, whenToClean: "delayed", ns, uuid});
-    assertHasRangeDeletionDoc({conn: st.shard1, pending: true, whenToClean: "now", ns, uuid});
+    assertHasRangeDeletionDoc(
+        {conn: st.shard0, pending: true, whenToClean: "delayed", ns, uuid, processing: false});
+    assertHasRangeDeletionDoc(
+        {conn: st.shard1, pending: true, whenToClean: "now", ns, uuid, processing: false});
     step4Failpoint.off();
 
     // Assert that the recipient has 'numDocs' orphans.
