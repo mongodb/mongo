@@ -11,6 +11,9 @@
  *   requires_getmore,
  *   # Runs a multi-delete which is non-retryable.
  *   requires_non_retryable_writes,
+ *   # Explain will force the query state to run outside of a transaction, and the query can
+ *   # call getMore depending on the random updates.
+ *   uses_getmore_outside_of_transaction,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
