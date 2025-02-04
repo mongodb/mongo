@@ -154,5 +154,136 @@ size_t UniqueStage::estimateCompileTimeSize() const {
     return size;
 }
 
+UniqueRoaringStage::UniqueRoaringStage(std::unique_ptr<PlanStage> input,
+                                       value::SlotId key,
+                                       PlanNodeId planNodeId,
+                                       bool participateInTrialRunTracking)
+    : PlanStage("unique_roaring"_sd,
+                nullptr /* yieldPolicy */,
+                planNodeId,
+                participateInTrialRunTracking),
+      _keySlot(key),
+      _seen(static_cast<size_t>(internalRoaringBitmapsThreshold.load()),
+            static_cast<size_t>(internalRoaringBitmapsBatchSize.load()),
+            static_cast<uint64_t>(internalRoaringBitmapsThreshold.load() /
+                                  internalRoaringBitmapsMinimalDensity.load())) {
+    _children.emplace_back(std::move(input));
+}
+
+std::unique_ptr<PlanStage> UniqueRoaringStage::clone() const {
+    return std::make_unique<UniqueRoaringStage>(
+        _children[0]->clone(), _keySlot, _commonStats.nodeId, participateInTrialRunTracking());
+}
+
+void UniqueRoaringStage::prepare(CompileCtx& ctx) {
+    _children[0]->prepare(ctx);
+    _inKeyAccessor = _children[0]->getAccessor(ctx, _keySlot);
+}
+
+value::SlotAccessor* UniqueRoaringStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
+    return _children[0]->getAccessor(ctx, slot);
+}
+
+void UniqueRoaringStage::open(bool reOpen) {
+    auto optTimer(getOptTimer(_opCtx));
+    ++_commonStats.opens;
+
+    if (reOpen) {
+        _seen.clear();
+    }
+    _children[0]->open(reOpen);
+}
+
+PlanState UniqueRoaringStage::getNext() {
+    auto optTimer(getOptTimer(_opCtx));
+
+    while (_children[0]->getNext() == PlanState::ADVANCED) {
+        auto [tag, val] = _inKeyAccessor->getViewOfValue();
+
+        int64_t roaringVal;
+        switch (tag) {
+            case value::TypeTags::NumberInt32: {
+                roaringVal = value::bitcastTo<int32_t>(val);
+                break;
+            }
+            case value::TypeTags::NumberInt64: {
+                roaringVal = value::bitcastTo<int64_t>(val);
+                break;
+            }
+            case value::TypeTags::RecordId: {
+                auto recordId = value::getRecordIdView(val);
+                tassert(
+                    9762501,
+                    "unique_roaring stage encountered a record id that is not formatted as long",
+                    recordId->isLong());
+                roaringVal = recordId->getLong();
+                break;
+            }
+            default: {
+                auto tag_ = tag;
+                tasserted(9762500,
+                          str::stream()
+                              << "unique_roaring stage encountered unexpected SBE value type: "
+                              << tag_);
+            }
+        }
+
+        ++_specificStats.dupsTested;
+        auto inserted = _seen.addChecked(roaringVal);
+        if (inserted) {
+            return trackPlanState(PlanState::ADVANCED);
+        } else {
+            // This row has been seen already, so we skip it.
+            ++_specificStats.dupsDropped;
+        }
+    }
+
+    return trackPlanState(PlanState::IS_EOF);
+}
+
+void UniqueRoaringStage::close() {
+    auto optTimer(getOptTimer(_opCtx));
+    trackClose();
+
+    _seen.clear();
+    _children[0]->close();
+}
+
+std::unique_ptr<PlanStageStats> UniqueRoaringStage::getStats(bool includeDebugInfo) const {
+    auto ret = std::make_unique<PlanStageStats>(_commonStats);
+    ret->specific = std::make_unique<UniqueStats>(_specificStats);
+
+    if (includeDebugInfo) {
+        BSONObjBuilder bob;
+        bob.appendNumber("dupsTested", static_cast<long long>(_specificStats.dupsTested));
+        bob.appendNumber("dupsDropped", static_cast<long long>(_specificStats.dupsDropped));
+        bob.append("keySlot", _keySlot);
+        ret->debugInfo = bob.obj();
+    }
+
+    ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
+    return ret;
+}
+
+const SpecificStats* UniqueRoaringStage::getSpecificStats() const {
+    return &_specificStats;
+}
+
+std::vector<DebugPrinter::Block> UniqueRoaringStage::debugPrint() const {
+    auto ret = PlanStage::debugPrint();
+
+    DebugPrinter::addIdentifier(ret, _keySlot);
+    DebugPrinter::addNewLine(ret);
+    DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
+
+    return ret;
+}
+
+size_t UniqueRoaringStage::estimateCompileTimeSize() const {
+    size_t size = sizeof(*this);
+    size += size_estimator::estimate(_children);
+    size += size_estimator::estimate(_specificStats);
+    return size;
+}
 }  // namespace sbe
 }  // namespace mongo

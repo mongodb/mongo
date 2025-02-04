@@ -969,7 +969,11 @@ std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
     // To avoid such situation, we are placing 'unique' stage to prevent repeating records from
     // appearing in the result.
     if (index.multikey) {
-        ixScanNljStage = b.makeUnique(std::move(ixScanNljStage), foreignRecordIdSlot);
+        if (foreignColl->isClustered()) {
+            ixScanNljStage = b.makeUnique(std::move(ixScanNljStage), foreignRecordIdSlot);
+        } else {
+            ixScanNljStage = b.makeUniqueRoaring(std::move(ixScanNljStage), foreignRecordIdSlot);
+        }
     }
 
     // Loop join the foreign record id produced by the index seek on the outer side with seek

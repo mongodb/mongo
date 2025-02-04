@@ -588,6 +588,10 @@ SbStage SbBuilder::makeUnique(SbStage stage, const SbSlotVector& keys) {
     return sbe::makeS<sbe::UniqueStage>(std::move(stage), lower(keys), _nodeId);
 }
 
+SbStage SbBuilder::makeUniqueRoaring(SbStage stage, SbSlot key) {
+    return sbe::makeS<sbe::UniqueRoaringStage>(std::move(stage), key.getId(), _nodeId);
+}
+
 SbStage SbBuilder::makeSort(const VariableTypes& varTypes,
                             SbStage stage,
                             const SbSlotVector& orderBy,

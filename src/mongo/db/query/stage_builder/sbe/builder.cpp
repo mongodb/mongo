@@ -1220,7 +1220,12 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildCountScan(
     if (csn->index.multikey ||
         (indexDescriptor->getIndexType() == IndexType::INDEX_WILDCARD &&
          indexDescriptor->keyPattern().nFields() > 1)) {
-        stage = b.makeUnique(std::move(stage), planStageSlots.get(PlanStageSlots::kRecordId));
+        if (collection->isClustered()) {
+            stage = b.makeUnique(std::move(stage), planStageSlots.get(PlanStageSlots::kRecordId));
+        } else {
+            stage = b.makeUniqueRoaring(std::move(stage),
+                                        planStageSlots.get(PlanStageSlots::kRecordId));
+        }
     }
 
     if (reqs.hasResult() || reqs.hasFields()) {
@@ -1882,7 +1887,12 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSortMerge(
                                                                      postimageAllowedFieldSets);
 
     if (mergeSortNode->dedup) {
-        stage = b.makeUnique(std::move(stage), outputs.get(kRecordId));
+        auto collection = getCurrentCollection(reqs);
+        if (collection->isClustered()) {
+            stage = b.makeUnique(std::move(stage), outputs.get(kRecordId));
+        } else {
+            stage = b.makeUniqueRoaring(std::move(stage), outputs.get(kRecordId));
+        }
     }
 
     // Stop propagating the RecordId output if none of our ancestors are going to use it.
@@ -3172,7 +3182,12 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildOr(const QuerySol
                                                                      postimageAllowedFieldSets);
 
     if (orn->dedup) {
-        stage = b.makeUnique(std::move(stage), outputs.get(kRecordId));
+        auto collection = getCurrentCollection(reqs);
+        if (collection->isClustered()) {
+            stage = b.makeUnique(std::move(stage), outputs.get(kRecordId));
+        } else {
+            stage = b.makeUniqueRoaring(std::move(stage), outputs.get(kRecordId));
+        }
     }
 
     // Stop propagating the RecordId output if none of our ancestors are going to use it.

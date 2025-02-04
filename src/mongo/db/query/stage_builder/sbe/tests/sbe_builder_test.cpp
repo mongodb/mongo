@@ -519,6 +519,10 @@ TEST_F(GoldenSbeStageBuilderTest, TestMatch) {
 }
 
 TEST_F(GoldenSbeStageBuilderTest, TestOr) {
+    // Create a dummy collection so that we can test collection metadata in the stage builder, even
+    // though this test only uses virtualscan stage.
+    createCollection({fromjson("{_id: 0}")}, boost::none);
+
     auto docs = std::vector<BSONArray>{BSON_ARRAY(int64_t{0} << BSON("a" << 1 << "b" << 2)),
                                        BSON_ARRAY(int64_t{1} << BSON("a" << 2 << "b" << 2)),
                                        BSON_ARRAY(int64_t{2} << BSON("a" << 3 << "b" << 2))};

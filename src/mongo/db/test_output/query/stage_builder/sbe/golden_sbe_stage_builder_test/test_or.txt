@@ -2,7 +2,7 @@
 [6] project [s13 = makeBsonObj(MakeObjSpec([a, c = Add(0), _id], Closed, NewObj, 0), s10, s12)] 
 [6] project [s12 = "b"] 
 [5] filter {traverseF(s11, lambda(l2.0) { ((move(l2.0) == 2) ?: false) }, false)} 
-[5] unique [s9] 
+[5] unique_roaring s9 
 [5] union [s9, s10, s11] 
     branch0 [s3, s2, s4] 
         [1] project [s4 = getField(s2, "a")] 

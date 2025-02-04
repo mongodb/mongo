@@ -936,7 +936,11 @@ std::pair<SbStage, PlanStageSlots> generateIndexScanImpl(StageBuilderState& stat
     }
 
     if (ixn->shouldDedup) {
-        stage = b.makeUnique(std::move(stage), outputs.get(PlanStageSlots::kRecordId));
+        if (collection->isClustered()) {
+            stage = b.makeUnique(std::move(stage), outputs.get(PlanStageSlots::kRecordId));
+        } else {
+            stage = b.makeUniqueRoaring(std::move(stage), outputs.get(PlanStageSlots::kRecordId));
+        }
     }
 
     if (ixn->filter) {
@@ -1130,7 +1134,11 @@ std::pair<SbStage, PlanStageSlots> generateIndexScanWithDynamicBoundsImpl(
     }
 
     if (ixn->shouldDedup) {
-        stage = b.makeUnique(std::move(stage), outputs.get(PlanStageSlots::kRecordId));
+        if (collection->isClustered()) {
+            stage = b.makeUnique(std::move(stage), outputs.get(PlanStageSlots::kRecordId));
+        } else {
+            stage = b.makeUniqueRoaring(std::move(stage), outputs.get(PlanStageSlots::kRecordId));
+        }
     }
 
     if (ixn->filter) {

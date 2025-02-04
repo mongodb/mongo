@@ -1,5 +1,5 @@
 # Golden test output of GoldenSbeStageBuilderTest/TestMergeSort
-[5] unique [s18] 
+[5] unique_roaring s18 
 [5] smerge [s18, s19, s20] [asc] [
     [s2] [s9, s7, s2] [2] nlj inner [s2, s7] [s1, s5, s3, s4, s6] 
         left 

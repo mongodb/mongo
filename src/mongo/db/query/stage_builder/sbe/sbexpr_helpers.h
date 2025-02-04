@@ -464,6 +464,8 @@ public:
 
     SbStage makeUnique(SbStage stage, const SbSlotVector& keys);
 
+    SbStage makeUniqueRoaring(SbStage stage, SbSlot key);
+
     SbStage makeSort(SbStage stage,
                      const SbSlotVector& orderBy,
                      std::vector<sbe::value::SortDirection> dirs,

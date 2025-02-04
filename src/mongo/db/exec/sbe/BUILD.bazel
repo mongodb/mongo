@@ -334,6 +334,8 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe/stages:unwind.h",
         "//src/mongo/db/exec/sbe/stages:virtual_scan.h",
         "//src/mongo/db/exec/sbe/stages:window.h",
+        "//src/mongo/db/query/util:hash_roaring_set.h",
+        "//src/mongo/util:roaring_bitmaps.h",
     ],
     deps = [
         ":query_sbe",
