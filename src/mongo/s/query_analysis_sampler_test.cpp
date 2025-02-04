@@ -78,8 +78,6 @@ namespace {
 
 using QuerySamplingOptions = OperationContext::QuerySamplingOptions;
 
-const auto smoothingFactor = gQueryAnalysisQueryStatsSmoothingFactor.load();
-
 class QueryAnalysisSamplerRateLimiterTest : public ServiceContextTest {
 public:
     QueryAnalysisSamplerRateLimiterTest()
@@ -911,6 +909,7 @@ TEST_F(QueryAnalysisSamplerTest, RefreshQueryStatsAndConfigurations) {
 
     auto queryStats2 = sampler.getQueryStatsForTest();
     ASSERT_EQ(queryStats2.getLastTotalCount(), 2);
+    const auto smoothingFactor = gQueryAnalysisQueryStatsSmoothingFactor.load();
     auto expectedAvgCount2 = (1 - smoothingFactor) * expectedAvgCount1 + smoothingFactor * 2;
     auto actualAvgCount2 = queryStats2.getLastAvgCount();
     ASSERT(actualAvgCount2);
