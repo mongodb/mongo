@@ -33,22 +33,29 @@
  *     Confirm the backup worked.
  */
 static void
-check_copy(uint64_t id)
+check_copy(WT_SESSION *session, uint64_t id)
 {
     WT_CONNECTION *conn;
     char from_path[MAX_FORMAT_PATH], to_path[MAX_FORMAT_PATH];
 
     /* Create the empty check directory. */
     testutil_create_backup_directory(g.home, id, true);
-    testutil_snprintf(from_path, sizeof(from_path), "%s/BACKUP", g.home);
     testutil_snprintf(to_path, sizeof(to_path), "%s/CHECK.%" PRIu64, g.home, id);
-    testutil_copy(from_path, to_path);
+    if (!GV(BACKUP_LIVE_RESTORE)) {
+        testutil_snprintf(from_path, sizeof(from_path), "%s/BACKUP", g.home);
+        testutil_copy(from_path, to_path);
+    }
 
     /* Now setup and open the path for real. */
+    g.backup_verify = true;
     wts_open(to_path, &conn, false);
+    g.backup_verify = false;
 
     /* Verify the objects. */
+    trace_msg(session, "Start %s backup verify in %s",
+      GV(BACKUP_LIVE_RESTORE) ? "live restore" : "copied", to_path);
     wts_verify(conn, true);
+    trace_msg(session, "Completed backup verify in %s", to_path);
 
     wts_close(&conn);
     /* If successful, remove the check directory. */
@@ -614,7 +621,7 @@ backup(void *arg)
                 incremental = mmrand(&g.extra_rnd, 1, 8);
         }
         /* Checking is done in a separate directory so we can check every iteration. */
-        check_copy(g.backup_id);
+        check_copy(session, g.backup_id);
         if (--incremental == 0)
             /* Periodically restart with a full backup. */
             incr_full = full = true;

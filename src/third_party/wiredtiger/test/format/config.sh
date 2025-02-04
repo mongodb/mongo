@@ -84,6 +84,8 @@ CONFIG configuration_list[] = {
 
 {"backup.incr_granularity", "incremental backup block granularity (KB)", 0x0, 4, 16384, 16384}
 
+{"backup.live_restore", "configure backup live restore recovery", C_BOOL, 0, 0, 0}
+
 {"block_cache", "enable the block cache", C_BOOL, 10, 0, 0}
 
 {"block_cache.cache_on_checkpoint", "block cache: cache checkpoint writes", C_BOOL, 30, 0, 0}
