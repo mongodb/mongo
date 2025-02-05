@@ -30,6 +30,8 @@
 #include "mongo/db/s/remove_shard_commit_coordinator.h"
 #include "mongo/db/s/remove_shard_exception.h"
 
+#include "mongo/db/s/topology_change_helpers.h"
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {

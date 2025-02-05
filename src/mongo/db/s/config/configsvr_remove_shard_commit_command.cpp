@@ -28,7 +28,9 @@
  */
 
 #include "mongo/db/s/remove_shard_commit_coordinator.h"
+#include "mongo/db/s/remove_shard_draining_progress_gen.h"
 #include "mongo/db/s/remove_shard_exception.h"
+#include "mongo/db/s/topology_change_helpers.h"
 #include "mongo/s/request_types/remove_shard_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 

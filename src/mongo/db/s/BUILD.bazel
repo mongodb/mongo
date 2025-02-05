@@ -621,7 +621,6 @@ mongo_cc_library(
 mongo_cc_library(
     name = "sharding_catalog_manager",
     srcs = [
-        "add_shard_util.cpp",
         "create_database_util.cpp",
         "ddl_lock_manager.cpp",
         "periodic_sharded_index_consistency_checker.cpp",
@@ -629,6 +628,7 @@ mongo_cc_library(
         "sharding_index_catalog_util.cpp",
         "sharding_util.cpp",
         "split_chunk_request_type.cpp",
+        "topology_change_helpers.cpp",
         "type_shard_identity.cpp",
         ":participant_block_gen",
         ":remove_tags_gen",
@@ -655,7 +655,6 @@ mongo_cc_library(
         "//src/mongo/db/s/config:sharding_catalog_manager_zone_operations.cpp",
     ],
     hdrs = [
-        "add_shard_util.h",
         "create_database_util.h",
         "ddl_lock_manager.h",
         "periodic_sharded_index_consistency_checker.h",
@@ -663,6 +662,7 @@ mongo_cc_library(
         "sharding_index_catalog_util.h",
         "sharding_util.h",
         "split_chunk_request_type.h",
+        "topology_change_helpers.h",
         "type_shard_identity.h",
         "//src/mongo/bson:bsonobj_comparator.h",
         "//src/mongo/db/s/balancer:actions_stream_policy.h",

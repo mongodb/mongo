@@ -30,6 +30,7 @@
 #include "mongo/db/s/add_shard_coordinator.h"
 
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/topology_change_helpers.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
