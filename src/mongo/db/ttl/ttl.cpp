@@ -72,7 +72,6 @@
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/write_ops/insert.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/member_state.h"
@@ -84,6 +83,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/ttl/ttl_collection_cache.h"
@@ -159,6 +159,7 @@ std::unique_ptr<BatchedDeleteStageParams> getBatchedDeleteStageParams(bool batch
 // 'safe' handling for time-series collections.
 Date_t safeExpirationDate(OperationContext* opCtx,
                           const CollectionPtr& coll,
+                          Date_t at,
                           std::int64_t expireAfterSeconds) {
     if (auto timeseries = coll->getTimeseriesOptions()) {
         const auto bucketMaxSpan = Seconds(*timeseries->getBucketMaxSpanSeconds());
@@ -168,10 +169,10 @@ Date_t safeExpirationDate(OperationContext* opCtx,
         // time value of a bucket. A bucket may have newer data, so we cannot safely delete
         // the entire bucket yet until the maximum bucket range has passed, even if the
         // minimum value can be expired.
-        return Date_t::now() - Seconds(expireAfterSeconds) - bucketMaxSpan;
+        return at - Seconds(expireAfterSeconds) - bucketMaxSpan;
     }
 
-    return Date_t::now() - Seconds(expireAfterSeconds);
+    return at - Seconds(expireAfterSeconds);
 }
 
 //  Computes and returns the start 'RecordIdBound' with the correct type for a bounded, clustered
@@ -328,7 +329,9 @@ void TTLMonitor::run() {
         try {
             const auto opCtxPtr = cc().makeOperationContext();
             writeConflictRetry(opCtxPtr.get(), "TTL pass", NamespaceString::kEmpty, [&] {
-                _doTTLPass(opCtxPtr.get());
+                hangTTLMonitorBetweenPasses.pauseWhileSet(opCtxPtr.get());
+
+                _doTTLPass(opCtxPtr.get(), Date_t::now());
             });
         } catch (const DBException& ex) {
             LOGV2_WARNING(22537,
@@ -350,15 +353,13 @@ void TTLMonitor::shutdown() {
     LOGV2(3684101, "Finished shutting down TTL collection monitor thread");
 }
 
-void TTLMonitor::_doTTLPass(OperationContext* opCtx) {
+void TTLMonitor::_doTTLPass(OperationContext* opCtx, Date_t at) {
     // Don't do work if we are a secondary (TTL will be handled by primary)
     auto replCoordinator = repl::ReplicationCoordinator::get(opCtx);
     if (replCoordinator && replCoordinator->getSettings().isReplSet() &&
         !replCoordinator->getMemberState().primary()) {
         return;
     }
-
-    hangTTLMonitorBetweenPasses.pauseWhileSet(opCtx);
 
     // Increment the metric after the TTL work has been finished.
     ON_BLOCK_EXIT([&] { ttlPasses.increment(); });
@@ -369,11 +370,11 @@ void TTLMonitor::_doTTLPass(OperationContext* opCtx) {
         // indicates that it did not delete everything possible, we continue performing sub-passes.
         // This maintains the semantic that a full TTL pass deletes everything it possibly can
         // before sleeping periodically.
-        moreToDelete = _doTTLSubPass(opCtx);
+        moreToDelete = _doTTLSubPass(opCtx, at);
     }
 }
 
-bool TTLMonitor::_doTTLSubPass(OperationContext* opCtx) {
+bool TTLMonitor::_doTTLSubPass(OperationContext* opCtx, Date_t at) {
     // If part of replSet but not in a readable state (e.g. during initial sync), skip.
     if (repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet() &&
         !repl::ReplicationCoordinator::get(opCtx)->getMemberState().readable())
@@ -400,7 +401,7 @@ bool TTLMonitor::_doTTLSubPass(OperationContext* opCtx) {
         TTLCollectionCache::InfoMap moreWork;
         for (const auto& [uuid, infos] : work) {
             for (const auto& info : infos) {
-                bool moreToDelete = _doTTLIndexDelete(opCtx, &ttlCollectionCache, uuid, info);
+                bool moreToDelete = _doTTLIndexDelete(opCtx, at, &ttlCollectionCache, uuid, info);
                 if (moreToDelete) {
                     moreWork[uuid].push_back(info);
                 }
@@ -417,6 +418,7 @@ bool TTLMonitor::_doTTLSubPass(OperationContext* opCtx) {
 }
 
 bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
+                                   Date_t at,
                                    TTLCollectionCache* ttlCollectionCache,
                                    const UUID& uuid,
                                    const TTLCollectionCache::Info& info) {
@@ -478,16 +480,31 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
             return false;
         }
 
-        if (collectionPtr->getRequiresTimeseriesExtendedRangeSupport()) {
-            return false;
-        }
-
         ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx, nss->dbName());
 
         if (info.isClustered()) {
-            return _deleteExpiredWithCollscan(opCtx, ttlCollectionCache, coll);
+            const auto& collOptions = collectionPtr->getCollectionOptions();
+            uassert(5400701,
+                    "collection is not clustered but is described as being TTL",
+                    collOptions.clusteredIndex);
+            invariant(collectionPtr->isClustered());
+
+            auto expireAfterSeconds = collOptions.expireAfterSeconds;
+            if (!expireAfterSeconds) {
+                ttlCollectionCache->deregisterTTLClusteredIndex(coll.uuid());
+                return false;
+            }
+
+            if (collectionPtr->getRequiresTimeseriesExtendedRangeSupport()) {
+                return _deleteExpiredWithCollscanForTimeseriesExtendedRange(
+                    opCtx, at, ttlCollectionCache, coll, *expireAfterSeconds);
+            } else {
+                return _deleteExpiredWithCollscan(
+                    opCtx, at, ttlCollectionCache, coll, *expireAfterSeconds);
+            }
         } else {
-            return _deleteExpiredWithIndex(opCtx, ttlCollectionCache, coll, info.getIndexName());
+            return _deleteExpiredWithIndex(
+                opCtx, at, ttlCollectionCache, coll, info.getIndexName());
         }
     } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
         // The TTL index tried to delete some information from a sharded collection
@@ -548,6 +565,7 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
 }
 
 bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
+                                         Date_t at,
                                          TTLCollectionCache* ttlCollectionCache,
                                          const CollectionAcquisition& collection,
                                          std::string indexName) {
@@ -574,7 +592,7 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
 
     auto expireAfterSeconds = spec[IndexDescriptor::kExpireAfterSecondsFieldName].safeNumberLong();
     const Date_t kDawnOfTime = Date_t::fromMillisSinceEpoch(std::numeric_limits<long long>::min());
-    const auto expirationDate = safeExpirationDate(opCtx, collectionPtr, expireAfterSeconds);
+    const auto expirationDate = safeExpirationDate(opCtx, collectionPtr, at, expireAfterSeconds);
     const BSONObj startKey = BSON("" << kDawnOfTime);
     const BSONObj endKey = BSON("" << expirationDate);
 
@@ -648,28 +666,91 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
 }
 
 bool TTLMonitor::_deleteExpiredWithCollscan(OperationContext* opCtx,
+                                            Date_t at,
                                             TTLCollectionCache* ttlCollectionCache,
-                                            const CollectionAcquisition& collection) {
-    const auto& collectionPtr = collection.getCollectionPtr();
-    const auto& collOptions = collectionPtr->getCollectionOptions();
-    uassert(5400701,
-            "collection is not clustered but is described as being TTL",
-            collOptions.clusteredIndex);
-    invariant(collectionPtr->isClustered());
-
-    auto expireAfterSeconds = collOptions.expireAfterSeconds;
-    if (!expireAfterSeconds) {
-        ttlCollectionCache->deregisterTTLClusteredIndex(collection.uuid());
-        return false;
-    }
-
+                                            const CollectionAcquisition& collection,
+                                            int64_t expireAfterSeconds) {
     LOGV2_DEBUG(5400704, 1, "running TTL job for clustered collection", logAttrs(collection.nss()));
+    const auto& collectionPtr = collection.getCollectionPtr();
 
     const auto startId = makeCollScanStartBound(collectionPtr, Date_t{});
 
-    const auto expirationDate = safeExpirationDate(opCtx, collectionPtr, *expireAfterSeconds);
+    const auto expirationDate = safeExpirationDate(opCtx, collectionPtr, at, expireAfterSeconds);
     const auto endId = makeCollScanEndBound(collectionPtr, expirationDate);
 
+    return _performDeleteExpiredWithCollscan(
+        opCtx, collection, startId, endId, /*forward*/ true, /*filter*/ nullptr);
+}
+
+bool TTLMonitor::_deleteExpiredWithCollscanForTimeseriesExtendedRange(
+    OperationContext* opCtx,
+    Date_t at,
+    TTLCollectionCache* ttlCollectionCache,
+    const CollectionAcquisition& collection,
+    int64_t expireAfterSeconds) {
+    // We cannot rely on the _id index for time-series data with extended time ranges. In theory
+    // data eligible for deletion could be located anywhere in the collection. It would not be
+    // performant to consider any bucket document. We instead run the deletion in two separate
+    // batches: [epoch, at-expiry] and [2038, 2106]. The second range will include data prior to
+    // the epoch unless they are too far from the epoch that cause then to be truncated into the
+    // [at-expiry, 2038] range that we don't consider for deletion. This is an acceptible tradeoff
+    // until we have a new _id format for time-series.
+    LOGV2_DEBUG(9736801,
+                1,
+                "running TTL job for timeseries collection with extended range",
+                logAttrs(collection.nss()));
+
+    const auto& collectionPtr = collection.getCollectionPtr();
+    bool passTargetMet = false;
+
+    auto timeSeriesOptions = collectionPtr->getTimeseriesOptions();
+    std::string timeField =
+        timeseries::kControlMaxFieldNamePrefix.toString() + timeSeriesOptions->getTimeField();
+    LTEMatchExpression filter(boost::optional<StringData>{timeField},
+                              Value{at - Seconds(expireAfterSeconds)});
+
+    // Delete from the beginning of the clustered _id index. In the typical case we consider
+    // anything from the epoch to at-expiry eligible for deletion. We add a filter to ensure we
+    // don't delete any data after 2038 that is not eligible for deletion.
+    {
+        const auto startId = makeCollScanStartBound(collectionPtr, Date_t{});
+        const auto expirationDate =
+            safeExpirationDate(opCtx, collectionPtr, at, expireAfterSeconds);
+        const auto endId = makeCollScanEndBound(collectionPtr, expirationDate);
+
+        passTargetMet |= _performDeleteExpiredWithCollscan(
+            opCtx, collection, startId, endId, /*forward*/ true, &filter);
+    }
+
+    // Delete from the end of the clustered _id index. In the typical case nothing should be
+    // deleted. But data prior to 1970 is sorted at the end and is eligible for deletion. We add a
+    // filter to ensure we only delete such data.    {
+    {
+        // 0x80000000 (in seconds) is the first value that no longer fits in a signed 32bit integer.
+        // We subtract the bucket span to get the beginning of the range we should consider
+        // deleting.
+        const auto startId = makeCollScanStartBound(
+            collectionPtr,
+            Date_t::fromMillisSinceEpoch((static_cast<long long>(0x80000000) -
+                                          *timeSeriesOptions->getBucketMaxSpanSeconds()) *
+                                         1000));
+
+        const auto endId = makeCollScanEndBound(
+            collectionPtr, Date_t::fromMillisSinceEpoch(static_cast<long long>(0xFFFFFFFF) * 1000));
+
+        passTargetMet |= _performDeleteExpiredWithCollscan(
+            opCtx, collection, startId, endId, /*forward*/ false, &filter);
+    }
+    return passTargetMet;
+}
+
+
+bool TTLMonitor::_performDeleteExpiredWithCollscan(OperationContext* opCtx,
+                                                   const CollectionAcquisition& collection,
+                                                   const RecordIdBound& startBound,
+                                                   const RecordIdBound& endBound,
+                                                   bool forward,
+                                                   const MatchExpression* filter) {
     auto params = std::make_unique<DeleteStageParams>();
     params->isMulti = true;
 
@@ -686,11 +767,12 @@ bool TTLMonitor::_deleteExpiredWithCollscan(OperationContext* opCtx,
         collection,
         std::move(params),
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-        InternalPlanner::Direction::FORWARD,
-        startId,
-        endId,
+        forward ? InternalPlanner::Direction::FORWARD : InternalPlanner::Direction::BACKWARD,
+        startBound,
+        endBound,
         CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords,
-        getBatchedDeleteStageParams(batchingEnabled));
+        getBatchedDeleteStageParams(batchingEnabled),
+        filter);
 
     try {
         const auto numDeleted = exec->executeDelete();
@@ -706,7 +788,9 @@ bool TTLMonitor::_deleteExpiredWithCollscan(OperationContext* opCtx,
                   "Deleted expired documents using clustered index scan",
                   logAttrs(collection.nss()),
                   "numDeleted"_attr = numDeleted,
-                  "duration"_attr = duration);
+                  "duration"_attr = duration,
+                  "extendedRange"_attr =
+                      collection.getCollectionPtr()->getRequiresTimeseriesExtendedRangeSupport());
         }
         if (batchingEnabled) {
             auto batchedDeleteStats = exec->getBatchedDeleteStats();

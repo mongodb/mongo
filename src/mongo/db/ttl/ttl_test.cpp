@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog_raii.h"
@@ -100,15 +101,15 @@ protected:
         return _opCtx.get();
     }
 
-    void doTTLPassForTest() {
+    void doTTLPassForTest(Date_t now) {
         TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
-        ttlMonitor->_doTTLPass(_opCtx.get());
+        ttlMonitor->_doTTLPass(_opCtx.get(), now);
     }
 
-    bool doTTLSubPassForTest(OperationContext* opCtx) {
+    bool doTTLSubPassForTest(OperationContext* opCtx, Date_t now) {
         TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
 
-        return ttlMonitor->_doTTLSubPass(opCtx);
+        return ttlMonitor->_doTTLSubPass(opCtx, now);
     }
 
     long long getTTLPasses() {
@@ -220,18 +221,30 @@ public:
         insert(nss, expiredDocs);
     }
 
-    void createCollection(const NamespaceString& nss) {
-        _client.createCollection(nss);
+    void insertTimeseriesDocs(const NamespaceString& nss,
+                              StringData timeField,
+                              Date_t now,
+                              Seconds interval,
+                              int numDocs) {
+        std::vector<BSONObj> docs{};
+        for (auto i = 0; i < numDocs; i++) {
+            docs.emplace_back(BSON(timeField << now + Seconds(interval * i)));
+        }
+        insert(nss, docs);
     }
 
-    void createCollectionWithOptions(const NamespaceString& nss, const CollectionOptions& options) {
-        Lock::DBLock dbLk(_opCtx, nss.dbName(), LockMode::MODE_IX);
-        Lock::CollectionLock collLk(_opCtx, nss, LockMode::MODE_IX);
-        auto databaseHolder = DatabaseHolder::get(_opCtx);
-        auto db = databaseHolder->openDb(_opCtx, nss.dbName(), nullptr);
-        WriteUnitOfWork wuow(_opCtx);
-        db->createCollection(_opCtx, nss, options);
-        wuow.commit();
+    void createColl(const NamespaceString& nss) {
+        ASSERT_OK(createCollection(_opCtx, nss, CollectionOptions{}, boost::none));
+    }
+
+    void createCollWithOptions(const NamespaceString& nss, const CollectionOptions& options) {
+        ASSERT_OK(createCollection(_opCtx, nss, options, boost::none));
+    }
+
+    void setTimeseriesExtendedRange(const NamespaceString& nss) {
+        CollectionCatalog::get(_opCtx)
+            ->lookupCollectionByNamespace(_opCtx, nss.makeTimeseriesBucketsNamespace())
+            ->setRequiresTimeseriesExtendedRangeSupport(_opCtx);
     }
 
 private:
@@ -246,7 +259,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionTwoIndexes) {
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
 
-    client.createCollection(nss);
+    client.createColl(nss);
 
     createIndex(nss, BSON("x" << 1), "testIndexX", Seconds(1));
     createIndex(nss, BSON("y" << 1), "testIndexY", Seconds(1));
@@ -260,7 +273,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionTwoIndexes) {
         // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
         // client because the OperationContext already exists.
         ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest();
+        doTTLPassForTest(Date_t::now());
     });
     thread.join();
 
@@ -276,7 +289,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionSecondaryDoesNothing) {
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
 
-    client.createCollection(nss);
+    client.createColl(nss);
 
     createIndex(nss, BSON("x" << 1), "testIndexX", Seconds(1));
 
@@ -291,7 +304,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionSecondaryDoesNothing) {
         // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
         // client because the OperationContext already exists.
         ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest();
+        doTTLPassForTest(Date_t::now());
     });
     thread.join();
 
@@ -312,7 +325,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionClusteredIndexes) {
     options.clusteredIndex =
         ClusteredCollectionInfo(ClusteredIndexSpec(fromjson("{_id: 1}"), true), false);
     options.expireAfterSeconds = 1;
-    client.createCollectionWithOptions(nss, options);
+    client.createCollWithOptions(nss, options);
 
     client.insertExpiredDocs(nss, "_id", 100);
     ASSERT_EQ(client.count(nss), 100);
@@ -322,7 +335,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionClusteredIndexes) {
         // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
         // client because the OperationContext already exists.
         ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest();
+        doTTLPassForTest(Date_t::now());
     });
     thread.join();
 
@@ -342,7 +355,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionMixedIndexes) {
     options.clusteredIndex =
         ClusteredCollectionInfo(ClusteredIndexSpec(fromjson("{_id: 1}"), true), false);
     options.expireAfterSeconds = 1;
-    client.createCollectionWithOptions(nss, options);
+    client.createCollWithOptions(nss, options);
     createIndex(nss, BSON("foo" << 1), "fooIndex", Seconds(1));
 
     client.insertExpiredDocs(nss, "_id", 50);
@@ -354,7 +367,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionMixedIndexes) {
         // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
         // client because the OperationContext already exists.
         ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest();
+        doTTLPassForTest(Date_t::now());
     });
     thread.join();
 
@@ -370,7 +383,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionMultipleDeletes) {
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
 
-    client.createCollection(nss);
+    client.createColl(nss);
     createIndex(nss, BSON("foo" << 1), "fooIndex", Seconds(1));
 
     client.insertExpiredDocs(nss, "foo", 50000);
@@ -381,7 +394,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionMultipleDeletes) {
         // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
         // client because the OperationContext already exists.
         ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest();
+        doTTLPassForTest(Date_t::now());
     });
     thread.join();
 
@@ -390,34 +403,203 @@ TEST_F(TTLTest, TTLPassSingleCollectionMultipleDeletes) {
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
 }
 
-TEST_F(TTLTest, TTLPassSingleTimeseriesCollection) {
+TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleDelete) {
     RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     SimpleClient client(opCtx());
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
 
+    std::string timeField = "t";
+    int maxSpanSeconds = 20;
+    int documents = maxSpanSeconds;
     CollectionOptions options;
-    options.timeseries = TimeseriesOptions(/*timeField=*/"t");
-    options.timeseries->setBucketMaxSpanSeconds(20);
-    client.createCollectionWithOptions(nss, options);
-    createIndex(nss, BSON("foo" << 1), "fooIndex", Seconds(1));
+    options.expireAfterSeconds = 1;
+    options.timeseries = TimeseriesOptions(timeField);
+    options.timeseries->setBucketMaxSpanSeconds(maxSpanSeconds);
+    options.timeseries->setBucketRoundingSeconds(maxSpanSeconds);
+    client.createCollWithOptions(nss, options);
 
-    client.insertExpiredDocs(nss, "foo", 50);
-    ASSERT_EQ(client.count(nss), 50);
+    Date_t now = Date_t::now();
+    // Insert documents starting at 2x maxSpanSeconds prior to when we will run the TTL delete. As
+    // no document is going to go pass `now-maxSpanSeconds` all the inserted documents should be
+    // deleted by TTL.
+    client.insertTimeseriesDocs(
+        nss, timeField, now - Seconds(maxSpanSeconds * 2), Seconds(1), documents);
+    ASSERT_EQ(client.count(nss), documents);
 
     auto initTTLPasses = getTTLPasses();
     stdx::thread thread([&]() {
         // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
         // client because the OperationContext already exists.
         ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest();
+        doTTLPassForTest(now);
     });
     thread.join();
 
-    // At least documents that were initially out of of window are removed
-    // (Likely exactly 20 remaining, but possibly more were removed depending on timing)
-    ASSERT_LTE(client.count(nss), 20);
+    // Everything should be deleted.
+    ASSERT_EQ(client.count(nss), 0);
+    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+}
+
+TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleUneligible) {
+    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+
+    SimpleClient client(opCtx());
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
+
+    std::string timeField = "t";
+    int maxSpanSeconds = 20;
+    int documents = maxSpanSeconds * 2;
+    CollectionOptions options;
+    options.expireAfterSeconds = 1;
+    options.timeseries = TimeseriesOptions(timeField);
+    options.timeseries->setBucketMaxSpanSeconds(maxSpanSeconds);
+    options.timeseries->setBucketRoundingSeconds(maxSpanSeconds);
+    client.createCollWithOptions(nss, options);
+
+    Date_t now = Date_t::now();
+    // Insert documents starting at now, no documents is then eligible for deletion.
+    client.insertTimeseriesDocs(nss, timeField, now, Seconds(1), documents);
+    ASSERT_EQ(client.count(nss), documents);
+
+    auto initTTLPasses = getTTLPasses();
+    stdx::thread thread([&]() {
+        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
+        // client because the OperationContext already exists.
+        ThreadClient threadClient(getGlobalServiceContext()->getService());
+        doTTLPassForTest(now);
+    });
+    thread.join();
+
+    // All documents remain after the TTL pass.
+    ASSERT_EQ(client.count(nss), documents);
+    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+}
+
+TEST_F(TTLTest, TTLPassSingleTimeseriesBucketMaxSpan) {
+    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+
+    SimpleClient client(opCtx());
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
+
+    std::string timeField = "t";
+    int documents = 50;
+    int maxSpanSeconds = 20;
+    CollectionOptions options;
+    options.expireAfterSeconds = 1;
+    options.timeseries = TimeseriesOptions(timeField);
+    options.timeseries->setBucketMaxSpanSeconds(maxSpanSeconds);
+    options.timeseries->setBucketRoundingSeconds(maxSpanSeconds);
+    client.createCollWithOptions(nss, options);
+
+    Date_t now = Date_t::now();
+    // Data going back `maxSpanSeconds` from when the TTL delete runs might get deleted depending on
+    // the rounding of `now`. TTL deletes on timeseries only delete buckets where the minTime +
+    // maxSpanSeconds is less than the TTL deletion time. When we insert at now-maxSpanSeconds the
+    // bucket minTime will be now-maxSpanSeconds-(now%roundingSeconds) resulting in now %
+    // roundingSeconds documents being inserted into a bucket eligible for deletion.
+    client.insertTimeseriesDocs(
+        nss, timeField, now - Seconds(maxSpanSeconds), Seconds(1), documents);
+    ASSERT_EQ(client.count(nss), documents);
+
+    auto initTTLPasses = getTTLPasses();
+    stdx::thread thread([&]() {
+        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
+        // client because the OperationContext already exists.
+        ThreadClient threadClient(getGlobalServiceContext()->getService());
+        doTTLPassForTest(now);
+    });
+    thread.join();
+
+    ASSERT_GTE(client.count(nss), documents - maxSpanSeconds + options.expireAfterSeconds.value());
+    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+}
+
+TEST_F(TTLTest, TTLPassTimeseriesExtendedPrior1970Delete) {
+    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+
+    SimpleClient client(opCtx());
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
+
+    std::string timeField = "t";
+    int maxSpanSeconds = 20;
+    CollectionOptions options;
+    options.expireAfterSeconds = 1;
+    options.timeseries = TimeseriesOptions(timeField);
+    options.timeseries->setBucketMaxSpanSeconds(maxSpanSeconds);
+    options.timeseries->setBucketRoundingSeconds(maxSpanSeconds);
+    client.createCollWithOptions(nss, options);
+
+    Date_t now = Date_t::now();
+    // Insert one document prior to 1970 and then one document eligible for deletion and one not
+    // eligible. The document prior to 1970 have such a time that when it is truncated to 4 bytes it
+    // would not be deleted by the regular timeseries TTL deleter unless the collection is properly
+    // marked as having extended range.
+    client.insertTimeseriesDocs(nss, timeField, Date_t::fromMillisSinceEpoch(-1000), Seconds(1), 1);
+    client.insertTimeseriesDocs(nss, timeField, now - Seconds(maxSpanSeconds * 2), Seconds(1), 1);
+    client.insertTimeseriesDocs(nss, timeField, now, Seconds(1), 1);
+    // Typically an opobserver marks the collection as extended range if needed. We don't have that
+    // in this unit test so we set it here.
+    client.setTimeseriesExtendedRange(nss);
+    ASSERT_EQ(client.count(nss), 3);
+
+    auto initTTLPasses = getTTLPasses();
+    stdx::thread thread([&]() {
+        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
+        // client because the OperationContext already exists.
+        ThreadClient threadClient(getGlobalServiceContext()->getService());
+        doTTLPassForTest(now);
+    });
+    thread.join();
+
+    // We should delete two documents, the one prior to 1970 and the other eligible doc.
+    ASSERT_EQ(client.count(nss), 1);
+    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+}
+
+TEST_F(TTLTest, TTLPassTimeseriesExtendedAfter2038Delete) {
+    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+
+    SimpleClient client(opCtx());
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
+
+    std::string timeField = "t";
+    int maxSpanSeconds = 20;
+    CollectionOptions options;
+    options.expireAfterSeconds = 1;
+    options.timeseries = TimeseriesOptions(timeField);
+    options.timeseries->setBucketMaxSpanSeconds(maxSpanSeconds);
+    options.timeseries->setBucketRoundingSeconds(maxSpanSeconds);
+    client.createCollWithOptions(nss, options);
+
+    Date_t now = Date_t::now();
+    // Insert one document eligible for deletion and one far into the future marking the collection
+    // with extended range. The document after 2038 is selected in such a way that it would be
+    // deleted by the regular timeseries TTL deleter if the collection is not marked as extended
+    // range.
+    client.insertTimeseriesDocs(nss, timeField, now - Seconds(maxSpanSeconds * 2), Seconds(1), 1);
+    client.insertTimeseriesDocs(nss, timeField, Date_t() + Seconds(0x10000FFFF), Seconds(1), 1);
+    // Typically an opobserver marks the collection as extended range if needed. We don't have that
+    // in this unit test so we set it here.
+    client.setTimeseriesExtendedRange(nss);
+    ASSERT_EQ(client.count(nss), 2);
+
+    const auto initTTLPasses = getTTLPasses();
+    stdx::thread thread([&]() {
+        // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
+        // client because the OperationContext already exists.
+        ThreadClient threadClient(getGlobalServiceContext()->getService());
+        doTTLPassForTest(now);
+    });
+    thread.join();
+
+    // The document with time 1940 should remain.
+    ASSERT_EQ(client.count(nss), 1);
     ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
 }
 
@@ -428,7 +610,7 @@ TEST_F(TTLTest, TTLPassCollectionWithoutExpiration) {
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
 
-    client.createCollection(nss);
+    client.createColl(nss);
     AutoGetCollection collection(opCtx(), nss, MODE_X);
     ASSERT(collection);
     auto spec =
@@ -445,7 +627,7 @@ TEST_F(TTLTest, TTLPassCollectionWithoutExpiration) {
         // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
         // client because the OperationContext already exists.
         ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest();
+        doTTLPassForTest(Date_t::now());
     });
     thread.join();
 
@@ -457,6 +639,7 @@ TEST_F(TTLTest, TTLPassCollectionWithoutExpiration) {
     ASSERT_EQ(getInvalidTTLIndexSkips(), initInvalidTTLIndexSkips);
 }
 
+
 TEST_F(TTLTest, TTLPassMultipCollectionsPass) {
     RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
@@ -465,8 +648,8 @@ TEST_F(TTLTest, TTLPassMultipCollectionsPass) {
     NamespaceString nss0 = NamespaceString::createNamespaceString_forTest("testDB.coll0");
     NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("testDB.coll1");
 
-    client.createCollection(nss0);
-    client.createCollection(nss1);
+    client.createColl(nss0);
+    client.createColl(nss1);
 
     createIndex(nss0, BSON("x" << 1), "testIndexX", Seconds(1));
 
@@ -490,7 +673,7 @@ TEST_F(TTLTest, TTLPassMultipCollectionsPass) {
         // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the
         // current client because the OperationContext already exists.
         ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest();
+        doTTLPassForTest(Date_t::now());
     });
     thread.join();
 
@@ -524,7 +707,7 @@ TEST_F(TTLTest, TTLSingleSubPass) {
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll");
 
-    client.createCollection(nss);
+    client.createColl(nss);
 
     createIndex(nss, BSON("x" << 1), "testIndexX", Seconds(1));
     createIndex(nss, BSON("y" << 1), "testIndexY", Seconds(1));
@@ -539,7 +722,7 @@ TEST_F(TTLTest, TTLSingleSubPass) {
     auto currentCount = client.count(nss);
     ASSERT_EQ(currentCount, xExpiredDocs + yExpiredDocs);
 
-    bool moreWork = doTTLSubPassForTest(opCtx());
+    bool moreWork = doTTLSubPassForTest(opCtx(), Date_t::now());
 
     // A sub-pass removes all expired document provided it does not reach
     // 'ttlMonitorSubPassTargetSecs'.
@@ -580,7 +763,7 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocuments) {
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll");
 
-    client.createCollection(nss);
+    client.createColl(nss);
 
     createIndex(nss, BSON("x" << 1), "testIndexX", Seconds(1));
     createIndex(nss, BSON("y" << 1), "testIndexY", Seconds(1));
@@ -606,7 +789,7 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocuments) {
 
     // Issue first subpass.
     {
-        moreWork = doTTLSubPassForTest(opCtx());
+        moreWork = doTTLSubPassForTest(opCtx(), Date_t::now());
         ASSERT_TRUE(moreWork);
 
         // Since there were less than ttlIndexDeleteTargetDocs yExpiredDocs, expect all of the
@@ -617,7 +800,7 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocuments) {
         currentCount = newCount;
     }
 
-    while ((moreWork = doTTLSubPassForTest(opCtx())) == true) {
+    while ((moreWork = doTTLSubPassForTest(opCtx(), Date_t::now())) == true) {
         auto newCount = client.count(nss);
         ASSERT_EQ(newCount, currentCount - ttlIndexDeleteTargetDocs);
         currentCount = newCount;
@@ -655,7 +838,7 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocumentsAddedBetweenSubPasses) {
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll");
 
-    client.createCollection(nss);
+    client.createColl(nss);
 
     createIndex(nss, BSON("x" << 1), "testIndexX", Seconds(1));
     createIndex(nss, BSON("y" << 1), "testIndexY", Seconds(1));
@@ -675,7 +858,7 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocumentsAddedBetweenSubPasses) {
 
     // Issue first subpass.
     {
-        moreWork = doTTLSubPassForTest(opCtx());
+        moreWork = doTTLSubPassForTest(opCtx(), Date_t::now());
         ASSERT_EQ(getTTLSubPasses(), ++nSubPasses);
 
         ASSERT_TRUE(moreWork);
@@ -702,7 +885,7 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocumentsAddedBetweenSubPasses) {
     client.insertExpiredDocs(nss, "y", yExpiredDocs1);
     ASSERT_EQ(client.count(nss), nDocumentsBeforeInsert + yExpiredDocs1);
 
-    while (doTTLSubPassForTest(opCtx())) {
+    while (doTTLSubPassForTest(opCtx(), Date_t::now())) {
     }
 
     ASSERT_EQ(client.count(nss), 0);
@@ -742,7 +925,7 @@ TEST_F(TTLTest, TTLSubPassesStartRemovingFromNewTTLIndex) {
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll");
 
-    client.createCollection(nss);
+    client.createColl(nss);
 
     createIndex(nss, BSON("x" << 1), "testIndexX", Seconds(1));
     createIndex(nss, BSON("y" << 1), "testIndexY", Seconds(1));
@@ -764,7 +947,7 @@ TEST_F(TTLTest, TTLSubPassesStartRemovingFromNewTTLIndex) {
 
     // Issue first subpass.
     {
-        moreWork = doTTLSubPassForTest(opCtx());
+        moreWork = doTTLSubPassForTest(opCtx(), Date_t::now());
         ASSERT_TRUE(moreWork);
 
         // Since there were less than ttlIndexDeleteTargetDocs yExpiredDocs, expect all of the
@@ -782,7 +965,7 @@ TEST_F(TTLTest, TTLSubPassesStartRemovingFromNewTTLIndex) {
     createIndex(nss, BSON("z" << 1), "testIndexZ", Seconds(1));
 
     do {
-        moreWork = doTTLSubPassForTest(opCtx());
+        moreWork = doTTLSubPassForTest(opCtx(), Date_t::now());
     } while (moreWork);
 
     ASSERT_EQ(client.count(nss), 0);
@@ -799,7 +982,7 @@ TEST_F(TTLTest, TTLRunMonitorThread) {
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
 
-    client.createCollection(nss);
+    client.createColl(nss);
 
     createIndex(nss, BSON("x" << 1), "testIndexX", Seconds(1));
 
@@ -829,7 +1012,7 @@ TEST_F(TTLTest, TTLDoubleFitsIntoInt32) {
     SimpleClient client(opCtx());
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
 
-    client.createCollection(nss);
+    client.createColl(nss);
     const double expireAfterSeconds = 4.5;
     const auto validSpec =
         BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("foo" << 1) << "name"
@@ -845,7 +1028,7 @@ TEST_F(TTLTest, TTLDoubleFitsIntoInt32) {
     const auto initInvalidTTLIndexSkips = getInvalidTTLIndexSkips();
     stdx::thread thread([&]() {
         ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest();
+        doTTLPassForTest(Date_t::now());
     });
     thread.join();
 
@@ -859,7 +1042,7 @@ TEST_F(TTLTest, TTLMinDoubleFitsIntoInt32) {
     SimpleClient client(opCtx());
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
 
-    client.createCollection(nss);
+    client.createColl(nss);
     const double expireAfterSeconds = std::numeric_limits<double>::min();
     const auto validSpec =
         BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("foo" << 1) << "name"
@@ -874,7 +1057,7 @@ TEST_F(TTLTest, TTLMinDoubleFitsIntoInt32) {
     const auto initInvalidTTLIndexSkips = getInvalidTTLIndexSkips();
     stdx::thread thread([&]() {
         ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest();
+        doTTLPassForTest(Date_t::now());
     });
     thread.join();
 
@@ -887,7 +1070,7 @@ TEST_F(TTLTest, TTLMinDoubleFitsIntoInt32) {
 TEST_F(TTLTest, TTLkExpireAfterSecondsForInactiveTTLIndexIsValid) {
     SimpleClient client(opCtx());
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.coll0");
-    client.createCollection(nss);
+    client.createColl(nss);
 
     // Historically, NaN values were automatically adjusted to
     // 'kExpireAfterSecondsForInactiveTTLIndex'. Any entries with this expiry won't be removed for a
@@ -906,7 +1089,7 @@ TEST_F(TTLTest, TTLkExpireAfterSecondsForInactiveTTLIndexIsValid) {
     const auto initInvalidTTLIndexSkips = getInvalidTTLIndexSkips();
     stdx::thread thread([&]() {
         ThreadClient threadClient(getGlobalServiceContext()->getService());
-        doTTLPassForTest();
+        doTTLPassForTest(Date_t::now());
     });
     thread.join();
 
@@ -926,7 +1109,7 @@ protected:
             NamespaceString::createNamespaceString_forTest("testDB.invalidTTLColl");
 
         SimpleClient client(opCtx());
-        client.createCollection(nss);
+        client.createColl(nss);
         createIndex(nss, spec);
         auto catalogEntry = DurableCatalog::get(opCtx())->scanForCatalogEntryByNss(opCtx(), nss);
         ASSERT(catalogEntry);
@@ -940,7 +1123,7 @@ protected:
 
         stdx::thread thread([&]() {
             ThreadClient threadClient(getGlobalServiceContext()->getService());
-            doTTLPassForTest();
+            doTTLPassForTest(Date_t::now());
         });
         thread.join();
 
