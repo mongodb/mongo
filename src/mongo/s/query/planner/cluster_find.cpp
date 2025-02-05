@@ -268,8 +268,25 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
         findCommandToForward->serialize(&cmdBuilder);
         appendShardVersion(shardId, cmdBuilder);
         appendSampleId(shardId, cmdBuilder);
+        auto cmdObj = cmdBuilder.obj();
 
-        return AsyncRequestsSender::Request(shardId, cmdBuilder.obj(), std::move(shard));
+        if (findCommandToForward->getRawData() &&
+            findCommandToForward->getNamespaceOrUUID().isNamespaceString() &&
+            findCommandToForward->getNamespaceOrUUID().nss().isTimeseriesBucketsCollection()) {
+            // Rewrite the command object to use the buckets namespace.
+            BSONObjBuilder builder{cmdObj.objsize()};
+            for (auto&& [fieldName, elem] : cmdObj) {
+                if (fieldName == FindCommandRequest::kCommandName) {
+                    builder.append(fieldName,
+                                   findCommandToForward->getNamespaceOrUUID().nss().coll());
+                } else {
+                    builder.append(elem);
+                }
+            }
+            cmdObj = builder.obj();
+        }
+
+        return AsyncRequestsSender::Request(shardId, cmdObj, std::move(shard));
     };
 
     std::vector<AsyncRequestsSender::Request> requests;

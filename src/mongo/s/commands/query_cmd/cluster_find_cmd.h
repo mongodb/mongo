@@ -50,6 +50,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/commands/query_cmd/cluster_explain.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
@@ -297,6 +298,14 @@ public:
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
             Impl::checkCanRunHere(opCtx);
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+
+            if (_cmdRequest->getRawData() &&
+                _cmdRequest->getNamespaceOrUUID().isNamespaceString() &&
+                CollectionRoutingInfoTargeter{opCtx, _cmdRequest->getNamespaceOrUUID().nss()}
+                    .timeseriesNamespaceNeedsRewrite(_cmdRequest->getNamespaceOrUUID().nss())) {
+                _cmdRequest->setNss(
+                    _cmdRequest->getNamespaceOrUUID().nss().makeTimeseriesBucketsNamespace());
+            }
 
             setReadConcern(opCtx);
             doFLERewriteIfNeeded(opCtx);
