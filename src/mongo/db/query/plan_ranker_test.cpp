@@ -31,13 +31,19 @@
  * This file contains tests for mongo/db/query/plan_ranker.h
  */
 
-#include "mongo/db/query/plan_ranker.h"
-
 #include <utility>
 #include <vector>
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/document_source_group.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_ranker_util.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -49,11 +55,21 @@ using std::make_unique;
 using std::string;
 using std::unique_ptr;
 
+unique_ptr<CanonicalQuery> makeCanonicalQuery() {
+    auto expCtx = new ExpressionContextForTest();
+    auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString());
+    return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = expCtx, .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+}
+
 unique_ptr<PlanStageStats> makeStats(const char* name,
                                      StageType type,
-                                     unique_ptr<SpecificStats> specific) {
+                                     unique_ptr<SpecificStats> specific,
+                                     size_t works = 1,
+                                     size_t advances = 1) {
     auto stats = make_unique<PlanStageStats>(name, type);
-    stats->common.works = 1;
+    stats->common.works = works;
+    stats->common.advanced = advances;
     stats->specific = std::move(specific);
     return stats;
 }
@@ -74,11 +90,59 @@ TEST(PlanRankerTest, NoFetchBonus) {
     badPlan->children[0]->children.emplace_back(
         makeStats("IXSCAN", STAGE_IXSCAN, make_unique<IndexScanStats>()));
 
+    auto cq = makeCanonicalQuery();
     auto scorer = plan_ranker::makePlanScorer();
-    auto goodScore = scorer->calculateScore(goodPlan.get());
-    auto badScore = scorer->calculateScore(badPlan.get());
+    auto goodScore = scorer->calculateScore(goodPlan.get(), *cq);
+    auto badScore = scorer->calculateScore(badPlan.get(), *cq);
 
     ASSERT_GT(goodScore, badScore);
+}
+
+TEST(PlanRankerTest, DistinctBonus) {
+    RAIIServerParameterControllerForTest shardFilteringDistinct(
+        "featureFlagShardFilteringDistinctScan", true);
+
+    // Two plans: both fetch, one is a DISTINCT_SCAN, other is an IXSCAN.
+    // DISTINCT_SCAN does 2 advances / 10 works.
+    auto dsStats = make_unique<DistinctScanStats>();
+    dsStats->isFetching = true;
+    dsStats->isShardFilteringDistinctScanEnabled = true;
+    auto distinctScanPlan =
+        makeStats("DISTINCT_SCAN", STAGE_DISTINCT_SCAN, std::move(dsStats), 10, 2);
+
+    // IXSCAN plan does 2 advances / 10 works.
+    auto ixscanPlan = makeStats("FETCH", STAGE_FETCH, make_unique<FetchStats>(), 10, 2);
+    ixscanPlan->children.emplace_back(
+        makeStats("IXSCAN", STAGE_IXSCAN, make_unique<IndexScanStats>(), 10, 2));
+
+    auto cq = makeCanonicalQuery();
+    cq->setDistinct(CanonicalDistinct("someKey"));
+    auto scorer = plan_ranker::makePlanScorer();
+    auto distinctScore = scorer->calculateScore(distinctScanPlan.get(), *cq);
+    auto ixscanScore = scorer->calculateScore(ixscanPlan.get(), *cq);
+
+    // Both plans should tie now- a tie-breaker will be applied at a later stage.
+    ASSERT_EQ(distinctScore, ixscanScore);
+
+    // Now we change to an aggregation context (simulate $groupByDistinct rewrite case).
+    auto groupBson = BSON("$group" << BSON("_id"
+                                           << "someKey"));
+    cq->setCqPipeline(
+        {DocumentSourceGroup::createFromBson(groupBson.firstElement(), cq->getExpCtx())}, true);
+
+    // When in a distinct() context, productivity is considered larger in a distinct, even if both
+    // plans have the same advances:work ratio. A DISTINCT_SCAN should now win by a large margin
+    // (tie breaker).
+    distinctScore = scorer->calculateScore(distinctScanPlan.get(), *cq);
+    ixscanScore = scorer->calculateScore(ixscanPlan.get(), *cq);
+    ASSERT_GT(distinctScore, ixscanScore);
+
+    // If we make the IXSCAN productive enough, however, it can still win!
+    ixscanPlan->children[0]->common.advanced = 10;
+    ixscanPlan->common.advanced = 10;
+    distinctScore = scorer->calculateScore(distinctScanPlan.get(), *cq);
+    ixscanScore = scorer->calculateScore(ixscanPlan.get(), *cq);
+    ASSERT_GT(ixscanScore, distinctScore);
 }
 
 };  // namespace

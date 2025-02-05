@@ -69,8 +69,10 @@ void logScoreFormula(std::function<std::string()> formula,
                      double noFetchBonus,
                      double noSortBonus,
                      double noIxisectBonus,
-                     double tieBreakers);
+                     double tieBreakers,
+                     boost::optional<double> groupByDistinctBonus);
 void logScoreBoost(double score);
+void logScoreGroupByDistinctBoost(double bonus);
 void logScoringPlan(std::function<std::string()> solution,
                     std::function<std::string()> explain,
                     std::function<std::string()> planSummary,
@@ -103,7 +105,7 @@ public:
     PlanScorer() = default;
     virtual ~PlanScorer() = default;
 
-    double calculateScore(const PlanStageStatsType* stats) const {
+    double calculateScore(const PlanStageStatsType* stats, const CanonicalQuery& cq) const {
         // We start all scores at 1.  Our "no plan selected" score is 0 and we want all plans to
         // be greater than that.
         const double baseScore = 1;
@@ -139,7 +141,23 @@ public:
         }
 
         const double tieBreakers = noFetchBonus + noSortBonus + noIxisectBonus;
-        double score = baseScore + productivity + tieBreakers;
+        boost::optional<double> groupByDistinctBonus;
+
+        // Apply a large bonus to DISTINCT_SCAN plans in an aggregaton context, as the
+        // $groupByDistinct rewrite can reduce the amount of overall work the query needs to do.
+        if (cq.getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled() && cq.getDistinct() &&
+            !cq.cqPipeline().empty() && hasStage(STAGE_DISTINCT_SCAN, stats)) {
+            // Assume that every advance in a distinct scan is twice as productive as the
+            // equivalent index scan, up to the number of works actually done by the
+            // distinct scan, in order to favor distinct scans. The maximum bonus is 0.5
+            // (productivity = 0.5), while the minimum bonus is 0 (productivity = 1). If the
+            // distinct scan is not very productive (< 0.5) we don't want to prioritize it
+            // too much; conversely, if it is very productive, we don't need a huge bonus.
+            groupByDistinctBonus = std::min(1 - productivity, productivity);
+            log_detail::logScoreGroupByDistinctBoost(*groupByDistinctBonus);
+        }
+
+        double score = baseScore + productivity + tieBreakers + groupByDistinctBonus.value_or(0.0);
 
         log_detail::logScoreFormula([this, stats] { return getProductivityFormula(stats); },
                                     score,
@@ -148,7 +166,8 @@ public:
                                     noFetchBonus,
                                     noSortBonus,
                                     noIxisectBonus,
-                                    tieBreakers);
+                                    tieBreakers,
+                                    groupByDistinctBonus);
 
         if (internalQueryForceIntersectionPlans.load()) {
             if (hasStage(STAGE_AND_HASH, stats) || hasStage(STAGE_AND_SORTED, stats)) {

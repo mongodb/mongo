@@ -208,7 +208,8 @@ void addTieBreakingHeuristicsBonuses(
  */
 template <typename PlanStageType, typename ResultType, typename Data>
 StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
-    const std::vector<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates) {
+    const std::vector<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates,
+    const CanonicalQuery& cq) {
     invariant(!candidates.empty());
     // A plan that hits EOF is automatically scored above
     // its peers. If multiple plans hit EOF during the same
@@ -243,7 +244,7 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
                                        [&]() { return explainer->getPlanSummary(); },
                                        i,
                                        statTrees[i]->common.isEOF);
-            double score = makePlanScorer()->calculateScore(statTrees[i].get());
+            double score = makePlanScorer()->calculateScore(statTrees[i].get(), cq);
             log_detail::logScore(score);
             if (statTrees[i]->common.isEOF) {
                 log_detail::logEOFBonus(eofBonus);
