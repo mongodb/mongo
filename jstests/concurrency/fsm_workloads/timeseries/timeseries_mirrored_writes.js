@@ -5,6 +5,8 @@
  *
  * During teardown we compare that the collections are identical.
  *
+ * NOTE: Any failures may be indicative of a serious data corruption or data loss issue.
+ *
  * @tags: [
  *   assumes_no_implicit_collection_creation_after_drop,
  *   requires_timeseries,
