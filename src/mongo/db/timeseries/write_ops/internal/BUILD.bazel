@@ -31,3 +31,17 @@ mongo_cc_library(
         "//src/mongo/db/transaction",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "db_timeseries_write_ops_internal_test",
+    srcs = [
+        "timeseries_write_ops_internal_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/query/write_ops:write_ops_exec",
+        "//src/mongo/db/timeseries/write_ops:timeseries_write_ops",
+    ],
+)

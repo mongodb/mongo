@@ -63,11 +63,15 @@ namespace mongo::timeseries::bucket_catalog {
 
 using StripeNumber = std::uint8_t;
 using ShouldClearFn = std::function<bool(const UUID&)>;
+// Tuple that stores a measurement, the time value for that measurement, and the index of the
+// measurement from the original insert request.
+using BatchedInsertTuple = std::tuple<BSONObj, Date_t, size_t>;
 
 /**
  * Bundle of information that gets passed down into 'insert' and functions below it that may create
  * a new bucket. It stores information that is used to decide which bucket to insert a measurement
- * into.
+ * into. Binding these values together is used to sort on measurement timestamps and keep track of
+ * the original index in the user batch for error reporting.
  */
 struct InsertContext {
     BucketKey key;
@@ -78,6 +82,26 @@ struct InsertContext {
     bool operator==(const InsertContext& other) const {
         return key == other.key;
     };
+};
+
+/**
+ * Represents a set of measurements that should target one bucket. The measurements contained in
+ * this struct are a best-effort guess at a grouping based on, but not intended to be a guarantee as
+ * to, what will fit in a bucket. The measurements stored within the struct should be sorted on
+ * time, and are guaranteed only to share a metaField value.
+ */
+struct BatchedInsertContext {
+    BucketKey key;
+    StripeNumber stripeNumber;
+    const TimeseriesOptions& options;
+    ExecutionStatsController stats;
+    std::vector<BatchedInsertTuple> measurementsTimesAndIndices;
+
+    BatchedInsertContext(BucketKey&,
+                         StripeNumber,
+                         const TimeseriesOptions&,
+                         ExecutionStatsController&,
+                         std::vector<BatchedInsertTuple>&);
 };
 
 /**

@@ -91,4 +91,60 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
                             absl::flat_hash_map<int, int>& retryAttemptsForDup,
                             const mongo::write_ops::InsertCommandRequest& request);
 
+/**
+ * Given a batch of user measurements for a collection that does not have a metaField value, returns
+ * a BatchedInsertContext for all of the user measurements.
+ *
+ * Passes through the inputted measurements twice, once to record the index of the measurement in
+ * the original user batch for error reporting, and then again to sort the measurements based on
+ * their time field.
+ *
+ * This is slightly more efficient and requires fewer maps/data structures than the metaField
+ * variant, because we do not need to split up the measurements into different batches according to
+ * their metaField value.
+ */
+StatusWith<std::vector<bucket_catalog::BatchedInsertContext>> buildBatchedInsertContextsNoMetaField(
+    const bucket_catalog::BucketCatalog& bucketCatalog,
+    const UUID& collectionUUID,
+    const TimeseriesOptions& timeseriesOptions,
+    const std::vector<BSONObj>& userMeasurementsBatch,
+    bucket_catalog::ExecutionStatsController& stats,
+    tracking::Context& trackingContext);
+
+
+/**
+ * Given a batch of user measurements for a collection that does have a metaField value, returns a
+ * vector of BatchedInsertContexts with each BatchedInsertContext storing the measurements for a
+ * particular metaField value.
+ *
+ * Passes through the inputted measurements twice, once to record the index of the measurement in
+ * the original user batch for error reporting, and then again to sort the measurements based on
+ * their time field.
+ */
+StatusWith<std::vector<bucket_catalog::BatchedInsertContext>>
+buildBatchedInsertContextsWithMetaField(const bucket_catalog::BucketCatalog& bucketCatalog,
+                                        const UUID& collectionUUID,
+                                        const TimeseriesOptions& timeseriesOptions,
+                                        const std::vector<BSONObj>& userMeasurementsBatch,
+                                        StringData metaFieldName,
+                                        bucket_catalog::ExecutionStatsController& stats,
+                                        tracking::Context& trackingContext);
+
+/**
+ * Given a set of measurements, splits up the measurements into batches based on the metaField.
+ * Returns a vector of BatchedInsertContext where each BatchedInsertContext will contain the batch
+ * of measurements for a particular metaField value, sorted on time, as well as other bucket-level
+ * metadata.
+ *
+ * If the time-series collection has no metaField value, then all of the measurements will be
+ * batched into one BatchedInsertContext.
+ *
+ * If any of the inserted measurements are malformed (i.e. missing the proper time field), returns a
+ * Status with an error code.
+ */
+StatusWith<std::vector<bucket_catalog::BatchedInsertContext>> buildBatchedInsertContexts(
+    bucket_catalog::BucketCatalog& bucketCatalog,
+    const UUID& collectionUUID,
+    const TimeseriesOptions& timeseriesOptions,
+    const std::vector<BSONObj>& userMeasurementsBatch);
 }  // namespace mongo::timeseries::write_ops::internal

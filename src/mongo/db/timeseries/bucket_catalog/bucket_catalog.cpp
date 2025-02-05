@@ -175,6 +175,18 @@ BucketCatalog::BucketCatalog(size_t numberOfStripes, std::function<uint64_t()> m
     });
 }
 
+BatchedInsertContext::BatchedInsertContext(
+    BucketKey& bucketKey,
+    StripeNumber stripeNumber,
+    const TimeseriesOptions& options,
+    ExecutionStatsController& stats,
+    std::vector<BatchedInsertTuple>& measurementsTimesAndIndices)
+    : key(std::move(bucketKey)),
+      stripeNumber(stripeNumber),
+      options(options),
+      stats(stats),
+      measurementsTimesAndIndices(measurementsTimesAndIndices){};
+
 BSONObj getMetadata(BucketCatalog& catalog, const BucketId& bucketId) {
     auto const& stripe = *catalog.stripes[internal::getStripeNumber(catalog, bucketId)];
     stdx::lock_guard stripeLock{stripe.mutex};
