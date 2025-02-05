@@ -160,19 +160,9 @@ std::vector<BSONObj> SamplingEstimatorImpl::getIndexKeys(const IndexBounds& boun
                                nullptr /*collator*/,
                                boost::none);
 
-    // This function converts an index key to a BSONObj in order to compare with the IndexBounds.
-    auto keyStringToBson = [](const key_string::Value& keyString) {
-        BSONObjBuilder bob;
-        auto keyStringObj = key_string::toBson(keyString, Ordering::make(BSONObj()));
-        for (auto&& keyStringElem : keyStringObj) {
-            bob.append(keyStringElem);
-        }
-        return bob.obj();
-    };
-
     std::vector<BSONObj> indexKeys;
     for (auto&& keyString : keyStrings) {
-        indexKeys.push_back(keyStringToBson(keyString));
+        indexKeys.push_back(key_string::toBson(keyString, Ordering::make(BSONObj())));
     }
     return indexKeys;
 }
@@ -303,10 +293,12 @@ SamplingEstimatorImpl::generateChunkSamplingPlan(PlanYieldPolicy* sbeYieldPolicy
         0 /* nodeId */);
 
 
+    sbe::value::SlotVector outerProjectsSlots;
+    sbe::value::SlotVector outerCorrelatedSlots{*outerRid};
     auto loopJoinStage = sbe::makeS<sbe::LoopJoinStage>(std::move(outerStage),
                                                         std::move(innerStage),
-                                                        sbe::value::SlotVector{},
-                                                        sbe::value::SlotVector{*outerRid},
+                                                        outerProjectsSlots,
+                                                        outerCorrelatedSlots,
                                                         nullptr /* predicate */,
                                                         0 /* _nodeId */);
 
@@ -411,6 +403,38 @@ void SamplingEstimatorImpl::generateChunkSample(size_t sampleSize) {
 
 void SamplingEstimatorImpl::generateChunkSample() {
     generateChunkSample(_sampleSize);
+    return;
+}
+
+void SamplingEstimatorImpl::generateSampleBySeqScanningForTesting() {
+    // Create a CanonicalQuery for the sampling plan.
+    auto cq = makeCanonicalQuery(_collections.getMainCollection()->ns(), _opCtx, _sampleSize);
+    auto sbeYieldPolicy = PlanYieldPolicySBE::make(
+        _opCtx, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, _collections, cq->nss());
+
+    auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
+    sbe::value::SlotIdGenerator ids;
+    staticData->resultSlot = ids.generate();
+    const CollectionPtr& collection = _collections.getMainCollection();
+    // Scan the first '_sampleSize' documents sequentially from the start of the target collection
+    // in order to generate a repeatable sample.
+    auto stage = makeScanStage(
+        collection, staticData->resultSlot, boost::none, boost::none, false, sbeYieldPolicy.get());
+    stage = sbe::makeS<sbe::LimitSkipStage>(
+        std::move(stage),
+        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                   sbe::value::bitcastFrom<int64_t>(_sampleSize)),
+        nullptr /* skip */,
+        0 /* nodeId */);
+
+    stage_builder::PlanStageData data{
+        stage_builder::Environment{std::make_unique<sbe::RuntimeEnvironment>()},
+        std::move(staticData)};
+    auto plan =
+        std::make_pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>(
+            std::move(stage), std::move(data));
+    executeSamplingQueryAndSample(plan, std::move(cq), std::move(sbeYieldPolicy));
+
     return;
 }
 
@@ -527,6 +551,11 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
       _sampleSize(sampleSize),
       _numChunks(numChunks),
       _collectionCard(collectionCard) {
+    if (internalQuerySamplingBySequentialScan.load()) {
+        // This is only used for testing purposes when a repeatable sample is needed.
+        generateSampleBySeqScanningForTesting();
+        return;
+    }
 
     if (sampleSize >= collectionCard.cardinality().v()) {
         // If the required sample is larger than the collection, the sample is generated from all

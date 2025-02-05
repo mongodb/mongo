@@ -225,6 +225,13 @@ private:
         std::unique_ptr<CanonicalQuery> cq,
         std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy);
 
+    /**
+     * Generates a sample by sequentially scanning documents from the start of the target
+     * collection. The sample is generated from the first '_sampleSize' documents of the collection.
+     * This sampling method is only used for testing purposes where a repeatable sample is needed.
+     */
+    void generateSampleBySeqScanningForTesting();
+
     /*
      * The SamplingEstimator calculates the size of a sample based on the confidence level and
      * margin of error required.

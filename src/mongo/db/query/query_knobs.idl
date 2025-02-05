@@ -1511,6 +1511,16 @@ server_parameters:
       gt: 0
     redact: false
 
+  internalQuerySamplingBySequentialScan:
+    description: "Indicate sampling CE to generate a repeatable sample by sequentially scanning
+    documents from the start of the target collection. This sampling method is useful for testing
+    purposes and should not be used in production." 
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQuerySamplingBySequentialScan"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+    redact: false
+
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'
