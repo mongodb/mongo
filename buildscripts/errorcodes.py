@@ -23,7 +23,7 @@ except ImportError:
     print("*** Run 'pip3 install --user regex' to speed up error code checking")
     import re  # type: ignore
 
-MAXIMUM_CODE = 9999999  # JIRA Ticket + XX
+MAXIMUM_CODE = 99999999  # JIRA Ticket + XX
 
 codes = []  # type: ignore
 

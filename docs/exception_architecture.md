@@ -90,7 +90,7 @@ when we expect a failure, a failure might be recoverable, or failure accounting 
 
 ### Choosing a unique location number
 
-The current convention for choosing a unique location number is to use the 5 digit SERVER ticket number
+The current convention for choosing a unique location number is to use the 5 or 6 digit SERVER ticket number
 for the ticket being addressed when the assertion is added, followed by a two digit counter to distinguish
 between codes added as part of the same ticket. For example, if you're working on SERVER-12345, the first
 error code would be 1234500, the second would be 1234501, etc. This convention can also be used for LOGV2
