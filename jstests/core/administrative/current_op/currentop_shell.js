@@ -112,6 +112,9 @@ function awaitOperations(getOperationsFunction) {
                 print(`Found command with empty 'batchSize' value; waiting for getmore: ${
                     tojson(operations)}`);
                 return false;
+            } else if (!operations.every(getCommandFromCurrentOpEntry)) {
+                print(`Waiting until all operations have a command: ${tojson(operations)}`);
+                return false;
             }
 
             return true;
@@ -131,7 +134,7 @@ function getCommandFromCurrentOpEntry(entry) {
                "originatingCommand" in entry.cursor) {
         return entry.cursor.originatingCommand;
     } else {
-        assert(false, entry);
+        return null;
     }
 }
 
