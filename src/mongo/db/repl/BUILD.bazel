@@ -780,6 +780,7 @@ mongo_cc_library(
         ":oplog_entry",
         ":optime",  # TODO(SERVER-93876): Remove.
         "//src/mongo:base",
+        "//src/mongo/db/storage:remove_saver",
         "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
     ],
 )

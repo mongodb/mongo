@@ -38,6 +38,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/roll_back_local_operations.h"
+#include "mongo/db/storage/remove_saver.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -76,6 +77,9 @@ long long getTerm(const OplogInterface::Iterator::Value& oplogValue) {
 }
 }  // namespace
 
+static constexpr auto kRollbackRemoveSaverType = "rollback";
+static constexpr auto kRollbackRemoveSaverWhy = "removed";
+
 RollBackLocalOperations::RollBackLocalOperations(const OplogInterface& localOplog,
                                                  const RollbackOperationFn& rollbackOperation)
 
@@ -99,7 +103,7 @@ RollBackLocalOperations::RollbackCommonPoint::RollbackCommonPoint(BSONObj oplogB
 }
 
 StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollBackLocalOperations::onRemoteOperation(
-    const BSONObj& operation) {
+    const BSONObj& operation, RemoveSaver& removeSaver, bool shouldCreateDataFiles) {
     if (_scanned == 0) {
         auto result = _localOplogIterator->next();
         if (!result.isOK()) {
@@ -118,6 +122,9 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollBackLocalOperations
                     2,
                     "Local oplog entry to roll back",
                     "oplogEntry"_attr = redact(_localOplogValue.first));
+        if (shouldCreateDataFiles) {
+            fassert(9777500, removeSaver.goingToDelete(_localOplogValue.first));
+        }
         auto status = _rollbackOperation(_localOplogValue.first);
         if (!status.isOK()) {
             invariant(ErrorCodes::NoSuchKey != status.code());
@@ -163,7 +170,8 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollBackLocalOperations
 StatusWith<RollBackLocalOperations::RollbackCommonPoint> syncRollBackLocalOperations(
     const OplogInterface& localOplog,
     const OplogInterface& remoteOplog,
-    const RollBackLocalOperations::RollbackOperationFn& rollbackOperation) {
+    const RollBackLocalOperations::RollbackOperationFn& rollbackOperation,
+    bool shouldCreateDataFiles) {
 
     std::unique_ptr<OplogInterface::Iterator> remoteIterator;
 
@@ -187,10 +195,12 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> syncRollBackLocalOperat
 
     RollBackLocalOperations finder(localOplog, rollbackOperation);
     Timestamp theirTime;
+    RemoveSaver removeSaver(kRollbackRemoveSaverType, "local.oplog.rs", kRollbackRemoveSaverWhy);
     while (remoteResult.isOK()) {
         BSONObj theirObj = remoteResult.getValue().first;
         theirTime = theirObj["ts"].timestamp();
-        auto result = finder.onRemoteOperation(theirObj);
+
+        auto result = finder.onRemoteOperation(theirObj, removeSaver, shouldCreateDataFiles);
         if (result.isOK()) {
             return result.getValue();
         } else if (result.getStatus().code() != ErrorCodes::NoSuchKey) {

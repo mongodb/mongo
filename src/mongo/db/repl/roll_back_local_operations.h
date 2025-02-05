@@ -37,6 +37,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog_interface.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/storage/remove_saver.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 
@@ -101,7 +102,9 @@ public:
      * Returns ErrorCodes::NoSuchKey if common point has not been found and
      * additional operations have to be read from the remote oplog.
      */
-    StatusWith<RollbackCommonPoint> onRemoteOperation(const BSONObj& operation);
+    StatusWith<RollbackCommonPoint> onRemoteOperation(const BSONObj& operation,
+                                                      RemoveSaver& removeSaver,
+                                                      bool shouldCreateDataFiles);
 
 private:
     std::unique_ptr<OplogInterface::Iterator> _localOplogIterator;
@@ -122,7 +125,8 @@ private:
 StatusWith<RollBackLocalOperations::RollbackCommonPoint> syncRollBackLocalOperations(
     const OplogInterface& localOplog,
     const OplogInterface& remoteOplog,
-    const RollBackLocalOperations::RollbackOperationFn& rollbackOperation);
+    const RollBackLocalOperations::RollbackOperationFn& rollbackOperation,
+    bool shouldCreateDataFiles);
 
 }  // namespace repl
 }  // namespace mongo

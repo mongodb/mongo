@@ -1162,8 +1162,8 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollbackImpl::_findComm
     // each oplog entry up until the common point. We only need the Timestamp of the common point
     // for the oplog truncate after point. Along the way, we save some information about the
     // rollback ops.
-    auto commonPointSW =
-        syncRollBackLocalOperations(*_localOplog, *_remoteOplog, onLocalOplogEntryFn);
+    auto commonPointSW = syncRollBackLocalOperations(
+        *_localOplog, *_remoteOplog, onLocalOplogEntryFn, shouldCreateDataFiles());
     if (!commonPointSW.isOK()) {
         return commonPointSW.getStatus();
     }

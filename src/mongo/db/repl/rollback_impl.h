@@ -292,8 +292,8 @@ public:
     }
 
     /**
-     * Returns true if the rollback system should write out data files containing documents that
-     * will be deleted by rollback.
+     * Returns true if the rollback system should write out data files containing documents and
+     * oplog entries that will be deleted by rollback.
      */
     static bool shouldCreateDataFiles();
 

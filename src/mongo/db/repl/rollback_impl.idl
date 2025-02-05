@@ -33,7 +33,8 @@ server_parameters:
     createRollbackDataFiles:
         description: >-
             Control whether or not the server will write out data files containing deleted documents during
-            rollback. This server parameter affects rollback via recovery to stable timestamp.
+            rollback, and data files containing rolled back oplog entries. This server parameter affects 
+            rollback via recovery to stable timestamp.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: gCreateRollbackDataFiles
