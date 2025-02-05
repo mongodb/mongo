@@ -37,6 +37,7 @@
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 
 namespace mongo {
@@ -596,6 +597,16 @@ std::unique_ptr<AggCatalogState> AggExState::createAggCatalogState() {
         collectionState = AggCatalogStateFactory::createCollectionlessAggCatalogState(*this);
     } else {
         collectionState = AggCatalogStateFactory::createDefaultAggCatalogState(*this);
+
+        if (getRequest().getRawData()) {
+            auto [isTimeseriesViewRequest, translatedNs] =
+                timeseries::isTimeseriesViewRequest(getOpCtx(), getRequest());
+            if (isTimeseriesViewRequest) {
+                setExecutionNss(translatedNs);
+                collectionState->relinquishLocks();
+                collectionState = AggCatalogStateFactory::createDefaultAggCatalogState(*this);
+            }
+        }
     }
 
     collectionState->validate();

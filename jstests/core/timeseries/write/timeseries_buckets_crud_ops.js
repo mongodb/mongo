@@ -45,13 +45,17 @@ function crudTest(fn, addStartingMeasurements = true) {
 
 // aggregate()
 crudTest(() => {
-    const buckets = bucketsColl.find().toArray();
-    assert.eq(buckets.length, 2);
-    const correctBucket = buckets.filter(bucket => bucket.control.count == 2)[0];
-    assert(correctBucket);
-    const agg = bucketsColl.aggregate([
-        {$match: {"control.count": 2}},
-    ]);
+    // TODO (SERVER-100413): Run this test case when going through a mongos or the collection is
+    // sharded/unsplittable.
+    if (FixtureHelpers.isMongos(db) || FixtureHelpers.isSharded(bucketsColl) ||
+        FixtureHelpers.isUnsplittable(bucketsColl)) {
+        return;
+    }
+    const agg = coll.aggregate(
+        [
+            {$match: {"control.count": 2}},
+        ],
+        {rawData: true});
     assert.eq(agg.toArray().length, 1);
 });
 
