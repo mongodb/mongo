@@ -55,7 +55,7 @@ void appendIfNonZero(StringData fieldName, int64_t value, BSONObjBuilder* builde
 }  // namespace
 
 WiredTigerStats::WiredTigerStats(WiredTigerSession& session) {
-    WT_CURSOR* c;
+    WT_CURSOR* c = nullptr;
     uassert(ErrorCodes::CursorNotFound,
             "Unable to open statistics cursor",
             !session.open_cursor("statistics:session", nullptr, "statistics=(fast)", &c));

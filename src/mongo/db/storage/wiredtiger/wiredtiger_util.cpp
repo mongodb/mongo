@@ -146,7 +146,7 @@ StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WiredTigerRecoveryUnit
 }
 
 StatusWith<std::string> WiredTigerUtil::getMetadata(WiredTigerSession& session, StringData uri) {
-    WT_CURSOR* cursor;
+    WT_CURSOR* cursor = nullptr;
     invariantWTOK(session.open_cursor("metadata:", nullptr, "", &cursor), session);
     invariant(cursor);
     ON_BLOCK_EXIT([cursor, &session] { invariantWTOK(cursor->close(cursor), session); });
