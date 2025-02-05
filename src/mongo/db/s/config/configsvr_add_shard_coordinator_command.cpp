@@ -103,9 +103,10 @@ public:
             audit::logAddShard(Client::getCurrent(), name ? name.value() : "", target.toString());
 
             const auto addShardCoordinator =
-                checked_pointer_cast<AddShardCoordinator>(std::invoke([&target, &name, opCtx]() {
+                checked_pointer_cast<AddShardCoordinator>(std::invoke([&]() {
                     auto coordinatorDoc = AddShardCoordinatorDocument();
                     coordinatorDoc.setConnectionString(target);
+                    coordinatorDoc.setIsConfigShard(false);
                     coordinatorDoc.setProposedName(name);
                     coordinatorDoc.setShardingDDLCoordinatorMetadata(
                         {{NamespaceString::kConfigsvrShardsNamespace,

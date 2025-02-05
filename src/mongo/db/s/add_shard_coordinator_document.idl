@@ -40,6 +40,7 @@ enums:
         values:
             kUnset: "unset"
             kCheckLocalPreconditions: "checkLocalPreconditions"
+            kCheckShardPreconditions: "checkShardPreconditions"
             kFinal: "final"
 
 structs:
@@ -57,6 +58,9 @@ structs:
                 type: string
                 description: "A proposed name for the new shard"
                 optional: true
+            isConfigShard:
+                type: bool
+                description: "Specifies if the new shard is supposed to be a config shard"
             phase:
                 type: AddShardCoordinatorPhase
                 description: "Coordinator phase."

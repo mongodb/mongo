@@ -183,12 +183,6 @@ feature_flags:
     default: true
     version: 8.1
     shouldBeFCVGated: true
-  # TODO (SERVER-99140): Remove once 9.0 becomes last LTS
-  featureFlagProhibitNonEmptyReplicaSetOnAddShard:
-    description: "Feature flag to prohibit adding non-empty replica set to the cluster."
-    cpp_varname: feature_flags::gProhibitNonEmptyReplicaSetOnAddShard
-    default: false
-    shouldBeFCVGated: true
   featureFlagTerminateSecondaryReadsUponRangeDeletion:
     description: "Feature flag to enable the termination of secondary reads due to range deletions."
     cpp_varname: feature_flags::gTerminateSecondaryReadsUponRangeDeletion

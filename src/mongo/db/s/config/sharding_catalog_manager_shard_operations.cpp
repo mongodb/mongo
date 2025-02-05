@@ -569,27 +569,20 @@ void joinMigrations(OperationContext* opCtx) {
     uassert(8955101, "Failed to await ongoing migrations before removing catalog shard", result);
 }
 
-StatusWith<boost::optional<ShardType>> checkIfShardExists(
-    OperationContext* opCtx,
-    const ConnectionString& proposedShardConnectionString,
-    const boost::optional<StringData>& proposedShardName,
-    ShardingCatalogClient& localCatalogClient) {
+boost::optional<ShardType> getExistingShard(OperationContext* opCtx,
+                                            const ConnectionString& proposedShardConnectionString,
+                                            const boost::optional<StringData>& proposedShardName,
+                                            ShardingCatalogClient& localCatalogClient) {
     // Check whether any host in the connection is already part of the cluster.
-    const auto existingShards =
-        localCatalogClient.getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
-    if (!existingShards.isOK()) {
-        return existingShards.getStatus().withContext(
-            "Failed to load existing shards during addShard");
-    }
+    const auto existingShards = uassertStatusOKWithContext(
+        localCatalogClient.getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern),
+        "Failed to load existing shards during addShard");
 
     // Now check if this shard already exists - if it already exists *with the same options* then
     // the addShard request can return success early without doing anything more.
-    for (const auto& existingShard : existingShards.getValue().value) {
-        auto swExistingShardConnStr = ConnectionString::parse(existingShard.getHost());
-        if (!swExistingShardConnStr.isOK()) {
-            return swExistingShardConnStr.getStatus();
-        }
-        auto existingShardConnStr = std::move(swExistingShardConnStr.getValue());
+    for (const auto& existingShard : existingShards.value) {
+        auto existingShardConnStr =
+            uassertStatusOK(ConnectionString::parse(existingShard.getHost()));
 
         // Function for determining if the options for the shard that is being added match the
         // options of an existing shard that conflicts with it.
@@ -611,7 +604,7 @@ StatusWith<boost::optional<ShardType>> checkIfShardExists(
         // Function for determining if there is an overlap amongst the hosts of the existing shard
         // and the propsed shard.
         auto checkIfHostsAreEquivalent =
-            [&](bool checkShardEquivalency) -> StatusWith<boost::optional<ShardType>> {
+            [&](bool checkShardEquivalency) -> boost::optional<ShardType> {
             for (const auto& existingHost : existingShardConnStr.getServers()) {
                 for (const auto& addingHost : proposedShardConnectionString.getServers()) {
                     if (existingHost == addingHost) {
@@ -620,16 +613,13 @@ StatusWith<boost::optional<ShardType>> checkIfShardExists(
                             // an existing shard. If the options aren't the same, then this is an
                             // error, but if the options match then the addShard operation should be
                             // immediately considered a success and terminated.
-                            if (shardsAreEquivalent()) {
-                                return {existingShard};
-                            } else {
-                                return {ErrorCodes::IllegalOperation,
-                                        str::stream()
-                                            << "'" << addingHost.toString() << "' "
-                                            << "is already a member of the existing shard '"
-                                            << existingShard.getHost() << "' ("
-                                            << existingShard.getName() << ")."};
-                            }
+                            uassert(ErrorCodes::IllegalOperation,
+                                    str::stream() << "'" << addingHost.toString() << "' "
+                                                  << "is already a member of the existing shard '"
+                                                  << existingShard.getHost() << "' ("
+                                                  << existingShard.getName() << ").",
+                                    shardsAreEquivalent());
+                            return {existingShard};
                         } else {
                             return {existingShard};
                         }
@@ -646,28 +636,24 @@ StatusWith<boost::optional<ShardType>> checkIfShardExists(
             // If the options aren't the same, then this is an error.
             // If the shards are equivalent, there must be some overlap amongst their hosts, if not
             // then addShard results in an error.
-            if (shardsAreEquivalent()) {
-                auto hostsAreEquivalent = checkIfHostsAreEquivalent(false);
-                if (hostsAreEquivalent.isOK() && hostsAreEquivalent.getValue() != boost::none) {
-                    return {existingShard};
-                } else {
-                    return {ErrorCodes::IllegalOperation,
-                            str::stream()
-                                << "A shard named " << existingShardConnStr.getSetName()
-                                << " containing the replica set '"
-                                << existingShardConnStr.getSetName() << "' already exists"};
-                }
-            } else {
-                return {ErrorCodes::IllegalOperation,
-                        str::stream() << "A shard already exists containing the replica set '"
-                                      << existingShardConnStr.getSetName() << "'"};
-            }
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << "A shard already exists containing the replica set '"
+                                  << existingShardConnStr.getSetName() << "'",
+                    shardsAreEquivalent());
+
+            auto hostsAreEquivalent = checkIfHostsAreEquivalent(false);
+
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << "A shard named " << existingShardConnStr.getSetName()
+                                  << " containing the replica set '"
+                                  << existingShardConnStr.getSetName() << "' already exists",
+                    hostsAreEquivalent != boost::none);
         }
 
         // Look if any of the hosts in the existing shard are present within the shard trying
         // to be added.
-        auto hostsAreEquivalent = checkIfHostsAreEquivalent(true);
-        if (!hostsAreEquivalent.isOK() || hostsAreEquivalent.getValue() != boost::none) {
+        if (auto hostsAreEquivalent = checkIfHostsAreEquivalent(true);
+            hostsAreEquivalent != boost::none) {
             return hostsAreEquivalent;
         }
 
@@ -675,42 +661,22 @@ StatusWith<boost::optional<ShardType>> checkIfShardExists(
             // If we get here then we're trying to add a shard with the same name as an
             // existing shard, but there was no overlap in the hosts between the existing
             // shard and the proposed connection string for the new shard.
-            return {ErrorCodes::IllegalOperation,
-                    str::stream() << "A shard named " << proposedShardName.value()
-                                  << " already exists"};
+            uasserted(ErrorCodes::IllegalOperation,
+                      str::stream()
+                          << "A shard named " << proposedShardName.value() << " already exists");
         }
     }
 
     return {boost::none};
 }
 
-std::string getRemoveShardMessage(const ShardDrainingStateEnum& status) {
-    switch (status) {
-        case ShardDrainingStateEnum::kStarted:
-            return "draining started successfully";
-        case ShardDrainingStateEnum::kOngoing:
-            return "draining ongoing";
-        case ShardDrainingStateEnum::kPendingDataCleanup:
-            return "waiting for data to be cleaned up";
-        case ShardDrainingStateEnum::kCompleted:
-            return "removeshard completed successfully";
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
-}  // namespace topology_change_helpers
-
-StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShard(
-    OperationContext* opCtx,
-    RemoteCommandTargeter* targeter,
-    const DatabaseName& dbName,
-    const BSONObj& cmdObj) {
-    auto swHost = targeter->findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
-    if (!swHost.isOK()) {
-        return swHost.getStatus();
-    }
-    auto host = std::move(swHost.getValue());
+Shard::CommandResponse runCommandForAddShard(OperationContext* opCtx,
+                                             RemoteCommandTargeter& targeter,
+                                             const DatabaseName& dbName,
+                                             const BSONObj& cmdObj,
+                                             std::shared_ptr<executor::TaskExecutor> executor) {
+    const auto host = uassertStatusOK(
+        targeter.findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}));
 
     executor::RemoteCommandRequest request(
         host, dbName, cmdObj, rpc::makeEmptyMetadata(), opCtx, kRemoteCommandTimeout);
@@ -718,16 +684,13 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShar
     executor::RemoteCommandResponse response(
         host, Status(ErrorCodes::InternalError, "Internal error running command"));
 
-    auto swCallbackHandle = _executorForAddShard->scheduleRemoteCommand(
+    auto callbackHandle = uassertStatusOK(executor->scheduleRemoteCommand(
         request, [&response](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
             response = args.response;
-        });
-    if (!swCallbackHandle.isOK()) {
-        return swCallbackHandle.getStatus();
-    }
+        }));
 
     // Block until the command is carried out
-    _executorForAddShard->wait(swCallbackHandle.getValue());
+    executor->wait(callbackHandle);
 
     if (response.status == ErrorCodes::ExceededTimeLimit) {
         LOGV2(21941, "Operation timed out", "error"_attr = redact(response.status));
@@ -735,13 +698,12 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShar
 
     if (!response.isOK()) {
         if (!Shard::shouldErrorBePropagated(response.status.code())) {
-            return {ErrorCodes::OperationFailed,
-                    str::stream() << "failed to run command " << cmdObj
-                                  << " when attempting to add shard "
-                                  << targeter->connectionString().toString()
-                                  << causedBy(response.status)};
+            uasserted(ErrorCodes::OperationFailed,
+                      str::stream()
+                          << "failed to run command " << cmdObj << " when attempting to add shard "
+                          << targeter.connectionString().toString() << causedBy(response.status));
         }
-        return response.status;
+        uassertStatusOK(response.status);
     }
 
     BSONObj result = response.data.getOwned();
@@ -751,7 +713,7 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShar
         commandStatus = {
             ErrorCodes::OperationFailed,
             str::stream() << "failed to run command " << cmdObj << " when attempting to add shard "
-                          << targeter->connectionString().toString() << causedBy(commandStatus)};
+                          << targeter.connectionString().toString() << causedBy(commandStatus)};
     }
 
     Status writeConcernStatus = getWriteConcernStatusFromCommandResult(result);
@@ -759,7 +721,7 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShar
         writeConcernStatus = {ErrorCodes::OperationFailed,
                               str::stream() << "failed to satisfy writeConcern for command "
                                             << cmdObj << " when attempting to add shard "
-                                            << targeter->connectionString().toString()
+                                            << targeter.connectionString().toString()
                                             << causedBy(writeConcernStatus)};
     }
 
@@ -769,104 +731,262 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShar
                                   std::move(writeConcernStatus));
 }
 
-StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
+void deleteUserWriteCriticalSections(
     OperationContext* opCtx,
-    std::shared_ptr<RemoteCommandTargeter> targeter,
-    const std::string* shardProposedName,
-    const ConnectionString& connectionString,
-    bool isConfigShard) {
-    auto swCommandResponse =
-        _runCommandForAddShard(opCtx, targeter.get(), DatabaseName::kAdmin, BSON("hello" << 1));
-    if (swCommandResponse.getStatus() == ErrorCodes::IncompatibleServerVersion) {
-        return swCommandResponse.getStatus().withReason(
-            str::stream() << "Cannot add " << connectionString.toString()
-                          << " as a shard because its binary version is not compatible with "
-                             "the cluster's featureCompatibilityVersion.");
-    } else if (!swCommandResponse.isOK()) {
-        return swCommandResponse.getStatus();
+    RemoteCommandTargeter& targeter,
+    boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
+    std::shared_ptr<executor::TaskExecutor> executor) {
+    // Delete all the config.user_writes_critical_sections documents from the new shard.
+    {
+        // We need to fetch manually rather than using Shard::runExhaustiveCursorCommand because
+        // ShardRemote uses the FixedTaskExecutor which checks that the host being targeted is a
+        // fully added shard already
+        auto fetcherStatus = Status::OK();
+        std::vector<BSONObj> userWriteCritSectionDocs;
+        auto fetcher = topology_change_helpers::createFetcher(
+            opCtx,
+            targeter,
+            NamespaceString::kUserWritesCriticalSectionsNamespace,
+            repl::ReadConcernLevel::kMajorityReadConcern,
+            [&](const std::vector<BSONObj>& docs) -> bool {
+                for (const BSONObj& doc : docs) {
+                    userWriteCritSectionDocs.emplace_back(doc.getOwned());
+                }
+                return true;
+            },
+            [&](const Status& status) { fetcherStatus = status; },
+            executor);
+        uassertStatusOK(fetcher->schedule());
+        uassertStatusOK(fetcher->join(opCtx));
+        uassertStatusOK(fetcherStatus);
+
+        const auto sendDelete = [&](std::vector<mongo::write_ops::DeleteOpEntry>&& deleteOps) {
+            if (deleteOps.empty()) {
+                return;
+            }
+            write_ops::DeleteCommandRequest deleteOp(
+                NamespaceString::kUserWritesCriticalSectionsNamespace);
+            deleteOp.setDeletes(deleteOps);
+            generic_argument_util::setMajorityWriteConcern(deleteOp);
+            if (osiGenerator) {
+                auto const osi = (*osiGenerator)(opCtx);
+                generic_argument_util::setOperationSessionInfo(deleteOp, osi);
+            }
+
+            const auto commandResponse = runCommandForAddShard(
+                opCtx,
+                targeter,
+                NamespaceString::kUserWritesCriticalSectionsNamespace.dbName(),
+                deleteOp.toBSON(),
+                executor);
+            uassertStatusOK(getStatusFromWriteCommandReply(commandResponse.response));
+        };
+
+        std::vector<mongo::write_ops::DeleteOpEntry> deleteOps;
+        deleteOps.reserve(write_ops::kMaxWriteBatchSize);
+        for (auto& element : userWriteCritSectionDocs) {
+            write_ops::DeleteOpEntry entry;
+            entry.setQ(std::move(element));
+            entry.setMulti(false);
+            deleteOps.emplace_back(std::move(entry));
+
+            if (deleteOps.size() == write_ops::kMaxWriteBatchSize) {
+                sendDelete(std::move(deleteOps));
+                deleteOps = std::vector<mongo::write_ops::DeleteOpEntry>();
+                deleteOps.reserve(write_ops::kMaxWriteBatchSize);
+            }
+        }
+        sendDelete(std::move(deleteOps));
+    }
+}
+
+void setUserWriteBlockingState(
+    OperationContext* opCtx,
+    RemoteCommandTargeter& targeter,
+    UserWriteBlockingLevel level,
+    bool block,
+    boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
+    std::shared_ptr<executor::TaskExecutor> executor) {
+
+    deleteUserWriteCriticalSections(opCtx, targeter, osiGenerator, executor);
+
+    const auto makeShardsvrSetUserWriteBlockModeCommand =
+        [block, &osiGenerator](OperationContext* opCtx,
+                               ShardsvrSetUserWriteBlockModePhaseEnum phase) -> BSONObj {
+        ShardsvrSetUserWriteBlockMode shardsvrSetUserWriteBlockModeCmd;
+        shardsvrSetUserWriteBlockModeCmd.setDbName(DatabaseName::kAdmin);
+        SetUserWriteBlockModeRequest setUserWriteBlockModeRequest(block /* global */);
+        shardsvrSetUserWriteBlockModeCmd.setSetUserWriteBlockModeRequest(
+            std::move(setUserWriteBlockModeRequest));
+        shardsvrSetUserWriteBlockModeCmd.setPhase(phase);
+        generic_argument_util::setMajorityWriteConcern(shardsvrSetUserWriteBlockModeCmd);
+        if (osiGenerator) {
+            auto const osi = (*osiGenerator)(opCtx);
+            generic_argument_util::setOperationSessionInfo(shardsvrSetUserWriteBlockModeCmd, osi);
+        }
+
+        return shardsvrSetUserWriteBlockModeCmd.toBSON();
+    };
+
+    if (level & UserWriteBlockingLevel::DDLOperations) {
+        const auto cmd = makeShardsvrSetUserWriteBlockModeCommand(
+            opCtx, ShardsvrSetUserWriteBlockModePhaseEnum::kPrepare);
+
+        const auto cmdResponse =
+            runCommandForAddShard(opCtx, targeter, DatabaseName::kAdmin, cmd, executor);
+        uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
+    }
+
+    if (level & UserWriteBlockingLevel::Writes) {
+        const auto cmd = makeShardsvrSetUserWriteBlockModeCommand(
+            opCtx, ShardsvrSetUserWriteBlockModePhaseEnum::kComplete);
+
+        const auto cmdResponse =
+            runCommandForAddShard(opCtx, targeter, DatabaseName::kAdmin, cmd, executor);
+        uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
+    }
+}
+
+std::vector<DatabaseName> getDBNamesListFromShard(
+    OperationContext* opCtx,
+    RemoteCommandTargeter& targeter,
+    std::shared_ptr<executor::TaskExecutor> executor) {
+    auto commandResponse = runCommandForAddShard(opCtx,
+                                                 targeter,
+                                                 DatabaseName::kAdmin,
+                                                 BSON("listDatabases" << 1 << "nameOnly" << true),
+                                                 executor);
+    uassertStatusOK(commandResponse.commandStatus);
+
+    auto& cmdResult = commandResponse.response;
+
+    std::vector<DatabaseName> dbNames;
+
+    for (const auto& dbEntry : cmdResult["databases"].Obj()) {
+        const auto& dbName = DatabaseNameUtil::deserialize(
+            boost::none, dbEntry["name"].String(), SerializationContext::stateDefault());
+
+        if (!(dbName.isAdminDB() || dbName.isLocalDB() || dbName.isConfigDB())) {
+            dbNames.push_back(dbName);
+        }
+    }
+
+    return dbNames;
+}
+
+void removeReplicaSetMonitor(OperationContext* opCtx, const ConnectionString& connectionString) {
+    // Do not remove the RSM for the config server because it is still needed even if
+    // adding the config server as a shard failed.
+    if (connectionString.type() == ConnectionString::ConnectionType::kReplicaSet &&
+        connectionString.getReplicaSetName() !=
+            repl::ReplicationCoordinator::get(opCtx)
+                ->getConfigConnectionString()
+                .getReplicaSetName()) {
+        // This is a workaround for the case were we could have some bad shard being
+        // requested to be added and we put that bad connection string on the global replica set
+        // monitor registry. It needs to be cleaned up so that when a correct replica set is
+        // added, it will be recreated.
+        ReplicaSetMonitor::remove(connectionString.getSetName());
+    }
+}
+
+BSONObj greetShard(OperationContext* opCtx,
+                   RemoteCommandTargeter& targeter,
+                   std::shared_ptr<executor::TaskExecutor> executor) {
+
+    boost::optional<Shard::CommandResponse> commandResponse;
+    try {
+        commandResponse = runCommandForAddShard(
+            opCtx, targeter, DatabaseName::kAdmin, BSON("hello" << 1), executor);
+    } catch (ExceptionFor<ErrorCodes::IncompatibleServerVersion>& ex) {
+        uassertStatusOK(ex.toStatus().withReason(
+            str::stream() << "Cannot add " << targeter.connectionString().toString()
+                          << " as a shard because its binary version is not compatible with the "
+                             "cluster's featureCompatibilityVersion."));
     }
 
     // Check for a command response error
-    auto resHelloStatus = std::move(swCommandResponse.getValue().commandStatus);
-    if (!resHelloStatus.isOK()) {
-        return resHelloStatus.withContext(str::stream() << "Error running 'hello' against "
-                                                        << targeter->connectionString().toString());
-    }
+    uassertStatusOKWithContext(commandResponse->commandStatus,
+                               str::stream() << "Error running 'hello' against "
+                                             << targeter.connectionString().toString());
 
-    auto resHello = std::move(swCommandResponse.getValue().response);
+    return std::move(commandResponse->response);
+}
+
+void validateHostAsShard(OperationContext* opCtx,
+                         RemoteCommandTargeter& targeter,
+                         const ConnectionString& connectionString,
+                         bool isConfigShard,
+                         std::shared_ptr<executor::TaskExecutor> executor) {
+    auto resHello = greetShard(opCtx, targeter, executor);
 
     // Fail if the node being added is a mongos.
     const std::string msg = resHello.getStringField("msg").toString();
-    if (msg == "isdbgrid") {
-        return {ErrorCodes::IllegalOperation, "cannot add a mongos as a shard"};
-    }
+    uassert(ErrorCodes::IllegalOperation, "cannot add a mongos as a shard", msg != "isdbgrid");
 
-    // Extract the maxWireVersion so we can verify that the node being added has a binary version
-    // greater than or equal to the cluster's featureCompatibilityVersion. We expect an incompatible
-    // binary node to be unable to communicate, returning an IncompatibleServerVersion error,
-    // because of our internal wire version protocol. So we can safely invariant here that the node
-    // is compatible.
+    // Extract the maxWireVersion so we can verify that the node being added has a binary
+    // version greater than or equal to the cluster's featureCompatibilityVersion. We expect an
+    // incompatible binary node to be unable to communicate, returning an
+    // IncompatibleServerVersion error, because of our internal wire version protocol. So we can
+    // safely invariant here that the node is compatible.
     long long maxWireVersion;
-    Status status = bsonExtractIntegerField(resHello, "maxWireVersion", &maxWireVersion);
-    if (!status.isOK()) {
-        return status.withContext(str::stream() << "hello returned invalid 'maxWireVersion' "
-                                                << "field when attempting to add "
-                                                << connectionString.toString() << " as a shard");
-    }
+    uassertStatusOKWithContext(
+        bsonExtractIntegerField(resHello, "maxWireVersion", &maxWireVersion),
+        str::stream() << "hello returned invalid 'maxWireVersion' field when attempting to add "
+                      << connectionString.toString() << " as a shard");
 
     // Check whether the host is a writable primary. If not, the replica set may not have been
     // initiated. If the connection is a standalone, it will return true for "isWritablePrimary".
     bool isWritablePrimary;
-    status = bsonExtractBooleanField(resHello, "isWritablePrimary", &isWritablePrimary);
-    if (!status.isOK()) {
-        return status.withContext(str::stream() << "hello returned invalid 'isWritablePrimary' "
-                                                << "field when attempting to add "
-                                                << connectionString.toString() << " as a shard");
-    }
-    if (!isWritablePrimary) {
-        return {ErrorCodes::NotWritablePrimary,
-                str::stream()
-                    << connectionString.toString()
-                    << " does not have a master. If this is a replica set, ensure that it has a"
-                    << " healthy primary and that the set has been properly initiated."};
-    }
+    uassertStatusOKWithContext(
+        bsonExtractBooleanField(resHello, "isWritablePrimary", &isWritablePrimary),
+        str::stream() << "hello returned invalid 'isWritablePrimary' field when attempting to add "
+                      << connectionString.toString() << " as a shard");
+
+    uassert(
+        ErrorCodes::NotWritablePrimary,
+        str::stream() << connectionString.toString()
+                      << " does not have a master. If this is a replica set, ensure that it has a"
+                      << " healthy primary and that the set has been properly initiated.",
+        isWritablePrimary);
 
     const std::string providedSetName = connectionString.getSetName();
     const std::string foundSetName = resHello["setName"].str();
 
     // Make sure the specified replica set name (if any) matches the actual shard's replica set
     if (providedSetName.empty() && !foundSetName.empty()) {
-        return {ErrorCodes::OperationFailed,
-                str::stream() << "host is part of set " << foundSetName << "; "
-                              << "use replica set url format "
-                              << "<setname>/<server1>,<server2>, ..."};
+        uasserted(
+            ErrorCodes::OperationFailed,
+            str::stream() << "host is part of set " << foundSetName
+                          << "; use replica set url format <setname>/<server1>,<server2>, ...");
     }
 
     if (!providedSetName.empty() && foundSetName.empty()) {
-        return {ErrorCodes::OperationFailed,
-                str::stream() << "host did not return a set name; "
-                              << "is the replica set still initializing? " << resHello};
+        uasserted(ErrorCodes::OperationFailed,
+                  str::stream()
+                      << "host did not return a set name; is the replica set still initializing? "
+                      << resHello);
     }
 
     // Make sure the set name specified in the connection string matches the one where its hosts
     // belong into
     if (!providedSetName.empty() && (providedSetName != foundSetName)) {
-        return {ErrorCodes::OperationFailed,
-                str::stream() << "the provided connection string (" << connectionString.toString()
-                              << ") does not match the actual set name " << foundSetName};
+        uasserted(ErrorCodes::OperationFailed,
+                  str::stream() << "the provided connection string (" << connectionString.toString()
+                                << ") does not match the actual set name " << foundSetName);
     }
 
     // Is it a config server?
     if (resHello.hasField("configsvr") && !isConfigShard) {
-        return {ErrorCodes::OperationFailed,
-                str::stream() << "Cannot add " << connectionString.toString()
-                              << " as a shard since it is a config server"};
+        uasserted(ErrorCodes::OperationFailed,
+                  str::stream() << "Cannot add " << connectionString.toString()
+                                << " as a shard since it is a config server");
     }
 
     if (resHello.hasField(HelloCommandReply::kIsImplicitDefaultMajorityWCFieldName) &&
         !resHello.getBoolField(HelloCommandReply::kIsImplicitDefaultMajorityWCFieldName) &&
         !ReadWriteConcernDefaults::get(opCtx).isCWWCSet(opCtx)) {
-        return {
+        uasserted(
             ErrorCodes::OperationFailed,
             str::stream()
                 << "Cannot add " << connectionString.toString()
@@ -874,7 +994,7 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                    "{w : 1}, because number of arbiters in the shard's configuration caused the "
                    "number of writable voting members not to be strictly more than the voting "
                    "majority. Change the shard configuration or set the cluster-wide write concern "
-                   "using the setDefaultRWConcern command and try again."};
+                   "using the setDefaultRWConcern command and try again.");
     }
 
     // If a config shard is being added, then we can skip comparing the CWWC on the shard and on the
@@ -888,26 +1008,26 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
 
         auto cachedCWWC = ReadWriteConcernDefaults::get(opCtx).getCWWC(opCtx);
         if (!cachedCWWC) {
-            return {ErrorCodes::OperationFailed,
-                    str::stream() << "Cannot add " << connectionString.toString()
-                                  << " as a shard since the cluster-wide write concern is set on "
-                                     "the shard and not set on the cluster. Set the CWWC on the "
-                                     "cluster to the same CWWC as the shard and try again."
-                                  << " The CWWC on the shard is (" << cwwcOnShard << ")."};
+            uasserted(ErrorCodes::OperationFailed,
+                      str::stream()
+                          << "Cannot add " << connectionString.toString()
+                          << " as a shard since the cluster-wide write concern is set on the shard "
+                             "and not set on the cluster. Set the CWWC on the cluster to the same "
+                             "CWWC as the shard and try again. The CWWC on the shard is ("
+                          << cwwcOnShard << ").");
         }
 
         auto cwwcOnConfig = cachedCWWC.value().toBSON();
         BSONObjComparator comparator(
             BSONObj(), BSONObjComparator::FieldNamesMode::kConsider, nullptr);
         if (comparator.compare(cwwcOnShard, cwwcOnConfig) != 0) {
-            return {
-                ErrorCodes::OperationFailed,
-                str::stream()
-                    << "Cannot add " << connectionString.toString()
-                    << " as a shard since the cluster-wide write concern set on the shard doesn't "
-                       "match the one set on the cluster. Make sure they match and try again."
-                    << " The CWWC on the shard is (" << cwwcOnShard
-                    << "), and the CWWC on the cluster is (" << cwwcOnConfig << ")."};
+            uasserted(ErrorCodes::OperationFailed,
+                      str::stream() << "Cannot add " << connectionString.toString()
+                                    << " as a shard since the cluster-wide write concern set on "
+                                       "the shard doesn't match the one set on the cluster. Make "
+                                       "sure they match and try again. The CWWC on the shard is ("
+                                    << cwwcOnShard << "), and the CWWC on the cluster is ("
+                                    << cwwcOnConfig << ").");
         }
     }
 
@@ -939,13 +1059,127 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
         for (const auto& hostEntry : connectionString.getServers()) {
             const auto& host = hostEntry.toString();  // host:port
             if (hostSet.find(host) == hostSet.end()) {
-                return {ErrorCodes::OperationFailed,
-                        str::stream() << "in seed list " << connectionString.toString() << ", host "
-                                      << host << " does not belong to replica set " << foundSetName
-                                      << "; found " << resHello.toString()};
+                uasserted(ErrorCodes::OperationFailed,
+                          str::stream() << "in seed list " << connectionString.toString()
+                                        << ", host " << host << " does not belong to replica set "
+                                        << foundSetName << "; found " << resHello.toString());
             }
         }
     }
+}
+
+std::unique_ptr<Fetcher> createFetcher(OperationContext* opCtx,
+                                       RemoteCommandTargeter& targeter,
+                                       const NamespaceString& nss,
+                                       const repl::ReadConcernLevel& readConcernLevel,
+                                       FetcherDocsCallbackFn processDocsCallback,
+                                       FetcherStatusCallbackFn processStatusCallback,
+                                       std::shared_ptr<executor::TaskExecutor> executor) {
+    auto host = uassertStatusOK(
+        targeter.findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}));
+
+    FindCommandRequest findCommand(nss);
+    const auto readConcern = repl::ReadConcernArgs(readConcernLevel);
+    findCommand.setReadConcern(readConcern);
+    const Milliseconds maxTimeMS =
+        std::min(opCtx->getRemainingMaxTimeMillis(), Milliseconds(kRemoteCommandTimeout));
+    findCommand.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
+
+    auto fetcherCallback = [processDocsCallback,
+                            processStatusCallback](const Fetcher::QueryResponseStatus& dataStatus,
+                                                   Fetcher::NextAction* nextAction,
+                                                   BSONObjBuilder* getMoreBob) {
+        // Throw out any accumulated results on error.
+        if (!dataStatus.isOK()) {
+            processStatusCallback(dataStatus.getStatus());
+            return;
+        }
+        const auto& data = dataStatus.getValue();
+
+        try {
+            if (!processDocsCallback(data.documents)) {
+                *nextAction = Fetcher::NextAction::kNoAction;
+            }
+        } catch (DBException& ex) {
+            processStatusCallback(ex.toStatus());
+            return;
+        }
+        processStatusCallback(Status::OK());
+
+        if (!getMoreBob) {
+            return;
+        }
+        getMoreBob->append("getMore", data.cursorId);
+        getMoreBob->append("collection", data.nss.coll());
+    };
+
+    return std::make_unique<Fetcher>(executor.get(),
+                                     host,
+                                     nss.dbName(),
+                                     findCommand.toBSON(),
+                                     fetcherCallback,
+                                     BSONObj(), /* metadata tracking, only used for shards */
+                                     maxTimeMS, /* command network timeout */
+                                     maxTimeMS /* getMore network timeout */);
+}
+
+std::string getRemoveShardMessage(const ShardDrainingStateEnum& status) {
+    switch (status) {
+        case ShardDrainingStateEnum::kStarted:
+            return "draining started successfully";
+        case ShardDrainingStateEnum::kOngoing:
+            return "draining ongoing";
+        case ShardDrainingStateEnum::kPendingDataCleanup:
+            return "waiting for data to be cleaned up";
+        case ShardDrainingStateEnum::kCompleted:
+            return "removeshard completed successfully";
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+}  // namespace topology_change_helpers
+
+StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShard(
+    OperationContext* opCtx,
+    RemoteCommandTargeter* targeter,
+    const DatabaseName& dbName,
+    const BSONObj& cmdObj) {
+    try {
+        return topology_change_helpers::runCommandForAddShard(
+            opCtx, *targeter, dbName, cmdObj, _executorForAddShard);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+}
+
+StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
+    OperationContext* opCtx,
+    std::shared_ptr<RemoteCommandTargeter> targeter,
+    const std::string* shardProposedName,
+    const ConnectionString& connectionString,
+    bool isConfigShard) {
+
+    try {
+        topology_change_helpers::validateHostAsShard(
+            opCtx, *targeter, connectionString, isConfigShard, _executorForAddShard);
+    } catch (DBException& ex) {
+        return ex.toStatus();
+    }
+
+    auto resHelloStatus = std::invoke([&]() -> StatusWith<BSONObj> {
+        try {
+            return topology_change_helpers::greetShard(opCtx, *targeter, _executorForAddShard);
+        } catch (DBException& ex) {
+            return ex.toStatus();
+        }
+    });
+    if (!resHelloStatus.isOK()) {
+        return resHelloStatus.getStatus();
+    }
+
+    auto resHello = std::move(resHelloStatus.getValue());
+    const std::string foundSetName = resHello["setName"].str();
 
     std::string actualShardName;
 
@@ -999,35 +1233,12 @@ Status ShardingCatalogManager::_dropSessionsCollection(
 
 StatusWith<std::vector<DatabaseName>> ShardingCatalogManager::_getDBNamesListFromShard(
     OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter) {
-
-    auto swCommandResponse =
-        _runCommandForAddShard(opCtx,
-                               targeter.get(),
-                               DatabaseName::kAdmin,
-                               BSON("listDatabases" << 1 << "nameOnly" << true));
-    if (!swCommandResponse.isOK()) {
-        return swCommandResponse.getStatus();
+    try {
+        return topology_change_helpers::getDBNamesListFromShard(
+            opCtx, *targeter, _executorForAddShard);
+    } catch (DBException& ex) {
+        return ex.toStatus();
     }
-
-    auto cmdStatus = std::move(swCommandResponse.getValue().commandStatus);
-    if (!cmdStatus.isOK()) {
-        return cmdStatus;
-    }
-
-    auto cmdResult = std::move(swCommandResponse.getValue().response);
-
-    std::vector<DatabaseName> dbNames;
-
-    for (const auto& dbEntry : cmdResult["databases"].Obj()) {
-        const auto& dbName = DatabaseNameUtil::deserialize(
-            boost::none, dbEntry["name"].String(), SerializationContext::stateDefault());
-
-        if (!(dbName.isAdminDB() || dbName.isLocalDB() || dbName.isConfigDB())) {
-            dbNames.push_back(dbName);
-        }
-    }
-
-    return dbNames;
 }
 
 StatusWith<std::vector<CollectionType>> ShardingCatalogManager::_getCollListFromShard(
@@ -1271,11 +1482,17 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     // Check if this shard has already been added (can happen in the case of a retry after a network
     // error, for example) and thus this addShard request should be considered a no-op.
-    const auto existingShard = topology_change_helpers::checkIfShardExists(
-        opCtx,
-        shardConnectionString,
-        shardProposedName ? boost::optional<StringData>(*shardProposedName) : boost::none,
-        *_localCatalogClient);
+    const auto existingShard = std::invoke([&]() -> StatusWith<boost::optional<ShardType>> {
+        try {
+            return topology_change_helpers::getExistingShard(
+                opCtx,
+                shardConnectionString,
+                shardProposedName ? boost::optional<StringData>(*shardProposedName) : boost::none,
+                *_localCatalogClient);
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+    });
     if (!existingShard.isOK()) {
         return existingShard.getStatus();
     }
@@ -1304,21 +1521,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     const std::shared_ptr<Shard> shard{shardRegistry->createConnection(shardConnectionString)};
     auto targeter = shard->getTargeter();
 
-    ScopeGuard stopMonitoringGuard([&] {
-        // Do not remove the RSM for the config server because it is still needed even if
-        // adding the config server as a shard failed.
-        if (shardConnectionString.type() == ConnectionString::ConnectionType::kReplicaSet &&
-            shardConnectionString.getReplicaSetName() !=
-                repl::ReplicationCoordinator::get(opCtx)
-                    ->getConfigConnectionString()
-                    .getReplicaSetName()) {
-            // This is a workaround for the case were we could have some bad shard being
-            // requested to be added and we put that bad connection string on the global replica set
-            // monitor registry. It needs to be cleaned up so that when a correct replica set is
-            // added, it will be recreated.
-            ReplicaSetMonitor::remove(shardConnectionString.getSetName());
-        }
-    });
+    ScopeGuard stopMonitoringGuard(
+        [&] { topology_change_helpers::removeReplicaSetMonitor(opCtx, shardConnectionString); });
 
     // Validate the specified connection string may serve as shard at all
     auto shardStatus = _validateHostAsShard(
@@ -2087,22 +2291,8 @@ StatusWith<long long> ShardingCatalogManager::_runCountCommandOnConfig(Operation
 
 void ShardingCatalogManager::_setUserWriteBlockingStateOnNewShard(OperationContext* opCtx,
                                                                   RemoteCommandTargeter* targeter) {
-    // Delete all the config.user_writes_critical_sections documents from the new shard.
-    {
-        write_ops::DeleteCommandRequest deleteOp(
-            NamespaceString::kUserWritesCriticalSectionsNamespace);
-        write_ops::DeleteOpEntry query({}, true /*multi*/);
-        deleteOp.setDeletes({query});
-        generic_argument_util::setMajorityWriteConcern(deleteOp);
 
-        const auto swCommandResponse =
-            _runCommandForAddShard(opCtx,
-                                   targeter,
-                                   NamespaceString::kUserWritesCriticalSectionsNamespace.dbName(),
-                                   deleteOp.toBSON());
-        uassertStatusOK(swCommandResponse.getStatus());
-        uassertStatusOK(getStatusFromWriteCommandReply(swCommandResponse.getValue().response));
-    }
+    uint8_t level = topology_change_helpers::UserWriteBlockingLevel::None;
 
     // Propagate the cluster's current user write blocking state onto the new shard.
     PersistentTaskStore<UserWriteBlockingCriticalSectionDocument> store(
@@ -2111,95 +2301,25 @@ void ShardingCatalogManager::_setUserWriteBlockingStateOnNewShard(OperationConte
         invariant(doc.getNss() ==
                   UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace);
 
-        const auto makeShardsvrSetUserWriteBlockModeCommand =
-            [](ShardsvrSetUserWriteBlockModePhaseEnum phase) -> BSONObj {
-            ShardsvrSetUserWriteBlockMode shardsvrSetUserWriteBlockModeCmd;
-            shardsvrSetUserWriteBlockModeCmd.setDbName(DatabaseName::kAdmin);
-            SetUserWriteBlockModeRequest setUserWriteBlockModeRequest(true /* global */);
-            shardsvrSetUserWriteBlockModeCmd.setSetUserWriteBlockModeRequest(
-                std::move(setUserWriteBlockModeRequest));
-            shardsvrSetUserWriteBlockModeCmd.setPhase(phase);
-            generic_argument_util::setMajorityWriteConcern(shardsvrSetUserWriteBlockModeCmd);
-
-            return shardsvrSetUserWriteBlockModeCmd.toBSON();
-        };
-
         if (doc.getBlockNewUserShardedDDL()) {
-            const auto cmd = makeShardsvrSetUserWriteBlockModeCommand(
-                ShardsvrSetUserWriteBlockModePhaseEnum::kPrepare);
-
-            const auto cmdResponse =
-                _runCommandForAddShard(opCtx, targeter, DatabaseName::kAdmin, cmd);
-            uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
+            level |= topology_change_helpers::UserWriteBlockingLevel::DDLOperations;
         }
 
         if (doc.getBlockUserWrites()) {
             invariant(doc.getBlockNewUserShardedDDL());
-            const auto cmd = makeShardsvrSetUserWriteBlockModeCommand(
-                ShardsvrSetUserWriteBlockModePhaseEnum::kComplete);
-
-            const auto cmdResponse =
-                _runCommandForAddShard(opCtx, targeter, DatabaseName::kAdmin, cmd);
-            uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
+            level |= topology_change_helpers::UserWriteBlockingLevel::Writes;
         }
 
         return true;
     });
-}
 
-std::unique_ptr<Fetcher> ShardingCatalogManager::_createFetcher(
-    OperationContext* opCtx,
-    std::shared_ptr<RemoteCommandTargeter> targeter,
-    const NamespaceString& nss,
-    const repl::ReadConcernLevel& readConcernLevel,
-    FetcherDocsCallbackFn processDocsCallback,
-    FetcherStatusCallbackFn processStatusCallback) {
-    auto host = uassertStatusOK(
-        targeter->findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}));
-
-    FindCommandRequest findCommand(nss);
-    const auto readConcern = repl::ReadConcernArgs(readConcernLevel);
-    findCommand.setReadConcern(readConcern);
-    const Milliseconds maxTimeMS =
-        std::min(opCtx->getRemainingMaxTimeMillis(), Milliseconds(kRemoteCommandTimeout));
-    findCommand.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
-
-    auto fetcherCallback = [processDocsCallback,
-                            processStatusCallback](const Fetcher::QueryResponseStatus& dataStatus,
-                                                   Fetcher::NextAction* nextAction,
-                                                   BSONObjBuilder* getMoreBob) {
-        // Throw out any accumulated results on error.
-        if (!dataStatus.isOK()) {
-            processStatusCallback(dataStatus.getStatus());
-            return;
-        }
-        const auto& data = dataStatus.getValue();
-
-        try {
-            if (!processDocsCallback(data.documents)) {
-                *nextAction = Fetcher::NextAction::kNoAction;
-            }
-        } catch (DBException& ex) {
-            processStatusCallback(ex.toStatus());
-            return;
-        }
-        processStatusCallback(Status::OK());
-
-        if (!getMoreBob) {
-            return;
-        }
-        getMoreBob->append("getMore", data.cursorId);
-        getMoreBob->append("collection", data.nss.coll());
-    };
-
-    return std::make_unique<Fetcher>(_executorForAddShard.get(),
-                                     host,
-                                     nss.dbName(),
-                                     findCommand.toBSON(),
-                                     fetcherCallback,
-                                     BSONObj(), /* metadata tracking, only used for shards */
-                                     maxTimeMS, /* command network timeout */
-                                     maxTimeMS /* getMore network timeout */);
+    topology_change_helpers::setUserWriteBlockingState(
+        opCtx,
+        *targeter,
+        topology_change_helpers::UserWriteBlockingLevel(level),
+        true,
+        boost::none,
+        _executorForAddShard);
 }
 
 Status ShardingCatalogManager::_pullClusterTimeKeys(
@@ -2210,9 +2330,9 @@ Status ShardingCatalogManager::_pullClusterTimeKeys(
 
     auto expireAt = opCtx->getServiceContext()->getFastClockSource()->now() +
         Seconds(gNewShardExistingClusterTimeKeysExpirationSecs.load());
-    auto fetcher = _createFetcher(
+    auto fetcher = topology_change_helpers::createFetcher(
         opCtx,
-        targeter,
+        *targeter,
         NamespaceString::kKeysCollectionNamespace,
         repl::ReadConcernLevel::kLocalReadConcern,
         [&](const std::vector<BSONObj>& docs) -> bool {
@@ -2222,7 +2342,8 @@ Status ShardingCatalogManager::_pullClusterTimeKeys(
             }
             return true;
         },
-        [&](const Status& status) { fetchStatus = status; });
+        [&](const Status& status) { fetchStatus = status; },
+        _executorForAddShard);
 
     auto scheduleStatus = fetcher->schedule();
     if (!scheduleStatus.isOK()) {
@@ -2302,9 +2423,9 @@ void ShardingCatalogManager::_pullClusterParametersFromNewShard(OperationContext
 
     int i = 0;
     for (const auto& tenantId : tenantIds) {
-        auto fetcher = _createFetcher(
+        auto fetcher = topology_change_helpers::createFetcher(
             opCtx,
-            targeter,
+            *targeter,
             NamespaceString::makeClusterParametersNSS(tenantId),
             repl::ReadConcernLevel::kMajorityReadConcern,
             [&allParameters, i](const std::vector<BSONObj>& docs) -> bool {
@@ -2316,7 +2437,8 @@ void ShardingCatalogManager::_pullClusterParametersFromNewShard(OperationContext
                 allParameters[i] = parameters;
                 return true;
             },
-            [&statuses, i](const Status& status) { statuses[i] = status; });
+            [&statuses, i](const Status& status) { statuses[i] = status; },
+            _executorForAddShard);
         uassertStatusOK(fetcher->schedule());
         fetchers.push_back(std::move(fetcher));
         i++;

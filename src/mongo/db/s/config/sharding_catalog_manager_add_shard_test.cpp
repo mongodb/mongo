@@ -259,15 +259,46 @@ protected:
             ASSERT_EQ(request.target, target);
             ASSERT_EQ(request.dbname,
                       NamespaceString::kUserWritesCriticalSectionsNamespace.dbName());
-            ASSERT_BSONOBJ_EQ(
-                request.cmdObj,
-                BSON("delete" << NamespaceString::kUserWritesCriticalSectionsNamespace.coll()
-                              << "bypassDocumentValidation" << false << "ordered" << true
-                              << "deletes" << BSON_ARRAY(BSON("q" << BSONObj() << "limit" << 0))
-                              << "writeConcern"
-                              << BSON("w"
-                                      << "majority"
-                                      << "wtimeout" << 60000)));
+            ASSERT_BSONOBJ_EQ(request.cmdObj,
+                              BSON("find"
+                                   << NamespaceString::kUserWritesCriticalSectionsNamespace.coll()
+                                   << "maxTimeMS" << 60000 << "readConcern"
+                                   << BSON("level"
+                                           << "majority")));
+
+            auto cursorRes =
+                CursorResponse(NamespaceString::createNamespaceString_forTest(
+                                   request.dbname,
+                                   NamespaceString::kUserWritesCriticalSectionsNamespace.coll()),
+                               0,
+                               {
+                                   BSON("_id"
+                                        << "doc1"),
+                                   BSON("_id"
+                                        << "doc2"),
+                               });
+            return cursorRes.toBSON(CursorResponse::ResponseType::InitialResponse);
+        });
+
+        onCommandForAddShard([&](const RemoteCommandRequest& request) {
+            ASSERT_EQ(request.target, target);
+            ASSERT_EQ(request.dbname,
+                      NamespaceString::kUserWritesCriticalSectionsNamespace.dbName());
+            ASSERT_BSONOBJ_EQ(request.cmdObj,
+                              BSON("delete"
+                                   << NamespaceString::kUserWritesCriticalSectionsNamespace.coll()
+                                   << "bypassDocumentValidation" << false << "ordered" << true
+                                   << "deletes"
+                                   << BSON_ARRAY(BSON("q" << BSON("_id"
+                                                                  << "doc1")
+                                                          << "limit" << 1)
+                                                 << BSON("q" << BSON("_id"
+                                                                     << "doc2")
+                                                             << "limit" << 1))
+                                   << "writeConcern"
+                                   << BSON("w"
+                                           << "majority"
+                                           << "wtimeout" << 60000)));
             ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
 
             return BSON("ok" << 1);
@@ -712,6 +743,7 @@ protected:
                                             << "hosts" << hosts.arr() << "maxWireVersion"
                                             << WireVersion::LATEST_WIRE_VERSION);
         expectHello(shardTarget, commandResponse);
+        expectHello(shardTarget, commandResponse);
 
         // Get databases list from new shard
         expectListDatabases(
@@ -825,6 +857,7 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
     BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
     expectHello(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
     expectListDatabases(
@@ -919,6 +952,7 @@ TEST_F(AddShardTest, StandaloneBasicPushSuccess) {
     BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
     expectHello(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
     expectListDatabases(
@@ -1004,6 +1038,7 @@ TEST_F(AddMultitenancyShardTest, StandaloneMultitenantPullSuccess) {
 
     BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
+    expectHello(shardTarget, commandResponse);
     expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
@@ -1113,6 +1148,7 @@ TEST_F(AddMultitenancyShardTest, StandaloneMultitenantPushSuccess) {
     BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
     expectHello(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
     expectListDatabases(
@@ -1209,6 +1245,7 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
 
     BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
+    expectHello(shardTarget, commandResponse);
     expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
@@ -1532,6 +1569,7 @@ TEST_F(AddShardTest, AddShardWithNameConfigFails) {
                                         << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
     expectHello(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
 }
@@ -1579,6 +1617,7 @@ TEST_F(AddShardTest, ShardContainsExistingDatabase) {
                                         << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
     expectHello(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     expectListDatabases(shardTarget, {BSON("name" << existingDB.getDbName().toString_forTest())});
 
@@ -1622,6 +1661,7 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
                                         << "mySet"
                                         << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
+    expectHello(shardTarget, commandResponse);
     expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
@@ -1713,6 +1753,7 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
                                         << "mySet"
                                         << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
+    expectHello(shardTarget, commandResponse);
     expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard

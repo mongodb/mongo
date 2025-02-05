@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/s/add_shard_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
@@ -60,8 +61,20 @@ private:
 
     void _verifyInput() const;
 
+    void _checkExistingDataOnShard(OperationContext* opCtx,
+                                   RemoteCommandTargeter& targeter,
+                                   std::shared_ptr<executor::TaskExecutor> executor) const;
+
+    RemoteCommandTargeter& _getTargeter(OperationContext* opCtx);
+
+    void _runWithRetries(std::function<void()>&& function,
+                         std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                         const CancellationToken& token);
+
     // Set on successful completion of the coordinator.
     boost::optional<std::string> _result;
+
+    std::unique_ptr<Shard> _shardConnection;
 };
 
 }  // namespace mongo
