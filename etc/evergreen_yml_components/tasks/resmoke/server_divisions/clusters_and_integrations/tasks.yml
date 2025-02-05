@@ -2170,7 +2170,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_cluster_scalability",
-        "experimental",
+        "default",
         "multiversion_passthrough",
         "multiversion",
       ]
