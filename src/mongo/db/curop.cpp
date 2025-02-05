@@ -449,7 +449,7 @@ void CurOp::_fetchStorageStatsIfNecessary(Date_t deadline, AdmissionContext::Pri
     // a storage engine would have at-least held a global lock at one point, hence we
     // limit our lock acquisition to such operations. We can get here and our lock
     // acquisition be timed out or interrupted, in which case we'll throw. Callers should
-    // handle that case, e.g., by logging a warning.
+    // handle that case, e.g., by logging a message.
     if (_debug.storageStats == nullptr &&
         shard_role_details::getLocker(opCtx)->wasGlobalLockTaken() &&
         opCtx->getServiceContext()->getStorageEngine()) {
@@ -495,10 +495,10 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
             const auto& admCtx = ExecutionAdmissionContext::get(opCtx());
             _fetchStorageStatsIfNecessary(Date_t::max(), admCtx.getPriority());
         } catch (DBException& ex) {
-            LOGV2_WARNING(8457400,
-                          "Failed to gather storage statistics for query stats",
-                          "opId"_attr = opCtx()->getOpID(),
-                          "error"_attr = redact(ex));
+            LOGV2(8457400,
+                  "Failed to gather storage statistics for query stats",
+                  "opId"_attr = opCtx()->getOpID(),
+                  "error"_attr = redact(ex));
         }
 
         if (_debug.storageStats) {
@@ -753,11 +753,11 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
             _fetchStorageStatsIfNecessary(Date_t::now() + Milliseconds(500),
                                           AdmissionContext::Priority::kExempt);
         } catch (const DBException& ex) {
-            LOGV2_WARNING_OPTIONS(20526,
-                                  logOptions,
-                                  "Failed to gather storage statistics for slow operation",
-                                  "opId"_attr = opCtx->getOpID(),
-                                  "error"_attr = redact(ex));
+            LOGV2_OPTIONS(20526,
+                          logOptions,
+                          "Failed to gather storage statistics for slow operation",
+                          "opId"_attr = opCtx->getOpID(),
+                          "error"_attr = redact(ex));
         }
 
         // Gets the time spent blocked on prepare conflicts.
