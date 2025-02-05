@@ -450,12 +450,6 @@ idl_generator(
 )
 
 mongo_cc_library(
-    name = "remove_shard_draining_progress_idl",
-    srcs = ["remove_shard_draining_progress_gen"],
-    deps = ["//src/mongo/db:server_base"],
-)
-
-mongo_cc_library(
     name = "type_shard_identity_idl",
     srcs = ["type_shard_identity_gen"],
     deps = [
@@ -534,6 +528,20 @@ mongo_cc_library(
         "//src/mongo/db/repl:replica_set_aware_service",
         "//src/mongo/s:analyze_shard_key_common",
         "//src/mongo/s:query_analysis_sampler",
+    ],
+)
+
+mongo_cc_library(
+    name = "remove_shard_exception",
+    srcs = [
+        "remove_shard_exception.cpp",
+        ":remove_shard_draining_progress_gen",
+    ],
+    hdrs = [
+        "remove_shard_exception.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
     ],
 )
 
@@ -688,7 +696,7 @@ mongo_cc_library(
     }),
     deps = [
         ":forwardable_operation_metadata",
-        ":remove_shard_draining_progress_idl",
+        ":remove_shard_exception",
         ":resharding_server_parameters_idl",
         ":sharding_logging",
         ":user_writes_recoverable_critical_section",

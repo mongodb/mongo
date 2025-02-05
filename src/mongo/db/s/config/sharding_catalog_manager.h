@@ -58,7 +58,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/s/remove_shard_draining_progress_gen.h"
+#include "mongo/db/s/remove_shard_exception.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_cache.h"

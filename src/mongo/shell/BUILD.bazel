@@ -397,6 +397,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:change_stream_error_extra_info",
         "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/query:query_request",
+        "//src/mongo/db/s:remove_shard_exception",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context_non_d",
         "//src/mongo/db/session:logical_session_id_helpers",

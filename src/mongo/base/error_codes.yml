@@ -936,3 +936,10 @@ error_codes:
       name: UnsupportedCbrNode,
       categories: [PlannerEstimationError],
     }
+  # The following is for remove shard commit commands which fail due to draining not yet being
+  # complete.
+  - {
+      code: 1003141,
+      name: RemoveShardDrainingInProgress,
+      extra: RemoveShardDrainingInfo,
+    }
