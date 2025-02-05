@@ -2617,7 +2617,8 @@ functions:
       local_file: system-resource-info.tgz
       remote_file: ${project}/${build_variant}/${revision}/systemresourceinfo/mongo-system-resource-info-${task_id}-${execution}.tgz
       bucket: mciuploads
-      permissions: public-read
+      permissions: private
+      visibility: signed
       content_type: application/gzip
       display_name: System Resource Info - Execution ${execution}
       optional: true
