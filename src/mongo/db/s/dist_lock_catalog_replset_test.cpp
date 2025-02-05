@@ -1243,7 +1243,9 @@ TEST_F(DistLockCatalogReplSetTest, BasicUnlockAll) {
         const auto& update = updates.front();
         ASSERT(!update.getUpsert());
         ASSERT(update.getMulti());
-        ASSERT_BSONOBJ_EQ(BSON(LocksType::process("processID")), update.getQ());
+        ASSERT_BSONOBJ_EQ(BSON(LocksType::state() << BSON("$ne" << LocksType::UNLOCKED)
+                                                  << LocksType::process("processID")),
+                          update.getQ());
         ASSERT_BSONOBJ_EQ(BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))),
                           update.getU().getUpdateModifier());
 

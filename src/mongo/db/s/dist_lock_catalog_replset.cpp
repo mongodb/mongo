@@ -365,7 +365,8 @@ Status DistLockCatalogImpl::unlockAll(OperationContext* opCtx,
         write_ops::UpdateCommandRequest updateOp(_locksNS);
         updateOp.setUpdates({[&] {
             write_ops::UpdateOpEntry entry;
-            auto query = BSON(LocksType::process(processID));
+            auto query = BSON(LocksType::state() << BSON("$ne" << LocksType::UNLOCKED)
+                                                 << LocksType::process(processID));
             if (term)
                 query.addFields(BSON(LocksType::term() << BSON("$lte" << *term)));
             entry.setQ(query);
