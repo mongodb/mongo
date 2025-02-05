@@ -475,6 +475,7 @@ private:
     static bool _interruptCallback(JSContext* cx);
     static void _gcCallback(JSContext* rt, JSGCStatus status, JS::GCReason reason, void* data);
     bool _checkErrorState(bool success, bool reportError = true, bool assertOnError = true);
+    Status _checkForPendingException();
 
     void installDBAccess();
     void installBSONTypes();

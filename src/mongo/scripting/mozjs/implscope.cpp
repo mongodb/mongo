@@ -1179,67 +1179,7 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
     }
 
     if (_status.isOK()) {
-        JS::RootedValue excn(_context);
-        if (JS_GetPendingException(_context, &excn)) {
-            // It's possible that we have an uncaught exception for OOM, which is reported on the
-            // exception status of the JSContext. We must check for this OOM exception before
-            // clearing the pending exception. This function checks both the status on the JSContext
-            // as well as the message string of the exception being provided.
-            const auto isThrowingOOM = JS_IsThrowingOutOfMemoryException(_context, excn);
-
-            // The pending JS exception needs to be cleared before we call ValueWriter below to
-            // print the exception. ValueWriter::toStringData() may call back into the Interpret,
-            // which asserts that we don't have an exception pending in DEBUG builds.
-            JS_ClearPendingException(_context);
-
-            if (excn.isObject()) {
-                str::stream ss;
-                // Exceptions originating from C++ should not get the "uncaught exception: " prefix.
-                // These exceptions thrown from mongo are represented as MongoStatusInfo, so we
-                // exclude MongoStatusInfo from having the prefix.
-                if (!getProto<MongoStatusInfo>().instanceOf(excn)) {
-                    ss << "uncaught exception: ";
-                }
-                JSStringWrapper jsstr;
-                ss << str::UTF8SafeTruncation(ValueWriter(_context, excn).toStringData(&jsstr),
-                                              kMaxErrorStringSize);
-                auto stackStr = ObjectWrapper(_context, excn).getString(InternedString::stack);
-                auto status =
-                    jsExceptionToStatus(_context, excn, ErrorCodes::JSInterpreterFailure, ss);
-                auto fnameStr = ObjectWrapper(_context, excn).getString(InternedString::fileName);
-                auto lineNum =
-                    ObjectWrapper(_context, excn).getNumberInt(InternedString::lineNumber);
-                auto colNum =
-                    ObjectWrapper(_context, excn).getNumberInt(InternedString::columnNumber);
-
-                if (stackStr.empty()) {
-                    // The JavaScript Error objects resulting from C++ exceptions may not always
-                    // have a
-                    // non-empty "stack" property. We instead use the line and column numbers of
-                    // where
-                    // in the JavaScript code the C++ function was called from.
-                    str::stream ss;
-                    ss << "@" << fnameStr << ":" << lineNum << ":" << colNum << "\n";
-                    stackStr = ss;
-                }
-                _status = Status(JSExceptionInfo(std::move(stackStr), status), ss);
-
-            } else {
-                str::stream ss;
-                JSStringWrapper jsstr;
-
-                if (isThrowingOOM) {
-                    _status = Status(ErrorCodes::JSInterpreterFailure, "Out of memory");
-                } else {
-                    ss << "uncaught exception: "
-                       << str::UTF8SafeTruncation(ValueWriter(_context, excn).toStringData(&jsstr),
-                                                  kMaxErrorStringSize);
-                    _status = Status(ErrorCodes::UnknownError, ss);
-                }
-            }
-        } else {
-            _status = Status(ErrorCodes::UnknownError, "Unknown Failure from JSInterpreter");
-        }
+        _status = _checkForPendingException();
     }
     // We always unconditionally clear any pending exception, as this method _checkErrorState is
     // expected to report and clear the errors before returning.
@@ -1271,6 +1211,58 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
     return true;
 }
 
+Status MozJSImplScope::_checkForPendingException() {
+    JS::RootedValue excn(_context);
+
+    if (!JS_GetPendingException(_context, &excn)) {
+        return Status(ErrorCodes::UnknownError, "Unknown Failure from JSInterpreter");
+    }
+
+    // It's possible that we have an uncaught exception for OOM, which is reported on the exception
+    // status of the JSContext. We must check for this OOM exception before clearing the pending
+    // exception. This function checks both the status on the JSContext as well as the message
+    // string of the exception being provided.
+    const auto isThrowingOOM = JS_IsThrowingOutOfMemoryException(_context, excn);
+    if (isThrowingOOM) {
+        return Status(ErrorCodes::JSInterpreterFailure, "Out of memory");
+    }
+
+    // The pending JS exception needs to be cleared before we call ValueWriter below to print the
+    // exception. ValueWriter::toStringData() may call back into the Interpret, which asserts that
+    // we don't have an exception pending in DEBUG builds.
+    JS_ClearPendingException(_context);
+
+    str::stream ss;
+    JSStringWrapper jsstr;
+    if (excn.isObject()) {
+        // Exceptions originating from C++ should not get the "uncaught exception: " prefix. These
+        // exceptions thrown from mongo are represented as MongoStatusInfo, so we exclude
+        // MongoStatusInfo from having the prefix.
+        if (!getProto<MongoStatusInfo>().instanceOf(excn)) {
+            ss << "uncaught exception: ";
+        }
+        ss << str::UTF8SafeTruncation(ValueWriter(_context, excn).toStringData(&jsstr),
+                                      kMaxErrorStringSize);
+        auto status = jsExceptionToStatus(_context, excn, ErrorCodes::JSInterpreterFailure, ss);
+
+        auto stackStr = ObjectWrapper(_context, excn).getString(InternedString::stack);
+        if (stackStr.empty()) {
+            // The JavaScript Error objects resulting from C++ exceptions may not always have a
+            // non-empty "stack" property. We instead use the line and column numbers of where in
+            // the JavaScript code the C++ function was called from.
+            auto fnameStr = ObjectWrapper(_context, excn).getString(InternedString::fileName);
+            auto lineNum = ObjectWrapper(_context, excn).getNumberInt(InternedString::lineNumber);
+            auto colNum = ObjectWrapper(_context, excn).getNumberInt(InternedString::columnNumber);
+            stackStr = str::stream() << "@" << fnameStr << ":" << lineNum << ":" << colNum << "\n";
+        }
+        return Status(JSExceptionInfo(std::move(stackStr), status), ss);
+    }
+
+    ss << "uncaught exception: "
+       << str::UTF8SafeTruncation(ValueWriter(_context, excn).toStringData(&jsstr),
+                                  kMaxErrorStringSize);
+    return Status(ErrorCodes::UnknownError, ss);
+}
 
 void MozJSImplScope::setCompileOptions(JS::CompileOptions* co) {}
 
