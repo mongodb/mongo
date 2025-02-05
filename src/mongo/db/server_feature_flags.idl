@@ -139,3 +139,8 @@ feature_flags:
         cpp_varname: gFeatureFlagMongogProxyProcolSupport
         default: false
         shouldBeFCVGated: true
+    featureFlagRawDataCrudOperations:
+        description: "Feature flag for rawData CRUD operations"
+        cpp_varname: gFeatureFlagRawDataCrudOperations
+        default: false
+        shouldBeFCVGated: false
