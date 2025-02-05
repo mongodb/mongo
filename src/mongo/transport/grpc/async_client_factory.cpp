@@ -243,7 +243,7 @@ void GRPCAsyncClientFactory::_dropConnections(WithLock lk) {
 }
 
 void GRPCAsyncClientFactory::_dropConnections(WithLock lk, EndpointState& target) {
-    // TODO SERVER-99034: drop channel from the transport layer too.
+    // TODO SERVER-100261: drop channels from the client too.
 
     if (target.keepOpen) {
         return;

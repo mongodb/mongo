@@ -211,6 +211,56 @@ TEST_F(ChannelPoolTest, CannotDropIdleChannelWhileCreatingNewStub) {
     ASSERT_EQ(pool().dropIdleChannels(Minutes{1}), 0);
 }
 
+TEST_F(ChannelPoolTest, DropChannelsByTarget) {
+    constexpr auto numChannelsPerHost = 5;
+    std::vector<std::string> hostnames = {"Host1", "Host2"};
+    for (const auto& host : hostnames) {
+        for (int port = 0; port < numChannelsPerHost; ++port) {
+            pool().createStub({host, port}, ConnectSSLMode::kDisableSSL, kNoTimeout);
+        }
+    }
+
+    auto numChannels = numChannelsPerHost * hostnames.size();
+    ASSERT_EQ(pool().size(), numChannels);
+
+    for (const auto& host : hostnames) {
+        for (int port = 0; port < numChannelsPerHost; ++port) {
+            ASSERT_EQ(pool().dropChannelsByTarget({host, port}), 1);
+            ASSERT_EQ(pool().size(), --numChannels);
+        }
+    }
+    ASSERT_EQ(pool().size(), 0);
+}
+
+TEST_F(ChannelPoolTest, DropNonExistingChannel) {
+    pool().createStub({"Hostname", 111}, ConnectSSLMode::kDisableSSL, kNoTimeout);
+    ASSERT_EQ(pool().size(), 1);
+
+    // No channel is dropped since there is no channel associated with this host and port.
+    ASSERT_EQ(pool().dropChannelsByTarget({"Hostname", 112}), 0);
+    ASSERT_EQ(pool().size(), 1);
+}
+
+TEST_F(ChannelPoolTest, SetKeepOpen) {
+    constexpr auto numChannels = 10;
+    constexpr auto startingPort = 123;
+    constexpr auto hostname = "FakeHost";
+    for (int i = 0; i < numChannels; i++) {
+        pool().createStub({hostname, startingPort + i}, ConnectSSLMode::kDisableSSL, kNoTimeout);
+    }
+
+    // Noop since there is no channel associated with this host and port.
+    pool().setKeepOpen({hostname, startingPort - 1}, true);
+
+    // setKeepOpen should prevent this channel from closing.
+    pool().setKeepOpen({hostname, startingPort}, true);
+    ASSERT_EQ(pool().dropAllChannels(), numChannels - 1);
+
+    pool().setKeepOpen({hostname, startingPort}, false);
+    ASSERT_EQ(pool().dropAllChannels(), 1);
+    ASSERT_EQ(pool().size(), 0);
+}
+
 TEST_F(ChannelPoolTest, OneChannelForMultipleStubs) {
     const HostAndPort remote{"SomeHost", 1234};
     unittest::Barrier beforeCreatingFirstStub(2);
