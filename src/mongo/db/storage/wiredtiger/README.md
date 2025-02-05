@@ -233,6 +233,22 @@ WiredTiger `OplogTruncateMarkers` obey an `oplogMinRetentionHours` configurable 
 truncate marker (a sequential range of oplog) is not within the minimum time range required to
 remain.
 
+## Oplog Hole Truncation
+
+MongoDB maintains an `oplogTruncateAfterPoint` timestamp while in `PRIMARY` and `SECONDARY`
+replication modes to track persisted oplog holes. Replication startup recovery uses the
+`oplogTruncateAfterPoint` timestamp, if one is found to be set, to truncate all oplog entries after
+that point. On clean shutdown, there are no oplog writes and the `oplogTruncateAfterPoint` is
+cleared. On unclean shutdown, however, parallel writes can be active and therefore oplog holes can
+exist. MongoDB allows secondaries to read their sync source's oplog as soon as there are no
+_in-memory_ oplog holes, ensuring data consistency on the secondaries. Primaries, therefore, can
+allow oplog entries to be replicated and then lose that data themselves, in an unclean shutdown,
+before the replicated oplog entries become persisted. Primaries use the `oplogTruncateAfterPoint`
+to continually track oplog holes on disk in order to eliminate them after an unclean shutdown.
+Additionally, secondaries apply batches of oplog entries out of order and similarly must use the
+`oplogTruncateAfterPoint` to track batch boundaries in order to avoid unknown oplog holes after an
+unclean shutdown.
+
 # Error Handling
 
 See
