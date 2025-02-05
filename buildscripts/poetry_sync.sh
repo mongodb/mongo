@@ -88,6 +88,11 @@ run env \
 # version on these platforms, and ends up not building required shared libraries.
 # Here we go behing poetry's back and install with pip
 if uname -a | grep -q 's390x\|ppc64le'; then
-    "${py3}" -m pip uninstall -y cryptography==2.3
-    "${py3}" -m pip install cryptography==2.3
+    if uname -a | grep -q 'rhel9'; then
+        "${py3}" -m pip uninstall -y cryptography==36.0.2
+        "${py3}" -m pip install cryptography==36.0.2
+    else
+        "${py3}" -m pip uninstall -y cryptography==2.3
+        "${py3}" -m pip install cryptography==2.3
+    fi
 fi

@@ -2,7 +2,6 @@
 name = "mdb-python-deps"
 version = "1.0.0"
 requires-python = ">=3.10,<4.0"
-#dynamic = [ "dependencies" ]
 description = "MongoDB python dependencies"
 authors = [ { name = "MongoDB" } ]
 readme = "README.md"
@@ -125,7 +124,7 @@ ruff = "^0.6.7"
 pypiwin32 = { version = ">=223", markers = "sys_platform == 'win32'" }
 pywin32 = { version = ">=225", markers = "sys_platform == 'win32'" }
 cryptography = [
-    { version = "2.3", markers = "platform_machine == 's390x' or platform_machine == 'ppc64le'" },     # Needed for oauthlib to use RSAAlgorithm # Version locked - see SERVER-36618
+    { version = "2.3", markers = "'el8' in platform_release and platform_machine == 's390x' or platform_machine == 'ppc64le'" },     # Needed for oauthlib to use RSAAlgorithm # Version locked - see SERVER-36618
     { version = "36.0.2", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" },
 ]
 mongo-ninja-python = [

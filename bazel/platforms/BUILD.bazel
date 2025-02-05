@@ -117,3 +117,12 @@ platform(
         ":use_mongo_toolchain",
     ],
 )
+
+platform(
+    name = "rhel9_s390x",
+    constraint_values = [
+        "@platforms//cpu:s390x",
+        "@platforms//os:linux",
+        ":use_mongo_toolchain",
+    ],
+)

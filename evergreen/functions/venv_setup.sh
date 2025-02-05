@@ -31,7 +31,12 @@ fi
 if uname -a | grep -q 's390x\|ppc64le'; then
   # s390x and ppc64le both require these old versions for some reason
   # They are pinned deps as well
-  EXTRA_IBM_ARGS="cryptography==2.3 pyOpenSSL==19.0.0"
+  if uname -a | grep -q 'rhel9'; then
+    EXTRA_IBM_ARGS="cryptography==36.0.2 pyOpenSSL==22.0.0"
+  else
+    EXTRA_IBM_ARGS="cryptography==2.3 pyOpenSSL==19.0.0"
+  fi
+
 fi
 poetry_dir="${workdir}/poetry_dir"
 mkdir -p $poetry_dir
