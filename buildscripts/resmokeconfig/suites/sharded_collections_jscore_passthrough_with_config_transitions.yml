@@ -74,6 +74,9 @@ selector:
     # as we transition to dedicated, the balancer will try an insert the document with a parallel
     # array on the shard with the index created.
     - jstests/core/index/geo/geo_multikey1.js
+    # These tests expect index creation to fail, which can block the config shard from transitioning
+    # to the dedicated state. Index creation failure will also block subsequent config transition attempts.
+    - jstests/core/index/geo/geo_invalid_polygon.js
     # These timeseries tests use a helper that runs and expects a chunk migration to succeed, which can
     # conflict with a config transition.
     - jstests/core/timeseries/ddl/bucket_granularity.js
