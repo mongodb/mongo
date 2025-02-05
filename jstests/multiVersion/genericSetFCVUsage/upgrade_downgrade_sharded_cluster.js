@@ -68,7 +68,7 @@ function checkConfigAndShardsFCV(expectedFCV) {
     }
 }
 
-// TODO(SERVER-77873): Remove checkReshardingActiveIndex; once the feature flag is removed the
+// TODO(SERVER-67712): Remove checkReshardingActiveIndex; once the feature flag is removed the
 // check will be incorrect.
 function checkReshardingActiveIndex() {
     const getActiveIndex = (node) => {

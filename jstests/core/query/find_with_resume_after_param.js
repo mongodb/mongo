@@ -253,7 +253,7 @@ function testResumeAfter(validateFunction) {
 }
 
 testResumeAfter(validateFailedResumeAfterInFind);
-// TODO(SERVER-77873): remove "featureFlagReshardingImprovements"
+// TODO(SERVER-67712): remove "featureFlagReshardingImprovements"
 if (FeatureFlagUtil.isPresentAndEnabled(db, "ReshardingImprovements")) {
     testResumeAfter(validateFailedResumeAfterInAggregate);
 }

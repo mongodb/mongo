@@ -116,7 +116,7 @@ public:
                     ShardId donorShard,
                     HostAndPort donorHost,
                     BSONObj resumeToken,
-                    // TODO(SERVER-77873): remove the useNaturalOrderCloner parameter.
+                    // TODO(SERVER-67712): remove the useNaturalOrderCloner parameter.
                     bool useNaturalOrderCloner);
 
     /**
@@ -128,7 +128,7 @@ public:
                        ShardId donorShard,
                        HostAndPort donorHost,
                        BSONObj resumeToken,
-                       // TODO(SERVER-77873): remove the useNaturalOrderCloner parameter.
+                       // TODO(SERVER-67712): remove the useNaturalOrderCloner parameter.
                        bool useNaturalOrderCloner);
 
 private:
