@@ -1,8 +1,13 @@
 /**
  * Test that a replica set member can process basic CRUD and DDL operations while switching from
  * being a shardsvr and back to non shardsvr.
- * @tags: [requires_persistence]
+ * @tags: [
+ *   requires_persistence,
+ *   # TODO (SERVER-100403): Enable this once addShard registers dbs in the shard-local catalog
+ *   incompatible_with_authoritative_shards,
+ * ]
  */
+
 /* global retryOnRetryableError */
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";

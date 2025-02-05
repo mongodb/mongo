@@ -1,3 +1,10 @@
+/**
+ * @tags: [
+ *   # TODO (SERVER-100403): Enable this once addShard registers dbs in the shard-local catalog
+ *   incompatible_with_authoritative_shards,
+ * ]
+ */
+
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";

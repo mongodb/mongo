@@ -5,6 +5,8 @@
  * @tags: [
  *   does_not_support_stepdowns,
  *   requires_fcv_70,
+ *   # TODO (SERVER-100403): Enable this once addShard registers dbs in the shard-local catalog
+ *   incompatible_with_authoritative_shards,
  * ]
  */
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
