@@ -11,8 +11,16 @@ exports_files(
 
 mongo_cc_library(
     name = "memory_tracking",
+    srcs = [
+        "op_memory_use.cpp",
+    ],
     hdrs = [
         "memory_usage_tracker.h",
+        "op_memory_use.h",
+        "operation_memory_usage_tracker.h",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
     ],
 )
 
@@ -20,6 +28,11 @@ mongo_cc_unit_test(
     name = "memory_tracking_test",
     srcs = [
         "memory_usage_tracker_test.cpp",
+        "op_memory_use_test.cpp",
     ],
     tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":memory_tracking",
+        "//src/mongo/db:service_context_test_fixture",
+    ],
 )

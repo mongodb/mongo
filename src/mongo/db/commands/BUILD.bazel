@@ -644,6 +644,7 @@ mongo_cc_library(
         "//src/mongo/db/matcher/schema:encrypt_schema_types.h",
         "//src/mongo/db/matcher/schema:expression_internal_schema_allowed_properties.h",
         "//src/mongo/db/matcher/schema:json_pointer.h",
+        "//src/mongo/db/memory_tracking:memory_usage_tracker.h",
         "//src/mongo/db/pipeline:accumulation_statement.h",
         "//src/mongo/db/pipeline:accumulator.h",
         "//src/mongo/db/pipeline:accumulator_for_window_functions.h",
