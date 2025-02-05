@@ -18,7 +18,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
+
+# Get relative imports to work when the package is not installed on the PYTHONPATH.
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from clang_tidy_vscode import CHECKS_SO
+from mongo_toolchain import get_mongo_toolchain
 from simple_report import make_report, put_report, try_combine_reports
 
 checks_so = ""
@@ -163,7 +168,8 @@ def __dedup_errors(clang_tidy_errors_threads: List[str]) -> str:
 
 
 def _run_tidy(args, parser_defaults):
-    clang_tidy_binary = f"/opt/mongodbtoolchain/{args.clang_tidy_toolchain}/bin/clang-tidy"
+    toolchain = get_mongo_toolchain(version=args.clang_tidy_toolchain)
+    clang_tidy_binary = toolchain.get_tool_path("clang-tidy")
 
     if os.path.exists(args.check_module):
         mongo_tidy_check_module = args.check_module
@@ -366,8 +372,7 @@ def main():
         default=False,
         help="if this is a test evaluating clang tidy itself.",
     )
-    # TODO: Is there someway to get this without hardcoding this much
-    parser.add_argument("-y", "--clang-tidy-toolchain", type=str, default="v4")
+    parser.add_argument("-y", "--clang-tidy-toolchain", type=str, default=None)
     parser.add_argument("-f", "--clang-tidy-cfg", type=str, default=config_file)
     args = parser.parse_args()
 

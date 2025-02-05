@@ -68,6 +68,10 @@ py_binary(
             "click",
             group = "evergreen",
         ),
+        dependency(
+            "typing-extensions",
+            group = "core",
+        ),
     ],
 )
 
@@ -193,4 +197,32 @@ sh_binary(
         "SHFMT_PATH": "$(execpath @shfmt//:shfmt)",
     },
     visibility = ["//visibility:public"],
+)
+
+py_library(
+    name = "mongo_toolchain",
+    srcs = [
+        "mongo_toolchain.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "typer",
+            group = "core",
+        ),
+    ],
+)
+
+py_library(
+    name = "clang_tidy_lib",
+    srcs = [
+        "apply_clang_tidy_fixes.py",
+        "clang_tidy.py",
+        "clang_tidy_vscode.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "mongo_toolchain",
+        "simple_report",
+    ],
 )

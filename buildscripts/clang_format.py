@@ -32,6 +32,7 @@ if __name__ == "__main__" and __package__ is None:
 
 from buildscripts.linter import git, parallel
 from buildscripts.linter.filediff import gather_changed_files_for_lint
+from buildscripts.mongo_toolchain import get_mongo_toolchain
 
 ##############################################################################
 #
@@ -47,12 +48,14 @@ CLANG_FORMAT_SHORTER_VERSION = "120"
 # Name of clang-format as a binary
 CLANG_FORMAT_PROGNAME = "clang-format"
 
+TOOLCHAIN_VERSION = "v4"
+
 CLANG_FORMAT_HTTP_DARWIN_CACHE = (
     "http://mongodbtoolchain.build.10gen.cc/toolchain/osx/clang-format-12.0.1"
 )
 
-# TODO: Move clang format to the v4 toolchain
-CLANG_FORMAT_TOOLCHAIN_PATH = "/opt/mongodbtoolchain/v4/bin/clang-format"
+toolchain = get_mongo_toolchain(version=TOOLCHAIN_VERSION)
+CLANG_FORMAT_TOOLCHAIN_PATH = toolchain.get_tool_path(CLANG_FORMAT_PROGNAME)
 
 
 ##############################################################################

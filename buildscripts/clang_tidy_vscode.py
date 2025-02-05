@@ -28,6 +28,11 @@ import os
 import subprocess
 import sys
 
+# Get relative imports to work when the package is not installed on the PYTHONPATH.
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from mongo_toolchain import get_mongo_toolchain
+
 CHECKS_SO = [
     "build/install/lib/libmongo_tidy_checks.so",
 ]
@@ -38,7 +43,8 @@ if os.path.exists(".mongo_checks_module_path"):
 
 
 def main():
-    clang_tidy_args = ["/opt/mongodbtoolchain/v4/bin/clang-tidy"]
+    toolchain = get_mongo_toolchain()
+    clang_tidy_args = [toolchain.get_tool_path("clang-tidy")]
     for check_lib in CHECKS_SO:
         if os.path.isfile(check_lib):
             clang_tidy_args += [f"-load={check_lib}"]

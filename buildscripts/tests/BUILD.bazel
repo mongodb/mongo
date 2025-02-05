@@ -1,0 +1,19 @@
+load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel:mongo_script_rules.bzl", "mongo_toolchain_py_cxx_test")
+
+mongo_toolchain_py_cxx_test(
+    name = "test_clang_tidy",
+    srcs = [
+        "test_clang_tidy.py",
+    ],
+    main = "test_clang_tidy.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:clang_tidy_lib",
+        "//buildscripts:mongo_toolchain",
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)

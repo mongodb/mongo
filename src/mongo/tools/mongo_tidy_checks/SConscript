@@ -1,32 +1,32 @@
 Import("env")
 Import("use_libunwind")
 
-from buildscripts.toolchains import DEFAULT_DATA_FILE, ToolchainConfig, ToolchainPlatform
+from pathlib import Path
+
+from buildscripts.mongo_toolchain import try_get_mongo_toolchain
 
 toolchain_clang_tidy_dev_found = False
 toolchain_found = False
 base_toolchain_bin = None
-try:
-    toolchain_config = ToolchainConfig(DEFAULT_DATA_FILE, ToolchainPlatform("default"))
-    toolchain_found = toolchain_config.base_path.exists()
-    base_toolchain_bin = toolchain_config.base_path / toolchain_config.aliases["stable"] / "bin"
-    base_revision_path = (base_toolchain_bin / "clang-tidy").resolve().parent.parent
+toolchain = try_get_mongo_toolchain(
+    version=env.get("MONGO_TOOLCHAIN_VERSION", "v4"), from_bazel=False
+)
+toolchain_found = toolchain is not None
+if not toolchain_found:
+    Return()
+base_toolchain_bin = Path(toolchain.get_bin_dir())
 
-    tidy_include = base_revision_path / "include"
-    tidy_lib = base_revision_path / "lib"
+tidy_include = Path(toolchain.get_include_dir())
+tidy_lib = toolchain.get_lib_dir()
 
-    toolchain_clang_tidy_dev_found = (tidy_include / "clang-tidy" / "ClangTidy.h").exists()
+toolchain_clang_tidy_dev_found = (tidy_include / "clang-tidy" / "ClangTidy.h").exists()
 
-except FileNotFoundError:
-    pass
 
 if toolchain_found and not toolchain_clang_tidy_dev_found:
     # If there was a toolchain but its not setup right, issue a warning about this.
     print(
         "Could not find not find clang-tidy headers in toolchain, not building mongo custom checks module."
     )
-
-if not toolchain_found or not toolchain_clang_tidy_dev_found:
     Return()
 
 env = env.Clone()
