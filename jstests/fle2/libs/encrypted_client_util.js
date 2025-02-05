@@ -616,6 +616,21 @@ export function assertIsUnindexedEncryptedField(value) {
 }
 
 /**
+ * Runs the callback function and returns whether or not it threw a client error, and
+ * if expectedErrorStr is given, if the error message contains it.
+ * The exception logged but not rethrown.
+ */
+export function codeFailsInClientWithError(callback, expectedErrorStr) {
+    try {
+        callback();
+        return false;
+    } catch (e) {
+        jsTestLog(`Test callback threw error: ${tojson(e)}`);
+        return (!expectedErrorStr || (e.message.indexOf(expectedErrorStr) !== -1));
+    }
+}
+
+/**
  * Runs the callback function and returns whether or not it threw a query analysis error, and
  * if expectedErrorStr is given, if the error message contains it.
  * The exception logged but not rethrown.

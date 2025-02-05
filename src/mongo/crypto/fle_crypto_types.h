@@ -59,6 +59,10 @@ using FLECounter = std::uint64_t;
 struct FLEEdgePrfBlock {
     PrfBlock esc;                   // ESCDerivedFromDataTokenAndContentionFactorToken
     boost::optional<PrfBlock> edc;  // EDCDerivedFromDataTokenAndContentionFactorToken
+
+    // Text search tokens sets may contain multiple identical "padding" esc & edc tokens.
+    // This zero-based counter can be used to number & disambiguate those padding tokens.
+    uint32_t paddingIndex = 0;
 };
 
 /**

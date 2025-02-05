@@ -162,4 +162,10 @@ bool _mongocrypt_buffer_from_subrange(_mongocrypt_buffer_t *out,
                                       uint32_t offset,
                                       uint32_t len) MONGOCRYPT_WARN_UNUSED_RESULT;
 
+/* _mongocrypt_buffer_copy_from_string_as_bson_value initializes @out, wraps the provided string
+ * into a BSON value, and copies the BSON value to @out. No BSON validation is performed on @str.
+ * Caller must call _mongocrypt_buffer_cleanup.
+ */
+void _mongocrypt_buffer_copy_from_string_as_bson_value(_mongocrypt_buffer_t *out, const char *str, int len);
+
 #endif /* MONGOCRYPT_BUFFER_H */

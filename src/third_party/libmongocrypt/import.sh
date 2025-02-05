@@ -45,7 +45,7 @@ if [ ! -d $SRC ]; then
     pushd $SRC
     # TODO: SERVER-97433 Revert back to `$VERSION` upon new release of libmongocrypt
     # $GIT_EXE checkout $VERSION
-    $GIT_EXE checkout 34a9572c416e0827a1fa988baf88411c4b5f2c7b
+    $GIT_EXE checkout ecb76142f7b7fd95bf228332e3c197d04d99003c
     popd
 fi
 

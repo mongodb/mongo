@@ -790,9 +790,12 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
 namespace {
 
 template <class T>
-FLEEdgePrfBlock toFLEEdgePrfBlock(const T& ts) {
+FLEEdgePrfBlock toFLEEdgePrfBlock(const T& ts, const FLEEdgePrfBlock* prev = nullptr) {
     FLEEdgePrfBlock blk;
     blk.esc = ts.getEscDerivedToken().asPrfBlock();
+    if (prev && blk.esc == prev->esc) {
+        blk.paddingIndex = prev->paddingIndex + 1;
+    }
     return blk;
 }
 
@@ -844,14 +847,21 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
 
             // The order of appending tokens below is important
             tokens.emplace_back(toFLEEdgePrfBlock(tsts.getExactTokenSet()));
+
+            // identical tokens are guaranteed to be next to each other in the array
+            FLEEdgePrfBlock* prev = nullptr;
             for (const auto& ts : tsts.getSubstringTokenSets()) {
-                tokens.emplace_back(toFLEEdgePrfBlock(ts));
+                prev = &tokens.emplace_back(toFLEEdgePrfBlock(ts, prev));
             }
+
+            prev = nullptr;
             for (const auto& ts : tsts.getSuffixTokenSets()) {
-                tokens.emplace_back(toFLEEdgePrfBlock(ts));
+                prev = &tokens.emplace_back(toFLEEdgePrfBlock(ts, prev));
             }
+
+            prev = nullptr;
             for (const auto& ts : tsts.getPrefixTokenSets()) {
-                tokens.emplace_back(toFLEEdgePrfBlock(ts));
+                prev = &tokens.emplace_back(toFLEEdgePrfBlock(ts, prev));
             }
             dassert(tokens.size() == tokenCount);
             totalTokens += tokenCount;
@@ -880,11 +890,14 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
 
         // each countInfo is returned from getTags with the "count" resulting from emuBinary,
         // the "tagTokenData" which is the "tag" token derived from the ESC data & cf token,
-        for (auto const& countInfo : countInfos) {
-            serverPayload[i].counts.push_back(countInfo.count);
+        for (size_t tokenIndex = 0; tokenIndex < countInfos.size(); tokenIndex++) {
+            const auto& countInfo = countInfos.at(tokenIndex);
+            auto count = countInfo.count + tokensSets[i][tokenIndex].paddingIndex;
+
+            serverPayload[i].counts.push_back(count);
 
             escDocuments.push_back(ESCCollection::generateNonAnchorDocument(
-                ESCTwiceDerivedTagToken(countInfo.tagTokenData), countInfo.count));
+                ESCTwiceDerivedTagToken(countInfo.tagTokenData), count));
         }
     }
 

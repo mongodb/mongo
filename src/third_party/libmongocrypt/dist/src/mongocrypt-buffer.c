@@ -317,7 +317,10 @@ fail:
     return ret;
 }
 
-void _mongocrypt_buffer_from_iter(_mongocrypt_buffer_t *plaintext, bson_iter_t *iter) {
+static void _mongocrypt_buffer_copy_as_bson_value(_mongocrypt_buffer_t *plaintext,
+                                                  bool (*append_func)(bson_t *bson, const void *data, int len),
+                                                  const void *data,
+                                                  int len) {
     bson_t wrapper = BSON_INITIALIZER;
     int32_t offset = INT32_LEN      /* skips document size */
                    + TYPE_LEN       /* element type */
@@ -326,13 +329,14 @@ void _mongocrypt_buffer_from_iter(_mongocrypt_buffer_t *plaintext, bson_iter_t *
     uint8_t *wrapper_data;
 
     BSON_ASSERT_PARAM(plaintext);
-    BSON_ASSERT_PARAM(iter);
+    BSON_ASSERT_PARAM(append_func);
 
     /* It is not straightforward to transform a bson_value_t to a string of
      * bytes. As a workaround, we wrap the value in a bson document with an empty
      * key, then use the raw buffer from inside the new bson_t, skipping the
      * length and type header information and the key name. */
-    bson_append_iter(&wrapper, "", 0, iter);
+    append_func(&wrapper, data, len);
+
     wrapper_data = ((uint8_t *)bson_get_data(&wrapper));
     BSON_ASSERT(wrapper.len >= (uint32_t)offset + NULL_BYTE_LEN);
     plaintext->len = wrapper.len - (uint32_t)offset - NULL_BYTE_LEN; /* the final null byte */
@@ -343,6 +347,25 @@ void _mongocrypt_buffer_from_iter(_mongocrypt_buffer_t *plaintext, bson_iter_t *
     memcpy(plaintext->data, wrapper_data + offset, plaintext->len);
 
     bson_destroy(&wrapper);
+}
+
+static bool _append_iter(bson_t *bson, const void *iter, int len) {
+    return bson_append_iter(bson, "", 0, (const bson_iter_t *)iter);
+}
+
+static bool _append_utf8(bson_t *bson, const void *str, int len) {
+    return bson_append_utf8(bson, "", 0, (const char *)str, len);
+}
+
+void _mongocrypt_buffer_copy_from_string_as_bson_value(_mongocrypt_buffer_t *plaintext, const char *str, int len) {
+    BSON_ASSERT_PARAM(str);
+    BSON_ASSERT(len >= 0);
+    _mongocrypt_buffer_copy_as_bson_value(plaintext, _append_utf8, str, len);
+}
+
+void _mongocrypt_buffer_from_iter(_mongocrypt_buffer_t *plaintext, bson_iter_t *iter) {
+    BSON_ASSERT_PARAM(iter);
+    _mongocrypt_buffer_copy_as_bson_value(plaintext, _append_iter, iter, 0);
 }
 
 bool _mongocrypt_buffer_from_uuid_iter(_mongocrypt_buffer_t *buf, bson_iter_t *iter) {

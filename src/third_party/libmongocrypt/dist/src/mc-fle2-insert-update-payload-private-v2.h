@@ -33,7 +33,8 @@
         _mongocrypt_buffer_t encryptedTokens;                                                                          \
     } mc_Text##Type##TokenSet_t;                                                                                       \
     void mc_Text##Type##TokenSet_init(mc_Text##Type##TokenSet_t *);                                                    \
-    void mc_Text##Type##TokenSet_cleanup(mc_Text##Type##TokenSet_t *)
+    void mc_Text##Type##TokenSet_cleanup(mc_Text##Type##TokenSet_t *);                                                 \
+    void mc_Text##Type##TokenSet_shallow_copy(const mc_Text##Type##TokenSet_t *src, mc_Text##Type##TokenSet_t *dest)
 
 DEF_TEXT_SEARCH_TOKEN_SET(Exact);
 DEF_TEXT_SEARCH_TOKEN_SET(Substring);

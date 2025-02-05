@@ -32,6 +32,14 @@
         _mongocrypt_buffer_cleanup(&ts->escDerivedToken);                                                              \
         _mongocrypt_buffer_cleanup(&ts->serverDerivedFromDataToken);                                                   \
         _mongocrypt_buffer_cleanup(&ts->encryptedTokens);                                                              \
+    }                                                                                                                  \
+    void mc_Text##Type##TokenSet_shallow_copy(const mc_Text##Type##TokenSet_t *src, mc_Text##Type##TokenSet_t *dst) {  \
+        BSON_ASSERT_PARAM(src);                                                                                        \
+        BSON_ASSERT_PARAM(dst);                                                                                        \
+        _mongocrypt_buffer_set_to(&src->edcDerivedToken, &dst->edcDerivedToken);                                       \
+        _mongocrypt_buffer_set_to(&src->escDerivedToken, &dst->escDerivedToken);                                       \
+        _mongocrypt_buffer_set_to(&src->serverDerivedFromDataToken, &dst->serverDerivedFromDataToken);                 \
+        _mongocrypt_buffer_set_to(&src->encryptedTokens, &dst->encryptedTokens);                                       \
     }
 
 DEF_TEXT_SEARCH_TOKEN_SET_INIT_CLEANUP(Exact)

@@ -29,6 +29,8 @@
 #include "mc-range-edge-generation-private.h"
 #include "mc-range-encoding-private.h"
 #include "mc-range-mincover-private.h"
+#include "mc-str-encode-string-sets-private.h"
+#include "mc-text-search-str-encode-private.h"
 #include "mc-tokens-private.h"
 #include "mongocrypt-buffer-private.h"
 #include "mongocrypt-ciphertext-private.h"
@@ -1126,26 +1128,22 @@ static bool _fle2_generate_TextSearchTokenSets(_mongocrypt_key_broker_t *kb,
                                                mc_FLE2InsertUpdatePayloadV2_t *payload,
                                                const _mongocrypt_buffer_t *indexKeyId,
                                                const mc_FLE2TextSearchInsertSpec_t *spec,
-                                               const _mongocrypt_buffer_t *value,
                                                int64_t contentionFactor,
                                                mongocrypt_status_t *status) {
     BSON_ASSERT_PARAM(kb);
     BSON_ASSERT_PARAM(payload);
     BSON_ASSERT_PARAM(indexKeyId);
     BSON_ASSERT_PARAM(spec);
-    BSON_ASSERT_PARAM(value);
 
     _mongocrypt_crypto_t *crypto = kb->crypt->crypto;
     mc_TextSearchTokenSets_t *tsts = &payload->textSearchTokenSets.tsts;
     _FLE2EncryptedPayloadCommon_t common = {{0}};
     bool res = false;
 
-    // TODO MONGOCRYPT-759 implement case folding; for now let foldedValue be a copy of value.
-    _mongocrypt_buffer_t foldedValue = {0};
-    _mongocrypt_buffer_init(&foldedValue);
-    _mongocrypt_buffer_copy_to(value, &foldedValue);
-
-    // TODO MONGOCRYPT-762 do StrEncode here to get substring sets to encode
+    mc_str_encode_sets_t *encodeSets = mc_text_search_str_encode(spec, status);
+    if (!encodeSets) {
+        goto fail;
+    }
 
     // Start the token derivations
     if (!_get_tokenKey(kb, indexKeyId, &common.tokenKey, status)) {
@@ -1164,72 +1162,154 @@ static bool _fle2_generate_TextSearchTokenSets(_mongocrypt_key_broker_t *kb,
         goto fail;
     }
 
-    if (!_fle2_generate_TextExactTokenSet(kb,
-                                          &tsts->exact,
-                                          &foldedValue,
-                                          contentionFactor,
-                                          common.collectionsLevel1Token,
-                                          common.serverTokenDerivationLevel1Token,
-                                          status)) {
-        goto fail;
-    }
-
-    if (spec->substr.set) {
-        // TODO MONGOCRYPT-762 iterate on StrEncode substrings set
-        mc_TextSubstringTokenSet_t substrSet = {{0}};
-        mc_TextSubstringTokenSet_init(&substrSet);
-
-        if (!_fle2_generate_TextSubstringTokenSet(kb,
-                                                  &substrSet,
-                                                  &foldedValue,
-                                                  contentionFactor,
-                                                  common.collectionsLevel1Token,
-                                                  common.serverTokenDerivationLevel1Token,
-                                                  status)) {
-            mc_TextSubstringTokenSet_cleanup(&substrSet);
+    // Generate exact token set singleton
+    {
+        _mongocrypt_buffer_t asBsonValue;
+        _mongocrypt_buffer_init(&asBsonValue);
+        BSON_ASSERT(encodeSets->exact.len < INT_MAX);
+        _mongocrypt_buffer_copy_from_string_as_bson_value(&asBsonValue,
+                                                          (const char *)encodeSets->exact.data,
+                                                          (int)encodeSets->exact.len);
+        if (!_fle2_generate_TextExactTokenSet(kb,
+                                              &tsts->exact,
+                                              &asBsonValue,
+                                              contentionFactor,
+                                              common.collectionsLevel1Token,
+                                              common.serverTokenDerivationLevel1Token,
+                                              status)) {
+            _mongocrypt_buffer_cleanup(&asBsonValue);
             goto fail;
         }
-        _mc_array_append_val(&tsts->substringArray, substrSet);
+        _mongocrypt_buffer_cleanup(&asBsonValue);
     }
-    if (spec->suffix.set) {
-        // TODO MONGOCRYPT-762 iterate on StrEncode suffixes set
-        mc_TextSuffixTokenSet_t suffixSet = {{0}};
-        mc_TextSuffixTokenSet_init(&suffixSet);
 
-        if (!_fle2_generate_TextSuffixTokenSet(kb,
-                                               &suffixSet,
-                                               &foldedValue,
-                                               contentionFactor,
-                                               common.collectionsLevel1Token,
-                                               common.serverTokenDerivationLevel1Token,
-                                               status)) {
-            mc_TextSuffixTokenSet_cleanup(&suffixSet);
-            goto fail;
+    const char *substring;
+    uint32_t bytelen;
+    uint32_t appendCount;
+
+    // Generate array of substring token sets
+    if (encodeSets->substring_set) {
+        mc_substring_set_iter_t set_itr;
+        mc_substring_set_iter_init(&set_itr, encodeSets->substring_set);
+
+        while (mc_substring_set_iter_next(&set_itr, &substring, &bytelen, &appendCount)) {
+            BSON_ASSERT(appendCount > 0);
+            BSON_ASSERT(bytelen < INT_MAX);
+
+            mc_TextSubstringTokenSet_t tset = {{0}};
+
+            _mongocrypt_buffer_t asBsonValue;
+            _mongocrypt_buffer_init(&asBsonValue);
+            _mongocrypt_buffer_copy_from_string_as_bson_value(&asBsonValue, substring, (int)bytelen);
+
+            if (!_fle2_generate_TextSubstringTokenSet(kb,
+                                                      &tset,
+                                                      &asBsonValue,
+                                                      contentionFactor,
+                                                      common.collectionsLevel1Token,
+                                                      common.serverTokenDerivationLevel1Token,
+                                                      status)) {
+                _mongocrypt_buffer_cleanup(&asBsonValue);
+                mc_TextSubstringTokenSet_cleanup(&tset);
+                goto fail;
+            }
+            _mongocrypt_buffer_cleanup(&asBsonValue);
+
+            if (appendCount > 1) {
+                mc_TextSubstringTokenSet_t tset_copy;
+                mc_TextSubstringTokenSet_shallow_copy(&tset, &tset_copy);
+                for (; appendCount > 1; appendCount--) {
+                    _mc_array_append_val(&tsts->substringArray, tset_copy);
+                }
+            }
+            _mc_array_append_val(&tsts->substringArray, tset); // array now owns tset
         }
-        _mc_array_append_val(&tsts->suffixArray, suffixSet);
     }
-    if (spec->prefix.set) {
-        // TODO MONGOCRYPT-762 iterate on StrEncode suffixes set
-        mc_TextPrefixTokenSet_t prefixSet = {{0}};
-        mc_TextPrefixTokenSet_init(&prefixSet);
 
-        if (!_fle2_generate_TextPrefixTokenSet(kb,
-                                               &prefixSet,
-                                               &foldedValue,
-                                               contentionFactor,
-                                               common.collectionsLevel1Token,
-                                               common.serverTokenDerivationLevel1Token,
-                                               status)) {
-            mc_TextPrefixTokenSet_cleanup(&prefixSet);
-            goto fail;
+    // Generate array of suffix token sets
+    if (encodeSets->suffix_set) {
+        mc_affix_set_iter_t set_itr;
+        mc_affix_set_iter_init(&set_itr, encodeSets->suffix_set);
+
+        while (mc_affix_set_iter_next(&set_itr, &substring, &bytelen, &appendCount)) {
+            BSON_ASSERT(appendCount > 0);
+            BSON_ASSERT(bytelen < INT_MAX);
+
+            mc_TextSuffixTokenSet_t tset = {{0}};
+            mc_TextSuffixTokenSet_init(&tset);
+
+            _mongocrypt_buffer_t asBsonValue;
+            _mongocrypt_buffer_init(&asBsonValue);
+            _mongocrypt_buffer_copy_from_string_as_bson_value(&asBsonValue, substring, (int)bytelen);
+
+            if (!_fle2_generate_TextSuffixTokenSet(kb,
+                                                   &tset,
+                                                   &asBsonValue,
+                                                   contentionFactor,
+                                                   common.collectionsLevel1Token,
+                                                   common.serverTokenDerivationLevel1Token,
+                                                   status)) {
+                _mongocrypt_buffer_cleanup(&asBsonValue);
+                mc_TextSuffixTokenSet_cleanup(&tset);
+                goto fail;
+            }
+            _mongocrypt_buffer_cleanup(&asBsonValue);
+
+            if (appendCount > 1) {
+                mc_TextSuffixTokenSet_t tset_copy;
+                mc_TextSuffixTokenSet_shallow_copy(&tset, &tset_copy);
+                for (; appendCount > 1; appendCount--) {
+                    _mc_array_append_val(&tsts->suffixArray, tset_copy);
+                }
+            }
+            _mc_array_append_val(&tsts->suffixArray, tset); // array now owns tset
         }
-        _mc_array_append_val(&tsts->prefixArray, prefixSet);
+    }
+
+    // Generate array of prefix token sets
+    if (encodeSets->prefix_set) {
+        mc_affix_set_iter_t set_itr;
+        mc_affix_set_iter_init(&set_itr, encodeSets->prefix_set);
+
+        while (mc_affix_set_iter_next(&set_itr, &substring, &bytelen, &appendCount)) {
+            BSON_ASSERT(appendCount > 0);
+            BSON_ASSERT(bytelen < INT_MAX);
+
+            mc_TextPrefixTokenSet_t tset = {{0}};
+            mc_TextPrefixTokenSet_init(&tset);
+
+            _mongocrypt_buffer_t asBsonValue;
+            _mongocrypt_buffer_init(&asBsonValue);
+            _mongocrypt_buffer_copy_from_string_as_bson_value(&asBsonValue, substring, (int)bytelen);
+
+            if (!_fle2_generate_TextPrefixTokenSet(kb,
+                                                   &tset,
+                                                   &asBsonValue,
+                                                   contentionFactor,
+                                                   common.collectionsLevel1Token,
+                                                   common.serverTokenDerivationLevel1Token,
+                                                   status)) {
+                _mongocrypt_buffer_cleanup(&asBsonValue);
+                mc_TextPrefixTokenSet_cleanup(&tset);
+                goto fail;
+            }
+            _mongocrypt_buffer_cleanup(&asBsonValue);
+
+            if (appendCount > 1) {
+                mc_TextPrefixTokenSet_t tset_copy;
+                mc_TextPrefixTokenSet_shallow_copy(&tset, &tset_copy);
+                for (; appendCount > 1; appendCount--) {
+                    _mc_array_append_val(&tsts->prefixArray, tset_copy); // array now owns tset_copy
+                }
+            }
+            _mc_array_append_val(&tsts->prefixArray, tset); // moves ownership of tset
+        }
     }
     payload->textSearchTokenSets.set = true;
     res = true;
 fail:
     _FLE2EncryptedPayloadCommon_cleanup(&common);
-    _mongocrypt_buffer_cleanup(&foldedValue);
+    mc_str_encode_sets_destroy(encodeSets);
     return res;
 }
 
@@ -1350,7 +1430,6 @@ static bool _mongocrypt_fle2_placeholder_to_insert_update_ciphertextForTextSearc
                                             &payload,
                                             &placeholder->index_key_id,
                                             &insertSpec,
-                                            &value,
                                             payload.contentionFactor,
                                             status)) {
         goto fail;
