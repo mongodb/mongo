@@ -46,6 +46,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/commands/query_cmd/cluster_explain.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
@@ -122,13 +123,13 @@ public:
 
     bool errmsgRun(OperationContext* opCtx,
                    const DatabaseName& dbName,
-                   const BSONObj& cmdObj,
+                   const BSONObj& originalCmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
         Impl::checkCanRunHere(opCtx);
 
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-        const NamespaceString nss(parseNs(dbName, cmdObj));
+        NamespaceString nss(parseNs(dbName, originalCmdObj));
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid namespace specified '" << nss.toStringForErrorMsg()
                               << "'",
@@ -139,6 +140,29 @@ public:
 
         std::vector<AsyncRequestsSender::Response> shardResponses;
         try {
+            auto cmdObj = [&] {
+                if (!OptionalBool::parseFromBSON(
+                        originalCmdObj[CountCommandRequest::kRawDataFieldName]) ||
+                    !CollectionRoutingInfoTargeter{opCtx, nss}.timeseriesNamespaceNeedsRewrite(
+                        nss)) {
+                    return originalCmdObj;
+                }
+
+                nss = nss.makeTimeseriesBucketsNamespace();
+
+                // Rewrite the command object to use the buckets namespace.
+                BSONObjBuilder builder{originalCmdObj.objsize()};
+                for (auto&& [fieldName, elem] : originalCmdObj) {
+                    if (fieldName == CountCommandRequest::kCommandName) {
+                        builder.append(fieldName, nss.coll());
+                    } else {
+                        builder.append(elem);
+                    }
+                }
+
+                return builder.obj();
+            }();
+
             auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
             if (prepareForFLERewrite(opCtx, countRequest.getEncryptionInformation())) {
                 processFLECountS(opCtx, nss, countRequest);
@@ -213,7 +237,8 @@ public:
                 true /*eligibleForSampling*/);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
             // Rewrite the count command as an aggregation.
-            auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
+            auto countRequest =
+                CountCommandRequest::parse(IDLParserContext("count"), originalCmdObj);
             auto aggRequestOnView =
                 query_request_conversion::asAggregateCommandRequest(countRequest);
             auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView);
@@ -269,7 +294,7 @@ public:
         }
 
         shardSubTotal.doneFast();
-        total = applySkipLimit(total, cmdObj);
+        total = applySkipLimit(total, originalCmdObj);
         result.appendNumber("n", total);
 
         // The # of documents returned is always 1 for the count command.
