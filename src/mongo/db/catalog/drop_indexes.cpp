@@ -402,8 +402,9 @@ void dropReadyIndexes(OperationContext* opCtx,
 
 void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString& nss) {
     try {
-        const auto scopedDss =
-            DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, nss.dbName());
+        bool isMovePrimaryInProgress =
+            DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, nss.dbName())
+                ->isMovePrimaryInProgress();
         auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);
 
         auto collDesc = scopedCss->getCollectionDescription(opCtx);
@@ -412,7 +413,7 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceStrin
         // Only collections that are not registered in the sharding catalog are affected by
         // movePrimary
         if (!collDesc.hasRoutingTable()) {
-            if (scopedDss->isMovePrimaryInProgress()) {
+            if (isMovePrimaryInProgress) {
                 LOGV2(4976500, "assertNoMovePrimaryInProgress", logAttrs(nss));
 
                 uasserted(ErrorCodes::MovePrimaryInProgress,

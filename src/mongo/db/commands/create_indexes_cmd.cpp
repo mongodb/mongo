@@ -319,8 +319,9 @@ bool indexesAlreadyExist(OperationContext* opCtx,
 
 void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString& nss) {
     try {
-        const auto scopedDss =
-            DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, nss.dbName());
+        bool isMovePrimaryInProgress =
+            DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, nss.dbName())
+                ->isMovePrimaryInProgress();
 
         auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);
 
@@ -328,7 +329,7 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceStrin
         // All the unsharded, untracked collections owned by the primary are affected by the
         // movePrimary.
         if (!collDesc.hasRoutingTable()) {
-            if (scopedDss->isMovePrimaryInProgress()) {
+            if (isMovePrimaryInProgress) {
                 LOGV2(4909200, "assertNoMovePrimaryInProgress", logAttrs(nss));
 
                 uasserted(ErrorCodes::MovePrimaryInProgress,
