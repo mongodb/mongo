@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
+
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
 #include <boost/container/small_vector.hpp>
@@ -40,12 +42,11 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
+#include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
-#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/tracking/context.h"
@@ -369,13 +370,11 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
     // measurement into.
     auto rehydratedBucket = (reopeningContext.bucketToReopen.has_value())
         ? internal::rehydrateBucket(catalog,
-                                    insertContext.stats,
-                                    insertContext.key.collectionUUID,
-                                    comparator,
-                                    insertContext.options,
-                                    reopeningContext.bucketToReopen.value(),
+                                    reopeningContext.bucketToReopen->bucketDocument,
                                     reopeningContext.catalogEra,
-                                    &insertContext.key)
+                                    comparator,
+                                    reopeningContext.bucketToReopen->validator,
+                                    insertContext)
         : StatusWith<tracking::unique_ptr<Bucket>>{ErrorCodes::BadValue, "No bucket to rehydrate"};
     if (rehydratedBucket.getStatus().code() == ErrorCodes::WriteConflict) {
         return rehydratedBucket.getStatus();
@@ -762,6 +761,65 @@ StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catal
     InsertContext insertContext{std::move(key), stripeNumber, options, stats};
 
     return {std::make_pair(std::move(insertContext), std::move(time))};
+}
+
+StatusWith<tracking::unique_ptr<Bucket>> getReopenedBucket(
+    OperationContext* opCtx,
+    BucketCatalog& catalog,
+    const Collection* bucketsColl,
+    const std::variant<OID, std::vector<BSONObj>>& reopeningCandidate,
+    BucketStateRegistry::Era catalogEra,
+    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+    bucket_catalog::InsertContext& insertContext) {
+    BSONObj reopenedBucketDoc =
+        visit(OverloadedVisitor{
+                  [&](const OID& bucketId) {
+                      return internal::reopenFetchedBucket(
+                          opCtx, bucketsColl, bucketId, insertContext.stats);
+                  },
+                  [&](const std::vector<BSONObj>& pipeline) {
+                      return internal::reopenQueriedBucket(
+                          opCtx, bucketsColl, insertContext.options, pipeline, insertContext.stats);
+                  },
+              },
+              reopeningCandidate);
+
+    if (reopenedBucketDoc.isEmpty()) {
+        // We couldn't find an eligible bucket document with the 'reopeningCandidate'.
+        return {tracking::unique_ptr<Bucket>(
+            getTrackingContext(catalog.trackingContexts, TrackingScope::kReopeningRequests),
+            nullptr)};
+    }
+
+    if (!timeseries::isCompressedBucket(reopenedBucketDoc)) {
+        // Compress the uncompressed bucket document and return.
+        auto uncompressedBucketId =
+            extractBucketId(catalog, insertContext.options, bucketsColl->uuid(), reopenedBucketDoc);
+        if (const auto& status =
+                internal::compressAndWriteBucket(opCtx,
+                                                 catalog,
+                                                 bucketsColl,
+                                                 uncompressedBucketId,
+                                                 insertContext.options.getTimeField(),
+                                                 compressAndWriteBucketFunc);
+            !status.isOK()) {
+            return status;
+        }
+        return Status{
+            ErrorCodes::WriteConflict,
+            "existing uncompressed bucket was compressed, retry insert on compressed bucket"};
+    }
+
+    // Instantiate the in-memory bucket representation of the reopened bucket document.
+    auto bucketDocumentValidator = [&](const BSONObj& bucketDoc) {
+        return bucketsColl->checkValidation(opCtx, bucketDoc);
+    };
+    return internal::rehydrateBucket(catalog,
+                                     reopenedBucketDoc,
+                                     catalogEra,
+                                     bucketsColl->getDefaultCollator(),
+                                     bucketDocumentValidator,
+                                     insertContext);
 }
 
 std::vector<std::shared_ptr<WriteBatch>> insertBatch(

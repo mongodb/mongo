@@ -51,7 +51,9 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_id.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
@@ -62,6 +64,7 @@
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/bucket_compression_failure.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
@@ -482,17 +485,91 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
     return nullptr;
 }
 
-StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
-                                                         ExecutionStatsController& stats,
-                                                         const UUID& collectionUUID,
-                                                         const StringDataComparator* comparator,
-                                                         const TimeseriesOptions& options,
-                                                         const BucketToReopen& bucketToReopen,
-                                                         const uint64_t catalogEra,
-                                                         const BucketKey* expectedKey) {
-    ScopeGuard updateStatsOnError([&stats] { stats.incNumBucketReopeningsFailed(); });
+Status compressAndWriteBucket(OperationContext* opCtx,
+                              BucketCatalog& catalog,
+                              const Collection* bucketsColl,
+                              const BucketId& uncompressedBucketId,
+                              StringData timeField,
+                              const CompressAndWriteBucketFunc& compressAndWriteBucketFunc) {
+    try {
+        LOGV2(8654200,
+              "Compressing uncompressed bucket upon bucket reopen",
+              "bucketId"_attr = uncompressedBucketId.oid);
+        // Compress the uncompressed bucket and write to disk.
+        invariant(compressAndWriteBucketFunc);
+        compressAndWriteBucketFunc(opCtx, uncompressedBucketId, bucketsColl->ns(), timeField);
+    } catch (...) {
+        bucket_catalog::freeze(catalog, uncompressedBucketId);
+        LOGV2_WARNING(8654201,
+                      "Failed to compress bucket for time-series insert upon reopening, will retry "
+                      "insert on a new bucket",
+                      "bucketId"_attr = uncompressedBucketId.oid);
+        return Status{timeseries::BucketCompressionFailure(bucketsColl->uuid(),
+                                                           uncompressedBucketId.oid,
+                                                           uncompressedBucketId.keySignature),
+                      "Failed to compress bucket for time-series insert upon reopening"};
+    }
+    return Status::OK();
+}
 
-    const auto& [bucketDoc, validator] = bucketToReopen;
+BSONObj reopenFetchedBucket(OperationContext* opCtx,
+                            const Collection* bucketsColl,
+                            const OID& bucketId,
+                            ExecutionStatsController& stats) {
+    const auto& reopenedBucketDoc =
+        DBDirectClient{opCtx}.findOne(bucketsColl->ns(), BSON("_id" << bucketId));
+
+    if (!reopenedBucketDoc.isEmpty()) {
+        stats.incNumBucketsFetched();
+    } else {
+        stats.incNumBucketFetchesFailed();
+    }
+    return reopenedBucketDoc;
+}
+
+BSONObj reopenQueriedBucket(OperationContext* opCtx,
+                            const Collection* bucketsColl,
+                            const TimeseriesOptions& options,
+                            const std::vector<BSONObj>& pipeline,
+                            ExecutionStatsController& stats) {
+    // Skips running the query if we don't have an index on meta and time for the time-series
+    // collection. Without the index we will perform a full collection scan which could cause us to
+    // take a performance hit.
+    if (const auto& index =
+            getIndexSupportingReopeningQuery(opCtx, bucketsColl->getIndexCatalog(), options)) {
+        DBDirectClient client{opCtx};
+
+        // Run an aggregation to find a suitable bucket to reopen.
+        AggregateCommandRequest aggRequest(bucketsColl->ns(), pipeline);
+        aggRequest.setHint(index);
+
+        // TODO SERVER-86094: remove after fixing perf regression.
+        query_settings::QuerySettings querySettings;
+        querySettings.setQueryFramework(QueryFrameworkControlEnum::kForceClassicEngine);
+        aggRequest.setQuerySettings(querySettings);
+
+        auto swCursor = DBClientCursor::fromAggregationRequest(
+            &client, aggRequest, false /* secondaryOk */, false /* useExhaust */);
+        if (swCursor.isOK() && swCursor.getValue()->more()) {
+            stats.incNumBucketsQueried();
+            return swCursor.getValue()->next();
+        }
+    }
+
+    stats.incNumBucketQueriesFailed();
+    return BSONObj{};
+}
+
+StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(
+    BucketCatalog& catalog,
+    const BSONObj& bucketDoc,
+    uint64_t catalogEra,
+    const StringDataComparator* comparator,
+    const BucketDocumentValidator& validator,
+    bucket_catalog::InsertContext& insertContext) {
+    ScopeGuard updateStatsOnError(
+        [&insertContext] { insertContext.stats.incNumBucketReopeningsFailed(); });
+
     if (catalogEra < getCurrentEra(catalog.bucketStateRegistry)) {
         return {ErrorCodes::WriteConflict, "Bucket is from an earlier era, may be outdated"};
     }
@@ -517,6 +594,7 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
     }
 
     BSONElement metadata;
+    const auto& options = insertContext.options;
     auto metaFieldName = options.getMetaField();
     if (metaFieldName) {
         metadata = bucketDoc.getField(kBucketMetaFieldName);
@@ -524,12 +602,12 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
 
     // Buckets are spread across independently-lockable stripes to improve parallelism. We map a
     // bucket to a stripe by hashing the BucketKey.
-    auto key = BucketKey{collectionUUID,
+    auto key = BucketKey{insertContext.key.collectionUUID,
                          BucketMetadata{getTrackingContext(catalog.trackingContexts,
                                                            TrackingScope::kOpenBucketsById),
                                         metadata,
                                         options.getMetaField()}};
-    if (expectedKey && key != *expectedKey) {
+    if (key != insertContext.key) {
         return {ErrorCodes::BadValue, "Bucket metadata does not match (hash collision)"};
     }
 
@@ -611,7 +689,8 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
 
         invariant(!TestingProctor::instance().isEnabled());
         timeseries::bucket_catalog::freeze(catalog, bucketId);
-        return Status(BucketCompressionFailure(collectionUUID, bucketId.oid, bucketId.keySignature),
+        return Status(BucketCompressionFailure(
+                          insertContext.key.collectionUUID, bucketId.oid, bucketId.keySignature),
                       ex.reason());
     }
 

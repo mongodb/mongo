@@ -175,19 +175,47 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
                            const Date_t& time);
 
 /**
- * Given a compressed bucket to reopen, performs validation and constructs the in-memory
- * representation of the bucket. If specified, 'expectedKey' is matched against the key extracted
- * from the document to validate that the bucket is expected (i.e. to help resolve hash collisions
- * for archived buckets). Does *not* hand ownership of the bucket to the catalog.
+ * Perform archived-based reopening and returns the fetched bucket document.
+ * Increments statistics accordingly.
  */
-StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
-                                                         ExecutionStatsController& stats,
-                                                         const UUID& collectionUUID,
-                                                         const StringDataComparator* comparator,
-                                                         const TimeseriesOptions& options,
-                                                         const BucketToReopen& bucketToReopen,
-                                                         uint64_t catalogEra,
-                                                         const BucketKey* expectedKey);
+BSONObj reopenFetchedBucket(OperationContext* opCtx,
+                            const Collection* bucketsColl,
+                            const OID& bucketId,
+                            ExecutionStatsController& stats);
+
+/**
+ * Perform query-based reopening and returns the fetched bucket document if the supporting index
+ * exists.
+ * Increments statistics accordingly.
+ */
+BSONObj reopenQueriedBucket(OperationContext* opCtx,
+                            const Collection* bucketsColl,
+                            const TimeseriesOptions& options,
+                            const std::vector<BSONObj>& pipeline,
+                            ExecutionStatsController& stats);
+
+/**
+ * Compress and write the bucket document to storage with 'compressAndWriteBucketFunc'. Return the
+ * error status and freeze the bucket if the compression fails.
+ */
+Status compressAndWriteBucket(OperationContext* opCtx,
+                              BucketCatalog& catalog,
+                              const Collection* bucketsColl,
+                              const BucketId& uncompressedBucketId,
+                              StringData timeField,
+                              const CompressAndWriteBucketFunc& compressAndWriteBucketFunc);
+
+/**
+ * Given a compressed bucket to reopen, performs validation and constructs the in-memory
+ * representation of the bucket. Does *not* hand ownership of the bucket to the catalog.
+ */
+StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(
+    BucketCatalog& catalog,
+    const BSONObj& bucketDoc,
+    uint64_t catalogEra,
+    const StringDataComparator* comparator,
+    const BucketDocumentValidator& validator,
+    bucket_catalog::InsertContext& insertContext);
 
 /**
  * Given a rehydrated 'bucket', passes ownership of that bucket to the catalog, marking the bucket

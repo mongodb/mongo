@@ -144,6 +144,9 @@ protected:
     void _testMeasurementSchema(
         const std::initializer_list<std::initializer_list<BSONObj>>& groups);
 
+    StatusWith<tracking::unique_ptr<Bucket>> _testRehydrateBucket(const CollectionPtr& coll,
+                                                                  const BSONObj& bucketDoc);
+
     Status _reopenBucket(const CollectionPtr& coll, const BSONObj& bucketDoc);
 
     BSONObj _getCompressedBucketDoc(const BSONObj& bucketDoc);
@@ -424,6 +427,34 @@ BSONObj BucketCatalogTest::_getCompressedBucketDoc(const BSONObj& bucketDoc) {
     return compressionResult.compressedBucket.value();
 }
 
+StatusWith<tracking::unique_ptr<Bucket>> BucketCatalogTest::_testRehydrateBucket(
+    const CollectionPtr& coll, const BSONObj& bucketDoc) {
+    const NamespaceString ns = coll->ns().getTimeseriesViewNamespace();
+    const UUID uuid = coll->uuid();
+    const boost::optional<TimeseriesOptions> options = coll->getTimeseriesOptions();
+
+    BSONElement metadata;
+    auto metaFieldName = options->getMetaField();
+    if (metaFieldName) {
+        metadata = bucketDoc.getField(kBucketMetaFieldName);
+    }
+    auto key = BucketKey{uuid,
+                         BucketMetadata{getTrackingContext(_bucketCatalog->trackingContexts,
+                                                           TrackingScope::kOpenBucketsByKey),
+                                        metadata,
+                                        metaFieldName}};
+    auto stats = internal::getOrInitializeExecutionStats(*_bucketCatalog, uuid);
+    auto stripeNumber = internal::getStripeNumber(*_bucketCatalog, key);
+    InsertContext insertContext{key, stripeNumber, *options, stats};
+    auto validator = [ opCtx = _opCtx, &coll ](const BSONObj& bucketDoc) -> auto {
+        return coll->checkValidation(opCtx, bucketDoc);
+    };
+    auto era = getCurrentEra(_bucketCatalog->bucketStateRegistry);
+
+    return internal::rehydrateBucket(
+        *_bucketCatalog, bucketDoc, era, coll->getDefaultCollator(), validator, insertContext);
+}
+
 Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj& bucketDoc) {
     const NamespaceString ns = coll->ns().getTimeseriesViewNamespace();
     const UUID uuid = coll->uuid();
@@ -442,38 +473,32 @@ Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj
                                                            TrackingScope::kOpenBucketsByKey),
                                         metadata,
                                         metaFieldName}};
+    auto stats = internal::getOrInitializeExecutionStats(*_bucketCatalog, uuid);
+    auto stripeNumber = internal::getStripeNumber(*_bucketCatalog, key);
+    InsertContext insertContext{key, stripeNumber, *options, stats};
 
     // Validate the bucket document against the schema.
     auto validator = [ opCtx = _opCtx, &coll ](const BSONObj& bucketDoc) -> auto {
         return coll->checkValidation(opCtx, bucketDoc);
     };
+    auto era = getCurrentEra(_bucketCatalog->bucketStateRegistry);
 
-    auto stats = internal::getOrInitializeExecutionStats(*_bucketCatalog, uuid);
-
-    auto res = internal::rehydrateBucket(*_bucketCatalog,
-                                         stats,
-                                         uuid,
-                                         coll->getDefaultCollator(),
-                                         *options,
-                                         BucketToReopen{bucketDoc, validator},
-                                         getCurrentEra(_bucketCatalog->bucketStateRegistry),
-                                         nullptr);
+    auto res = internal::rehydrateBucket(
+        *_bucketCatalog, bucketDoc, era, coll->getDefaultCollator(), validator, insertContext);
     if (!res.isOK()) {
         return res.getStatus();
     }
     auto bucket = std::move(res.getValue());
 
-    auto stripeNumber = internal::getStripeNumber(*_bucketCatalog, key);
-
     // Register the reopened bucket with the catalog.
-    auto& stripe = *_bucketCatalog->stripes[stripeNumber];
+    auto& stripe = *_bucketCatalog->stripes[insertContext.stripeNumber];
     stdx::lock_guard stripeLock{stripe.mutex};
 
     return internal::reopenBucket(*_bucketCatalog,
                                   stripe,
                                   stripeLock,
-                                  stats,
-                                  key,
+                                  insertContext.stats,
+                                  insertContext.key,
                                   std::move(bucket),
                                   getCurrentEra(_bucketCatalog->bucketStateRegistry))
         .getStatus();
@@ -1394,51 +1419,6 @@ TEST_F(BucketCatalogTest, ReopenClosedBuckets) {
     }
 }
 
-TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurementWithMeta) {
-    // Bucket document to reopen.
-    BSONObj bucketDoc = ::mongo::fromjson(
-        R"({"_id":{"$oid":"629e1e680958e279dc29a642"},
-            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
-                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
-            "meta": 42,
-            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
-                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
-                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
-                    "a":{"0":1,"1":2,"2":3},
-                    "b":{"0":1,"1":2,"2":3}}})");
-
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
-    BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
-    Status status = _reopenBucket(autoColl.getCollection(), compressedBucketDoc);
-    ASSERT_OK(status);
-
-    // Insert a measurement that is compatible with the reopened bucket.
-    auto result = _insertOneHelper(
-        _opCtx,
-        *_bucketCatalog,
-        _ns1,
-        _uuid1,
-        ::mongo::fromjson(
-            R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},"tag":42, "a":-100,"b":100})"));
-
-    ASSERT_EQ(0, _getExecutionStat(_uuid1, kNumSchemaChanges));
-
-    auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
-    ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
-    ASSERT_EQ(batch->measurements.size(), 1);
-
-    // The reopened bucket already contains three committed measurements.
-    ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 3);
-
-    // Verify that the min and max is updated correctly when inserting new measurements.
-    ASSERT_BSONOBJ_BINARY_EQ(batch->min, BSON("u" << BSON("a" << -100)));
-    ASSERT_BSONOBJ_BINARY_EQ(
-        batch->max,
-        BSON("u" << BSON("time" << Date_t::fromMillisSinceEpoch(1654529680000) << "b" << 100)));
-
-    finish(*_bucketCatalog, batch);
-}
-
 TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) {
     // Bucket document to reopen.
     BSONObj bucketDoc = ::mongo::fromjson(
@@ -1525,6 +1505,174 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
     ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 0);
 
     finish(*_bucketCatalog, batch);
+}
+
+TEST_F(BucketCatalogTest, RehydrateMalformedBucket) {
+    BSONObj bucketDoc = ::mongo::fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+    BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+
+    ASSERT_OK(_testRehydrateBucket(autoColl.getCollection(), compressedBucketDoc));
+
+    {
+        // Missing _id field.
+        BSONObj missingIdObj = compressedBucketDoc.removeField("_id");
+        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), missingIdObj));
+
+        // Bad _id type.
+        BSONObj badIdObj = compressedBucketDoc.addFields(BSON("_id" << 123));
+        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), badIdObj));
+    }
+
+    {
+        // Missing control field.
+        BSONObj missingControlObj = compressedBucketDoc.removeField("control");
+        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), missingControlObj));
+
+        // Bad control type.
+        BSONObj badControlObj = compressedBucketDoc.addFields(BSON("control" << BSONArray()));
+        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), badControlObj));
+
+        // Bad control.version type.
+        BSONObj badVersionObj = compressedBucketDoc.addFields(BSON(
+            "control" << BSON("version" << BSONArray() << "min"
+                                        << BSON("time" << BSON("$date"
+                                                               << "2022-06-06T15:34:00.000Z"))
+                                        << "max"
+                                        << BSON("time" << BSON("$date"
+                                                               << "2022-06-06T15:34:30.000Z")))));
+        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), badVersionObj));
+
+        // Bad control.min type.
+        BSONObj badMinObj = compressedBucketDoc.addFields(BSON(
+            "control" << BSON("version" << 1 << "min" << 123 << "max"
+                                        << BSON("time" << BSON("$date"
+                                                               << "2022-06-06T15:34:30.000Z")))));
+        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), badMinObj));
+
+        // Bad control.max type.
+        BSONObj badMaxObj = compressedBucketDoc.addFields(
+            BSON("control" << BSON("version" << 1 << "min"
+                                             << BSON("time" << BSON("$date"
+                                                                    << "2022-06-06T15:34:00.000Z"))
+                                             << "max" << 123)));
+        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), badMaxObj));
+
+        // Missing control.min.time.
+        BSONObj missingMinTimeObj = compressedBucketDoc.addFields(BSON(
+            "control" << BSON("version" << 1 << "min" << BSON("abc" << 1) << "max"
+                                        << BSON("time" << BSON("$date"
+                                                               << "2022-06-06T15:34:30.000Z")))));
+        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), missingMinTimeObj));
+
+        // Missing control.max.time.
+        BSONObj missingMaxTimeObj = compressedBucketDoc.addFields(
+            BSON("control" << BSON("version" << 1 << "min"
+                                             << BSON("time" << BSON("$date"
+                                                                    << "2022-06-06T15:34:00.000Z"))
+                                             << "max" << BSON("abc" << 1))));
+        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), missingMaxTimeObj));
+    }
+
+    {
+        // Missing data field.
+        BSONObj missingDataObj = compressedBucketDoc.removeField("data");
+        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), missingDataObj));
+
+        // Bad time field in the data field.
+        BSONObj badTimeFieldInDataFieldObj =
+            compressedBucketDoc.addFields(BSON("data" << BSON("time" << BSON("0" << 123))));
+        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), badTimeFieldInDataFieldObj));
+
+        // Bad data type.
+        BSONObj badDataObj = compressedBucketDoc.addFields(BSON("data" << 123));
+        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), badDataObj));
+    }
+}
+
+TEST_F(BucketCatalogTest, RehydrateMixedSchemaDataBucket) {
+    BSONObj bucketDoc = ::mongo::fromjson(
+        R"({"_id":{"$oid":"02091c2c050b7495eaef4581"},
+            "control":{"version":1,
+                       "min":{"_id":{"$oid":"63091c30138e9261fd70a903"},
+                              "time":{"$date":"2022-08-26T19:19:00Z"},
+                              "x":1},
+                       "max":{"_id":{"$oid":"63091c30138e9261fd70a905"},
+                       "time":{"$date":"2022-08-26T19:19:30Z"},
+                       "x":{"y":"z"}}},
+            "data":{"_id":{"0":{"$oid":"63091c30138e9261fd70a903"},
+                           "1":{"$oid":"63091c30138e9261fd70a904"},
+                           "2":{"$oid":"63091c30138e9261fd70a905"}},
+                    "time":{"0":{"$date":"2022-08-26T19:19:30Z"},
+                            "1":{"$date":"2022-08-26T19:19:30Z"},
+                            "2":{"$date":"2022-08-26T19:19:30Z"}},
+                    "x":{"0":1,"1":{"y":"z"},"2":"abc"}}})");
+
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
+    ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), compressedBucketDoc));
+
+    auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
+    ASSERT_EQ(1, stats->numBucketReopeningsFailed.load());
+}
+
+TEST_F(BucketCatalogTest, RehydrateClosedBuckets) {
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+
+    {
+        // control.closed: true
+        BSONObj closedBucket = ::mongo::fromjson(
+            R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3},
+                                   "closed": true},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+        BSONObj compressedClosedBucketDoc = _getCompressedBucketDoc(closedBucket);
+        ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), compressedClosedBucketDoc));
+    }
+
+    {
+        // control.closed: false
+        BSONObj openBucket = ::mongo::fromjson(
+            R"({"_id":{"$oid":"629e1e680958e279dc29a518"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3},
+                                   "closed": false},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+        BSONObj compressedOpenBucketDoc = _getCompressedBucketDoc(openBucket);
+        ASSERT_OK(_testRehydrateBucket(autoColl.getCollection(), compressedOpenBucketDoc));
+    }
+
+    {
+        // No control.closed
+        BSONObj openBucket = ::mongo::fromjson(
+            R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+        BSONObj compressedOpenBucketDoc = _getCompressedBucketDoc(openBucket);
+        ASSERT_OK(_testRehydrateBucket(autoColl.getCollection(), compressedOpenBucketDoc));
+    }
 }
 
 TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {

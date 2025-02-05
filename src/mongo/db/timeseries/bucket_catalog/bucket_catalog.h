@@ -395,6 +395,25 @@ StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catal
                                                             const TimeseriesOptions& options,
                                                             const BSONObj& measurementDoc);
 
+using CompressAndWriteBucketFunc = std::function<void(
+    OperationContext*, const bucket_catalog::BucketId&, const NamespaceString&, StringData)>;
+
+/**
+ * Given the 'reopeningCandidate', returns:
+ *      - An owned pointer of the bucket if successfully reopened and initialized in memory.
+ *      - A nullptr if no eligible bucket is reopened.
+ *      - An error if the reopened bucket cannot be used for new inserts.
+ * Compresses the reopened bucket document if it's uncompressed.
+ */
+StatusWith<tracking::unique_ptr<Bucket>> getReopenedBucket(
+    OperationContext* opCtx,
+    BucketCatalog& catalog,
+    const Collection* bucketsColl,
+    const std::variant<OID, std::vector<BSONObj>>& reopeningCandidate,
+    BucketStateRegistry::Era catalogEra,
+    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+    bucket_catalog::InsertContext& insertContext);
+
 /**
  * Efficiently inserts a batch of time-series measurements. It handles the logic of finding a bucket
  * to insert measurements into, and the logic of finding a new bucket to insert into when a bucket

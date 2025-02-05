@@ -279,26 +279,17 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucketWithReopening(
         }
     }
 
-    try {
-        LOGV2(8654200,
-              "Compressing uncompressed bucket upon bucket reopen",
-              "bucketId"_attr = uncompressedBucketId.get().oid);
-        // Compress the uncompressed bucket and write to disk.
-        if (compressAndWriteBucketFunc) {
-            compressAndWriteBucketFunc(
-                opCtx, uncompressedBucketId.get(), bucketsColl->ns(), options.getTimeField());
-        }
-    } catch (...) {
-        bucket_catalog::freeze(bucketCatalog, uncompressedBucketId.get());
-        LOGV2_WARNING(8654201,
-                      "Failed to compress bucket for time-series insert upon reopening, will retry "
-                      "insert on a new bucket",
-                      "bucketId"_attr = uncompressedBucketId.get().oid);
-        return Status{timeseries::BucketCompressionFailure(bucketsColl->uuid(),
-                                                           uncompressedBucketId.get().oid,
-                                                           uncompressedBucketId.get().keySignature),
-                      "Failed to compress bucket for time-series insert upon reopening"};
+    if (const auto& status =
+            bucket_catalog::internal::compressAndWriteBucket(opCtx,
+                                                             bucketCatalog,
+                                                             bucketsColl,
+                                                             uncompressedBucketId.get(),
+                                                             options.getTimeField(),
+                                                             compressAndWriteBucketFunc);
+        !status.isOK()) {
+        return status;
     }
+
     return Status{ErrorCodes::WriteConflict,
                   "existing uncompressed bucket was compressed, retry insert on compressed bucket"};
 }
