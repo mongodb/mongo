@@ -137,18 +137,13 @@ public:
         Invocation(OperationContext* opCtx,
                    const Command* command,
                    const OpMsgRequest& opMsgRequest)
-            : InvocationBaseGen(opCtx, command, opMsgRequest), _ns([&] {
-                  if (request().getRawData()) {
-                      return timeseries::isTimeseriesViewRequest(opCtx, request()).second;
-                  }
-
-                  return request().getNamespaceOrUUID().isNamespaceString()
+            : InvocationBaseGen(opCtx, command, opMsgRequest),
+              _ns(request().getNamespaceOrUUID().isNamespaceString()
                       ? request().getNamespaceOrUUID().nss()
                       : CollectionCatalog::get(opCtx)->resolveNamespaceStringFromDBNameAndUUID(
                             opCtx,
                             request().getNamespaceOrUUID().dbName(),
-                            request().getNamespaceOrUUID().uuid());
-              }()) {
+                            request().getNamespaceOrUUID().uuid())) {
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid namespace specified '" << _ns.toStringForErrorMsg()
                                   << "'",
@@ -256,6 +251,18 @@ public:
             CurOpFailpointHelpers::waitWhileFailPointEnabled(
                 &hangBeforeCollectionCount, opCtx, "hangBeforeCollectionCount", []() {}, _ns);
 
+            auto ns = [&] {
+                if (request().getRawData()) {
+                    auto [isTimeseriesViewRequest, ns] =
+                        timeseries::isTimeseriesViewRequest(opCtx, request());
+                    if (isTimeseriesViewRequest) {
+                        ctx.emplace(opCtx, ns);
+                        return ns;
+                    }
+                }
+                return _ns;
+            }();
+
             // Start the query planning timer.
             auto curOp = CurOp::get(opCtx);
             curOp->beginQueryPlanningTimer();
@@ -270,13 +277,13 @@ public:
             auto expCtx =
                 makeExpressionContextForGetExecutor(opCtx,
                                                     request().getCollation().value_or(BSONObj()),
-                                                    _ns,
+                                                    ns,
                                                     boost::none /* verbosity*/);
 
             const auto& collection = ctx->getCollection();
-            const auto extensionsCallback = getExtensionsCallback(collection, opCtx, _ns);
+            const auto extensionsCallback = getExtensionsCallback(collection, opCtx, ns);
             auto parsedFind = uassertStatusOK(
-                parsed_find_command::parseFromCount(expCtx, request(), *extensionsCallback, _ns));
+                parsed_find_command::parseFromCount(expCtx, request(), *extensionsCallback, ns));
 
             registerRequestForQueryStats(opCtx, expCtx, curOp, ctx, request(), *parsedFind);
 
