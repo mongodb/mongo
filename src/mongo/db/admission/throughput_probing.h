@@ -109,6 +109,9 @@ private:
         AtomicWord<int64_t> totalAmountDecreased;
         AtomicWord<int64_t> totalAmountIncreased;
         AtomicWord<int64_t> resizeDurationMicros;
+        AtomicWord<int64_t> timesProbedStable;
+        AtomicWord<int64_t> timesProbedUp;
+        AtomicWord<int64_t> timesProbedDown;
     } _stats;
 
     PeriodicJobAnchor _job;

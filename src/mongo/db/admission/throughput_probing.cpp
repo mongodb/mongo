@@ -196,7 +196,6 @@ std::pair<int32_t, int32_t> newReadWriteConcurrencies(double stableConcurrency, 
 
 void ThroughputProbing::_probeStable(OperationContext* opCtx, double throughput) {
     invariant(_state == ProbingState::kStable);
-
     LOGV2_DEBUG(7346000, 3, "Throughput Probing: stable", "throughput"_attr = throughput);
 
     // Record the baseline reading.
@@ -218,6 +217,8 @@ void ThroughputProbing::_probeStable(OperationContext* opCtx, double throughput)
         _state = ProbingState::kDown;
         _decreaseConcurrency(opCtx);
     }
+    // Due to the time resize concurrency takes, increment after increase/decrease
+    _stats.timesProbedStable.fetchAndAdd(1);
 }
 
 void ThroughputProbing::_probeUp(OperationContext* opCtx, double throughput) {
@@ -249,6 +250,8 @@ void ThroughputProbing::_probeUp(OperationContext* opCtx, double throughput) {
         _state = ProbingState::kStable;
         _resetConcurrency(opCtx);
     }
+    // Due to the time resize concurrency takes, increment after reset
+    _stats.timesProbedUp.fetchAndAdd(1);
 }
 
 void ThroughputProbing::_probeDown(OperationContext* opCtx, double throughput) {
@@ -280,6 +283,8 @@ void ThroughputProbing::_probeDown(OperationContext* opCtx, double throughput) {
         _state = ProbingState::kStable;
         _resetConcurrency(opCtx);
     }
+    // Due to the time resize concurrency takes, increment after reset
+    _stats.timesProbedDown.fetchAndAdd(1);
 }
 
 void ThroughputProbing::_resize(OperationContext* opCtx,
@@ -375,6 +380,9 @@ void ThroughputProbing::Stats::serialize(BSONObjBuilder& builder) const {
     builder.append("totalAmountDecreased", static_cast<long long>(totalAmountDecreased.load()));
     builder.append("totalAmountIncreased", static_cast<long long>(totalAmountIncreased.load()));
     builder.append("resizeDurationMicros", static_cast<long long>(resizeDurationMicros.load()));
+    builder.append("timesProbedStable", static_cast<long long>(timesProbedStable.load()));
+    builder.append("timesProbedUp", static_cast<long long>(timesProbedUp.load()));
+    builder.append("timesProbedDown", static_cast<long long>(timesProbedDown.load()));
 }
 
 ThroughputProbingTicketHolderManager::ThroughputProbingTicketHolderManager(
