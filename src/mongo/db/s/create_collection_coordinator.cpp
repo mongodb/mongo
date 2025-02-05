@@ -820,7 +820,7 @@ void checkShardingCatalogCollectionOptions(OperationContext* opCtx,
 
         uassert(
             ErrorCodes::AlreadyInitialized,
-            "Collection '{}' already exists with a differnt shard key. Requested {} but found {}"_format(
+            "Collection '{}' already exists with a different shard key. Requested {} but found {}"_format(
                 targetNss.toStringForErrorMsg(),
                 requestKeyPattern.toString(),
                 cm.getShardKeyPattern().toBSON().toString()),
