@@ -335,9 +335,8 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
             ceRes = estimate(static_cast<const ElemMatchValueMatchExpression*>(node), isFilterRoot);
             break;
         case MatchExpression::ELEM_MATCH_OBJECT:
-            ceRes =
-                estimate(static_cast<const ElemMatchObjectMatchExpression*>(node), isFilterRoot);
-            break;
+            // TODO SERVER-100293
+            return Status(ErrorCodes::UnsupportedCbrNode, "elemMatchObject supported");
         default:
             MONGO_UNIMPLEMENTED_TASSERT(9586708);
     }

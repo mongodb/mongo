@@ -1899,6 +1899,19 @@ tasks:
         vars:
           suite: query_tester_manual_test
 
+  - <<: *task_template
+    name: query_cbr_heuristic_jscore_passthrough
+    tags: [
+        "assigned_to_jira_team_server_query_optimization",
+        "experimental",
+        "blocked_in_query_alias", # We explicitly specify this task in query alias
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_cbr_heuristic_jscore_passthrough
+
   ################################################
   #           Query Integration tasks            #
   ################################################
