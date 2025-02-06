@@ -61,21 +61,13 @@ executor::RemoteCommandRequest createManageSearchIndexRemoteCommandRequest(
     manageSearchIndexRequest.setCollectionUUID(uuid);
     manageSearchIndexRequest.setUserCommand(userCmd);
     if (viewName) {
-        // The existing viewName field accepted by mongot is now no longer needed due to the view
-        // object serving the same purpose. To protect existing Evergreen e2e tests from failing, we
-        // will continue to support viewName in our code until the mongot team officially deprecates
-        // it.
-        // TODO SERVER-98368: remove this line as the view name is passed through the `view` object
-        // below.
-        manageSearchIndexRequest.setViewName(viewName->coll());
-
         SearchIndexRequestView view;
-        // TODO SERVER-98368: get the name directly from `viewName` as it's no longer set on
-        // `manageSearchIndexRequest`.
+
         // Always append the view name.
-        view.setName(manageSearchIndexRequest.getViewName()->toString());
+        view.setName(viewName->coll());
 
         // Only append the view pipeline if it exists.
+        // TODO SERVER-100553: replace this conditional with a tassert that viewPipeline exists.
         if (viewPipeline) {
             view.setEffectivePipeline(viewPipeline.value());
         }

@@ -66,7 +66,9 @@ executor::RemoteCommandRequest getRemoteCommandRequestForSearchQuery(
     uuid.value().appendToBuilder(&cmdBob, kCollectionUuidField);
     cmdBob.append(kQueryField, query);
     if (viewName) {
-        cmdBob.append(kViewNameField, viewName->coll());
+        BSONObjBuilder subObj(cmdBob.subobjStart(kViewField));
+        subObj.append(kViewNameField, viewName->coll());
+        subObj.done();
     }
     if (explain) {
         cmdBob.append(kExplainField,

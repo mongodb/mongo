@@ -117,18 +117,11 @@ inline void _replicateSearchIndexCommandOnAllMongodsForTesting(
                NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
     bob.append("userCmd", userCmd);
     if (viewName) {
-        // The existing viewName field accepted by mongot is required until the view object format
-        // (below) is in the release binary of mongot. To protect existing Evergreen e2e tests from
-        // failing, we will continue to support viewName in our code until the mongot team
-        // officially deprecates it.
-        // TODO SERVER-98368: remove this line as the view name is passed through the `view` object
-        // below.
-        bob.append("viewName",
-                   NamespaceStringUtil::serialize(*viewName, SerializationContext::stateDefault()));
         BSONObjBuilder subObj(bob.subobjStart("view"));
         subObj.append(
             "name",
             NamespaceStringUtil::serialize(*viewName, SerializationContext::stateDefault()));
+        // TODO SERVER-100553: Add a tassert ensuring that viewPipeline exists.
         subObj.append("effectivePipeline", *viewPipeline);
         subObj.done();
     }

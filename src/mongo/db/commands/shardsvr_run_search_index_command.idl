@@ -56,6 +56,7 @@ commands:
                     name of the view.
                 type: namespacestring
                 optional: true
+            # TODO SERVER-100553: Add an optional view struct that contains required fields viewName and effectivePipeline.
             mongotAlreadyInformed:
                 description: >-
                     This string represents the host and port connection string running a mongot 

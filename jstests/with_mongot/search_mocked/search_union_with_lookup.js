@@ -62,7 +62,7 @@ function setupSearchQuery(term,
                           times,
                           batch,
                           searchMetaValue,
-                          viewName = null,
+                          view = null,
                           explainVerbosity = null,
                           explainObject = null) {
     const searchQuery = {query: term, path: "title"};
@@ -72,7 +72,7 @@ function setupSearchQuery(term,
         db: dbName,
         collectionUUID: collUUID,
         explainVerbosity,
-        viewName,
+        view,
     });
 
     if (Array.isArray(searchMetaValue)) {
@@ -746,11 +746,10 @@ const lookupSearchViewQuery = setupSearchQuery(
         {_id: 8, $searchScore: 0.5}
     ],
     1,
-    // TODO SERVER-98368 change this to view object instead of viewName
     FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'MongotIndexedViews')
-        ? view1.getName()
-        : null  // viewName is only included in the request to mongot if the feature flag to enable
-                // mongot indexing on views is enabled
+        ? {name: view1.getName()}
+        : null  // view object is only included in the request to mongot if the feature flag to
+                // enable mongot indexing on views is enabled
 );
 view1.drop();
 assert.commandWorked(db.createView(view1.getName(), coll.getName(), []));
