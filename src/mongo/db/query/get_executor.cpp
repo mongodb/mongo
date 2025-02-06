@@ -1582,6 +1582,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     ClassicPrepareExecutionHelper helper{
         opCtx, collections, std::move(ws), cq.get(), policy, std::move(plannerParams)};
     auto result = uassertStatusOK(helper.prepare());
+    setOpDebugPlanCacheInfo(opCtx, result->planCacheInfo());
     result->runtimePlanner->addDeleteStage(
         parsedDelete, projection.get(), std::move(deleteStageParams));
     if (auto status = result->runtimePlanner->plan(); !status.isOK()) {
@@ -1749,6 +1750,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
             .collections = collections,
         })};
     auto result = uassertStatusOK(helper.prepare());
+    setOpDebugPlanCacheInfo(opCtx, result->planCacheInfo());
     result->runtimePlanner->addUpdateStage(
         parsedUpdate, projection.get(), std::move(updateStageParams));
     if (auto status = result->runtimePlanner->plan(); !status.isOK()) {
