@@ -156,7 +156,10 @@ public:
         delete concrete(block);
     }
 
-    static bool compareEq(AbstractType* blockLhs, AbstractType* blockRhs) noexcept {
+    static bool compareEq(AbstractType* blockLhs, AbstractType* blockRhs) {
+        tassert(9895600,
+                "To compare the types they need to be non-null",
+                (blockLhs != nullptr && blockRhs != nullptr));
         if (blockLhs->getRuntimeTag() == blockRhs->getRuntimeTag()) {
             return *castConst<T>(blockLhs) == *castConst<T>(blockRhs);
         }
@@ -272,7 +275,8 @@ private:
     class CompareHelper {
         ControlBlock<Ts...>* _object{nullptr};
 
-        auto tag() const noexcept {
+        auto tag() const {
+            tassert(9895601, "PolyValue is empty", _object != nullptr);
             return _object->getRuntimeTag();
         }
 
@@ -290,7 +294,8 @@ private:
         ControlBlock<Ts...>* _object{nullptr};
 
 
-        auto tag() const noexcept {
+        auto tag() const {
+            tassert(9895602, "PolyValue is empty", _object != nullptr);
             return _object->getRuntimeTag();
         }
 
