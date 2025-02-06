@@ -242,7 +242,6 @@ tasks:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
     commands:
-      - func: "fetch bazel"
       - func: "bazel run"
         vars:
           target: >-
@@ -255,7 +254,6 @@ tasks:
         variant: generate-tasks-for-version
     exec_timeout_secs: 32400 # 9 hours
     commands:
-      - func: "fetch bazel"
       - func: "bazel compile"
         vars:
           targets: archive-dist-test
@@ -278,7 +276,6 @@ tasks:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
     commands:
-      - func: "fetch bazel"
       - func: "bazel compile"
         vars:
           targets: //src/...
@@ -302,7 +299,6 @@ tasks:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
     commands:
-      - func: "fetch bazel"
       - func: "bazel compile"
         vars:
           targets: //src/...
@@ -326,7 +322,6 @@ tasks:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
     commands:
-      - func: "fetch bazel"
       - func: "bazel compile"
         vars:
           targets: //src/...
@@ -350,7 +345,6 @@ tasks:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
     commands:
-      - func: "fetch bazel"
       - func: "bazel compile"
         vars:
           targets: //src/...
@@ -374,7 +368,6 @@ tasks:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
     commands:
-      - func: "fetch bazel"
       - func: "bazel compile"
         vars:
           targets: //src/...
@@ -391,7 +384,6 @@ tasks:
     name: run_bazel_clang_tidy
     commands:
       - func: "do scons setup"
-      - func: "fetch bazel"
       - func: "bazel compile (clang)"
         vars:
           # Note that we only run clang-tidy on the Mongo-authored targets, not on third-party code.
@@ -404,7 +396,6 @@ tasks:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
     commands:
-      - func: "fetch bazel"
       - func: "bazel run"
         vars:
           target: >-

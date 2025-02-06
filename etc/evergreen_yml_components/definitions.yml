@@ -1449,16 +1449,6 @@ functions:
       content_type: text/plain
       display_name: Bazel-SCons Diff File
 
-  "fetch bazel":
-    - *f_expansions_write
-    - command: subprocess.exec
-      display_name: "fetch bazel"
-      type: test
-      params:
-        binary: bash
-        args:
-          - "src/evergreen/get_bazelisk.sh"
-
   "verify build output present":
     # Args:
     #   $output (string) - relpath to the file-to-be-checked

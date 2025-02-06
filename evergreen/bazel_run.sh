@@ -20,6 +20,7 @@ activate_venv
 eval echo "Execution environment: Args: ${args} Target: ${target}"
 
 source ./evergreen/bazel_RBE_supported.sh
+source ./evergreen/bazel_utility_functions.sh
 
 if bazel_rbe_supported; then
   LOCAL_ARG=""
@@ -27,28 +28,12 @@ else
   LOCAL_ARG="--config=local"
 fi
 
-ARCH=$(uname -m)
-if [[ "$ARCH" == "arm64" || "$ARCH" == "aarch64" ]]; then
-  ARCH="arm64"
-elif [[ "$ARCH" == "ppc64le" || "$ARCH" == "ppc64" || "$ARCH" == "ppc" || "$ARCH" == "ppcle" ]]; then
-  ARCH="ppc64le"
-elif [[ "$ARCH" == "s390x" || "$ARCH" == "s390" ]]; then
-  ARCH="s390x"
-else
-  ARCH="amd64"
-fi
+# Set the base URL for the bazelisk binaries to download from our s3 bucket
+export BAZELISK_BASE_URL=https://mdb-build-public.s3.amazonaws.com/bazel-binaries
 
-# TODO(SERVER-86050): remove the branch once bazelisk is built on s390x & ppc64le
-if [[ $ARCH == "ppc64le" ]] || [[ $ARCH == "s390x" ]]; then
-  BAZEL_BINARY=$TMPDIR/bazel
-else
-  BAZEL_BINARY=$TMPDIR/bazelisk
-fi
-
-# Set the JAVA_HOME directories for ppc64le and s390x since their bazel binaries are not compiled with a built-in JDK.
-if [[ $ARCH == "ppc64le" ]]; then
-  export JAVA_HOME="/usr/lib/jvm/java-21-openjdk"
-elif [[ $ARCH == "s390x" ]]; then
+BAZEL_BINARY=$(bazel_get_binary_path)
+if is_s390x_or_ppc64le; then
+  # Set the JAVA_HOME directories for ppc64le and s390x since their bazel binaries are not compiled with a built-in JDK.
   export JAVA_HOME="/usr/lib/jvm/java-21-openjdk"
 fi
 

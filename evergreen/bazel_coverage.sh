@@ -16,6 +16,9 @@ cd src
 set -o errexit
 set -o verbose
 
+# Set the base URL for the bazelisk binaries to download from our s3 bucket
+export BAZELISK_BASE_URL=https://mdb-build-public.s3.amazonaws.com/bazel-binaries
+
 # Use `eval` to force evaluation of the environment variables in the echo statement:
 eval echo "Execution environment: Args: ${args} Target: ${target}"
 

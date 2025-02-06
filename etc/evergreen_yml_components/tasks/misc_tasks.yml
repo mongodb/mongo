@@ -626,8 +626,6 @@ tasks:
       - func: "set up venv"
       - func: "upload pip requirements"
       - func: "get engflow creds"
-      # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
-      - func: "fetch bazel"
       - func: "bazel run"
         vars:
           target: >-
@@ -659,8 +657,6 @@ tasks:
       - func: "set up venv"
       - func: "upload pip requirements"
       - func: "get engflow creds"
-      # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
-      - func: "fetch bazel"
       - func: "bazel run"
         vars:
           target: >-
@@ -692,8 +688,6 @@ tasks:
       - func: "set up venv"
       - func: "upload pip requirements"
       - func: "get engflow creds"
-      # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
-      - func: "fetch bazel"
       - func: "bazel run"
         vars:
           target: >-
@@ -1109,8 +1103,6 @@ tasks:
       - func: "set up venv"
       - func: "upload pip requirements"
       - func: "get engflow creds"
-      # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
-      - func: "fetch bazel"
       - func: "bazel coverage"
         vars:
           # Running something like "bazel test //src/..." has to do a lot of preprocessing on *all*

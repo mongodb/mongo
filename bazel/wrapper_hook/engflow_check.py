@@ -1,5 +1,6 @@
 import os
 import pathlib
+import platform
 import sys
 import time
 
@@ -20,6 +21,6 @@ def engflow_auth(args):
         and "--config local" not in args_str
         and "--config public-release" not in args_str
     ):
-        if os.environ.get("CI") is None:
+        if os.environ.get("CI") is None and platform.machine().lower() not in {"ppc64le", "s390x"}:
             setup_auth(verbose=False)
     wrapper_debug(f"engflow auth time: {time.time() - start}")
