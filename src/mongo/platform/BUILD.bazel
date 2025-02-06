@@ -71,7 +71,7 @@ mongo_cc_unit_test(
     ],
     has_custom_mainline = True,
     tags = [
-        "mongo_unittest_second_group",
+        "mongo_unittest_third_group",
         "server-programmability",
     ],
     deps = [
@@ -115,7 +115,7 @@ mongo_cc_unit_test(
         "//src/mongo/unittest:join_thread.h",
     ],
     tags = [
-        "mongo_unittest_second_group",
+        "mongo_unittest_fourth_group",
         "server-programmability",
     ],
 )
@@ -127,7 +127,7 @@ mongo_cc_unit_test(
         "//src/mongo/unittest:join_thread.h",
     ],
     tags = [
-        "mongo_unittest_third_group",
+        "mongo_unittest_sixth_group",
         "server-programmability",
     ],
     deps = [
@@ -139,7 +139,7 @@ mongo_cc_unit_test(
     name = "throw_hook_test",
     srcs = ["throw_hook_test.cpp"],
     tags = [
-        "mongo_unittest_fourth_group",
+        "mongo_unittest_seventh_group",
         "server-programmability",
     ],
     target_compatible_with = select({

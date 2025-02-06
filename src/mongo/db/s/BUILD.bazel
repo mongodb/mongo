@@ -1412,7 +1412,7 @@ mongo_cc_unit_test(
     srcs = [
         "shard_server_op_observer_test.cpp",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_seventh_group"],
     deps = [
         ":sharding_runtime_d",
         "//src/mongo/db:service_context_d_test_fixture",
@@ -1517,10 +1517,10 @@ mongo_cc_unit_test(
     ],
     tags = [
         "compile_requires_large_memory_gcc",
-        "mongo_unittest_second_group",
         # State mismatch in sandbox in resharding_recipient_service_test.cpp
         "code_coverage_quarantine",
         "code_coverage_quarantine_SERVER-98847",
+        "mongo_unittest_fourth_group",
     ],
     deps = [
         ":analyze_shard_key_util",
@@ -1620,7 +1620,7 @@ mongo_cc_unit_test(
     ],
     tags = [
         "compile_requires_large_memory_gcc_fission",
-        "mongo_unittest_fourth_group",
+        "mongo_unittest_seventh_group",
     ],
     deps = [
         ":config_server_test_fixture",

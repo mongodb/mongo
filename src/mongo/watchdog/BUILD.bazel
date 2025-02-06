@@ -78,9 +78,7 @@ mongo_cc_unit_test(
     srcs = [
         "watchdog_test.cpp",
     ],
-    tags = [
-        "mongo_unittest_fourth_group",
-    ],
+    tags = ["mongo_unittest_eighth_group"],
     deps = [
         "watchdog",
         "//src/mongo/db:service_context_non_d",

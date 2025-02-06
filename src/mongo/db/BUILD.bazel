@@ -695,7 +695,7 @@ mongo_cc_unit_test(
         "db_raii_test.cpp",
         "shard_role_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_third_group"],
     deps = [
         ":query_exec",
         ":shard_role",
@@ -722,7 +722,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query:multiple_collection_accessor.h",
         "//src/mongo/db/query:multiple_collection_accessor_test.cpp",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":query_exec",
         ":shard_role",
@@ -755,7 +755,7 @@ mongo_cc_unit_test(
         "vector_clock_test_fixture.cpp",
         "vector_clock_test_fixture.h",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_fifth_group"],
     deps = [
         ":keys_collection_client_direct",
         ":keys_collection_document",
@@ -2091,7 +2091,7 @@ mongo_cc_unit_test(
     name = "throw_hook_impl_test",
     srcs = ["throw_hook_impl_test.cpp"],
     tags = [
-        "mongo_unittest_second_group",
+        "mongo_unittest_third_group",
         "server-programmability",
     ],
     target_compatible_with = select({
@@ -2875,7 +2875,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/fle:range_predicate_test.cpp",
         "//src/mongo/db/query/fle:range_validator_test.cpp",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_seventh_group"],
     target_compatible_with = select({
         "//bazel/config:use_wiredtiger_enabled": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -3738,7 +3738,7 @@ mongo_cc_unit_test(
         "client_out_of_line_executor_test.cpp",
     ],
     tags = [
-        "mongo_unittest_fourth_group",
+        "mongo_unittest_seventh_group",
         "server-programmability",
     ],
     deps = [
@@ -3754,7 +3754,7 @@ mongo_cc_unit_test(
         "//src/mongo/util:database_name_util_test.cpp",
         "//src/mongo/util:namespace_string_util_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_sixth_group"],
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/idl:server_parameter_test_util",
@@ -3766,7 +3766,7 @@ mongo_cc_unit_test(
     srcs = [
         "server_lifecycle_monitor_test.cpp",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_seventh_group"],
     deps = [
         ":server_lifecycle_monitor",
     ],
@@ -3777,7 +3777,7 @@ mongo_cc_unit_test(
     srcs = [
         "profile_settings_test.cpp",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_eighth_group"],
     deps = [
         "profile_settings",
     ],
@@ -3800,7 +3800,7 @@ mongo_cc_unit_test(
         "service_entry_point_shard_role_test.cpp",
     ],
     tags = [
-        "mongo_unittest_second_group",
+        "mongo_unittest_third_group",
         "server-programmability",
     ],
     deps = [
@@ -3817,7 +3817,7 @@ mongo_cc_unit_test(
         "change_stream_pre_images_truncate_manager_test.cpp",
         "change_stream_pre_images_truncate_markers_per_nsUUID_test.cpp",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":change_stream_options",
         ":change_stream_options_manager",
@@ -3845,7 +3845,7 @@ mongo_cc_unit_test(
         "mongod_options_test.cpp",
     ],
     tags = [
-        "mongo_unittest_third_group",
+        "mongo_unittest_sixth_group",
         "server-programmability",
     ],
     deps = [
@@ -3872,7 +3872,7 @@ mongo_cc_unit_test(
         "shard_id_test.cpp",
         "startup_warnings_mongod_thp_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_fifth_group"],
     target_compatible_with = select({
         "//bazel/config:use_wiredtiger_enabled": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -3900,7 +3900,7 @@ mongo_cc_unit_test(
     srcs = [
         "change_collection_expired_change_remover_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_sixth_group"],
     target_compatible_with = select({
         "//bazel/config:use_wiredtiger_enabled": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -3933,7 +3933,7 @@ mongo_cc_unit_test(
         "multi_key_path_tracker_test.cpp",
         "update_index_data_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_fourth_group"],
     target_compatible_with = select({
         "//bazel/config:use_wiredtiger_enabled": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -3973,7 +3973,7 @@ mongo_cc_unit_test(
         "curop_stats_test.cpp",
         "curop_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_fifth_group"],
     target_compatible_with = select({
         "//bazel/config:use_wiredtiger_enabled": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -4015,7 +4015,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/session:session_catalog_test.h",
         "//src/mongo/unittest:ensure_fcv.h",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_seventh_group"],
     target_compatible_with = select({
         "//bazel/config:use_wiredtiger_enabled": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -4055,7 +4055,7 @@ mongo_cc_unit_test(
         "default_baton_test.cpp",
     ],
     tags = [
-        "mongo_unittest_second_group",
+        "mongo_unittest_fourth_group",
         "server-programmability",
     ],
     deps = [
@@ -4088,7 +4088,7 @@ mongo_cc_unit_test(
         "//src/mongo/util:executor_test_util.h",
     ],
     tags = [
-        "mongo_unittest_second_group",
+        "mongo_unittest_fourth_group",
         "server-programmability",
     ],
     target_compatible_with = select({
@@ -4154,7 +4154,7 @@ mongo_cc_unit_test(
         "write_concern_options_test.cpp",
         "write_concern_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_fifth_group"],
     deps = [
         ":rw_concern_d",
         ":service_context_test_fixture",
@@ -4175,7 +4175,7 @@ mongo_cc_unit_test(
         "keys_collection_manager_sharding_test.cpp",
         "logical_time_validator_test.cpp",
     ],
-    tags = ["mongo_unittest_first_group"],
+    tags = ["mongo_unittest_second_group"],
     deps = [
         ":keys_collection_client_direct",
         ":vector_clock",
@@ -4191,7 +4191,7 @@ mongo_cc_unit_test(
     srcs = [
         "op_msg_fuzzer_fixture_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_fifth_group"],
     deps = [
         ":op_msg_fuzzer_fixture",
         ":server_base",
@@ -4204,7 +4204,7 @@ mongo_cc_unit_test(
     srcs = [
         "prepare_conflict_tracker_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_third_group"],
     deps = [
         ":prepare_conflict_tracker",
         "//src/mongo/util:tick_source_mock",
@@ -4254,7 +4254,7 @@ mongo_cc_unit_test(
     srcs = [
         "profile_filter_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":service_context_test_fixture",
         "//src/mongo/db/commands:profile_common",

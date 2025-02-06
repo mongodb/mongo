@@ -129,7 +129,7 @@ mongo_cc_unit_test(
     srcs = [
         "ingress_admission_control_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_third_group"],
     deps = [
         ":ingress_admission_control",
         "//src/mongo/db:service_context_test_fixture",
@@ -142,7 +142,7 @@ mongo_cc_unit_test(
     srcs = [
         "throughput_probing_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_fifth_group"],
     deps = [
         ":execution_control",
         "//src/mongo/db:service_context",

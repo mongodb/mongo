@@ -203,7 +203,7 @@ mongo_cc_unit_test(
         "exception_util_test.cpp",
     ],
     tags = [
-        "mongo_unittest_first_group",
+        "mongo_unittest_second_group",
         "server-programmability",
     ],
     deps = [
@@ -224,7 +224,7 @@ mongo_cc_unit_test(
         "locker_test.cpp",
         "resource_catalog_test.cpp",
     ],
-    tags = ["mongo_unittest_first_group"],
+    tags = ["mongo_unittest_second_group"],
     deps = [
         ":exception_util",
         ":lock_manager",

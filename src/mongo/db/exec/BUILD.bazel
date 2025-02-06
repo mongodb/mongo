@@ -204,7 +204,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/expression:evaluate_trigonometric_test.cpp",
         "//src/mongo/db/exec/timeseries:bucket_unpacker_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":projection_executor",
         ":query_shard_server_test_fixture",

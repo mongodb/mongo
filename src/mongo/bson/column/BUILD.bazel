@@ -89,7 +89,7 @@ mongo_cc_unit_test(
         "simple8b_test.cpp",
         "simple8b_type_util_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":bson_column_fuzzer_impl",
         ":bsoncolumn_test_util",

@@ -1,0 +1,7 @@
+test_kind: cpp_unit_test
+
+selector:
+  root: build/eighth_group_unittests.txt
+
+executor:
+  config: {}

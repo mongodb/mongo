@@ -407,7 +407,7 @@ mongo_cc_unit_test(
         "hostandport_test.cpp",
         "http_client_test.cpp",
     ],
-    tags = ["mongo_unittest_first_group"],
+    tags = ["mongo_unittest_second_group"],
     deps = [
         ":http_client",
         ":network",
@@ -427,7 +427,7 @@ mongo_cc_unit_test(
     data = [
         "//jstests/libs:test_pem_files",
     ],
-    tags = ["mongo_unittest_first_group"],
+    tags = ["mongo_unittest_second_group"],
     target_compatible_with = select({
         "//bazel/config:ssl_enabled": [],
         "//conditions:default": ["@platforms//:incompatible"],

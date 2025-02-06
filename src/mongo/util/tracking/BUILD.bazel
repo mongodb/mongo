@@ -32,9 +32,7 @@ mongo_cc_unit_test(
     srcs = [
         "tracking_allocator_test.cpp",
     ],
-    tags = [
-        "mongo_unittest_fourth_group",
-    ],
+    tags = ["mongo_unittest_seventh_group"],
     deps = [
         "//src/mongo/db:service_context_test_fixture",
     ],

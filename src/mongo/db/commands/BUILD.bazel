@@ -1657,7 +1657,7 @@ mongo_cc_unit_test(
     srcs = [
         "command_mirroring_test.cpp",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_seventh_group"],
     deps = [
         ":standalone",
         "//src/mongo:base",
@@ -1697,7 +1697,7 @@ mongo_cc_unit_test(
             "//src/mongo/db/commands/query_cmd:mr_test.cpp",
         ],
     }),
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":cluster_server_parameter_commands_invocation",
         ":core",

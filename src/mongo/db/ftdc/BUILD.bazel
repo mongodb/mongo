@@ -190,7 +190,7 @@ mongo_cc_unit_test(
         "metadata_compressor_test.cpp",
         "varint_test.cpp",
     ],
-    tags = ["mongo_unittest_first_group"],
+    tags = ["mongo_unittest_second_group"],
     deps = [
         ":ftdc",
         "//src/mongo/db:service_context_non_d",

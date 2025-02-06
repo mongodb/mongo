@@ -36,7 +36,7 @@ mongo_cc_unit_test(
         "//src/mongo/unittest/expected_output/golden_self_test:sanity_test",
         "//src/mongo/util/tracing_profiler/test_output/profiler_test_fixture:profiler_service_simple",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_fifth_group"],
     deps = [
         ":tracing_profiler",
         "//src/mongo:base",

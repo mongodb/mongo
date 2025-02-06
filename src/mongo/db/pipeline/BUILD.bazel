@@ -1446,10 +1446,10 @@ mongo_cc_unit_test(
     ],
     tags = [
         "compile_requires_large_memory_gcc",
-        "mongo_unittest_fourth_group",
         # Trying to access /data/db/ is incompatible with the sandbox
         "code_coverage_quarantine",
         "code_coverage_quarantine_SERVER-98846",
+        "mongo_unittest_seventh_group",
     ],
     deps = [
         ":accumulator",
@@ -1524,7 +1524,7 @@ mongo_cc_unit_test(
     srcs = [
         "group_with_acc_n_optimization_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":accumulator",
         ":aggregation_context_fixture",

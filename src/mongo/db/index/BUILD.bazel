@@ -131,7 +131,7 @@ mongo_cc_unit_test(
         "wildcard_key_generator_test.cpp",
         "wildcard_validation_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_third_group"],
     deps = [
         ":expression_params",
         ":index_access_method",

@@ -97,7 +97,7 @@ mongo_cc_unit_test(
         "rate_limiting_test.cpp",
         "supplemental_metrics_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":query_stats",
         ":rate_limiting",

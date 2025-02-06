@@ -257,7 +257,7 @@ mongo_cc_unit_test(
         "timeseries_update_delete_util_test.cpp",
         "timeseries_write_util_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":bucket_compression",
         ":timeseries_conversion_util",

@@ -68,7 +68,7 @@ mongo_cc_unit_test(
         "minmax_test.cpp",
         "schema_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":bucket_catalog",
         "//src/mongo/db:dbdirectclient",
@@ -87,7 +87,7 @@ mongo_cc_unit_test(
     srcs = [
         "timeseries_sizing_test.cpp",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":bucket_catalog",
     ],

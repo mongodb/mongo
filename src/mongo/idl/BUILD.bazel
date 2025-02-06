@@ -263,9 +263,7 @@ mongo_cc_unit_test(
         "cluster_server_parameter_test_util.h",
         ":cluster_server_parameter_test_gen",
     ],
-    tags = [
-        "mongo_unittest_second_group",
-    ],
+    tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":cluster_parameter_synchronization_helpers",
         ":cluster_server_parameter",
@@ -319,7 +317,7 @@ mongo_cc_unit_test(
         "//src/mongo/util/cmdline_utils:censor_cmdline_test.h",
     ],
     tags = [
-        "mongo_unittest_third_group",
+        "mongo_unittest_fifth_group",
         "server-programmability",
     ],
     deps = [

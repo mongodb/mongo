@@ -545,6 +545,6 @@ mongo_cc_unit_test(
         "//bazel/config:ssl_enabled": ["kms_test.cpp"],
         "//conditions:default": [],
     }),
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_fifth_group"],
     deps = ["shell_test_dependencies"],
 )

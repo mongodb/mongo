@@ -2192,7 +2192,7 @@ mongo_cc_unit_test(
     srcs = [
         "idempotency_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_sixth_group"],
     target_compatible_with = select({
         "//bazel/config:use_wiredtiger_enabled": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -2331,7 +2331,7 @@ mongo_cc_unit_test(
     ],
     tags = [
         "compile_requires_large_memory_gcc",
-        "mongo_unittest_third_group",
+        "mongo_unittest_fifth_group",
     ],
     deps = [
         ":isself",
@@ -2363,7 +2363,7 @@ mongo_cc_unit_test(
     ],
     tags = [
         "compile_requires_large_memory_gcc",
-        "mongo_unittest_third_group",
+        "mongo_unittest_fifth_group",
     ],
     deps = [
         ":data_replicator_external_state_mock",
@@ -2403,7 +2403,7 @@ mongo_cc_unit_test(
         "rollback_impl_test.cpp",
         "//src/mongo/db/catalog:collection_mock.h",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":oplog_interface_local",
         ":oplog_interface_remote",
@@ -2429,7 +2429,7 @@ mongo_cc_unit_test(
         "initial_syncer_test.cpp",
         "//src/mongo/db/storage:storage_engine_mock.h",
     ],
-    tags = ["mongo_unittest_first_group"],
+    tags = ["mongo_unittest_second_group"],
     deps = [
         ":abstract_async_component",
         ":data_replicator_external_state_mock",
@@ -2454,7 +2454,7 @@ mongo_cc_unit_test(
         "storage_timestamp_test.cpp",
         "//src/mongo/dbtests:dbtests.h",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":oplog_application",
         ":oplog_entry_test_helpers",
@@ -2489,7 +2489,7 @@ mongo_cc_unit_test(
         "repl_set_tag_test.cpp",
         "//src/mongo/unittest:ensure_fcv.h",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_third_group"],
     deps = [
         ":repl_coordinator_impl",
         ":replmocks",
@@ -2506,7 +2506,7 @@ mongo_cc_unit_test(
         "replication_consistency_markers_impl_test.cpp",
         "replication_recovery_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_fifth_group"],
     deps = [
         ":oplog_applier_impl_test_fixture",
         ":oplog_entry",
@@ -2521,7 +2521,7 @@ mongo_cc_unit_test(
     srcs = [
         "storage_interface_impl_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_fifth_group"],
     deps = [
         ":oplog_applier_impl_test_fixture",
         ":replication_process",
@@ -2536,7 +2536,7 @@ mongo_cc_unit_test(
     srcs = [
         "topology_version_observer_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_fifth_group"],
     deps = [
         ":repl_coordinator_impl",
         ":repl_coordinator_test_fixture",
@@ -2594,7 +2594,7 @@ mongo_cc_unit_test(
         "replica_set_aware_service_test.cpp",
         "//src/mongo/db/catalog:database_holder_mock.h",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":repl_coordinator_impl",
         ":repl_coordinator_test_fixture",

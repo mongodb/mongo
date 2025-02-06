@@ -541,7 +541,7 @@ mongo_cc_unit_test(
     data = [
         "//src/mongo/db/test_output/exec/sbe:test_data",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":sbe_plan_stage_test",
         "//src/mongo/db:service_context_d_test_fixture",

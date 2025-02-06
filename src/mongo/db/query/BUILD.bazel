@@ -823,7 +823,7 @@ mongo_cc_unit_test(
     ],
     tags = [
         "compile_requires_large_memory_gcc",
-        "mongo_unittest_second_group",
+        "mongo_unittest_third_group",
     ],
     deps = [
         "common_query_enums_and_helpers",

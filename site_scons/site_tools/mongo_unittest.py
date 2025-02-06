@@ -55,10 +55,10 @@ def build_cpp_unit_test(env, target, source, **kwargs):
 
     if test_group not in TEST_GROUPS:
         TEST_GROUPS.append(test_group)
-        env.TestList(f"$BUILD_ROOT/{test_group}_quarter_unittests.txt", source=[])
+        env.TestList(f"$BUILD_ROOT/{test_group}_group_unittests.txt", source=[])
         env.Alias(
-            f"install-{test_group}-quarter-unittests",
-            f"$BUILD_ROOT/{test_group}_quarter_unittests.txt",
+            f"install-{test_group}_group_unittests",
+            f"$BUILD_ROOT/{test_group}_group_unittests.txt",
         )
 
     if not kwargs.get("UNITTEST_HAS_CUSTOM_MAINLINE", False):
@@ -73,7 +73,7 @@ def build_cpp_unit_test(env, target, source, **kwargs):
     elif primary_component:
         kwargs["AIB_COMPONENT"] = primary_component
     else:
-        kwargs["AIB_COMPONENT"] = f"{test_group}-quarter-unittests"
+        kwargs["AIB_COMPONENT"] = f"{test_group}_group_unittests"
 
     if "AIB_COMPONENTS_EXTRA" in kwargs:
         kwargs["AIB_COMPONENTS_EXTRA"] = set(kwargs["AIB_COMPONENTS_EXTRA"]).union(
@@ -96,10 +96,13 @@ def build_cpp_unit_test(env, target, source, **kwargs):
     env.Alias("$UNITTEST_ALIAS", result[0])
 
     env.RegisterTest(
-        f"$BUILD_ROOT/{test_group}_quarter_unittests.txt", result[0], generate_alias=False
+        f"$BUILD_ROOT/{test_group}_group_unittests.txt", result[0], generate_alias=False
     )
-    env.Alias(f"install-{test_group}-quarter-unittests", result[0])
-
+    install_file = env.GetAutoInstalledFiles(result[0])
+    if install_file:
+        debug_file = getattr(install_file[0].attributes, "separate_debug_files")
+        env.Alias(f"install-{test_group}_group_unittests", env.GetAutoInstalledFiles(result[0]))
+        env.Alias(f"install-{test_group}_group_unittests-debug", debug_file)
     return result
 
 

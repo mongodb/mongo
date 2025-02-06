@@ -706,7 +706,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/catalog/validate:index_consistency_test.cpp",
         "//src/mongo/db/catalog/validate:validate_results_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_third_group"],
     target_compatible_with = select({
         "//bazel/config:use_wiredtiger_enabled": [],
         "//conditions:default": ["@platforms//:incompatible"],

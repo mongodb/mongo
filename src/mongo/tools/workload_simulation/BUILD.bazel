@@ -69,7 +69,7 @@ mongo_cc_unit_test(
     srcs = [
         "workload_characteristics_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":workload_characteristics",
         "//src/mongo/unittest",

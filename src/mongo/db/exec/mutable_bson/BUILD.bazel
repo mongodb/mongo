@@ -47,7 +47,7 @@ mongo_cc_unit_test(
         "mutable_bson_algo_test.cpp",
         "mutable_bson_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_third_group"],
     deps = [
         ":mutable_bson",
         ":mutable_bson_test_utils",

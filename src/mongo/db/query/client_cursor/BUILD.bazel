@@ -114,7 +114,7 @@ mongo_cc_unit_test(
     srcs = [
         "cursor_manager_test.cpp",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":client_cursor",
         "//src/mongo/db:query_exec",

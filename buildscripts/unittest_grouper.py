@@ -18,6 +18,17 @@ from buildscripts.install_bazel import install_bazel
 
 RELEASE_URL = "https://github.com/bazelbuild/buildtools/releases/download/v7.3.1/"
 
+groups_sort_keys = {
+    "first": 1,
+    "second": 2,
+    "third": 3,
+    "fourth": 4,
+    "fifth": 5,
+    "sixth": 6,
+    "seventh": 7,
+    "eighth": 8,
+}
+
 
 def determine_platform():
     syst = platform.system()
@@ -67,23 +78,27 @@ def find_group(unittest_paths):
         # group1
         "0": "first",
         "1": "first",
-        "2": "first",
-        "3": "first",
         # group2
-        "4": "second",
-        "5": "second",
-        "6": "second",
-        "7": "second",
+        "2": "second",
+        "3": "second",
         # group3
-        "8": "third",
-        "9": "third",
-        "a": "third",
-        "b": "third",
+        "4": "third",
+        "5": "third",
         # group4
-        "c": "fourth",
-        "d": "fourth",
-        "e": "fourth",
-        "f": "fourth",
+        "6": "fourth",
+        "7": "fourth",
+        # group5
+        "8": "fifth",
+        "9": "fifth",
+        # group6
+        "a": "sixth",
+        "b": "sixth",
+        # group7
+        "c": "seventh",
+        "d": "seventh",
+        # group8
+        "e": "eighth",
+        "f": "eighth",
     }
 
     group_to_path: Dict[str, List[str]] = {}
@@ -114,6 +129,14 @@ def find_group(unittest_paths):
         group_to_path[group].append(path)
 
     return json.dumps(group_to_path, indent=4)
+
+
+def find_multiple_groups(test, groups):
+    tagged_groups = []
+    for group in groups:
+        if test in groups[group]:
+            tagged_groups.append(group)
+    return tagged_groups
 
 
 def validate_bazel_groups(generate_report, fix):
@@ -158,7 +181,7 @@ def validate_bazel_groups(generate_report, fix):
 
     groups = json.loads(find_group(bazel_unittests))
     failures = []
-    for group in groups:
+    for group in sorted(groups, key=lambda x: groups_sort_keys[x]):
         try:
             start = time.time()
             sys.stdout.write(f"Query all mongo_unittest_{group}_group unittests... ")
@@ -204,8 +227,20 @@ def validate_bazel_groups(generate_report, fix):
                     )
                     print(failures[-1][1])
                     if fix:
+                        buildozer_update_cmds += [[f"add tags mongo_unittest_{group}_group", test]]
+
+            for test in group_tests:
+                if test not in groups[group]:
+                    failures.append(
+                        [
+                            test + " tag",
+                            f"{test} is tagged in the wrong group.",
+                        ]
+                    )
+                    print(failures[-1][1])
+                    if fix:
                         buildozer_update_cmds += [
-                            [buildozer, f"add tags mongo_unittest_{group}_group", test]
+                            [f"remove tags mongo_unittest_{group}_group", test]
                         ]
 
     if fix:

@@ -336,7 +336,7 @@ mongo_cc_unit_test(
         "index_builds_manager_test.cpp",
         "multi_index_block_test.cpp",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_seventh_group"],
     target_compatible_with = select({
         "//bazel/config:use_wiredtiger_enabled": [],
         "//conditions:default": ["@platforms//:incompatible"],

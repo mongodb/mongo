@@ -30,7 +30,7 @@ mongo_cc_unit_test(
         "memory_usage_tracker_test.cpp",
         "op_memory_use_test.cpp",
     ],
-    tags = ["mongo_unittest_first_group"],
+    tags = ["mongo_unittest_second_group"],
     deps = [
         ":memory_tracking",
         "//src/mongo/db:service_context_test_fixture",

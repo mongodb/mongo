@@ -66,9 +66,7 @@ mongo_cc_unit_test(
         "spillable_map_test.cpp",
         "spilling_stats_test.cpp",
     ],
-    tags = [
-        "mongo_unittest_fourth_group",
-    ],
+    tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":spilling_test_utils",
         "//src/mongo/db/exec/document_value:document_value_test_util",

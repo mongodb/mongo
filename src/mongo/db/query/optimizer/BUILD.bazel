@@ -43,7 +43,7 @@ mongo_cc_unit_test(
     srcs = [
         "reference_tracker_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":optimizer_base",
         "//src/mongo/db/exec/sbe:query_sbe",  # needed to register extended type destruction for MakeObjSpec :(

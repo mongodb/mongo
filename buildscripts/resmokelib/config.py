@@ -683,8 +683,8 @@ DEFAULT_INTEGRATION_TEST_LIST = "build/integration_tests.txt"
 DEFAULT_LIBFUZZER_TEST_LIST = "build/libfuzzer_tests.txt"
 DEFAULT_PRETTY_PRINTER_TEST_LIST = "build/pretty_printer_tests.txt"
 SPLIT_UNITTESTS_LISTS = [
-    f"build/{test_group}_quarter_unittests.txt"
-    for test_group in ["first", "second", "third", "fourth"]
+    f"build/{test_group}_group_unittests.txt"
+    for test_group in ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth"]
 ]
 BENCHMARK_SUITE_TEST_LISTS = [
     "build/repl_bm.txt",

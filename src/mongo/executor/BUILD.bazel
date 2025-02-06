@@ -621,7 +621,7 @@ mongo_cc_unit_test(
     ],
     tags = [
         "compile_requires_large_memory_gcc_fission",
-        "mongo_unittest_third_group",
+        "mongo_unittest_fifth_group",
     ],
     deps = [
         "async_rpc",
@@ -663,7 +663,7 @@ mongo_cc_unit_test(
         "//src/mongo/util:executor_test_util.h",
     ],
     tags = [
-        "mongo_unittest_second_group",
+        "mongo_unittest_fourth_group",
         "server-programmability",
     ],
     deps = [

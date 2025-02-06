@@ -1167,7 +1167,7 @@ mongo_cc_unit_test(
     tags = [
         "compile_requires_large_memory_gcc",
         "compile_requires_large_memory_sanitizer",
-        "mongo_unittest_third_group",
+        "mongo_unittest_sixth_group",
     ],
     deps = [
         ":load_balancer_support",
@@ -1205,9 +1205,7 @@ mongo_cc_unit_test(
     srcs = [
         "service_entry_point_router_role_test.cpp",
     ],
-    tags = [
-        "mongo_unittest_second_group",
-    ],
+    tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":startup_initialization",
         "//src/mongo/db:service_context_non_d",
@@ -1240,9 +1238,7 @@ mongo_cc_unit_test(
     srcs = [
         "multi_statement_transaction_requests_sender_test.cpp",
     ],
-    tags = [
-        "mongo_unittest_second_group",
-    ],
+    tags = ["mongo_unittest_third_group"],
     deps = [
         ":sharding_api",
         ":sharding_mongos_test_fixture",

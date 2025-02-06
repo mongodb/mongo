@@ -190,7 +190,7 @@ mongo_cc_unit_test(
         "//src/mongo/unittest/expected_output/golden_self_test2:sanity_test2",
     ],
     tags = [
-        "mongo_unittest_second_group",
+        "mongo_unittest_fourth_group",
         "server-programmability",
     ],
 )

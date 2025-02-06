@@ -109,7 +109,7 @@ mongo_cc_unit_test(
         "collator_interface_mock_test.cpp",
         "//src/mongo/bson:bsonobj_comparator.h",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":collator_factory_mock",
         ":collator_icu",

@@ -1,6 +1,6 @@
+load("@poetry//:dependencies.bzl", "dependency")
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
 load("//bazel/config:render_template.bzl", "render_template")
-load("@poetry//:dependencies.bzl", "dependency")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -132,7 +132,7 @@ mongo_cc_unit_test(
         "//src/mongo/base:data_type_validated.h",
     ],
     tags = [
-        "mongo_unittest_fourth_group",
+        "mongo_unittest_seventh_group",
         "platform",
         "server-programmability",
     ],

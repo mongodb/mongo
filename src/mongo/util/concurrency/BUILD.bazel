@@ -118,7 +118,7 @@ mongo_cc_unit_test(
         "with_lock_test.cpp",
     ],
     tags = [
-        "mongo_unittest_second_group",
+        "mongo_unittest_third_group",
         "server-programmability",
     ],
     deps = [
@@ -139,7 +139,7 @@ mongo_cc_unit_test(
         "lock_free_read_list_test.cpp",
         "//src/mongo/unittest:join_thread.h",
     ],
-    tags = ["mongo_unittest_first_group"],
+    tags = ["mongo_unittest_second_group"],
     deps = [],
 )
 
@@ -176,9 +176,7 @@ mongo_cc_unit_test(
     srcs = [
         "ticketholder_test.cpp",
     ],
-    tags = [
-        "mongo_unittest_fourth_group",
-    ],
+    tags = ["mongo_unittest_eighth_group"],
     deps = [
         "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",

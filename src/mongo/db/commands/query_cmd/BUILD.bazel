@@ -308,7 +308,7 @@ mongo_cc_unit_test(
         "map_reduce_agg_test.cpp",
         "map_reduce_parse_test.cpp",
     ],
-    tags = ["mongo_unittest_first_group"],
+    tags = ["mongo_unittest_second_group"],
     deps = [
         ":map_reduce_agg",
         "//src/mongo/db:service_context_d_test_fixture",

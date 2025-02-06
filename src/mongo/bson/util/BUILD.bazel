@@ -40,7 +40,7 @@ mongo_cc_unit_test(
         "bson_extract_test.cpp",
         "builder_test.cpp",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":bson_extract",
         "//src/mongo:base",

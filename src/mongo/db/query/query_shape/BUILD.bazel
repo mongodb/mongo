@@ -99,7 +99,7 @@ mongo_cc_unit_test(
         "query_shape_test.cpp",
         ":query_shape_test_gen",
     ],
-    tags = ["mongo_unittest_first_group"],
+    tags = ["mongo_unittest_second_group"],
     deps = [
         ":query_shape",
         "//src/mongo/db:service_context_d_test_fixture",

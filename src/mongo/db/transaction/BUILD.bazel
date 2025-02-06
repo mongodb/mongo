@@ -137,7 +137,7 @@ mongo_cc_unit_test(
     ],
     tags = [
         "compile_requires_large_memory_gcc",
-        "mongo_unittest_fourth_group",
+        "mongo_unittest_eighth_group",
     ],
     deps = [
         ":transaction",

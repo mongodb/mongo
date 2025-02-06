@@ -40,7 +40,7 @@ mongo_cc_unit_test(
     srcs = [
         "date_time_support_test.cpp",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_seventh_group"],
     deps = [
         ":date_time_support",
         "//src/mongo/db/concurrency:lock_manager",

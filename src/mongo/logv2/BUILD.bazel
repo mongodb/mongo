@@ -35,9 +35,7 @@ mongo_cc_unit_test(
         "logv2_test.cpp",
         "redaction_test.cpp",
     ],
-    tags = [
-        "mongo_unittest_first_group",
-    ],
+    tags = ["mongo_unittest_second_group"],
     deps = [
         "//src/mongo/db/auth:security_token",
         "//src/mongo/db/commands:core",

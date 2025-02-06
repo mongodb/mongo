@@ -104,7 +104,7 @@ mongo_cc_unit_test(
         "topology_manager_test.cpp",
         "topology_state_machine_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":sdam",
         ":sdam_test_util",

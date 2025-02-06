@@ -71,7 +71,7 @@ mongo_cc_unit_test(
         "histogram_estimation_impl_test.cpp",
         "histogram_estimator_test.cpp",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_seventh_group"],
     deps = [
         ":ce_test_utils",
     ],
@@ -82,7 +82,7 @@ mongo_cc_unit_test(
     srcs = [
         "maxdiff_histogram_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":ce_test_utils",
     ],
@@ -93,7 +93,7 @@ mongo_cc_unit_test(
     srcs = [
         "generated_histograms_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_fifth_group"],
     deps = [
         ":ce_test_utils",
         "//src/mongo/db:service_context_test_fixture",
@@ -144,7 +144,7 @@ mongo_cc_unit_test(
     srcs = [
         "sampling_estimator_test.cpp",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_eighth_group"],
     deps = [
         "//src/mongo/db:query_exec",
         "//src/mongo/db/catalog:catalog_test_fixture",

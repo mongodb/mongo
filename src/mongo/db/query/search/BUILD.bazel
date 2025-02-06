@@ -208,7 +208,7 @@ mongo_cc_unit_test(
     srcs = [
         "list_search_indexes_authorization_session_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_fourth_group"],
     deps = [
         "//src/mongo/db/auth:auth_checks",
         "//src/mongo/db/auth:authorization_session_test_fixture",

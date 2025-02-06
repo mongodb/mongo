@@ -599,7 +599,7 @@ mongo_cc_unit_test(
     data = [
         "//src/mongo/client/mongo_uri_tests:test_data",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_fourth_group"],
     target_compatible_with = select({
         "//bazel/config:use_wiredtiger_enabled": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -637,7 +637,7 @@ mongo_cc_unit_test(
     srcs = [
         "dbclient_rs_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":clientdriver_network",
         ":replica_set_monitor_test_helper",
@@ -653,7 +653,7 @@ mongo_cc_unit_test(
     srcs = [
         "dbclient_grpc_stream_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_fourth_group"],
     target_compatible_with = select({
         "//bazel/config:build_grpc_enabled": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -670,7 +670,7 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "scoped_db_connection_pool_test",
     srcs = ["scoped_db_connection_test.cpp"],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_seventh_group"],
     deps = [
         ":clientdriver_network",
         "//src/mongo/dbtests:mocklib",
@@ -682,7 +682,7 @@ mongo_cc_unit_test(
     srcs = [
         "dbclient_connection_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_third_group"],
     deps = [
         ":clientdriver_network",
         "//src/mongo/util:version_impl",

@@ -35,7 +35,7 @@ mongo_cc_unit_test(
         "unordered_map_test.cpp",
     ],
     tags = [
-        "mongo_unittest_second_group",
+        "mongo_unittest_third_group",
         "server-programmability",
     ],
     deps = [],
@@ -47,7 +47,7 @@ mongo_cc_unit_test(
         "sigaltstack_location_test.cpp",
     ],
     has_custom_mainline = True,
-    tags = ["mongo_unittest_first_group"],
+    tags = ["mongo_unittest_second_group"],
     deps = [
         "//src/mongo:base",
     ],
@@ -71,7 +71,7 @@ mongo_cc_unit_test(
         "set_terminate_from_main_die_in_thread_test.cpp",
     ],
     has_custom_mainline = True,
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_seventh_group"],
     deps = [
         "//src/mongo:base",
     ],
@@ -83,7 +83,7 @@ mongo_cc_unit_test(
         "set_terminate_from_thread_die_in_main_test.cpp",
     ],
     has_custom_mainline = True,
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_seventh_group"],
     deps = [
         "//src/mongo:base",
     ],
@@ -95,7 +95,7 @@ mongo_cc_unit_test(
         "set_terminate_from_thread_die_in_thread_test.cpp",
     ],
     has_custom_mainline = True,
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_sixth_group"],
     deps = [
         "//src/mongo:base",
     ],

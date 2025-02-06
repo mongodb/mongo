@@ -343,7 +343,7 @@ mongo_cc_unit_test(
         "op_observer_registry_test.cpp",
         "user_write_block_mode_op_observer_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_third_group"],
     deps = [
         ":batched_write_context",
         ":change_stream_pre_images_op_observer",

@@ -14,7 +14,7 @@ mongo_cc_unit_test(
     srcs = [
         "partitioned_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_sixth_group"],
     deps = [
         "//src/mongo:core_headers_library",
     ],

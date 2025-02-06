@@ -142,7 +142,7 @@ mongo_cc_unit_test(
         "stats_cache_loader_mock.h",
         "stats_cache_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_third_group"],
     deps = [
         ":stats",
         ":stats_test_utils",
@@ -157,7 +157,7 @@ mongo_cc_unit_test(
     srcs = [
         "stats_path_test.cpp",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_third_group"],
     deps = [
         ":stats_test_utils",
         "//src/mongo:base",
@@ -170,7 +170,7 @@ mongo_cc_unit_test(
     srcs = [
         "type_collision_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":stats_test_utils",
     ],
@@ -181,7 +181,7 @@ mongo_cc_unit_test(
     srcs = [
         "type_count_test.cpp",
     ],
-    tags = ["mongo_unittest_first_group"],
+    tags = ["mongo_unittest_second_group"],
     deps = [
         ":stats_test_utils",
     ],
@@ -192,7 +192,7 @@ mongo_cc_unit_test(
     srcs = [
         "ce_histogram_test.cpp",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":stats_test_utils",
     ],
@@ -203,7 +203,7 @@ mongo_cc_unit_test(
     srcs = [
         "value_utils_test.cpp",
     ],
-    tags = ["mongo_unittest_first_group"],
+    tags = ["mongo_unittest_second_group"],
     deps = [
         ":stats_test_utils",
         ":test_utils",
@@ -218,7 +218,7 @@ mongo_cc_unit_test(
         "stats_cache_loader_test_fixture.cpp",
         "stats_cache_loader_test_fixture.h",
     ],
-    tags = ["mongo_unittest_second_group"],
+    tags = ["mongo_unittest_third_group"],
     deps = [
         "//src/mongo/db:multitenancy",
         "//src/mongo/db:query_expressions",

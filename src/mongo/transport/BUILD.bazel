@@ -359,9 +359,7 @@ mongo_cc_unit_test(
         "//conditions:default": [],
     }),
     data = ["//jstests/libs:test_pem_files"],
-    tags = [
-        "mongo_unittest_second_group",
-    ],
+    tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":message_compressor",
         ":message_compressor_options_server",

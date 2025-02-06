@@ -33,7 +33,7 @@ mongo_cc_unit_test(
     srcs = [
         "external_record_store_test.cpp",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":virtual_collection",
         "//src/mongo/db/storage:record_store_base",

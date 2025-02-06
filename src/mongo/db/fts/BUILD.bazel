@@ -139,7 +139,7 @@ mongo_cc_unit_test(
         "stop_words_test.cpp",
         "tokenizer_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_fifth_group"],
     deps = [
         ":base_fts",
         "//src/mongo/db:query_expressions",

@@ -373,9 +373,7 @@ mongo_cc_unit_test(
         "//src/mongo/s/commands/query_cmd:cluster_profile_cmd_test.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_update_test.cpp",
     ],
-    tags = [
-        "mongo_unittest_third_group",
-    ],
+    tags = ["mongo_unittest_fifth_group"],
     deps = [
         ":cluster_commands",
         ":cluster_commands_common",

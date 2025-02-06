@@ -3492,7 +3492,7 @@ mongo_cc_unit_test(
         "-Isrc/third_party/grpc/dist/examples/protos",
         "-I$(BINDIR)/src/third_party/grpc/dist/examples/protos",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_eighth_group"],
     target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
     deps = [
         "grpc++_reflection",

@@ -6830,6 +6830,7 @@ if env.get("__NINJA_NO") != "1":
         for installed_debug_file in installed_debugs:
             env.Depends(installed_debug_file, debugs)
 
+        setattr(installed_prog[0].attributes, "separate_debug_files", installed_debugs)
         setattr(t.attributes, "AIB_INSTALLED_FILES", installed_prog)
 
         return target, source
@@ -7090,10 +7091,14 @@ names = [
     f'install-{env["AIB_META_COMPONENT"]}',
     "install-tests",
     env["UNITTEST_ALIAS"],
-    "install-first-quarter-unittests",
-    "install-second-quarter-unittests",
-    "install-third-quarter-unittests",
-    "install-fourth-quarter-unittests",
+    "install-first_group_unittests",
+    "install-second_group_unittests",
+    "install-third_group_unittests",
+    "install-fourth_group_unittests",
+    "install-fifth_group_unittests",
+    "install-sixth_group_unittests",
+    "install-seventh_group_unittests",
+    "install-eighth_group_unittests",
     # TODO SERVER-97990 Not all unittests are being excluded.
     "install-mongo-crypt-test",
     "install-stitch-support-test",
@@ -7115,10 +7120,14 @@ env.Alias(
 env.Alias(
     "prove-unittests",
     [
-        "prove-first-quarter-unittests",
-        "prove-second-quarter-unittests",
-        "prove-third-quarter-unittests",
-        "prove-fourth-quarter-unittests",
+        "prove-first_group_unittests",
+        "prove-second_group_unittests",
+        "prove-third_group_unittests",
+        "prove-fourth_group_unittests",
+        "prove-fifth_group_unittests",
+        "prove-sixth_group_unittests",
+        "prove-seventh_group_unittests",
+        "prove-eighth_group_unittests",
     ],
 )
 

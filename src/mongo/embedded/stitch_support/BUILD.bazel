@@ -74,7 +74,7 @@ mongo_cc_unit_test(
     ],
     has_custom_mainline = True,
     tags = [
-        "mongo_unittest_second_group",
+        "mongo_unittest_third_group",
         "stitch_support_test",
     ],
     target_compatible_with = select({

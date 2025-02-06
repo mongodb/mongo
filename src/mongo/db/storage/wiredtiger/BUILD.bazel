@@ -216,7 +216,7 @@ mongo_cc_unit_test(
         "wiredtiger_stats_test.cpp",
         "wiredtiger_util_test.cpp",
     ],
-    tags = ["mongo_unittest_fourth_group"],
+    tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":storage_wiredtiger",
         ":storage_wiredtiger_core",
@@ -245,7 +245,7 @@ mongo_cc_unit_test(
         "wiredtiger_standard_index_test.cpp",
         "wiredtiger_standard_record_store_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":storage_wiredtiger_core",
         ":wiredtiger_index_test_harness",
