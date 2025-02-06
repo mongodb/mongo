@@ -13,9 +13,9 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
 
 from buildscripts.linter import (
-    git,  # pylint: disable=wrong-import-position
-    mongolint,  # pylint: disable=wrong-import-position
-    parallel,  # pylint: disable=wrong-import-position
+    git,
+    mongolint,
+    parallel,
 )
 
 FILES_RE = re.compile("\\.(h|cpp)$")
@@ -62,7 +62,6 @@ def lint(file_names: List[str]) -> None:
 
 
 def lint_all(file_names: List[str]) -> None:
-    # pylint: disable=unused-argument
     """Lint files command entry point based on working tree."""
     all_file_names = git.get_files_to_check_working_tree(is_interesting_file)
 

@@ -10,8 +10,6 @@ from typing import Iterable
 
 import buildscripts.todo_check as under_test
 
-# pylint: disable=invalid-name
-
 
 def create_file_iterator(file_contents: str) -> Iterable[str]:
     return textwrap.dedent(file_contents.strip()).splitlines()

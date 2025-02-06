@@ -62,7 +62,6 @@ def calibrate_node(
     if node_config.filter_function is not None:
         abt_node_df = node_config.filter_function(abt_node_df)
 
-    # pylint: disable=invalid-name
     if node_config.variables_override is None:
         variables = ["n_processed"]
     else:

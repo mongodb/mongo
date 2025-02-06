@@ -11,7 +11,7 @@ import sys
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from buildscripts.ciconfig import evergreen  # pylint: disable=wrong-import-position
+from buildscripts.ciconfig import evergreen
 
 DEFAULT_EVERGREEN_FILE = "etc/evergreen.yml"
 

@@ -73,7 +73,7 @@ def make_dummy_fixture(suite_name):
     return make_fixture(fixture_class, fixture_logger, job_num=0, **fixture_config)
 
 
-class FixtureBuilder(ABC, metaclass=registry.make_registry_metaclass(_BUILDERS, type(ABC))):  # pylint: disable=invalid-metaclass
+class FixtureBuilder(ABC, metaclass=registry.make_registry_metaclass(_BUILDERS, type(ABC))):
     """
     ABC for fixture builders.
 

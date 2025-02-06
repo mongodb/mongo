@@ -60,7 +60,7 @@ def delete_directory(directory):
     """Recursively deletes a directory and its contents."""
     try:
         shutil.rmtree(directory)
-    except Exception:  # pylint: disable=broad-except
+    except Exception:
         pass
 
 
@@ -184,7 +184,7 @@ def parse_options(args):
             xform.replace(os.path.altsep or os.path.sep, os.path.sep).split("=", 1)
             for xform in opts.transformations
         ]
-    except Exception as err:  # pylint: disable=broad-except
+    except Exception as err:
         parser.error(err)
 
     return opts

@@ -1,6 +1,5 @@
 """Unit tests for the generate_resmoke_suite script."""
 
-# pylint: disable=invalid-name
 import unittest
 
 from mock import MagicMock, mock

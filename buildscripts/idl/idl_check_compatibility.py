@@ -1751,7 +1751,6 @@ def check_security_access_checks(
     new_idl_file_path: str,
 ) -> None:
     """Check the compatibility between security access checks of the old and new command."""
-    # pylint:disable=too-many-nested-blocks
     cmd_name = cmd.command_name
     if old_access_checks is not None and new_access_checks is not None:
         old_access_check_type = old_access_checks.get_access_check_type()

@@ -9,7 +9,7 @@ from buildscripts.resmokelib.hang_analyzer.process_list import Pinfo, get_proces
 NS = "buildscripts.resmokelib.hang_analyzer.process_list"
 
 
-def ns(relative_name):  # pylint: disable=invalid-name
+def ns(relative_name):
     """Return a full name from a name relative to the test module"s name space."""
     return NS + "." + relative_name
 

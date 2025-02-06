@@ -364,7 +364,6 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                 # These error codes may be transient, and so we retry the reconfig with a
                 # (potentially) higher config version. We should not receive these codes
                 # indefinitely.
-                # pylint: disable=too-many-boolean-expressions
                 if err.code not in [
                     ReplicaSetFixture._NEW_REPLICA_SET_CONFIGURATION_INCOMPATIBLE,
                     ReplicaSetFixture._CURRENT_CONFIG_NOT_COMMITTED_YET,

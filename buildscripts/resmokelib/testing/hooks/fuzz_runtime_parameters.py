@@ -297,7 +297,7 @@ class _SetParameterThread(threading.Thread):
                 now = time.time()
                 wait_secs = max(0, self._setparameter_interval_secs - (now - self._last_exec))
                 self.__lifecycle.wait_for_action_interval(wait_secs)
-        except Exception:  # pylint: disable=W0703
+        except Exception:
             # Proactively log the exception when it happens so it will be
             # flushed immediately.
             self.logger.exception("SetParameter thread threw exception")

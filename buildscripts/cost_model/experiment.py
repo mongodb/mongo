@@ -212,7 +212,6 @@ def print_explain(calibration_df: pd.DataFrame, abt_df: pd.DataFrame, row_index:
 
 def calibrate(abt_node_df: pd.DataFrame, variables: list[str] = None):
     """Calibrate the ABT node given in abd_node_df with the given model input variables."""
-    # pylint: disable=invalid-name
     if variables is None:
         variables = ["n_processed"]
     y = abt_node_df["execution_time"]

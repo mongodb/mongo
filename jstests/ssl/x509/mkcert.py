@@ -20,7 +20,6 @@ import mkdigest
 import OpenSSL
 import yaml
 
-# pylint: disable=protected-access
 try:
     # Newer versions of PyOpenSSL hide OBJ_create, but also seem okay without it.
     OBJ_create = OpenSSL._util.lib.OBJ_create
@@ -34,7 +33,6 @@ try:
     )
 except:
     pass
-# pylint: enable=protected-access
 
 CONFIGFILE = "jstests/ssl/x509/certs.yml"
 
@@ -120,7 +118,6 @@ def load_authority_file(issuer):
         return (certificate, signing_key)
 
     # Externally sourced certifiate, try by path. Hopefully unencrypted.
-    # pylint: disable=bare-except
     try:
         pem = open(issuer, "rt").read()
         certificate = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, pem)
@@ -960,7 +957,6 @@ def process_cert(cert):
 
 def parse_command_line():
     """Accept a named config file."""
-    # pylint: disable=global-statement
     global CONFIGFILE
 
     parser = argparse.ArgumentParser(description="X509 Test Certificate Generator")
@@ -1079,7 +1075,6 @@ def sort_items(items):
 
 def main():
     """Go go go."""
-    # pylint: disable=global-statement
     global CONFIG
 
     items_to_process = parse_command_line()

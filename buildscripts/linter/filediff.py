@@ -11,7 +11,6 @@ from git import Repo
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
 
-# pylint: disable=wrong-import-position
 from buildscripts.linter import git
 from buildscripts.patch_builds.change_data import (
     RevisionMap,
@@ -19,8 +18,6 @@ from buildscripts.patch_builds.change_data import (
     find_modified_lines_for_files_in_repos,
     generate_revision_map,
 )
-
-# pylint: enable=wrong-import-position
 
 LOGGER = structlog.get_logger(__name__)
 MONGO_REVISION_ENV_VAR = "REVISION"

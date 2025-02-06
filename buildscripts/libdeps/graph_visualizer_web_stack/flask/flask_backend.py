@@ -116,7 +116,6 @@ class BackendServer:
 
         version = ""
         git_hash = ""
-        # pylint: disable=c-extension-no-member
         for _, element in etree.iterparse(
             str(graph_file), tag="{http://graphml.graphdrawing.org/xmlns}data"
         ):

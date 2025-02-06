@@ -45,7 +45,7 @@ class _BackgroundJob(threading.Thread):
 
             try:
                 self._hook_test_case.run_dynamic_test(self._test_report)
-            except:  # pylint: disable=bare-except
+            except:
                 self.exc_info = sys.exc_info()
             finally:
                 with self._lock:

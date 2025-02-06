@@ -8,8 +8,6 @@ import mock
 
 from buildscripts.resmokelib.testing.hooks import fuzz_runtime_parameters as _runtime_fuzzer
 
-# pylint: disable=protected-access
-
 
 class TestRuntimeFuzzGeneration(unittest.TestCase):
     def assert_parameter_values_ok(self, spec, generated_values):

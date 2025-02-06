@@ -10,12 +10,10 @@ import buildscripts.timeouts.timeout_service as under_test
 from buildscripts.resmoke_proxy.resmoke_proxy import ResmokeProxyService
 from buildscripts.util.teststats import HistoricTaskData, HistoricTestInfo
 
-# pylint: disable=invalid-name,protected-access
-
 NS = "buildscripts.timeouts.timeout_service"
 
 
-def ns(relative_name):  # pylint: disable=invalid-name
+def ns(relative_name):
     """Return a full name from a name relative to the test module"s name space."""
     return NS + "." + relative_name
 

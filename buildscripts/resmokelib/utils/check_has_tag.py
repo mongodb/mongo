@@ -33,6 +33,6 @@ try:
         print("no tags match", sys.argv[2])
         sys.exit(1)
 
-except Exception as err:  # pylint: disable=W0703
+except Exception as err:
     print(err)
     sys.exit(3)

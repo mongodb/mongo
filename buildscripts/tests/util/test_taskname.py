@@ -4,8 +4,6 @@ import unittest
 
 import buildscripts.util.taskname as under_test
 
-# pylint: disable=invalid-name
-
 
 class TestNameTask(unittest.TestCase):
     def test_name_task_with_width_one(self):

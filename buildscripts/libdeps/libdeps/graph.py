@@ -38,10 +38,6 @@ except ImportError:
     pass
 
 
-# We need to disable invalid name here because it break backwards compatibility with
-# our graph schemas. Possibly we could use lower case conversion process to maintain
-# backwards compatibility and make pylint happy.
-# pylint: disable=invalid-name
 class CountTypes(Enum):
     """Enums for the different types of counts to perform on a graph."""
 

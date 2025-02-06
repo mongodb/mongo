@@ -23,7 +23,7 @@ class MagicRestoreEveryN(interface.Hook):
         )
         interface.Hook.__init__(self, hook_logger, fixture, description)
 
-        self.n = n  # pylint: disable=invalid-name
+        self.n = n
         self.tests_run = 0
 
         self.pit = False

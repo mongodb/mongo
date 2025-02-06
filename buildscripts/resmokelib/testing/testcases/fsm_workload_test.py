@@ -101,7 +101,7 @@ class _FSMWorkloadTestCaseBuilder(interface.TestCaseFactory):
     def make_process(self):
         # This function should only be called by MultiClientsTestCase's _make_process().
         test_case = self.create_test_case(self.logger, self.shell_options)
-        return test_case._make_process()  # pylint: disable=protected-access
+        return test_case._make_process()
 
     def create_test_case(self, logger, shell_options) -> _SingleFSMWorkloadTestCase:
         test_case = _SingleFSMWorkloadTestCase(
@@ -169,7 +169,7 @@ class ParallelFSMWorkloadTestCase(FSMWorkloadTestCase):
     REGISTERED_NAME = "parallel_fsm_workload_test"
 
     @staticmethod
-    def get_workload_group(selected_tests: list[str]) -> list[str]:  # pylint: disable=arguments-renamed
+    def get_workload_group(selected_tests: list[str]) -> list[str]:
         """Generate an FSM workload group from tests selected by the selector.
 
         When this function was updated the naming was misleading.
@@ -187,7 +187,7 @@ class ParallelFSMWorkloadTestCase(FSMWorkloadTestCase):
         return selected_tests
 
     @staticmethod
-    def get_workload_uid(selected_tests: list[str]) -> str:  # pylint: disable=arguments-renamed
+    def get_workload_uid(selected_tests: list[str]) -> str:
         """Get an unique identifier for a workload group.
 
         When this function was updated the naming was misleading.

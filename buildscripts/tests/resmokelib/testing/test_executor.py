@@ -8,12 +8,10 @@ import mock
 from buildscripts.resmokelib.testing import executor
 from buildscripts.resmokelib.testing.suite import Suite
 
-# pylint: disable=protected-access
-
 NS = "buildscripts.resmokelib.testing.executor"
 
 
-def ns(relative_name):  # pylint: disable=invalid-name
+def ns(relative_name):
     """Return a full name from a name relative to the test module"s name space."""
     return NS + "." + relative_name
 
@@ -28,7 +26,7 @@ def mock_suite(n_tests):
 
 
 class UnitTestExecutor(executor.TestSuiteExecutor):
-    def __init__(self, suite, config):  # pylint: disable=super-init-not-called
+    def __init__(self, suite, config):
         self._suite = suite
         self.test_queue_logger = logging.getLogger("executor_unittest")
         self.test_config = config

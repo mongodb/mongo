@@ -5,7 +5,7 @@ import signal
 from buildscripts.resmokelib.testing.fixtures import interface
 
 
-class YesFixture(interface.Fixture):  # pylint: disable=abstract-method
+class YesFixture(interface.Fixture):
     """Fixture which spawns several 'yes' executables to generate lots of log messages."""
 
     def __init__(self, logger, job_num, fixturelib, num_instances=1, message_length=100):

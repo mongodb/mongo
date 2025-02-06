@@ -428,7 +428,6 @@ class IDLCompatibilityContext(object):
         type_name: Optional[str],
         is_command_parameter: bool,
     ) -> None:
-        # pylint: disable=invalid-name
         """Add an error about the new and old command or parameter type validators not being equal."""
         if is_command_parameter:
             self._add_error(
@@ -536,7 +535,6 @@ class IDLCompatibilityContext(object):
         type_name: str,
         is_command_parameter: bool,
     ) -> None:
-        # pylint: disable=invalid-name
         """
         Add a new added required parameter or command type field error.
 
@@ -630,7 +628,6 @@ class IDLCompatibilityContext(object):
         type_name: Optional[str],
         is_command_parameter: bool,
     ) -> None:
-        # pylint: disable=invalid-name
         """
         Add a stable required parameter or command type field error.
 
@@ -764,7 +761,6 @@ class IDLCompatibilityContext(object):
         field_name: Optional[str],
         is_command_parameter: bool,
     ) -> None:
-        # pylint: disable=invalid-name
         """
         Add an error about the new command or parameter type not being a variant type.
 
@@ -804,7 +800,6 @@ class IDLCompatibilityContext(object):
         field_name: Optional[str],
         is_command_parameter: bool,
     ) -> None:
-        # pylint: disable=invalid-name
         """
         Add an error about the new variant types not being a superset.
 
@@ -846,7 +841,6 @@ class IDLCompatibilityContext(object):
         field_name: Optional[str],
         is_command_parameter: bool,
     ) -> None:
-        # pylint: disable=invalid-name
         """
         Add an error about the new chained types not being a superset.
 
@@ -1217,7 +1211,6 @@ class IDLCompatibilityContext(object):
         field_name: Optional[str],
         is_command_parameter: bool,
     ) -> None:
-        # pylint: disable=invalid-name
         """
         Add an error about the old command or param type bson serialization type being 'any'.
 
@@ -1256,7 +1249,6 @@ class IDLCompatibilityContext(object):
         field_name: Optional[str],
         is_command_parameter: bool,
     ) -> None:
-        # pylint: disable=invalid-name
         """
         Add an error about the new command or param type bson serialization type being 'any'.
 
@@ -1642,7 +1634,6 @@ class IDLCompatibilityContext(object):
     def add_new_param_or_command_type_field_requires_stability_error(
         self, command_name: str, field_name: str, file: str, is_command_parameter: bool
     ) -> None:
-        # pylint: disable=invalid-name
         """Add an error that a new param or command type field requires the 'stability' field."""
         if is_command_parameter:
             self._add_error(

@@ -30,7 +30,7 @@ codes = []  # type: ignore
 # Each AssertLocation identifies the C++ source location of an assertion
 AssertLocation = namedtuple("AssertLocation", ["sourceFile", "byteOffset", "lines", "code"])
 
-list_files = False  # pylint: disable=invalid-name
+list_files = False
 
 _CODE_PATTERNS = [
     re.compile(p + r"\s*(?P<code>\d+)", re.MULTILINE)
@@ -336,7 +336,7 @@ def main():
     if extra:
         parser.error(f"Unrecognized arguments: {' '.join(extra)}")
 
-    global list_files  # pylint: disable=global-statement,invalid-name
+    global list_files
     list_files = options.list_files
 
     (_, errors, seen) = read_error_codes()

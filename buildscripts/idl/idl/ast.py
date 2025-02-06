@@ -146,7 +146,6 @@ class Struct(common.SourceLocation):
         self.generic_list_type = None  # type: Optional[GenericListType]
         # Determines whether or not this IDL struct can be a component of a query shape. See WRITING-13831.
         self.query_shape_component = False  # type: bool
-        # pylint: disable=invalid-name
         self.unsafe_dangerous_disable_extra_field_duplicate_checks = None  # type: bool
 
         # Indicates if the struct is a view type or not. If a struct is a view type, then the
@@ -206,7 +205,6 @@ class Validator(common.SourceLocation):
         # type: (str, int, int) -> None
         """Construct a Validator."""
         # Don't lint gt/lt as bad attribute names.
-        # pylint: disable=C0103
         self.gt = None  # type: Expression
         self.lt = None  # type: Expression
         self.gte = None  # type: Expression

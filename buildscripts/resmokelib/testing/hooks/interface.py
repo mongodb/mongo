@@ -20,7 +20,7 @@ def make_hook(class_name, *args, **kwargs):
     return _HOOKS[class_name](*args, **kwargs)
 
 
-class Hook(object, metaclass=registry.make_registry_metaclass(_HOOKS)):  # pylint: disable=invalid-metaclass
+class Hook(object, metaclass=registry.make_registry_metaclass(_HOOKS)):
     """Common interface all Hooks will inherit from."""
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
@@ -62,7 +62,7 @@ class Hook(object, metaclass=registry.make_registry_metaclass(_HOOKS)):  # pylin
         pass
 
 
-class DynamicTestCase(testcase.TestCase):  # pylint: disable=abstract-method
+class DynamicTestCase(testcase.TestCase):
     """DynamicTestCase class."""
 
     def __init__(self, logger, test_name, description, base_test_name, hook):

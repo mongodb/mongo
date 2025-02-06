@@ -44,7 +44,7 @@ RESMOKELIB = "buildscripts.resmokelib"
 NS = "buildscripts.burn_in_tests"
 
 
-def ns(relative_name):  # pylint: disable=invalid-name
+def ns(relative_name):
     """Return a full name from a name relative to the test module"s name space."""
     return NS + "." + relative_name
 

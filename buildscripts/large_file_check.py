@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Check files in git diff to ensure they are within a given size limit."""
 
-# pylint: disable=wrong-import-position
-
 import argparse
 import fnmatch
 import logging

@@ -44,7 +44,7 @@ def storable_dict_from_historic(to_storable):
         return to_storable
 
 
-class Historic(ABC, metaclass=registry.make_registry_metaclass(_HISTORICS, type(ABC))):  # pylint: disable=invalid-metaclass
+class Historic(ABC, metaclass=registry.make_registry_metaclass(_HISTORICS, type(ABC))):
     """ABC for classes that have trackable historic state."""
 
     def __init__(self):
@@ -99,7 +99,7 @@ class Historic(ABC, metaclass=registry.make_registry_metaclass(_HISTORICS, type(
         """
         return
 
-    def accept_write(self, key):  # pylint: disable=unused-argument
+    def accept_write(self, key):
         """
         Update state based on a subscriber's write.
 
@@ -123,7 +123,7 @@ class Subscriber:
 ALLOWED_TYPES = (bool, int, float, str, type(None), Historic)
 
 
-class HistoryDict(MutableMapping, Historic):  # pylint: disable=too-many-ancestors
+class HistoryDict(MutableMapping, Historic):
     """
     Dict-like class that tracks history.
 
@@ -210,7 +210,7 @@ class HistoryDict(MutableMapping, Historic):  # pylint: disable=too-many-ancesto
 
     def write_equals(self, other_dict):
         """Compare two dicts for write equality."""
-        if not len(other_dict._value_store) == len(self._value_store):  # pylint: disable=protected-access
+        if not len(other_dict._value_store) == len(self._value_store):
             return False
 
         for key in self._value_store:
@@ -221,7 +221,7 @@ class HistoryDict(MutableMapping, Historic):  # pylint: disable=too-many-ancesto
             ]
             their_writes = [
                 access.value_written
-                for access in other_dict._history_store[key]  # pylint: disable=protected-access
+                for access in other_dict._history_store[key]
                 if access.type == AccessType.WRITE
             ]
             if not our_writes == their_writes:
@@ -262,8 +262,8 @@ class HistoryDict(MutableMapping, Historic):  # pylint: disable=too-many-ancesto
         Don't record writes here.
         """
         history_dict = HistoryDict()
-        history_dict._global_time = self._global_time  # pylint: disable=protected-access
-        history_dict._history_store = copy.deepcopy(self._history_store)  # pylint: disable=protected-access
+        history_dict._global_time = self._global_time
+        history_dict._history_store = copy.deepcopy(self._history_store)
         for key, value in self.items():
             history_dict[key] = make_historic(value)
         return history_dict

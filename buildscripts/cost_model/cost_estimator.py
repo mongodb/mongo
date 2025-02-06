@@ -58,7 +58,6 @@ class CostModelParameters:
 class LinearModel:
     """Calibrated Linear Model and its metrics."""
 
-    # pylint: disable=invalid-name
     intercept: float
     coef: list[float]
     mse: float  # Mean Squared Error
@@ -67,7 +66,6 @@ class LinearModel:
     corrcoef: any  # Correlation Coefficients
 
 
-# pylint: disable=invalid-name
 def estimate(
     fit, X: np.ndarray, y: np.ndarray, test_size: float, trace: bool = False
 ) -> LinearModel:

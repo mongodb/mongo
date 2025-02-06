@@ -14,12 +14,9 @@ from evergreen.api import EvergreenApi, RetryingEvergreenApi
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# pylint: disable=wrong-import-position
 from buildscripts.util.cmdutils import enable_logging
 from buildscripts.util.fileops import read_yaml_file
 from buildscripts.util.taskname import remove_gen_suffix
-
-# pylint: enable=wrong-import-position
 
 LOGGER = structlog.getLogger(__name__)
 
@@ -141,4 +138,4 @@ def main(expansion_file: str, evergreen_config: str, verbose: bool) -> None:
 
 
 if __name__ == "__main__":
-    main()  # pylint: disable=no-value-for-parameter
+    main()

@@ -177,7 +177,7 @@ class HangAnalyzer(Subcommand):
                         except dumper.DumpError as err:
                             self.root_logger.error(err.message)
                             dump_pids = {**err.dump_pids, **dump_pids}
-                        except Exception as err:  # pylint: disable=broad-except
+                        except Exception as err:
                             self.root_logger.info(
                                 "Error encountered when invoking debugger %s", err
                             )
@@ -201,7 +201,7 @@ class HangAnalyzer(Subcommand):
         for pinfo in [pinfo for pinfo in processes if not re.match("^(java|python)", pinfo.name)]:
             try:
                 dumpers.dbg.dump_info(pinfo, take_dump=False)
-            except Exception as err:  # pylint: disable=broad-except
+            except Exception as err:
                 self.root_logger.info("Error encountered when invoking debugger %s", err)
                 trapped_exceptions.append(traceback.format_exc())
 
@@ -212,7 +212,7 @@ class HangAnalyzer(Subcommand):
                     dumpers.jstack.dump_info(
                         self.root_logger, self.options.debugger_output, pinfo.name, pid
                     )
-                except Exception as err:  # pylint: disable=broad-except
+                except Exception as err:
                     self.root_logger.info("Error encountered when invoking debugger %s", err)
                     trapped_exceptions.append(traceback.format_exc())
 

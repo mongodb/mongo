@@ -126,7 +126,7 @@ def prune_cache(cache_path, cache_size_gb, clean_ratio):
             to_remove = cache_item.path + ".del"
             try:
                 os.rename(cache_item.path, to_remove)
-            except Exception as err:  # pylint: disable=broad-except
+            except Exception as err:
                 # another process may have already cleared the file.
                 LOGGER.warning("Unable to rename %s : %s", cache_item, err)
             else:
@@ -136,7 +136,7 @@ def prune_cache(cache_path, cache_size_gb, clean_ratio):
                     else:
                         os.remove(to_remove)
                     total_size -= cache_item.size
-                except Exception as err:  # pylint: disable=broad-except
+                except Exception as err:
                     # this should not happen, but who knows?
                     LOGGER.error(
                         "error [%s, %s] removing file '%s', " "please report this error",

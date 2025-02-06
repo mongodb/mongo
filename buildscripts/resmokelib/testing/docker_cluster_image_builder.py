@@ -15,11 +15,11 @@ from buildscripts.util.expansions import get_expansion
 def build_images(suite_name, fixture_instance):
     """Build images needed to run the resmoke suite against docker containers."""
     image_builder = DockerComposeImageBuilder(suite_name, fixture_instance)
-    if "config" in config.DOCKER_COMPOSE_BUILD_IMAGES:  # pylint: disable=unsupported-membership-test
+    if "config" in config.DOCKER_COMPOSE_BUILD_IMAGES:
         image_builder.build_config_image()
-    if "mongo-binaries" in config.DOCKER_COMPOSE_BUILD_IMAGES:  # pylint: disable=unsupported-membership-test
+    if "mongo-binaries" in config.DOCKER_COMPOSE_BUILD_IMAGES:
         image_builder.build_mongo_binaries_image()
-    if "workload" in config.DOCKER_COMPOSE_BUILD_IMAGES:  # pylint: disable=unsupported-membership-test
+    if "workload" in config.DOCKER_COMPOSE_BUILD_IMAGES:
         image_builder.build_workload_image()
     if config.DOCKER_COMPOSE_BUILD_IMAGES:
         repro_command = f"""

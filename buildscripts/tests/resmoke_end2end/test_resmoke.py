@@ -46,7 +46,7 @@ class _ResmokeSelftest(unittest.TestCase):
         rmtree(self.test_dir, ignore_errors=True)
         os.makedirs(self.test_dir, mode=0o755, exist_ok=True)
 
-    def execute_resmoke(self, resmoke_args, **kwargs):  # pylint: disable=unused-argument
+    def execute_resmoke(self, resmoke_args, **kwargs):
         resmoke_process = core.programs.make_process(
             self.logger,
             [sys.executable, "buildscripts/resmoke.py"] + self.resmoke_const_args + resmoke_args,
@@ -256,7 +256,7 @@ class TestTestSelection(_ResmokeSelftest):
         with open(self.report_file) as fd:
             return json.load(fd)
 
-    def execute_resmoke(self, resmoke_args):  # pylint: disable=arguments-differ
+    def execute_resmoke(self, resmoke_args):
         resmoke_process = core.programs.make_process(
             self.logger, [sys.executable, "buildscripts/resmoke.py", "run"] + resmoke_args
         )

@@ -31,7 +31,7 @@ def suffix(suf):
     be set at runtime for the duration of the import, which is why this
     contextmanager + global runtime variable is used.
     """
-    global GLOBAL_SUFFIX  # pylint: disable=global-statement
+    global GLOBAL_SUFFIX
     GLOBAL_SUFFIX = suf
     with SUFFIX_LOCK:
         yield suf
@@ -49,7 +49,7 @@ def make_registry_metaclass(registry_store, base_metaclass=None):
     class Registry(base_metaclass):
         """A metaclass that stores a reference to all registered classes."""
 
-        def __new__(mcs, class_name, base_classes, class_dict):  # pylint: disable=bad-classmethod-argument
+        def __new__(mcs, class_name, base_classes, class_dict):
             """Create and returns a new instance of Registry.
 
             The registry is a class named 'class_name' derived from 'base_classes'

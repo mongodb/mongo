@@ -33,11 +33,8 @@ import structlog
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
 
-# pylint: disable=wrong-import-position
 from buildscripts.linter import git, parallel
 from buildscripts.linter.filediff import gather_changed_files_for_lint
-
-# pylint: enable=wrong-import-position
 
 ##############################################################################
 #

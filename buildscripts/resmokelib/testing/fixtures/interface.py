@@ -37,7 +37,7 @@ _VERSIONS = {}  # type: ignore
 # interface.py and fixturelib API establishes forward-compatibility of fixture files.
 # If the informal API becomes heavily used and needs forward-compatibility,
 # consider adding it to the formal API.
-class APIVersion(object, metaclass=registry.make_registry_metaclass(_VERSIONS)):  # pylint: disable=invalid-metaclass
+class APIVersion(object, metaclass=registry.make_registry_metaclass(_VERSIONS)):
     """Class storing fixture API version info."""
 
     REGISTERED_NAME = "APIVersion"
@@ -74,7 +74,7 @@ class TeardownMode(Enum):
     ABORT = 6
 
 
-class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  # pylint: disable=invalid-metaclass
+class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):
     """Base class for all fixtures."""
 
     # Error response codes copied from mongo/base/error_codes.yml.

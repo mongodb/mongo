@@ -644,8 +644,6 @@ def _parse_struct(ctxt, spec, name, node):
         },
     )
 
-    # PyLint has difficulty with some iterables: https://github.com/PyCQA/pylint/issues/3105
-    # pylint: disable=not-an-iterable
     if (
         struct.generate_comparison_operators
         and struct.fields

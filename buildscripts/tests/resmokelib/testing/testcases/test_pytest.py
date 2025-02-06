@@ -8,8 +8,6 @@ from buildscripts.resmokelib.testing.testcases import pytest
 
 _IS_WINDOWS = sys.platform == "win32"
 
-# pylint: disable=protected-access
-
 
 def get_filename(filename):
     if _IS_WINDOWS:

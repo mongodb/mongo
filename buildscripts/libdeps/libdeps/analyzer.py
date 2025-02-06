@@ -73,9 +73,6 @@ def get_class_that_defined_method(meth):
     return getattr(meth, "__objclass__", None)  # handle special descriptor objects
 
 
-# newer pylints contain the fix: https://github.com/PyCQA/pylint/pull/2926/commits/35e1c61026eab90af504806ef9da6241b096e659
-# signature-mutators=buildscripts.libdeps.graph_analyzer.schema_check
-# pylint: disable=no-value-for-parameter
 def parametrized(dec):
     """Allow parameters passed to the decorator."""
 

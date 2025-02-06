@@ -85,7 +85,7 @@ def __lldb_init_module(debugger, *_args):
 #############################
 
 
-def StatusPrinter(valobj, *_args):  # pylint: disable=invalid-name
+def StatusPrinter(valobj, *_args):
     """Pretty-Prints MongoDB Status objects."""
     err = valobj.GetChildMemberWithName("_error")
     px = err.GetChildMemberWithName("px")
@@ -96,7 +96,7 @@ def StatusPrinter(valobj, *_args):  # pylint: disable=invalid-name
     return "Status({}, {})".format(code, reason)
 
 
-def StatusWithPrinter(valobj, *_args):  # pylint: disable=invalid-name
+def StatusWithPrinter(valobj, *_args):
     """Extend the StatusPrinter to print the value of With for a StatusWith."""
     status = valobj.GetChildMemberWithName("_status")
     code = (
@@ -111,7 +111,7 @@ def StatusWithPrinter(valobj, *_args):  # pylint: disable=invalid-name
     return rep.replace("Status", "StatusWith", 1)
 
 
-def StringDataPrinter(valobj, *_args):  # pylint: disable=invalid-name
+def StringDataPrinter(valobj, *_args):
     """Print StringData value."""
     ptr = valobj.GetChildMemberWithName("_data").GetValueAsUnsigned()
     if ptr == 0:
@@ -130,7 +130,7 @@ def read_memory_as_hex(process, address, size):
     return "0x" + ba.hex(" ", 1)
 
 
-def ConstDataRangePrinter(valobj, *_args):  # pylint: disable=invalid-name
+def ConstDataRangePrinter(valobj, *_args):
     """Pretty-Prints MongoDB Status objects."""
     begin_value = valobj.GetChildMemberWithName("_begin")
     begin = begin_value.GetValueAsUnsigned()
@@ -152,7 +152,7 @@ def ConstDataRangePrinter(valobj, *_args):  # pylint: disable=invalid-name
     return "size=%d,v=%s" % (size, value)
 
 
-def BSONObjPrinter(valobj, *_args):  # pylint: disable=invalid-name
+def BSONObjPrinter(valobj, *_args):
     """Print a BSONObj in a JSON format."""
     ptr = valobj.GetChildMemberWithName("_objdata").GetValueAsUnsigned()
 
@@ -176,7 +176,7 @@ def BSONObjPrinter(valobj, *_args):  # pylint: disable=invalid-name
     return obj
 
 
-def BSONElementPrinter(valobj, *_args):  # pylint: disable=invalid-name
+def BSONElementPrinter(valobj, *_args):
     """Print a BSONElement in a JSON format."""
     ptr = valobj.GetChildMemberWithName("data").GetValueAsUnsigned()
     size = valobj.GetChildMemberWithName("totalSize").GetValueAsUnsigned()
@@ -187,12 +187,12 @@ def BSONElementPrinter(valobj, *_args):  # pylint: disable=invalid-name
     mem = bytes(memoryview(valobj.GetProcess().ReadMemory(ptr, size, lldb.SBError())))
 
     # Call an internal bson method to directly convert an BSON element to a string
-    el_tuple = bson._element_to_dict(mem, memoryview(mem), 0, len(mem), DEFAULT_CODEC_OPTIONS)  # pylint: disable=protected-access
+    el_tuple = bson._element_to_dict(mem, memoryview(mem), 0, len(mem), DEFAULT_CODEC_OPTIONS)
 
     return '"%s": %s' % (el_tuple[0], el_tuple[1])
 
 
-def Date_tPrinter(valobj, *_args):  # pylint: disable=invalid-name
+def Date_tPrinter(valobj, *_args):
     """Print a Date_t in a string format."""
     millis = valobj.GetChildMemberWithName("millis").GetValueAsUnsigned()
 
@@ -207,7 +207,7 @@ def Date_tPrinter(valobj, *_args):  # pylint: disable=invalid-name
     return dt.isoformat()
 
 
-def UUIDPrinter(valobj, *_args):  # pylint: disable=invalid-name
+def UUIDPrinter(valobj, *_args):
     """Print the UUID's hex string value."""
     char_array = valobj.GetChildMemberWithName("_uuid").GetChildAtIndex(0)
     raw_bytes = [x.GetValueAsUnsigned() for x in char_array]
@@ -215,7 +215,7 @@ def UUIDPrinter(valobj, *_args):  # pylint: disable=invalid-name
     return str(uuid.UUID("".join(uuid_hex_bytes)))
 
 
-def Decimal128Printer(valobj, *_args):  # pylint: disable=invalid-name
+def Decimal128Printer(valobj, *_args):
     """Print the Decimal128's string value."""
     value = valobj.GetChildMemberWithName("_value")
     low64 = value.GetChildMemberWithName("low64").GetValueAsUnsigned()
@@ -325,7 +325,7 @@ def optional_sb_value_to_string(sb_value):
     return desc
 
 
-def OptionalSummaryPrinter(valobj, *_args):  # pylint: disable=invalid-name
+def OptionalSummaryPrinter(valobj, *_args):
     """Pretty-Prints boost::optional objects."""
     # This is displayed in vscode variables windows
     # The input is from OptionalPrinter
@@ -388,7 +388,7 @@ class AbslHashSetPrinter:
             self.data_type = resolve_type_to_base(
                 self.valobj.GetChildMemberWithName("slots_").GetType()
             ).GetPointerType()
-        except:  # pylint: disable=bare-except
+        except:
             print("Exception: " + str(sys.exc_info()))
 
 

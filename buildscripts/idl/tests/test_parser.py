@@ -2131,7 +2131,6 @@ class TestParser(testcase.IDLTestcase):
             idl.errors.ERROR_ID_EMPTY_ACCESS_CHECK,
         )
 
-    # pylint: disable=invalid-name
     def test_struct_unsafe_dangerous_disable_extra_field_duplicate_checks_negative(self):
         # Test commands and unsafe_dangerous_disable_extra_field_duplicate_checks are disallowed
         self.assert_parse_fail(

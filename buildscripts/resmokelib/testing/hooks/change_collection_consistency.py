@@ -10,12 +10,10 @@ class CheckReplChangeCollectionConsistency(jsfile.PerClusterDataConsistencyHook)
 
     IS_BACKGROUND = False
 
-    def __init__(  # pylint: disable=super-init-not-called
-        self, hook_logger, fixture, shell_options=None
-    ):
+    def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize CheckReplChangeCollectionConsistency."""
         description = "Check change_collection(s) of all replica set members"
         js_filename = os.path.join("jstests", "hooks", "run_check_repl_change_collection.js")
-        jsfile.JSHook.__init__(  # pylint: disable=non-parent-init-called
+        jsfile.JSHook.__init__(
             self, hook_logger, fixture, js_filename, description, shell_options=shell_options
         )

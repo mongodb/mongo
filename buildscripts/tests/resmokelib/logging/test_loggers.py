@@ -6,8 +6,6 @@ from unittest.mock import MagicMock
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib.logging import loggers
 
-# pylint: disable=protected-access
-
 
 class TestLoggers(unittest.TestCase):
     """Unit tests for the resmoke loggers."""

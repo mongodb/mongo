@@ -82,7 +82,7 @@ class _ChangeStreamsThread(threading.Thread):
             while stream.alive and not self._stop_iterating.is_set():
                 try:
                     change = stream.try_next()
-                except Exception as err:  # pylint: disable=broad-except
+                except Exception as err:
                     self.logger.error(
                         "Failed to get the next change from the change stream: %s", err
                     )

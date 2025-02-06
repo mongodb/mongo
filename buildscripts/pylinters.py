@@ -13,10 +13,7 @@ mongo_dir = os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__f
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(mongo_dir)
 
-# pylint: disable=wrong-import-position
 from buildscripts.linter import ruffchecker, ruffformatter, runner
-
-# pylint: enable=wrong-import-position
 
 # List of supported linters
 _LINTERS = [

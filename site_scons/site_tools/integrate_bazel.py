@@ -405,7 +405,7 @@ def bazel_server_timeout_dumper(jvm_out, proc_pid, project_root):
                     target="#devprod-build-automation",
                     msg=error_msg,
                 )
-            except Exception:  # pylint: disable=broad-except
+            except Exception:
                 traceback.print_exc()
 
 

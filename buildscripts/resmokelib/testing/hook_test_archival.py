@@ -23,7 +23,7 @@ TRACER = trace.get_tracer("resmoke")
 class HookTestArchival(object):
     """Archive hooks and tests to S3."""
 
-    def __init__(self, suite: Suite, hooks, archive_instance, archive_config):  # pylint: disable=unused-argument
+    def __init__(self, suite: Suite, hooks, archive_instance, archive_config):
         """Initialize HookTestArchival."""
         self.archive_instance = archive_instance
         archive_config = utils.default_if_none(archive_config, {})

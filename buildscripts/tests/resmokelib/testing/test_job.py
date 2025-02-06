@@ -13,8 +13,6 @@ from buildscripts.resmokelib.testing.fixtures import interface as _fixtures
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 from buildscripts.resmokelib.utils import queue as _queue
 
-# pylint: disable=protected-access
-
 
 class TestJob(unittest.TestCase):
     TESTS = ["jstests/core/and.js", "jstests/core/or.js"]

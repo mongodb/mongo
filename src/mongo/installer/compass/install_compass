@@ -376,7 +376,7 @@ def download_and_install_compass():
     except FileDownloadError as error:
         LOG.exception(error)
         is_successful = False
-    except Exception as error:  # pylint: disable=broad-except
+    except Exception as error:
         LOG.error('Unexpected error when downloading: %s', error.message)
         is_successful = False
 
@@ -390,7 +390,7 @@ def download_and_install_compass():
         except InstallationError  as error:
             LOG.exception(error)
             is_successful = False
-        except Exception as error:  # pylint: disable=broad-except
+        except Exception as error:
             LOG.error('Unexpected error when installing: %s', error.message)
             is_successful = False
 

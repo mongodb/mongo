@@ -77,8 +77,6 @@ if sys.platform == "win32":
 class Process(object):
     """Wrapper around subprocess.Popen class."""
 
-    # pylint: disable=protected-access
-
     def __init__(self, logger, args, env=None, env_vars=None, cwd=None):
         """Initialize the process with the specified logger, arguments, and environment."""
 

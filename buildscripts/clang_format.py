@@ -8,8 +8,6 @@
 5. Supports validating and updating a set of files to the right coding style.
 """
 
-# pylint: disable=wrong-import-position
-
 import difflib
 import glob
 import logging

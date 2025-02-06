@@ -40,7 +40,6 @@ import yaml
 # Permit imports from "buildscripts".
 sys.path.append(os.path.normpath(os.path.join(os.path.abspath(__file__), "../../..")))
 
-# pylint: disable=wrong-import-position
 from buildscripts.idl import lib
 from buildscripts.idl.idl import parser
 

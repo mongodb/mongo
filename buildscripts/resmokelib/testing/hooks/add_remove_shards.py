@@ -271,7 +271,7 @@ class _AddRemoveShardThread(threading.Thread):
                 if self.__lifecycle.poll_for_idle_request():
                     self.__lifecycle.send_idle_acknowledgement()
 
-        except Exception:  # pylint: disable=W0703
+        except Exception:
             # Proactively log the exception when it happens so it will be
             # flushed immediately.
             self.logger.exception("Add/Remove Shard Thread threw exception")

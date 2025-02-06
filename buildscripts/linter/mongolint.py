@@ -277,7 +277,7 @@ def main():
             print('File "{}" failed with {} errors.'.format(args.file, error_count))
             return 1
         return 0
-    except Exception as ex:  # pylint: disable=broad-except
+    except Exception as ex:
         print('Exception while checking file "{}": {}'.format(args.file, ex))
         return 2
 

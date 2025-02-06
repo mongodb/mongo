@@ -18,7 +18,6 @@ import requests
 # register parent directory in sys.path, so 'buildscripts' is detected no matter where the script is called from
 sys.path.append(str(pathlib.Path(os.path.join(os.getcwd(), __file__)).parent.parent))
 
-# pylint: disable=wrong-import-position
 from buildscripts.build_system_options import PathOptions
 from buildscripts.resmokelib.setup_multiversion.setup_multiversion import (
     SetupMultiversion,

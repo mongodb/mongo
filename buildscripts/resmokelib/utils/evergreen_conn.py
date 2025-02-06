@@ -71,7 +71,7 @@ def get_evergreen_api(evergreen_config=None):
         try:
             return RetryingEvergreenApi.get_api(config_file=config)
         #
-        except Exception as ex:  # pylint: disable=broad-except
+        except Exception as ex:
             last_ex = ex
             continue
 
@@ -106,7 +106,6 @@ def get_buildvariant_name(
     return buildvariant_name
 
 
-# pylint: disable=protected-access
 def get_patch_module_diffs(evg_api: RetryingEvergreenApi, version_id):
     """Get the raw git diffs for all modules."""
     evg_url = evg_api._create_url(f"/patches/{version_id}")

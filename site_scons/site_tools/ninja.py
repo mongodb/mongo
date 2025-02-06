@@ -327,7 +327,6 @@ class SConsToNinjaTranslator:
         elif isinstance(action, SCons.Action.FunctionAction):
             build = self.handle_func_action(node, action)
         elif isinstance(action, SCons.Action.LazyAction):
-            # pylint: disable=protected-access
             action = action._generate_cache(env)
             build = self.action_to_ninja_build(node, action=action)
         elif isinstance(action, SCons.Action.ListAction):
@@ -1340,7 +1339,6 @@ def get_command(env, node, action):
 
     # Generate a real CommandAction
     if isinstance(action, SCons.Action.CommandGeneratorAction):
-        # pylint: disable=protected-access
         action = action._generate(tlist, slist, sub_env, 0, executor=executor)
 
     variables = {}
@@ -1452,7 +1450,6 @@ def ninja_builder(env, target, source):
     return 0
 
 
-# pylint: disable=too-few-public-methods
 class AlwaysExecAction(SCons.Action.FunctionAction):
     """Override FunctionAction.__call__ to always execute."""
 

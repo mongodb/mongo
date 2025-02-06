@@ -33,7 +33,7 @@ class CleanEveryN(interface.Hook):
             )
             n = 1
 
-        self.n = n  # pylint: disable=invalid-name
+        self.n = n
         self.tests_run = 0
         self.shell_options = shell_options
         self.skip_database_deletion = skip_database_deletion

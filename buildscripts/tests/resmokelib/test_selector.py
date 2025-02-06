@@ -196,7 +196,7 @@ class MockTestFileExplorer(object):
     def jstest_tags(self, file_path):
         return self.tags.get(file_path, [])
 
-    def read_root_file(self, root_file_path):  # pylint: disable=unused-argument
+    def read_root_file(self, root_file_path):
         return ["build/testA", "build/testB"]
 
     def fnmatchcase(self, name, pattern):
@@ -205,10 +205,10 @@ class MockTestFileExplorer(object):
     def isfile(self, path):
         return path in self.files
 
-    def list_dbtests(self, binary):  # pylint: disable=unused-argument
+    def list_dbtests(self, binary):
         return ["dbtestA", "dbtestB", "dbtestC"]
 
-    def parse_tag_files(self, test_kind, tag_files=None, tagged_tests=None):  # pylint: disable=unused-argument
+    def parse_tag_files(self, test_kind, tag_files=None, tagged_tests=None):
         if test_kind == "js_test":
             return self.jstest_tag_file
         return None

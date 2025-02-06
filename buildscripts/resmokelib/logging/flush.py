@@ -15,7 +15,7 @@ _FLUSH_THREAD: "_FlushThread" = None
 def start_thread():
     """Start the flush thread."""
 
-    global _FLUSH_THREAD  # pylint: disable=global-statement
+    global _FLUSH_THREAD
     with _FLUSH_THREAD_LOCK:
         if _FLUSH_THREAD is not None:
             raise ValueError("FlushThread has already been started")

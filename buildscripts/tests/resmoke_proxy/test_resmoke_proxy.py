@@ -5,8 +5,6 @@ from unittest.mock import MagicMock
 
 from buildscripts.resmoke_proxy import resmoke_proxy as under_test
 
-# pylint: disable=protected-access
-
 
 class TestResmokeProxy(unittest.TestCase):
     def test_list_tests_can_handle_strings_and_lists(self):

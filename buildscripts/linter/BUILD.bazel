@@ -10,13 +10,10 @@ py_library(
         "mongolint.py",
         "mypy.py",
         "parallel.py",
-        "pydocstyle.py",
-        "pylint.py",
         "pyrightlinter.py",
         "ruffchecker.py",
         "ruffformatter.py",
         "runner.py",
-        "yapf.py",
     ],
     visibility = ["//visibility:public"],
     deps = [

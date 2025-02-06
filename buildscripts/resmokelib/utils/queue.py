@@ -19,7 +19,7 @@ T = TypeVar("T")
 class Queue(_queue.Queue, Generic[T]):
     """A multi-producer, multi-consumer queue."""
 
-    def join(self, timeout=None):  # pylint: disable=arguments-differ
+    def join(self, timeout=None):
         """Wait until all items in the queue have been processed or 'timeout' seconds have passed.
 
         The count of unfinished tasks is incremented whenever an item is added

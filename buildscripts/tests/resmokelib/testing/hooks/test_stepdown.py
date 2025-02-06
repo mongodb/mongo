@@ -9,8 +9,6 @@ from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interface
 from buildscripts.resmokelib.testing.hooks import stepdown as _stepdown
 
-# pylint: disable=protected-access
-
 
 class TestStepdownThread(unittest.TestCase):
     @mock.patch("buildscripts.resmokelib.testing.fixtures.replicaset.ReplicaSetFixture")

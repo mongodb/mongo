@@ -27,7 +27,7 @@ def __lldb_init_module(debugger, *_args):
 #######################
 
 
-def PrintGlobalServiceContext(debugger, *_args):  # pylint: disable=invalid-name
+def PrintGlobalServiceContext(debugger, *_args):
     """Provide the mongodb-service-context command.
 
     Emulates the same convenience command available in GDB
@@ -36,12 +36,12 @@ def PrintGlobalServiceContext(debugger, *_args):  # pylint: disable=invalid-name
     debugger.HandleCommand("print *globalServiceContext")
 
 
-def MongoDBDumpLocks(debugger, *_args):  # pylint: disable=invalid-name
+def MongoDBDumpLocks(debugger, *_args):
     """Dump locks in the mongod process."""
     debugger.HandleCommand("call mongo::dumpLockManager()")
 
 
-def BreakpointOnAssert(debugger, command, _exec_ctx, _result, _internal_dict):  # pylint: disable=invalid-name
+def BreakpointOnAssert(debugger, command, _exec_ctx, _result, _internal_dict):
     """Set a breakpoint on MongoDB uassert that throws the specified error code."""
 
     arg_strs = shlex.split(command)
@@ -56,7 +56,7 @@ def BreakpointOnAssert(debugger, command, _exec_ctx, _result, _internal_dict):  
     )
 
 
-def MongoDBFindBreakpoint(debugger, _command, exec_ctx, _result, _internal_dict):  # pylint: disable=invalid-name
+def MongoDBFindBreakpoint(debugger, _command, exec_ctx, _result, _internal_dict):
     """Find the thread that triggered a breakpoint from 'debugger.cpp'."""
 
     process = exec_ctx.process
@@ -80,7 +80,7 @@ def MongoDBFindBreakpoint(debugger, _command, exec_ctx, _result, _internal_dict)
     debugger.HandleCommand("thread select %d" % (thread_num))
 
 
-def DumpGSC(_debugger, _command, exec_ctx, _result, _internal_dict):  # pylint: disable=invalid-name
+def DumpGSC(_debugger, _command, exec_ctx, _result, _internal_dict):
     """Dump the global service context as a hash table."""
 
     gsc_list = exec_ctx.target.FindGlobalVariables("globalServiceContext", 1)

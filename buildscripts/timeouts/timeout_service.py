@@ -168,7 +168,7 @@ class TimeoutService:
                 "Found historic runtime information", evg_stats=evg_stats.historic_test_results
             )
             return evg_stats
-        except Exception as err:  # pylint: disable=broad-except
+        except Exception as err:
             # If we have any trouble getting the historic runtime information, log the issue, but
             # don't fall back to default timeouts instead of failing.
             LOGGER.warning("Error querying history runtime information from evergreen: %s", err)

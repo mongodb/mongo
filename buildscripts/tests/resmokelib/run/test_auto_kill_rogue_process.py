@@ -1,6 +1,5 @@
 """Unit tests for buildscripts/resmokelib/run/list_tags.py."""
 
-# pylint: disable=protected-access
 import logging
 import os
 import sys

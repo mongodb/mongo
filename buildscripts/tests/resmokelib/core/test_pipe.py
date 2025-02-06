@@ -10,8 +10,6 @@ import mock
 
 from buildscripts.resmokelib.core import pipe as _pipe
 
-# pylint: disable=protected-access
-
 
 class TestLoggerPipe(unittest.TestCase):
     LOG_LEVEL = logging.DEBUG

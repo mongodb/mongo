@@ -29,7 +29,7 @@ __all__ = (
     "discover_module_directories",
     "configure_modules",
     "register_module_test",
-)  # pylint: disable=undefined-all-variable
+)
 
 import imp
 import inspect

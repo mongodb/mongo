@@ -126,4 +126,4 @@ def main(resmoke_report_file: str, project_id: str, build_variant: str, task_nam
 
 
 if __name__ == "__main__":
-    main()  # pylint: disable=no-value-for-parameter
+    main()

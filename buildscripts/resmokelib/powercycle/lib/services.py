@@ -36,7 +36,6 @@ if _IS_WINDOWS:
     _try_import("win32serviceutil")
 
 
-# pylint: disable=undefined-variable,unused-variable
 class WindowsService(object):
     """Windows service control class."""
 
@@ -184,7 +183,6 @@ class WindowsService(object):
         return self.pids
 
 
-# pylint: enable=undefined-variable,unused-variable
 class PosixService(object):
     """Service control on POSIX systems.
 
@@ -222,7 +220,7 @@ class PosixService(object):
             self.pids = proc.get_pids()
         return ret, output
 
-    def stop(self, timeout):  # pylint: disable=unused-argument
+    def stop(self, timeout):
         """Crash the posix process process. Empty "pids" to signal to `status` the process was terminated. Returns (code, output) tuple."""
         proc = ProcessControl(name=self.bin_name)
         proc.kill()

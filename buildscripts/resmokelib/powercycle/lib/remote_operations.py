@@ -138,7 +138,6 @@ class RemoteOperations(object):
         """
         return message.startswith("ssh:")
 
-    # pylint: disable=inconsistent-return-statements
     def operation(
         self, operation_type, operation_param, operation_dir=None, retry=False, retry_count=5
     ):

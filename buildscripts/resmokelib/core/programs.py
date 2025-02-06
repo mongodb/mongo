@@ -48,7 +48,6 @@ def get_path_env_var(env_vars):
 def get_binary_version(executable):
     """Return the string for the binary version of the given executable."""
 
-    # pylint: disable=wrong-import-position
     from buildscripts.resmokelib.multiversionconstants import LATEST_FCV
 
     split_executable = os.path.basename(executable).split("-")

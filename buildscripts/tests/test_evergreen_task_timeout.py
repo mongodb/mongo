@@ -8,8 +8,6 @@ import buildscripts.evergreen_task_timeout as under_test
 from buildscripts.ciconfig.evergreen import EvergreenProjectConfig
 from buildscripts.timeouts.timeout_service import TimeoutService
 
-# pylint: disable=invalid-name
-
 
 class TestTimeoutOverride(unittest.TestCase):
     def test_exec_timeout_should_be_settable(self):

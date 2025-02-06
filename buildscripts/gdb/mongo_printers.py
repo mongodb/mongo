@@ -14,7 +14,7 @@ ROOT_PATH = str(Path(os.path.abspath(__file__)).parent.parent.parent)
 if ROOT_PATH not in sys.path:
     sys.path.insert(0, ROOT_PATH)
 from src.third_party.immer.dist.tools.gdb_pretty_printers.printers import (
-    ListIter as ImmerListIter,  # pylint: disable=wrong-import-position
+    ListIter as ImmerListIter,
 )
 
 if not gdb:
@@ -907,7 +907,7 @@ class WtUpdateToBsonPrinter(object):
         memory = gdb.selected_inferior().read_memory(self.ptr, self.size).tobytes()
         bsonobj = None
         try:
-            bsonobj = next(bson.decode_iter(memory))  # pylint: disable=stop-iteration-return
+            bsonobj = next(bson.decode_iter(memory))
         except bson.errors.InvalidBSON:
             return
 

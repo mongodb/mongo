@@ -586,7 +586,7 @@ class _Selector(object):
         return tests, excluded
 
     @staticmethod
-    def get_tags(test_file):  # pylint: disable=unused-argument
+    def get_tags(test_file):
         """Retrieve the tags associated with the give test file."""
         return []
 

@@ -115,7 +115,7 @@ def exit_handler():
             with open(REPORT_JSON_FILE, "w") as jstream:
                 json.dump(REPORT_JSON, jstream)
             LOGGER.debug("Exit handler: report file contents %s", REPORT_JSON)
-        except:  # pylint: disable=bare-except
+        except:
             pass
 
     if EXIT_YML_FILE:
@@ -124,21 +124,21 @@ def exit_handler():
             with open(EXIT_YML_FILE, "w") as yaml_stream:
                 yaml.safe_dump(EXIT_YML, yaml_stream)
             LOGGER.debug("Exit handler: report file contents %s", EXIT_YML)
-        except:  # pylint: disable=bare-except
+        except:
             pass
 
     LOGGER.debug("Exit handler: Killing processes")
     try:
         Processes.kill_all()
         LOGGER.debug("Exit handler: Killing processes finished")
-    except:  # pylint: disable=bare-except
+    except:
         pass
 
     LOGGER.debug("Exit handler: Cleaning up temporary files")
     try:
         NamedTempFile.delete_all()
         LOGGER.debug("Exit handler: Cleaning up temporary files finished")
-    except:  # pylint: disable=bare-except
+    except:
         pass
 
 
@@ -192,7 +192,7 @@ def register_signal_handler(handler):
         signal.signal(signal_num, handler)
 
 
-def dump_stacks_and_exit(signum, frame):  # pylint: disable=unused-argument
+def dump_stacks_and_exit(signum, frame):
     """Provide a handler that will dump the stacks of all threads."""
     LOGGER.info("Dumping stacks!")
 
@@ -282,9 +282,7 @@ def abs_path(path):
 def symlink_dir(source_dir, dest_dir):
     """Symlink the 'dest_dir' to 'source_dir'."""
     if _IS_WINDOWS:
-        win32file.CreateSymbolicLink(  # pylint: disable=undefined-variable
-            dest_dir, source_dir, win32file.SYMBOLIC_LINK_FLAG_DIRECTORY
-        )  # pylint: disable=undefined-variable
+        win32file.CreateSymbolicLink(dest_dir, source_dir, win32file.SYMBOLIC_LINK_FLAG_DIRECTORY)
     else:
         os.symlink(source_dir, dest_dir)
 
@@ -480,14 +478,12 @@ def chmod_w_file(chmod_file):
         # The os package cannot set the directory to '+w', so we use win32security.
         # See https://stackoverflow.com/
         #       questions/12168110/setting-folder-permissions-in-windows-using-python
-        # pylint: disable=undefined-variable,unused-variable
         user, domain, sec_type = win32security.LookupAccountName("", "Everyone")
         file_sd = win32security.GetFileSecurity(chmod_file, win32security.DACL_SECURITY_INFORMATION)
         dacl = file_sd.GetSecurityDescriptorDacl()
         dacl.AddAccessAllowedAce(win32security.ACL_REVISION, ntsecuritycon.FILE_GENERIC_WRITE, user)
         file_sd.SetSecurityDescriptorDacl(1, dacl, 0)
         win32security.SetFileSecurity(chmod_file, win32security.DACL_SECURITY_INFORMATION, file_sd)
-        # pylint: enable=undefined-variable,unused-variable
     else:
         os.chmod(chmod_file, os.stat(chmod_file) | stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH)
 
@@ -1372,13 +1368,11 @@ def get_remote_python():
 def main(parser_actions, options):
     """Execute Main program."""
 
-    # pylint: disable=global-statement
     global REPORT_JSON
     global REPORT_JSON_FILE
     global REPORT_JSON_SUCCESS
     global EXIT_YML_FILE
     global EXIT_YML
-    # pylint: enable=global-statement
 
     atexit.register(exit_handler)
     register_signal_handler(dump_stacks_and_exit)

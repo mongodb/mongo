@@ -36,12 +36,12 @@ from tenacity import Retrying, retry_if_result, stop_after_delay, wait_fixed
 
 sys.path.append(str(Path(os.getcwd(), __file__).parent.parent))
 
-from buildscripts.build_system_options import PathOptions  # pylint: disable=wrong-import-position
+from buildscripts.build_system_options import PathOptions
 from buildscripts.util.oauth import (
     Configs,
     get_client_cred_oauth_credentials,
     get_oauth_credentials,
-)  # pylint: disable=wrong-import-position
+)
 
 SYMBOLIZER_PATH_ENV = "MONGOSYMB_SYMBOLIZER_PATH"
 # since older versions may have issues with symbolizing, we are setting the toolchain version to v4
@@ -98,7 +98,7 @@ class S3BuildidDbgFileResolver(DbgFileResolver):
         if not os.path.exists(build_id_path):
             try:
                 self._get_from_s3(build_id)
-            except Exception:  # noqa pylint: disable=broad-except
+            except Exception:
                 ex = sys.exc_info()[0]
                 sys.stderr.write(
                     "Failed to find debug symbols for {} in s3: {}\n".format(build_id, ex)
@@ -399,7 +399,7 @@ class PathResolver(DbgFileResolver):
                 else:
                     data = response.json().get("data", {})
                     path, binary_name = data.get("debug_symbols_url"), data.get("file_name")
-            except Exception as err:  # noqa pylint: disable=broad-except
+            except Exception as err:
                 sys.stderr.write(
                     f"Error occurred while trying to get response from server "
                     f"for buildId({build_id}): {err}\n"
@@ -421,7 +421,7 @@ class PathResolver(DbgFileResolver):
             else:
                 print("Downloaded, now unpacking...")
                 path = self.unpack(dl_path)
-        except Exception as err:  # noqa pylint: disable=broad-except
+        except Exception as err:
             sys.stderr.write(f"Failed to download & unpack file: {err}\n")
         # we may have '<name>.debug', '<name>.so' or just executable binary file which may not have file 'extension'.
         # if file has extension, it is good. if not, we should append .debug, because those without extension are
@@ -630,7 +630,7 @@ def preprocess_frames_with_retries(
     return retrying(preprocess_frames, dbg_path_resolver, trace_doc, input_format)
 
 
-def classic_output(frames, outfile, **kwargs):  # pylint: disable=unused-argument
+def classic_output(frames, outfile, **kwargs):
     """Provide classic output."""
     for frame in frames:
         symbinfo = frame.get("symbinfo")

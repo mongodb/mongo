@@ -41,7 +41,7 @@ class LinterBase(object, metaclass=ABCMeta):
         """
         Check if we need to diff the output of this linter with the original file.
 
-        This applies to tools like clang-format and yapf which do not have a notion of linting. We
+        This applies to tools like clang-format which do not have a notion of linting. We
         introduce the idea of linting by formatting a file with the tool to standard out and
         comparing it to the original.
         """

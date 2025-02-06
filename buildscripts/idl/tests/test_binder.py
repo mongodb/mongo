@@ -3563,7 +3563,6 @@ class TestBinder(testcase.IDLTestcase):
             idl.errors.ERROR_ID_CANNOT_DECLARE_SHAPE_LITERAL,
         )
 
-    # pylint: disable=invalid-name
     def test_struct_unsafe_dangerous_disable_extra_field_duplicate_checks_negative(self):
         # type: () -> None
         """Negative struct tests for unsafe_dangerous_disable_extra_field_duplicate_checks."""

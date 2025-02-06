@@ -4,8 +4,6 @@ import unittest
 
 from buildscripts.timeouts import timeout as under_test
 
-# pylint: disable=invalid-name
-
 
 class CalculateTimeoutTest(unittest.TestCase):
     def test_min_timeout(self):

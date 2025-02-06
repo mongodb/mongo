@@ -6,8 +6,6 @@ from packaging.version import Version
 
 import buildscripts.resmokelib.multiversion.multiversion_service as under_test
 
-# pylint: disable=invalid-name
-
 
 class TestTagStr(TestCase):
     def test_require_fcv_tag_should_be_returned(self):

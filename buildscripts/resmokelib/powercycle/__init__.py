@@ -244,7 +244,7 @@ MongoDB Powercycle Tests. To run a powercycle test locally, use the following st
 
         parser.add_argument("remote_operations", nargs="*", help=argparse.SUPPRESS)
 
-        self.parser_actions = parser._actions[1:-1]  # pylint: disable=protected-access
+        self.parser_actions = parser._actions[1:-1]
 
     def parse(self, subcommand, parser, parsed_args, should_configure_otel=True, **kwargs):
         """Parse command-line options."""

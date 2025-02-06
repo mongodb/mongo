@@ -10,7 +10,6 @@ from typing import List, Tuple
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
 
-# pylint: disable=wrong-import-position
 from buildscripts.linter.filediff import gather_changed_files_with_lines
 
 LEGACY_TYPES = [

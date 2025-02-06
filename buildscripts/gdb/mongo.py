@@ -95,7 +95,7 @@ def load_libstdcxx_printers(progspace):
         stdcxx_printer_toolchain_paths[progspace] = detect_toolchain(progspace)
         try:
             sys.path.insert(0, stdcxx_printer_toolchain_paths[progspace])
-            global stdlib_printers  # pylint: disable=invalid-name,global-variable-not-assigned
+            global stdlib_printers
             from libstdcxx.v6 import printers as stdlib_printers
             from libstdcxx.v6 import register_libstdcxx_printers
 
@@ -184,7 +184,7 @@ def lookup_type(gdb_type_str: str) -> gdb.Type:
     case or at least it doesn't search all global blocks, sometimes it required
     to get the global block based off the current frame.
     """
-    global MAIN_GLOBAL_BLOCK  # pylint: disable=global-statement
+    global MAIN_GLOBAL_BLOCK
 
     exceptions = []
     try:
@@ -383,7 +383,7 @@ class DumpGlobalServiceContext(gdb.Command):
         """Initialize DumpGlobalServiceContext."""
         RegisterMongoCommand.register(self, "mongodb-service-context", gdb.COMMAND_DATA)
 
-    def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
+    def invoke(self, arg, _from_tty):
         """Invoke GDB command to print the Global Service Context."""
         gdb.execute("print *('mongo::(anonymous namespace)::globalServiceContext')")
 
@@ -575,7 +575,7 @@ class MongoDBDumpLocks(gdb.Command):
         """Initialize MongoDBDumpLocks."""
         RegisterMongoCommand.register(self, "mongodb-dump-locks", gdb.COMMAND_DATA)
 
-    def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
+    def invoke(self, arg, _from_tty):
         """Invoke MongoDBDumpLocks."""
         print("Running Hang Analyzer Supplement - MongoDBDumpLocks")
 
@@ -723,7 +723,7 @@ class MongoDBDumpStorageEngineInfo(gdb.Command):
         """Initialize MongoDBDumpStorageEngineInfo."""
         RegisterMongoCommand.register(self, "mongodb-dump-storage-engine-info", gdb.COMMAND_DATA)
 
-    def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
+    def invoke(self, arg, _from_tty):
         """Invoke MongoDBDumpStorageEngineInfo."""
         print("Running Hang Analyzer Supplement - MongoDBDumpStorageEngineInfo")
 
@@ -760,7 +760,7 @@ class BtIfActive(gdb.Command):
         """Initialize BtIfActive."""
         RegisterMongoCommand.register(self, "mongodb-bt-if-active", gdb.COMMAND_DATA)
 
-    def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
+    def invoke(self, arg, _from_tty):
         """Invoke GDB to print stack trace."""
         try:
             idle_location = gdb.parse_and_eval("mongo::for_debuggers::idleThreadLocation")
@@ -881,7 +881,7 @@ class MongoDBJavaScriptStack(gdb.Command):
         """Initialize MongoDBJavaScriptStack."""
         RegisterMongoCommand.register(self, "mongodb-javascript-stack", gdb.COMMAND_STATUS)
 
-    def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
+    def invoke(self, arg, _from_tty):
         """Invoke GDB to dump JS stacks."""
         print("Running Print JavaScript Stack Supplement")
 
@@ -992,7 +992,7 @@ class MongoDBPPrintBsonAtPointer(gdb.Command):
             print("Usage: mongodb-pprint-bson <ptr> <optional length>")
             return
 
-        ptr = eval(args[0])  # pylint: disable=eval-used
+        ptr = eval(args[0])
         size = 20 * 1024
         if len(args) >= 2:
             size = int(args[1])
@@ -1016,7 +1016,7 @@ class MongoDBHelp(gdb.Command):
         """Initialize MongoDBHelp."""
         gdb.Command.__init__(self, "mongodb-help", gdb.COMMAND_SUPPORT)
 
-    def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
+    def invoke(self, arg, _from_tty):
         """Register the mongo print commands."""
         RegisterMongoCommand.print_commands()
 

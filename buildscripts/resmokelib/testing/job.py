@@ -110,7 +110,7 @@ class Job(object):
                     "Received a StopExecution exception when setting up the fixture: %s.", err
                 )
                 setup_succeeded = False
-            except:  # pylint: disable=bare-except
+            except:
                 # Something unexpected happened when setting up the fixture. We don't attempt to run
                 # any tests.
                 self.logger.exception("Encountered an error when setting up the fixture.")
@@ -127,7 +127,7 @@ class Job(object):
                 # Stop running tests immediately.
                 self.logger.error("Received a StopExecution exception: %s.", err)
                 self._interrupt_all_jobs(queue, interrupt_flag)
-            except:  # pylint: disable=bare-except
+            except:
                 # Unknown error, stop execution.
                 self.logger.exception("Encountered an error during test execution.")
                 self._interrupt_all_jobs(queue, interrupt_flag)
@@ -144,7 +144,7 @@ class Job(object):
                     "Received a StopExecution exception when tearing down the fixture: %s.", err
                 )
                 teardown_succeeded = False
-            except:  # pylint: disable=bare-except
+            except:
                 # Something unexpected happened when tearing down the fixture. We indicate back to
                 # the executor thread that teardown has failed. This may mean resmoke.py is exiting
                 # without having terminated all of the child processes it spawned.

@@ -31,7 +31,7 @@ _NAMED_SUITES = None
 
 def get_named_suites() -> List[SuiteName]:
     """Return a list of the suites names."""
-    global _NAMED_SUITES  # pylint: disable=global-statement
+    global _NAMED_SUITES
 
     if _NAMED_SUITES is None:
         # Skip "with_*server" and "no_server" because they do not define any test files to run.

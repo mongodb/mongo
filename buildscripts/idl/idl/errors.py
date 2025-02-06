@@ -559,7 +559,7 @@ class ParserContext(object):
             % (name),
         )
 
-    def add_not_custom_scalar_serialization_not_supported_error(  # pylint: disable=invalid-name
+    def add_not_custom_scalar_serialization_not_supported_error(
         self, location, ast_type, ast_parent, bson_type_name
     ):
         # type: (common.SourceLocation, str, str, str) -> None
@@ -859,7 +859,7 @@ class ParserContext(object):
             ("Command '%s' cannot have the same name as a field.") % (command_name),
         )
 
-    def add_bad_field_non_const_getter_in_immutable_struct_error(  # pylint: disable=invalid-name
+    def add_bad_field_non_const_getter_in_immutable_struct_error(
         self, location, struct_name, field_name
     ):
         # type: (common.SourceLocation, str, str) -> None

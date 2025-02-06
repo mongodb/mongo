@@ -102,9 +102,9 @@ def _main(expansions_file: str, defaults_file: str):
         for key, value in expansions.items():
             print(f"{_clean_key(key)}={quote(value)}; ", end="")
 
-    except Exception as ex:  # pylint: disable=broad-except
+    except Exception as ex:
         _error(ex)
 
 
 if __name__ == "__main__":
-    _main()  # pylint: disable=no-value-for-parameter
+    _main()

@@ -14,7 +14,6 @@ import sys
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# pylint: disable=wrong-import-position
 from buildscripts.resmokelib import selector
 from buildscripts.resmokelib.multiversionconstants import REQUIRES_FCV_TAG_LATEST
 from buildscripts.resmokelib.utils import jscomment

@@ -12,7 +12,7 @@ from click.testing import CliRunner
 import buildscripts.simple_report
 
 
-def ns(name):  # pylint: disable=invalid-name
+def ns(name):
     return f"buildscripts.simple_report.{name}"
 
 
@@ -32,7 +32,7 @@ class TestSimpleReport(unittest.TestCase):
         """Run test 100x with randomly generated error codes."""
         print(f"TestSimpleReport.test_trivial_report seed: {self.seed}")
         for _ in range(0, 100):
-            self._test_trivial_report()  # pylint: disable=no-value-for-parameter
+            self._test_trivial_report()
 
     @patch(ns("try_combine_reports"))
     @patch(ns("_clean_log_file"))

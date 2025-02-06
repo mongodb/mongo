@@ -22,7 +22,7 @@ if _IS_WINDOWS:
 def register(logger, suites, start_time):
     """Register an event object to wait for signal, or a signal handler for SIGUSR1."""
 
-    def _handle_sigusr1(signum, frame):  # pylint: disable=unused-argument
+    def _handle_sigusr1(signum, frame):
         """Signal handler for SIGUSR1.
 
         The handler will dump the stacks of all threads and write out the report file and
@@ -110,7 +110,7 @@ def _dump_stacks(logger, header_msg):
     sb = []
     sb.append(header_msg)
 
-    frames = sys._current_frames()  # pylint: disable=protected-access
+    frames = sys._current_frames()
     sb.append("Total threads: %d" % (len(frames)))
     sb.append("")
 

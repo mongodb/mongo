@@ -178,7 +178,7 @@ def _try_find_log_file(store: Optional[str], test_name) -> str:
         with open(os.path.join(store, test_name, "jepsen.log")) as fh:
             return fh.read()
 
-    except Exception:  # pylint: disable=broad-except
+    except Exception:
         return ""
 
 
@@ -312,4 +312,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main()  # pylint: disable=no-value-for-parameter
+    main()

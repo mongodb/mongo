@@ -60,7 +60,7 @@ class LoadDebugFile(gdb.Command):
         try:
             section_map = parse_sections()
             load_sym_file_at_addrs(dbg_file, section_map)
-        except Exception as err:  # pylint: disable=broad-except
+        except Exception as err:
             print(err)
 
 
@@ -247,7 +247,7 @@ class LoadDistTest(gdb.Command):
                 if (idx + 1) % 50 == 0 or len(dwarf_files) == idx + 1:
                     print(f"{idx+1}/{len(dwarf_files)} symbol files loaded")
 
-        except Exception as err:  # pylint: disable=broad-except
+        except Exception as err:
             print(err)
 
         if self._is_udb:

@@ -18,7 +18,6 @@ from buildscripts.resmokelib.powercycle.lib.remote_operations import RemoteOpera
 LOGGER = logging.getLogger(__name__)
 
 
-# pylint: disable=abstract-method
 class PowercycleCommand(Subcommand):
     """Base class for remote operations to set up powercycle."""
 

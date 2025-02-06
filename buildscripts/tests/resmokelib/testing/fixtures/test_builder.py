@@ -1,6 +1,5 @@
 """Unit tests for the resmokelib.testing.fixtures._builder module."""
 
-# pylint: disable=protected-access,invalid-name
 import unittest
 from unittest.mock import MagicMock
 

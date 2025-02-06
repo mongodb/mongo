@@ -1,5 +1,3 @@
-# pylint: disable=C0111
-
 import unittest
 
 from buildscripts.resmokelib.core.programs import _format_shell_vars

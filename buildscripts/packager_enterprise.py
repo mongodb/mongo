@@ -40,7 +40,7 @@ import git
 
 sys.path.append(os.getcwd())
 
-import packager  # pylint: disable=wrong-import-position
+import packager
 
 # The MongoDB names for the architectures we support.
 ARCH_CHOICES = ["x86_64", "ppc64le", "s390x", "arm64", "aarch64"]

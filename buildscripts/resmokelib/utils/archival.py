@@ -87,7 +87,7 @@ def remove_file(file_name):
         os.remove(file_name)
         status = 0
         message = "Successfully deleted file {}".format(file_name)
-    except Exception as err:  # pylint: disable=broad-except
+    except Exception as err:
         status = 1
         message = "Error deleting file {}: {}".format(file_name, err)
     return status, message
@@ -260,7 +260,7 @@ class Archival(object):
                     upload_args.s3_bucket,
                     upload_args.s3_path,
                 )
-            except Exception as err:  # pylint: disable=broad-except
+            except Exception as err:
                 logger.exception("Upload to S3 error %s", err)
 
             if upload_args.delete_file:

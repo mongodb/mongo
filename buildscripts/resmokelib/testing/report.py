@@ -1,4 +1,3 @@
-# pylint: disable=invalid-name
 """Extension to the unittest.TestResult.
 
 This is used to support additional test status and timing information for the report.json file.
@@ -16,7 +15,6 @@ from buildscripts.resmokelib.testing.symbolizer_service import ResmokeSymbolizer
 from buildscripts.resmokelib.testing.testcases.interface import TestCase
 
 
-# pylint: disable=attribute-defined-outside-init
 class TestReport(unittest.TestResult):
     """Record test status and timing information."""
 
@@ -63,7 +61,7 @@ class TestReport(unittest.TestResult):
                     f"reports must be a list of TestReport instances, current report is {type(report)}"
                 )
 
-            with report._lock:  # pylint: disable=protected-access
+            with report._lock:
                 for test_info in report.test_infos:
                     # If the user triggers a KeyboardInterrupt exception while a test is running,
                     # then it is possible for 'test_info' to be modified by a job thread later on.

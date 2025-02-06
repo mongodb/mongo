@@ -14,8 +14,6 @@ import unittest
 
 from buildscripts.resmokelib.powercycle.lib import remote_operations as rop
 
-# pylint: disable=invalid-name
-
 
 class RemoteOperationsTestCase(unittest.TestCase):
     def setUp(self):

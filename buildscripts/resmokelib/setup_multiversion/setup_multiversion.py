@@ -461,7 +461,7 @@ class SetupMultiversion(Subcommand):
 
                 try:
                     try_download(url)
-                except Exception as err:  # pylint: disable=broad-except
+                except Exception as err:
                     self.logger.warning(
                         "Setting up tarball failed with error, retrying once... error=%s", err
                     )

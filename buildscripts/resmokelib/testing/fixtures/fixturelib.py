@@ -149,7 +149,6 @@ class _FixtureConfig(object):
             LAST_LTS_MONGOS_BINARY,
         )
 
-        # pylint: disable=invalid-name
         self.MONGOD_EXECUTABLE = config.MONGOD_EXECUTABLE
         self.DEFAULT_MONGOD_EXECUTABLE = config.DEFAULT_MONGOD_EXECUTABLE
         self.MONGOD_SET_PARAMETERS = config.MONGOD_SET_PARAMETERS

@@ -39,7 +39,7 @@ class BGJob(threading.Thread):
                     if interrupted:
                         self._hook.logger.info("interrupted")
                         break
-            except Exception as err:  # pylint: disable=broad-except
+            except Exception as err:
                 self._hook.logger.error("Background thread caught exception: %s.", err)
                 self.err = err
                 self.__is_alive = False

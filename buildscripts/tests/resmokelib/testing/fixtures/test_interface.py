@@ -43,7 +43,7 @@ class TestFixtureTeardownHandler(unittest.TestCase):
         self.assertEqual(expected_msg, handler.get_error_message())
 
 
-class UnitTestFixture(interface.Fixture):  # pylint: disable=abstract-method
+class UnitTestFixture(interface.Fixture):
     ERROR_MESSAGE = "Failed"
 
     def __init__(self, should_raise=False):

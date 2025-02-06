@@ -1,8 +1,6 @@
 # This script needs to be compatible with odler versions of python since it runs on older versions of OSs when testing packaging
 # For example ubuntu 1604 uses python3.5
 
-# pylint: disable=redefined-outer-name,invalid-name,subprocess-run-check
-
 import grp
 import json
 import logging

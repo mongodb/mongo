@@ -417,7 +417,7 @@ def get_clang_includes() -> List[str]:
     The query reliably gets the include dirs that would be used in normal compiles. We cache and reuse the result
     so the subprocess only runs once.
     """
-    global CLANG_INCLUDES  # pylint: disable=global-statement
+    global CLANG_INCLUDES
     if CLANG_INCLUDES is None:
         clang_includes = subprocess.getoutput(
             f"{TOOLCHAIN_DIR}/clang++ -Wp,-v -x c++ - -fsyntax-only < /dev/null 2>&1 | sed -e '/^#include <...>/,/^End of search/{{ //!b }};d'"
@@ -904,7 +904,7 @@ def run_iwyu(cmd_entry: CompileCommand) -> Tuple[ResultType, CompileCommand]:
 
 def main() -> None:
     """Main function."""
-    global IWYU_ANALYSIS_STATE, SHUTDOWN_FLAG  # pylint: disable=global-statement
+    global IWYU_ANALYSIS_STATE, SHUTDOWN_FLAG
     atexit.register(write_iwyu_data)
 
     with concurrent.futures.ThreadPoolExecutor(

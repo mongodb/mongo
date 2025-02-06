@@ -43,7 +43,7 @@ class BackgroundInitialSync(interface.Hook):
         description = "Background Initial Sync"
         interface.Hook.__init__(self, hook_logger, fixture, description)
 
-        self.n = n  # pylint: disable=invalid-name
+        self.n = n
         self.tests_run = 0
         self.random_restarts = 0
         self._shell_options = shell_options
@@ -203,7 +203,7 @@ class IntermediateInitialSync(interface.Hook):
         description = "Intermediate Initial Sync"
         interface.Hook.__init__(self, hook_logger, fixture, description)
 
-        self.n = n  # pylint: disable=invalid-name
+        self.n = n
         self.tests_run = 0
 
     def _should_run_after_test(self):

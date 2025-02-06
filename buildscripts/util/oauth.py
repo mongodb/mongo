@@ -39,8 +39,6 @@ AUTH_HANDLER_RESPONSE = """\
 class Configs:
     """Collect configurations necessary for authentication process."""
 
-    # pylint: disable=invalid-name
-
     AUTH_DOMAIN = "corp.mongodb.com/oauth2/aus4k4jv00hWjNnps297"
     CLIENT_ID = "0oa5zf9ps4N3JKWIJ297"
     REDIRECT_PORT = 8989
@@ -136,8 +134,6 @@ class _RedirectServer(HTTPServer):
 class _Handler(BaseHTTPRequestHandler):
     """Request handler class to use when trying to get OAuth credentials."""
 
-    # pylint: disable=invalid-name
-
     server: _RedirectServer
 
     def _set_response(self) -> None:
@@ -146,7 +142,7 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-type", "text/html")
         self.end_headers()
 
-    def log_message(self, log_format: Any, *args: Any) -> None:  # pylint: disable=unused-argument,arguments-differ
+    def log_message(self, log_format: Any, *args: Any) -> None:
         """
         Log HTTP Server internal messages.
 

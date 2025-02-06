@@ -107,4 +107,4 @@ def main(test_name: str, log_file: pathlib.Path, exit_code: int, dedup_lines: bo
 
 
 if __name__ == "__main__":
-    main()  # pylint: disable=no-value-for-parameter
+    main()

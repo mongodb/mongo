@@ -76,10 +76,13 @@ class TestTask(unittest.TestCase):
         task_dict = {
             "name": "compile",
             "depends_on": [],
-            "commands": [{"func": "fetch source"}, {"func": "run a task that passes"},
-                         {"func": "run a function with an arg", "vars": {"foobar": "TESTING: ONE"}},
-                         {"func": "run a function with an arg", "vars": {"foobar": "TESTING: TWO"}}]
-        }  # yapf: disable
+            "commands": [
+                {"func": "fetch source"},
+                {"func": "run a task that passes"},
+                {"func": "run a function with an arg", "vars": {"foobar": "TESTING: ONE"}},
+                {"func": "run a function with an arg", "vars": {"foobar": "TESTING: TWO"}},
+            ],
+        }
         task = _evergreen.Task(task_dict)
 
         self.assertEqual("compile", task.name)
@@ -281,11 +284,8 @@ class TestTask(unittest.TestCase):
     def test_tags_with_no_tags(self):
         task_dict = {
             "name": "jsCore",
-            "commands": [{
-                "func": "run tests",
-                "vars": {"resmoke_args": "--suites=core"}
-            }]
-        }  # yapf: disable
+            "commands": [{"func": "run tests", "vars": {"resmoke_args": "--suites=core"}}],
+        }
         task = _evergreen.Task(task_dict)
 
         self.assertEqual(0, len(task.tags))
@@ -294,11 +294,8 @@ class TestTask(unittest.TestCase):
         task_dict = {
             "name": "jsCore",
             "tags": ["tag 0", "tag 1", "tag 2"],
-            "commands": [{
-                "func": "run tests",
-                "vars": {"resmoke_args": "--suites=core"}
-            }]
-        }  # yapf: disable
+            "commands": [{"func": "run tests", "vars": {"resmoke_args": "--suites=core"}}],
+        }
         task = _evergreen.Task(task_dict)
 
         tag_set = task.tags
@@ -397,7 +394,7 @@ class TestTask(unittest.TestCase):
         task = _evergreen.Task(task_dict)
 
         with self.assertRaises(TypeError):
-            task.generated_task_name  # pylint: disable=pointless-statement
+            task.generated_task_name
 
     def test_generate_task_name(self):
         task_name = "jsCore_gen"

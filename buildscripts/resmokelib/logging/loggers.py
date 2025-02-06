@@ -74,11 +74,11 @@ def configure_loggers():
     """Configure the loggers and setup redirects."""
     _setup_redirects()
 
-    global ROOT_TESTS_LOGGER  # pylint: disable=global-statement
+    global ROOT_TESTS_LOGGER
     ROOT_TESTS_LOGGER = new_root_logger(TESTS_LOGGER_NAME)
-    global ROOT_FIXTURE_LOGGER  # pylint: disable=global-statement
+    global ROOT_FIXTURE_LOGGER
     ROOT_FIXTURE_LOGGER = new_root_logger(FIXTURE_LOGGER_NAME)
-    global ROOT_EXECUTOR_LOGGER  # pylint: disable=global-statement
+    global ROOT_EXECUTOR_LOGGER
     ROOT_EXECUTOR_LOGGER = new_root_logger(EXECUTOR_LOGGER_NAME)
 
     _write_evergreen_log_spec()

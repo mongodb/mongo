@@ -13,7 +13,7 @@ from buildscripts.resmokelib.utils.sharded_cluster_util import (
 )
 
 
-class FixtureTestCase(interface.TestCase):  # pylint: disable=abstract-method
+class FixtureTestCase(interface.TestCase):
     """Base class for the fixture test cases."""
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED

@@ -11,11 +11,8 @@ from pathlib import Path
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
 
-# pylint: disable=wrong-import-position
 from buildscripts import simple_report
 from buildscripts.linter.filediff import gather_changed_files_for_lint
-
-# pylint: enable=wrong-import-position
 
 
 def is_js_file(filename: str) -> bool:

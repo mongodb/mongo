@@ -39,10 +39,7 @@ import yaml
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# pylint: disable=wrong-import-position
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
-
-# pylint: enable=wrong-import-position
 
 # Name of map to search for in the variables map in evergreen.yml
 MONGOCRYPTD_VARIANTS = "mongocryptd_variants"

@@ -167,7 +167,7 @@ class JSTestCaseBuilder(interface.TestCaseFactory):
 
     def make_process(self) -> "process.Process":
         # This function should only be called by MultiClientsTestCase's _make_process().
-        return self.test_case_template._make_process()  # pylint: disable=protected-access
+        return self.test_case_template._make_process()
 
     def create_test_case(self, logger: logging.Logger, shell_options: dict) -> _SingleJSTestCase:
         test_case = _SingleJSTestCase(
@@ -200,7 +200,7 @@ class MultiClientsTestCase(interface.TestCase):
             """Run the jstest."""
             try:
                 threading.Thread.run(self)
-            except:  # pylint: disable=bare-except
+            except:
                 self.exc_info = sys.exc_info()
 
     def __init__(
@@ -218,7 +218,7 @@ class MultiClientsTestCase(interface.TestCase):
         self.use_tenant_client = False
         self._factory = factory
 
-    def configure(  # pylint: disable=arguments-differ,keyword-arg-before-vararg
+    def configure(
         self,
         fixture: "interface.Fixture",
         num_clients: int = DEFAULT_CLIENT_NUM,
@@ -234,7 +234,7 @@ class MultiClientsTestCase(interface.TestCase):
 
     def _make_process(self):
         # This function should only be called by interface.py's as_command().
-        return self._factory.make_process()  # pylint: disable=protected-access
+        return self._factory.make_process()
 
     def _run_single_copy(self):
         tenant_id = str(ObjectId()) if self.use_tenant_client else None
@@ -311,7 +311,7 @@ class MultiClientsTestCase(interface.TestCase):
                 f"Mongo shell exited with code {return_code} while running jstest {self.basename()}."
                 " Further test execution may be unsafe."
             )
-            raise self.propagate_error  # pylint: disable=raising-bad-type
+            raise self.propagate_error
 
 
 class JSTestCase(MultiClientsTestCase):

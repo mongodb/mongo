@@ -7,10 +7,8 @@ import mock
 
 from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interface
 
-# pylint: disable=protected-access
 
-
-def _get_threading_lock(test_case, MockCondition):  # pylint: disable=invalid-name
+def _get_threading_lock(test_case, MockCondition):
     # There doesn't seem to be a better way to get the arguments that were passed in to the
     # constructor. We need to call release() on the threading.Lock in order for other methods on the
     # lifecycle object to be able to acquire() it.
@@ -33,7 +31,7 @@ class TestFlagBasedThreadLifecycle(unittest.TestCase):
         self.assertTrue(lifecycle.wait_for_action_permitted())
 
     @mock.patch("threading.Condition")
-    def test_waiting_for_action_permitted_is_interruptible(self, MockCondition):  # pylint: disable=invalid-name
+    def test_waiting_for_action_permitted_is_interruptible(self, MockCondition):
         lifecycle = lifecycle_interface.FlagBasedThreadLifecycle()
         lifecycle.mark_test_started()
         lifecycle.mark_test_finished()
@@ -95,11 +93,11 @@ class TestFileBasedThreadLifecycle(unittest.TestCase):
 
     @mock.patch("threading.Condition")
     @mock.patch("os.path")
-    def test_thread_waits_until_permitted_file_exists(self, mock_os_path, MockCondition):  # pylint: disable=invalid-name
+    def test_thread_waits_until_permitted_file_exists(self, mock_os_path, MockCondition):
         lifecycle = lifecycle_interface.FileBasedThreadLifecycle(self.ACTION_FILES)
         lifecycle.mark_test_started()
 
-        def mock_does_permitted_file_exists(filename):  # pylint: disable=inconsistent-return-statements
+        def mock_does_permitted_file_exists(filename):
             if filename == "permitted":
                 return permitted_file_exists
 
@@ -120,7 +118,7 @@ class TestFileBasedThreadLifecycle(unittest.TestCase):
 
     @mock.patch("threading.Condition")
     @mock.patch("os.path")
-    def test_waiting_for_action_permitted_is_interruptible(self, mock_os_path, MockCondition):  # pylint: disable=invalid-name
+    def test_waiting_for_action_permitted_is_interruptible(self, mock_os_path, MockCondition):
         lifecycle = lifecycle_interface.FileBasedThreadLifecycle(self.ACTION_FILES)
         lifecycle.mark_test_started()
 

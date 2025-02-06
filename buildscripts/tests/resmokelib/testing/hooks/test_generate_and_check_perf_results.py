@@ -9,8 +9,6 @@ from typing import Dict, List
 import mock
 
 import buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results as cbr
-
-# pylint: disable=protected-access
 from buildscripts.resmokelib.errors import CedarReportError, ServerFailure
 from buildscripts.util.cedar_report import CedarMetric
 
@@ -209,7 +207,7 @@ class GenerateAndCheckPerfResultsFixture(unittest.TestCase):
     # Mock the hook's parent class because we're testing only functionality of this hook and
     # not anything related to or inherit from the parent class.
     @mock.patch("buildscripts.resmokelib.testing.hooks.interface.Hook", autospec=True)
-    def setUp(self, MockHook):  # pylint: disable=arguments-differ,unused-argument
+    def setUp(self, MockHook):
         self.bm_threads_report = cbr._BenchmarkThreadsReport(_BM_CONTEXT)
 
         self.cbr_hook = cbr.GenerateAndCheckPerfResults(None, None)

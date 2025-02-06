@@ -11,7 +11,7 @@ from buildscripts import validate_mongocryptd as under_test
 NS = "buildscripts.validate_mongocryptd"
 
 
-def ns(relative_name):  # pylint: disable=invalid-name
+def ns(relative_name):
     """Return a full name from a name relative to the test module"s name space."""
     return NS + "." + relative_name
 

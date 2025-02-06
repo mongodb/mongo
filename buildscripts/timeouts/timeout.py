@@ -32,7 +32,7 @@ def calculate_timeout(avg_runtime: float, scaling_factor: Optional[float] = None
     def round_to_minute(runtime):
         """Round the given seconds up to the nearest minute."""
         distance_to_min = 60 - (runtime % 60)
-        return int(math.ceil(runtime + distance_to_min))  # pylint: disable=c-extension-no-member
+        return int(math.ceil(runtime + distance_to_min))
 
     return max(MIN_TIMEOUT_SECONDS, round_to_minute(avg_runtime * scaling_factor))
 

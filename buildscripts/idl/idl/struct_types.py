@@ -97,8 +97,6 @@ class ArgumentInfo(object):
 class MethodInfo(object):
     """Class that encapslates information about a method and how to declare, define, and call it."""
 
-    # pylint: disable=too-many-instance-attributes
-
     def __init__(
         self,
         class_name,
@@ -111,7 +109,6 @@ class MethodInfo(object):
         desc_for_comment=None,
     ):
         # type: (str, str, List[str], str, bool, bool, bool, Optional[str]) -> None
-        # pylint: disable=too-many-arguments
         """Create a MethodInfo instance."""
         self.class_name = class_name
         self.method_name = method_name

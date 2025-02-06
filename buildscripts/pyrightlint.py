@@ -16,11 +16,8 @@ MONGO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__f
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(MONGO_DIR)
 
-# pylint: disable=wrong-import-position
 from buildscripts.linter import pyrightlinter, runner
 from buildscripts.linter.filediff import gather_changed_files_for_lint
-
-# pylint: enable=wrong-import-position
 
 
 def is_interesting_file(filename: str) -> bool:

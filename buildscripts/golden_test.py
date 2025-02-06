@@ -19,10 +19,7 @@ import click
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# pylint: disable=wrong-import-position
 from buildscripts.util.fileops import read_yaml_file
-
-# pylint: enable=wrong-import-position
 
 assert sys.version_info >= (3, 7)
 
@@ -397,7 +394,7 @@ class GoldenTestApp(object):
 def main():
     """Execute main."""
     try:
-        cli()  # pylint: disable=no-value-for-parameter
+        cli()
     except AppError as err:
         print(err)
         sys.exit(1)
