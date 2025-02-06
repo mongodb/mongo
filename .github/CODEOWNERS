@@ -264,6 +264,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/aggregation/sources/indexStats/**/* @10gen/query-execution-index-access-stats @svc-auto-approve-bot
 /jstests/aggregation/sources/indexStats/**/OWNERS.yml @10gen/query-execution-staff-leads @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/aggregation/sources/rankFusion/OWNERS.yml
+/jstests/aggregation/sources/rankFusion/**/* @10gen/query-integration-search @svc-auto-approve-bot
+/jstests/aggregation/sources/rankFusion/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/aggregation/sources/sample/OWNERS.yml
 /jstests/aggregation/sources/sample/**/* @10gen/query-execution-aggregation @10gen/query-optimization @svc-auto-approve-bot
 /jstests/aggregation/sources/sample/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
