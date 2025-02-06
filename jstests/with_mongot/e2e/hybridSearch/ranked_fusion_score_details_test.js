@@ -82,9 +82,11 @@ for (const foundDoc of results) {
     // Description of rank fusion. Wrapper on both search / vector.
     assertFieldPresent("details", details);
     const subDetails = details["details"];
-    assertFieldPresent("search", subDetails);
-    assertFieldPresent("vector", subDetails);
-    const searchDetails = subDetails["search"];
+    assert.eq(subDetails.length, 2);
+
+    const searchDetails = subDetails[0];
+    assertFieldPresent("inputPipelineName", searchDetails);
+    assert.eq(searchDetails["inputPipelineName"], "search");
     assertFieldPresent("rank", searchDetails);
     // If there isn't a value, we didn't get this back from search at all.
     if (searchDetails.hasOwnProperty("value")) {
@@ -92,13 +94,15 @@ for (const foundDoc of results) {
         assertFieldPresent("details",
                            searchDetails);  // Not checking description contents, just that its
                                             // present and not our placeholder value.
-        assert.neq(searchDetails["details"], "Not Calculated");
+        assert.neq(searchDetails["details"], []);
         // Note we won't check the shape of the search scoreDetails beyond here.
     }
 
-    const vectorDetails = subDetails["vector"];
+    const vectorDetails = subDetails[1];
+    assertFieldPresent("inputPipelineName", vectorDetails);
+    assert.eq(vectorDetails["inputPipelineName"], "vector");
     assertFieldPresent("details", vectorDetails);
-    assert.eq(vectorDetails["details"], "Not Calculated");
+    assert.eq(vectorDetails["details"], []);
     assertFieldPresent("rank", vectorDetails);
 }
 
@@ -129,19 +133,23 @@ for (const foundDoc of results) {
     // Description of rank fusion. Wrapper on both secondVector / vector.
     assertFieldPresent("details", details);
     const subDetails = details["details"];
-    assertFieldPresent("secondVector", subDetails);
-    assertFieldPresent("vector", subDetails);
-    const secondVectorDetails = subDetails["secondVector"];
+    assert.eq(subDetails.length, 2);
+
+    const secondVectorDetails = subDetails[0];
+    assertFieldPresent("inputPipelineName", secondVectorDetails);
+    assert.eq(secondVectorDetails["inputPipelineName"], "secondVector");
     assertFieldPresent("rank", secondVectorDetails);
     assertFieldPresent("value", secondVectorDetails);  // Original 'score' AKA vectorSearchScore.
     assertFieldPresent("details",
                        secondVectorDetails);  // Not checking description contents, just that its
                                               // present and not our placeholder value.
-    assert.eq(secondVectorDetails["details"], "Not Calculated");
+    assert.eq(secondVectorDetails["details"], []);
 
-    const vectorDetails = subDetails["vector"];
+    const vectorDetails = subDetails[1];
+    assertFieldPresent("inputPipelineName", vectorDetails);
+    assert.eq(vectorDetails["inputPipelineName"], "vector");
     assertFieldPresent("details", vectorDetails);
-    assert.eq(vectorDetails["details"], "Not Calculated");
+    assert.eq(vectorDetails["details"], []);
     assertFieldPresent("value", vectorDetails);  // Original 'score' AKA vectorSearchScore.
     assertFieldPresent("rank", vectorDetails);
 }
@@ -185,22 +193,25 @@ for (const foundDoc of results) {
     // Description of rank fusion. Wrapper on both search / vector.
     assertFieldPresent("details", details);
     const subDetails = details["details"];
-    assertFieldPresent("search", subDetails);
-    assertFieldPresent("vector", subDetails);
-    const searchDetails = subDetails["search"];
+    assert.eq(subDetails.length, 2);
+
+    const searchDetails = subDetails[0];
+    assertFieldPresent("inputPipelineName", searchDetails);
+    assert.eq(searchDetails["inputPipelineName"], "search");
     assertFieldPresent("rank", searchDetails);
     // If there isn't a value, we didn't get this back from search at all.
-    // if ("value" in searchDetails) {
     if (searchDetails.hasOwnProperty("value")) {
         assertFieldPresent("value", searchDetails);  // Output of rank calculation.
         assertFieldPresent("details", searchDetails);
-        assert.eq(searchDetails["details"], "Not Calculated");
+        assert.eq(searchDetails["details"], []);
         // Note we won't check the shape of the search scoreDetails beyond here.
     }
 
-    const vectorDetails = subDetails["vector"];
+    const vectorDetails = subDetails[1];
+    assertFieldPresent("inputPipelineName", vectorDetails);
+    assert.eq(vectorDetails["inputPipelineName"], "vector");
     assertFieldPresent("details", vectorDetails);
-    assert.eq(vectorDetails["details"], "Not Calculated");
+    assert.eq(vectorDetails["details"], []);
     assertFieldPresent("rank", vectorDetails);
 }
 

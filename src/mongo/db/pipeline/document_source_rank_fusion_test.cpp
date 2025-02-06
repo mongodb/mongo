@@ -2535,9 +2535,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
                                     "value": {
                                         "$meta": "score"
                                     },
-                                    "details": {
-                                        "$const": "Not Calculated"
-                                    }
+                                    "details": []
                                 }
                             ]
                         }
@@ -2585,20 +2583,19 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
                 },
                 {
                     "$addFields": {
-                        "calculatedScoreDetails": {
-                            "$mergeObjects": [
-                                {
-                                    "agatha": {
-                                        "$mergeObjects": [
-                                            {
-                                                "rank": "$agatha_rank"
-                                            },
-                                            "$agatha_scoreDetails"
-                                        ]
-                                    }
-                                }
-                            ]
-                        }
+                        "calculatedScoreDetails": [
+                            {
+                                "$mergeObjects": [
+                                    {
+                                        "inputPipelineName": {
+                                            "$const": "agatha"
+                                        },
+                                        "rank": "$agatha_rank"
+                                    },
+                                    "$agatha_scoreDetails"
+                                ]
+                            }
+                        ]
                     }
                 },
                 {
@@ -2731,9 +2728,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                                     "value": {
                                         "$meta": "score"
                                     },
-                                    "details": {
-                                        "$const": "Not Calculated"
-                                    }
+                                    "details": []
                                 }
                             ]
                         }
@@ -2809,9 +2804,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                                                 "value": {
                                                     "$meta": "score"
                                                 },
-                                                "details": {
-                                                    "$const": "Not Calculated"
-                                                }
+                                                "details": []
                                             }
                                         ]
                                     }
@@ -2886,30 +2879,30 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                 },
                 {
                     "$addFields": {
-                        "calculatedScoreDetails": {
-                            "$mergeObjects": [
-                                {
-                                    "agatha": {
-                                        "$mergeObjects": [
-                                            {
-                                                "rank": "$agatha_rank"
-                                            },
-                                            "$agatha_scoreDetails"
-                                        ]
-                                    }
-                                },
-                                {
-                                    "searchPipe": {
-                                        "$mergeObjects": [
-                                            {
-                                                "rank": "$searchPipe_rank"
-                                            },
-                                            "$searchPipe_scoreDetails"
-                                        ]
-                                    }
-                                }
-                            ]
-                        }
+                        "calculatedScoreDetails": [
+                            {
+                                "$mergeObjects": [
+                                    {
+                                        "inputPipelineName": {
+                                            "$const": "agatha"
+                                        },
+                                        "rank": "$agatha_rank"
+                                    },
+                                    "$agatha_scoreDetails"
+                                ]
+                            },
+                            {
+                                "$mergeObjects": [
+                                    {
+                                        "inputPipelineName": {
+                                            "$const": "searchPipe"
+                                        },
+                                        "rank": "$searchPipe_rank"
+                                    },
+                                    "$searchPipe_scoreDetails"
+                                ]
+                            }
+                        ]
                     }
                 },
                 {

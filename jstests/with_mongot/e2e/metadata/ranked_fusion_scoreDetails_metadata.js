@@ -81,9 +81,14 @@ function runTest({
             assert(result["scoreDetails"].hasOwnProperty("details"),
                    `scoreDetails had unexpected contents in document ${tojson(result)}`);
 
+            assert.eq(result["scoreDetails"]["details"].length,
+                      numInputPipelines,
+                      `scoreDetails had unexpected contents in document ${tojson(result)}`);
+
             for (let i = 0; i < numInputPipelines; ++i) {
-                assert(result["scoreDetails"]["details"].hasOwnProperty(`searchPipeline${i}`),
-                       `scoreDetails had unexpected contents in document ${tojson(result)}`);
+                assert.eq(result["scoreDetails"]["details"][i]["inputPipelineName"],
+                          `searchPipeline${i}`,
+                          `scoreDetails had unexpected contents in document ${tojson(result)}`);
             }
         } else {
             // TODO SERVER-99169 Throw an error instead of returning empty results.
