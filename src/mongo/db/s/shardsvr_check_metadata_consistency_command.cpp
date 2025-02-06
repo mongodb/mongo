@@ -243,46 +243,48 @@ public:
                                                       boost::none /* shardVersion */,
                                                       db.getVersion() /* databaseVersion */);
 
-                auto checkMetadataForDb = [&]() {
-                    try {
-                        hangShardCheckMetadataBeforeDDLLock.pauseWhileSet();
-                        auto backoffStrategy = std::invoke([]() {
-                            static const size_t retryCount{60};
-                            static const size_t baseWaitTimeMs{50};
-                            static const size_t maxWaitTimeMs{1000};
+                const auto dbCheckWithDeadlineIfSet = [&] {
+                    auto checkMetadataForDb = [&]() {
+                        try {
+                            hangShardCheckMetadataBeforeDDLLock.pauseWhileSet();
+                            auto backoffStrategy = std::invoke([]() {
+                                static const size_t retryCount{60};
+                                static const size_t baseWaitTimeMs{50};
+                                static const size_t maxWaitTimeMs{1000};
 
-                            return DDLLockManager::TruncatedExponentialBackoffStrategy<
-                                retryCount,
-                                baseWaitTimeMs,
-                                maxWaitTimeMs>();
-                        });
-                        DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
-                            opCtx, dbNss.dbName(), kDDLLockReason, MODE_S, backoffStrategy};
-                        tassert(9504001,
+                                return DDLLockManager::TruncatedExponentialBackoffStrategy<
+                                    retryCount,
+                                    baseWaitTimeMs,
+                                    maxWaitTimeMs>();
+                            });
+                            DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
+                                opCtx, dbNss.dbName(), kDDLLockReason, MODE_S, backoffStrategy};
+                            tassert(
+                                9504001,
                                 "Expected interrupt before tripwireShardCheckMetadataAfterDDLLock",
                                 !tripwireShardCheckMetadataAfterDDLLock.shouldFail());
 
-                        auto dbCursors = _establishCursorOnParticipants(opCtx, dbNss);
-                        cursors.insert(cursors.end(),
-                                       std::make_move_iterator(dbCursors.begin()),
-                                       std::make_move_iterator(dbCursors.end()));
-                        return Status::OK();
-                    } catch (const ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
-                        // Receiving a StaleDbVersion is because of one of these scenarios:
-                        // - A movePrimary is changing the db primary shard.
-                        // - The database is being dropped.
-                        // - This shard doesn't know about the existence of the db.
-                        LOGV2_DEBUG(8840400,
-                                    1,
-                                    "Received StaleDbVersion error while trying to run database "
-                                    "metadata checks",
-                                    logAttrs(dbNss.dbName()),
-                                    "error"_attr = redact(ex));
-                        return ex.toStatus();
-                    }
-                };
+                            auto dbCursors = _establishCursorOnParticipants(opCtx, dbNss);
+                            cursors.insert(cursors.end(),
+                                           std::make_move_iterator(dbCursors.begin()),
+                                           std::make_move_iterator(dbCursors.end()));
+                            return Status::OK();
+                        } catch (const ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
+                            // Receiving a StaleDbVersion is because of one of these scenarios:
+                            // - A movePrimary is changing the db primary shard.
+                            // - The database is being dropped.
+                            // - This shard doesn't know about the existence of the db.
+                            LOGV2_DEBUG(
+                                8840400,
+                                1,
+                                "Received StaleDbVersion error while trying to run database "
+                                "metadata checks",
+                                logAttrs(dbNss.dbName()),
+                                "error"_attr = redact(ex));
+                            return ex.toStatus();
+                        }
+                    };
 
-                const auto dbCheckStatus = [&] {
                     if (request().getDbMetadataLockMaxTimeMS().is_initialized()) {
                         const auto timeout =
                             Milliseconds(request().getDbMetadataLockMaxTimeMS().value());
@@ -291,11 +293,12 @@ public:
                     } else {
                         return checkMetadataForDb();
                     }
-                }();
+                };
 
                 bool skippedMetadataChecks = false;
-                if (!dbCheckStatus.isOK()) {
-                    auto extraInfo = dbCheckStatus.extraInfo<StaleDbRoutingVersion>();
+                auto status = dbCheckWithDeadlineIfSet();
+                if (!status.isOK()) {
+                    auto extraInfo = status.extraInfo<StaleDbRoutingVersion>();
                     if (!extraInfo || extraInfo->getVersionWanted()) {
                         // In case there is a wanted shard version means that the metadata is stale
                         // and we are going to skip the checks.
@@ -306,7 +309,7 @@ public:
                         (void)FilteringMetadataCache::get(opCtx)->onDbVersionMismatch(
                             opCtx, dbNss.dbName(), extraInfo->getVersionReceived());
 
-                        skippedMetadataChecks = !checkMetadataForDb().isOK();
+                        skippedMetadataChecks = !dbCheckWithDeadlineIfSet().isOK();
                     }
                 }
 
@@ -324,17 +327,17 @@ public:
         }
 
         Response _runDatabaseLevel(OperationContext* opCtx, const NamespaceString& nss) {
-            auto establishDBCursors = [&]() {
-                hangShardCheckMetadataBeforeDDLLock.pauseWhileSet();
-                DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
-                    opCtx, nss.dbName(), kDDLLockReason, MODE_S};
-                tassert(9504002,
-                        "Expected interrupt before tripwireShardCheckMetadataAfterDDLLock",
-                        !tripwireShardCheckMetadataAfterDDLLock.shouldFail());
-                return _establishCursorOnParticipants(opCtx, nss);
-            };
-
             auto dbCursors = [&]() {
+                auto establishDBCursors = [&]() {
+                    hangShardCheckMetadataBeforeDDLLock.pauseWhileSet();
+                    DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
+                        opCtx, nss.dbName(), kDDLLockReason, MODE_S};
+                    tassert(9504002,
+                            "Expected interrupt before tripwireShardCheckMetadataAfterDDLLock",
+                            !tripwireShardCheckMetadataAfterDDLLock.shouldFail());
+                    return _establishCursorOnParticipants(opCtx, nss);
+                };
+
                 if (request().getDbMetadataLockMaxTimeMS().is_initialized()) {
                     const auto timeout =
                         Milliseconds(request().getDbMetadataLockMaxTimeMS().value());
