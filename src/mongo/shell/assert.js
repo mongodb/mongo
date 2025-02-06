@@ -90,7 +90,7 @@ function _convertExceptionToReturnStatus(func, excMsg) {
     return safeFunc;
 }
 
-class AssertionError extends Error {
+var AssertionError = class MongoAssertionError extends Error {
     constructor(message, id, attr) {
         super(message);
         // Properties that are always present ('message' is managed by the parent class).
@@ -116,7 +116,7 @@ class AssertionError extends Error {
     tojson() {
         return this.#serialize(tojson, arguments);
     }
-}
+};
 
 assert = (function() {
     // Wrapping the helper function in an IIFE to avoid polluting the global namespace.

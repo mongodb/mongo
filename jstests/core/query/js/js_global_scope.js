@@ -25,6 +25,7 @@ const expectedGlobalVars = [
     "AggregateError",
     "Array",
     "ArrayBuffer",
+    "AssertionError",
     "BigInt",
     "BigInt64Array",
     "BigUint64Array",
