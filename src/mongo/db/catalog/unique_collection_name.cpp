@@ -40,6 +40,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/query/random_utils.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/mutex.h"
@@ -49,21 +50,10 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-namespace {
 
-stdx::mutex uniqueCollectionNameMutex;
-
-// Random number generator used to create unique collection namespaces suitable for temporary
-// collections
-PseudoRandom uniqueCollectionNamespacePseudoRandom(Date_t::now().asInt64());
-
-}  // namespace
-
-StatusWith<NamespaceString> makeUniqueCollectionName(OperationContext* opCtx,
-                                                     const DatabaseName& dbName,
-                                                     StringData collectionNameModel) {
-    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_IX));
-
+StatusWith<NamespaceString> generateRandomCollectionName(OperationContext* opCtx,
+                                                         const DatabaseName& dbName,
+                                                         StringData collectionNameModel) {
     // There must be at least one percent sign in the collection name model.
     auto numPercentSign = std::count(collectionNameModel.begin(), collectionNameModel.end(), '%');
     if (numPercentSign == 0) {
@@ -74,32 +64,45 @@ StatusWith<NamespaceString> makeUniqueCollectionName(OperationContext* opCtx,
                           << collectionNameModel << " must contain at least one percent sign.");
     }
 
-    const auto charsToChooseFrom =
+    static constexpr auto charsToChooseFrom =
         "0123456789"
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "abcdefghijklmnopqrstuvwxyz"_sd;
-    invariant((10U + 26U * 2) == charsToChooseFrom.size());
+    static constexpr auto charsetSize = charsToChooseFrom.size();
 
-    stdx::lock_guard<stdx::mutex> lk(uniqueCollectionNameMutex);
+    static_assert((10U + 26U * 2) == charsetSize);
+
+    auto& rng = random_utils::getRNG();
 
     auto replacePercentSign = [&](char c) {
         if (c != '%') {
             return c;
         }
-        auto i = uniqueCollectionNamespacePseudoRandom.nextInt32(charsToChooseFrom.size());
+        auto i = rng.nextInt32(charsetSize);
         return charsToChooseFrom[i];
     };
 
-    auto numGenerationAttempts = numPercentSign * charsToChooseFrom.size() * 100U;
-    for (decltype(numGenerationAttempts) i = 0; i < numGenerationAttempts; ++i) {
-        auto collectionName = collectionNameModel.toString();
-        std::transform(collectionName.begin(),
-                       collectionName.end(),
-                       collectionName.begin(),
-                       replacePercentSign);
+    auto collectionName = collectionNameModel.toString();
+    std::transform(
+        collectionName.begin(), collectionName.end(), collectionName.begin(), replacePercentSign);
 
-        NamespaceString nss(NamespaceStringUtil::deserialize(dbName, collectionName));
-        if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
+    return NamespaceStringUtil::deserialize(dbName, collectionName);
+}
+
+StatusWith<NamespaceString> makeUniqueCollectionName(OperationContext* opCtx,
+                                                     const DatabaseName& dbName,
+                                                     StringData collectionNameModel) {
+    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_IX));
+
+    static constexpr auto kNumGenerationAttempts = 30'000;
+    for (auto i = 0; i < kNumGenerationAttempts; ++i) {
+        auto nss = generateRandomCollectionName(opCtx, dbName, collectionNameModel);
+
+        if (!nss.isOK()) {
+            return nss;
+        }
+
+        if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss.getValue())) {
             return nss;
         }
     }
@@ -107,7 +110,7 @@ StatusWith<NamespaceString> makeUniqueCollectionName(OperationContext* opCtx,
     return Status(
         ErrorCodes::NamespaceExists,
         str::stream() << "Cannot generate collection name for temporary collection with model "
-                      << collectionNameModel << " after " << numGenerationAttempts
+                      << collectionNameModel << " after " << kNumGenerationAttempts
                       << " attempts due to namespace conflicts with existing collections.");
 }
 

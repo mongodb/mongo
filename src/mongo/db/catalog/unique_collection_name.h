@@ -53,4 +53,17 @@ StatusWith<NamespaceString> makeUniqueCollectionName(OperationContext* opCtx,
                                                      const DatabaseName& dbName,
                                                      StringData collectionNameModel);
 
+/**
+ * Generates a random collection name suitable for creating a temporary collection. Does not check
+ * for its existence in the catalog to avoid collisions.
+ *
+ * The name is based on a model that replaces each percent sign in 'collectionNameModel' by a random
+ * character in the range [0-9A-Za-z].
+ *
+ * Throws FailedToParse if 'collectionNameModel' does not contain any percent signs.
+ */
+StatusWith<NamespaceString> generateRandomCollectionName(OperationContext* opCtx,
+                                                         const DatabaseName& dbName,
+                                                         StringData collectionNameModel);
+
 }  // namespace mongo

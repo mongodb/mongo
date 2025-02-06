@@ -47,6 +47,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/local_oplog_info.h"
@@ -71,6 +72,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
@@ -234,21 +236,84 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
+namespace {
+struct ConvertToCappedAcquisitions {
+    CollectionAcquisition sourceAcquisition;
+    CollectionAcquisition tmpAcquisition;
+    boost::optional<CollectionAcquisition> targetUUIDAcquisition;
+};
+
+ConvertToCappedAcquisitions acquireLocksForConvertToCapped(
+    OperationContext* opCtx,
+    const NamespaceString& fromNs,
+    const boost::optional<UUID>& targetUUID) {
+    const auto& dbName = fromNs.dbName();
+    const auto modelName = fmt::format("tmp%%%%%.convertToCapped.{}", fromNs.coll());
+
+    // If given a targetUUID we must also acquire whatever collection with it since it's a
+    // temporary leftover collection from a failed execution and will be dropped.s
+    bool shouldFetchWithTargetUUID = targetUUID.has_value();
+    while (true) {
+        // We attempt to acquire all target collections. This may be retried if the temporary
+        // collection already exists since we want a unique collection name.
+        auto tmpName = uassertStatusOKWithContext(
+            generateRandomCollectionName(opCtx, dbName, modelName),
+            str::stream() << "Cannot generate temporary collection namespace to convert "
+                          << fromNs.toStringForErrorMsg() << " to a capped collection");
+        CollectionAcquisitionRequests requests = {
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, fromNs, AcquisitionPrerequisites::OperationType::kWrite),
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, tmpName, AcquisitionPrerequisites::OperationType::kWrite),
+        };
+        if (shouldFetchWithTargetUUID) {
+            // We also attempt to acquire any leftover collection with the specified targetUUID.
+            // That collection will be dropped as part of pre-conversion cleanup.
+            requests.push_back(CollectionAcquisitionRequest::fromOpCtx(
+                opCtx,
+                NamespaceStringOrUUID{fromNs.dbName(), *targetUUID},
+                AcquisitionPrerequisites::OperationType::kWrite));
+        }
+        try {
+            auto acquisitions = makeAcquisitionMap(acquireCollections(opCtx, requests, MODE_X));
+            bool tmpNameExists =
+                CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, tmpName);
+            if (tmpNameExists) {
+                // Retry the acquisitions as the tmpName already exists.
+                continue;
+            }
+            boost::optional<CollectionAcquisition> leftoverAcq;
+            if (shouldFetchWithTargetUUID) {
+                // We have to iterate the map since we don't know the actual name of the leftover
+                // collection.
+                const auto& tempColl =
+                    std::find_if(acquisitions.begin(), acquisitions.end(), [&](const auto& elem) {
+                        return elem.second.exists() && elem.second.uuid() == *targetUUID;
+                    })->second;
+                // The leftover might be the same acquisition as the source, so make a copy here.
+                leftoverAcq.emplace(tempColl);
+            }
+            return ConvertToCappedAcquisitions{
+                .sourceAcquisition = std::move(acquisitions.at(fromNs)),
+                .tmpAcquisition = std::move(acquisitions.at(tmpName)),
+                .targetUUIDAcquisition = std::move(leftoverAcq)};
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+            // There is no leftover collection with the targetUUID, no cleanup is necessary. As
+            // all acquisitions have been released we retry the acquisition but now without
+            // acquiring the UUID.
+            shouldFetchWithTargetUUID = false;
+            continue;
+        }
+    }
+}
+}  // namespace
+
 void convertToCapped(OperationContext* opCtx,
                      const NamespaceString& ns,
                      long long size,
                      const boost::optional<UUID>& targetUUID) {
-    auto dbname = ns.dbName();
-    StringData shortSource = ns.coll();
-
-    // TODO SERVER-100043: We disable lock runtime ordering checks since a subsequent rename as part
-    // of oplog replication might take the locks in opposite order if the ResourceId of the
-    // namespaces happens to dictate so.
-    DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
-
-    AutoGetCollection coll(opCtx, ns, MODE_X);
-    CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, ns)->checkShardVersionOrThrow(
-        opCtx);
+    const auto [sourceAcq, tmpAcq, leftoverAcq] =
+        acquireLocksForConvertToCapped(opCtx, ns, targetUUID);
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns);
@@ -258,75 +323,44 @@ void convertToCapped(OperationContext* opCtx,
                           << " to a capped collection",
             !userInitiatedWritesAndNotPrimary);
 
-    Database* const db = coll.getDb();
+    const auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, ns.dbName());
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "database " << dbname.toStringForErrorMsg() << " not found",
+            str::stream() << "database " << ns.dbName().toStringForErrorMsg() << " not found",
             db);
 
-    if (coll) {
-        IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(coll->uuid());
+    if (sourceAcq.exists()) {
+        IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(sourceAcq.uuid());
     }
 
     if (targetUUID) {
         // Return if the collection is already capped with the given UUID.
-        if (coll && (coll->uuid() == *targetUUID) && coll->isCapped()) {
-            invariant(coll->getCappedMaxSize() == size);
+        if (sourceAcq.exists() && (sourceAcq.uuid() == targetUUID) &&
+            sourceAcq.getCollectionPtr()->isCapped()) {
+            invariant(sourceAcq.getCollectionPtr()->getCappedMaxSize() == size);
             return;
         }
 
-        // Check if a previous execution left an existing temporary collection with the given
-        // targetUUID. In that case let's drop the temporary collection to be able to proceed with
-        // the creation of a new one.
-        boost::optional<NamespaceString> oldTempNssToDrop;
-        try {
-            AutoGetCollection tempColl(
-                opCtx, NamespaceStringOrUUID{ns.dbName(), *targetUUID}, MODE_S);
-            invariant(!tempColl || (tempColl && tempColl->isTemporary()));
-
-            if (tempColl && tempColl->isTemporary()) {
-                oldTempNssToDrop = tempColl.getNss();
-            }
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        }
-
-        if (oldTempNssToDrop) {
+        if (leftoverAcq) {
+            // A previous execution left an existing temporary collection with the given targetUUID.
+            // In that case let's drop the temporary collection to be able to proceed with the
+            // creation of a new one.
+            invariant(leftoverAcq->exists() && leftoverAcq->getCollectionPtr()->isTemporary());
             DropReply unused;
             uassertStatusOK(
                 dropCollection(opCtx,
-                               *oldTempNssToDrop,
+                               leftoverAcq->nss(),
                                &unused,
                                DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops,
                                false));
         }
     }
 
-    // Generate a temporary collection name that will not collide with any existing collections.
-    boost::optional<Lock::CollectionLock> collLock;
-    const auto tempNs = [&] {
-        while (true) {
-            auto tmpName = uassertStatusOKWithContext(
-                makeUniqueCollectionName(opCtx, dbname, "tmp%%%%%.convertToCapped." + shortSource),
-                str::stream() << "Cannot generate temporary collection namespace to convert "
-                              << ns.toStringForErrorMsg() << " to a capped collection");
-
-            collLock.emplace(opCtx, tmpName, MODE_X);
-            if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, tmpName)) {
-                return tmpName;
-            }
-
-            // The temporary collection was created by someone else between the name being
-            // generated and acquiring the lock on the collection, so try again with a new
-            // temporary collection name.
-            collLock.reset();
-        }
-    }();
-
-    cloneCollectionAsCapped(opCtx, db, ns, tempNs, size, true /* temp */, targetUUID);
+    cloneCollectionAsCapped(opCtx, db, ns, tmpAcq.nss(), size, true /* temp */, targetUUID);
 
     RenameCollectionOptions options;
     options.dropTarget = true;
     options.stayTemp = false;
-    uassertStatusOK(renameCollection(opCtx, tempNs, ns, options));
+    uassertStatusOK(renameCollection(opCtx, tmpAcq.nss(), ns, options));
 }
 
 }  // namespace mongo
