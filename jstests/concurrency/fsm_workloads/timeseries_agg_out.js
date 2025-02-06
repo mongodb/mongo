@@ -14,7 +14,8 @@
  *   does_not_support_transactions,
  *   does_not_support_stepdowns,
  *   requires_fcv_70,
- *   featureFlagAggOutTimeseries
+ *   # `convertToCapped` is not supported in serverless.
+ *   command_not_supported_in_serverless,
  * ]
  */
 load('jstests/concurrency/fsm_workloads/agg_out.js');  // for $super state functions

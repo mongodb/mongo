@@ -11,7 +11,6 @@
  *   does_not_support_stepdowns,
  *   uses_curop_agg_stage,
  *   requires_fcv_70,
- *   featureFlagAggOutTimeseries
  * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
@@ -58,7 +57,9 @@ var $config = extendWorkload($config, function($config, $super) {
             "command.drop": {
                 $exists: false
             }  // Exclude 'drop' command from the filter to make sure that we don't kill the the
-            // drop command which is responsible for dropping the temporary collection.
+            // drop command which is responsible for dropping the temporary collection in the
+            // destructor. This won't prevent any drop commands run internally (with the same
+            // operation context) by $out, such as in renameCollection.
         });
     };
 

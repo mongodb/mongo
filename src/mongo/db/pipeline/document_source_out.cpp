@@ -53,35 +53,64 @@ using namespace fmt::literals;
 
 MONGO_FAIL_POINT_DEFINE(hangWhileBuildingDocumentSourceOutBatch);
 MONGO_FAIL_POINT_DEFINE(outWaitAfterTempCollectionCreation);
+MONGO_FAIL_POINT_DEFINE(outWaitAfterTempCollectionRenameBeforeView);
+
 REGISTER_DOCUMENT_SOURCE(out,
                          DocumentSourceOut::LiteParsed::parse,
                          DocumentSourceOut::createFromBson,
                          AllowedWithApiStrict::kAlways);
 
 DocumentSourceOut::~DocumentSourceOut() {
-    DESTRUCTOR_GUARD(
-        // Make sure we drop the temp collection if anything goes wrong. Errors are ignored
-        // here because nothing can be done about them. Additionally, if this fails and the
-        // collection is left behind, it will be cleaned up next time the server is started.
+    if (_tmpCleanUpState == OutCleanUpProgress::kComplete) {
+        return;
+    }
 
-        // If creating a time-series collection, we must drop the "real" buckets collection, if
-        // anything goes wrong creating the view.
+    DESTRUCTOR_GUARD({
+        // Make sure we drop the temp collection(s) if anything goes wrong.
+        // Errors are ignored here because nothing can be done about them. Additionally, if
+        // this fails and the collection is left behind, it will be cleaned up next time the
+        // server is started.
+        auto cleanupClient =
+            pExpCtx->opCtx->getServiceContext()->makeClient("$out_replace_coll_cleanup");
+        AlternativeClientRegion acr(cleanupClient);
 
-        // If creating a time-series collection, '_tempNs' is translated to include the
-        // "system.buckets" prefix.
-        if (_tempNs.size() || (_timeseries && !_timeseriesStateConsistent)) {
-            auto cleanupClient =
-                pExpCtx->opCtx->getServiceContext()->makeClient("$out_replace_coll_cleanup");
-            AlternativeClientRegion acr(cleanupClient);
-            // Create a new operation context so that any interrupts on the current operation will
-            // not affect the dropCollection operation below.
-            auto cleanupOpCtx = cc().makeOperationContext();
+        // Create a new operation context so that any interrupts on the current operation
+        // will not affect the dropCollection operation below.
+        auto cleanupOpCtx = cc().makeOperationContext();
+        DocumentSourceWriteBlock writeBlock(cleanupOpCtx.get());
+        auto dropCollectionCmd = [&](NamespaceString dropNs) {
+            try {
+                pExpCtx->mongoProcessInterface->dropCollection(cleanupOpCtx.get(), dropNs);
+            } catch (const DBException& e) {
+                LOGV2_WARNING(7466203,
+                              "Unexpected error dropping temporary collection; drop will complete "
+                              "on next server restart",
+                              "error"_attr = e.toString(),
+                              "coll"_attr = dropNs);
+            };
+        };
 
-            DocumentSourceWriteBlock writeBlock(cleanupOpCtx.get());
-
-            auto deleteNs = _tempNs.size() ? _tempNs : makeBucketNsIfTimeseries(getOutputNs());
-            pExpCtx->mongoProcessInterface->dropCollection(cleanupOpCtx.get(), deleteNs);
-        });
+        switch (_tmpCleanUpState) {
+            case OutCleanUpProgress::kTmpCollExists:
+                dropCollectionCmd(_tempNs);
+                break;
+            case OutCleanUpProgress::kRenameComplete:
+                // For time-series collections, since we haven't created a view in this state, we
+                // must drop the buckets collection iff the user already didn't have a view.
+                if (_timeseries) {
+                    auto outNs = getOutputNs();
+                    auto view =
+                        CollectionCatalog::get(pExpCtx->opCtx)->lookupView(pExpCtx->opCtx, outNs);
+                    if (!view) {
+                        dropCollectionCmd(outNs.makeTimeseriesBucketsNamespace());
+                    }
+                }
+                break;
+            default:
+                MONGO_UNREACHABLE;
+                break;
+        }
+    });
 }
 
 DocumentSourceOutSpec DocumentSourceOut::parseOutSpecAndResolveTargetNamespace(
@@ -207,6 +236,10 @@ void DocumentSourceOut::initialize() {
         } else {
             cmd.appendElementsUnique(_originalOutOptions);
         }
+
+        // Set the enum state to 'kTmpCollExists' first, because 'createCollection' can throw
+        // after constructing the collection.
+        _tmpCleanUpState = OutCleanUpProgress::kTmpCollExists;
         pExpCtx->mongoProcessInterface->createCollection(
             pExpCtx->opCtx, _tempNs.dbName(), cmd.done());
     }
@@ -239,15 +272,7 @@ void DocumentSourceOut::initialize() {
     }
 }
 
-void DocumentSourceOut::finalize() {
-    DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
-
-    uassert(7406101,
-            "$out to time-series collections is only supported on FCV greater than or equal to 7.1",
-            feature_flags::gFeatureFlagAggOutTimeseries.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
-                !_timeseries);
-
+void DocumentSourceOut::renameTemporaryCollection() {
     // If the collection is time-series, we must rename to the "real" buckets collection.
     const NamespaceString& outputNs = makeBucketNsIfTimeseries(getOutputNs());
 
@@ -258,22 +283,50 @@ void DocumentSourceOut::finalize() {
                                                                             false /* stayTemp */,
                                                                             _originalOutOptions,
                                                                             _originalIndexes);
+}
 
-    // The rename succeeded, so the temp collection no longer exists.
-    _tempNs = {};
+void DocumentSourceOut::createTimeseriesView() {
+    _tmpCleanUpState = OutCleanUpProgress::kRenameComplete;
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &outWaitAfterTempCollectionRenameBeforeView,
+        pExpCtx->opCtx,
+        "outWaitAfterTempCollectionRenameBeforeView",
+        []() {
+            LOGV2(8961400,
+                  "Hanging aggregation due to 'outWaitAfterTempCollectionRenameBeforeView' "
+                  "failpoint");
+        });
 
-    _timeseriesStateConsistent = false;
-    // If the collection is time-series, try to create the view.
+    BSONObjBuilder cmd;
+    cmd << "create" << getOutputNs().coll();
+    cmd << DocumentSourceOutSpec::kTimeseriesFieldName << _timeseries->toBSON();
+    pExpCtx->mongoProcessInterface->createTimeseriesView(
+        pExpCtx->opCtx, getOutputNs(), cmd.done(), _timeseries.value());
+}
+
+void DocumentSourceOut::finalize() {
+    DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
+    uassert(7406101,
+            "$out to time-series collections is only supported on FCV greater than or equal to 7.1",
+            feature_flags::gFeatureFlagAggOutTimeseries.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
+                !_timeseries);
+
+    // Rename the temporary collection to the namespace the user requested, and drop the
+    // target collection if $out is writing to a collection that exists.
+    renameTemporaryCollection();
+
+    // The rename has succeeded, if the collection is time-series, try to create the view.
+    // Creating the view must happen immediately after the rename. We cannot guarantee that both the
+    // rename and view creation for time-series will succeed if there is an unclean shutdown. This
+    // could lead us to an unsupported state (a buckets collection with no view). To minimize the
+    // chance this happens, we should ensure that view creation is tried immediately after the
+    // rename succeeds.
     if (_timeseries) {
-        BSONObjBuilder cmd;
-        cmd << "create" << getOutputNs().coll();
-        cmd << DocumentSourceOutSpec::kTimeseriesFieldName << _timeseries->toBSON();
-        pExpCtx->mongoProcessInterface->createTimeseriesView(
-            pExpCtx->opCtx, getOutputNs(), cmd.done(), _timeseries.value());
+        createTimeseriesView();
     }
 
-    // Creating the view succeeded, so the boolean should be set to true.
-    _timeseriesStateConsistent = true;
+    _tmpCleanUpState = OutCleanUpProgress::kComplete;
 }
 
 BatchedCommandRequest DocumentSourceOut::initializeBatchedWriteRequest() const {
