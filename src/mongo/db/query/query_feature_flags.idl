@@ -213,3 +213,8 @@ feature_flags:
       default: false
       shouldBeFCVGated: true
 
+    featureFlagGenerateInternalUnpackBucketStageWithoutView:
+      description: "Feature flag to enable codepaths for view-less timeseries collections."
+      cpp_varname: gFeatureFlagGenerateInternalUnpackBucketStageWithoutView
+      default: false
+      shouldBeFCVGated: true
