@@ -9,12 +9,14 @@
 #pragma once
 
 #include <catch2/catch.hpp>
-
 #include "wt_internal.h"
+#include "../wrappers/connection_wrapper.h"
 
 namespace utils {
 
-// Check error helpers
+void prepare_session_and_error(
+  connection_wrapper *conn_wrapper, WT_SESSION **session, WT_ERROR_INFO **err_info);
+
 void check_error_info(
   WT_ERROR_INFO *err_info, int err, int sub_level_err, const char *err_msg_content);
 

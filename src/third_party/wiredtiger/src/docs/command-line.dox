@@ -22,8 +22,6 @@ Specify an encryption secret key for the ::wiredtiger_open function.
 Specify a database home directory.
 @par \c -L
 Forcibly turn off logging subsystem for debugging purposes.
-@par \c -l directory
-Open a database that is in the process of being live restored. This parameter takes the path to the source directory as an argument.
 @par \c -m
 Verify the WiredTiger metadata as part of opening the database.
 @par \c -R

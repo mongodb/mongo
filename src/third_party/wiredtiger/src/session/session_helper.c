@@ -99,6 +99,10 @@ __wt_session_dump(WT_SESSION_IMPL *session, WT_SESSION_IMPL *dump_session, bool 
             "read-committed" :
             (dump_session->isolation == WT_ISO_READ_UNCOMMITTED ? "read-uncommitted" :
                                                                   "snapshot")));
+        WT_ERR(__wt_msg(session, "  last saved error code: %d", dump_session->err_info.err));
+        WT_ERR(__wt_msg(
+          session, "  last saved sub-level error code: %d", dump_session->err_info.sub_level_err));
+        WT_ERR(__wt_msg(session, "  last saved error message: %s", dump_session->err_info.err_msg));
         WT_ERR(__wt_msg(session, "  Transaction:"));
         WT_ERR(__wt_verbose_dump_txn_one(session, dump_session, 0, NULL));
     } else {

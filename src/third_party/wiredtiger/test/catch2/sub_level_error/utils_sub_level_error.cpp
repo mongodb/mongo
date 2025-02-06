@@ -12,6 +12,19 @@
 namespace utils {
 
 /*
+ * prepare_session_and_error --
+ *     Prepare a session and error_info struct to be used by the drop tests.
+ */
+void
+prepare_session_and_error(
+  connection_wrapper *conn_wrapper, WT_SESSION **session, WT_ERROR_INFO **err_info)
+{
+    WT_CONNECTION *conn = conn_wrapper->get_wt_connection();
+    REQUIRE(conn->open_session(conn, NULL, NULL, session) == 0);
+    *err_info = &(((WT_SESSION_IMPL *)(*session))->err_info);
+}
+
+/*
  * check_error_info --
  *     Perform checks on each of the three members of a WT_ERROR_INFO struct.
  */

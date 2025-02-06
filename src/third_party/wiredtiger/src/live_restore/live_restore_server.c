@@ -74,8 +74,12 @@ err:
 static void
 __live_restore_free_work_item(WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_WORK_ITEM **work_itemp)
 {
+    WTI_LIVE_RESTORE_SERVER *server = S2C(session)->live_restore_server;
+
     __wt_free(session, (*work_itemp)->uri);
     __wt_free(session, *work_itemp);
+    WT_STAT_CONN_SET(
+      session, live_restore_work_remaining, __wt_atomic_sub64(&server->work_items_remaining, 1));
 
     *work_itemp = NULL;
 }
@@ -155,9 +159,27 @@ __live_restore_worker_run(WT_SESSION_IMPL *session, WT_THREAD *ctx)
     WT_CURSOR *cursor;
     WT_SESSION *wt_session = (WT_SESSION *)session;
     ret = wt_session->open_cursor(wt_session, work_item->uri, NULL, NULL, &cursor);
+    if (ret != 0)
+        __wt_verbose_debug1(session, WT_VERB_LIVE_RESTORE,
+          "Live restore worker: Error opening cursor to %s, ret %d", work_item->uri, ret);
     if (ret == ENOENT) {
         /* Free the work item. */
         __live_restore_free_work_item(session, &work_item);
+        return (0);
+    } else if (ret == EBUSY) {
+        uint64_t remain;
+        uint32_t threads;
+        /*
+         * Someone else has exclusive access to the table. Add it back to the work queue and try
+         * again later.
+         */
+        __wt_spin_lock(session, &server->queue_lock);
+        remain = server->work_items_remaining;
+        threads = server->threads_working;
+        TAILQ_INSERT_TAIL(&server->work_queue, work_item, q);
+        __wt_spin_unlock(session, &server->queue_lock);
+        if (remain < (uint64_t)threads)
+            __wt_sleep(0, 100 * WT_THOUSAND);
         return (0);
     }
     WT_RET(ret);
@@ -176,12 +198,10 @@ __live_restore_worker_run(WT_SESSION_IMPL *session, WT_THREAD *ctx)
       session, WT_VERB_LIVE_RESTORE, "Live restore worker: Filling holes in %s", work_item->uri);
     ret = __wti_live_restore_fs_fill_holes(fh, wt_session);
     __wt_verbose_debug1(session, WT_VERB_LIVE_RESTORE,
-      "Live restore worker: Finished finished filling holes in %s", work_item->uri);
+      "Live restore worker: Finished finished filling holes in %s ret %d", work_item->uri, ret);
 
     /* Free the work item. */
     __live_restore_free_work_item(session, &work_item);
-    WT_STAT_CONN_SET(
-      session, live_restore_work_remaining, __wt_atomic_sub64(&server->work_items_remaining, 1));
     WT_TRET(cursor->close(cursor));
     return (ret);
 }

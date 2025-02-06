@@ -36,7 +36,7 @@ __thread_run(void *arg)
  */
 err:
     if (thread->stop_func != NULL)
-        ret = thread->stop_func(session, thread);
+        WT_TRET(thread->stop_func(session, thread));
 
     if (ret != 0 && F_ISSET(thread, WT_THREAD_PANIC_FAIL))
         WT_IGNORE_RET(__wt_panic(session, ret, "Unrecoverable utility thread error"));
