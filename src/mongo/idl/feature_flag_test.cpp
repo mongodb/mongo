@@ -146,7 +146,7 @@ TEST_F(FeatureFlagTest, ServerStatus) {
 
     {
         ASSERT_OK(_featureFlagFork->setFromString("true", boost::none));
-        ASSERT(feature_flags::gFeatureFlagFork.isEnabledAndIgnoreFCVUnsafe() == true);
+        ASSERT(feature_flags::gFeatureFlagFork.isEnabled() == true);
 
         BSONObjBuilder builder;
 
@@ -162,7 +162,7 @@ TEST_F(FeatureFlagTest, ServerStatus) {
 
     {
         ASSERT_OK(_featureFlagFork->setFromString("false", boost::none));
-        ASSERT(feature_flags::gFeatureFlagFork.isEnabledAndIgnoreFCVUnsafe() == false);
+        ASSERT(feature_flags::gFeatureFlagFork.isEnabled() == false);
 
         BSONObjBuilder builder;
 
@@ -245,29 +245,62 @@ TEST_F(FeatureFlagTest, RAIIFeatureFlagController) {
 
 // Test feature flags that should not be FCV Gated
 TEST_F(FeatureFlagTest, ShouldBeFCVGatedFalse) {
-    // Test that feature flag that is enabled and not FCV gated will return true for isEnabled.
+    // Test that feature flag that is enabled and not FCV gated will return true for isEnabled,
+    // regardless of the FCV.
     // Test newest version
     // (Generic FCV reference): feature flag test
     ASSERT_OK(_featureFlagFork->setFromString("true", boost::none));
 
     serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
 
-    ASSERT_TRUE(feature_flags::gFeatureFlagFork.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+    ASSERT_TRUE(feature_flags::gFeatureFlagFork.isEnabled());
 
     // Test oldest version
     // (Generic FCV reference): feature flag test
     serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastLTS);
 
-    ASSERT_TRUE(feature_flags::gFeatureFlagFork.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+    ASSERT_TRUE(feature_flags::gFeatureFlagFork.isEnabled());
 
     // Test uninitialized FCV
     serverGlobalParams.mutableFCV.setVersion(
         multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior);
 
-    ASSERT_TRUE(feature_flags::gFeatureFlagFork.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+    ASSERT_TRUE(feature_flags::gFeatureFlagFork.isEnabled());
+}
+
+// Utility to fail a test if a checkable feature flag reference is unexpectedly checked as if it was
+// wrapping an FCV-gated feature flag.
+static constexpr auto fcvGatedFlagCheckMustNotBeCalled = [](FCVGatedFeatureFlag&) -> bool {
+    MONGO_UNREACHABLE;
+};
+
+// Test none and default-constructed values of a checkable feature flag reference.
+// As they mean that a feature is not conditional on a feature flag, they always return true.
+TEST_F(FeatureFlagTest, NoneAsCheckableFeatureFlagRef) {
+    ASSERT_TRUE(CheckableFeatureFlagRef().isEnabled(fcvGatedFlagCheckMustNotBeCalled));
+    ASSERT_TRUE(kDoesNotRequireFeatureFlag.isEnabled(fcvGatedFlagCheckMustNotBeCalled));
+}
+
+// Tests wrapping a binary-compatible feature flag inside a checkable feature flag reference.
+// It should return whether the feature flag is enabled without invoking the callback.
+TEST_F(FeatureFlagTest, BinaryCompatibleAsCheckableFeatureFlagRef) {
+    CheckableFeatureFlagRef checkableFeatureFlagRefFork(feature_flags::gFeatureFlagFork);
+    ASSERT_OK(_featureFlagFork->setFromString("false", boost::none));
+    ASSERT_FALSE(checkableFeatureFlagRefFork.isEnabled(fcvGatedFlagCheckMustNotBeCalled));
+    ASSERT_OK(_featureFlagFork->setFromString("true", boost::none));
+    ASSERT_TRUE(checkableFeatureFlagRefFork.isEnabled(fcvGatedFlagCheckMustNotBeCalled));
+}
+
+// Tests wrapping an FCV-gated feature flag inside a checkable feature flag reference.
+// It should invoke the callback to check whether the feature flag is enabled and forward its value.
+TEST_F(FeatureFlagTest, FCVGatedAsCheckableFeatureFlagRef) {
+    CheckableFeatureFlagRef checkableFeatureFlagRefBlender(feature_flags::gFeatureFlagBlender);
+    checkableFeatureFlagRefBlender.isEnabled([](auto& fcvGatedFlag) -> bool {
+        ASSERT_EQUALS(&fcvGatedFlag, &feature_flags::gFeatureFlagBlender);
+        return true;
+    });
+    ASSERT_FALSE(checkableFeatureFlagRefBlender.isEnabled([](auto&) { return false; }));
+    ASSERT_TRUE(checkableFeatureFlagRefBlender.isEnabled([](auto&) { return true; }));
 }
 
 

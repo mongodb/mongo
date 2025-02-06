@@ -2190,7 +2190,7 @@ void registerSigmoidExpression() {
                                        ExpressionSigmoid::parseExpressionSigmoid,
                                        AllowedWithApiStrict::kNeverInVersion1,
                                        AllowedWithClientType::kAny,
-                                       boost::none);
+                                       kDoesNotRequireFeatureFlag);
     } catch (...) {
         // registerSigmoidExpression() will throw if a duplicate registration is attempted. We catch
         // and ignore this here. This is so that we can add registerSigmoidExpression() to each test

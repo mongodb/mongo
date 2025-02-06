@@ -30,22 +30,16 @@
 #include "mongo/db/feature_flag.h"
 
 
-#include <boost/optional/optional.hpp>
-
-#include "mongo/base/status_with.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
-#include "mongo/util/str.h"
 #include "mongo/util/version/releases.h"
 
 namespace mongo {
 
 // (Generic FCV reference): feature flag support
-FeatureFlag::FeatureFlag(bool enabled, StringData versionString, bool shouldBeFCVGated)
-    : _enabled(enabled),
-      _version(multiversion::GenericFCV::kLatest),
-      _shouldBeFCVGated(shouldBeFCVGated) {
+FCVGatedFeatureFlag::FCVGatedFeatureFlag(bool enabled, StringData versionString)
+    : _enabled(enabled), _version(multiversion::GenericFCV::kLatest) {
 
     // Verify the feature flag invariants. IDL binder verifies these hold but we add these checks to
     // prevent incorrect direct instantiation.
@@ -53,7 +47,7 @@ FeatureFlag::FeatureFlag(bool enabled, StringData versionString, bool shouldBeFC
     // If default is true, then version should be present.
     // If default is false, then no version is allowed.
     if (kDebugBuild) {
-        if (enabled && shouldBeFCVGated) {
+        if (enabled) {
             dassert(!versionString.empty());
         } else {
             dassert(versionString.empty());
@@ -67,12 +61,7 @@ FeatureFlag::FeatureFlag(bool enabled, StringData versionString, bool shouldBeFC
 
 // If the functionality of this function changes, make sure that the isEnabled/isPresentAndEnabled
 // functions in feature_flag_util.js also incorporate the change.
-bool FeatureFlag::isEnabled(const ServerGlobalParams::FCVSnapshot fcv) const {
-    // If the feature flag is not FCV gated, return whether it is enabled.
-    if (!_shouldBeFCVGated) {
-        return _enabled;
-    }
-
+bool FCVGatedFeatureFlag::isEnabled(const ServerGlobalParams::FCVSnapshot fcv) const {
     if (!_enabled) {
         return false;
     }
@@ -82,7 +71,7 @@ bool FeatureFlag::isEnabled(const ServerGlobalParams::FCVSnapshot fcv) const {
     return fcv.isGreaterThanOrEqualTo(_version);
 }
 
-bool FeatureFlag::isEnabledUseLastLTSFCVWhenUninitialized(
+bool FCVGatedFeatureFlag::isEnabledUseLastLTSFCVWhenUninitialized(
     const ServerGlobalParams::FCVSnapshot fcv) const {
     if (fcv.isVersionInitialized()) {
         return isEnabled(fcv);
@@ -92,7 +81,7 @@ bool FeatureFlag::isEnabledUseLastLTSFCVWhenUninitialized(
     }
 }
 
-bool FeatureFlag::isEnabledUseLatestFCVWhenUninitialized(
+bool FCVGatedFeatureFlag::isEnabledUseLatestFCVWhenUninitialized(
     const ServerGlobalParams::FCVSnapshot fcv) const {
     if (fcv.isVersionInitialized()) {
         return isEnabled(fcv);
@@ -112,16 +101,13 @@ bool FeatureFlag::isEnabledUseLatestFCVWhenUninitialized(
 // or use isEnabledUseLatestFCVWhenUninitialized if your feature flag could be run while FCV
 // is uninitialized during initial sync.
 // Note that if the feature flag does not have any upgrade/downgrade concerns, then shouldBeFCVGated
-// should be set to false and FeatureFlag::isEnabled() should be used instead of this function.
-bool FeatureFlag::isEnabledAndIgnoreFCVUnsafe() const {
+// should be set to false and BinaryCompatibleFeatureFlag should be used instead of this function.
+bool FCVGatedFeatureFlag::isEnabledAndIgnoreFCVUnsafe() const {
     return _enabled;
 }
 
-bool FeatureFlag::isEnabledOnVersion(multiversion::FeatureCompatibilityVersion targetFCV) const {
-    if (!_shouldBeFCVGated) {
-        return _enabled;
-    }
-
+bool FCVGatedFeatureFlag::isEnabledOnVersion(
+    multiversion::FeatureCompatibilityVersion targetFCV) const {
     if (!_enabled) {
         return false;
     }
@@ -129,7 +115,7 @@ bool FeatureFlag::isEnabledOnVersion(multiversion::FeatureCompatibilityVersion t
     return targetFCV >= _version;
 }
 
-bool FeatureFlag::isDisabledOnTargetFCVButEnabledOnOriginalFCV(
+bool FCVGatedFeatureFlag::isDisabledOnTargetFCVButEnabledOnOriginalFCV(
     multiversion::FeatureCompatibilityVersion targetFCV,
     multiversion::FeatureCompatibilityVersion originalFCV) const {
     if (!_enabled) {
@@ -139,7 +125,7 @@ bool FeatureFlag::isDisabledOnTargetFCVButEnabledOnOriginalFCV(
     return originalFCV >= _version && targetFCV < _version;
 }
 
-bool FeatureFlag::isEnabledOnTargetFCVButDisabledOnOriginalFCV(
+bool FCVGatedFeatureFlag::isEnabledOnTargetFCVButDisabledOnOriginalFCV(
     multiversion::FeatureCompatibilityVersion targetFCV,
     multiversion::FeatureCompatibilityVersion originalFCV) const {
     if (!_enabled) {
@@ -149,70 +135,14 @@ bool FeatureFlag::isEnabledOnTargetFCVButDisabledOnOriginalFCV(
     return targetFCV >= _version && originalFCV < _version;
 }
 
-multiversion::FeatureCompatibilityVersion FeatureFlag::getVersion() const {
+multiversion::FeatureCompatibilityVersion FCVGatedFeatureFlag::getVersion() const {
     uassert(5111001, "Feature Flag is not enabled, cannot retrieve version", _enabled);
 
     return _version;
 }
 
-void FeatureFlag::set(bool enabled) {
+void FCVGatedFeatureFlag::set(bool enabled) {
     _enabled = enabled;
-}
-
-FeatureFlagServerParameter::FeatureFlagServerParameter(StringData name, FeatureFlag& storage)
-    : ServerParameter(name, ServerParameterType::kStartupOnly), _storage(storage) {}
-
-void FeatureFlagServerParameter::append(OperationContext* opCtx,
-                                        BSONObjBuilder* b,
-                                        StringData name,
-                                        const boost::optional<TenantId>&) {
-    bool enabled = _storage.isEnabledAndIgnoreFCVUnsafe();
-
-    {
-        auto sub = BSONObjBuilder(b->subobjStart(name));
-        sub.append("value"_sd, enabled);
-
-        if (enabled) {
-            sub.append("version",
-                       FeatureCompatibilityVersionParser::serializeVersionForFeatureFlags(
-                           _storage.getVersion()));
-        }
-
-        sub.append("shouldBeFCVGated", _storage._shouldBeFCVGated);
-    }
-}
-
-void FeatureFlagServerParameter::appendSupportingRoundtrip(OperationContext* opCtx,
-                                                           BSONObjBuilder* b,
-                                                           StringData name,
-                                                           const boost::optional<TenantId>&) {
-    bool enabled = _storage.isEnabledAndIgnoreFCVUnsafe();
-    b->append(name, enabled);
-}
-
-Status FeatureFlagServerParameter::set(const BSONElement& newValueElement,
-                                       const boost::optional<TenantId>&) {
-    bool newValue;
-
-    if (auto status = newValueElement.tryCoerce(&newValue); !status.isOK()) {
-        return {status.code(),
-                str::stream() << "Failed setting " << name() << ": " << status.reason()};
-    }
-
-    _storage.set(newValue);
-
-    return Status::OK();
-}
-
-Status FeatureFlagServerParameter::setFromString(StringData str, const boost::optional<TenantId>&) {
-    auto swNewValue = idl_server_parameter_detail::coerceFromString<bool>(str);
-    if (!swNewValue.isOK()) {
-        return swNewValue.getStatus();
-    }
-
-    _storage.set(swNewValue.getValue());
-
-    return Status::OK();
 }
 
 }  // namespace mongo

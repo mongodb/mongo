@@ -65,7 +65,7 @@ REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(searchMeta,
                                        DocumentSourceSearchMeta::createFromBson,
                                        AllowedWithApiStrict::kNeverInVersion1,
                                        AllowedWithClientType::kAny,
-                                       boost::none,
+                                       kDoesNotRequireFeatureFlag,
                                        true);
 ALLOCATE_DOCUMENT_SOURCE_ID(searchMeta, DocumentSourceSearchMeta::id)
 

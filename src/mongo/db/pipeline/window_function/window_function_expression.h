@@ -89,10 +89,11 @@ class PartitionIterator;
 
 #define REGISTER_STABLE_WINDOW_FUNCTION(name, parser) \
     REGISTER_WINDOW_FUNCTION_CONDITIONALLY(           \
-        name, parser, boost::none, AllowedWithApiStrict::kAlways, true)
+        name, parser, kDoesNotRequireFeatureFlag, AllowedWithApiStrict::kAlways, true)
 
 #define REGISTER_WINDOW_FUNCTION(name, parser, allowedWithApi) \
-    REGISTER_WINDOW_FUNCTION_CONDITIONALLY(name, parser, boost::none, allowedWithApi, true)
+    REGISTER_WINDOW_FUNCTION_CONDITIONALLY(                    \
+        name, parser, kDoesNotRequireFeatureFlag, allowedWithApi, true)
 
 /**
  * We store featureFlag in the parserMap, so that it can be checked at runtime to correctly
@@ -107,10 +108,10 @@ class PartitionIterator;
                               ("EndWindowFunctionRegistration"))                               \
     (InitializerContext*) {                                                                    \
         if (!__VA_ARGS__ ||                                                                    \
-            (boost::optional<FeatureFlag>(featureFlag) != boost::none &&                       \
-             !boost::optional<FeatureFlag>(featureFlag)                                        \
-                  ->isEnabledUseLatestFCVWhenUninitialized(                                    \
-                      serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))) {        \
+            !CheckableFeatureFlagRef(featureFlag).isEnabled([](auto& fcvGatedFlag) {           \
+                return fcvGatedFlag.isEnabledUseLatestFCVWhenUninitialized(                    \
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());             \
+            })) {                                                                              \
             return;                                                                            \
         }                                                                                      \
         ::mongo::window_function::Expression::registerParser(                                  \
@@ -125,7 +126,7 @@ class PartitionIterator;
         ::mongo::window_function::Expression::registerParser(                          \
             "$" #name,                                                                 \
             ::mongo::window_function::ExpressionRemovable<accumClass, wfClass>::parse, \
-            boost::none,                                                               \
+            kDoesNotRequireFeatureFlag,                                                \
             AllowedWithApiStrict::kAlways);                                            \
     }
 
@@ -176,13 +177,13 @@ public:
 
     struct ExpressionParserRegistration {
         Parser parser;
-        boost::optional<FeatureFlag> featureFlag;
+        CheckableFeatureFlagRef featureFlag;
         AllowedWithApiStrict allowedWithApi;
     };
 
     static void registerParser(std::string functionName,
                                Parser parser,
-                               boost::optional<FeatureFlag> featureFlag,
+                               CheckableFeatureFlagRef featureFlag,
                                AllowedWithApiStrict allowedWithApi);
 
     /**

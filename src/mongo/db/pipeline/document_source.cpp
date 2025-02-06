@@ -95,7 +95,7 @@ void accumulatePipelinePlanSummaryStats(const Pipeline& pipeline,
 
 void DocumentSource::registerParser(string name,
                                     Parser parser,
-                                    boost::optional<FeatureFlag> featureFlag) {
+                                    CheckableFeatureFlagRef featureFlag) {
     auto it = parserMap.find(name);
     massert(28707,
             str::stream() << "Duplicate document source (" << name << ") registered.",
@@ -105,7 +105,7 @@ void DocumentSource::registerParser(string name,
 
 void DocumentSource::registerParser(string name,
                                     SimpleParser simpleParser,
-                                    boost::optional<FeatureFlag> featureFlag) {
+                                    CheckableFeatureFlagRef featureFlag) {
 
     Parser parser =
         [simpleParser = std::move(simpleParser)](

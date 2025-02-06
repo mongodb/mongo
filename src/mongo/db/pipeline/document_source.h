@@ -120,7 +120,7 @@ class Document;
                                            fullParser,                              \
                                            allowedWithApiStrict,                    \
                                            AllowedWithClientType::kAny,             \
-                                           boost::none,                             \
+                                           kDoesNotRequireFeatureFlag,              \
                                            true)
 
 /**
@@ -147,7 +147,7 @@ class Document;
                                            fullParser,                            \
                                            AllowedWithApiStrict::kInternal,       \
                                            AllowedWithClientType::kInternal,      \
-                                           boost::none,                           \
+                                           kDoesNotRequireFeatureFlag,            \
                                            condition)
 
 /**
@@ -169,10 +169,10 @@ class Document;
                               ("EndDocumentSourceRegistration"))                                  \
     (InitializerContext*) {                                                                       \
         if (!__VA_ARGS__ ||                                                                       \
-            (boost::optional<FeatureFlag>(featureFlag) != boost::none &&                          \
-             !boost::optional<FeatureFlag>(featureFlag)                                           \
-                  ->isEnabledUseLatestFCVWhenUninitialized(                                       \
-                      serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))) {           \
+            !CheckableFeatureFlagRef(featureFlag).isEnabled([](auto& fcvGatedFlag) {              \
+                return fcvGatedFlag.isEnabledUseLatestFCVWhenUninitialized(                       \
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());                \
+            })) {                                                                                 \
             DocumentSource::registerParser("$" #key, DocumentSource::parseDisabled, featureFlag); \
             LiteParsedDocumentSource::registerParser("$" #key,                                    \
                                                      LiteParsedDocumentSource::parseDisabled,     \
@@ -194,7 +194,7 @@ class Document;
                                            fullParser,                             \
                                            AllowedWithApiStrict::kNeverInVersion1, \
                                            AllowedWithClientType::kAny,            \
-                                           boost::none,                            \
+                                           kDoesNotRequireFeatureFlag,             \
                                            ::mongo::getTestCommandsEnabled())
 
 /**
@@ -244,7 +244,7 @@ public:
 
     struct ParserRegistration {
         DocumentSource::Parser parser;
-        boost::optional<FeatureFlag> featureFlag;
+        CheckableFeatureFlagRef featureFlag;
     };
 
     /**
@@ -587,7 +587,7 @@ public:
      */
     static void registerParser(std::string name,
                                Parser parser,
-                               boost::optional<FeatureFlag> featureFlag);
+                               CheckableFeatureFlagRef featureFlag);
     /**
      * Convenience wrapper for the common case, when DocumentSource::Parser returns a list of one
      * DocumentSource.
@@ -597,7 +597,7 @@ public:
      */
     static void registerParser(std::string name,
                                SimpleParser simpleParser,
-                               boost::optional<FeatureFlag> featureFlag);
+                               CheckableFeatureFlagRef featureFlag);
 
     /**
      * Allocate and return a new, unique DocumentSource::Id value.

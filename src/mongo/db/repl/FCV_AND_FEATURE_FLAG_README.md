@@ -546,8 +546,17 @@ have a feature flag. Features that span multiple commits should also have a feat
 with them because continuous delivery means that we often branch in the middle of feature
 development.
 
-Additionally, any project or ticket that wants to introduce different behavior based on which FCV
-the server is running **_must_** add a feature flag. In the past, the branching of the different
+There are two types of feature flags, designed for two distinct use cases:
+
+- _Binary-compatible_ feature flags are used to keep backwards-compatible features disabled until
+  their development is completed and they can be confidently enabled.
+- _FCV-gated_ feature flags are for those features that have compatibility or upgrade/downgrade
+  concerns and must be kept disabled until FCV reaches a certain threshold version.
+
+For more details and guidelines on determining whether a binary-compatible or FCV-gated flag is appropriate, see [Determining if a feature flag should be binary-compatible or FCV-gated](#determining-if-a-feature-flag-should-be-binary-compatible-or-fcv-gated).
+
+It should be noted that any project or ticket that wants to introduce different behavior based on which FCV
+the server is running **_must_** add an FCV-gated feature flag. In the past, the branching of the different
 behavior would be done by directly checking which FCV the server was running. However, we now must
 **_not_** be using any references to FCV constants such as kVersion*6_0 ([example of what to avoid](https://github.com/mongodb/mongo/blob/ef8bdb8d0cbd584d47c54d64c3215ae29ec1a32f/src/mongo/db/pipeline/document_source_list_catalog.cpp#L130)).
 Instead we should branch
@@ -555,7 +564,7 @@ the different behavior using feature flags (see [Feature Flag Gating](#feature-f
 \*\*\_This means that individual ticket that wants to introduce an FCV check will also need to create a
 feature flag specific to that ticket.*\*\*
 
-The motivation for using feature flags rather than checking FCV constants directly is because
+The motivation for using FCV-gated feature flags rather than checking FCV constants directly is because
 checking FCV constants directly is more error prone and has caused issues in the release process
 when updating/removing outdated FCV constants.
 
@@ -565,6 +574,31 @@ entire feature flag system is built on the assumption that these are used for pr
 in-development code from being exposed to users, and not for turning off arbitrary features after
 they've been released.
 
+## Determining if a feature flag should be binary-compatible or FCV-gated
+
+A question one should ask when determining if something is binary-compatible or FCV gated is whether they would want
+their feature to be disabled or enabled while in a cluster that includes nodes of a different
+binary version (for example, during upgrade/downgrade of a mongodb cluster, where some nodes can
+be on the 7.0 binary version while others are on 8.0 binary version)
+
+When a feature needs to be FCV gated:
+
+- the feature changes the on-disk format of some data
+- the feature changes the way nodes in a cluster communicate with each other, e.g. a new oplog
+  format. This is because if an old binary secondary replicates one of the oplog entries with a new
+  format, it won't know how to read them
+
+Examples of when a feature does not need to be FCV gated, i.e. it is binary-compatible:
+
+- the feature improves query performance. This does not affect any on-disk
+  format and does not affect inter-node communication, and it would be okay if some nodes on the
+  upgraded binary performed queries faster and other nodes on the downgraded binary performed
+  queries slower.
+- the feature only exists on mongos, which does not have an FCV.
+
+If in doubt about whether your feature needs to be FCV gated, please reach out to the Replication
+team in #server-featureflags and add the Replication team as a reviewer to your code review.
+
 ## Lifecycle of a feature flag
 
 - Adding the feature flag
@@ -572,7 +606,7 @@ they've been released.
   - This should be done concurrently with the first work ticket in the PM for the feature.
 - Enabling the feature by default
 
-  - Feature flags with default:true must have a specific release version associated in its
+  - FCV-gated feature flags with default:true must have a specific release version associated in its
     definition.
   - **_We do not support disabling feature flags once they have been enabled via IDL in a release
     build_**.
@@ -592,7 +626,7 @@ they've been released.
   - After this point the feature flag is used for FCV gating to make upgrade/downgrade safe.
 
 - Removing the feature flag
-  - Any projects/tickets that use and enable a feature flag **_must_** leave that feature flag in
+  - Any projects/tickets that use and enable an FCV-gated feature flag **_must_** leave that feature flag in
     the codebase at least until the next major release.
     _ For example, if a feature flag was enabled by default in 5.1, it must remain in the
     codebase until 6.0 is branched. After that, the feature flag can be removed.
@@ -607,28 +641,39 @@ they've been released.
 
 Feature flags are created by adding it to an IDL file:
 
-```
-// featureFlagToaster is a feature flag that is under development and off by default.
-// Enabling this feature flag will associate it with the latest FCV (eg. 4.9.0).
-   featureFlagToaster:
-     description: "Create a feature flag"
-     cpp_varname: gFeatureFlagToaster
-     default: false
-     shouldBeFCVGated: true
+```yaml
+global:
+  cpp_namespace: "mongo"
+
+feature_flags:
+  # featureFlagFork is a binary-compatible feature flag that is finished and enabled by default.
+  featureFlagFork:
+    description: "Fork feature flag"
+    cpp_varname: feature_flags::gFeatureFlagFork
+    default: true
+    shouldBeFCVGated: false
+
+  # featureFlagToaster is an FCV-gated feature flag that is under development and off by default.
+  # This feature flag can be enabled only after associating it with the latest FCV (eg. 4.9.0).
+  featureFlagToaster:
+    description: "Toaster feature flag"
+    cpp_varname: feature_flags::gFeatureFlagToaster
+    default: false
+    shouldBeFCVGated: true
 ```
 
 A feature flag has the following properties:
 
 - Server Parameter Name: featureFlag\<MyFeatureName\>
+  - Feature flags implicitly generate a server parameter (see `FeatureFlagServerParameter`).
   - The name should not include "Use", "Allow", "Enable", or "Disable".
-- Server Parameter set_at value: [ startup ]
-  - Feature flags should generally be settable at server startup only. This supports the use of
+  - Feature flags can only be set at server startup: their server parameters are declared with `set_at: startup`. This supports the use of
     feature flags as a release/development tool and should not impose an unnecessary burden on
     server administration.
-- C++ Type: mongo::feature_flags
+- C++ Namespace: `mongo::feature_flags`
   - This should apply to all feature flags that follow the naming convention in the previous
     bullet.
-  - No other type should be allowed for feature flags. For server parameters that support
+  - By convention all feature flags should be placed in this namespace. For server parameters that support
     multiple enumerated choices (for example, protocol/implementation for a command), these should
     be declared separately. Feature flags may still be used to toggle support for a particular
     option for the non-feature flag server parameter.
@@ -641,35 +686,19 @@ A feature flag has the following properties:
   - Required field if `default` is true and `shouldBeFCVGated` is true
   - Must be a string acceptable to FeatureCompatibilityVersionParser.
 - shouldBeFCVGated: boolean
-  - When set to `true`, the feature flag will only be enabled once the FCV is reaches the version
+  - When set to `true`, an FCV-gated feature flag will be created. Thus, it will only be enabled once the FCV is reaches the version
     set in the `version` field. For example, if a feature flag has `shouldBeFCVGated: true` and
     `version: 8.0`, this means that in a mixed version replica set, where some nodes are on the
     7.0 binary version while others are on 8.0 binary version, the feature flag will not be enabled.
     It will only be enabled once all nodes are on the 8.0 binary version AND the FCV of the replica
     set is upgraded to 8.0 through the setFeatureCompatibilityVersion command.
-  - When set to `false`, the feature flag won't require a `version` field, so it will only be
+  - When set to `false`, a binary-compatible feature flag will be created. It should not have a `version` field, and it will only be
     gated based on whether it is enabled by default on that binary version. For example, if a feature
     flag has `shouldBeFCVGated: false`, this means that during upgrade/downgrade, in a mixed version
     replica set, where some nodes are still on the 7.0 binary version while others are on 8.0 binary
     version, the feature flag will already be enabled on the nodes on the 8.0 binary version, but not
     on the nodes with the 7.0 binary version.
-  - A question one should ask when deciding something should be FCV gated is whether they would want
-    their feature to be disabled or enabled while in a cluster that includes nodes of a different
-    binary version (for example, during upgrade/downgrade of a mongodb cluster, where some nodes can
-    be on the 7.0 binary version while others are on 8.0 binary version)
-  - When a feature needs to be FCV gated:
-    - the feature changes the on-disk format of some data
-    - the feature changes the way nodes in a cluster communicate with each other, e.g. a new oplog
-      format. This is because if an old binary secondary replicates one of the oplog entries with a new
-      format, it won't know how to read them
-  - Examples of when a feature does not need to be FCV gated:
-    - the feature improves query performance. This does not affect any on-disk
-      format and does not affect inter-node communication, and it would be okay if some nodes on the
-      upgraded binary performed queries faster and other nodes on the downgraded binary performed
-      queries slower.
-    - the feature only exists on mongos, which does not have an FCV.
-  - If in doubt about whether your feature needs to be FCV gated, please reach out to the Replication
-    team in #server-featureflags and add the Replication team as a reviewer to your code review.
+  - See [Determining if a feature flag should be binary-compatible or FCV-gated](#determining-if-a-feature-flag-should-be-binary-compatible-or-fcv-gated) for guidelines on when each type of feature flag should be used.
 
 To turn on a feature flag for testing when starting up a server, we would use the following command
 line (for the Toaster feature):
@@ -690,26 +719,38 @@ For example, a new index build feature that is being flag-guarded may be declare
 
 ## Feature Flag Gating
 
-To check if a feature flag is enabled, we should do the following:
+Binary-compatible and FCV-gated feature flags generate variables of different C++ types (`BinaryCompatibleFeatureFlag` and `FCVGatedFeatureFlag` respectively). The API for binary-compatible flags is straightforward, while the API for FCV-gated flags is more complex, as it needs to support scenarios such as uninitialized FCV or checking multiple feature flags under concurrent FCV transitions.
 
+To check if a binary-compatible feature flag is enabled, we should do the following:
+
+```c++
+if (feature_flags::featureFlagFork.isEnabled()) {
+    // The feature flag is enabled. Perform the new feature behavior.
+} else {
+    // The feature flag is disabled. Perform the old feature behavior.
+}
 ```
-if(feature_flags::gFeatureFlagToaster.isEnabled(serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-	// The feature flag is enabled and we are guaranteed to be only communicating to
+
+Similarly, to check if an FCV-gated feature flag is enabled, we should do the following:
+
+```c++
+if (feature_flags::gFeatureFlagToaster.isEnabled(serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    // The feature flag is enabled and we are guaranteed to be only communicating to
     // nodes with binary versions greater than or equal to 4.9.0. Perform the new
     // feature behavior.
 } else {
-	// It is possible that the feature flag is disabled or we are talking to nodes
+    // It is possible that the feature flag is disabled or we are talking to nodes
     // with binary versions less than 4.9.0. Perform behavior that is compatible with
     // older versions instead.
 }
 ```
 
-A common pattern is to check if the FCV is initialized AND if the feature flag is enabled on the FCV.
+For FCV-gated feature flags, a common pattern is to check if the FCV is initialized AND if the feature flag is enabled on the FCV.
 In this case, we must make sure to do these checks on the SAME `FCVSnapshot`:
 
-```
+```c++
 const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-if(fcvSnapshot.isVersionInitialized() && feature_flags::gFeatureFlagToaster.isEnabled(fcvSnapshot)){
+if (fcvSnapshot.isVersionInitialized() && feature_flags::gFeatureFlagToaster.isEnabled(fcvSnapshot)) {
 
 }
 ```
@@ -718,18 +759,42 @@ This is because otherwise, if you use two different snapshots, the in-memory FCV
 This same principle applies in general. If you want to check multiple properties of the FCV/feature flag at a specific point in time (i.e. you are expecting the FCV value to be the same in all of your function calls), you must do the checks on the SAME `FCVSnapshot`.
 See the [section about checking the in-memory FCV for more information](#checking-the-in-memory-FCV)
 
-If the feature flag has `shouldBeFCVGated` set to false, then `isEnabled` will simply return
-whether the feature flag is enabled.
+This does not apply to feature flags where `shouldBeFCVGated` is set to false, since `isEnabled`
+always returns the same value after it is initialized during startup.
 
 If the registration of a command should be gated by a feature flag, use `requiresFeatureFlag` when
 registering it with `MONGO_REGISTER_COMMAND`. For example:
 
 ```c++
 MONGO_REGISTER_COMMAND(CommandOnlyEnabledWithToaster)
-    .requiresFeatureFlag(&mongo::gFeatureFlagToaster);
+    .requiresFeatureFlag(mongo::gFeatureFlagToaster);
 ```
 
-### Feature Flag Gating During Initial Sync
+To build generic infrastructure which can accept both binary-compatible and FCV-gated feature flags, such as the command registration above, the `CheckableFeatureFlagRef` class can wrap and check either type of feature flag. A simple usage example is:
+
+```c++
+CheckableFeatureFlagRef CheckableFeatureFlagRef(feature_flags::gFeatureFlagToaster);
+if (CheckableFeatureFlagRef.isEnabled([](auto& fcvGatedFlag) {
+        return fcvGatedFlag.isEnabled(serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    })) {
+    // Feature is enabled
+}
+```
+
+A more complex usage example checking multiple feature flags and with handling for uninitialized FCV:
+
+```c++
+CheckableFeatureFlagRef CheckableFeatureFlagRef(feature_flags::gFeatureFlagToaster);
+auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+if (feature_flags::gFeatureFlagFryer.isEnabledUseLastLTSFCVWhenUninitialized(fcvSnapshot) &&
+    CheckableFeatureFlagRef.isEnabled([&](auto& fcvGatedFlag) {
+        return fcvGatedFlag.isEnabledUseLastLTSFCVWhenUninitialized(fcvSnapshot);
+    })) {
+    // Both features are enabled
+}
+```
+
+### FCV-gated Feature Flag Behavior During Initial Sync
 
 **_IMPORTANT NOTE ABOUT INITIAL SYNC_**:
 `isEnabled` checks if the feature flag is enabled on the input FCV, which is usually
@@ -751,7 +816,7 @@ should use one of these options instead:
   even though the FCV has not been upgraded yet and will be set to lastLTS once initial sync is complete.
 - Write your own special logic to avoid the invariant. If there is a request for creating additional server-wide helper functions in this area, please reach out to the Replication team.
 
-### Additional feature flag gating guidelines
+### Additional FCV-gated feature flag guidelines
 
 There are some cases outside of startup where we also want to check if the feature flag is turned on,
 regardless of which FCV we are on. In these cases we can use the `isEnabledAndIgnoreFCVUnsafe`
@@ -772,7 +837,7 @@ result in only part of the operation being executed.
 In C++ tests, you can use the following RAII guard to ensure that a feature flag is enabled/disabled
 when testing a specific codepath:
 
-```
+```c++
 // featureFlagToaster has the default value.
 {
     RAIIServerParameterControllerForTest controller("featureFlagToaster", true);
@@ -783,7 +848,7 @@ when testing a specific codepath:
 
 In JavaScript, we can use the FeatureFlagUtil library to query the setting for a feature flag:
 
-```
+```c++
 if (FeatureFlagUtil.isPresentAndEnabled(db, "Toaster")) {
 }
 ```
@@ -854,15 +919,15 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "Toaster")) {
 # Summary of Rules for FCV and Feature Flag Usage:
 
 - Any project or ticket that wants to introduce different behavior based on which FCV
-  the server is running **_must_** add a feature flag.
+  the server is running **_must_** add an FCV-gated feature flag.
 - We should **_not_** be adding any references to FCV constants such as kVersion_6_0.
 - To make sure all generic FCV references are
   indeed meant to exist across LTS binary versions, **_a comment containing “(Generic FCV reference):”
   is required within 10 lines before a generic FCV reference._**
 - If you want to ensure that the FCV will not change during your operation, you must take the global
   IX or X lock first, and then check the feature flag/FCV value after that point.
-- In a single operation, you should only check the feature flag once, as reads are non-repeatable.
-- Any projects/tickets that use and enable a feature flag **_must_** leave that feature flag in the
+- In a single operation, you should only check the FCV-gated feature flag once, as reads are non-repeatable.
+- Any projects/tickets that use and enable an FCV-gated feature flag **_must_** leave that feature flag in the
   codebase at least until the next major release.
 - We do not support disabling feature flags once they have been enabled via IDL in a release build.
 - Feature flags should never be enabled in the period of time after branch cut but before FCV

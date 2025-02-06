@@ -65,7 +65,7 @@ REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(fill,
                                        document_source_fill::createFromBson,
                                        AllowedWithApiStrict::kNeverInVersion1,
                                        AllowedWithClientType::kAny,
-                                       boost::none,
+                                       kDoesNotRequireFeatureFlag,
                                        true);
 namespace document_source_fill {
 

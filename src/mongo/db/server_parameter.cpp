@@ -139,7 +139,8 @@ bool ServerParameter::_isEnabledOnVersion(
 bool ServerParameter::featureFlagIsDisabledOnVersion(
     const multiversion::FeatureCompatibilityVersion& targetFCV) const {
     stdx::lock_guard lk(_mutex);
-    return _featureFlag && !_featureFlag->isEnabledOnVersion(targetFCV);
+    return !_featureFlag.isEnabled(
+        [&](auto& fcvGatedFlag) { return fcvGatedFlag.isEnabledOnVersion(targetFCV); });
 }
 
 ServerParameterSet* ServerParameterSet::getClusterParameterSet() {

@@ -150,7 +150,7 @@ intrusive_ptr<Expression> Expression::parse(BSONObj obj,
 
 void Expression::registerParser(std::string functionName,
                                 Parser parser,
-                                boost::optional<FeatureFlag> featureFlag,
+                                CheckableFeatureFlagRef featureFlag,
                                 AllowedWithApiStrict allowedWithApi) {
     invariant(parserMap.find(functionName) == parserMap.end());
     ExpressionParserRegistration r{parser, featureFlag, allowedWithApi};

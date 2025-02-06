@@ -1311,6 +1311,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 if param.feature_flag or (param.condition and param.condition.feature_flag)
             ]:
                 header_list.append("mongo/db/feature_flag.h")
+                header_list.append("mongo/db/feature_flag_server_parameter.h")
             if [
                 param
                 for param in spec.server_parameters
@@ -3375,7 +3376,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     if param.condition:
                         if param.condition.feature_flag:
                             self._writer.write_line(
-                                "scp_%d->setFeatureFlag(&%s);"
+                                "scp_%d->setFeatureFlag(%s);"
                                 % (param_no, param.condition.feature_flag)
                             )
                         if param.condition.min_fcv:

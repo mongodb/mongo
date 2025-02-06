@@ -518,8 +518,7 @@ public:
      * 'maxFeatureCompatibilityVersion' if set. Will do nothing if the feature flag is enabled
      * or boost::none.
      */
-    void throwIfFeatureFlagIsNotEnabledOnFCV(StringData name,
-                                             const boost::optional<FeatureFlag>& flag);
+    void throwIfFeatureFlagIsNotEnabledOnFCV(StringData name, CheckableFeatureFlagRef flag);
 
     void setOperationContext(OperationContext* opCtx) {
         _params.opCtx = opCtx;

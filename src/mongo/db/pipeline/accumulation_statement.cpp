@@ -58,7 +58,7 @@ void AccumulationStatement::registerAccumulator(std::string name,
                                                 AccumulationStatement::Parser parser,
                                                 AllowedWithApiStrict allowedWithApiStrict,
                                                 AllowedWithClientType allowedWithClientType,
-                                                boost::optional<FeatureFlag> featureFlag) {
+                                                CheckableFeatureFlagRef featureFlag) {
     auto it = parserMap.find(name);
     massert(28722,
             str::stream() << "Duplicate accumulator (" << name << ") registered.",

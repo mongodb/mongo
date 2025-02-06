@@ -29,39 +29,69 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <memory>
-#include <string>
+#include <variant>
 
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/server_parameter.h"
-#include "mongo/db/tenant_id.h"
+#include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/version/releases.h"
 
 namespace mongo {
 
 /**
- * FeatureFlag contains information about whether a feature flag is enabled and what version it was
- * released.
- *
- * FeatureFlag represents the state of a feature flag and whether it is associated with a particular
- * version. It is not implicitly convertible to bool to force all call sites to make a decision
- * about what check to use.
- *
- * It is only set at startup.
+ * BinaryCompatibleFeatureFlag is a simple boolean feature flag whose value is only set at startup.
+ * Its value does not change at runtime, nor during FCV upgrade/downgrade.
  */
-class FeatureFlag {
-    friend class FeatureFlagServerParameter;
-
-protected:
-    FeatureFlag(bool enabled, StringData versionString, bool shouldBeFCVGated);
+class BinaryCompatibleFeatureFlag {
+    friend class FeatureFlagServerParameter;  // For set(...)
 
 public:
+    explicit BinaryCompatibleFeatureFlag(bool enabled) : _enabled(enabled) {}
+
+    // Non-copyable, non-movable
+    BinaryCompatibleFeatureFlag(const BinaryCompatibleFeatureFlag&) = delete;
+    BinaryCompatibleFeatureFlag& operator=(const BinaryCompatibleFeatureFlag&) = delete;
+
+    bool isEnabled() const {
+        return _enabled;
+    }
+
+    // TODO(SERVER-99874): Remove this stub
+    bool isEnabled(ServerGlobalParams::FCVSnapshot fcv) const {
+        return isEnabled();
+    }
+    bool isEnabledUseLastLTSFCVWhenUninitialized(ServerGlobalParams::FCVSnapshot fcv) const {
+        return isEnabled();
+    }
+    bool isEnabledUseLatestFCVWhenUninitialized(ServerGlobalParams::FCVSnapshot fcv) const {
+        return isEnabled();
+    }
+    bool isEnabledAndIgnoreFCVUnsafe() const {
+        return isEnabled();
+    }
+
+private:
+    void set(bool enabled) {
+        _enabled = enabled;
+    };
+
+    bool _enabled;
+};
+
+/**
+ * FCVGatedFeatureFlag is a boolean feature flag which is be enabled or disabled depending on FCV.
+ * The feature flag is enabled if the current FCV is greater than or equal than the specified
+ * threshold version and it is defined as enabled by default. It is not implicitly convertible to
+ * bool to force all call sites to make a decision about what check to use.
+ */
+// TODO(SERVER-99351): Review the API exposed for FCV-gated feature flags
+class FCVGatedFeatureFlag {
+    friend class FeatureFlagServerParameter;  // For set(...)
+
+public:
+    FCVGatedFeatureFlag(bool enabled, StringData versionString);
+
     /**
      * Returns true if the flag is set to true and enabled for this FCV version.
      * If the functionality of this function changes, make sure that the
@@ -131,65 +161,50 @@ private:
 private:
     bool _enabled;
     multiversion::FeatureCompatibilityVersion _version;
-    bool _shouldBeFCVGated;
-};
-
-// TODO(SERVER-99351): Review the API exposed for FCV-gated feature flags
-class FeatureFlagFCVGated : public FeatureFlag {
-public:
-    FeatureFlagFCVGated(bool enabled, StringData versionString)
-        : FeatureFlag(enabled, versionString, true) {}
-};
-
-// TODO(SERVER-99302): Review the API exposed for binary-compatible feature flags
-class FeatureFlagBinaryCompatible : public FeatureFlag {
-public:
-    FeatureFlagBinaryCompatible(bool enabled) : FeatureFlag(enabled, "", false) {}
 };
 
 /**
- * Specialization of ServerParameter for FeatureFlags used by IDL generator.
+ * Expresses that a feature may depend on either a binary-compatible or FCV-gated feature flag.
+ *
+ * This class can wrap either a BinaryCompatibleFeatureFlag or an FCVGatedFeatureFlag, and provides
+ * a single method to check if the feature is enabled.
+ *
+ * It can also represent a "null object" state, where the feature does not depend on a feature flag,
+ * and thus it is unconditionally enabled.
+ *
+ * For FCV-gated feature flags, you must provide a callback defining how to check an FCV-gated flag,
+ * to handle cases such as uninitialized FCV or checking multiple flags under the same FCV snapshot.
+ *
+ * If you don't need to support both binary-compatible and FCV-gated feature flags, you should
+ * use BinaryCompatibleFeatureFlag or FCVGatedFeatureFlag directly.
  */
-class FeatureFlagServerParameter : public ServerParameter {
+class CheckableFeatureFlagRef {
 public:
-    FeatureFlagServerParameter(StringData name, FeatureFlag& storage);
+    CheckableFeatureFlagRef() = default;
+    explicit(false) CheckableFeatureFlagRef(BinaryCompatibleFeatureFlag& featureFlag)
+        : _featureFlag(&featureFlag) {}
+    explicit(false) CheckableFeatureFlagRef(FCVGatedFeatureFlag& featureFlag)
+        : _featureFlag(&featureFlag) {}
 
-    /**
-     * Encode the setting into BSON object.
-     *
-     * Typically invoked by {getParameter:...} to produce a dictionary
-     * of ServerParameter settings.
-     */
-    void append(OperationContext* opCtx,
-                BSONObjBuilder* b,
-                StringData name,
-                const boost::optional<TenantId>&) final;
-
-    /**
-     * Encode the feature flag value into a BSON object, discarding the version.
-     */
-    void appendSupportingRoundtrip(OperationContext* opCtx,
-                                   BSONObjBuilder* b,
-                                   StringData name,
-                                   const boost::optional<TenantId>&) override;
-
-    /**
-     * Update the underlying value using a BSONElement
-     *
-     * Allows setting non-basic values (e.g. vector<string>)
-     * via the {setParameter: ...} call.
-     */
-    Status set(const BSONElement& newValueElement, const boost::optional<TenantId>&) final;
-
-    /**
-     * Update the underlying value from a string.
-     *
-     * Typically invoked from commandline --setParameter usage.
-     */
-    Status setFromString(StringData str, const boost::optional<TenantId>&) final;
+    template <typename F>
+    bool isEnabled(F&& isFcvGatedFlagEnabled) const {
+        return visit(
+            OverloadedVisitor{[](std::monostate) { return true; },
+                              [](BinaryCompatibleFeatureFlag* impl) { return impl->isEnabled(); },
+                              [&](FCVGatedFeatureFlag* impl) -> bool {
+                                  return isFcvGatedFlagEnabled(*impl);
+                              }},
+            _featureFlag);
+    }
 
 private:
-    FeatureFlag& _storage;
+    std::variant<std::monostate, BinaryCompatibleFeatureFlag*, FCVGatedFeatureFlag*> _featureFlag;
 };
+
+/**
+ * Expresses that a feature is not dependent on a feature flag, and
+ * thus it is always enabled.
+ */
+inline constexpr CheckableFeatureFlagRef kDoesNotRequireFeatureFlag;
 
 }  // namespace mongo

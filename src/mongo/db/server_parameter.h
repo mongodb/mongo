@@ -57,6 +57,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/mutex.h"
@@ -107,7 +108,6 @@ enum class ServerParameterType {
     kClusterWide,
 };
 
-class FeatureFlag;
 class ServerParameterSet;
 
 class OperationContext;
@@ -280,7 +280,7 @@ public:
     // temporarily disabled
     bool canBeEnabledOnVersion(const multiversion::FeatureCompatibilityVersion& targetFCV) const;
 
-    void setFeatureFlag(FeatureFlag* featureFlag) {
+    void setFeatureFlag(CheckableFeatureFlagRef featureFlag) {
         stdx::lock_guard lk(_mutex);
         _featureFlag = featureFlag;
     }
@@ -315,7 +315,7 @@ private:
     bool _testOnly = false;
     bool _redact = false;
     bool _isOmittedInFTDC = false;
-    FeatureFlag* _featureFlag = nullptr;
+    CheckableFeatureFlagRef _featureFlag = kDoesNotRequireFeatureFlag;
     boost::optional<multiversion::FeatureCompatibilityVersion> _minFCV = boost::none;
 
     // Tracks whether a parameter is enabled, temporarily disabled, or permanently disabled. This is

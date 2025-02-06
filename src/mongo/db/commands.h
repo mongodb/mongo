@@ -1581,7 +1581,7 @@ class CommandConstructionPlan {
 public:
     struct Entry {
         std::function<std::unique_ptr<Command>()> construct;
-        const FeatureFlag* featureFlag = nullptr;
+        CheckableFeatureFlagRef featureFlag = kDoesNotRequireFeatureFlag;
         bool testOnly = false;
         boost::optional<ClusterRole> roles;
         const std::type_info* typeInfo = nullptr;
@@ -1640,7 +1640,7 @@ CommandConstructionPlan& globalCommandConstructionPlan();
  * Example:
  *
  *   auto dum = *CommandConstructionPlan::EntryBuilder::make<CmdType>()
- *       .requiresFeatureFlag(&myFeatureFlag)
+ *       .requiresFeatureFlag(myFeatureFlag)
  *       .testOnly();
  */
 class CommandConstructionPlan::EntryBuilder {
@@ -1695,9 +1695,15 @@ public:
      * A command object will be created only if the featureFlag is enabled,
      * regardless of the current FCV.
      */
-    EntryBuilder requiresFeatureFlag(const FeatureFlag* featureFlag) && {
+    EntryBuilder requiresFeatureFlag(CheckableFeatureFlagRef featureFlag) && {
         _entry->featureFlag = featureFlag;
         return std::move(*this);
+    }
+
+    // TODO(SERVER-99874): Remove this stub
+    template <typename T>
+    EntryBuilder requiresFeatureFlag(T* featureFlag) && {
+        return std::move(*this).requiresFeatureFlag(CheckableFeatureFlagRef(*featureFlag));
     }
 
     /**

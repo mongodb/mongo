@@ -69,7 +69,7 @@ namespace mongo {
                                        factory,                       \
                                        AllowedWithApiStrict::kAlways, \
                                        AllowedWithClientType::kAny,   \
-                                       boost::none,                   \
+                                       kDoesNotRequireFeatureFlag,    \
                                        true)
 
 /**
@@ -77,15 +77,17 @@ namespace mongo {
  * enabled. We store featureFlag in the parseMap, so that it can be checked at runtime
  * to correctly enable/disable the accumulator.
  */
-#define REGISTER_ACCUMULATOR_WITH_FEATURE_FLAG(key, factory, featureFlag) \
-    REGISTER_ACCUMULATOR_CONDITIONALLY(                                   \
-        key,                                                              \
-        factory,                                                          \
-        AllowedWithApiStrict::kAlways,                                    \
-        AllowedWithClientType::kAny,                                      \
-        featureFlag,                                                      \
-        featureFlag.isEnabledUseLatestFCVWhenUninitialized(               \
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))
+#define REGISTER_ACCUMULATOR_WITH_FEATURE_FLAG(key, factory, featureFlag)       \
+    REGISTER_ACCUMULATOR_CONDITIONALLY(                                         \
+        key,                                                                    \
+        factory,                                                                \
+        AllowedWithApiStrict::kAlways,                                          \
+        AllowedWithClientType::kAny,                                            \
+        featureFlag,                                                            \
+        CheckableFeatureFlagRef(featureFlag).isEnabled([](auto& fcvGatedFlag) { \
+            return fcvGatedFlag.isEnabledUseLatestFCVWhenUninitialized(         \
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());  \
+        }))
 
 /**
  * Like REGISTER_ACCUMULATOR_WITH_FEATURE_FLAG, except the accumulator will be set with
@@ -98,8 +100,10 @@ namespace mongo {
         AllowedWithApiStrict::kNeverInVersion1,                                    \
         AllowedWithClientType::kAny,                                               \
         featureFlag,                                                               \
-        featureFlag.isEnabledUseLatestFCVWhenUninitialized(                        \
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))
+        CheckableFeatureFlagRef(featureFlag).isEnabled([](auto& fcvGatedFlag) {    \
+            return fcvGatedFlag.isEnabledUseLatestFCVWhenUninitialized(            \
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());     \
+        }))
 
 /**
  * You can specify a condition, evaluated during startup,
@@ -278,8 +282,8 @@ public:
      * Associates a Parser with information regarding which contexts it can be used in, including
      * API Version and feature flag.
      */
-    using ParserRegistration = std::
-        tuple<Parser, AllowedWithApiStrict, AllowedWithClientType, boost::optional<FeatureFlag>>;
+    using ParserRegistration =
+        std::tuple<Parser, AllowedWithApiStrict, AllowedWithClientType, CheckableFeatureFlagRef>;
 
     AccumulationStatement(std::string fieldName, AccumulationExpression expr)
         : fieldName(std::move(fieldName)), expr(std::move(expr)) {}
@@ -308,7 +312,7 @@ public:
                                     Parser parser,
                                     AllowedWithApiStrict allowedWithApiStrict,
                                     AllowedWithClientType allowedWithClientType,
-                                    boost::optional<FeatureFlag> featureFlag);
+                                    CheckableFeatureFlagRef featureFlag);
 
     /**
      * Retrieves the Parser for the accumulator specified by the given name, and raises an error if

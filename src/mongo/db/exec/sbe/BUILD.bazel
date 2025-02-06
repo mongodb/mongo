@@ -132,6 +132,7 @@ mongo_cc_library(
         "//src/mongo/db:database_name_reserved.def.h",
         "//src/mongo/db:feature_compatibility_version_parser.h",
         "//src/mongo/db:feature_flag.h",
+        "//src/mongo/db:feature_flag_server_parameter.h",
         "//src/mongo/db:field_ref.h",
         "//src/mongo/db:logical_time.h",
         "//src/mongo/db:namespace_string.h",
