@@ -188,6 +188,7 @@
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_ready.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_lifecycle_monitor.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -322,7 +323,6 @@ const ntservice::NtServiceDefaultStrings defaultServiceStrings = {
 
 auto makeTransportLayer(ServiceContext* svcCtx) {
     boost::optional<int> routerPort;
-    boost::optional<int> loadBalancerPort;
     boost::optional<int> proxyPort;
 
     if (serverGlobalParams.routerPort) {
@@ -336,20 +336,23 @@ auto makeTransportLayer(ServiceContext* svcCtx) {
         // TODO SERVER-78730: add support for load-balanced connections.
     }
 
-    if (serverGlobalParams.proxyPort) {
-        proxyPort = *serverGlobalParams.proxyPort;
-        if (*proxyPort == serverGlobalParams.port) {
-            LOGV2_ERROR(9967800,
-                        "The proxy port must be different from the public listening port.",
-                        "port"_attr = serverGlobalParams.port);
-            quickExit(ExitCode::badOptions);
-        }
+    // (Ignore FCV check): The proxy port needs to be open before the FCV is set.
+    if (gFeatureFlagMongodProxyProcolSupport.isEnabledAndIgnoreFCVUnsafe()) {
+        if (serverGlobalParams.proxyPort) {
+            proxyPort = *serverGlobalParams.proxyPort;
+            if (*proxyPort == serverGlobalParams.port) {
+                LOGV2_ERROR(9967800,
+                            "The proxy port must be different from the public listening port.",
+                            "port"_attr = serverGlobalParams.port);
+                quickExit(ExitCode::badOptions);
+            }
 
-        if (routerPort && *proxyPort == *routerPort) {
-            LOGV2_ERROR(9967801,
-                        "The proxy port must be different from the public router port.",
-                        "port"_attr = *routerPort);
-            quickExit(ExitCode::badOptions);
+            if (routerPort && *proxyPort == *routerPort) {
+                LOGV2_ERROR(9967801,
+                            "The proxy port must be different from the public router port.",
+                            "port"_attr = *routerPort);
+                quickExit(ExitCode::badOptions);
+            }
         }
     }
 
@@ -369,11 +372,8 @@ auto makeTransportLayer(ServiceContext* svcCtx) {
     }
 #endif
 
-    return transport::TransportLayerManagerImpl::createWithConfig(&serverGlobalParams,
-                                                                  svcCtx,
-                                                                  useEgressGRPC,
-                                                                  std::move(loadBalancerPort),
-                                                                  std::move(routerPort));
+    return transport::TransportLayerManagerImpl::createWithConfig(
+        &serverGlobalParams, svcCtx, useEgressGRPC, std::move(proxyPort), std::move(routerPort));
 }
 
 ExitCode initializeTransportLayer(ServiceContext* serviceContext, BSONObjBuilder* timerReport) {

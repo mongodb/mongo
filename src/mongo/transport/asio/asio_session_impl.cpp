@@ -747,6 +747,15 @@ Future<bool> CommonAsioSession::maybeHandshakeSSLForIngress(const MutableBufferS
     if (checkForHTTPRequest(buffer)) {
         return Future<bool>::makeReady(false);
     }
+
+    if (maybeProxyProtocolHeader(
+            StringData(asio::buffer_cast<const char*>(buffer), asio::buffer_size(buffer)))) {
+        // Protocol requirements mean that neither raw mongorpc nor TLS client hello will look like
+        // Proxy.
+        return Future<bool>::makeReady(
+            Status(ErrorCodes::OperationFailed, "ProxyProtocol message detected on mongorpc port"));
+    }
+
     // This logic was taken from the old mongo/util/net/sock.cpp.
     //
     // It lets us run both TLS and unencrypted mongo over the same port.

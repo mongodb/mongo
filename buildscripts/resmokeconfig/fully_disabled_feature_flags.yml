@@ -17,5 +17,5 @@
 - featureFlagEgressGrpcForSearch
 - featureFlagTrackUnshardedCollectionsUponCreation
 - featureFlagTSBucketingParametersUnchanged
-- featureFlagMongogProxyProcolSupport
+- featureFlagMongodProxyProcolSupport
 - featureFlagShardAuthoritativeDbMetadata

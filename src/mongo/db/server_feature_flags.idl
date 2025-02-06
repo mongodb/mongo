@@ -134,9 +134,9 @@ feature_flags:
          cpp_varname: gFeatureFlagExposeClientIpInAuditLogs
          default: false
          shouldBeFCVGated: true
-    featureFlagMongogProxyProcolSupport:
+    featureFlagMongodProxyProcolSupport:
         description: "Enables non-OCS proxy protocol connections on Mongos and Mongod"
-        cpp_varname: gFeatureFlagMongogProxyProcolSupport
+        cpp_varname: gFeatureFlagMongodProxyProcolSupport
         default: false
         shouldBeFCVGated: true
     featureFlagRawDataCrudOperations:
