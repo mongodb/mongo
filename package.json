@@ -3,7 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "devDependencies": {
-    "prettier": "3.4.2",
-    "eslint": "8.28.0"
+    "@eslint/js": "^9",
+    "@eslint/eslintrc": "3.2.0",
+    "eslint": "9.19.0",
+    "globals": "14.0.0",
+    "eslint-formatter-unix": "^8.40.0",
+    "prettier": "3.4.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": []
   }
 }

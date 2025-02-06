@@ -4,6 +4,7 @@
 import argparse
 import logging
 import os
+import subprocess
 import sys
 from typing import List
 
@@ -89,6 +90,12 @@ def main():
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
     structlog.configure(logger_factory=structlog.stdlib.LoggerFactory())
+
+    # Use the nodejs binary from the bazel's npm repository
+    subprocess.run(["bazel", "build", "//:eslint", "--config=local"], env=os.environ, check=True)
+    os.environ["PATH"] = (
+        "bazel-bin/eslint_/eslint.runfiles/nodejs_linux_arm64/bin/nodejs/bin/" + os.pathsep
+    ) + os.environ["PATH"]
 
     args.func(args.paths if hasattr(args, "paths") else [])
 

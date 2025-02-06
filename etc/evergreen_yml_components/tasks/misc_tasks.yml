@@ -601,7 +601,7 @@ tasks:
           jepsen_test_name: set
 
   # TODO(SERVER-97804): rename if display_name appears on the evergreen UI
-  - name: bazel_run_//:format
+  - name: bazel_run_format
     tags:
       [
         "assigned_to_jira_team_devprod_build",
@@ -796,6 +796,9 @@ tasks:
         "development_critical_single_variant",
         "lint",
       ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
     commands:
       - command: timeout.update
         params:

@@ -42,14 +42,11 @@ Ex: `buildscripts/quickmongolint.py lint`
 
 ## Javascript Linters
 
-The `buildscripts/eslint.py` wrapper script runs the `eslint` javascript linter. You can see the
-usage message for the wrapper by running `buildscripts/eslint.py --help`.
+The `bazel run lint` command runs the `eslint` javascript linter.
 
-Ex: `buildscripts/eslint.py lint`
-
-| Linter   | Configuration File(s)           | Help Command    | Documentation                              |
-| -------- | ------------------------------- | --------------- | ------------------------------------------ |
-| `eslint` | `.eslintrc.yml` `.eslintignore` | `eslint --help` | [https://eslint.org/](https://eslint.org/) |
+| Linter   | Configuration File(s) | Help Command | Documentation                              |
+| -------- | --------------------- | ------------ | ------------------------------------------ |
+| `eslint` | `.eslint.config.mjs`  |              | [https://eslint.org/](https://eslint.org/) |
 
 ## Yaml Linters
 

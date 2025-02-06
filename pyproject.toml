@@ -17,7 +17,7 @@ packages = [
 ]
 dependencies = [
     "networkx",                               # This is also used as a part of build_metrics so it is sort of required
-    "pyright==1.1.380",
+    "pyright (==1.1.393)",
     "flask",
     "flask-cors",
     "lxml",
@@ -41,7 +41,7 @@ gevent = { version = "*", optional = true }
 progressbar2 = { version = "*", optional = true }
 cxxfilt = { version = "*", optional = true }
 pympler = { version = "*", optional = true }
-pyright = "1.1.380"
+pyright = "1.1.393"
 
 [tool.poetry.group.aws.dependencies]
 boto3 = "^1.34.156"

@@ -2,6 +2,8 @@ load("@npm//:defs.bzl", "npm_link_all_packages")
 load("//bazel/install_rules:install_rules.bzl", "mongo_install")
 load("//bazel/toolchains:mongo_toolchain.bzl", "setup_mongo_toolchain_aliases")
 load("//bazel/config:render_template.bzl", "render_template")
+load("@npm//:eslint/package_json.bzl", eslint_bin = "bin")
+load("@aspect_rules_js//js:defs.bzl", "js_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -16,9 +18,31 @@ exports_files([
 
 npm_link_all_packages(name = "node_modules")
 
+js_library(
+    name = "eslintrc",
+    srcs = ["eslint.config.mjs"],
+    deps = [
+        ":node_modules/@eslint/js",
+        ":node_modules/globals",
+        "//:node_modules/@eslint/eslintrc",
+    ],
+)
+
+eslint_bin.eslint_binary(
+    name = "eslint",
+    data = [
+        "//:eslintrc",
+    ],
+)
+
 alias(
     name = "format",
     actual = "//bazel/format",
+)
+
+alias(
+    name = "lint",
+    actual = "//bazel:lint",
 )
 
 alias(

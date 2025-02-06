@@ -269,7 +269,7 @@ node_modules/
 package-lock.json
 
 # jstestfuzz generated test directory
-jstestfuzz/
+/jstestfuzz/
 
 # Bazel-related work
 # (Note that each string does NOT terminate with a '/' so that gitignore works properly)

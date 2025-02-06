@@ -34,6 +34,78 @@ http_archive(
     ],
 )
 
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "aspect_rules_lint",
+    sha256 = "f60e4a737a5e09402f5fa3bd182efa80dac5523ca4b9bc5c6fa8c06fbfb46630",
+    strip_prefix = "rules_lint-1.1.0",
+    url = "https://github.com/aspect-build/rules_lint/releases/download/v1.1.0/rules_lint-v1.1.0.tar.gz",
+)
+
+# aspect_rules_lint depends on aspect_bazel_lib.
+http_archive(
+    name = "aspect_bazel_lib",
+    sha256 = "6d758a8f646ecee7a3e294fbe4386daafbe0e5966723009c290d493f227c390b",
+    strip_prefix = "bazel-lib-2.7.7",
+    url = "https://github.com/aspect-build/bazel-lib/releases/download/v2.7.7/bazel-lib-v2.7.7.tar.gz",
+)
+
+load("@aspect_bazel_lib//lib:repositories.bzl", "aspect_bazel_lib_dependencies")
+
+# aspect_bazel_lib depends on bazel_skylib
+aspect_bazel_lib_dependencies()
+
+load(
+    "@aspect_rules_lint//format:repositories.bzl",
+    # Fetch additional formatter binaries you need:
+    "fetch_java_format",
+    "fetch_ktfmt",
+    "fetch_swiftformat",
+    "rules_lint_dependencies",
+)
+
+rules_lint_dependencies()
+
+fetch_java_format()
+
+fetch_ktfmt()
+
+fetch_swiftformat()
+
+load("@aspect_rules_lint//lint:checkstyle.bzl", "fetch_checkstyle")
+
+fetch_checkstyle()
+
+load("@aspect_rules_lint//lint:pmd.bzl", "fetch_pmd")
+
+fetch_pmd()
+
+load("@aspect_rules_lint//lint:vale.bzl", "fetch_vale")
+
+fetch_vale()
+
+load("@aspect_rules_lint//lint:ktlint.bzl", "fetch_ktlint")
+
+fetch_ktlint()
+
+load("@aspect_rules_lint//lint:spotbugs.bzl", "fetch_spotbugs")
+
+fetch_spotbugs()
+
+########################
+# Optional: multitool provides defaults for some tools such as yamlfmt
+# If you do not set up multitool, you must provide these tools yourself
+load("@rules_multitool//multitool:multitool.bzl", "multitool")
+
+multitool(
+    name = "multitool",
+    lockfiles = [
+        "@aspect_rules_lint//format:multitool.lock.json",
+        "@aspect_rules_lint//lint:multitool.lock.json",
+    ],
+)
+
 load("//bazel/platforms:local_config_platform.bzl", "setup_local_config_platform")
 load("//bazel/toolchains:mongo_toolchain.bzl", "toolchain_download")
 
@@ -165,16 +237,16 @@ poetry(
 
 http_archive(
     name = "aspect_rules_js",
-    sha256 = "630a71aba66c4023a5b16ab3efafaeed8b1a2865ccd168a34611eb73876b3fc4",
-    strip_prefix = "rules_js-1.37.1",
+    sha256 = "875b8d01af629dbf626eddc5cf239c9f0da20330f4d99ad956afc961096448dd",
+    strip_prefix = "rules_js-2.1.3",
     urls = [
         # Implements retry by relisting each url multiple times to be used as a failover.
         # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://github.com/aspect-build/rules_js/releases/download/v1.37.1/rules_js-v1.37.1.tar.gz",
-        "https://github.com/aspect-build/rules_js/releases/download/v1.37.1/rules_js-v1.37.1.tar.gz",
-        "https://github.com/aspect-build/rules_js/releases/download/v1.37.1/rules_js-v1.37.1.tar.gz",
-        "https://github.com/aspect-build/rules_js/releases/download/v1.37.1/rules_js-v1.37.1.tar.gz",
-        "https://github.com/aspect-build/rules_js/releases/download/v1.37.1/rules_js-v1.37.1.tar.gz",
+        "https://github.com/aspect-build/rules_js/releases/download/v2.1.3/rules_js-v2.1.3.tar.gz",
+        "https://github.com/aspect-build/rules_js/releases/download/v2.1.3/rules_js-v2.1.3.tar.gz",
+        "https://github.com/aspect-build/rules_js/releases/download/v2.1.3/rules_js-v2.1.3.tar.gz",
+        "https://github.com/aspect-build/rules_js/releases/download/v2.1.3/rules_js-v2.1.3.tar.gz",
+        "https://github.com/aspect-build/rules_js/releases/download/v2.1.3/rules_js-v2.1.3.tar.gz",
     ],
 )
 
@@ -182,17 +254,15 @@ load("@aspect_rules_js//js:repositories.bzl", "rules_js_dependencies")
 
 rules_js_dependencies()
 
-load("@rules_nodejs//nodejs:repositories.bzl", "DEFAULT_NODE_VERSION", "nodejs_register_toolchains")
+load("@aspect_rules_js//js:toolchains.bzl", "DEFAULT_NODE_VERSION", "rules_js_register_toolchains")
 
-nodejs_register_toolchains(
-    name = "nodejs",
-    node_version = DEFAULT_NODE_VERSION,
-)
+rules_js_register_toolchains(node_version = DEFAULT_NODE_VERSION)
 
 load("@aspect_rules_js//npm:repositories.bzl", "npm_translate_lock")
 
 npm_translate_lock(
     name = "npm",
+    npmrc = "//:.npmrc",
     pnpm_lock = "//:pnpm-lock.yaml",
     verify_node_modules_ignored = "//:.bazelignore",
 )

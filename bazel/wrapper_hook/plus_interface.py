@@ -10,6 +10,7 @@ REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
 sys.path.append(str(REPO_ROOT))
 
 from bazel.wrapper_hook.compiledb import generate_compiledb
+from bazel.wrapper_hook.lint import run_rules_lint
 from bazel.wrapper_hook.wrapper_debug import wrapper_debug
 
 
@@ -57,8 +58,10 @@ def test_runner_interface(args, autocomplete_query, get_buildozer_output=get_bui
     plus_starts = ("+", ":+", "//:+")
     skip_plus_interface = True
     compiledb_target = False
+    lint_target = False
     persistent_compdb = True
     compiledb_targets = ["//:compiledb", ":compiledb", "compiledb"]
+    lint_targets = ["//:lint", ":lint", "lint"]
     sources_to_bin = {}
     select_sources = {}
     current_select = None
@@ -80,6 +83,8 @@ def test_runner_interface(args, autocomplete_query, get_buildozer_output=get_bui
     for arg in args:
         if arg in compiledb_targets:
             compiledb_target = True
+        if arg in lint_targets:
+            lint_target = True
         if arg == "--intree_compdb":
             replacements[arg] = []
             persistent_compdb = False
@@ -89,6 +94,9 @@ def test_runner_interface(args, autocomplete_query, get_buildozer_output=get_bui
 
     if compiledb_target:
         generate_compiledb(args[0], persistent_compdb)
+
+    if lint_target:
+        run_rules_lint(args[0], args[3:])
 
     if skip_plus_interface and not autocomplete_query:
         return args[1:]

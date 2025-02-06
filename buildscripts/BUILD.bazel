@@ -1,4 +1,5 @@
 load("@poetry//:dependencies.bzl", "dependency")
+load("@npm//:eslint/package_json.bzl", "bin")
 
 exports_files([
     "cheetah_source_generator.py",
@@ -225,4 +226,11 @@ py_library(
         "mongo_toolchain",
         "simple_report",
     ],
+)
+
+bin.eslint_binary(
+    name = "eslint_binary",
+    # Allow the binary to be run outside bazel
+    # See more details about this by commenting this out and running `bazel run //:format`
+    env = {"BAZEL_BINDIR": "."},
 )

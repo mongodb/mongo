@@ -716,10 +716,17 @@ buildvariants:
       - name: compile_jstestshell_TG
         distros:
           - amazon2-arm64-latest-nvme
-      - name: .development_critical_single_variant !.requires_large_host
-      - name: .development_critical_single_variant .requires_large_host
+      # TODO(SERVER-99105): Remove the lint/non-lint branch once this is on AL2023
+      - name: .development_critical_single_variant !.requires_large_host !.lint
+      - name: .development_critical_single_variant .requires_large_host !.lint
         distros:
           - amazon2-arm64-latest-xlarge
+      - name: .development_critical_single_variant !.requires_large_host .lint
+        distros:
+          - amazon2023.3-arm64-small
+      - name: .development_critical_single_variant .requires_large_host .lint
+        distros:
+          - amazon2023.3-arm64-large
       - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.stitch !.crypt
       - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.stitch !.crypt
         distros:

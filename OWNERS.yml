@@ -24,9 +24,6 @@ filters:
   - ".eslintignore":
     approvers:
       - 10gen/devprod-correctness
-  - ".eslintrc.yml":
-    approvers:
-      - 10gen/devprod-correctness
   - ".gitignore":
     approvers:
       - 10gen/devprod-build
@@ -48,6 +45,9 @@ filters:
       - IamXander
       - smcclure15
   - "copy.bara.staging.sky":
+    approvers:
+      - 10gen/devprod-correctness
+  - "eslint.config.mjs":
     approvers:
       - 10gen/devprod-correctness
   - "jsconfig.json":
