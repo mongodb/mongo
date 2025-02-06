@@ -218,6 +218,7 @@ class TestReport(unittest.TestResult):
             if test_info.end_time is None:
                 raise ValueError("stopTest was not called on %s" % (test.basename()))
 
+            changed = test_info.status != "error"
             # We don't distinguish between test failures and Python errors in Evergreen.
             test_info.status = "error"
             test_info.evergreen_status = "fail"
@@ -229,6 +230,9 @@ class TestReport(unittest.TestResult):
         self.num_failed = len(self.get_failed())
         self.num_errored = len(self.get_errored())
         self.num_interrupted = len(self.get_interrupted())
+
+        if changed:
+            self._log_outcome_change(test, "error")
 
     def addFailure(self, test, err):
         """Call when a failureException was raised during the execution of 'test'."""
@@ -243,7 +247,7 @@ class TestReport(unittest.TestResult):
             test_info.evergreen_status = "fail"
             test_info.return_code = test.return_code
 
-    def setFailure(self, test, return_code=1):
+    def setFailure(self, test, return_code=1, reason=""):
         """Change the outcome of an existing test to a failure."""
 
         with self._lock:
@@ -251,6 +255,7 @@ class TestReport(unittest.TestResult):
             if test_info.end_time is None:
                 raise ValueError("stopTest was not called on %s" % (test.basename()))
 
+            changed = test_info.status != "fail"
             test_info.status = "fail"
             test_info.evergreen_status = "fail"
             test_info.return_code = return_code
@@ -260,6 +265,9 @@ class TestReport(unittest.TestResult):
         self.num_failed = len(self.get_failed())
         self.num_errored = len(self.get_errored())
         self.num_interrupted = len(self.get_interrupted())
+
+        if changed:
+            self._log_outcome_change(test, "fail", reason)
 
     def addSuccess(self, test):
         """Call when 'test' executed successfully."""
@@ -396,6 +404,24 @@ class TestReport(unittest.TestResult):
                 return test_info
 
         raise ValueError("Details for %s not found in the report" % (test.basename()))
+
+    def _log_outcome_change(self, test, outcome, reason=""):
+        # Recreate the test logger for this test in order to append to the existing log.
+        logger = logging.loggers.new_test_logger(
+            test.short_name(),
+            test.basename(),
+            None,
+            test.logger,
+            self.job_num,
+            test.id(),
+            self.job_logger,
+        )
+        logger.info(
+            f'Sometime after completion of {test.short_description()}, the test outcome was changed to "{outcome}"'
+            + (f" because: {reason}" if reason else "."),
+        )
+        for handler in logger.handlers:
+            logging.flush.close_later(handler)
 
 
 class TestInfo(object):

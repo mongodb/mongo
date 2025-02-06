@@ -262,7 +262,9 @@ class Job(object):
                     "%s marked as a failure because the fixture crashed during the test.",
                     test.short_description(),
                 )
-                self.report.setFailure(test, return_code=2)
+                self.report.setFailure(
+                    test, return_code=2, reason="the fixture crashed during the test"
+                )
                 # Always fail fast if the fixture fails.
                 raise errors.StopExecution(
                     "%s not running after %s" % (self.fixture, test.short_description())
@@ -397,10 +399,14 @@ class Job(object):
                 self.fixture.stop_balancer()
             except:
                 self.logger.exception(
-                    "%s failed while stopping the balancer for end-test hooks",
+                    "%s failed while stopping the balancer for after-test hooks",
                     test.short_description(),
                 )
-                self.report.setFailure(test, return_code=2)
+                self.report.setFailure(
+                    test,
+                    return_code=2,
+                    reason="the balancer failed to stop before running after-test hooks",
+                )
                 if self.archival:
                     result = TestResult(test=test, hook=None, success=False)
                     self.archival.archive(self.logger, result, self.manager)
@@ -418,14 +424,18 @@ class Job(object):
             self.logger.exception(
                 "%s marked as a failure by a hook's after_test.", test.short_description()
             )
-            self.report.setFailure(test, return_code=2)
+            self.report.setFailure(
+                test, return_code=2, reason=f"The hook {hook.REGISTERED_NAME} failed."
+            )
             raise errors.StopExecution("A hook's after_test failed")
 
         except errors.TestFailure:
             self.logger.exception(
                 "%s marked as a failure by a hook's after_test.", test.short_description()
             )
-            self.report.setFailure(test, return_code=1)
+            self.report.setFailure(
+                test, return_code=1, reason=f"The hook {hook.REGISTERED_NAME} failed."
+            )
             if self.suite_options.fail_fast:
                 raise errors.StopExecution("A hook's after_test failed")
 
@@ -442,7 +452,11 @@ class Job(object):
                     "%s failed while re-starting the balancer after end-test hooks",
                     test.short_description(),
                 )
-                self.report.setFailure(test, return_code=2)
+                self.report.setFailure(
+                    test,
+                    return_code=2,
+                    reason="the balancer failed to restart after running after test hooks",
+                )
                 if self.archival:
                     result = TestResult(test=test, hook=None, success=False)
                     self.archival.archive(self.logger, result, self.manager)
