@@ -35,44 +35,25 @@
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/rpc/metadata/audit_client_attrs_gen.h"
 #include "mongo/rpc/metadata/audit_metadata_gen.h"
 
 namespace mongo::rpc {
 
-class AuditClientAttrs {
+class AuditClientAttrs : public rpc::AuditClientAttrsBase {
 public:
     AuditClientAttrs(HostAndPort local, HostAndPort remote, std::vector<HostAndPort> proxies)
-        : _local(std::move(local)), _remote(std::move(remote)), _proxies(std::move(proxies)) {}
-
+        : AuditClientAttrsBase(std::move(local), std::move(remote), std::move(proxies)) {}
     AuditClientAttrs(HostAndPort local, HostAndPort remote)
         : AuditClientAttrs(std::move(local), std::move(remote), {}) {}
+
+    explicit AuditClientAttrs(const BSONObj& obj);
 
     static boost::optional<AuditClientAttrs> get(Client* client);
     static void set(Client* client, AuditClientAttrs clientAttrs);
     static void reset(Client* client);
 
-    const HostAndPort& getLocal() const {
-        return _local;
-    }
-
-    const HostAndPort& getRemote() const {
-        return _remote;
-    }
-
-    const std::vector<HostAndPort>& getProxiedEndpoints() const {
-        return _proxies;
-    }
-
     ImpersonatedClientMetadata generateClientMetadataObj();
-
-    // Allows this type to be used in IDL and converted directly to/from BSON in commands.
-    static AuditClientAttrs parseFromBSON(BSONObj obj);
-    BSONObj serialize() const;
-
-private:
-    HostAndPort _local;
-    HostAndPort _remote;
-    std::vector<HostAndPort> _proxies;
 };
 
 }  // namespace mongo::rpc

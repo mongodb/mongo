@@ -32,5 +32,6 @@ idl_generator(
     src = "audit_client_attrs.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/util/net:hostandport_gen",
     ],
 )

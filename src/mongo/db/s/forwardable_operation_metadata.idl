@@ -28,6 +28,7 @@
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes: "mongo/rpc/metadata/audit_client_attrs.h"
 
 imports:
      - "mongo/db/basic_types.idl"
