@@ -422,5 +422,24 @@ void assertDataMovementAllowed();
  */
 void assertNamespaceLengthLimit(const NamespaceString& nss, bool isUnsharded);
 
+struct DatabaseMetadataCommitRequest {
+    CommitToShardLocalCatalogOpEnum op;
+    DatabaseName dbName;
+    ShardId shardId;
+    boost::optional<DatabaseVersion> dbVersion;
+};
+
+/**
+ *  Commits database metadata changes to the shard-local catalog by sending the command
+ * `_shardsvrCommitToShardLocalCatalog` to the appropiate shard. This command can be used to update
+ * the database metadata of the shard-local catalog of any shard.
+ */
+void commitDatabaseMetadataToShardLocalCatalog(
+    OperationContext* opCtx,
+    const DatabaseMetadataCommitRequest& request,
+    const OperationSessionInfo& osi,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token);
+
 }  // namespace sharding_ddl_util
 }  // namespace mongo

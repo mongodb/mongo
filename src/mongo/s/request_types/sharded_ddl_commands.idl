@@ -43,6 +43,7 @@ imports:
     - "mongo/db/keypattern.idl"
     - "mongo/db/coll_mod.idl"
     - "mongo/db/basic_types.idl"
+    - "mongo/s/catalog/type_database.idl"
     - "mongo/s/sharding_types.idl"
     - "mongo/s/resharding/common_types.idl"
     - "mongo/db/timeseries/timeseries.idl"
@@ -71,6 +72,13 @@ enums:
             # user writes. When disabling user write blocking, kComplete means the shard
             # will to start accepting sharded DDL operations again.
             kComplete: "complete"
+
+    CommitToShardLocalCatalogOp:
+        description: "Operation to execute for the _shardsvrCommitToShardLocalCatalog command."
+        type: string
+        values:
+            kInsertDatabaseMetadata: "insertDatabaseMetadata"
+            kRemoveDatabaseMetadata: "removeDatabaseMetadata"
 
 structs:
 
@@ -838,4 +846,22 @@ commands:
         namespace: type
         type: namespacestring
         api_version: ""
+        reply_type: OkReply
+
+    _shardsvrCommitToShardLocalCatalog:
+        command_name: _shardsvrCommitToShardLocalCatalog
+        cpp_name: ShardsvrCommitToShardLocalCatalog
+        description: "Internal command to commit metadata to the shard-local catalog"
+        strict: false
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        fields:
+            operation:
+                type: CommitToShardLocalCatalogOp
+                description: "Type of operation to execute for this command."
+            dbMetadata:
+                type: DatabaseType
+                description: "The database metadata to commit."
+                optional: true
         reply_type: OkReply

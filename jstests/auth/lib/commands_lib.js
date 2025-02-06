@@ -3160,6 +3160,21 @@ export const authCommandsLib = {
           ]
         },
         {
+          testname: "_shardsvrCommitToShardLocalCatalog",
+          command: {_shardsvrCommitToShardLocalCatalog: "test.x", operation: "insertDatabaseMetadata"},
+          skipSharded: true,
+          testcases: [
+            {
+              runOnDb: adminDbName,
+              roles: {__system: 1},
+              privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+              expectFail: true
+            },
+            {runOnDb: firstDbName, roles: {}},
+            {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
           testname: "commitTxn",
           command: {commitTransaction: 1},
           skipSharded: true,

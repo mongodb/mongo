@@ -32,7 +32,6 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/create_database_util.h"
 #include "mongo/db/s/participant_block_gen.h"
-#include "mongo/db/s/shard_database_metadata_client.h"
 #include "mongo/db/s/sharding_util.h"
 
 namespace mongo {
@@ -183,11 +182,20 @@ DatabaseType CreateDatabaseCoordinator::_commitClusterCatalog(OperationContext* 
         opCtx, dbName, _doc.getPrimaryShard().get(), _doc.getUserSelectedPrimary());
 }
 
-void CreateDatabaseCoordinator::_commitShardLocalCatalog(OperationContext* opCtx,
-                                                         const DatabaseType& db) {
+void CreateDatabaseCoordinator::_commitShardLocalCatalog(
+    OperationContext* opCtx,
+    const DatabaseType& db,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
     if (_doc.getAuthoritativeShardCommit().get_value_or(false)) {
-        ShardDatabaseMetadataClient dbMetadataClient{opCtx, db.getPrimary()};
-        dbMetadataClient.insert(db);
+        sharding_ddl_util::DatabaseMetadataCommitRequest request{
+            CommitToShardLocalCatalogOpEnum::kInsertDatabaseMetadata,
+            db.getDbName(),
+            db.getPrimary(),
+            db.getVersion()};
+
+        sharding_ddl_util::commitDatabaseMetadataToShardLocalCatalog(
+            opCtx, request, getNewSession(opCtx), executor, token);
     }
 }
 
@@ -211,12 +219,12 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
                                      _enterCriticalSection(opCtx, executor, token);
                                  }))
         .then(_buildPhaseHandler(Phase::kCommitOnShardingCatalog,
-                                 [this, anchor = shared_from_this()] {
+                                 [this, token, executor = executor, anchor = shared_from_this()] {
                                      auto opCtxHolder = cc().makeOperationContext();
                                      auto* opCtx = opCtxHolder.get();
 
                                      auto db = _commitClusterCatalog(opCtx);
-                                     _commitShardLocalCatalog(opCtx, db);
+                                     _commitShardLocalCatalog(opCtx, db, executor, token);
 
                                      // Persists the metadata of the created database on the
                                      // coordinator doc.

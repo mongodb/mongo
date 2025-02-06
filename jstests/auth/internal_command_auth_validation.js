@@ -505,6 +505,13 @@ const internalCommandsMap = {
             reshardingUUID: UUID(),
         },
     },
+    _shardsvrCommitToShardLocalCatalog: {
+        testname: "_shardsvrCommitToShardLocalCatalog",
+        command: {
+            _shardsvrCommitToShardLocalCatalog: "x.y",
+            operation: "insertDatabaseMetadata",
+        },
+    },
     _shardsvrDropCollection: {
         testname: "_shardsvrDropCollection",
         command: {

@@ -61,7 +61,6 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
-#include "mongo/db/s/shard_database_metadata_client.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_recovery_service.h"
@@ -184,50 +183,52 @@ void MovePrimaryCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
 ExecutorFuture<void> MovePrimaryCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
-    return ExecutorFuture<void>(**executor).then([this, executor, anchor = shared_from_this()] {
-        const auto opCtxHolder = cc().makeOperationContext();
-        auto* opCtx = opCtxHolder.get();
-        getForwardableOpMetadata().setOn(opCtx);
+    return ExecutorFuture<void>(**executor)
+        .then([this, token, executor, anchor = shared_from_this()] {
+            const auto opCtxHolder = cc().makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            getForwardableOpMetadata().setOn(opCtx);
 
-        const auto& toShardId = _doc.getToShardId();
+            const auto& toShardId = _doc.getToShardId();
 
-        if (toShardId == ShardingState::get(opCtx)->shardId()) {
-            LOGV2(7120200,
-                  "Database already on requested primary shard",
-                  logAttrs(_dbName),
-                  "to"_attr = toShardId);
+            if (toShardId == ShardingState::get(opCtx)->shardId()) {
+                LOGV2(7120200,
+                      "Database already on requested primary shard",
+                      logAttrs(_dbName),
+                      "to"_attr = toShardId);
 
-            return ExecutorFuture<void>(**executor);
-        }
+                return ExecutorFuture<void>(**executor);
+            }
 
-        const auto toShardEntry = [&] {
-            const auto config = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            const auto findResponse = uassertStatusOK(
-                config->exhaustiveFindOnConfig(opCtx,
-                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                               repl::ReadConcernLevel::kMajorityReadConcern,
-                                               NamespaceString::kConfigsvrShardsNamespace,
-                                               BSON(ShardType::name() << toShardId),
-                                               BSONObj() /* No sorting */,
-                                               1 /* Limit */));
+            const auto toShardEntry = [&] {
+                const auto config = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+                const auto findResponse = uassertStatusOK(config->exhaustiveFindOnConfig(
+                    opCtx,
+                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                    repl::ReadConcernLevel::kMajorityReadConcern,
+                    NamespaceString::kConfigsvrShardsNamespace,
+                    BSON(ShardType::name() << toShardId),
+                    BSONObj() /* No sorting */,
+                    1 /* Limit */));
+
+                uassert(ErrorCodes::ShardNotFound,
+                        "Requested primary shard {} does not exist"_format(toShardId.toString()),
+                        !findResponse.docs.empty());
+
+                return uassertStatusOK(ShardType::fromBSON(findResponse.docs.front()));
+            }();
 
             uassert(ErrorCodes::ShardNotFound,
-                    "Requested primary shard {} does not exist"_format(toShardId.toString()),
-                    !findResponse.docs.empty());
+                    "Requested primary shard {} is draining"_format(toShardId.toString()),
+                    !toShardEntry.getDraining());
 
-            return uassertStatusOK(ShardType::fromBSON(findResponse.docs.front()));
-        }();
-
-        uassert(ErrorCodes::ShardNotFound,
-                "Requested primary shard {} is draining"_format(toShardId.toString()),
-                !toShardEntry.getDraining());
-
-        return runMovePrimaryWorkflow(executor);
-    });
+            return runMovePrimaryWorkflow(executor, token);
+        });
 }
 
 ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
         .then(_buildPhaseHandler(
             Phase::kClone,
@@ -312,7 +313,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                                  }))
         .then(_buildPhaseHandler(
             Phase::kCommit,
-            [this, anchor = shared_from_this()] {
+            [this, token, executor = executor, anchor = shared_from_this()] {
                 const auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
@@ -325,7 +326,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                 auto dbMetadata = getPostCommitDatabaseMetadata(opCtx);
                 assertChangedMetadataOnConfig(opCtx, dbMetadata, preCommitDbVersion);
 
-                commitMetadataToShards(opCtx, dbMetadata.getVersion());
+                commitMetadataToShards(opCtx, dbMetadata.getVersion(), executor, token);
 
                 notifyChangeStreamsOnMovePrimary(
                     opCtx, _dbName, ShardingState::get(opCtx)->shardId(), _doc.getToShardId());
@@ -718,13 +719,25 @@ void MovePrimaryCoordinator::assertChangedMetadataOnConfig(
 }
 
 void MovePrimaryCoordinator::commitMetadataToShards(
-    OperationContext* opCtx, const DatabaseVersion& preCommitDbVersion) const {
+    OperationContext* opCtx,
+    const DatabaseVersion& preCommitDbVersion,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
     if (_doc.getAuthoritativeShardCommit().get_value_or(false)) {
-        ShardDatabaseMetadataClient oldPrimaryClient{opCtx, ShardingState::get(opCtx)->shardId()};
-        oldPrimaryClient.remove(_dbName);
+        sharding_ddl_util::DatabaseMetadataCommitRequest removeRequest{
+            CommitToShardLocalCatalogOpEnum::kRemoveDatabaseMetadata,
+            _dbName,
+            ShardingState::get(opCtx)->shardId()};
+        sharding_ddl_util::commitDatabaseMetadataToShardLocalCatalog(
+            opCtx, removeRequest, getNewSession(opCtx), executor, token);
 
-        ShardDatabaseMetadataClient newPrimaryClient{opCtx, _doc.getToShardId()};
-        newPrimaryClient.insert({_dbName, _doc.getToShardId(), preCommitDbVersion});
+        sharding_ddl_util::DatabaseMetadataCommitRequest insertRequest{
+            CommitToShardLocalCatalogOpEnum::kInsertDatabaseMetadata,
+            _dbName,
+            _doc.getToShardId(),
+            preCommitDbVersion};
+        sharding_ddl_util::commitDatabaseMetadataToShardLocalCatalog(
+            opCtx, insertRequest, getNewSession(opCtx), executor, token);
     }
 }
 

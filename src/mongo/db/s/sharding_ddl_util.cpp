@@ -876,6 +876,46 @@ void assertNamespaceLengthLimit(const NamespaceString& nss, bool isUnsharded) {
         nss.size() <= maxNsLen);
 }
 
+void commitDatabaseMetadataToShardLocalCatalog(
+    OperationContext* opCtx,
+    const DatabaseMetadataCommitRequest& request,
+    const OperationSessionInfo& osi,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
+    auto shardsvrRequest = [&]() {
+        switch (request.op) {
+            case CommitToShardLocalCatalogOpEnum::kInsertDatabaseMetadata: {
+                tassert(1003892,
+                        "Expecting to find database metadata in this operation",
+                        request.dbVersion);
+
+                DatabaseType dbType{request.dbName, request.shardId, *request.dbVersion};
+
+                ShardsvrCommitToShardLocalCatalog updateRequest{NamespaceString{request.dbName}};
+                updateRequest.setDbName(request.dbName);
+                updateRequest.setOperation(request.op);
+                updateRequest.setDbMetadata(dbType);
+                return updateRequest;
+            }
+            case CommitToShardLocalCatalogOpEnum::kRemoveDatabaseMetadata: {
+                ShardsvrCommitToShardLocalCatalog updateRequest{NamespaceString{request.dbName}};
+                updateRequest.setDbName(request.dbName);
+                updateRequest.setOperation(request.op);
+                return updateRequest;
+            }
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }();
+
+    generic_argument_util::setMajorityWriteConcern(shardsvrRequest);
+    generic_argument_util::setOperationSessionInfo(shardsvrRequest, osi);
+
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCommitToShardLocalCatalog>>(
+        **executor, token, std::move(shardsvrRequest));
+
+    sendAuthenticatedCommandToShards(opCtx, opts, {request.shardId});
+}
 
 }  // namespace sharding_ddl_util
 }  // namespace mongo

@@ -63,7 +63,6 @@
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/participant_block_gen.h"
-#include "mongo/db/s/shard_database_metadata_client.h"
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_util.h"
@@ -128,11 +127,18 @@ BSONObj makeDatabaseQuery(const DatabaseName& dbName, const DatabaseVersion& dbV
 
 void removeDatabaseMetadataFromShard(OperationContext* opCtx,
                                      bool isAuthoritativeShardCommitEnabled,
-                                     const DatabaseName& dbName) {
+                                     const DatabaseName& dbName,
+                                     const OperationSessionInfo& osi,
+                                     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                                     const CancellationToken& token) {
     if (isAuthoritativeShardCommitEnabled) {
-        ShardDatabaseMetadataClient dbMetadataClient{
-            opCtx, ShardingState::get(opCtx)->shardId() /* shardId */};
-        dbMetadataClient.remove(dbName);
+        sharding_ddl_util::DatabaseMetadataCommitRequest request{
+            CommitToShardLocalCatalogOpEnum::kRemoveDatabaseMetadata,
+            dbName,
+            ShardingState::get(opCtx)->shardId()};
+
+        sharding_ddl_util::commitDatabaseMetadataToShardLocalCatalog(
+            opCtx, request, osi, executor, token);
     }
 }
 
@@ -520,7 +526,12 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     _clearDatabaseInfoOnSecondaries(opCtx);
 
                     removeDatabaseMetadataFromShard(
-                        opCtx, _doc.getAuthoritativeShardCommit().get_value_or(false), _dbName);
+                        opCtx,
+                        _doc.getAuthoritativeShardCommit().get_value_or(false),
+                        _dbName,
+                        getNewSession(opCtx),
+                        executor,
+                        token);
 
                     {
                         const auto& session = getNewSession(opCtx);

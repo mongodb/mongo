@@ -162,6 +162,7 @@ let testCases = {
     _shardsvrCleanupStructuredEncryptionData: {skip: "internal command"},
     _shardsvrCommitIndexParticipant: {skip: "internal command"},
     _shardsvrCommitReshardCollection: {skip: "internal command"},
+    _shardsvrCommitToShardLocalCatalog: {skip: "internal command"},
     _shardsvrCompactStructuredEncryptionData: {skip: "internal command"},
     _shardsvrConvertToCapped: {skip: "internal command"},
     _shardsvrCoordinateMultiUpdate: {skip: "internal command"},

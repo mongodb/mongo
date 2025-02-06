@@ -548,10 +548,12 @@ mongo_cc_library(
 mongo_cc_library(
     name = "sharding_catalog",
     srcs = [
+        "shard_local_catalog_operations.cpp",
         "sharding_index_catalog_ddl_util.cpp",
         ":shard_authoritative_catalog_gen",
     ],
     hdrs = [
+        "shard_local_catalog_operations.h",
         "sharding_index_catalog_ddl_util.h",
     ],
     deps = [
@@ -811,7 +813,6 @@ mongo_cc_library(
         "session_catalog_migration.cpp",
         "session_catalog_migration_destination.cpp",
         "session_catalog_migration_source.cpp",
-        "shard_database_metadata_client.cpp",
         "shard_filtering_metadata_refresh.cpp",
         "shard_identity_rollback_notifier.cpp",
         "shard_key_util.cpp",
@@ -923,7 +924,6 @@ mongo_cc_library(
         "session_catalog_migration.h",
         "session_catalog_migration_destination.h",
         "session_catalog_migration_source.h",
-        "shard_database_metadata_client.h",
         "shard_filtering_metadata_refresh.h",
         "shard_identity_rollback_notifier.h",
         "shard_key_util.h",
@@ -1194,6 +1194,7 @@ mongo_cc_library(
         "shardsvr_collmod_participant_command.cpp",
         "shardsvr_commit_index_participant_command.cpp",
         "shardsvr_commit_reshard_collection_command.cpp",
+        "shardsvr_commit_to_shard_local_catalog_command.cpp",
         "shardsvr_compact_structured_encryption_data_command.cpp",
         "shardsvr_convert_to_capped_command.cpp",
         "shardsvr_convert_to_capped_participant_command.cpp",

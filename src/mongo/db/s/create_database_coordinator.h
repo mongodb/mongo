@@ -88,7 +88,10 @@ private:
 
     DatabaseType _commitClusterCatalog(OperationContext* opCtx);
 
-    void _commitShardLocalCatalog(OperationContext* opCtx, const DatabaseType& db);
+    void _commitShardLocalCatalog(OperationContext* opCtx,
+                                  const DatabaseType& db,
+                                  const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                                  const CancellationToken& token);
 
     const BSONObj _critSecReason;
 

@@ -84,7 +84,8 @@ private:
                                          const Status& status) noexcept override;
 
     ExecutorFuture<void> runMovePrimaryWorkflow(
-        std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept;
+        std::shared_ptr<executor::ScopedTaskExecutor> executor,
+        const CancellationToken& token) noexcept;
 
     /**
      * Clone data to the recipient shard.
@@ -149,7 +150,9 @@ private:
      * shard.
      */
     void commitMetadataToShards(OperationContext* opCtx,
-                                const DatabaseVersion& preCommitDbVersion) const;
+                                const DatabaseVersion& preCommitDbVersion,
+                                const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                                const CancellationToken& token);
 
     /**
      * Clears the database metadata in the local catalog cache. Secondary nodes clear the database

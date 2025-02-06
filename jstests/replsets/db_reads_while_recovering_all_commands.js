@@ -97,6 +97,7 @@ const allCommands = {
     _shardsvrRegisterIndex: {skip: isPrimaryOnly},
     _shardsvrCommitIndexParticipant: {skip: isPrimaryOnly},
     _shardsvrCommitReshardCollection: {skip: isPrimaryOnly},
+    _shardsvrCommitToShardLocalCatalog: {skip: isPrimaryOnly},
     _shardsvrConvertToCapped: {skip: isPrimaryOnly},
     _shardsvrDropCollection: {skip: isPrimaryOnly},
     _shardsvrCreateCollection: {skip: isPrimaryOnly},

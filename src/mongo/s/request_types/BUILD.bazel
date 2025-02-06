@@ -25,6 +25,7 @@ idl_generator(
         "//src/mongo/db/query/client_cursor:cursor_response_gen",
         "//src/mongo/db/timeseries:timeseries_gen",
         "//src/mongo/s:sharding_types_gen",
+        "//src/mongo/s/catalog:type_database_gen",
         "//src/mongo/s/resharding:common_types_gen",
     ],
 )

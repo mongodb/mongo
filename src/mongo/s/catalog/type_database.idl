@@ -38,7 +38,7 @@ imports:
 structs:
     DatabaseType:
         description: "Represents the layout and contents of documents contained in the config 
-                      server's config.databases collection."
+                      server's config.databases and the primary shard's config.shard.databases collection."
         strict: false
         fields:
             _id:
