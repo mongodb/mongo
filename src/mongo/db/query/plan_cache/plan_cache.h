@@ -56,6 +56,7 @@
 #include "mongo/db/query/partitioned_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_callbacks.h"
 #include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
+#include "mongo/db/query/plan_cache/plan_cache_log_utils.h"
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/platform/atomic_proxy.h"

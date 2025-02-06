@@ -1267,6 +1267,7 @@ mongo_cc_library(
         "//src/mongo/db/exec:near.h",
         "//src/mongo/db/exec:or.h",
         "//src/mongo/db/exec:orphan_chunk_skipper.h",
+        "//src/mongo/db/exec:plan_cache_callbacks_impl.h",
         "//src/mongo/db/exec:plan_cache_util.h",
         "//src/mongo/db/exec:plan_stage.h",
         "//src/mongo/db/exec:projection.h",

@@ -729,6 +729,7 @@ mongo_cc_library(
         "//src/mongo/db/query/plan_cache:plan_cache_callbacks.h",
         "//src/mongo/db/query/plan_cache:plan_cache_debug_info.h",
         "//src/mongo/db/query/plan_cache:plan_cache_key_info.h",
+        "//src/mongo/db/query/plan_cache:plan_cache_log_utils.h",
         "//src/mongo/db/query/plan_enumerator:plan_enumerator_explain_info.h",
         "//src/mongo/db/query/query_settings:query_settings_gen",
         "//src/mongo/db/query/query_settings:query_settings_hash.h",

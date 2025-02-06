@@ -13,8 +13,8 @@ mongo_cc_library(
     name = "query_plan_cache",
     srcs = [
         "classic_plan_cache.cpp",
-        "plan_cache_callbacks.cpp",
         "plan_cache_invalidator.cpp",
+        "plan_cache_log_utils.cpp",
         "sbe_plan_cache.cpp",
         "//src/mongo/db/query/stage_builder/sbe:builder_data.h",
     ],
@@ -22,6 +22,7 @@ mongo_cc_library(
         "classic_plan_cache.h",
         "plan_cache_callbacks.h",
         "plan_cache_invalidator.h",
+        "plan_cache_log_utils.h",
         "sbe_plan_cache.h",
     ],
     deps = [

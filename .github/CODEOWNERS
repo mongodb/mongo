@@ -1425,7 +1425,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/exec/**/cached_plan* @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
 /src/mongo/db/exec/**/multi_plan* @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
 /src/mongo/db/exec/**/subplan* @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
-/src/mongo/db/exec/**/plan_cache_util* @10gen/query-optimization-plan-cache @svc-auto-approve-bot
+/src/mongo/db/exec/**/plan_cache* @10gen/query-optimization-plan-cache @svc-auto-approve-bot
 /src/mongo/db/exec/**/trial_period_utils* @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
 /src/mongo/db/exec/**/trial_run_tracker.h @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
 /src/mongo/db/exec/**/trial_stage* @10gen/query-optimization-runtime-planners @svc-auto-approve-bot

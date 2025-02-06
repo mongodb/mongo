@@ -26,7 +26,7 @@ filters:
   - "subplan*":
     approvers:
       - 10gen/query-optimization-runtime-planners
-  - "plan_cache_util*":
+  - "plan_cache*":
     approvers:
       - 10gen/query-optimization-plan-cache
   - "trial_period_utils*":

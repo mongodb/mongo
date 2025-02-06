@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,11 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/plan_cache/plan_cache_log_utils.h"
 
-#include "mongo/db/query/plan_cache/plan_cache_callbacks.h"
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -151,5 +148,4 @@ void logUnexpectedPinnedCacheEntry(std::string&& query,
           "newSbePlan"_attr = newSbePlan,
           "newWorks"_attr = newWorks);
 }
-
 }  // namespace mongo::log_detail
