@@ -1014,6 +1014,8 @@ ASAN_OPTIONS = [
     "handle_abort=1",
     "strict_string_checks=true",
     "detect_invalid_pointer_pairs=1",
+    # TODO SERVER-100334 Enable detect_stack_use_after_return once bugs it exposes are resolved.
+    "detect_stack_use_after_return=0",
 ]
 
 LSAN_OPTIONS = [
