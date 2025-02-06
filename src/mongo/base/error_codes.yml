@@ -943,3 +943,8 @@ error_codes:
       name: RemoveShardDrainingInProgress,
       extra: RemoveShardDrainingInfo,
     }
+  - {
+      code: 10045600,
+      name: InterruptedDueToFCVChange,
+      categories: [Interruption, RetriableError],
+    }

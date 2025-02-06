@@ -125,7 +125,8 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
         if (newFcvSnapshot.isUpgradingOrDowngrading()) {
             SessionKiller::Matcher matcherAllSessions(
                 KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-            killSessionsAbortUnpreparedTransactions(opCtx, matcherAllSessions);
+            killSessionsAbortUnpreparedTransactions(
+                opCtx, matcherAllSessions, ErrorCodes::InterruptedDueToFCVChange);
         }
     } catch (const DBException&) {
         // Swallow the error when running within a recovery unit to avoid process termination.
