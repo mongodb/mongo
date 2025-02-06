@@ -95,17 +95,13 @@ using OpObserverForTest = resharding_service_test_helpers::
 using PauseDuringStateTransitions =
     resharding_service_test_helpers::PauseDuringStateTransitions<CoordinatorStateEnum>;
 
-int64_t convertShardIdToLong(const ShardId& shardId) {
-    return static_cast<int64_t>(std::hash<std::string>{}(shardId.toString()));
-}
-
 class ExternalStateForTest : public ReshardingCoordinatorExternalState {
 public:
     struct Options {
+        std::map<ShardId, int64_t> documentsToCopy;
+        boost::optional<ErrorCodes::Error> getDocumentsToCopyErrorCode;
         boost::optional<ErrorCodes::Error> verifyClonedErrorCode;
         boost::optional<ErrorCodes::Error> verifyFinalErrorCode;
-        boost::optional<ErrorCodes::Error> getDocumentsToCopyErrorCode;
-        boost::optional<int64_t> getDocumentsToCopyResponse;
     };
 
     ExternalStateForTest(Options options)
@@ -132,19 +128,25 @@ public:
             {coordinatorDoc.getDonorShards(), coordinatorDoc.getRecipientShards(), initialChunks});
     }
 
-    StatusWith<int64_t> getDocumentsToCopyFromShard(OperationContext* opCtx,
-                                                    const ShardId& shardId,
-                                                    const ShardVersion& shardVersion,
-                                                    const NamespaceString& nss,
-                                                    const Timestamp& cloneTimestamp) override {
+    std::map<ShardId, int64_t> getDocumentsToCopyFromDonors(
+        OperationContext* opCtx,
+        const std::shared_ptr<executor::TaskExecutor>& executor,
+        CancellationToken token,
+        const UUID& reshardingUUID,
+        const NamespaceString& nss,
+        const Timestamp& cloneTimestamp,
+        const std::map<ShardId, ShardVersion>& shardVersions) override {
         if (_options.getDocumentsToCopyErrorCode) {
             uasserted(*_options.getDocumentsToCopyErrorCode, "Failing call to getDocumentsToCopy.");
         }
 
-        if (_options.getDocumentsToCopyResponse) {
-            return StatusWith<int64_t>(*_options.getDocumentsToCopyResponse);
+        std::map<ShardId, int64_t> docsToCopy;
+        for (const auto& [shardId, _] : shardVersions) {
+            auto it = _options.documentsToCopy.find(shardId);
+            ASSERT(it != _options.documentsToCopy.end());
+            docsToCopy.emplace(shardId, it->second);
         }
-        return StatusWith<int64_t>(convertShardIdToLong(shardId));
+        return docsToCopy;
     }
 
     void verifyClonedCollection(OperationContext* opCtx,
@@ -320,7 +322,7 @@ public:
 
         ReshardingCoordinatorDocument doc(state, donorShards, recipientShards);
         doc.setCommonReshardingMetadata(meta);
-        resharding::emplaceCloneTimestampIfExists(doc, cloneTimestamp);
+        resharding::emplaceCloneTimestampIfExists(doc, _cloneTimestamp);
         return doc;
     }
 
@@ -385,7 +387,7 @@ public:
         auto donorShards = coordDoc.getDonorShards();
         DonorShardContext donorCtx;
         donorCtx.setState(DonorStateEnum::kDonatingInitialData);
-        donorCtx.setMinFetchTimestamp(cloneTimestamp);
+        donorCtx.setMinFetchTimestamp(_cloneTimestamp);
         donorCtx.setBytesToClone(totalApproxBytesToClone / donorShards.size());
         donorCtx.setDocumentsToClone(totalApproxDocumentsToClone / donorShards.size());
         for (auto& shard : donorShards) {
@@ -804,7 +806,28 @@ public:
         coordinator->getCompletionFuture().get(opCtx);
     }
 
-    void runReshardingToCompletionAssertToCopyMetrics(const ReshardingOptions& reshardingOptions) {
+    int64_t getDocumentsToCopyForDonor(const ShardId& shardId) {
+        auto it = documentsToCopy.find(shardId);
+        ASSERT(it != documentsToCopy.end());
+        return it->second;
+    }
+
+    void checkDonorDocumentsToCopyMetrics(const ReshardingCoordinatorDocument& coordinatorDoc) {
+        if (coordinatorDoc.getState() < CoordinatorStateEnum::kApplying) {
+            return;
+        }
+        for (const auto& donorShard : coordinatorDoc.getDonorShards()) {
+            if (coordinatorDoc.getCommonReshardingMetadata().getPerformVerification()) {
+                ASSERT_EQUALS(*donorShard.getDocumentsToCopy(),
+                              getDocumentsToCopyForDonor(donorShard.getId()));
+            } else {
+                ASSERT_FALSE(donorShard.getDocumentsToCopy().has_value());
+            }
+        }
+    }
+
+    void runReshardingToCompletionAssertApproxToCopyMetrics(
+        const ReshardingOptions& reshardingOptions) {
         long numRecipientsToClone = reshardingOptions.recipientShardIds.size() -
             reshardingOptions.recipientShardIdsNoInitialChunks.size();
         long expectedApproxBytesToClone = totalApproxBytesToClone / numRecipientsToClone;
@@ -870,9 +893,9 @@ public:
         ChunkRange(BSON("newShardKey" << 0), _newShardKey.getKeyPattern().globalMax()),
     };
 
-    Timestamp cloneTimestamp = Timestamp(Date_t::now());
+    Timestamp _cloneTimestamp = Timestamp(Date_t::now());
 
-    RAIIServerParameterControllerForTest serverParamController{
+    RAIIServerParameterControllerForTest _serverParamController{
         "reshardingMinimumOperationDurationMillis", 0};
     FailPointEnableBlock _performVerificationAfterApplying{
         "reshardingPerformValidationAfterApplying"};
@@ -889,12 +912,17 @@ protected:
 
     const long totalApproxBytesToClone = 10000;
     const long totalApproxDocumentsToClone = 100;
+
+    const std::map<ShardId, int64_t> documentsToCopy{
+        {shardId0, 65},
+        {shardId1, 55},
+    };
 };
 
 class ReshardingCoordinatorServiceTest : public ReshardingCoordinatorServiceTestBase {
 public:
     ExternalStateForTest::Options getExternalStateOptions() const override {
-        return {};
+        return {.documentsToCopy = documentsToCopy};
     }
 };
 
@@ -1087,22 +1115,7 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
         }
 
         auto coordinatorDoc = getCoordinatorDoc(opCtx);
-        if (coordinatorDoc.getCommonReshardingMetadata().getPerformVerification() &&
-            coordinatorDoc.getState() >= CoordinatorStateEnum::kApplying) {
-            // The donor shards in the coordinator doc should have values for documentsToCopy if
-            // the state is greater than or equal to applying.
-            for (auto& shardEntry : coordinatorDoc.getDonorShards()) {
-                auto shardId = shardEntry.getId();
-                ASSERT_EQUALS(shardEntry.getDocumentsToCopy(), convertShardIdToLong(shardId));
-            }
-        }
-
-        if (!coordinatorDoc.getCommonReshardingMetadata().getPerformVerification() &&
-            coordinatorDoc.getState() >= CoordinatorStateEnum::kApplying) {
-            for (auto& donorShardEntry : coordinatorDoc.getDonorShards()) {
-                ASSERT_FALSE(donorShardEntry.getDocumentsToCopy().has_value());
-            }
-        }
+        checkDonorDocumentsToCopyMetrics(coordinatorDoc);
 
         // 'done' state is never written to storage so don't wait for it.
         waitUntilCommittedCoordinatorDocReach(opCtx, state);
@@ -1392,7 +1405,7 @@ TEST_F(ReshardingCoordinatorServiceTest, ZeroNumRecipientShardsNoInitialChunks) 
     auto reshardingOptions =
         ReshardingOptions(donorShardIds, recipientShardIds, recipientShardIdsNoInitialChunks);
 
-    runReshardingToCompletionAssertToCopyMetrics(reshardingOptions);
+    runReshardingToCompletionAssertApproxToCopyMetrics(reshardingOptions);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, NonZeroNumRecipientShardsNoInitialChunks) {
@@ -1402,7 +1415,7 @@ TEST_F(ReshardingCoordinatorServiceTest, NonZeroNumRecipientShardsNoInitialChunk
     auto reshardingOptions =
         ReshardingOptions(donorShardIds, recipientShardIds, recipientShardIdsNoInitialChunks);
 
-    runReshardingToCompletionAssertToCopyMetrics(reshardingOptions);
+    runReshardingToCompletionAssertApproxToCopyMetrics(reshardingOptions);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, CoordinatorHonorsCriticalSectionTimeoutAfterStepUp) {
@@ -1486,7 +1499,7 @@ class ReshardingCoordinatorServiceFailCloningVerificationTest
     : public ReshardingCoordinatorServiceTestBase {
 public:
     ExternalStateForTest::Options getExternalStateOptions() const override {
-        return {.verifyClonedErrorCode = verifyClonedErrorCode};
+        return {.documentsToCopy = documentsToCopy, .verifyClonedErrorCode = verifyClonedErrorCode};
     }
 
 protected:
@@ -1552,7 +1565,7 @@ class ReshardingCoordinatorServiceFailFinalVerificationTest
     : public ReshardingCoordinatorServiceTestBase {
 public:
     ExternalStateForTest::Options getExternalStateOptions() const override {
-        return {.verifyFinalErrorCode = verifyFinalErrorCode};
+        return {.documentsToCopy = documentsToCopy, .verifyFinalErrorCode = verifyFinalErrorCode};
     }
 
 protected:
@@ -1634,12 +1647,7 @@ TEST_F(
     auto checkPersistentStates = [&] {
         auto opCtx = operationContext();
         auto coordinatorDoc = getCoordinatorDoc(opCtx);
-        if (coordinatorDoc.getState() >= CoordinatorStateEnum::kApplying) {
-            for (auto& donorShardEntry : coordinatorDoc.getDonorShards()) {
-                ASSERT_EQUALS(donorShardEntry.getDocumentsToCopy(),
-                              convertShardIdToLong(donorShardEntry.getId()));
-            }
-        }
+        checkDonorDocumentsToCopyMetrics(coordinatorDoc);
     };
 
     auto transitionFunctions =
@@ -1656,29 +1664,65 @@ TEST_F(
         transitionFunctions, nullptr /* stateTransitionsGuard */, states, reshardingOptions);
 }
 
-class ReshardingCoordinatorServiceNoVerificationGetDocumentsToCopy
+class ReshardingCoordinatorServiceFailGetDocumentsToCopy
     : public ReshardingCoordinatorServiceTestBase {
 public:
     ExternalStateForTest::Options getExternalStateOptions() const override {
-        return {.getDocumentsToCopyErrorCode = getDocumentsToCopyErrorCode};
+        return {.documentsToCopy = documentsToCopy,
+                .getDocumentsToCopyErrorCode = getDocumentsToCopyErrorCode};
     }
 
 protected:
     const ErrorCodes::Error getDocumentsToCopyErrorCode{9858108};
 };
 
-TEST_F(ReshardingCoordinatorServiceNoVerificationGetDocumentsToCopy,
-       CoordinatorDocDonorShardEntriesShouldNotHaveDocumentsToCopyIfPerformVerificationIsFalse) {
+TEST_F(ReshardingCoordinatorServiceFailGetDocumentsToCopy, AbortIfPerformVerification) {
+    const std::vector<CoordinatorStateEnum> states = {CoordinatorStateEnum::kPreparingToDonate,
+                                                      CoordinatorStateEnum::kCloning,
+                                                      CoordinatorStateEnum::kAborting};
+
+    PauseDuringStateTransitions stateTransitionsGuard{controller(), states};
+
+    auto opCtx = operationContext();
+
+    auto reshardingOptions = makeDefaultReshardingOptions();
+    auto coordinator = initializeAndGetCoordinator(_reshardingUUID,
+                                                   _originalNss,
+                                                   _tempNss,
+                                                   _newShardKey,
+                                                   _originalUUID,
+                                                   _oldShardKey,
+                                                   reshardingOptions);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kPreparingToDonate);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kPreparingToDonate);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
+
+    makeDonorsReadyToDonateWithAssert(opCtx);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kCloning);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kCloning);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kAborting);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kAborting);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kAborting);
+
+    makeRecipientsProceedToDone(opCtx);
+    makeDonorsProceedToDone(opCtx);
+
+    ASSERT_THROWS_CODE(
+        coordinator->getCompletionFuture().get(opCtx), DBException, getDocumentsToCopyErrorCode);
+}
+
+TEST_F(ReshardingCoordinatorServiceFailGetDocumentsToCopy,
+       CoordinatorDocDonorShardEntriesShouldNotHaveDocumentsToCopyIfNotPerformVerification) {
     auto reshardingOptions = makeDefaultReshardingOptions();
     reshardingOptions.performVerification = false;
     auto checkPersistentStates = [&] {
         auto opCtx = operationContext();
         auto coordinatorDoc = getCoordinatorDoc(opCtx);
-        if (coordinatorDoc.getState() >= CoordinatorStateEnum::kApplying) {
-            for (auto& donorShardEntry : coordinatorDoc.getDonorShards()) {
-                ASSERT_FALSE(donorShardEntry.getDocumentsToCopy().has_value());
-            }
-        }
+        checkDonorDocumentsToCopyMetrics(coordinatorDoc);
     };
 
     auto transitionFunctions =
@@ -1699,11 +1743,14 @@ class ReshardingCoordinatorServiceReturnZeroFromGetDocumentsToCopy
     : public ReshardingCoordinatorServiceTestBase {
 public:
     ExternalStateForTest::Options getExternalStateOptions() const override {
-        return {.getDocumentsToCopyResponse = getDocumentsToCopyResponse};
+        return {.documentsToCopy = documentsToCopy};
     }
 
 protected:
-    const int64_t getDocumentsToCopyResponse = 0;
+    const std::map<ShardId, int64_t> documentsToCopy = {
+        {shardId0, 0},
+        {shardId1, 0},
+    };
 };
 
 TEST_F(ReshardingCoordinatorServiceReturnZeroFromGetDocumentsToCopy,
@@ -1713,7 +1760,7 @@ TEST_F(ReshardingCoordinatorServiceReturnZeroFromGetDocumentsToCopy,
         auto opCtx = operationContext();
         auto coordinatorDoc = getCoordinatorDoc(opCtx);
         if (coordinatorDoc.getState() >= CoordinatorStateEnum::kApplying) {
-            for (auto& donorShardEntry : coordinatorDoc.getDonorShards()) {
+            for (const auto& donorShardEntry : coordinatorDoc.getDonorShards()) {
                 ASSERT_TRUE(donorShardEntry.getDocumentsToCopy().has_value());
                 ASSERT_EQUALS(*donorShardEntry.getDocumentsToCopy(), (int64_t)0);
             }

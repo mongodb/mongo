@@ -86,23 +86,24 @@ Status sharding_ddl_util_deserializeErrorStatusFromBSON(const BSONElement& bsonE
 
 namespace sharding_ddl_util {
 
-/**
- * Creates a barrier after which we are guaranteed that all writes to the config server performed by
- * the previous primary have been majority commited and will be seen by the new primary.
- */
-void linearizeCSRSReads(OperationContext* opCtx);
+namespace {
 
 /**
- * Generic utility to send a command to a list of shards. Throws if one of the commands fails.
+ * Generic utility to send a command to a list of shards.
  */
 template <typename CommandType>
 std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> originalOpts,
     const std::vector<ShardId>& shardIds,
-    bool throwOnError = true) {
+    const boost::optional<std::vector<ShardVersion>>& shardVersions,
+    const ReadPreferenceSetting readPref,
+    bool throwOnError) {
     if (shardIds.size() == 0) {
         return {};
+    }
+    if (shardVersions) {
+        invariant(shardIds.size() == shardVersions->size());
     }
 
     // AsyncRPC ignores audit metadata so we need to manually attach them to
@@ -119,7 +120,6 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
     CancellationSource cancelSource(originalOpts->token);
 
     for (size_t i = 0; i < shardIds.size(); ++i) {
-        ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly);
         std::unique_ptr<async_rpc::Targeter> targeter =
             std::make_unique<async_rpc::ShardIdTargeter>(
                 originalOpts->exec, opCtx, shardIds[i], readPref);
@@ -130,6 +130,9 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
             Shard::RetryPolicy::kIdempotentOrCursorInvalidated, startTransaction);
         auto opts = std::make_shared<async_rpc::AsyncRPCOptions<CommandType>>(
             originalOpts->exec, cancelSource.token(), originalOpts->cmd, retryPolicy);
+        if (shardVersions) {
+            opts->cmd.setShardVersion((*shardVersions)[i]);
+        }
         futures.push_back(async_rpc::sendCommand<CommandType>(opts, opCtx, std::move(targeter)));
         (*indexToShardId)[i] = shardIds[i];
     }
@@ -180,6 +183,45 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
             .get();
     }
 }
+
+}  // namespace
+
+template <typename CommandType>
+std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
+    OperationContext* opCtx,
+    std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> originalOpts,
+    const std::map<ShardId, ShardVersion>& shardIdsToShardVersions,
+    const ReadPreferenceSetting readPref,
+    bool throwOnError) {
+    std::vector<ShardId> shardIds;
+    std::vector<ShardVersion> shardVersions;
+    for (auto const& [shardId, shardVersion] : shardIdsToShardVersions) {
+        shardIds.push_back(shardId);
+        shardVersions.push_back(shardVersion);
+    }
+    return sendAuthenticatedCommandToShards(
+        opCtx, originalOpts, shardIds, shardVersions, readPref, throwOnError);
+}
+
+template <typename CommandType>
+std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
+    OperationContext* opCtx,
+    std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> originalOpts,
+    const std::vector<ShardId>& shardIds,
+    bool throwOnError = true) {
+    return sendAuthenticatedCommandToShards(opCtx,
+                                            originalOpts,
+                                            shardIds,
+                                            boost::none /* shardVersions */,
+                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                            throwOnError);
+}
+
+/**
+ * Creates a barrier after which we are guaranteed that all writes to the config server performed by
+ * the previous primary have been majority commited and will be seen by the new primary.
+ */
+void linearizeCSRSReads(OperationContext* opCtx);
 
 /**
  * Erase tags metadata from config server for the given namespace, using the _configsvrRemoveTags

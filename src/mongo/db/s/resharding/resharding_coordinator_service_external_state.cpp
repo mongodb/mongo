@@ -140,68 +140,6 @@ ReshardingCoordinatorExternalState::getCatalogIndexVersionForCommit(OperationCon
     return boost::none;
 }
 
-StatusWith<int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsToCopyFromShard(
-    OperationContext* opCtx,
-    const ShardId& shardId,
-    const ShardVersion& shardVersion,
-    const NamespaceString& nss,
-    const Timestamp& cloneTimestamp) {
-    const auto& shard =
-        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
-    std::vector<BSONObj> pipeline;
-    pipeline.push_back(BSON("$count"
-                            << "count"));
-    AggregateCommandRequest aggRequest(nss, pipeline);
-
-    BSONObj hint = BSON("_id" << 1);
-    aggRequest.setHint(hint);
-
-    aggRequest.setWriteConcern(WriteConcernOptions());
-    aggRequest.setReadConcern(repl::ReadConcernArgs::snapshot(LogicalTime(cloneTimestamp)));
-
-    aggRequest.setUnwrappedReadPref(
-        ReadPreferenceSetting{ReadPreference::SecondaryPreferred}.toContainingBSON());
-
-    aggRequest.setShardVersion(shardVersion);
-
-    int64_t countResult = 0;
-
-    auto status = shard->runAggregation(
-        opCtx,
-        aggRequest,
-        [&countResult, shardId](const std::vector<BSONObj>& batch,
-                                const boost::optional<BSONObj>& postBatchResumeToken) {
-            uassert(9858102,
-                    str::stream() << "The aggregation result from fetching the number of "
-                                     "documents from the shard "
-                                  << shardId
-                                  << " should contain at most one document but has a batch size of "
-                                  << batch.size() << ".",
-                    batch.size() <= 1);
-            // If there are no documents in the batch, the count aggregation had no results.
-            if (batch.size() == 0) {
-                return true;
-            }
-            auto doc = batch[0];
-            uassert(9858103,
-                    str::stream() << "The aggregation result from fetching the number of "
-                                     "documents from the shard "
-                                  << shardId << " does not have the field 'count' set.",
-                    doc.hasField("count"));
-            countResult += doc["count"].numberLong();
-            return true;
-        });
-
-    if (!status.isOK()) {
-        return status;
-    }
-    LOGV2(9858107,
-          "Fetched documents to copy from shard.",
-          "shardId"_attr = shardId,
-          "documentsToCopy"_attr = countResult);
-    return countResult;
-}
-
 ReshardingCoordinatorExternalState::ParticipantShardsAndChunks
 ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
     OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
@@ -331,6 +269,75 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
     return {constructDonorShardEntries(donorShardIds),
             constructRecipientShardEntries(recipientShardIds),
             initialChunks};
+}
+
+std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsToCopyFromDonors(
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    CancellationToken token,
+    const UUID& reshardingUUID,
+    const NamespaceString& nss,
+    const Timestamp& cloneTimestamp,
+    const std::map<ShardId, ShardVersion>& shardVersions) {
+    std::vector<BSONObj> pipeline;
+    pipeline.push_back(BSON("$count"
+                            << "count"));
+    AggregateCommandRequest aggRequest(nss, pipeline);
+    BSONObj hint = BSON("_id" << 1);
+    aggRequest.setHint(hint);
+
+    aggRequest.setWriteConcern(WriteConcernOptions());
+    aggRequest.setReadConcern(repl::ReadConcernArgs::snapshot(LogicalTime(cloneTimestamp)));
+
+    auto readPref = ReadPreferenceSetting{ReadPreference::SecondaryPreferred};
+    aggRequest.setUnwrappedReadPref(readPref.toContainingBSON());
+
+    const auto opts = std::make_shared<async_rpc::AsyncRPCOptions<AggregateCommandRequest>>(
+        executor, token, aggRequest);
+    opts->cmd.setDbName(nss.dbName());
+    auto responses = sendCommandToShards(opCtx, opts, shardVersions, readPref);
+
+    std::map<ShardId, int64_t> docsToCopy;
+
+    for (auto&& response : responses) {
+        const auto& donorShardId = response.shardId;
+
+        uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
+        auto cursorReply = CursorInitialReply::parse(
+            IDLParserContext("getDocumentsToCopyFromDonors"), response.swResponse.getValue().data);
+        auto firstBatch = cursorReply.getCursor()->getFirstBatch();
+
+        uassert(9858102,
+                str::stream() << "The aggregation result from fetching the number of "
+                                 "documents from the donor shard '"
+                              << donorShardId
+                              << "' should contain at most one document but it contains "
+                              << firstBatch.size() << " documents .",
+                firstBatch.size() <= 1);
+
+        int64_t count = [&] {
+            // If there are no documents in the collection, the count aggregation would not
+            // return any documents.
+            if (firstBatch.size() == 0) {
+                return 0LL;
+            }
+            auto doc = firstBatch[0];
+            uassert(9858103,
+                    str::stream() << "The aggregation result from fetching the number of "
+                                     "documents from the donor shard '"
+                                  << donorShardId << "' does not have the field 'count' set.",
+                    doc.hasField("count"));
+            return doc["count"].numberLong();
+        }();
+        docsToCopy.emplace(donorShardId, count);
+
+        LOGV2(9858107,
+              "Fetched documents to copy from donor shard",
+              "shardId"_attr = donorShardId,
+              "documentsToCopy"_attr = count);
+    }
+
+    return docsToCopy;
 }
 
 std::map<ShardId, int64_t>
