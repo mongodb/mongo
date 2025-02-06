@@ -57,6 +57,8 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(failAtomicTimeseriesWrites);
 MONGO_FAIL_POINT_DEFINE(failUnorderedTimeseriesInsert);
 MONGO_FAIL_POINT_DEFINE(hangInsertIntoBucketCatalogBeforeCheckingTimeseriesCollection);
+MONGO_FAIL_POINT_DEFINE(hangCommitTimeseriesBucketBeforeCheckingTimeseriesCollection);
+MONGO_FAIL_POINT_DEFINE(hangCommitTimeseriesBucketsAtomicallyBeforeCheckingTimeseriesCollection);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeCommit);
 
 
@@ -374,6 +376,8 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
                                        TimeseriesStmtIds&& stmtIds,
                                        boost::optional<repl::OpTime>* opTime,
                                        boost::optional<OID>* electionId) {
+    hangCommitTimeseriesBucketsAtomicallyBeforeCheckingTimeseriesCollection.pauseWhileSet();
+
     auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
 
     auto batchesToCommit = timeseries::determineBatchesToCommit(batches, extractFromPair);
@@ -393,19 +397,47 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
     try {
         std::vector<mongo::write_ops::InsertCommandRequest> insertOps;
         std::vector<mongo::write_ops::UpdateCommandRequest> updateOps;
-        auto catalog = CollectionCatalog::get(opCtx);
         auto nss = write_ops_utils::makeTimeseriesBucketsNamespace(internal::ns(request));
-        auto bucketsColl = catalog->lookupCollectionByNamespace(opCtx, nss);
-        assertTimeseriesBucketsCollection(bucketsColl);
+
+        // Explicitly hold a reference to the CollectionCatalog, such that the corresponding
+        // Collection instances remain valid, and the collator is not invalidated.
+        auto catalog = CollectionCatalog::get(opCtx);
+        const CollatorInterface* collator = nullptr;
+
+        try {
+            // The associated collection must be acquired before we check for the presence of
+            // buckets collection. This ensures that a potential ShardVersion mismatch can be
+            // detected, before checking for other errors. Moreover, since e.g. 'prepareCommit()'
+            // might block waiting for other batches to complete, limiting the scope of the
+            // collectionAcquisition is necessary to prevent deadlocks due to ticket exhaustion.
+            const auto acquisition =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      opCtx, nss, AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
+            auto bucketsColl = acquisition.getCollectionPtr().get();
+            assertTimeseriesBucketsCollection(bucketsColl);
+            collator = bucketsColl->getDefaultCollator();
+        } catch (const DBException& ex) {
+            if (ex.code() != ErrorCodes::StaleDbVersion &&
+                !ErrorCodes::isStaleShardVersionError(ex)) {
+                throw;
+            }
+            // The unsuccessful ordered timeseries insert will resolve into a sequence of unordered
+            // inserts. Therefore, do not set the failed operation status on the operation sharding
+            // state here, as it will be set during the unordered insert attempt.
+            abortStatus = ex.toStatus();
+            return false;
+        }
+
         for (auto batch : batchesToCommit) {
             auto metadata = getMetadata(bucketCatalog, batch.get()->bucketId);
-            auto prepareCommitStatus = bucket_catalog::prepareCommit(
-                bucketCatalog, batch, bucketsColl->getDefaultCollator());
+            auto prepareCommitStatus =
+                bucket_catalog::prepareCommit(bucketCatalog, batch, collator);
             if (!prepareCommitStatus.isOK()) {
                 abortStatus = prepareCommitStatus;
                 return false;
             }
-
             write_ops_utils::makeWriteRequest(
                 opCtx, batch, metadata, stmtIds, nss, &insertOps, &updateOps);
         }
@@ -797,14 +829,43 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
                             std::vector<size_t>* docsToRetry,
                             absl::flat_hash_map<int, int>& retryAttemptsForDup,
                             const mongo::write_ops::InsertCommandRequest& request) try {
-    auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
+    hangCommitTimeseriesBucketBeforeCheckingTimeseriesCollection.pauseWhileSet();
 
+    auto& bucketCatalog = bucket_catalog::GlobalBucketCatalog::get(opCtx->getServiceContext());
     auto metadata = getMetadata(bucketCatalog, batch->bucketId);
-    auto catalog = CollectionCatalog::get(opCtx);
     auto nss = write_ops_utils::makeTimeseriesBucketsNamespace(internal::ns(request));
-    auto bucketsColl = catalog->lookupCollectionByNamespace(opCtx, nss);
-    assertTimeseriesBucketsCollection(bucketsColl);
-    auto status = prepareCommit(bucketCatalog, batch, bucketsColl->getDefaultCollator());
+
+    // Explicitly hold a reference to the CollectionCatalog, such that the corresponding
+    // Collection instances remain valid, and the collator is not invalidated.
+    auto catalog = CollectionCatalog::get(opCtx);
+    const CollatorInterface* collator = nullptr;
+
+    try {
+        // The associated collection must be acquired before we check for the presence of
+        // buckets collection. This ensures that a potential ShardVersion mismatch can be
+        // detected, before checking for other errors. Moreover, since e.g. 'prepareCommit()' might
+        // block waiting for other batches to complete, limiting the scope of the
+        // collectionAcquisition is necessary to prevent deadlocks due to ticket exhaustion.
+        const auto acquisition = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        auto bucketsColl = acquisition.getCollectionPtr().get();
+        assertTimeseriesBucketsCollection(bucketsColl);
+        collator = bucketsColl->getDefaultCollator();
+    } catch (const DBException& ex) {
+        if (ex.code() != ErrorCodes::StaleDbVersion && !ErrorCodes::isStaleShardVersionError(ex)) {
+            throw;
+        }
+        auto& oss{OperationShardingState::get(opCtx)};
+        oss.setShardingOperationFailedStatus(ex.toStatus());
+        const auto error{
+            write_ops_exec::generateError(opCtx, ex.toStatus(), start + index, errors->size())};
+        errors->emplace_back(std::move(*error));
+        return false;
+    }
+
+    auto status = prepareCommit(bucketCatalog, batch, collator);
     if (!status.isOK()) {
         invariant(bucket_catalog::isWriteBatchFinished(*batch));
         docsToRetry->push_back(index);
