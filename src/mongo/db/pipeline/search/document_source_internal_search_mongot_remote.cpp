@@ -112,7 +112,7 @@ Value DocumentSourceInternalSearchMongotRemote::addMergePipelineIfNeeded(
         // We've redacted the interesting parts of the stage, return early.
         return innerSpecVal;
     }
-    if ((!opts.verbosity || pExpCtx->getInRouter()) &&
+    if ((!opts.isSerializingForExplain() || pExpCtx->getInRouter()) &&
         _spec.getMetadataMergeProtocolVersion().has_value() && _mergingPipeline) {
         MutableDocument innerSpec{innerSpecVal.getDocument()};
         innerSpec[InternalSearchMongotRemoteSpec::kMergingPipelineFieldName] =
@@ -125,7 +125,7 @@ Value DocumentSourceInternalSearchMongotRemote::addMergePipelineIfNeeded(
 Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
     const SerializationOptions& opts) const {
     // Though router can generate explain output, it should never make a remote call to the mongot.
-    if (!opts.verbosity || pExpCtx->getInRouter()) {
+    if (!opts.isSerializingForExplain() || pExpCtx->getInRouter()) {
         if (_spec.getMetadataMergeProtocolVersion().has_value()) {
             // TODO SERVER-90941 The IDL should be able to handle this serialization once we
             // populate the query_shape field.

@@ -72,6 +72,6 @@ void DocumentSourceTeeConsumer::doDispose() {
 
 Value DocumentSourceTeeConsumer::serialize(const SerializationOptions& opts) const {
     // We only serialize this stage in the context of explain.
-    return opts.verbosity ? Value(DOC(_stageName << Document())) : Value();
+    return opts.isSerializingForExplain() ? Value(DOC(_stageName << Document())) : Value();
 }
 }  // namespace mongo

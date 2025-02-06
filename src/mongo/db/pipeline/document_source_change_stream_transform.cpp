@@ -210,7 +210,7 @@ void serializeSpec(const DocumentSourceChangeStreamSpec& spec,
 }  // namespace
 
 Value DocumentSourceChangeStreamTransform::serialize(const SerializationOptions& opts) const {
-    if (opts.verbosity) {
+    if (opts.isSerializingForExplain()) {
         return Value(Document{{DocumentSourceChangeStream::kStageName,
                                Document{{"stage"_sd, "internalTransform"_sd},
                                         {"options"_sd, _changeStreamSpec.toBSON(opts)}}}});
@@ -219,8 +219,7 @@ Value DocumentSourceChangeStreamTransform::serialize(const SerializationOptions&
     // Internal change stream stages are not serialized for query stats. Query stats uses this stage
     // to serialize the user specified stage, and therefore if serializing for query stats, we
     // should use the '$changeStream' stage name.
-    auto stageName =
-        (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged || opts.transformIdentifiers)
+    auto stageName = (opts.isSerializingForQueryStats())
         ? DocumentSourceChangeStream::kStageName
         : DocumentSourceChangeStreamTransform::kStageName;
     return Value(Document{{stageName, _changeStreamSpec.toBSON(opts)}});

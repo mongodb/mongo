@@ -181,7 +181,7 @@ Value DocumentSourceChangeStreamUnwindTransaction::doSerialize(
     const SerializationOptions& opts) const {
     tassert(7481400, "expression has not been initialized", _expression);
 
-    if (opts.verbosity) {
+    if (opts.isSerializingForExplain()) {
         BSONObjBuilder builder;
         builder.append("stage"_sd, "internalUnwindTransaction"_sd);
         builder.append(DocumentSourceChangeStreamUnwindTransactionSpec::kFilterFieldName,

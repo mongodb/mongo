@@ -188,7 +188,7 @@ Pipeline::SourceContainer::iterator DocumentSourceSequentialDocumentCache::doOpt
 }
 
 Value DocumentSourceSequentialDocumentCache::serialize(const SerializationOptions& opts) const {
-    if (opts.verbosity) {
+    if (opts.isSerializingForExplain()) {
         return Value(Document{
             {kStageName,
              Document{{"maxSizeBytes"_sd,

@@ -124,7 +124,7 @@ void FindCmdShapeComponents::appendTo(BSONObjBuilder& bob,
     // The values here don't matter (assuming we're not using the 'kUnchanged' policy).
     tassert(7973601,
             "Serialization policy not supported - original values have been discarded",
-            serializationOpts.literalPolicy != LiteralSerializationPolicy::kUnchanged);
+            !serializationOpts.isKeepingLiteralsUnchanged());
     if (hasField.limit) {
         serializationOpts.appendLiteral(&bob, FindCommandRequest::kLimitFieldName, 1ll);
     }

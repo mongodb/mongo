@@ -1242,12 +1242,11 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
         if (!_userPipeline) {
             return std::vector<BSONObj>{};
         }
-        if (opts.transformIdentifiers ||
-            opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
+        if (opts.isSerializingForQueryStats()) {
             // TODO SERVER-94227 we don't need to do any validation as part of this parsing pass.
             return Pipeline::parse(*_userPipeline, _fromExpCtx)->serializeToBson(opts);
         }
-        if (opts.verbosity) {
+        if (opts.isSerializingForExplain()) {
             // TODO SERVER-81802 We should also serialize the resolved pipeline for explain.
             return *_userPipeline;
         }
@@ -1286,8 +1285,7 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
     }();
     if (_additionalFilter) {
         auto serializedFilter = [&]() -> BSONObj {
-            if (opts.transformIdentifiers ||
-                opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
+            if (opts.isSerializingForQueryStats()) {
                 auto filter =
                     uassertStatusOK(MatchExpressionParser::parse(*_additionalFilter, pExpCtx));
                 return filter->serialize(opts);
@@ -1307,7 +1305,7 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
         output[getSourceName()]["pipeline"] = Value(serializedPipeline);
     }
 
-    if (opts.verbosity) {
+    if (opts.isSerializingForExplain()) {
         if (_unwindSrc) {
             const boost::optional<FieldPath> indexPath = _unwindSrc->indexPath();
             output[getSourceName()]["unwinding"] =

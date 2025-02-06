@@ -365,7 +365,8 @@ Value DocumentSourceInternalSetWindowFields::serialize(const SerializationOption
     MutableDocument out;
     out[getSourceName()] = Value(spec.freeze());
 
-    if (opts.verbosity && *opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
+    if (opts.isSerializingForExplain() &&
+        *opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
         MutableDocument md;
 
         for (auto&& [fieldName, function] : _executableOutputs) {

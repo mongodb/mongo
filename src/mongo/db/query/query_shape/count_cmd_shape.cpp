@@ -60,7 +60,7 @@ void CountCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
                                                      const SerializationOptions& opts) const {
     tassert(9065200,
             "Serialization policy not supported - original values have been discarded",
-            opts.literalPolicy != LiteralSerializationPolicy::kUnchanged);
+            !opts.isKeepingLiteralsUnchanged());
 
     // Command name.
     bob.append("command", CountCommandRequest::kCommandName);

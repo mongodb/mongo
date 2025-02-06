@@ -228,8 +228,8 @@ Value DocumentSourceFacet::serialize(const SerializationOptions& opts) const {
     MutableDocument serialized;
     for (auto&& facet : _facets) {
         serialized[opts.serializeFieldPathFromString(facet.name)] =
-            Value(opts.verbosity ? facet.pipeline->writeExplainOps(opts)
-                                 : facet.pipeline->serialize(opts));
+            Value(opts.isSerializingForExplain() ? facet.pipeline->writeExplainOps(opts)
+                                                 : facet.pipeline->serialize(opts));
     }
     return Value(Document{{"$facet", serialized.freezeToValue()}});
 }

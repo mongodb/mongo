@@ -688,8 +688,7 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
     }
 
     if (_additionalFilter) {
-        if (opts.transformIdentifiers ||
-            opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
+        if (opts.isSerializingForQueryStats()) {
             auto matchExpr =
                 uassertStatusOK(MatchExpressionParser::parse(*_additionalFilter, pExpCtx));
             spec["restrictSearchWithMatch"] = Value(matchExpr->serialize(opts));
@@ -700,7 +699,7 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
 
     // If we are explaining, include an absorbed $unwind inside the $graphLookup
     // specification.
-    if (_unwind && opts.verbosity) {
+    if (_unwind && opts.isSerializingForExplain()) {
         const boost::optional<FieldPath> indexPath = (*_unwind)->indexPath();
         spec["unwinding"] =
             Value(DOC("preserveNullAndEmptyArrays"
@@ -712,7 +711,8 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
     MutableDocument out;
     out[getSourceName()] = spec.freezeToValue();
 
-    if (opts.verbosity && *opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
+    if (opts.isSerializingForExplain() &&
+        *opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
         out["usedDisk"] = opts.serializeLiteral(_stats.spillingStats.getSpills() > 0);
         out["spills"] =
             opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpills()));
@@ -728,7 +728,7 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
 
     // If we are not explaining, the output of this method must be parseable, so serialize
     // our $unwind into a separate stage.
-    if (_unwind && !opts.verbosity) {
+    if (_unwind && !opts.isSerializingForExplain()) {
         (*_unwind)->serializeToArray(array, opts);
     }
 }

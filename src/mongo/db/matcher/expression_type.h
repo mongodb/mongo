@@ -269,7 +269,7 @@ public:
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
                                        const SerializationOptions& opts = {},
                                        bool includePath = true) const final {
-        if (opts.literalPolicy == LiteralSerializationPolicy::kUnchanged) {
+        if (opts.isKeepingLiteralsUnchanged()) {
             bob->append(name(), _binDataSubType);
         } else {
             // There is some fancy serialization logic to get the above BSONObjBuilder append to

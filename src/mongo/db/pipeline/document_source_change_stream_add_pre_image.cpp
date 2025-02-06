@@ -149,7 +149,7 @@ boost::optional<Document> DocumentSourceChangeStreamAddPreImage::lookupPreImage(
 }
 
 Value DocumentSourceChangeStreamAddPreImage::doSerialize(const SerializationOptions& opts) const {
-    return opts.verbosity
+    return opts.isSerializingForExplain()
         ? Value(Document{
               {DocumentSourceChangeStream::kStageName,
                Document{{"stage"_sd, "internalAddPreImage"_sd},

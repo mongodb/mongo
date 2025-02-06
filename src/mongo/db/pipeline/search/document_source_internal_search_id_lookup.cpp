@@ -89,7 +89,7 @@ Value DocumentSourceInternalSearchIdLookUp::serialize(const SerializationOptions
         outputSpec["limit"] = Value(opts.serializeLiteral(Value((long long)_limit)));
     }
 
-    if (opts.verbosity) {
+    if (opts.isSerializingForExplain()) {
         // At serialization, the _id value is unknown as it is only returned by mongot during
         // execution.
         // TODO SERVER-93637 add comment explaining why subPipeline is only needed for explain.

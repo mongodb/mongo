@@ -520,4 +520,29 @@ std::string SerializationOptions::serializeFieldPathFromString(StringData path) 
     }
     return path.toString();
 }
+
+bool SerializationOptions::isDefaultSerialization() const {
+    return literalPolicy == LiteralSerializationPolicy::kUnchanged && !transformIdentifiers;
+}
+
+bool SerializationOptions::isKeepingLiteralsUnchanged() const {
+    return literalPolicy == LiteralSerializationPolicy::kUnchanged;
+}
+
+bool SerializationOptions::isSerializingLiteralsAsDebugTypes() const {
+    return literalPolicy == LiteralSerializationPolicy::kToDebugTypeString;
+}
+
+bool SerializationOptions::isReplacingLiteralsWithRepresentativeValues() const {
+    return literalPolicy == LiteralSerializationPolicy::kToRepresentativeParseableValue;
+}
+
+bool SerializationOptions::isSerializingForExplain() const {
+    return verbosity.has_value();
+}
+
+bool SerializationOptions::isSerializingForQueryStats() const {
+    return literalPolicy != LiteralSerializationPolicy::kUnchanged || transformIdentifiers;
+}
+
 }  // namespace mongo

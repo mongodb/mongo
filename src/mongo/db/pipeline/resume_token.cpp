@@ -322,7 +322,7 @@ Document ResumeToken::toDocument(const SerializationOptions& options) const {
         // the debug string by passing an empty value, since '_typeBits' is rarely set and will
         // always be either missing or of type BinData.
         {kTypeBitsFieldName,
-         options.literalPolicy == LiteralSerializationPolicy::kToDebugTypeString
+         options.isSerializingLiteralsAsDebugTypes()
              ? Value()
              : options.serializeLiteral(_typeBits, kDefaultTokenQueryStats._typeBits)}};
 }

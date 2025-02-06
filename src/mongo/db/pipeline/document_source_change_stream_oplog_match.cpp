@@ -235,7 +235,7 @@ Pipeline::SourceContainer::iterator DocumentSourceChangeStreamOplogMatch::doOpti
 
 Value DocumentSourceChangeStreamOplogMatch::doSerialize(const SerializationOptions& opts) const {
     BSONObjBuilder builder;
-    if (opts.verbosity) {
+    if (opts.isSerializingForExplain()) {
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
         sub.append("stage"_sd, kStageName);
         sub.append(DocumentSourceChangeStreamOplogMatchSpec::kFilterFieldName,

@@ -395,7 +395,7 @@ void DocumentSourceUnionWith::doDispose() {
 Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const {
     auto collectionless =
         _pipeline->getContext()->getNamespaceString().isCollectionlessAggregateNS();
-    if (opts.verbosity) {
+    if (opts.isSerializingForExplain()) {
         // There are several different possible states depending on the explain verbosity as well as
         // the other stages in the pipeline:
         //  * If verbosity is queryPlanner, then the sub-pipeline should be untouched and we can
@@ -486,8 +486,7 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
         // special case here if we are serializing the stage for that purpose. Otherwise, we should
         // return the current (optimized) pipeline for introspection with explain, etc.
         auto serializedPipeline = [&]() -> std::vector<BSONObj> {
-            if (opts.transformIdentifiers ||
-                opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
+            if (opts.isSerializingForQueryStats()) {
                 // TODO SERVER-94227 we don't need to do any validation as part of this parsing
                 // pass.
                 return Pipeline::parse(_userPipeline, _pipeline->getContext())

@@ -68,7 +68,7 @@ void AggCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
     tassert(7633000,
             "We don't support serializing to the unmodified shape here, since we have already "
             "shapified and stored the representative query - we've lost the original literals",
-            opts.literalPolicy != LiteralSerializationPolicy::kUnchanged);
+            !opts.isKeepingLiteralsUnchanged());
 
     auto expCtx = ExpressionContext::makeBlankExpressionContext(
         opCtx, nssOrUUID, _components.let.shapifiedLet);

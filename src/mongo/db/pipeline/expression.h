@@ -554,7 +554,7 @@ public:
         // As a special case, we would like to serialize a variadic number of children as
         // "?array<?subtype>" if they are all constant. Check for that here, otherwise default to
         // the normal one-by-one serialization of the children.
-        if (options.literalPolicy == LiteralSerializationPolicy::kToDebugTypeString &&
+        if (options.isSerializingLiteralsAsDebugTypes() &&
             ExpressionConstant::allConstant(this->_children)) {
             // We could evaluate the expression right here and now and end up with just the one
             // constant answer, but this is not an optimization funciton, it is meant to just

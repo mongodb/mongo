@@ -535,7 +535,7 @@ void InMatchExpression::serializeToShape(BSONObjBuilder* bob,
 void InMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
                                                       const SerializationOptions& opts,
                                                       bool includePath) const {
-    if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
+    if (!opts.isKeepingLiteralsUnchanged()) {
         serializeToShape(bob, opts);
         return;
     }

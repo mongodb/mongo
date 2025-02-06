@@ -105,7 +105,7 @@ void AggCmdComponents::appendTo(BSONObjBuilder& bob, const SerializationOptions&
 
     tassert(78429,
             "Serialization policy not supported - original values have been discarded",
-            opts.literalPolicy != LiteralSerializationPolicy::kUnchanged);
+            !opts.isKeepingLiteralsUnchanged());
 
     if (_hasField.batchSize) {
         // cursor
@@ -124,7 +124,7 @@ void AggCmdComponents::appendTo(BSONObjBuilder& bob, const SerializationOptions&
     // The values here don't matter (assuming we're not using the 'kUnchanged' policy).
     tassert(8949601,
             "Serialization policy not supported - original values have been discarded",
-            opts.literalPolicy != LiteralSerializationPolicy::kUnchanged);
+            !opts.isKeepingLiteralsUnchanged());
     if (_hasField.passthroughToShard) {
         BSONObjBuilder passthroughToShardInfo =
             bob.subobjStart(AggregateCommandRequest::kPassthroughToShardFieldName);

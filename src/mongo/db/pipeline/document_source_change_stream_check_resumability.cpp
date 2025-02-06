@@ -231,7 +231,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckResumability::doGet
 Value DocumentSourceChangeStreamCheckResumability::doSerialize(
     const SerializationOptions& opts) const {
     BSONObjBuilder builder;
-    if (opts.verbosity) {
+    if (opts.isSerializingForExplain()) {
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
         sub.append("stage"_sd, kStageName);
         sub << "resumeToken"_sd << Value(ResumeToken(_tokenFromClient).toDocument(opts));

@@ -413,7 +413,7 @@ Value DocumentSourceMerge::serialize(const SerializationOptions& opts) const {
     }());
     // Do not serialize 'targetCollectionVersion' and 'allowMergeOnNullishValues attribute as it is
     // not part of the query shape.
-    if (opts.literalPolicy == LiteralSerializationPolicy::kUnchanged) {
+    if (opts.isKeepingLiteralsUnchanged()) {
         spec.setTargetCollectionVersion(_mergeProcessor->getCollectionPlacementVersion());
         if (feature_flags::gFeatureFlagAllowMergeOnNullishValues
                 .isEnabledUseLastLTSFCVWhenUninitialized(

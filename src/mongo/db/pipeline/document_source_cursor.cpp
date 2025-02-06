@@ -271,18 +271,17 @@ void DocumentSourceCursor::recordPlanSummaryStats() {
 }
 
 Value DocumentSourceCursor::serialize(const SerializationOptions& opts) const {
-    auto verbosity = opts.verbosity;
     // We never parse a DocumentSourceCursor, so we only serialize for explain. Since it's never
     // part of user input, there's no need to compute its query shape.
-    if (!verbosity || opts.transformIdentifiers ||
-        opts.literalPolicy != LiteralSerializationPolicy::kUnchanged)
+    if (!opts.isSerializingForExplain() || opts.isSerializingForQueryStats()) {
         return Value();
+    }
 
     invariant(_exec);
 
     uassert(50660,
             "Mismatch between verbosity passed to serialize() and expression context verbosity",
-            verbosity == pExpCtx->getExplain());
+            opts.verbosity == pExpCtx->getExplain());
 
     MutableDocument out;
 
@@ -312,7 +311,7 @@ Value DocumentSourceCursor::serialize(const SerializationOptions& opts) const {
         Explain::explainStages(
             _exec.get(),
             collections,
-            verbosity.value(),
+            opts.verbosity.value(),
             _execStatus,
             _winningPlanTrialStats,
             BSONObj(),
@@ -325,7 +324,7 @@ Value DocumentSourceCursor::serialize(const SerializationOptions& opts) const {
     invariant(explainStats["queryPlanner"]);
     out["queryPlanner"] = Value(explainStats["queryPlanner"]);
 
-    if (verbosity.value() >= ExplainOptions::Verbosity::kExecStats) {
+    if (opts.verbosity.value() >= ExplainOptions::Verbosity::kExecStats) {
         invariant(explainStats["executionStats"]);
         out["executionStats"] = Value(explainStats["executionStats"]);
     }

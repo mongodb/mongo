@@ -236,10 +236,18 @@ struct SerializationOptions {
     // Whether to serialize a DocumentSource instance such that the serialized spec can
     // be used to clone the DocumentSource instance. When 'serializeForCloning' is true, all other
     // options in this struct should be set to their default values.
-    bool serializeForCloning{false};
+    bool serializeForCloning = false;
 
     // If set to true, serializes each stage and expression as needed for FLE2.
     bool serializeForFLE2 = false;
+
+    // Serialization state check helpers.
+    bool isDefaultSerialization() const;
+    bool isKeepingLiteralsUnchanged() const;
+    bool isSerializingLiteralsAsDebugTypes() const;
+    bool isReplacingLiteralsWithRepresentativeValues() const;
+    bool isSerializingForExplain() const;
+    bool isSerializingForQueryStats() const;
 };
 
 }  // namespace mongo

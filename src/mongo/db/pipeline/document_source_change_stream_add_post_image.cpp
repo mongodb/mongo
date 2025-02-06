@@ -241,7 +241,7 @@ boost::optional<Document> DocumentSourceChangeStreamAddPostImage::lookupLatestPo
 }
 
 Value DocumentSourceChangeStreamAddPostImage::doSerialize(const SerializationOptions& opts) const {
-    return opts.verbosity
+    return opts.isSerializingForExplain()
         ? Value(Document{
               {DocumentSourceChangeStream::kStageName,
                Document{{"stage"_sd, kStageName},

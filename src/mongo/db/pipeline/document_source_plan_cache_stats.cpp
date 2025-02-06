@@ -86,11 +86,10 @@ DocumentSourcePlanCacheStats::DocumentSourcePlanCacheStats(
 
 void DocumentSourcePlanCacheStats::serializeToArray(std::vector<Value>& array,
                                                     const SerializationOptions& opts) const {
-    if (opts.verbosity) {
+    if (opts.isSerializingForExplain()) {
         tassert(7513100,
                 "$planCacheStats is not equipped to serialize in explain mode with redaction on",
-                !opts.transformIdentifiers &&
-                    opts.literalPolicy == LiteralSerializationPolicy::kUnchanged);
+                opts.isDefaultSerialization());
         array.push_back(Value{Document{
             {kStageName,
              Document{{"match"_sd, _absorbedMatch ? Value{_absorbedMatch->getQuery()} : Value{}},

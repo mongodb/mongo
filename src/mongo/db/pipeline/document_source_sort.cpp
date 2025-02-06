@@ -375,7 +375,7 @@ void DocumentSourceSort::serializeToArray(std::vector<Value>& array,
                                           const SerializationOptions& opts) const {
     if (_timeSorter) {
         serializeForBoundedSort(array, opts);
-    } else if (opts.verbosity) {
+    } else if (opts.isSerializingForExplain()) {
         serializeWithVerbosity(array, opts);
     } else if (opts.serializeForCloning) {
         serializeForCloning(array, opts);

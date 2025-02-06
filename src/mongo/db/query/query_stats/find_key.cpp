@@ -47,7 +47,7 @@ void FindCmdComponents::appendTo(BSONObjBuilder& bob, const SerializationOptions
     // Provide an arbitrary literal long here.
     tassert(7973602,
             "Serialization policy not supported - original values have been discarded",
-            opts.literalPolicy != LiteralSerializationPolicy::kUnchanged);
+            !opts.isKeepingLiteralsUnchanged());
 
     if (_hasField.batchSize) {
         opts.appendLiteral(&bob, FindCommandRequest::kBatchSizeFieldName, 0ll);

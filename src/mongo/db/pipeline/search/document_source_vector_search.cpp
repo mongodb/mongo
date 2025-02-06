@@ -94,7 +94,7 @@ void DocumentSourceVectorSearch::initializeOpDebugVectorSearchMetrics() {
 }
 
 Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) const {
-    if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
+    if (!opts.isKeepingLiteralsUnchanged()) {
         BSONObjBuilder builder;
 
         // For the query shape we only care about the filter expression and 'index' field. We treat
@@ -115,7 +115,7 @@ Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) co
 
     // We don't want router to make a remote call to mongot even though it can generate explain
     // output.
-    if (!opts.verbosity || pExpCtx->getInRouter()) {
+    if (!opts.isSerializingForExplain() || pExpCtx->getInRouter()) {
         return Value(Document{{kStageName, _originalSpec}});
     }
 
@@ -137,7 +137,7 @@ Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) co
 
     // Redact queryVector (embeddings field) if it exists to avoid including all
     // embeddings values and keep explainObj data concise.
-    if (opts.verbosity && explainObj.hasField("queryVector")) {
+    if (opts.isSerializingForExplain() && explainObj.hasField("queryVector")) {
         explainObj = explainObj.addFields(BSON("queryVector"
                                                << "redacted"));
     }

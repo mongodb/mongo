@@ -397,8 +397,7 @@ public:
         : DocumentSource(stageName, expCtx) {}
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const override {
-        if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged ||
-            opts.transformIdentifiers) {
+        if (opts.isSerializingForQueryStats()) {
             // Stages made internally by 'DocumentSourceChangeStream' should not be serialized for
             // query stats. For query stats we will serialize only the user specified $changeStream
             // stage.

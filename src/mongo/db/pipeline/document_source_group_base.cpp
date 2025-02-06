@@ -102,8 +102,7 @@ Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const
     if (_groupProcessor.doingMerge()) {
         insides[kDoingMergeSpecField] = opts.serializeLiteral(true);
     } else if (pExpCtx->isFeatureFlagShardFilteringDistinctScanEnabled() &&
-               !_groupProcessor.willBeMerged() &&
-               opts.literalPolicy == LiteralSerializationPolicy::kUnchanged) {
+               !_groupProcessor.willBeMerged() && opts.isKeepingLiteralsUnchanged()) {
         // Only serialize this flag when it is set to false & we are not already merging & this is
         // not being used for query settings - otherwise, mongod must infer from the expression
         // context what to do.
@@ -115,7 +114,8 @@ Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const
     MutableDocument out;
     out[getSourceName()] = insides.freezeToValue();
 
-    if (opts.verbosity && *opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
+    if (opts.isSerializingForExplain() &&
+        *opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
         MutableDocument md;
 
         const auto& memoryTracker = _groupProcessor.getMemoryTracker();
