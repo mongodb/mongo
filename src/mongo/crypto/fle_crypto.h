@@ -1300,6 +1300,10 @@ public:
      */
     static StatusWith<std::vector<uint8_t>> decryptData(ConstDataRange key,
                                                         ConstDataRange cipherText);
+
+    // Encrypt data with AES-256-CTR. Exposed for testing.
+    static StatusWith<std::vector<uint8_t>> encryptData(ConstDataRange key,
+                                                        ConstDataRange plainText);
 };
 
 /**

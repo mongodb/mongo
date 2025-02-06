@@ -5786,4 +5786,18 @@ TEST_F(AnchorPaddingFixture, generatePaddingDocument) {
     }
 }
 
+TEST_F(ServiceContextTest, fleEncryptAndDecrypt) {
+    PrfBlock key;
+    uassertStatusOK(crypto::engineRandBytes(DataRange(key)));
+    std::vector<uint8_t> plaintext{'a', 'b', 'c', 'd', 'e', 'f'};
+    auto encrypt1 = uassertStatusOK(FLEUtil::encryptData(key, plaintext));
+    auto encrypt2 = uassertStatusOK(FLEUtil::encryptData(key, plaintext));
+    // Ensure that we are correctly generating random IVs in encryptData.
+    ASSERT_NE(encrypt1, encrypt2);
+    auto decrypt1 = uassertStatusOK(FLEUtil::decryptData(key, encrypt1));
+    auto decrypt2 = uassertStatusOK(FLEUtil::decryptData(key, encrypt2));
+    ASSERT_EQ(decrypt1, decrypt2);
+    ASSERT_EQ(decrypt1, plaintext);
+}
+
 }  // namespace mongo

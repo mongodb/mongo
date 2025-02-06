@@ -400,42 +400,12 @@ StatusWith<std::vector<uint8_t>> encryptDataWithAssociatedData(ConstDataRange ke
     return {out};
 }
 
-StatusWith<std::vector<uint8_t>> encryptData(ConstDataRange key, ConstDataRange plainText) {
-    MongoCryptStatus status;
-    auto* fle2alg = _mcFLE2Algorithm();
-    auto ciphertextLen = fle2alg->get_ciphertext_len(plainText.length(), status);
-    if (!status.isOK()) {
-        return status.toStatus();
-    }
-    MongoCryptBuffer out;
-    out.resize(ciphertextLen);
-
-    MongoCryptBuffer iv;
-    iv.resize(MONGOCRYPT_IV_LEN);
-
-    uint32_t written;
-
-    if (!fle2alg->do_encrypt(getGlobalMongoCrypt()->crypto,
-                             iv.get() /* iv */,
-                             NULL /* aad */,
-                             MongoCryptBuffer::borrow(key).get(),
-                             MongoCryptBuffer::borrow(plainText).get(),
-                             out.get(),
-                             &written,
-                             status)) {
-        return status.toStatus();
-    }
-
-    auto cdr = out.toCDR();
-    return std::vector<uint8_t>(cdr.data(), cdr.data() + cdr.length());
-}
-
 StatusWith<std::vector<uint8_t>> encryptData(ConstDataRange key, uint64_t value) {
 
     std::array<char, sizeof(uint64_t)> bufValue;
     DataView(bufValue.data()).write<LittleEndian<uint64_t>>(value);
 
-    return encryptData(key, bufValue);
+    return FLEUtil::encryptData(key, bufValue);
 }
 
 StatusWith<std::vector<uint8_t>> decryptDataWithAssociatedData(ConstDataRange key,
@@ -499,7 +469,7 @@ StatusWith<std::vector<uint8_t>> packAndEncrypt(std::tuple<T1, T2> tuple, const 
     }
 
     dassert(builder.getCursor().length() == (sizeof(T1) + sizeof(T2)));
-    return encryptData(token.toCDR(), builder.getCursor());
+    return FLEUtil::encryptData(token.toCDR(), builder.getCursor());
 }
 
 
@@ -2226,10 +2196,10 @@ StateCollectionTokensV2::Encrypted StateCollectionTokensV2::encrypt(const ECOCTo
         DataBuilder builder(sizeof(PrfBlock) + 1);
         uassertStatusOK(builder.writeAndAdvance(_esc.toCDR()));
         uassertStatusOK(builder.writeAndAdvance(*_isLeaf));
-        encryptedTokens = uassertStatusOK(encryptData(token.toCDR(), builder.getCursor()));
+        encryptedTokens = uassertStatusOK(FLEUtil::encryptData(token.toCDR(), builder.getCursor()));
     } else {
         // Equality
-        encryptedTokens = uassertStatusOK(encryptData(token.toCDR(), _esc.toCDR()));
+        encryptedTokens = uassertStatusOK(FLEUtil::encryptData(token.toCDR(), _esc.toCDR()));
     }
 
     return StateCollectionTokensV2::Encrypted(std::move(encryptedTokens));
@@ -3019,7 +2989,8 @@ StatusWith<std::vector<uint8_t>> FLE2TagAndEncryptedMetadataBlock::serialize(
         return swEncryptedCount;
     }
 
-    auto swEncryptedZeros = encryptData(zerosEncryptionToken.toCDR(), ConstDataRange(zeros));
+    auto swEncryptedZeros =
+        FLEUtil::encryptData(zerosEncryptionToken.toCDR(), ConstDataRange(zeros));
     if (!swEncryptedZeros.isOK()) {
         return swEncryptedZeros;
     }
@@ -3168,8 +3139,8 @@ FLE2IndexedEqualityEncryptedValueV2 FLE2IndexedEqualityEncryptedValueV2::fromUne
     FLE2IndexedEqualityEncryptedValueV2 value;
     mc_FLE2IndexedEncryptedValueV2_t* iev = value._value.get();
 
-    auto swServerEncryptedValue =
-        encryptData(serverEncryptionToken.toCDR(), ConstDataRange(clientEncryptedValueParam));
+    auto swServerEncryptedValue = FLEUtil::encryptData(serverEncryptionToken.toCDR(),
+                                                       ConstDataRange(clientEncryptedValueParam));
     uassertStatusOK(swServerEncryptedValue);
 
     auto swSerializedMetadata = metadataBlockParam.serialize(serverDataDerivedToken);
@@ -3511,7 +3482,7 @@ StatusWith<std::vector<uint8_t>> FLE2IndexedRangeEncryptedValueV2::serialize(
     uint8_t edgeCount = static_cast<uint8_t>(metadataBlocks.size());
 
     auto swEncryptedData =
-        encryptData(serverEncryptionToken.toCDR(), ConstDataRange(clientEncryptedValue));
+        FLEUtil::encryptData(serverEncryptionToken.toCDR(), ConstDataRange(clientEncryptedValue));
     if (!swEncryptedData.isOK()) {
         return swEncryptedData;
     }
@@ -3642,7 +3613,7 @@ FLE2IndexedTextEncryptedValue FLE2IndexedTextEncryptedValue::fromUnencrypted(
 
     auto keyId = payload.getIndexKeyId().toCDR();
 
-    auto serverEncryptedValue = uassertStatusOK(encryptData(
+    auto serverEncryptedValue = uassertStatusOK(FLEUtil::encryptData(
         payload.getServerEncryptionToken().toCDR(), ConstDataRange(clientEncryptedValue)));
 
     if (!_mongocrypt_buffer_copy_from_data_and_size(
@@ -4833,6 +4804,41 @@ StatusWith<std::vector<uint8_t>> FLEUtil::decryptData(ConstDataRange key,
     }
 
     return {out};
+}
+
+StatusWith<std::vector<uint8_t>> FLEUtil::encryptData(ConstDataRange key,
+                                                      ConstDataRange plainText) {
+    MongoCryptStatus status;
+    // AES-256-CTR
+    auto* fle2alg = _mcFLE2Algorithm();
+    auto ciphertextLen = fle2alg->get_ciphertext_len(plainText.length(), status);
+    if (!status.isOK()) {
+        return status.toStatus();
+    }
+    MongoCryptBuffer out;
+    out.resize(ciphertextLen);
+
+    MongoCryptBuffer iv;
+    iv.resize(MONGOCRYPT_IV_LEN);
+    auto* crypto = getGlobalMongoCrypt()->crypto;
+    if (!_mongocrypt_random(crypto, iv.get(), MONGOCRYPT_IV_LEN, status)) {
+        return status.toStatus();
+    }
+
+    uint32_t written;
+    if (!fle2alg->do_encrypt(crypto,
+                             iv.get() /* iv */,
+                             NULL /* aad */,
+                             MongoCryptBuffer::borrow(key).get(),
+                             MongoCryptBuffer::borrow(plainText).get(),
+                             out.get(),
+                             &written,
+                             status)) {
+        return status.toStatus();
+    }
+
+    auto cdr = out.toCDR();
+    return std::vector<uint8_t>(cdr.data(), cdr.data() + cdr.length());
 }
 
 template class ESCCollectionCommon<ESCTwiceDerivedTagToken, ESCTwiceDerivedValueToken>;
