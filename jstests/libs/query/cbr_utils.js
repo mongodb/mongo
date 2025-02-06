@@ -22,3 +22,11 @@ function planEstimateTypeIs(plan, type) {
 export function planEstimatedWithHistogram(plan) {
     return planEstimateTypeIs(plan, "Histogram");
 }
+
+/**
+ * Assert the given plan was not costed. This is used as an indicator to whether CBR used its
+ * fallback to multiplanning for this plan.
+ */
+export function assertPlanNotCosted(plan) {
+    assert(!plan.hasOwnProperty('costEstimate'), plan);
+}

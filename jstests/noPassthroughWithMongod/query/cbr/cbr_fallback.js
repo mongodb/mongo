@@ -6,6 +6,7 @@ import {
     getPlanStages,
     isExpress,
 } from "jstests/libs/query/analyze_plan.js";
+import {assertPlanNotCosted} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 // TODO SERVER-92589: Remove this exemption
@@ -33,14 +34,6 @@ function isPlanWithIndexScan(keyPattern) {
             return bsonWoCompare(stage.keyPattern, keyPattern) === 0;
         });
     };
-}
-
-/**
- * Assert the given plan was not costed. This is used as an indicator to whether CBR used its
- * fallback to multiplanning for this plan.
- */
-function assertPlanNotCosted(plan) {
-    assert(!plan.hasOwnProperty('costEstimate'), plan);
 }
 
 function testHashedIndex() {
@@ -217,6 +210,20 @@ function testSortKeyGenerator() {
     assert.commandWorked(coll.dropIndexes());
 }
 
+function testDistictScan() {
+    assert.commandWorked(coll.createIndex({a: 1, b: 1}));
+    const explain =
+        coll.explain().aggregate([{$sort: {a: 1, b: 1}}, {$group: {_id: '$a', f: {$first: '$b'}}}]);
+    const plans = getAllPlans(explain);
+    assert.gt(plans.length, 0);
+    plans.forEach(plan => {
+        const distinctScanStages = getPlanStages(plan, "DISTINCT_SCAN");
+        assert.neq(0, distinctScanStages.length, plan);
+    });
+    plans.forEach(assertPlanNotCosted);
+    assert.commandWorked(coll.dropIndexes());
+}
+
 try {
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "heuristicCE"}));
 
@@ -233,6 +240,7 @@ try {
     testMinMaxIndexScan();
     testReturnKey();
     testSortKeyGenerator();
+    testDistictScan();
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));

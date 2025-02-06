@@ -131,14 +131,8 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
             ceRes = estimate(static_cast<const SkipNode*>(node));
             isConjunctionBreaker = true;
             break;
-        case STAGE_SHARDING_FILTER:
-            // TODO SERVER-99073: Implement shard filter
-            MONGO_UNIMPLEMENTED_TASSERT(9907301);
-        case STAGE_DISTINCT_SCAN: {
-            isConjunctionBreaker = true;
-            // TODO SERVER-99075: Implement distinct scan
-            MONGO_UNIMPLEMENTED_TASSERT(9907501);
-        }
+        case STAGE_SHARDING_FILTER:  // TODO SERVER-99073: Implement shard filter
+        case STAGE_DISTINCT_SCAN:    // TODO SERVER-99075: Implement distinct scan
         case STAGE_TEXT_OR:
         case STAGE_TEXT_MATCH:
         case STAGE_GEO_NEAR_2D:
