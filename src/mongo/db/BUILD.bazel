@@ -4325,7 +4325,6 @@ mongo_cc_benchmark(
 mongo_cc_benchmark(
     name = "service_entry_point_shard_role_bm",
     srcs = [
-        "profiler_bm_fixture.h",
         "service_entry_point_bm_fixture.h",
         "service_entry_point_shard_role_bm.cpp",
     ],
@@ -4347,6 +4346,7 @@ mongo_cc_benchmark(
         "//src/mongo/db/s:sharding_runtime_d",
         "//src/mongo/db/storage:storage_control",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
+        "//src/mongo/unittest:benchmark_util",
         "//src/mongo/util:periodic_runner_factory",
     ],
 )

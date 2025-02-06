@@ -920,7 +920,6 @@ mongo_cc_library(
     ],
     hdrs = [
         "query_bm_fixture.h",
-        "//src/mongo/db:profiler_bm_fixture.h",
     ],
     deps = [
         "query_planner_test_fixture",
@@ -929,6 +928,7 @@ mongo_cc_library(
         "//src/mongo/db:service_context_d",
         "//src/mongo/db/catalog:catalog_test_fixture",
         "//src/mongo/db/repl:storage_interface_impl",
+        "//src/mongo/unittest:benchmark_util",
         "//src/third_party/benchmark",
     ],
 )

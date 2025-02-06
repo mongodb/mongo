@@ -27,25 +27,22 @@
  *    it in the license file.
  */
 
-#include "service_entry_point_bm_fixture.h"
-
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_entry_point_bm_fixture.h"
 #include "mongo/db/service_entry_point_shard_role.h"
 
 namespace mongo {
 
 class ServiceEntryPointShardRoleBenchmarkFixture : public ServiceEntryPointBenchmarkFixture {
 public:
-    void setServiceEntryPoint(ServiceContext* service) const override {
-        service->getService(getClusterRole())
-            ->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
-    }
-
-    void setupImpl(ServiceContext* service) override {
-        auto replCoordMock = std::make_unique<repl::ReplicationCoordinatorMock>(service);
+    void doConfigureServiceContext(ServiceContext* sc) override {
+        auto replCoordMock = std::make_unique<repl::ReplicationCoordinatorMock>(sc);
         // Transition to primary so that the server can accept writes.
         invariant(replCoordMock->setFollowerMode(repl::MemberState::RS_PRIMARY));
-        repl::ReplicationCoordinator::set(service, std::move(replCoordMock));
+        repl::ReplicationCoordinator::set(sc, std::move(replCoordMock));
+        sc->getService(getClusterRole())
+            ->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
     }
 
     ClusterRole getClusterRole() const override {

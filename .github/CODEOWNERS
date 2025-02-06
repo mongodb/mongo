@@ -1208,7 +1208,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/operation_key_manager.* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/db/**/operation_killer.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/operation_time_tracker* @10gen/server-programmability @svc-auto-approve-bot
-/src/mongo/db/**/profiler_bm_fixture.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/README_default_max_time_ms.md @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/db/**/request_execution_context.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/service_context* @10gen/server-programmability @svc-auto-approve-bot

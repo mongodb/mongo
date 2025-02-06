@@ -1222,7 +1222,6 @@ mongo_cc_benchmark(
     name = "service_entry_point_router_role_bm",
     srcs = [
         "service_entry_point_router_role_bm.cpp",
-        "//src/mongo/db:profiler_bm_fixture.h",
         "//src/mongo/db:service_entry_point_bm_fixture.h",
     ],
     tags = ["sep_bm"],
@@ -1232,6 +1231,7 @@ mongo_cc_benchmark(
         "//src/mongo/db:service_context_non_d",
         "//src/mongo/db/auth:authserver",
         "//src/mongo/rpc:message",
+        "//src/mongo/unittest:benchmark_util",
     ],
 )
 

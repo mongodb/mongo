@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2024-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -36,13 +36,19 @@
 #include <unistd.h>
 #endif  // __linux__
 
+#include <barrier>  // NOLINT
 #include <benchmark/benchmark.h>
+#include <memory>
+#include <utility>
 
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic.h"
+#include "mongo/stdx/mutex.h"
 
-namespace mongo {
+// Utilities for helping with writing Google-style benchmarks.
+
+namespace mongo::unittest {
 
 /**
  * An RAII type that tracks the number of instructions and CPU cycles.
@@ -138,11 +144,92 @@ private:
     const uint64_t _start = _getCycle();
 };
 
-class BenchmarkWithProfiler : public benchmark::Fixture {
+/**
+ * Thread barrier abstraction for use in managing benchmark threads.
+ *
+ * Note: this class is only appropriate for test code, because it uses std::barrier, which is not
+ * compatible with interruptibility requirements in the server.
+ */
+class BenchmarkBarrier {
+public:
+    /**
+     * Make the barrier for a benchmark run if it doesn't yet exist.
+     * All participating `threads` must call this to begin a run.
+     * The first caller will create the barrier and wait for the other threads
+     * to call this as well, so there's an implicit arrival.
+     */
+    void startThreadRun(size_t threads) {
+        if (stdx::unique_lock lk{_mu}; !std::exchange(_active, true))
+            _b.emplace(threads);
+        _b->arrive_and_wait();
+    }
+
+    /**
+     * Empty this object, destroying the barrier at the end of a benchmark run.
+     * When the last thread arrives, the barrier is synchronously destroyed.
+     * This arrival ensures that no threads can be using the barrier while it's
+     * being destroyed. They are all unanimously agreeing that it's time to
+     * destroy it.
+     */
+    void endThreadRun() {
+        _b->arrive_and_wait();
+        if (stdx::unique_lock lk{_mu}; std::exchange(_active, false))
+            _b.reset();
+    }
+
+    /**
+     * Mark arrival at a sync point. Every thread will stop here and wait for
+     * all of the others to catch up, and then they all proceed together.
+     */
+    void sync() {
+        return _b->arrive_and_wait();
+    }
+
+private:
+    struct Nop {
+        void operator()() const noexcept {}
+    };
+    using NopBarrier = std::barrier<Nop>;  // NOLINT
+
+    mutable stdx::mutex _mu;
+    bool _active = false;
+    boost::optional<NopBarrier> _b;
+};
+
+class ThreadBenchmarkFixture : public benchmark::Fixture {
 public:
     void SetUp(benchmark::State& state) override {
-        // Do not emit logs that impact performance measurements. The following assumes that this
-        // benchmark will have its own process-global state (i.e. has its own target).
+        _barrier.startThreadRun(state.threads);
+        if (state.thread_index == 0)
+            setUpSharedResources(state);
+        _barrier.sync();
+        setUpPerThreadResources(state);
+        _barrier.sync();
+    }
+
+    void TearDown(benchmark::State& state) override {
+        _barrier.sync();
+        tearDownPerThreadResources(state);
+        _barrier.sync();
+        if (state.thread_index == 0)
+            tearDownSharedResources(state);
+        _barrier.endThreadRun();
+    }
+
+    virtual void setUpSharedResources(benchmark::State& state) {}
+    virtual void tearDownSharedResources(benchmark::State& state) {}
+
+    virtual void setUpPerThreadResources(benchmark::State& state) {}
+    virtual void tearDownPerThreadResources(benchmark::State& state) {}
+
+private:
+    BenchmarkBarrier _barrier;
+};
+
+class BenchmarkWithProfiler : public ThreadBenchmarkFixture {
+public:
+    void setUpSharedResources(benchmark::State& state) override {
+        ThreadBenchmarkFixture::setUpSharedResources(state);
         auto& settings = logv2::LogManager::global().getGlobalSettings();
         for (size_t i = 0; i < logv2::LogComponent::kNumLogComponents; ++i) {
             settings.setMinimumLoggedSeverity(
@@ -150,8 +237,6 @@ public:
                 logv2::LogSeverity::Error());
         }
     }
-
-    void TearDown(benchmark::State& state) override {}
 
     template <typename BenchmarkFunc>
     void runBenchmarkWithProfiler(const BenchmarkFunc& benchmarkFunc, benchmark::State& state) {
@@ -165,8 +250,6 @@ public:
         state.counters["instructions_per_iteration"] =
             benchmark::Counter(profile.instructions, benchmark::Counter::kAvgIterations);
     }
-
-private:
 };
 
-}  // namespace mongo
+}  // namespace mongo::unittest

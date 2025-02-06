@@ -41,11 +41,11 @@
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/query_shard_server_test_fixture.h"
-#include "mongo/db/profiler_bm_fixture.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/shard_version_factory.h"
+#include "mongo/unittest/benchmark_util.h"
 #include "mongo/util/assert_util.h"
 
 /**
@@ -241,20 +241,15 @@ private:
 
 using ChunkDesc = QueryShardServerTestFixture::ChunkDesc;
 
-class ShardFilteringDistinctScanBM : public BenchmarkWithProfiler {
+class ShardFilteringDistinctScanBM : public unittest::BenchmarkWithProfiler {
 public:
-    ShardFilteringDistinctScanBM() {}
-
-    void SetUp(benchmark::State& state) override {
-        invariant(state.thread_index == 0);
-        BenchmarkWithProfiler::SetUp(state);
+    void setUpSharedResources(benchmark::State& state) override {
+        invariant(state.threads == 1, "must be single threaded");
         _fixture = std::make_unique<ShardFilteringDistinctScanPerfTestFixture>();
         _fixture->setUp();
     }
 
-    void TearDown(benchmark::State& state) override {
-        invariant(state.thread_index == 0);
-        BenchmarkWithProfiler::TearDown(state);
+    void tearDownSharedResources(benchmark::State& state) override {
         _fixture.reset();
     }
 
@@ -340,8 +335,6 @@ public:
                       ShardFilteringStrategy strategy,
                       bool fetch,
                       benchmark::State& state) {
-        invariant(state.thread_index == 0);
-
         const ShardKeyPattern shardKeyPattern(BSON(fieldName << 1));
         const KeyPattern& shardKey = shardKeyPattern.getKeyPattern();
 

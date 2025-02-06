@@ -93,9 +93,6 @@ filters:
   - "operation_time_tracker*":
     approvers:
       - 10gen/server-programmability
-  - "profiler_bm_fixture.*":
-    approvers:
-      - 10gen/server-programmability
   - "README_default_max_time_ms.md":
     approvers:
       - 10gen/server-networking-and-observability

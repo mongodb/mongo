@@ -233,12 +233,12 @@ mongo_cc_benchmark(
     name = "distinct_scan_bm",
     srcs = [
         "distinct_scan_bm.cpp",
-        "//src/mongo/db:profiler_bm_fixture.h",
     ],
     deps = [
         ":query_shard_server_test_fixture",
         "//src/mongo/db:query_exec",
         "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/unittest:benchmark_util",
     ],
 )
 
