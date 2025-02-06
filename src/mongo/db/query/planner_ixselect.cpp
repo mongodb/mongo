@@ -560,21 +560,6 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             return false;
         }
 
-        if (MatchExpression::REGEX == exprtype) {
-            // Indexes are only useful if have no collator since otherwise it's keys are ICU encoded
-            // and neither PCRE nor PCRE2 support such encoding.
-            //
-            // However we may still want to use the index if:
-            // 1. The query **must** use an indexed plan. (e.g: there are other predicates that
-            // require an index such as $text or geo) OR
-            // 2. The index has no collator OR
-            // 3. internalQueryPlannerIgnoreIndexWithCollationForRegex is set to false. This knob
-            // helps avoiding possible regressions when the index would still be better than
-            // COLLSCAN. See HELP-60129 for details.
-            return queryContext.mustUseIndexedPlan ||
-                CollatorInterface::isSimpleCollator(index.collator) ||
-                !internalQueryPlannerIgnoreIndexWithCollationForRegex.load();
-        }
 
         // We can only index EQ using text indices.  This is an artificial limitation imposed by
         // FTSSpec::getIndexPrefix() which will fail if there is not an EQ predicate on each
@@ -583,8 +568,24 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
         // Example for key pattern {a: 1, b: "text"}:
         // - Allowed: node = {a: 7}
         // - Not allowed: node = {a: {$gt: 7}}
+        // - Not allowed: node = {a: /[ab]*/}
 
         if (INDEX_TEXT != index.type) {
+            if (MatchExpression::REGEX == exprtype) {
+                // Indexes are only useful if have no collator since otherwise it's keys are ICU
+                // encoded and neither PCRE nor PCRE2 support such encoding.
+                //
+                // However we may still want to use the index if:
+                // 1. The query **must** use an indexed plan. (e.g: there are other predicates that
+                // require an index such as $geo) OR
+                // 2. The index has no collator OR
+                // 3. internalQueryPlannerIgnoreIndexWithCollationForRegex is set to false. This
+                // knob helps avoiding possible regressions when the index would still be better
+                // than COLLSCAN. See HELP-60129 for details.
+                return queryContext.mustUseIndexedPlan ||
+                    CollatorInterface::isSimpleCollator(index.collator) ||
+                    !internalQueryPlannerIgnoreIndexWithCollationForRegex.load();
+            }
             return true;
         }
 
