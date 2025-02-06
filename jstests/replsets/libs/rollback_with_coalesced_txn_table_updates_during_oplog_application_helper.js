@@ -5,17 +5,19 @@
  * application.
  * We also test that if a node crashes after oplog truncation during rollback, the update made to
  * the 'config.transactions' table is persisted on startup.
- *
- * @tags: [requires_persistence]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const oplogApplierBatchSize = 100;
-
-function runTest(crashAfterRollbackTruncation) {
+let runTest = function(crashAfterRollbackTruncation,
+                       initFunc,
+                       stopReplProducerOnDocumentFunc,
+                       opsFunc,
+                       stmtMajorityCommittedFunc,
+                       validateFunc) {
     jsTestLog(`Running test with crashAfterRollbackTruncation = ${crashAfterRollbackTruncation}`);
+    const oplogApplierBatchSize = 100;
     const rst = new ReplSetTest({
         nodes: {
             n0: {},
@@ -41,8 +43,9 @@ function runTest(crashAfterRollbackTruncation) {
     const lsid = ({id: UUID()});
     const primary = rst.getPrimary();
     const ns = "test.retryable_write_partial_rollback";
-    assert.commandWorked(
-        primary.getCollection(ns).insert({_id: 0, counter: 0}, {writeConcern: {w: 5}}));
+    const counterTotal = oplogApplierBatchSize;
+    initFunc(primary, ns, counterTotal);
+
     // SERVER-65971: Do a write with `lsid` to add an entry to config.transactions. This write will
     // persist after rollback and be updated when the rollback code corrects for omitted writes to
     // the document.
@@ -63,25 +66,25 @@ function runTest(crashAfterRollbackTruncation) {
     const stopReplProducerFailpoints = [secondary1, secondary2, secondary3, secondary4].map(
         conn => configureFailPoint(conn, 'stopReplProducer'));
 
+    // Using an odd number ensures that when the 'ReplicateVectoredInsertsTransactionally' feature
+    // flag is enabled, counterMajorityCommitted + 1 will be in a different oplog entry. This is
+    // because we're using an internal batching size of 2, resulting in pairs like [0, 1], [2, 3],
+    // etc.
+    const counterMajorityCommitted = counterTotal - 5;
+
     // While replication is still entirely disabled, additionally disable replication partway into
     // the retryable write on all but the first secondary. The idea is that while secondary1 will
     // apply all of the oplog entries in a single batch, the other secondaries will only apply up to
     // counterMajorityCommitted oplog entries.
-    const counterTotal = oplogApplierBatchSize;
-    const counterMajorityCommitted = counterTotal - 2;
     const stopReplProducerOnDocumentFailpoints = [secondary2, secondary3, secondary4].map(
         conn => configureFailPoint(conn,
                                    'stopReplProducerOnDocument',
-                                   {document: {"diff.u.counter": counterMajorityCommitted + 1}}));
+                                   stopReplProducerOnDocumentFunc(counterMajorityCommitted)));
 
-    assert.commandWorked(primary.getCollection(ns).runCommand("update", {
-        updates: Array.from({length: counterTotal}, () => ({q: {_id: 0}, u: {$inc: {counter: 1}}})),
-        lsid,
-        txnNumber: NumberLong(2),
-    }));
-
-    const stmtMajorityCommitted = primary.getCollection("local.oplog.rs")
-                                      .findOne({ns, "o.diff.u.counter": counterMajorityCommitted});
+    opsFunc(primary, ns, counterTotal, lsid);
+    const stmtMajorityCommitted =
+        primary.getCollection("local.oplog.rs")
+            .findOne(stmtMajorityCommittedFunc(primary, ns, counterMajorityCommitted));
     assert.neq(null, stmtMajorityCommitted);
 
     for (const fp of stopReplProducerFailpoints) {
@@ -170,25 +173,30 @@ function runTest(crashAfterRollbackTruncation) {
     assert.commandWorked(secondary1.adminCommand({replSetFreeze: 0}));
     rst.stepUp(secondary1);
 
-    const docBeforeRetry = secondary1.getCollection(ns).findOne({_id: 0});
-    assert.eq(docBeforeRetry, {_id: 0, counter: counterMajorityCommitted});
-
-    assert.commandWorked(secondary1.getCollection(ns).runCommand("update", {
-        updates: Array.from({length: counterTotal}, () => ({q: {_id: 0}, u: {$inc: {counter: 1}}})),
-        lsid,
-        txnNumber: NumberLong(2),
-        writeConcern: {w: 5},
-    }));
-
-    const docAfterRetry = secondary1.getCollection(ns).findOne({_id: 0});
-    assert.eq(docAfterRetry, {_id: 0, counter: counterTotal});
+    validateFunc(secondary1, ns, counterMajorityCommitted, counterTotal, lsid);
 
     rst.stopSet();
-}
+};
 
-// Test the general scenario where we perform the appropriate update to the 'config.transactions'
-// table during rollback.
-runTest(false);
-// Extends the test to crash the secondary in the middle of rollback right after oplog truncation.
-// We assert that the update made to the 'config.transactions' table persisted on startup.
-runTest(true);
+export var runTests = function(
+    initFunc, stopReplProducerOnDocumentFunc, opsFunc, stmtMajorityCommittedFunc, validateFunc) {
+    // Test the general scenario where we perform the appropriate update to the
+    // 'config.transactions'
+    // table during rollback.
+    runTest(false,
+            initFunc,
+            stopReplProducerOnDocumentFunc,
+            opsFunc,
+            stmtMajorityCommittedFunc,
+            validateFunc);
+
+    // Extends the test to crash the secondary in the middle of rollback right after oplog
+    // truncation. We assert that the update made to the 'config.transactions' table persisted on
+    // startup.
+    runTest(true,
+            initFunc,
+            stopReplProducerOnDocumentFunc,
+            opsFunc,
+            stmtMajorityCommittedFunc,
+            validateFunc);
+};

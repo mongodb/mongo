@@ -548,12 +548,22 @@ void RollbackImpl::_restoreTxnsTableEntryFromRetryableWrites(OperationContext* o
     const auto filterFromMigration = BSON("op"
                                           << "n"
                                           << "fromMigrate" << true);
+    // When the 'ReplicateVectoredInsertsTransactionally' feature flag is enabled, we batch inserts
+    // into a single applyOps oplog entry with an internal array of operations as inserts, and set
+    // the 'multiOpType' flag. The stmtId then becomes an internal parameter for the array of
+    // batched operations, so we should not look for it in the outer document.
+    const auto filterForVectorInsertsApplyOps =
+        BSON("op"
+             << "c"
+             << "multiOpType" << repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
     FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
-    findRequest.setFilter(BSON("ts" << BSON("$gt" << stableTimestamp) << "txnNumber"
-                                    << BSON("$exists" << true) << "stmtId"
-                                    << BSON("$exists" << true) << "prevOpTime.ts"
-                                    << BSON("$gte" << Timestamp(1, 0) << "$lte" << stableTimestamp)
-                                    << "$or" << BSON_ARRAY(filter << filterFromMigration)));
+    findRequest.setFilter(BSON(
+        "ts" << BSON("$gt" << stableTimestamp) << "txnNumber" << BSON("$exists" << true) << "$or"
+             << BSON_ARRAY(BSON("stmtId" << BSON("$exists" << true))
+                           << filterForVectorInsertsApplyOps)
+             << "prevOpTime.ts" << BSON("$gte" << Timestamp(1, 0) << "$lte" << stableTimestamp)
+             << "$or"
+             << BSON_ARRAY(filter << filterFromMigration << filterForVectorInsertsApplyOps)));
     auto cursor = client->find(std::move(findRequest));
     while (cursor->more()) {
         auto doc = cursor->next();

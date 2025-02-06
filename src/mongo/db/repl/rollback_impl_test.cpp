@@ -1724,6 +1724,9 @@ TEST_F(RollbackImplTest, RollbackFixesCountForBatchedRetryableWriteApplyOpsChain
 }
 
 TEST_F(RollbackImplTest, RollbackFixesCountForBatchedRetryableWriteApplyOpsChain2) {
+    const auto nss = NamespaceString::kSessionTransactionsTableNamespace;
+    _initializeCollection(_opCtx.get(), UUID::gen(), nss);
+
     auto collId = UUID::gen();
     auto ops = _setUpBatchedRetryableWriteForCountTest(collId);
 
@@ -1732,9 +1735,22 @@ TEST_F(RollbackImplTest, RollbackFixesCountForBatchedRetryableWriteApplyOpsChain
     const auto& commonOp = ops[1];
     _storageInterface->setStableTimestamp(nullptr, commonOp.first["ts"].timestamp());
     _remoteOplog->setOperations({commonOp});
+    // The 'config.transactions' table is currently empty.
+    ASSERT_NOT_OK(_storageInterface->findSingleton(_opCtx.get(), nss));
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
 
     ASSERT_EQ(_storageInterface->getFinalCollectionCount(collId), 2);
+
+    auto swDoc = _storageInterface->findById(_opCtx.get(), nss, commonOp.first.getField("lsid"));
+    ASSERT_OK(swDoc);
+    auto sessionsEntryBson = swDoc.getValue();
+    // New sessions entry should match the session information retrieved from the retryable writes
+    // oplog entry from the 'stableTimestamp'.
+    ASSERT_EQUALS(sessionsEntryBson["txnNum"].numberInt(), commonOp.first["txnNumber"].numberInt());
+    ASSERT_EQ(sessionsEntryBson["lastWriteOpTime"]["ts"].timestamp(),
+              commonOp.first["ts"].timestamp());
+    ASSERT_EQ(sessionsEntryBson["lastWriteOpTime"]["t"].numberInt(),
+              commonOp.first["t"].numberInt());
 }
 
 TEST_F(RollbackImplTest, RollbackRestoresTxnTableEntryToBeConsistentWithStableTimestamp) {

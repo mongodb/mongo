@@ -3,7 +3,9 @@
  * with the node data at the 'stableTimestamp', specifically in the case where multiple derived ops
  * to the 'config.transactions' table were coalesced into a single operation when performing
  * vectored inserts on the primary.
- *
+ * Note that when the 'ReplicateVectoredInsertsTransactionally' feature flag is enabled, updates to
+ * the 'config.transactions' table are not coalesced on the primary. However, we are still testing
+ * this as a sanity check in case the behavior changes in the future.
  * @tags: [requires_persistence]
  */
 
@@ -42,9 +44,14 @@ const [secondary1, secondary2] = rst.getSecondaries();
 // while the primary will apply all of the writes in a single storage transaction, the secondaries
 // will only apply up to insertBatchMajorityCommitted oplog entries.
 
-let insertBatchTotal;
-let insertBatchMajorityCommitted;
-let stopReplProducerOnDocumentFailpoints;
+let insertBatchTotal = 40;
+// Using an odd number ensures that when the 'ReplicateVectoredInsertsTransactionally' feature flag
+// is enabled, insertBatchMajorityCommitted + 1 will be in a different oplog entry. This is because
+// we're using an internal batching size of 2, resulting in pairs like [0, 1], [2, 3], etc.
+let insertBatchMajorityCommitted = insertBatchTotal - 5;
+let stopReplProducerOnDocumentFailpoints = [secondary1, secondary2].map(
+    conn => configureFailPoint(
+        conn, 'stopReplProducerOnDocument', {document: {"_id": insertBatchMajorityCommitted + 1}}));
 let oplogFilterForMajority;
 
 // When ReplicateVectoredInsertsTransactionally is enabled, inserts are batched into applyOps
@@ -53,25 +60,11 @@ if (FeatureFlagUtil.isPresentAndEnabled(primary, "ReplicateVectoredInsertsTransa
     // Set the batch size to 2 so we're testing batching but don't have to insert a huge number
     // of documents
     assert.commandWorked(primary.adminCommand({setParameter: 1, internalInsertMaxBatchSize: 2}));
-    // Using an odd number tests that the short batch (which should be an 'i', not an applyOps)
-    // works.
-    insertBatchTotal = 41;
-    insertBatchMajorityCommitted = insertBatchTotal - 3;
-    stopReplProducerOnDocumentFailpoints = [secondary1, secondary2].map(
-        conn => configureFailPoint(conn, 'stopReplProducerOnDocument', {
-            document: {"o.applyOps.o._id": insertBatchMajorityCommitted + 1}
-        }));
     oplogFilterForMajority = {
         "o.applyOps.ns": ns,
         "o.applyOps.o._id": insertBatchMajorityCommitted
     };
 } else {
-    insertBatchTotal = 20;
-    insertBatchMajorityCommitted = insertBatchTotal - 2;
-    stopReplProducerOnDocumentFailpoints = [secondary1, secondary2].map(
-        conn => configureFailPoint(conn,
-                                   'stopReplProducerOnDocument',
-                                   {document: {"_id": insertBatchMajorityCommitted + 1}}));
     oplogFilterForMajority = {ns: ns, "o._id": insertBatchMajorityCommitted};
 }
 

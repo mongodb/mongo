@@ -374,6 +374,8 @@ last-continuous:
       ticket: SERVER-89883
     - test_file: jstests/sharding/metadata_refresh_on_shard_removal.js
       ticket: SERVER-99277
+    - test_file: jstests/replsets/rollback_with_coalesced_txn_table_updates_during_oplog_application_inserts.js
+      ticket: SERVER-99185
   suites: null
 last-lts:
   all:
@@ -795,4 +797,6 @@ last-lts:
       ticket: SERVER-89883
     - test_file: jstests/sharding/metadata_refresh_on_shard_removal.js
       ticket: SERVER-99277
+    - test_file: jstests/replsets/rollback_with_coalesced_txn_table_updates_during_oplog_application_inserts.js
+      ticket: SERVER-99185
   suites: null

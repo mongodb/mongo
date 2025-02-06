@@ -780,9 +780,9 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
         return Status(ErrorCodes::FailPointEnabled, "stopReplProducer fail point is enabled");
     }
 
-    // Stop fetching and return when we reach a particular document. This failpoint should be used
-    // with the setParameter bgSyncOplogFetcherBatchSize=1, so that documents are fetched one at a
-    // time.
+    // Stop fetching and return when we reach a particular document in a batch.
+    // Consider using the parameter setParameter bgSyncOplogFetcherBatchSize=1 to fetch documents
+    // one at a time.
     {
         Status status = Status::OK();
         stopReplProducerOnDocument.executeIf(
@@ -796,12 +796,36 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
                 auto opCtx = cc().makeOperationContext();
                 auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(_nss).build();
                 Matcher m(data["document"].Obj(), expCtx);
-                // TODO SERVER-46240: Handle batchSize 1 in DBClientCursor.
-                // Due to a bug in DBClientCursor, it actually uses batchSize 2 if the given
-                // batchSize is 1 for the find command. So we need to check up to two documents.
-                return !documents.empty() &&
-                    (m.matches(documents.front()["o"].Obj()) ||
-                     m.matches(documents.back()["o"].Obj()));
+                for (const auto& doc : documents) {
+                    const auto& obj = doc["o"].Obj();
+                    std::vector<BSONObj> objToBeMatched;
+                    // When the 'ReplicateVectoredInsertsTransactionally' feature flag is enabled,
+                    // we batch inserts into a single applyOps oplog entry with an internal array of
+                    // operations as inserts, and set the 'multiOpType' flag.
+                    if (doc.hasField("multiOpType") &&
+                        doc["multiOpType"].numberInt() ==
+                            int(repl::MultiOplogEntryType::kApplyOpsAppliedSeparately)) {
+                        auto applyOpsElement = obj.getField("applyOps");
+                        for (const auto& element : applyOpsElement.Array()) {
+                            objToBeMatched.push_back(element.Obj()["o"].Obj());
+                        }
+                    } else {
+                        objToBeMatched.push_back(obj);
+                    }
+
+                    for (const auto& obj : objToBeMatched) {
+                        if (m.matches(obj)) {
+                            LOGV2(9918500,
+                                  "stopReplProducerOnDocument matched a document.",
+                                  "doc"_attr = doc,
+                                  "batchSize"_attr = documents.size(),
+                                  "firstTimestamp"_attr = documents.front()["ts"],
+                                  "lastTimestamp"_attr = documents.back()["ts"]);
+                            return true;
+                        }
+                    }
+                }
+                return false;
             });
         if (!status.isOK()) {
             return status;
