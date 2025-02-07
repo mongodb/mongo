@@ -54,6 +54,7 @@
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/resource_yielder.h"
+#include "mongo/db/s/resharding/resharding_coordinator.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/resharding/resharding_util.h"
