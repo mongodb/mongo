@@ -21,6 +21,8 @@
 #
 last-continuous:
   all:
+    - test_file: jstests/change_streams/change_streams_namespace_match_expressions.js
+      ticket: SERVER-100489
     - test_file: jstests/change_streams/change_streams_dynamic_match_expressions.js
       ticket: SERVER-100345
     - test_file: jstests/sharding/analyze_shard_key/analyze_shard_key_cmd_validation.js
@@ -379,6 +381,8 @@ last-continuous:
   suites: null
 last-lts:
   all:
+    - test_file: jstests/change_streams/change_streams_namespace_match_expressions.js
+      ticket: SERVER-100489
     - test_file: jstests/change_streams/change_streams_dynamic_match_expressions.js
       ticket: SERVER-100345
     - test_file: jstests/sharding/analyze_shard_key/analyze_shard_key_cmd_validation.js
