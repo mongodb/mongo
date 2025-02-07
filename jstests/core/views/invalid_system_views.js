@@ -15,8 +15,8 @@
  *   requires_replication,
  *   uses_compact,
  *   references_foreign_collection,
- *   # The test leaves the database in a broken state such that listCollections will fail and
- *   # trigger a validation failure.
+ *   # Antithesis can inject a fault while an invalid view still exists, which causes validation
+ *   # failures in hooks, as they leave the database in a broken state where listCollections fails.
  *   antithesis_incompatible,
  * ]
  */

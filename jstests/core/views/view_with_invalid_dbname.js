@@ -11,6 +11,9 @@
  *   assumes_against_mongod_not_mongos,
  *   # applyOps is not retryable.
  *   requires_non_retryable_commands,
+ *   # Antithesis can inject a fault while an invalid view still exists, which causes validation
+ *   # failures in hooks, as they leave the database in a broken state where listCollections fails.
+ *   antithesis_incompatible,
  * ]
  */
 const testDB = db.getSiblingDB("view_with_invalid_dbname");
