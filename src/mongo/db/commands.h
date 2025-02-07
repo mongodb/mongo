@@ -1455,6 +1455,62 @@ class TypedCommand<Derived>::MinimalInvocationBase : public InvocationBaseIntern
     using InvocationBaseInternal::InvocationBaseInternal;
 };
 
+/**
+ * Mix-in base for requests containing a `GenericArguments`.
+ * Fills some of the requirements for use as a `TypedCommand`'s `Request` type.
+ */
+class GenericArgumentsTypedRequest {
+public:
+    explicit GenericArgumentsTypedRequest(const OpMsgRequest& req) : _args{_parseArgs(req)} {}
+
+    const GenericArguments& getGenericArguments() const {
+        return _args;
+    }
+    GenericArguments& getGenericArguments() {
+        return _args;
+    }
+    void setGenericArguments(GenericArguments args) {
+        _args = std::move(args);
+    }
+
+private:
+    static GenericArguments _parseArgs(const OpMsgRequest& req) {
+        IDLParserContext ctx("GenericArguments",
+                             req.validatedTenancyScope,
+                             req.getValidatedTenantId(),
+                             req.getSerializationContext());
+        return GenericArguments::parse(ctx, req.body);
+    }
+
+    GenericArguments _args;
+};
+
+/**
+ * Mix-in base for Requests containing a DatabaseName.
+ * Fills some of the requirements for use as a `TypedCommand`'s `Request` type.
+ */
+class DbNameTypedRequest {
+public:
+    explicit DbNameTypedRequest(const OpMsgRequest& req) : _dbName{req.parseDbName()} {}
+
+    const DatabaseName& getDbName() const {
+        return _dbName;
+    }
+
+private:
+    DatabaseName _dbName;
+};
+
+/**
+ * Base for Requests having a `GenericArguments` and a `DatabaseName`.
+ * Fills the `TypedCommand` `Request` requirements.
+ */
+class BasicTypedRequest : public GenericArgumentsTypedRequest, public DbNameTypedRequest {
+public:
+    explicit BasicTypedRequest(const OpMsgRequest& req)
+        : GenericArgumentsTypedRequest{req}, DbNameTypedRequest{req} {}
+};
+
 /*
  * Classes derived from TypedCommand::InvocationBase must:
  *
