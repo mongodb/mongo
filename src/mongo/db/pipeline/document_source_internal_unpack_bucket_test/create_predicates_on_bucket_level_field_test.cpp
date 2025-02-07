@@ -816,12 +816,8 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsAndWith
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
-                      fromjson("{meta: {$gte: 1}}"
-                               "]}"));
-    ASSERT_BSONOBJ_EQ(predicate.tightPredicate->serialize(),
-                      fromjson("{meta: {$gte: 1}}"
-                               "]}"));
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(), fromjson("{meta: {$gte: 1}}"));
+    ASSERT_BSONOBJ_EQ(predicate.tightPredicate->serialize(), fromjson("{meta: {$gte: 1}}"));
 }
 
 TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsOrWithOneChild) {
@@ -842,12 +838,8 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsOrWithO
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
                          ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
-    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(),
-                      fromjson("{meta: {$gte: 1}}"
-                               "]}"));
-    ASSERT_BSONOBJ_EQ(predicate.tightPredicate->serialize(),
-                      fromjson("{meta: {$gte: 1}}"
-                               "]}"));
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(), fromjson("{meta: {$gte: 1}}"));
+    ASSERT_BSONOBJ_EQ(predicate.tightPredicate->serialize(), fromjson("{meta: {$gte: 1}}"));
 }
 
 TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePredicatesOnId) {

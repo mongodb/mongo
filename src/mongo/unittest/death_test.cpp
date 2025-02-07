@@ -334,17 +334,11 @@ void DeathTestBase::Subprocess::monitorChild(FILE* pf) {
             line = line.substr(0, line.size() - 1);
         if (line.empty())
             continue;
-        int parsedLen = 0;
-        BSONObj parsedChildLog;
         try {
-            parsedChildLog = fromjson(lineBuf, &parsedLen);
+            auto parsedChildLog = fromjson(lineBuf);
+            LOGV2(20165, "child", "json"_attr = parsedChildLog);
         } catch (DBException&) {
             // ignore json parsing errors and dump the whole log line as text
-            parsedLen = 0;
-        }
-        if (static_cast<size_t>(parsedLen) == line.size()) {
-            LOGV2(20165, "child", "json"_attr = parsedChildLog);
-        } else {
             LOGV2(20169, "child", "text"_attr = line);
         }
         os.write(lineBuf, bytesRead);
