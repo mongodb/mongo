@@ -5,8 +5,11 @@ src:src/third_party/snappy-*/*
 src:src/third_party/icu4c-*/*
 
 # TODO SERVER-97033 Remove immer suppressions if and when the UB is fixed upstream.
+fun:_ZN5immer6detail3csl10member_two*type*get*
+fun:_ZN5immer6detail3csl3get*
 fun:_ZN5immer6detail5hamts4node*make_inner_n*
 fun:_ZN5immer6detail5hamts4node*make_merged*
+fun:_ZN5immer6detail5hamts4node*ownee*
 
 # TODO SERVER-100171 Remove these once UB detected by the v5 toolchain is addressed in wiredtiger.
 src:src/third_party/wiredtiger/src/include/modify_inline.h
