@@ -253,7 +253,8 @@ public:
             // this case, we simply return a kNotSupported type GetModPathsReturn so that pipeline
             // optimization does not occur.
             //
-            // TODO SERVER-86431 no longer allow $meta in exclusion projections
+            // TODO SERVER-100587 Fix dependency analysis to enable pipeline optimization when $meta
+            // is used in an exclusion projection
             return {DocumentSource::GetModPathsReturn::Type::kNotSupported, {}, {}};
         }
     }
