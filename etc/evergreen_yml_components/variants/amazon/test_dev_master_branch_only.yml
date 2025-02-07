@@ -352,6 +352,8 @@ buildvariants:
       - name: rollback_fuzzer_sanity_patch
       - name: query_cbr_heuristic_jscore_passthrough
         cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_cbr_sampling_jscore_passthrough
+        cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
 
   - <<: *amazon_linux2_arm64_static_compile_variant_dependency
     name: amazon_linux2_arm64_static-try-sbe-engine-query-patch-only
