@@ -41,4 +41,4 @@ def mongo_cc_proto_lib(name, deps):
     mongo_cc_proto_library(name = proto_cc_name, deps = deps)
 
     cc_dep = ":" + proto_cc_name
-    mongo_cc_library(name = name, cc_deps = [cc_dep], copts = OTEL_COPTS, target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH)
+    mongo_cc_library(name = name, cc_deps = [cc_dep], copts = OTEL_COPTS, target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH, no_undefined_ref_DO_NOT_USE = False)
