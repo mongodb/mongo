@@ -1,7 +1,5 @@
 ## 1. No DISTINCT_SCAN candidate considered
 ### Distinct on "x", with filter: { "x" : { "$gt" : 3 }, "z" : 5 }
-### Expected results
-`[ 5, 6, 7 ]`
 ### Distinct results
 `[ 5, 6, 7 ]`
 ### Summarized explain
@@ -110,8 +108,6 @@
 
 ### No DISTINCT_SCAN candidate considered due to multikeyness
 ### Distinct on "x", with filter: { "x" : 3 }
-### Expected results
-`[ 1, 2, 3, 4, 5 ]`
 ### Distinct results
 `[ 1, 2, 3, 4, 5 ]`
 ### Summarized explain
@@ -178,8 +174,6 @@
 ```
 
 ### Distinct on "x", with filter: { "x" : { "$gt" : 3 }, "z" : 5 }
-### Expected results
-`[ 5, 6, 7 ]`
 ### Distinct results
 `[ 5, 6, 7 ]`
 ### Summarized explain
@@ -292,8 +286,6 @@
 
 ### Only DISTINCT_SCAN candidates considered despite multikeyness
 ### Distinct on "x", with filter: { }
-### Expected results
-`[ 1, 2, 3, 4, 5, 6, 7, 8 ]`
 ### Distinct results
 `[ 1, 2, 3, 4, 5, 6, 7, 8 ]`
 ### Summarized explain
@@ -339,8 +331,6 @@
 
 ## 2. Only DISTINCT_SCAN candidates considered
 ### Distinct on "x", with filter: { }
-### Expected results
-`[ 3, 5, 6, 7, 8 ]`
 ### Distinct results
 `[ 3, 5, 6, 7, 8 ]`
 ### Summarized explain
@@ -388,8 +378,6 @@
 ```
 
 ### Distinct on "x", with filter: { "x" : 3 }
-### Expected results
-`[ 3 ]`
 ### Distinct results
 `[ 3 ]`
 ### Summarized explain
@@ -515,8 +503,6 @@
 ```
 
 ### Distinct on "x", with filter: { "x" : { "$gt" : 3 }, "y" : 5 }
-### Expected results
-`[ 5, 6, 7 ]`
 ### Distinct results
 `[ 5, 6, 7 ]`
 ### Summarized explain
@@ -692,8 +678,6 @@
 		}
 	]
 }
-### Expected results
-`[ 3, 7, 8 ]`
 ### Distinct results
 `[ 3, 7, 8 ]`
 ### Summarized explain
@@ -1233,8 +1217,6 @@
 		}
 	]
 }
-### Expected results
-`[ 6 ]`
 ### Distinct results
 `[ 6 ]`
 ### Summarized explain
@@ -1380,8 +1362,6 @@
 		}
 	]
 }
-### Expected results
-`[ 3, 5, 6, 7, 8 ]`
 ### Distinct results
 `[ 3, 5, 6, 7, 8 ]`
 ### Summarized explain
@@ -1467,8 +1447,6 @@
 		}
 	]
 }
-### Expected results
-`[ 3, 5, 6, 7 ]`
 ### Distinct results
 `[ 3, 5, 6, 7 ]`
 ### Summarized explain
@@ -1545,8 +1523,6 @@
 
 ## 3. Prefer DISTINCT_SCAN for many duplicate values in the collection
 ### Distinct on "x", with filter: { "x" : { "$gt" : -1 }, "y" : { "$lt" : 250 } }
-### Expected results
-`[ 0, 1 ]`
 ### Distinct results
 `[ 0, 1 ]`
 ### Summarized explain
@@ -1661,8 +1637,6 @@
 
 ## 4. Prefer FETCH + filter + IXSCAN for more selective predicate on y
 ### Distinct on "x", with filter: { "x" : { "$gt" : -1 }, "y" : { "$lt" : 105 } }
-### Expected results
-`[ 0, 1, 2, 3, 4 ]`
 ### Distinct results
 `[ 0, 1, 2, 3, 4 ]`
 ### Summarized explain
@@ -1793,8 +1767,6 @@
 		}
 	]
 }
-### Expected results
-`[ 0, 1, 2, 3, 4 ]`
 ### Distinct results
 `[ 0, 1, 2, 3, 4 ]`
 ### Summarized explain
@@ -1868,8 +1840,6 @@
 
 ## 5. Use hinted DISTINCT_SCAN
 ### Distinct on "x", with filter: { "x" : { "$gt" : 3 }, "y" : 5 }, and options: { "hint" : { "x" : 1, "y" : 1 } }
-### Expected results
-`[ 5, 6, 7 ]`
 ### Distinct results
 `[ 5, 6, 7 ]`
 ### Summarized explain
@@ -1918,8 +1888,6 @@
 
 ## 6. Use hinted IXSCAN, even with preferable DISTINCT_SCAN
 ### Distinct on "x", with filter: { "x" : { "$gt" : -1 }, "y" : { "$lt" : 250 } }, and options: { "hint" : { "x" : 1 } }
-### Expected results
-`[ 0, 1 ]`
 ### Distinct results
 `[ 0, 1 ]`
 ### Summarized explain
@@ -1962,8 +1930,6 @@
 
 ## 7. Use hinted COLLSCAN, even with preferable DISTINCT_SCAN
 ### Distinct on "x", with filter: { "x" : { "$gt" : -1 }, "y" : { "$lt" : 250 } }, and options: { "hint" : { "$natural" : 1 } }
-### Expected results
-`[ 0, 1 ]`
 ### Distinct results
 `[ 0, 1 ]`
 ### Summarized explain
@@ -1996,8 +1962,6 @@
 
 ## 8. Use hinted DISTINCT_SCAN, even with no duplicate values
 ### Distinct on "x", with filter: { "x" : { "$gt" : -1 }, "y" : { "$lt" : 105 } }, and options: { "hint" : { "x" : 1, "y" : 1 } }
-### Expected results
-`[ 0, 1, 2, 3, 4 ]`
 ### Distinct results
 `[ 0, 1, 2, 3, 4 ]`
 ### Summarized explain

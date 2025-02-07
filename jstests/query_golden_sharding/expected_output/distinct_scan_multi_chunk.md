@@ -1,7 +1,5 @@
 ## 1. distinct on shard key
 ### Distinct on "shardKey", with filter: { }
-### Expected results
-`[ "chunk1_s0_0", "chunk1_s0_1", "chunk1_s0_2", "chunk1_s1_0", "chunk1_s1_1", "chunk1_s1_2", "chunk2_s0_0", "chunk2_s0_1", "chunk2_s0_2", "chunk2_s1_0", "chunk2_s1_1", "chunk2_s1_2", "chunk3_s0_0", "chunk3_s0_1", "chunk3_s0_2", "chunk3_s1_0", "chunk3_s1_1", "chunk3_s1_2" ]`
 ### Distinct results
 `[ "chunk1_s0_0", "chunk1_s0_1", "chunk1_s0_2", "chunk1_s1_0", "chunk1_s1_1", "chunk1_s1_2", "chunk2_s0_0", "chunk2_s0_1", "chunk2_s0_2", "chunk2_s1_0", "chunk2_s1_1", "chunk2_s1_2", "chunk3_s0_0", "chunk3_s0_1", "chunk3_s0_2", "chunk3_s1_0", "chunk3_s1_1", "chunk3_s1_2" ]`
 ### Summarized explain
@@ -87,8 +85,6 @@
 ```
 
 ### Distinct on "shardKey", with filter: { "shardKey" : { "$eq" : "chunk1_s0_1" } }
-### Expected results
-`[ "chunk1_s0_1" ]`
 ### Distinct results
 `[ "chunk1_s0_1" ]`
 ### Summarized explain
@@ -177,8 +173,6 @@
 ```
 
 ### Distinct on "shardKey", with filter: { "notShardKey" : { "$eq" : "1notShardKey_chunk1_s0_1" } }
-### Expected results
-`[ "chunk1_s0_1" ]`
 ### Distinct results
 `[ "chunk1_s0_1" ]`
 ### Summarized explain
@@ -230,8 +224,6 @@
 ```
 
 ### Distinct on "shardKey", with filter: { "shardKey" : { "$gte" : "chunk1_s0_1" } }
-### Expected results
-`[ "chunk1_s0_1", "chunk1_s0_2", "chunk1_s1_0", "chunk1_s1_1", "chunk1_s1_2", "chunk2_s0_0", "chunk2_s0_1", "chunk2_s0_2", "chunk2_s1_0", "chunk2_s1_1", "chunk2_s1_2", "chunk3_s0_0", "chunk3_s0_1", "chunk3_s0_2", "chunk3_s1_0", "chunk3_s1_1", "chunk3_s1_2" ]`
 ### Distinct results
 `[ "chunk1_s0_1", "chunk1_s0_2", "chunk1_s1_0", "chunk1_s1_1", "chunk1_s1_2", "chunk2_s0_0", "chunk2_s0_1", "chunk2_s0_2", "chunk2_s1_0", "chunk2_s1_1", "chunk2_s1_2", "chunk3_s0_0", "chunk3_s0_1", "chunk3_s0_2", "chunk3_s1_0", "chunk3_s1_1", "chunk3_s1_2" ]`
 ### Summarized explain
@@ -391,8 +383,6 @@
 ```
 
 ### Distinct on "shardKey", with filter: { "notShardKey" : { "$gte" : "1notShardKey_chunk1_s0_1" } }
-### Expected results
-`[ "chunk1_s0_0", "chunk1_s0_1", "chunk1_s0_2", "chunk1_s1_0", "chunk1_s1_1", "chunk1_s1_2", "chunk2_s0_0", "chunk2_s0_1", "chunk2_s0_2", "chunk2_s1_0", "chunk2_s1_1", "chunk2_s1_2", "chunk3_s0_0", "chunk3_s0_1", "chunk3_s0_2", "chunk3_s1_0", "chunk3_s1_1", "chunk3_s1_2" ]`
 ### Distinct results
 `[ "chunk1_s0_0", "chunk1_s0_1", "chunk1_s0_2", "chunk1_s1_0", "chunk1_s1_1", "chunk1_s1_2", "chunk2_s0_0", "chunk2_s0_1", "chunk2_s0_2", "chunk2_s1_0", "chunk2_s1_1", "chunk2_s1_2", "chunk3_s0_0", "chunk3_s0_1", "chunk3_s0_2", "chunk3_s1_0", "chunk3_s1_1", "chunk3_s1_2" ]`
 ### Summarized explain
@@ -445,8 +435,6 @@
 
 ## 2. distinct on non-shard key field
 ### Distinct on "notShardKey", with filter: { }
-### Expected results
-`[ "1notShardKey_chunk1_s0_0", "1notShardKey_chunk1_s0_1", "1notShardKey_chunk1_s0_2", "1notShardKey_chunk1_s1_0", "1notShardKey_chunk1_s1_1", "1notShardKey_chunk1_s1_2", "1notShardKey_chunk2_s0_0", "1notShardKey_chunk2_s0_1", "1notShardKey_chunk2_s0_2", "1notShardKey_chunk2_s1_0", "1notShardKey_chunk2_s1_1", "1notShardKey_chunk2_s1_2", "1notShardKey_chunk3_s0_0", "1notShardKey_chunk3_s0_1", "1notShardKey_chunk3_s0_2", "1notShardKey_chunk3_s1_0", "1notShardKey_chunk3_s1_1", "1notShardKey_chunk3_s1_2", "2notShardKey_chunk1_s0_0", "2notShardKey_chunk1_s0_1", "2notShardKey_chunk1_s0_2", "2notShardKey_chunk1_s1_0", "2notShardKey_chunk1_s1_1", "2notShardKey_chunk1_s1_2", "2notShardKey_chunk2_s0_0", "2notShardKey_chunk2_s0_1", "2notShardKey_chunk2_s0_2", "2notShardKey_chunk2_s1_0", "2notShardKey_chunk2_s1_1", "2notShardKey_chunk2_s1_2", "2notShardKey_chunk3_s0_0", "2notShardKey_chunk3_s0_1", "2notShardKey_chunk3_s0_2", "2notShardKey_chunk3_s1_0", "2notShardKey_chunk3_s1_1", "2notShardKey_chunk3_s1_2", "3notShardKey_chunk1_s0_0", "3notShardKey_chunk1_s0_1", "3notShardKey_chunk1_s0_2", "3notShardKey_chunk1_s1_0", "3notShardKey_chunk1_s1_1", "3notShardKey_chunk1_s1_2", "3notShardKey_chunk2_s0_0", "3notShardKey_chunk2_s0_1", "3notShardKey_chunk2_s0_2", "3notShardKey_chunk2_s1_0", "3notShardKey_chunk2_s1_1", "3notShardKey_chunk2_s1_2", "3notShardKey_chunk3_s0_0", "3notShardKey_chunk3_s0_1", "3notShardKey_chunk3_s0_2", "3notShardKey_chunk3_s1_0", "3notShardKey_chunk3_s1_1", "3notShardKey_chunk3_s1_2" ]`
 ### Distinct results
 `[ "1notShardKey_chunk1_s0_0", "1notShardKey_chunk1_s0_1", "1notShardKey_chunk1_s0_2", "1notShardKey_chunk1_s1_0", "1notShardKey_chunk1_s1_1", "1notShardKey_chunk1_s1_2", "1notShardKey_chunk2_s0_0", "1notShardKey_chunk2_s0_1", "1notShardKey_chunk2_s0_2", "1notShardKey_chunk2_s1_0", "1notShardKey_chunk2_s1_1", "1notShardKey_chunk2_s1_2", "1notShardKey_chunk3_s0_0", "1notShardKey_chunk3_s0_1", "1notShardKey_chunk3_s0_2", "1notShardKey_chunk3_s1_0", "1notShardKey_chunk3_s1_1", "1notShardKey_chunk3_s1_2", "2notShardKey_chunk1_s0_0", "2notShardKey_chunk1_s0_1", "2notShardKey_chunk1_s0_2", "2notShardKey_chunk1_s1_0", "2notShardKey_chunk1_s1_1", "2notShardKey_chunk1_s1_2", "2notShardKey_chunk2_s0_0", "2notShardKey_chunk2_s0_1", "2notShardKey_chunk2_s0_2", "2notShardKey_chunk2_s1_0", "2notShardKey_chunk2_s1_1", "2notShardKey_chunk2_s1_2", "2notShardKey_chunk3_s0_0", "2notShardKey_chunk3_s0_1", "2notShardKey_chunk3_s0_2", "2notShardKey_chunk3_s1_0", "2notShardKey_chunk3_s1_1", "2notShardKey_chunk3_s1_2", "3notShardKey_chunk1_s0_0", "3notShardKey_chunk1_s0_1", "3notShardKey_chunk1_s0_2", "3notShardKey_chunk1_s1_0", "3notShardKey_chunk1_s1_1", "3notShardKey_chunk1_s1_2", "3notShardKey_chunk2_s0_0", "3notShardKey_chunk2_s0_1", "3notShardKey_chunk2_s0_2", "3notShardKey_chunk2_s1_0", "3notShardKey_chunk2_s1_1", "3notShardKey_chunk2_s1_2", "3notShardKey_chunk3_s0_0", "3notShardKey_chunk3_s0_1", "3notShardKey_chunk3_s0_2", "3notShardKey_chunk3_s1_0", "3notShardKey_chunk3_s1_1", "3notShardKey_chunk3_s1_2" ]`
 ### Summarized explain
@@ -518,8 +506,6 @@
 ```
 
 ### Distinct on "notShardKey", with filter: { "shardKey" : { "$eq" : "chunk1_s0_1" } }
-### Expected results
-`[ "1notShardKey_chunk1_s0_1", "2notShardKey_chunk1_s0_1", "3notShardKey_chunk1_s0_1" ]`
 ### Distinct results
 `[ "1notShardKey_chunk1_s0_1", "2notShardKey_chunk1_s0_1", "3notShardKey_chunk1_s0_1" ]`
 ### Summarized explain
@@ -602,8 +588,6 @@
 ```
 
 ### Distinct on "notShardKey", with filter: { "notShardKey" : { "$eq" : "1notShardKey_chunk1_s0_1" } }
-### Expected results
-`[ "1notShardKey_chunk1_s0_1" ]`
 ### Distinct results
 `[ "1notShardKey_chunk1_s0_1" ]`
 ### Summarized explain
@@ -675,8 +659,6 @@
 ```
 
 ### Distinct on "notShardKey", with filter: { "shardKey" : { "$gte" : "chunk1_s0_1" } }
-### Expected results
-`[ "1notShardKey_chunk1_s0_1", "1notShardKey_chunk1_s0_2", "1notShardKey_chunk1_s1_0", "1notShardKey_chunk1_s1_1", "1notShardKey_chunk1_s1_2", "1notShardKey_chunk2_s0_0", "1notShardKey_chunk2_s0_1", "1notShardKey_chunk2_s0_2", "1notShardKey_chunk2_s1_0", "1notShardKey_chunk2_s1_1", "1notShardKey_chunk2_s1_2", "1notShardKey_chunk3_s0_0", "1notShardKey_chunk3_s0_1", "1notShardKey_chunk3_s0_2", "1notShardKey_chunk3_s1_0", "1notShardKey_chunk3_s1_1", "1notShardKey_chunk3_s1_2", "2notShardKey_chunk1_s0_1", "2notShardKey_chunk1_s0_2", "2notShardKey_chunk1_s1_0", "2notShardKey_chunk1_s1_1", "2notShardKey_chunk1_s1_2", "2notShardKey_chunk2_s0_0", "2notShardKey_chunk2_s0_1", "2notShardKey_chunk2_s0_2", "2notShardKey_chunk2_s1_0", "2notShardKey_chunk2_s1_1", "2notShardKey_chunk2_s1_2", "2notShardKey_chunk3_s0_0", "2notShardKey_chunk3_s0_1", "2notShardKey_chunk3_s0_2", "2notShardKey_chunk3_s1_0", "2notShardKey_chunk3_s1_1", "2notShardKey_chunk3_s1_2", "3notShardKey_chunk1_s0_1", "3notShardKey_chunk1_s0_2", "3notShardKey_chunk1_s1_0", "3notShardKey_chunk1_s1_1", "3notShardKey_chunk1_s1_2", "3notShardKey_chunk2_s0_0", "3notShardKey_chunk2_s0_1", "3notShardKey_chunk2_s0_2", "3notShardKey_chunk2_s1_0", "3notShardKey_chunk2_s1_1", "3notShardKey_chunk2_s1_2", "3notShardKey_chunk3_s0_0", "3notShardKey_chunk3_s0_1", "3notShardKey_chunk3_s0_2", "3notShardKey_chunk3_s1_0", "3notShardKey_chunk3_s1_1", "3notShardKey_chunk3_s1_2" ]`
 ### Distinct results
 `[ "1notShardKey_chunk1_s0_1", "1notShardKey_chunk1_s0_2", "1notShardKey_chunk1_s1_0", "1notShardKey_chunk1_s1_1", "1notShardKey_chunk1_s1_2", "1notShardKey_chunk2_s0_0", "1notShardKey_chunk2_s0_1", "1notShardKey_chunk2_s0_2", "1notShardKey_chunk2_s1_0", "1notShardKey_chunk2_s1_1", "1notShardKey_chunk2_s1_2", "1notShardKey_chunk3_s0_0", "1notShardKey_chunk3_s0_1", "1notShardKey_chunk3_s0_2", "1notShardKey_chunk3_s1_0", "1notShardKey_chunk3_s1_1", "1notShardKey_chunk3_s1_2", "2notShardKey_chunk1_s0_1", "2notShardKey_chunk1_s0_2", "2notShardKey_chunk1_s1_0", "2notShardKey_chunk1_s1_1", "2notShardKey_chunk1_s1_2", "2notShardKey_chunk2_s0_0", "2notShardKey_chunk2_s0_1", "2notShardKey_chunk2_s0_2", "2notShardKey_chunk2_s1_0", "2notShardKey_chunk2_s1_1", "2notShardKey_chunk2_s1_2", "2notShardKey_chunk3_s0_0", "2notShardKey_chunk3_s0_1", "2notShardKey_chunk3_s0_2", "2notShardKey_chunk3_s1_0", "2notShardKey_chunk3_s1_1", "2notShardKey_chunk3_s1_2", "3notShardKey_chunk1_s0_1", "3notShardKey_chunk1_s0_2", "3notShardKey_chunk1_s1_0", "3notShardKey_chunk1_s1_1", "3notShardKey_chunk1_s1_2", "3notShardKey_chunk2_s0_0", "3notShardKey_chunk2_s0_1", "3notShardKey_chunk2_s0_2", "3notShardKey_chunk2_s1_0", "3notShardKey_chunk2_s1_1", "3notShardKey_chunk2_s1_2", "3notShardKey_chunk3_s0_0", "3notShardKey_chunk3_s0_1", "3notShardKey_chunk3_s0_2", "3notShardKey_chunk3_s1_0", "3notShardKey_chunk3_s1_1", "3notShardKey_chunk3_s1_2" ]`
 ### Summarized explain
@@ -830,8 +812,6 @@
 ```
 
 ### Distinct on "notShardKey", with filter: { "notShardKey" : { "$gte" : "1notShardKey_chunk1_s0_1" } }
-### Expected results
-`[ "1notShardKey_chunk1_s0_1", "1notShardKey_chunk1_s0_2", "1notShardKey_chunk1_s1_0", "1notShardKey_chunk1_s1_1", "1notShardKey_chunk1_s1_2", "1notShardKey_chunk2_s0_0", "1notShardKey_chunk2_s0_1", "1notShardKey_chunk2_s0_2", "1notShardKey_chunk2_s1_0", "1notShardKey_chunk2_s1_1", "1notShardKey_chunk2_s1_2", "1notShardKey_chunk3_s0_0", "1notShardKey_chunk3_s0_1", "1notShardKey_chunk3_s0_2", "1notShardKey_chunk3_s1_0", "1notShardKey_chunk3_s1_1", "1notShardKey_chunk3_s1_2", "2notShardKey_chunk1_s0_0", "2notShardKey_chunk1_s0_1", "2notShardKey_chunk1_s0_2", "2notShardKey_chunk1_s1_0", "2notShardKey_chunk1_s1_1", "2notShardKey_chunk1_s1_2", "2notShardKey_chunk2_s0_0", "2notShardKey_chunk2_s0_1", "2notShardKey_chunk2_s0_2", "2notShardKey_chunk2_s1_0", "2notShardKey_chunk2_s1_1", "2notShardKey_chunk2_s1_2", "2notShardKey_chunk3_s0_0", "2notShardKey_chunk3_s0_1", "2notShardKey_chunk3_s0_2", "2notShardKey_chunk3_s1_0", "2notShardKey_chunk3_s1_1", "2notShardKey_chunk3_s1_2", "3notShardKey_chunk1_s0_0", "3notShardKey_chunk1_s0_1", "3notShardKey_chunk1_s0_2", "3notShardKey_chunk1_s1_0", "3notShardKey_chunk1_s1_1", "3notShardKey_chunk1_s1_2", "3notShardKey_chunk2_s0_0", "3notShardKey_chunk2_s0_1", "3notShardKey_chunk2_s0_2", "3notShardKey_chunk2_s1_0", "3notShardKey_chunk2_s1_1", "3notShardKey_chunk2_s1_2", "3notShardKey_chunk3_s0_0", "3notShardKey_chunk3_s0_1", "3notShardKey_chunk3_s0_2", "3notShardKey_chunk3_s1_0", "3notShardKey_chunk3_s1_1", "3notShardKey_chunk3_s1_2" ]`
 ### Distinct results
 `[ "1notShardKey_chunk1_s0_1", "1notShardKey_chunk1_s0_2", "1notShardKey_chunk1_s1_0", "1notShardKey_chunk1_s1_1", "1notShardKey_chunk1_s1_2", "1notShardKey_chunk2_s0_0", "1notShardKey_chunk2_s0_1", "1notShardKey_chunk2_s0_2", "1notShardKey_chunk2_s1_0", "1notShardKey_chunk2_s1_1", "1notShardKey_chunk2_s1_2", "1notShardKey_chunk3_s0_0", "1notShardKey_chunk3_s0_1", "1notShardKey_chunk3_s0_2", "1notShardKey_chunk3_s1_0", "1notShardKey_chunk3_s1_1", "1notShardKey_chunk3_s1_2", "2notShardKey_chunk1_s0_0", "2notShardKey_chunk1_s0_1", "2notShardKey_chunk1_s0_2", "2notShardKey_chunk1_s1_0", "2notShardKey_chunk1_s1_1", "2notShardKey_chunk1_s1_2", "2notShardKey_chunk2_s0_0", "2notShardKey_chunk2_s0_1", "2notShardKey_chunk2_s0_2", "2notShardKey_chunk2_s1_0", "2notShardKey_chunk2_s1_1", "2notShardKey_chunk2_s1_2", "2notShardKey_chunk3_s0_0", "2notShardKey_chunk3_s0_1", "2notShardKey_chunk3_s0_2", "2notShardKey_chunk3_s1_0", "2notShardKey_chunk3_s1_1", "2notShardKey_chunk3_s1_2", "3notShardKey_chunk1_s0_0", "3notShardKey_chunk1_s0_1", "3notShardKey_chunk1_s0_2", "3notShardKey_chunk1_s1_0", "3notShardKey_chunk1_s1_1", "3notShardKey_chunk1_s1_2", "3notShardKey_chunk2_s0_0", "3notShardKey_chunk2_s0_1", "3notShardKey_chunk2_s0_2", "3notShardKey_chunk2_s1_0", "3notShardKey_chunk2_s1_1", "3notShardKey_chunk2_s1_2", "3notShardKey_chunk3_s0_0", "3notShardKey_chunk3_s0_1", "3notShardKey_chunk3_s0_2", "3notShardKey_chunk3_s1_0", "3notShardKey_chunk3_s1_1", "3notShardKey_chunk3_s1_2" ]`
 ### Summarized explain
@@ -10188,8 +10168,6 @@
 
 ## 6. distinct on multikey field
 ### Distinct on "notShardKey", with filter: { }
-### Expected results
-`[ 1, "1notShardKey_chunk1_s0_0", "1notShardKey_chunk1_s0_1", "1notShardKey_chunk1_s0_2", "1notShardKey_chunk1_s1_0", "1notShardKey_chunk1_s1_1", "1notShardKey_chunk1_s1_2", "1notShardKey_chunk2_s0_0", "1notShardKey_chunk2_s0_1", "1notShardKey_chunk2_s0_2", "1notShardKey_chunk2_s1_0", "1notShardKey_chunk2_s1_1", "1notShardKey_chunk2_s1_2", "1notShardKey_chunk3_s0_0", "1notShardKey_chunk3_s0_1", "1notShardKey_chunk3_s0_2", "1notShardKey_chunk3_s1_0", "1notShardKey_chunk3_s1_1", "1notShardKey_chunk3_s1_2", 2, "2notShardKey_chunk1_s0_0", "2notShardKey_chunk1_s0_1", "2notShardKey_chunk1_s0_2", "2notShardKey_chunk1_s1_0", "2notShardKey_chunk1_s1_1", "2notShardKey_chunk1_s1_2", "2notShardKey_chunk2_s0_0", "2notShardKey_chunk2_s0_1", "2notShardKey_chunk2_s0_2", "2notShardKey_chunk2_s1_0", "2notShardKey_chunk2_s1_1", "2notShardKey_chunk2_s1_2", "2notShardKey_chunk3_s0_0", "2notShardKey_chunk3_s0_1", "2notShardKey_chunk3_s0_2", "2notShardKey_chunk3_s1_0", "2notShardKey_chunk3_s1_1", "2notShardKey_chunk3_s1_2", 3, "3notShardKey_chunk1_s0_0", "3notShardKey_chunk1_s0_1", "3notShardKey_chunk1_s0_2", "3notShardKey_chunk1_s1_0", "3notShardKey_chunk1_s1_1", "3notShardKey_chunk1_s1_2", "3notShardKey_chunk2_s0_0", "3notShardKey_chunk2_s0_1", "3notShardKey_chunk2_s0_2", "3notShardKey_chunk2_s1_0", "3notShardKey_chunk2_s1_1", "3notShardKey_chunk2_s1_2", "3notShardKey_chunk3_s0_0", "3notShardKey_chunk3_s0_1", "3notShardKey_chunk3_s0_2", "3notShardKey_chunk3_s1_0", "3notShardKey_chunk3_s1_1", "3notShardKey_chunk3_s1_2", 4 ]`
 ### Distinct results
 `[ 1, 2, 3, 4, "1notShardKey_chunk1_s0_0", "1notShardKey_chunk1_s0_1", "1notShardKey_chunk1_s0_2", "1notShardKey_chunk1_s1_0", "1notShardKey_chunk1_s1_1", "1notShardKey_chunk1_s1_2", "1notShardKey_chunk2_s0_0", "1notShardKey_chunk2_s0_1", "1notShardKey_chunk2_s0_2", "1notShardKey_chunk2_s1_0", "1notShardKey_chunk2_s1_1", "1notShardKey_chunk2_s1_2", "1notShardKey_chunk3_s0_0", "1notShardKey_chunk3_s0_1", "1notShardKey_chunk3_s0_2", "1notShardKey_chunk3_s1_0", "1notShardKey_chunk3_s1_1", "1notShardKey_chunk3_s1_2", "2notShardKey_chunk1_s0_0", "2notShardKey_chunk1_s0_1", "2notShardKey_chunk1_s0_2", "2notShardKey_chunk1_s1_0", "2notShardKey_chunk1_s1_1", "2notShardKey_chunk1_s1_2", "2notShardKey_chunk2_s0_0", "2notShardKey_chunk2_s0_1", "2notShardKey_chunk2_s0_2", "2notShardKey_chunk2_s1_0", "2notShardKey_chunk2_s1_1", "2notShardKey_chunk2_s1_2", "2notShardKey_chunk3_s0_0", "2notShardKey_chunk3_s0_1", "2notShardKey_chunk3_s0_2", "2notShardKey_chunk3_s1_0", "2notShardKey_chunk3_s1_1", "2notShardKey_chunk3_s1_2", "3notShardKey_chunk1_s0_0", "3notShardKey_chunk1_s0_1", "3notShardKey_chunk1_s0_2", "3notShardKey_chunk1_s1_0", "3notShardKey_chunk1_s1_1", "3notShardKey_chunk1_s1_2", "3notShardKey_chunk2_s0_0", "3notShardKey_chunk2_s0_1", "3notShardKey_chunk2_s0_2", "3notShardKey_chunk2_s1_0", "3notShardKey_chunk2_s1_1", "3notShardKey_chunk2_s1_2", "3notShardKey_chunk3_s0_0", "3notShardKey_chunk3_s0_1", "3notShardKey_chunk3_s0_2", "3notShardKey_chunk3_s1_0", "3notShardKey_chunk3_s1_1", "3notShardKey_chunk3_s1_2" ]`
 ### Summarized explain
@@ -10263,8 +10241,6 @@
 ```
 
 ### Distinct on "notShardKey", with filter: { "shardKey" : null }
-### Expected results
-`[ 1, 2, 3, 4 ]`
 ### Distinct results
 `[ 1, 2, 3, 4 ]`
 ### Summarized explain
@@ -10353,8 +10329,6 @@
 ```
 
 ### Distinct on "notShardKey", with filter: { "notShardKey" : 3 }
-### Expected results
-`[ 1, 2, 3, 4 ]`
 ### Distinct results
 `[ 1, 2, 3, 4 ]`
 ### Summarized explain

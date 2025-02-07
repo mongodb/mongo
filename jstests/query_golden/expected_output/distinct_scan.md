@@ -1,7 +1,5 @@
 ## 1. distinct() without index
 ### Distinct on "a", with filter: { }
-### Expected results
-`[ 1, 2, 3, 4, 7 ]`
 ### Distinct results
 `[ 1, 2, 3, 4, 7 ]`
 ### Summarized explain
@@ -57,8 +55,6 @@ Execution Engine: sbe
 
 ## 3. distinct() with index on 'a'
 ### Distinct on "a", with filter: { }
-### Expected results
-`[ 1, 2, 3, 4, 7 ]`
 ### Distinct results
 `[ 1, 2, 3, 4, 7 ]`
 ### Summarized explain
@@ -168,8 +164,6 @@ Execution Engine: classic
 
 ## 5. distinct() with multiple choices for index
 ### Distinct on "a", with filter: { }
-### Expected results
-`[ 1, 2, 3, 4, 7 ]`
 ### Distinct results
 `[ 1, 2, 3, 4, 7 ]`
 ### Summarized explain
@@ -494,8 +488,6 @@ Execution Engine: classic
 
 ## 7. distinct() with filter on 'a' with available indexes
 ### Distinct on "a", with filter: { "a" : { "$lte" : 3 } }
-### Expected results
-`[ 1, 2, 3 ]`
 ### Distinct results
 `[ 1, 2, 3 ]`
 ### Summarized explain
@@ -690,8 +682,6 @@ Execution Engine: classic
 
 ## 9. distinct() with filter on 'b' with available indexes
 ### Distinct on "a", with filter: { "b" : 3 }
-### Expected results
-`[ 2, 4 ]`
 ### Distinct results
 `[ 2, 4 ]`
 ### Summarized explain

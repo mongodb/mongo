@@ -53,9 +53,6 @@ export function outputDistinctPlanAndResults(coll, key, filter = {}, options = {
     subSection(`Distinct on "${key}", with filter: ${tojson(filter)}${
         Object.keys(options).length ? `, and options: ${tojson(options)}` : ''}`);
 
-    subSection("Expected results");
-    codeOneLine(getUniqueResults(coll, key, filter));
-
     subSection("Distinct results");
     codeOneLine(results);
 
@@ -63,19 +60,6 @@ export function outputDistinctPlanAndResults(coll, key, filter = {}, options = {
     code(tojsonMultiLineSortKeys(flatPlan));
 
     linebreak();
-}
-
-/**
- * Helper function that manually computes the unique values for the given key in the given
- * collection (filtered on `filter`). Useful to compare with the actual output from a distinct()
- * query. Note that this function doesn't perfectly mimic actual MQL distinct semantics. For
- * example, multikey paths might not be handled properly.
- */
-function getUniqueResults(coll, key, filter) {
-    return Array
-        .from(new Set(
-            coll.find(filter, {[key]: 1, _id: 0}).toArray().flatMap(o => o ? o[key] : null)))
-        .sort();
 }
 
 /**

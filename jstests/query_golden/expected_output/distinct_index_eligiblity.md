@@ -276,8 +276,6 @@ Execution Engine: classic
 
 ### !flip && !strict && !multikey on distinct field => DISTINCT_SCAN
 ### Distinct on "a", with filter: { "a" : { "$gt" : 3 } }
-### Expected results
-`[ ]`
 ### Distinct results
 `[ ]`
 ### Summarized explain
@@ -329,8 +327,6 @@ Execution Engine: classic
 ## 2. Distinct Field not part of the Index Key Pattern
 ### wildcard && covered projection => DISTINCT_SCAN
 ### Distinct on "a", with filter: { "a" : { "$lt" : 3 } }
-### Expected results
-`[ 1, 2 ]`
 ### Distinct results
 `[ 1, 2 ]`
 ### Summarized explain
@@ -379,8 +375,6 @@ Execution Engine: classic
 
 ### !wildcard => no DISTINCT_SCAN
 ### Distinct on "a", with filter: { "a" : { "$lt" : 3 } }
-### Expected results
-`[ 1, 2 ]`
 ### Distinct results
 `[ 1, 2 ]`
 ### Summarized explain
@@ -404,8 +398,6 @@ Execution Engine: classic
 
 ### wildcard && !covered projection => no DISTINCT_SCAN
 ### Distinct on "a", with filter: { "b" : { "$lt" : 5 } }
-### Expected results
-`[ 4 ]`
 ### Distinct results
 `[ 4 ]`
 ### Summarized explain
