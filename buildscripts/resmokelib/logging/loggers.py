@@ -246,6 +246,10 @@ def _add_handler(logger, handler_info, formatter):
 
 def _get_formatter(logger_info):
     """Return formatter."""
+    if config.LOG_FORMAT == "json":
+        # Override existing configuration with predefined formatter.
+        return formatters.JsonLogFormatter()
+
     if "format" in logger_info:
         log_format = logger_info["format"]
     else:
@@ -309,9 +313,12 @@ def _add_evergreen_handler(logger, job_num, test_id=None, test_name=None):
         os.makedirs(os.path.dirname(fp), exist_ok=True)
 
         handler = BufferedFileHandler(fp)
-        handler.setFormatter(
-            formatters.EvergreenLogFormatter(fmt=logger_info.get("format", _DEFAULT_FORMAT))
-        )
+        if config.LOG_FORMAT == "json":
+            handler.setFormatter(formatters.EvergreenJsonLogFormatter())
+        else:
+            handler.setFormatter(
+                formatters.EvergreenLogFormatter(fmt=logger_info.get("format", _DEFAULT_FORMAT))
+            )
         logger.addHandler(handler)
 
         if test_id:
