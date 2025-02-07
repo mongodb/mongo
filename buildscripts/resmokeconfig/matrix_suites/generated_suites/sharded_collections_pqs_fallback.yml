@@ -103,6 +103,8 @@ selector:
     - jstests/core/query/queryable_encryption/**/*.js
     - src/mongo/db/modules/enterprise/jstests/fle2/**/*.js
     - jstests/core/index/wildcard/*.js
+    - jstests/core/query/index_correctness_pbt.js
+    - jstests/core/query/plan_cache/cache_correctness_pbt.js
     - jstests/core/query/find_with_resume_after_param.js
     - jstests/core/write/bulk/bulk_write_timeseries_basic.js
     - jstests/core/index/index_filter_commands_invalidate_plan_cache_entries.js

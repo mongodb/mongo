@@ -41,3 +41,16 @@ export function getExpectedPipelineLimit(database) {
         "buildEnvironment" in buildInfo ? buildInfo.buildEnvironment.distarch == "s390x" : false;
     return isDebug ? 200 : (isS390X ? 700 : 1000);
 }
+
+/**
+ * For tests that run many aggregations, different build settings can affect whether we can finish
+ * the test before the timeout. These settings are: whether debug is on, whether optimizations are
+ * enabled, whether sanitizers are enabled, and whether spidermonkey is used.
+ */
+export function isSlowBuild(db) {
+    const buildInfo = db.getServerBuildInfo();
+    return buildInfo.isDebug() || !buildInfo.isOptimizationsEnabled() ||
+        buildInfo.isAddressSanitizerActive() || buildInfo.isLeakSanitizerActive() ||
+        buildInfo.isThreadSanitizerActive() || buildInfo.isUndefinedBehaviorSanitizerActive() ||
+        _isSpiderMonkeyDebugEnabled();
+}

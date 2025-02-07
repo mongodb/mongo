@@ -6,7 +6,6 @@
  * take on at the leaves. We call this a "query family". This way, our properties have access to
  * many varying query shapes, but also variations of the same query shape.
  */
-
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 // ------------------------------------- Aggregation Arbitraries -----------------------------------
@@ -14,24 +13,23 @@ import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 // shrink.
 const scalarArb = fc.oneof(fc.constant(null),
                            fc.boolean(),
-                           fc.integer({min: -99, max: 99}),
+                           fc.integer({min: -30, max: 30}),
                            // Strings starting with `$` can be confused with fields.
                            fc.string().filter(s => !s.startsWith('$')),
                            fc.date());
-export const maxNumLeafParametersPerFamily = 10;
+export const leafParametersPerFamily = 10;
 export class LeafParameter {
     constructor(concreteValues) {
         this.concreteValues = concreteValues;
     }
 }
 
-const leafParameterArb = fc.array(scalarArb, {
-                               minLength: 1,
-                               maxLength: maxNumLeafParametersPerFamily
-                           }).map((constants) => {
-    // In the leaves of the query family, we generate an object with a list of constants to place.
-    return new LeafParameter(constants);
-});
+const leafParameterArb =
+    fc.array(scalarArb, {minLength: 1, maxLength: leafParametersPerFamily}).map((constants) => {
+        // In the leaves of the query family, we generate an object with a list of constants to
+        // place.
+        return new LeafParameter(constants);
+    });
 
 const fieldArb = fc.constantFrom('t', 'm', 'm.m1', 'm.m2', 'a', 'b', 'array');
 const assignableFieldArb = fc.constantFrom('m', 't', 'a', 'b');

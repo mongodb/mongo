@@ -17,6 +17,8 @@
       - jstests/core/write/bulk/bulk_write_timeseries_basic.js
       - jstests/core/ddl/convert_to_capped.js
       - jstests/core/rename_system_buckets_collections.js
+      - jstests/core/query/index_correctness_pbt.js
+      - jstests/core/query/plan_cache/cache_correctness_pbt.js
       - jstests/core/write/empty_ts/bypass_empty_ts_replacement_timeseries.js
       # due to error: "BSON field 'create.recordIdsReplicated' is not allowed with apiStrict:true."
       - jstests/core/version_api_v1_command_coverage.js

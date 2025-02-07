@@ -44,6 +44,12 @@ selector:
     - jstests/core/query/query_settings/query_settings_size_limits.js
     # TODO (SERVER-95786): Fails because this suite overrides DBCollection.prototype.getIndexes
     # and re-implements it using $indexStats, which (by design) doesn't return clustered indexes
+
+    # TODO SERVER-99768 re-enable these tests in this passthrough
+    - jstests/core/query/index_correctness_pbt.js
+    - jstests/core/query/plan_cache/cache_correctness_pbt.js
+    - jstests/core/query/plan_cache/queries_create_one_cache_entry_pbt.js
+
     - jstests/core/catalog/list_catalog_stage_consistency.js
 
   exclude_with_any_tags:

@@ -11,14 +11,11 @@
  *      assumes_read_concern_unchanged
  * ]
  */
+import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 
 // Only run this test for debug=off opt=on without sanitizers active, since this test runs lots of
 // queries.
-const buildInfo = db.getServerBuildInfo();
-if (buildInfo.isDebug() || !buildInfo.isOptimizationsEnabled() ||
-    buildInfo.isAddressSanitizerActive() || buildInfo.isLeakSanitizerActive() ||
-    buildInfo.isThreadSanitizerActive() || buildInfo.isUndefinedBehaviorSanitizerActive() ||
-    _isSpiderMonkeyDebugEnabled()) {
+if (isSlowBuild(db)) {
     jsTestLog("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
     quit();
 }
