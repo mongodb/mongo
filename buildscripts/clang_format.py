@@ -30,7 +30,7 @@ if __name__ == "__main__" and __package__ is None:
 
 from buildscripts.linter import git, parallel
 from buildscripts.linter.filediff import gather_changed_files_for_lint
-from buildscripts.mongo_toolchain import get_mongo_toolchain
+from buildscripts.mongo_toolchain import MongoToolchainError, get_mongo_toolchain
 
 ##############################################################################
 #
@@ -52,8 +52,13 @@ CLANG_FORMAT_HTTP_DARWIN_CACHE = (
     "http://mongodbtoolchain.build.10gen.cc/toolchain/osx/clang-format-12.0.1"
 )
 
-toolchain = get_mongo_toolchain(version=TOOLCHAIN_VERSION)
-CLANG_FORMAT_TOOLCHAIN_PATH = toolchain.get_tool_path(CLANG_FORMAT_PROGNAME)
+try:
+    toolchain = get_mongo_toolchain(version=TOOLCHAIN_VERSION)
+    CLANG_FORMAT_TOOLCHAIN_PATH = toolchain.get_tool_path(CLANG_FORMAT_PROGNAME)
+except MongoToolchainError:
+    # This isn't fatal, we'll try to get clang-format using other methods if we don't find the
+    # mongo toolchain.
+    CLANG_FORMAT_TOOLCHAIN_PATH = ""
 
 
 ##############################################################################
