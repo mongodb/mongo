@@ -1,0 +1,30 @@
+load("@poetry//:dependencies.bzl", "dependency")
+
+py_binary(
+    name = "mod_scanner",
+    srcs = [
+        "__init__.py",
+        "cindex.py",
+        "mod_scanner.py",
+    ],
+    data = [
+        "modules.yaml",
+        "//.github:CODEOWNERS",
+        # These are runtime deps, but switched to getting them via the dependency on
+        # on cc_toolchain.all_files injected by the aspect that is needed in order to get
+        # access to the toolchain headers. Ideally there would be an all_headers file list
+        # that we could depend on.
+        # "@mongo_toolchain//:v4/lib/libLLVM-12.so",
+        # "@mongo_toolchain//:v4/lib/libclang.so",
+    ],
+    deps = [
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+        dependency(
+            "codeowners",
+            group = "modules_poc",
+        ),
+    ],
+)

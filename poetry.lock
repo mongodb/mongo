@@ -73,7 +73,7 @@ description = "Backport of CPython tarfile module"
 optional = false
 python-versions = ">=3.8"
 groups = ["export", "jira-client"]
-markers = "(\"el8\" in platform_release or platform_machine == \"ppc64le\" or platform_machine == \"s390x\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and python_version < \"3.12\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")"
+markers = "python_version < \"3.12\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")"
 files = [
     {file = "backports.tarfile-1.2.0-py3-none-any.whl", hash = "sha256:77e284d754527b01fb1e6fa8a1afe577858ebe4e9dad8919e34c862cb399bc34"},
     {file = "backports_tarfile-1.2.0.tar.gz", hash = "sha256:d75e02c268746e1b8144c278978b6e98e85de6ad16f8e4b0844a154557eca991"},
@@ -290,7 +290,7 @@ files = [
     {file = "cffi-1.17.1-cp39-cp39-win_amd64.whl", hash = "sha256:d016c76bdd850f3c626af19b0542c9677ba156e4ee4fccfdd7848803533ef662"},
     {file = "cffi-1.17.1.tar.gz", hash = "sha256:1c39c6016c32bc48dd54561950ebd6836e1670f2ae46128f67cf49e789c52824"},
 ]
-markers = {main = "platform_python_implementation == \"CPython\" and sys_platform == \"win32\" and (\"el8\" in platform_release or platform_machine == \"ppc64le\" or platform_machine == \"s390x\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")", export = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" or (platform_machine == \"ppc64le\" or platform_machine == \"s390x\") and (sys_platform == \"linux\" or sys_platform == \"darwin\")", external-auth = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\"", jira-client = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" or (platform_machine == \"ppc64le\" or platform_machine == \"s390x\") and sys_platform == \"linux\"", platform = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\"", testing = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""}
+markers = {main = "platform_python_implementation == \"CPython\" and sys_platform == \"win32\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")", export = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" or (platform_machine == \"ppc64le\" or platform_machine == \"s390x\") and (sys_platform == \"linux\" or sys_platform == \"darwin\")", external-auth = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\"", jira-client = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" or (platform_machine == \"ppc64le\" or platform_machine == \"s390x\") and sys_platform == \"linux\"", platform = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\"", testing = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""}
 
 [package.dependencies]
 pycparser = "*"
@@ -471,6 +471,22 @@ files = [
 
 [package.dependencies]
 colorama = {version = "*", markers = "platform_system == \"Windows\""}
+
+[[package]]
+name = "codeowners"
+version = "0.7.0"
+description = "Codeowners parser for Python"
+optional = false
+python-versions = ">=3.7,<4.0"
+groups = ["modules_poc"]
+markers = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""
+files = [
+    {file = "codeowners-0.7.0-py3-none-any.whl", hash = "sha256:0df5cd47299f984ba2e120dc4a0a7be68b528d53016ff39d06e86f85e33c7fc2"},
+    {file = "codeowners-0.7.0.tar.gz", hash = "sha256:a842647b20968c14da6066e4de4fffac4fd7c1c30de9cfa8b2fc8f534b3d9f48"},
+]
+
+[package.dependencies]
+typing_extensions = ">=3.7"
 
 [[package]]
 name = "colorama"
@@ -918,7 +934,7 @@ description = "Backport of PEP 654 (exception groups)"
 optional = false
 python-versions = ">=3.7"
 groups = ["testing"]
-markers = "(\"el8\" in platform_release or platform_machine == \"ppc64le\" or platform_machine == \"s390x\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and python_version < \"3.11\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")"
+markers = "python_version < \"3.11\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")"
 files = [
     {file = "exceptiongroup-1.2.2-py3-none-any.whl", hash = "sha256:3111b9d131c238bec2f8f516e123e14ba243563fb135d3fe885990585aa7795b"},
     {file = "exceptiongroup-1.2.2.tar.gz", hash = "sha256:47c2edf7c6738fafb49fd34290706d1a1a2f4d1c6df275526b62cbb4aa5393cc"},
@@ -1308,7 +1324,7 @@ files = [
     {file = "importlib_metadata-8.5.0-py3-none-any.whl", hash = "sha256:45e54197d28b7a7f1559e60b95e7c567032b602131fbd588f1497f47880aa68b"},
     {file = "importlib_metadata-8.5.0.tar.gz", hash = "sha256:71522656f0abace1d072b9e5481a48f07c138e00f079c38c8f883823f9c26bd7"},
 ]
-markers = {export = "(\"el8\" in platform_release or platform_machine == \"ppc64le\" or platform_machine == \"s390x\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and python_version < \"3.12\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")", jira-client = "(\"el8\" in platform_release or platform_machine == \"ppc64le\" or platform_machine == \"s390x\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and python_version < \"3.12\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")", testing = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""}
+markers = {export = "python_version < \"3.12\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")", jira-client = "python_version < \"3.12\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")", testing = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""}
 
 [package.dependencies]
 zipp = ">=3.20"
@@ -1449,7 +1465,7 @@ description = "Low-level, pure Python DBus protocol wrapper."
 optional = false
 python-versions = ">=3.7"
 groups = ["export", "jira-client"]
-markers = "(\"el8\" in platform_release or platform_machine == \"ppc64le\" or platform_machine == \"s390x\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and sys_platform == \"linux\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")"
+markers = "sys_platform == \"linux\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")"
 files = [
     {file = "jeepney-0.8.0-py3-none-any.whl", hash = "sha256:c0a454ad016ca575060802ee4d590dd912e35c122fa04e70306de3d076cce755"},
     {file = "jeepney-0.8.0.tar.gz", hash = "sha256:5efe48d255973902f6badc3ce55e2aa6c5c3b3bc642059ef3a91247bcfcc5806"},
@@ -1609,6 +1625,28 @@ pyparsing = "*"
 six = ">=1.7"
 Twisted = "*"
 "zope.interface" = "*"
+
+[[package]]
+name = "linkify-it-py"
+version = "2.0.3"
+description = "Links recognition library with FULL unicode support."
+optional = false
+python-versions = ">=3.7"
+groups = ["modules_poc"]
+markers = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""
+files = [
+    {file = "linkify-it-py-2.0.3.tar.gz", hash = "sha256:68cda27e162e9215c17d786649d1da0021a451bdc436ef9e0fa0ba5234b9b048"},
+    {file = "linkify_it_py-2.0.3-py3-none-any.whl", hash = "sha256:6bcbc417b0ac14323382aef5c5192c0075bf8a9d6b41820a2b66371eac6b6d79"},
+]
+
+[package.dependencies]
+uc-micro-py = "*"
+
+[package.extras]
+benchmark = ["pytest", "pytest-benchmark"]
+dev = ["black", "flake8", "isort", "pre-commit", "pyproject-flake8"]
+doc = ["myst-parser", "sphinx", "sphinx-book-theme"]
+test = ["coverage", "pytest", "pytest-cov"]
 
 [[package]]
 name = "lxml"
@@ -1772,7 +1810,7 @@ version = "3.0.0"
 description = "Python port of markdown-it. Markdown parsing, done right!"
 optional = false
 python-versions = ">=3.8"
-groups = ["core"]
+groups = ["core", "modules_poc"]
 markers = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""
 files = [
     {file = "markdown-it-py-3.0.0.tar.gz", hash = "sha256:e3f60a94fa066dc52ec76661e37c851cb232d92f9886b15cb560aaada2df8feb"},
@@ -1780,6 +1818,8 @@ files = [
 ]
 
 [package.dependencies]
+linkify-it-py = {version = ">=1,<3", optional = true, markers = "extra == \"linkify\""}
+mdit-py-plugins = {version = "*", optional = true, markers = "extra == \"plugins\""}
 mdurl = ">=0.1,<1.0"
 
 [package.extras]
@@ -1865,12 +1905,33 @@ files = [
 ]
 
 [[package]]
+name = "mdit-py-plugins"
+version = "0.4.2"
+description = "Collection of plugins for markdown-it-py"
+optional = false
+python-versions = ">=3.8"
+groups = ["modules_poc"]
+markers = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""
+files = [
+    {file = "mdit_py_plugins-0.4.2-py3-none-any.whl", hash = "sha256:0c673c3f889399a33b95e88d2f0d111b4447bdfea7f237dab2d488f459835636"},
+    {file = "mdit_py_plugins-0.4.2.tar.gz", hash = "sha256:5f2cd1fdb606ddf152d37ec30e46101a60512bc0e5fa1a7002c36647b09e26b5"},
+]
+
+[package.dependencies]
+markdown-it-py = ">=1.0.0,<4.0.0"
+
+[package.extras]
+code-style = ["pre-commit"]
+rtd = ["myst-parser", "sphinx-book-theme"]
+testing = ["coverage", "pytest", "pytest-cov", "pytest-regressions"]
+
+[[package]]
 name = "mdurl"
 version = "0.1.2"
 description = "Markdown URL utilities"
 optional = false
 python-versions = ">=3.7"
-groups = ["core"]
+groups = ["core", "modules_poc"]
 markers = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""
 files = [
     {file = "mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8"},
@@ -2471,7 +2532,7 @@ version = "4.3.6"
 description = "A small Python package for determining appropriate platform-specific dirs, e.g. a `user data dir`."
 optional = false
 python-versions = ">=3.8"
-groups = ["export"]
+groups = ["export", "modules_poc"]
 markers = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""
 files = [
     {file = "platformdirs-4.3.6-py3-none-any.whl", hash = "sha256:73e575e1408ab8103900836b97580d5307456908a03e92031bab39e4554cc3fb"},
@@ -2535,9 +2596,9 @@ files = [
 name = "progressbar2"
 version = "4.5.0"
 description = "A Python Progressbar library to provide visual (yet text based) progress to long running operations."
-optional = true
+optional = false
 python-versions = ">=3.8"
-groups = ["main"]
+groups = ["main", "modules_poc"]
 markers = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""
 files = [
     {file = "progressbar2-4.5.0-py3-none-any.whl", hash = "sha256:625c94a54e63915b3959355e6d4aacd63a00219e5f3e2b12181b76867bf6f628"},
@@ -2692,7 +2753,7 @@ files = [
     {file = "pycparser-2.22-py3-none-any.whl", hash = "sha256:c3702b6d3dd8c7abc1afa565d7e63d53a1d0bd86cdc24edd75470f4de499cfcc"},
     {file = "pycparser-2.22.tar.gz", hash = "sha256:491c8be9c040f5390f5bf44a5b07752bd07f56edf992381b05c701439eec10f6"},
 ]
-markers = {main = "platform_python_implementation == \"CPython\" and sys_platform == \"win32\" and (\"el8\" in platform_release or platform_machine == \"ppc64le\" or platform_machine == \"s390x\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")", export = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" or (platform_machine == \"ppc64le\" or platform_machine == \"s390x\") and (sys_platform == \"linux\" or sys_platform == \"darwin\")", external-auth = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\"", jira-client = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" or (platform_machine == \"ppc64le\" or platform_machine == \"s390x\") and sys_platform == \"linux\"", platform = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\"", testing = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""}
+markers = {main = "platform_python_implementation == \"CPython\" and sys_platform == \"win32\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")", export = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" or (platform_machine == \"ppc64le\" or platform_machine == \"s390x\") and (sys_platform == \"linux\" or sys_platform == \"darwin\")", external-auth = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\"", jira-client = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" or (platform_machine == \"ppc64le\" or platform_machine == \"s390x\") and sys_platform == \"linux\"", platform = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\"", testing = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""}
 
 [[package]]
 name = "pydantic"
@@ -2809,7 +2870,7 @@ version = "2.19.1"
 description = "Pygments is a syntax highlighting package written in Python."
 optional = false
 python-versions = ">=3.8"
-groups = ["core", "testing"]
+groups = ["core", "modules_poc", "testing"]
 markers = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""
 files = [
     {file = "pygments-2.19.1-py3-none-any.whl", hash = "sha256:9ea1544ad55cecf4b8242fab6dd35a93bbce657034b0611ee383099054ab6d8c"},
@@ -3082,7 +3143,7 @@ description = ""
 optional = false
 python-versions = "*"
 groups = ["platform"]
-markers = "(\"el8\" in platform_release or platform_machine == \"ppc64le\" or platform_machine == \"s390x\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and sys_platform == \"win32\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")"
+markers = "sys_platform == \"win32\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")"
 files = [
     {file = "pypiwin32-223-py3-none-any.whl", hash = "sha256:67adf399debc1d5d14dffc1ab5acacb800da569754fafdc576b2a039485aa775"},
     {file = "pypiwin32-223.tar.gz", hash = "sha256:71be40c1fbd28594214ecaecb58e7aa8b708eabfa0125c8a109ebd51edbd776a"},
@@ -3160,9 +3221,9 @@ six = ">=1.5"
 name = "python-utils"
 version = "3.9.1"
 description = "Python Utils is a module with some convenient utilities not included with the standard Python install"
-optional = true
+optional = false
 python-versions = ">=3.9.0"
-groups = ["main"]
+groups = ["main", "modules_poc"]
 markers = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""
 files = [
     {file = "python_utils-3.9.1-py2.py3-none-any.whl", hash = "sha256:0273d7363c7ad4b70999b2791d5ba6b55333d6f7a4e4c8b6b39fb82b5fab4613"},
@@ -3217,7 +3278,7 @@ files = [
     {file = "pywin32-308-cp39-cp39-win32.whl", hash = "sha256:7873ca4dc60ab3287919881a7d4f88baee4a6e639aa6962de25a98ba6b193341"},
     {file = "pywin32-308-cp39-cp39-win_amd64.whl", hash = "sha256:71b3322d949b4cc20776436a9c9ba0eeedcbc9c650daa536df63f0ff111bb920"},
 ]
-markers = {main = "(platform_system == \"Windows\" or sys_platform == \"win32\") and (\"el8\" in platform_release or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\") and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")", platform = "(\"el8\" in platform_release or platform_machine == \"ppc64le\" or platform_machine == \"s390x\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and sys_platform == \"win32\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")", testing = "(\"el8\" in platform_release or platform_machine == \"ppc64le\" or platform_machine == \"s390x\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and sys_platform == \"win32\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")"}
+markers = {main = "(platform_system == \"Windows\" or sys_platform == \"win32\") and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")", platform = "sys_platform == \"win32\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")", testing = "sys_platform == \"win32\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")"}
 
 [[package]]
 name = "pywin32-ctypes"
@@ -3226,7 +3287,7 @@ description = "A (partial) reimplementation of pywin32 using ctypes/cffi"
 optional = false
 python-versions = ">=3.6"
 groups = ["export", "jira-client"]
-markers = "(\"el8\" in platform_release or platform_machine == \"ppc64le\" or platform_machine == \"s390x\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and sys_platform == \"win32\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")"
+markers = "sys_platform == \"win32\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")"
 files = [
     {file = "pywin32-ctypes-0.2.3.tar.gz", hash = "sha256:d162dc04946d704503b2edc4d55f3dba5c1d539ead017afa00142c38b9885755"},
     {file = "pywin32_ctypes-0.2.3-py3-none-any.whl", hash = "sha256:8a1513379d709975552d202d942d9837758905c8d01eb82b8bcc30918929e7b8"},
@@ -3598,7 +3659,7 @@ version = "13.9.4"
 description = "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
 optional = false
 python-versions = ">=3.8.0"
-groups = ["core"]
+groups = ["core", "modules_poc"]
 markers = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""
 files = [
     {file = "rich-13.9.4-py3-none-any.whl", hash = "sha256:6049d5e6ec054bf2779ab3358186963bac2ea89175919d699e378b99738c2a90"},
@@ -3782,7 +3843,7 @@ description = "Python bindings to FreeDesktop.org Secret Service API"
 optional = false
 python-versions = ">=3.6"
 groups = ["export", "jira-client"]
-markers = "(\"el8\" in platform_release or platform_machine == \"ppc64le\" or platform_machine == \"s390x\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and sys_platform == \"linux\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")"
+markers = "sys_platform == \"linux\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")"
 files = [
     {file = "SecretStorage-3.3.3-py3-none-any.whl", hash = "sha256:f356e6628222568e3af06f2eba8df495efa13b3b63081dafd4f7d9a7b7bc9f99"},
     {file = "SecretStorage-3.3.3.tar.gz", hash = "sha256:2403533ef369eca6d2ba81718576c5e0f564d5cca1b58f73a8b23e7d4eeebd77"},
@@ -4101,13 +4162,51 @@ doc = ["reno", "sphinx"]
 test = ["pytest", "tornado (>=4.5)", "typeguard"]
 
 [[package]]
+name = "textual"
+version = "1.0.0"
+description = "Modern Text User Interface framework"
+optional = false
+python-versions = "<4.0.0,>=3.8.1"
+groups = ["modules_poc"]
+markers = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""
+files = [
+    {file = "textual-1.0.0-py3-none-any.whl", hash = "sha256:2d4a701781c05104925e463ae370c630567c70c2880e92ab838052e3e23c986f"},
+    {file = "textual-1.0.0.tar.gz", hash = "sha256:bec9fe63547c1c552569d1b75d309038b7d456c03f86dfa3706ddb099b151399"},
+]
+
+[package.dependencies]
+markdown-it-py = {version = ">=2.1.0", extras = ["linkify", "plugins"]}
+platformdirs = ">=3.6.0,<5"
+rich = ">=13.3.3"
+tree-sitter = {version = ">=0.23.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
+tree-sitter-bash = {version = ">=0.23.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
+tree-sitter-css = {version = ">=0.23.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
+tree-sitter-go = {version = ">=0.23.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
+tree-sitter-html = {version = ">=0.23.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
+tree-sitter-java = {version = ">=0.23.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
+tree-sitter-javascript = {version = ">=0.23.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
+tree-sitter-json = {version = ">=0.24.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
+tree-sitter-markdown = {version = ">=0.3.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
+tree-sitter-python = {version = ">=0.23.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
+tree-sitter-regex = {version = ">=0.24.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
+tree-sitter-rust = {version = ">=0.23.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
+tree-sitter-sql = {version = ">=0.3.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
+tree-sitter-toml = {version = ">=0.6.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
+tree-sitter-xml = {version = ">=0.7.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
+tree-sitter-yaml = {version = ">=0.6.0", optional = true, markers = "python_version >= \"3.9\" and extra == \"syntax\""}
+typing-extensions = ">=4.4.0,<5.0.0"
+
+[package.extras]
+syntax = ["tree-sitter (>=0.23.0)", "tree-sitter-bash (>=0.23.0)", "tree-sitter-css (>=0.23.0)", "tree-sitter-go (>=0.23.0)", "tree-sitter-html (>=0.23.0)", "tree-sitter-java (>=0.23.0)", "tree-sitter-javascript (>=0.23.0)", "tree-sitter-json (>=0.24.0)", "tree-sitter-markdown (>=0.3.0)", "tree-sitter-python (>=0.23.0)", "tree-sitter-regex (>=0.24.0)", "tree-sitter-rust (>=0.23.0)", "tree-sitter-sql (>=0.3.0)", "tree-sitter-toml (>=0.6.0)", "tree-sitter-xml (>=0.7.0)", "tree-sitter-yaml (>=0.6.0)"]
+
+[[package]]
 name = "tomli"
 version = "2.2.1"
 description = "A lil' TOML parser"
 optional = false
 python-versions = ">=3.8"
 groups = ["export", "lint", "testing"]
-markers = "(\"el8\" in platform_release or platform_machine == \"ppc64le\" or platform_machine == \"s390x\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and python_version < \"3.11\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")"
+markers = "python_version < \"3.11\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")"
 files = [
     {file = "tomli-2.2.1-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:678e4fa69e4575eb77d103de3df8a895e1591b48e740211bd1067378c69e8249"},
     {file = "tomli-2.2.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:023aa114dd824ade0100497eb2318602af309e5a55595f76b626d6d9f3b7b0a6"},
@@ -4178,6 +4277,403 @@ discord = ["requests"]
 notebook = ["ipywidgets (>=6)"]
 slack = ["slack-sdk"]
 telegram = ["requests"]
+
+[[package]]
+name = "tree-sitter"
+version = "0.24.0"
+description = "Python bindings to the Tree-sitter parsing library"
+optional = false
+python-versions = ">=3.10"
+groups = ["modules_poc"]
+markers = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""
+files = [
+    {file = "tree-sitter-0.24.0.tar.gz", hash = "sha256:abd95af65ca2f4f7eca356343391ed669e764f37748b5352946f00f7fc78e734"},
+    {file = "tree_sitter-0.24.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:f3f00feff1fc47a8e4863561b8da8f5e023d382dd31ed3e43cd11d4cae445445"},
+    {file = "tree_sitter-0.24.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:f9691be48d98c49ef8f498460278884c666b44129222ed6217477dffad5d4831"},
+    {file = "tree_sitter-0.24.0-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:098a81df9f89cf254d92c1cd0660a838593f85d7505b28249216661d87adde4a"},
+    {file = "tree_sitter-0.24.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0b26bf9e958da6eb7e74a081aab9d9c7d05f9baeaa830dbb67481898fd16f1f5"},
+    {file = "tree_sitter-0.24.0-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:2a84ff87a2f2a008867a1064aba510ab3bd608e3e0cd6e8fef0379efee266c73"},
+    {file = "tree_sitter-0.24.0-cp310-cp310-win_amd64.whl", hash = "sha256:c012e4c345c57a95d92ab5a890c637aaa51ab3b7ff25ed7069834b1087361c95"},
+    {file = "tree_sitter-0.24.0-cp310-cp310-win_arm64.whl", hash = "sha256:033506c1bc2ba7bd559b23a6bdbeaf1127cee3c68a094b82396718596dfe98bc"},
+    {file = "tree_sitter-0.24.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:de0fb7c18c6068cacff46250c0a0473e8fc74d673e3e86555f131c2c1346fb13"},
+    {file = "tree_sitter-0.24.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:a7c9c89666dea2ce2b2bf98e75f429d2876c569fab966afefdcd71974c6d8538"},
+    {file = "tree_sitter-0.24.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:4ddb113e6b8b3e3b199695b1492a47d87d06c538e63050823d90ef13cac585fd"},
+    {file = "tree_sitter-0.24.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:01ea01a7003b88b92f7f875da6ba9d5d741e0c84bb1bd92c503c0eecd0ee6409"},
+    {file = "tree_sitter-0.24.0-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:464fa5b2cac63608915a9de8a6efd67a4da1929e603ea86abaeae2cb1fe89921"},
+    {file = "tree_sitter-0.24.0-cp311-cp311-win_amd64.whl", hash = "sha256:3b1f3cbd9700e1fba0be2e7d801527e37c49fc02dc140714669144ef6ab58dce"},
+    {file = "tree_sitter-0.24.0-cp311-cp311-win_arm64.whl", hash = "sha256:f3f08a2ca9f600b3758792ba2406971665ffbad810847398d180c48cee174ee2"},
+    {file = "tree_sitter-0.24.0-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:14beeff5f11e223c37be7d5d119819880601a80d0399abe8c738ae2288804afc"},
+    {file = "tree_sitter-0.24.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:26a5b130f70d5925d67b47db314da209063664585a2fd36fa69e0717738efaf4"},
+    {file = "tree_sitter-0.24.0-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:5fc5c3c26d83c9d0ecb4fc4304fba35f034b7761d35286b936c1db1217558b4e"},
+    {file = "tree_sitter-0.24.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:772e1bd8c0931c866b848d0369b32218ac97c24b04790ec4b0e409901945dd8e"},
+    {file = "tree_sitter-0.24.0-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:24a8dd03b0d6b8812425f3b84d2f4763322684e38baf74e5bb766128b5633dc7"},
+    {file = "tree_sitter-0.24.0-cp312-cp312-win_amd64.whl", hash = "sha256:f9e8b1605ab60ed43803100f067eed71b0b0e6c1fb9860a262727dbfbbb74751"},
+    {file = "tree_sitter-0.24.0-cp312-cp312-win_arm64.whl", hash = "sha256:f733a83d8355fc95561582b66bbea92ffd365c5d7a665bc9ebd25e049c2b2abb"},
+    {file = "tree_sitter-0.24.0-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:0d4a6416ed421c4210f0ca405a4834d5ccfbb8ad6692d4d74f7773ef68f92071"},
+    {file = "tree_sitter-0.24.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:e0992d483677e71d5c5d37f30dfb2e3afec2f932a9c53eec4fca13869b788c6c"},
+    {file = "tree_sitter-0.24.0-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:57277a12fbcefb1c8b206186068d456c600dbfbc3fd6c76968ee22614c5cd5ad"},
+    {file = "tree_sitter-0.24.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d25fa22766d63f73716c6fec1a31ee5cf904aa429484256bd5fdf5259051ed74"},
+    {file = "tree_sitter-0.24.0-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:7d5d9537507e1c8c5fa9935b34f320bfec4114d675e028f3ad94f11cf9db37b9"},
+    {file = "tree_sitter-0.24.0-cp313-cp313-win_amd64.whl", hash = "sha256:f58bb4956917715ec4d5a28681829a8dad5c342cafd4aea269f9132a83ca9b34"},
+    {file = "tree_sitter-0.24.0-cp313-cp313-win_arm64.whl", hash = "sha256:23641bd25dcd4bb0b6fa91b8fb3f46cc9f1c9f475efe4d536d3f1f688d1b84c8"},
+]
+
+[package.extras]
+docs = ["sphinx (>=8.1,<9.0)", "sphinx-book-theme"]
+tests = ["tree-sitter-html (>=0.23.2)", "tree-sitter-javascript (>=0.23.1)", "tree-sitter-json (>=0.24.8)", "tree-sitter-python (>=0.23.6)", "tree-sitter-rust (>=0.23.2)"]
+
+[[package]]
+name = "tree-sitter-bash"
+version = "0.23.3"
+description = "Bash grammar for tree-sitter"
+optional = false
+python-versions = ">=3.9"
+groups = ["modules_poc"]
+markers = "platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\""
+files = [
+    {file = "tree_sitter_bash-0.23.3-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:c1ee7a46fcbfca9937d01056be756631762f53c5afdb8c4ab64eb9fed060896b"},
+    {file = "tree_sitter_bash-0.23.3-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:5a090118e887bf667d82ae445794906186216f5500e0d2cd58eb499f7502dc57"},
+    {file = "tree_sitter_bash-0.23.3-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:aa4b5dde719291eea3a81b1f9ece6afeee2deadc2b2f769bee92f955da7595cf"},
+    {file = "tree_sitter_bash-0.23.3-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2ff7bffc3d594e7f1054de051e19df1b24082963598a175dda64083c6b3eea1a"},
+    {file = "tree_sitter_bash-0.23.3-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:4427baccbd7549a2ebb1859b6d42cdab0739c05d53c2b3daad9cadc069a7b3f6"},
+    {file = "tree_sitter_bash-0.23.3-cp39-abi3-win_amd64.whl", hash = "sha256:525c5cce28a7c5624fb016ac8f3ae33d32968567b718f7878c6351229d2e8394"},
+    {file = "tree_sitter_bash-0.23.3-cp39-abi3-win_arm64.whl", hash = "sha256:1f703d1bf6235355f6c900be64bf9f61fc4b1d0cfed6829b4eeb74a6b41ea910"},
+    {file = "tree_sitter_bash-0.23.3.tar.gz", hash = "sha256:7b15ed89a1ea8e3e3c2399758746413e464d4c1c3a6d3b75d643ae2bc2fb356b"},
+]
+
+[package.extras]
+core = ["tree-sitter (>=0.22,<1.0)"]
+
+[[package]]
+name = "tree-sitter-cpp"
+version = "0.23.4"
+description = "C++ grammar for tree-sitter"
+optional = false
+python-versions = ">=3.9"
+groups = ["modules_poc"]
+markers = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""
+files = [
+    {file = "tree_sitter_cpp-0.23.4-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:aacb1759f0efd9dbc25bd8ee88184a340483018869f75412d9c3bc32c039a520"},
+    {file = "tree_sitter_cpp-0.23.4-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:bc3c404d9f0cbd87951213a85440afbf4c31e718f8d907fa9ee12bea4b8d276f"},
+    {file = "tree_sitter_cpp-0.23.4-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:ccc43ddf1279d5d5a4ef190373f4cb16522801bec4492bcd4754edf2aeba2b7b"},
+    {file = "tree_sitter_cpp-0.23.4-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:773d2cafc08bbc0f998687fa33f42f378c1a371cdb582870c4d13abb06092706"},
+    {file = "tree_sitter_cpp-0.23.4-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:247d127f0eb6574b0f6b30c0151e0bd0774e2e7acf9c558bdf9fbb8adc2e80c0"},
+    {file = "tree_sitter_cpp-0.23.4-cp39-abi3-win_amd64.whl", hash = "sha256:68606a45bea92669d155399e1239f771a7767d8683cd8f8e30e7d813107030ca"},
+    {file = "tree_sitter_cpp-0.23.4-cp39-abi3-win_arm64.whl", hash = "sha256:712f84f18be94cbe2a148fa4fdf40fcf4a8c25a8f7670efb9f8a47ddec2fc281"},
+    {file = "tree_sitter_cpp-0.23.4.tar.gz", hash = "sha256:6a59c4cebb1ad1dc2e8d586cf8a72b39d21b8108b7b139d089719e81a339e41d"},
+]
+
+[package.extras]
+core = ["tree-sitter (>=0.22,<1.0)"]
+
+[[package]]
+name = "tree-sitter-css"
+version = "0.23.2"
+description = "CSS grammar for tree-sitter"
+optional = false
+python-versions = ">=3.9"
+groups = ["modules_poc"]
+markers = "platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\""
+files = [
+    {file = "tree_sitter_css-0.23.2-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:62b9eadb8f47c666a36a2ead96d17c2a01d7599e1f13f69c617f08e4acf62bf0"},
+    {file = "tree_sitter_css-0.23.2-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:0be54e07f90679173bb06a8ecf483a7d79eaa6d236419b5baa6ce02401ea31a9"},
+    {file = "tree_sitter_css-0.23.2-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:a4ac53c7d74fbb88196301f998a3ab06325447175374500aa477211a59372da2"},
+    {file = "tree_sitter_css-0.23.2-cp39-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0f51bf93f607581ec08c30c591a9274fb29b4b59a1bde4adee7d395de7687285"},
+    {file = "tree_sitter_css-0.23.2-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:6d13c0683d259d82bed17d00d788a8af026ffb3f412337e9971324742dcf2cc8"},
+    {file = "tree_sitter_css-0.23.2-cp39-abi3-win_amd64.whl", hash = "sha256:78236683eb974cc738969f70f1fb6d978ae375139b89cfe8efeaca4b865055be"},
+    {file = "tree_sitter_css-0.23.2-cp39-abi3-win_arm64.whl", hash = "sha256:4b95b7f53142029fca2abd3fcb635e3eb952bc198f340be5c429040c791f9c00"},
+    {file = "tree_sitter_css-0.23.2.tar.gz", hash = "sha256:04198e9f4dee4935dbf17fdd7f534be8b9a2dd3a4b44a3ca481d3e8c15f10dca"},
+]
+
+[package.extras]
+core = ["tree-sitter (>=0.22,<1.0)"]
+
+[[package]]
+name = "tree-sitter-go"
+version = "0.23.4"
+description = "Go grammar for tree-sitter"
+optional = false
+python-versions = ">=3.9"
+groups = ["modules_poc"]
+markers = "platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\""
+files = [
+    {file = "tree_sitter_go-0.23.4-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:c9320f87a05cd47fa0f627b9329bbc09b7ed90de8fe4f5882aed318d6e19962d"},
+    {file = "tree_sitter_go-0.23.4-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:914e63d16b36ab0e4f52b031e574b82d17d0bbfecca138ae83e887a1cf5b71ac"},
+    {file = "tree_sitter_go-0.23.4-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:330ecbb38d6ea4ef41eba2d473056889705e64f6a51c2fb613de05b1bcb5ba22"},
+    {file = "tree_sitter_go-0.23.4-cp39-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:dd14d23056ae980debfccc0db67d0a168da03792ca2968b1b5dd58ce288084e7"},
+    {file = "tree_sitter_go-0.23.4-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:c3b40912487fdb78c4028860dd79493a521ffca0104f209849823358db3618a0"},
+    {file = "tree_sitter_go-0.23.4-cp39-abi3-win_amd64.whl", hash = "sha256:ae4b231cad2ef76401d33617879cda6321c4d0853f7fd98cb5654c50a218effb"},
+    {file = "tree_sitter_go-0.23.4-cp39-abi3-win_arm64.whl", hash = "sha256:2ac907362a3c347145dc1da0858248546500a323de90d2cb76d2a3fdbfc8da25"},
+    {file = "tree_sitter_go-0.23.4.tar.gz", hash = "sha256:0ebff99820657066bec21690623a14c74d9e57a903f95f0837be112ddadf1a52"},
+]
+
+[package.extras]
+core = ["tree-sitter (>=0.22,<1.0)"]
+
+[[package]]
+name = "tree-sitter-html"
+version = "0.23.2"
+description = "HTML grammar for tree-sitter"
+optional = false
+python-versions = ">=3.9"
+groups = ["modules_poc"]
+markers = "platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\""
+files = [
+    {file = "tree_sitter_html-0.23.2-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:9e1641d5edf5568a246c6c47b947ed524b5bf944664e6473b21d4ae568e28ee9"},
+    {file = "tree_sitter_html-0.23.2-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:3d0a83dd6cd1c7d4bcf6287b5145c92140f0194f8516f329ae8b9e952fbfa8ff"},
+    {file = "tree_sitter_html-0.23.2-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:81b3775732fffc0abd275a419ef018fd4c1ad4044b2a2e422f3378d93c30eded"},
+    {file = "tree_sitter_html-0.23.2-cp39-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4bdaa7ac5030d416aea0c512d4810ef847bbbd62d61e3d213f370b64ce147293"},
+    {file = "tree_sitter_html-0.23.2-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:d2e9631b66041a4fd792d7f79a0c4128adb3bfc71f3dcb7e1a3eab5dbee77d67"},
+    {file = "tree_sitter_html-0.23.2-cp39-abi3-win_amd64.whl", hash = "sha256:85095f49f9e57f0ac9087a3e830783352c8447fdda55b1c1139aa47e5eaa0e21"},
+    {file = "tree_sitter_html-0.23.2-cp39-abi3-win_arm64.whl", hash = "sha256:0f65ed9e877144d0f04ade5644e5b0e88bf98a9e60bce65235c99905623e2f1a"},
+    {file = "tree_sitter_html-0.23.2.tar.gz", hash = "sha256:bc9922defe23144d9146bc1509fcd00d361bf6b3303f9effee6532c6a0296961"},
+]
+
+[package.extras]
+core = ["tree-sitter (>=0.22,<1.0)"]
+
+[[package]]
+name = "tree-sitter-java"
+version = "0.23.5"
+description = "Java grammar for tree-sitter"
+optional = false
+python-versions = ">=3.9"
+groups = ["modules_poc"]
+markers = "platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\""
+files = [
+    {file = "tree_sitter_java-0.23.5-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:355ce0308672d6f7013ec913dee4a0613666f4cda9044a7824240d17f38209df"},
+    {file = "tree_sitter_java-0.23.5-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:24acd59c4720dedad80d548fe4237e43ef2b7a4e94c8549b0ca6e4c4d7bf6e69"},
+    {file = "tree_sitter_java-0.23.5-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:9401e7271f0b333df39fc8a8336a0caf1b891d9a2b89ddee99fae66b794fc5b7"},
+    {file = "tree_sitter_java-0.23.5-cp39-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:370b204b9500b847f6d0c5ad584045831cee69e9a3e4d878535d39e4a7e4c4f1"},
+    {file = "tree_sitter_java-0.23.5-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:aae84449e330363b55b14a2af0585e4e0dae75eb64ea509b7e5b0e1de536846a"},
+    {file = "tree_sitter_java-0.23.5-cp39-abi3-win_amd64.whl", hash = "sha256:1ee45e790f8d31d416bc84a09dac2e2c6bc343e89b8a2e1d550513498eedfde7"},
+    {file = "tree_sitter_java-0.23.5-cp39-abi3-win_arm64.whl", hash = "sha256:402efe136104c5603b429dc26c7e75ae14faaca54cfd319ecc41c8f2534750f4"},
+    {file = "tree_sitter_java-0.23.5.tar.gz", hash = "sha256:f5cd57b8f1270a7f0438878750d02ccc79421d45cca65ff284f1527e9ef02e38"},
+]
+
+[package.extras]
+core = ["tree-sitter (>=0.22,<1.0)"]
+
+[[package]]
+name = "tree-sitter-javascript"
+version = "0.23.1"
+description = "JavaScript grammar for tree-sitter"
+optional = false
+python-versions = ">=3.9"
+groups = ["modules_poc"]
+markers = "platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\""
+files = [
+    {file = "tree_sitter_javascript-0.23.1-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:6ca583dad4bd79d3053c310b9f7208cd597fd85f9947e4ab2294658bb5c11e35"},
+    {file = "tree_sitter_javascript-0.23.1-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:94100e491a6a247aa4d14caf61230c171b6376c863039b6d9cd71255c2d815ec"},
+    {file = "tree_sitter_javascript-0.23.1-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:5a6bc1055b061c5055ec58f39ee9b2e9efb8e6e0ae970838af74da0afb811f0a"},
+    {file = "tree_sitter_javascript-0.23.1-cp39-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:056dc04fb6b24293f8c5fec43c14e7e16ba2075b3009c643abf8c85edc4c7c3c"},
+    {file = "tree_sitter_javascript-0.23.1-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:a11ca1c0f736da42967586b568dff8a465ee148a986c15ebdc9382806e0ce871"},
+    {file = "tree_sitter_javascript-0.23.1-cp39-abi3-win_amd64.whl", hash = "sha256:041fa22b34250ea6eb313d33104d5303f79504cb259d374d691e38bbdc49145b"},
+    {file = "tree_sitter_javascript-0.23.1-cp39-abi3-win_arm64.whl", hash = "sha256:eb28130cd2fb30d702d614cbf61ef44d1c7f6869e7d864a9cc17111e370be8f7"},
+    {file = "tree_sitter_javascript-0.23.1.tar.gz", hash = "sha256:b2059ce8b150162cda05a457ca3920450adbf915119c04b8c67b5241cd7fcfed"},
+]
+
+[package.extras]
+core = ["tree-sitter (>=0.22,<1.0)"]
+
+[[package]]
+name = "tree-sitter-json"
+version = "0.24.8"
+description = "JSON grammar for tree-sitter"
+optional = false
+python-versions = ">=3.9"
+groups = ["modules_poc"]
+markers = "platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\""
+files = [
+    {file = "tree_sitter_json-0.24.8-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:59ac06c6db1877d0e2076bce54a5fddcdd2fc38ca778905662e80fa9ffcea2ab"},
+    {file = "tree_sitter_json-0.24.8-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:62b4c45b561db31436a81a3f037f71ec29049f4fc9bf5269b6ec3ebaaa35a1cd"},
+    {file = "tree_sitter_json-0.24.8-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:f8627f7d375fda9fc193ebee368c453f374f65c2f25c58b6fea4e6b49a7fccbc"},
+    {file = "tree_sitter_json-0.24.8-cp39-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:85cca779872f7278f3a74eb38533d34b9c4de4fd548615e3361fa64fe350ad0a"},
+    {file = "tree_sitter_json-0.24.8-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:deeb45850dcc52990fbb52c80196492a099e3fa3512d928a390a91cf061068cc"},
+    {file = "tree_sitter_json-0.24.8-cp39-abi3-win_amd64.whl", hash = "sha256:e4849a03cd7197267b2688a4506a90a13568a8e0e8588080bd0212fcb38974e3"},
+    {file = "tree_sitter_json-0.24.8-cp39-abi3-win_arm64.whl", hash = "sha256:591e0096c882d12668b88f30d3ca6f85b9db3406910eaaab6afb6b17d65367dd"},
+    {file = "tree_sitter_json-0.24.8.tar.gz", hash = "sha256:ca8486e52e2d261819311d35cf98656123d59008c3b7dcf91e61d2c0c6f3120e"},
+]
+
+[package.extras]
+core = ["tree-sitter (>=0.22,<1.0)"]
+
+[[package]]
+name = "tree-sitter-markdown"
+version = "0.3.2"
+description = "Markdown grammar for tree-sitter"
+optional = false
+python-versions = ">=3.9"
+groups = ["modules_poc"]
+markers = "platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\""
+files = [
+    {file = "tree_sitter_markdown-0.3.2-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:2a0d60ee5185fbc20c6f3e7744348956a62f8bc9ae85b574251632e3c2220c77"},
+    {file = "tree_sitter_markdown-0.3.2-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:0a72f199966380e18f668abb3e9d0a75569c8a292967deefc432282e253f9f84"},
+    {file = "tree_sitter_markdown-0.3.2-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:3555e5732223b030c8b5742fb565b4528566d96700ea7de9a2902e51fb91be21"},
+    {file = "tree_sitter_markdown-0.3.2-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d7fd68cbbccd917067696952773a553ef4d604017d9332b7a6f6a05549f1c0a3"},
+    {file = "tree_sitter_markdown-0.3.2-cp39-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:a693f0251f13fa925631fdc9e30f2435f5569d1b3b3d2c3d3b24060d3234f98a"},
+    {file = "tree_sitter_markdown-0.3.2-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:507b9d99500dcbeefb069815b689c3dd36892375e878669f98125d0cd0a814a4"},
+    {file = "tree_sitter_markdown-0.3.2-cp39-abi3-win_amd64.whl", hash = "sha256:a89a374920d648599d07036e0ec979f54fde684ddaee1bddf406339c51565cbc"},
+    {file = "tree_sitter_markdown-0.3.2-cp39-abi3-win_arm64.whl", hash = "sha256:017e7c09c44861f35a4499564ecd0d97a25341905dc9d0dec2e6a38ee4e6b52d"},
+    {file = "tree_sitter_markdown-0.3.2.tar.gz", hash = "sha256:64501234ae4ce5429551624e2fd675008cf86824bd8b9352223653e39218e753"},
+]
+
+[package.extras]
+core = ["tree-sitter (>=0.23,<1.0)"]
+
+[[package]]
+name = "tree-sitter-python"
+version = "0.23.6"
+description = "Python grammar for tree-sitter"
+optional = false
+python-versions = ">=3.9"
+groups = ["modules_poc"]
+markers = "platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\""
+files = [
+    {file = "tree_sitter_python-0.23.6-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:28fbec8f74eeb2b30292d97715e60fac9ccf8a8091ce19b9d93e9b580ed280fb"},
+    {file = "tree_sitter_python-0.23.6-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:680b710051b144fedf61c95197db0094f2245e82551bf7f0c501356333571f7a"},
+    {file = "tree_sitter_python-0.23.6-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8a9dcef55507b6567207e8ee0a6b053d0688019b47ff7f26edc1764b7f4dc0a4"},
+    {file = "tree_sitter_python-0.23.6-cp39-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:29dacdc0cd2f64e55e61d96c6906533ebb2791972bec988450c46cce60092f5d"},
+    {file = "tree_sitter_python-0.23.6-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:7e048733c36f564b379831689006801feb267d8194f9e793fbb395ef1723335d"},
+    {file = "tree_sitter_python-0.23.6-cp39-abi3-win_amd64.whl", hash = "sha256:a24027248399fb41594b696f929f9956828ae7cc85596d9f775e6c239cd0c2be"},
+    {file = "tree_sitter_python-0.23.6-cp39-abi3-win_arm64.whl", hash = "sha256:71334371bd73d5fe080aed39fbff49ed8efb9506edebe16795b0c7567ed6a272"},
+    {file = "tree_sitter_python-0.23.6.tar.gz", hash = "sha256:354bfa0a2f9217431764a631516f85173e9711af2c13dbd796a8815acfe505d9"},
+]
+
+[package.extras]
+core = ["tree-sitter (>=0.22,<1.0)"]
+
+[[package]]
+name = "tree-sitter-regex"
+version = "0.24.3"
+description = "Regex grammar for tree-sitter"
+optional = false
+python-versions = ">=3.9"
+groups = ["modules_poc"]
+markers = "platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\""
+files = [
+    {file = "tree_sitter_regex-0.24.3-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:16ded552d0f43dda608cec078b4a63f1dfa53c793775ba1a1bb06b2539b94fff"},
+    {file = "tree_sitter_regex-0.24.3-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:0a26bf77f7a8aa070299246eb3a29276030481ff380346c4085a97e448c34570"},
+    {file = "tree_sitter_regex-0.24.3-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:6abbf0708dbef6d70444bf9482528b39bae255ce59ed147dd1a731127e49a8da"},
+    {file = "tree_sitter_regex-0.24.3-cp39-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:cdb7134e1c954a18c321053f753da1c5aea9dc6d92e814796d34d03c4b76c012"},
+    {file = "tree_sitter_regex-0.24.3-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:bf21ff69b8356d83b19ece6468ffe855d397eeeee1e34e8a11de0dc2be5ee896"},
+    {file = "tree_sitter_regex-0.24.3-cp39-abi3-win_amd64.whl", hash = "sha256:7cb8f173054859a3d8b8f111833c638b1f1fef878fafb191e6974bbcaf5e930f"},
+    {file = "tree_sitter_regex-0.24.3-cp39-abi3-win_arm64.whl", hash = "sha256:2eb9001e9ccb97d3d608e07f524335b0e5614abf67a004004c6c90abf0feb7cf"},
+    {file = "tree_sitter_regex-0.24.3.tar.gz", hash = "sha256:58bb63f9e0ff01430da56ff158bddcb1b62a31f115abdf93cc6af76cc3aff86e"},
+]
+
+[package.extras]
+core = ["tree-sitter (>=0.22,<1.0)"]
+
+[[package]]
+name = "tree-sitter-rust"
+version = "0.23.2"
+description = "Rust grammar for tree-sitter"
+optional = false
+python-versions = ">=3.9"
+groups = ["modules_poc"]
+markers = "platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\""
+files = [
+    {file = "tree_sitter_rust-0.23.2-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:b6b26a4c07ddc243f3701450ff34093b8e3b08f14d269db2d049c625d151677c"},
+    {file = "tree_sitter_rust-0.23.2-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:c6224f608df559d75425e5ef428f635b9fb87d7aa8716444915ee67ec6955085"},
+    {file = "tree_sitter_rust-0.23.2-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:deced590a85ce848cda56f33728bad93b95827c1e3c736b707b24fb4280b3788"},
+    {file = "tree_sitter_rust-0.23.2-cp39-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:540cf826932fe7cfd800361e368617e138c3d7914fad3b90786b7505af216be6"},
+    {file = "tree_sitter_rust-0.23.2-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:880be40b220e87105b60db48c57cdd8019b5039b324afb1d643fa9c2fc187873"},
+    {file = "tree_sitter_rust-0.23.2-cp39-abi3-win_amd64.whl", hash = "sha256:d8e0bea4fd76fc8b325247f3d1bb3dc2707db7dd3818b02c251efdea1b47909c"},
+    {file = "tree_sitter_rust-0.23.2-cp39-abi3-win_arm64.whl", hash = "sha256:3ea49daa887ad59230758e7a96432193af4a2c7183781e1e85c35d4f8cb30b6b"},
+    {file = "tree_sitter_rust-0.23.2.tar.gz", hash = "sha256:9088a0e0342d3de2749088811f5561994423cb10dab5ad3251003dffaa0a1bd1"},
+]
+
+[package.extras]
+core = ["tree-sitter (>=0.22,<1.0)"]
+
+[[package]]
+name = "tree-sitter-sql"
+version = "0.3.7"
+description = "Tree-sitter Grammar for SQL"
+optional = false
+python-versions = ">=3.9"
+groups = ["modules_poc"]
+markers = "platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\""
+files = [
+    {file = "tree_sitter_sql-0.3.7-cp38-abi3-macosx_10_9_x86_64.whl", hash = "sha256:f3f8427328bd8b4ee02ab50d71bfc515937c037b8a03dcf54b8c98403d804269"},
+    {file = "tree_sitter_sql-0.3.7-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:97ad55611f7d777b08a30d60150e1c44100ac2759a341b1cf1ffa2f97f20259e"},
+    {file = "tree_sitter_sql-0.3.7-cp38-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:aa7beae1c2e841edc6de5a80d3ee6d401b579d9d27ce9553f2c569bef4b95b8f"},
+    {file = "tree_sitter_sql-0.3.7-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b5fc2daa8fc8d49265327ddaff0b5bbda5a6a0e37d05b157fdbcb2530f1e96e8"},
+    {file = "tree_sitter_sql-0.3.7-cp38-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:5f3c34121b625ee8f43e6ccffaca5205b206afa31592aedd1f078b4f6f4cb321"},
+    {file = "tree_sitter_sql-0.3.7-cp38-abi3-win_amd64.whl", hash = "sha256:09e4af2b4c32b09e602c83f1e584e5f390901fce929fa7c3da2ddf416e30681e"},
+    {file = "tree_sitter_sql-0.3.7-cp38-abi3-win_arm64.whl", hash = "sha256:e7b09235e5492ac8f71abaeb078e28dbfa94881998a5fbf22c659da49165054c"},
+    {file = "tree_sitter_sql-0.3.7.tar.gz", hash = "sha256:5eb671ad597e6245d96aa44fd584c990d3eaffe80faddf941bfe8ebee6a8e2dd"},
+]
+
+[package.extras]
+core = ["tree-sitter (>=0.22,<1.0)"]
+
+[[package]]
+name = "tree-sitter-toml"
+version = "0.7.0"
+description = "TOML grammar for tree-sitter"
+optional = false
+python-versions = ">=3.9"
+groups = ["modules_poc"]
+markers = "platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\""
+files = [
+    {file = "tree_sitter_toml-0.7.0-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:b9ae5c3e7c5b6bb05299dd73452ceafa7fa0687d5af3012332afa7757653b676"},
+    {file = "tree_sitter_toml-0.7.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:18be09538e9775cddc0290392c4e2739de2201260af361473ca60b5c21f7bd22"},
+    {file = "tree_sitter_toml-0.7.0-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:a045e0acfcf91b7065066f7e51ea038ed7385c1e35e7e8fae18f252d3f8adb8c"},
+    {file = "tree_sitter_toml-0.7.0-cp39-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7a2f8cf9d73f07b6628093b35e5c5fbac039247e32cb075eaa5289a5914e73af"},
+    {file = "tree_sitter_toml-0.7.0-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:860ffa4513b2dc3083d8e412bd815a350b0a9490624b37e7c8f6ed5c6f9ce63c"},
+    {file = "tree_sitter_toml-0.7.0-cp39-abi3-win_amd64.whl", hash = "sha256:2760a04f06937b01b1562a2135cd7e8207e399e73ef75bbebc77e37b1ad3b15d"},
+    {file = "tree_sitter_toml-0.7.0-cp39-abi3-win_arm64.whl", hash = "sha256:fd00fd8a51c65aa19c40539431cb1773d87c30af5757b4041fa6c229058420b4"},
+    {file = "tree_sitter_toml-0.7.0.tar.gz", hash = "sha256:29e257612fa8f0c1fcbc4e7e08ddc561169f1725265302e64d81086354144a70"},
+]
+
+[package.extras]
+core = ["tree-sitter (>=0.22,<1.0)"]
+
+[[package]]
+name = "tree-sitter-xml"
+version = "0.7.0"
+description = "XML & DTD grammars for tree-sitter"
+optional = false
+python-versions = ">=3.9"
+groups = ["modules_poc"]
+markers = "platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\""
+files = [
+    {file = "tree_sitter_xml-0.7.0-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:cc3e516d4c1e0860fb22172c172148debb825ba638971bc48bad15b22e5b0bae"},
+    {file = "tree_sitter_xml-0.7.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:0674fdf4cc386e4d323cb287d3b072663de0f20a9e9af5d5e09821aae56a9e5c"},
+    {file = "tree_sitter_xml-0.7.0-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8c0fe5f2d6cc09974c8375c8ea9b24909f493b5bf04aacdc4c694b5d2ae6b040"},
+    {file = "tree_sitter_xml-0.7.0-cp39-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:dd3209516a4d84dff90bc91d2ad2ce246de8504cede4358849687fa8e71536e7"},
+    {file = "tree_sitter_xml-0.7.0-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:87578e15fa55f44ecd9f331233b6f8a2cbde3546b354c830ecb862a632379455"},
+    {file = "tree_sitter_xml-0.7.0-cp39-abi3-win_amd64.whl", hash = "sha256:9ba2dafc6ce9feaf4ccc617d3aeea57f8e0ca05edad34953e788001ebff79133"},
+    {file = "tree_sitter_xml-0.7.0-cp39-abi3-win_arm64.whl", hash = "sha256:fc759f710a8fd7a01c23e2d7cb013679199045bea3dc0e5151650a11322aaf40"},
+    {file = "tree_sitter_xml-0.7.0.tar.gz", hash = "sha256:ab0ff396f20230ad8483d968151ce0c35abe193eb023b20fbd8b8ce4cf9e9f61"},
+]
+
+[package.extras]
+core = ["tree-sitter (>=0.22,<1.0)"]
+
+[[package]]
+name = "tree-sitter-yaml"
+version = "0.7.0"
+description = "YAML grammar for tree-sitter"
+optional = false
+python-versions = ">=3.9"
+groups = ["modules_poc"]
+markers = "platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\""
+files = [
+    {file = "tree_sitter_yaml-0.7.0-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:e21553ac190ae05bf82796df8beb4d9158ba195b5846018cb36fbc3a35bd0679"},
+    {file = "tree_sitter_yaml-0.7.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:c022054f1f9b54201082ea83073a6c24c42d0436ad8ee99ff2574cba8f928c28"},
+    {file = "tree_sitter_yaml-0.7.0-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:1cd1725142f19e41c51d27c99cfc60780f596e069eb181cfa6433d993a19aa3d"},
+    {file = "tree_sitter_yaml-0.7.0-cp39-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:9d1b268378254f75bb27396d83c96d886ccbfcda6bd8c2778e94e3e1d2459085"},
+    {file = "tree_sitter_yaml-0.7.0-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:27c2e7f4f49ddf410003abbb82a7b00ec77ea263d8ef08dbce1a15d293eed2fd"},
+    {file = "tree_sitter_yaml-0.7.0-cp39-abi3-win_amd64.whl", hash = "sha256:98dce0d6bc376f842cfb1d3c32512eea95b37e61cd2c87074bb4b05c999917c8"},
+    {file = "tree_sitter_yaml-0.7.0-cp39-abi3-win_arm64.whl", hash = "sha256:f0f8d8e05fa8e70f08d0f18a209d6026e171844f4ea7090e7c779b9c375b3a31"},
+    {file = "tree_sitter_yaml-0.7.0.tar.gz", hash = "sha256:9c8bb17d9755c3b0e757260917240c0d19883cd3b59a5d74f205baa8bf8435a4"},
+]
+
+[package.extras]
+core = ["tree-sitter (>=0.22,<1.0)"]
 
 [[package]]
 name = "trio"
@@ -4277,7 +4773,7 @@ description = "An extension for use in the twisted I/O Completion Ports reactor.
 optional = false
 python-versions = "*"
 groups = ["external-auth"]
-markers = "(\"el8\" in platform_release or platform_machine == \"ppc64le\" or platform_machine == \"s390x\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and platform_system == \"Windows\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")"
+markers = "platform_system == \"Windows\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")"
 files = [
     {file = "twisted-iocpsupport-1.0.4.tar.gz", hash = "sha256:858096c0d15e33f15ac157f455d8f86f2f2cdd223963e58c0f682a3af8362d89"},
     {file = "twisted_iocpsupport-1.0.4-cp310-cp310-win32.whl", hash = "sha256:afa2b630797f9ed2f27f3d9f55e3f72b4244911e45a8c82756f44babbf0b243e"},
@@ -4367,12 +4863,28 @@ version = "4.12.2"
 description = "Backported and Experimental Type Hints for Python 3.8+"
 optional = false
 python-versions = ">=3.8"
-groups = ["main", "build-metrics", "core", "evergreen", "external-auth", "lint", "platform", "testing", "tooling-metrics"]
+groups = ["main", "build-metrics", "core", "evergreen", "external-auth", "lint", "modules_poc", "platform", "testing", "tooling-metrics"]
 markers = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""
 files = [
     {file = "typing_extensions-4.12.2-py3-none-any.whl", hash = "sha256:04e5ca0351e0f3f85c6853954072df659d0d13fac324d0072316b67d7794700d"},
     {file = "typing_extensions-4.12.2.tar.gz", hash = "sha256:1a7ead55c7e559dd4dee8856e3a88b41225abfe1ce8df57b7c13915fe121ffb8"},
 ]
+
+[[package]]
+name = "uc-micro-py"
+version = "1.0.3"
+description = "Micro subset of unicode data files for linkify-it-py projects."
+optional = false
+python-versions = ">=3.7"
+groups = ["modules_poc"]
+markers = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""
+files = [
+    {file = "uc-micro-py-1.0.3.tar.gz", hash = "sha256:d321b92cff673ec58027c04015fcaa8bb1e005478643ff4a500882eaab88c48a"},
+    {file = "uc_micro_py-1.0.3-py3-none-any.whl", hash = "sha256:db1dffff340817673d7b466ec86114a9dc0e9d4d9b5ba229d9d60e5c12600cd5"},
+]
+
+[package.extras]
+test = ["coverage", "pytest", "pytest-cov"]
 
 [[package]]
 name = "unittest-xml-reporting"
@@ -4613,7 +5125,7 @@ description = "Python wrapper for extended filesystem attributes"
 optional = false
 python-versions = ">=3.8"
 groups = ["export"]
-markers = "(\"el8\" in platform_release or platform_machine == \"ppc64le\" or platform_machine == \"s390x\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and sys_platform == \"darwin\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")"
+markers = "sys_platform == \"darwin\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")"
 files = [
     {file = "xattr-1.1.4-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:acb85b6249e9f3ea10cbb56df1021d43f4027212f0d004304bc9075dc7f54769"},
     {file = "xattr-1.1.4-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:1a848ab125c0fafdc501ccd83b4c9018bba576a037a4ca5960a22f39e295552e"},
@@ -4724,7 +5236,7 @@ files = [
     {file = "zipp-3.21.0-py3-none-any.whl", hash = "sha256:ac1bbe05fd2991f160ebce24ffbac5f6d11d83dc90891255885223d42b3cd931"},
     {file = "zipp-3.21.0.tar.gz", hash = "sha256:2c9958f6430a2040341a52eb608ed6dd93ef4392e02ffe219417c1b28b5dd1f4"},
 ]
-markers = {export = "(\"el8\" in platform_release or platform_machine == \"ppc64le\" or platform_machine == \"s390x\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and python_version < \"3.12\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")", jira-client = "(\"el8\" in platform_release or platform_machine == \"ppc64le\" or platform_machine == \"s390x\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and python_version < \"3.12\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")", testing = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""}
+markers = {export = "python_version < \"3.12\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")", jira-client = "python_version < \"3.12\" and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\")", testing = "\"el8\" in platform_release and (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"ppc64le\" or platform_machine == \"s390x\""}
 
 [package.extras]
 check = ["pytest-checkdocs (>=2.4)", "pytest-ruff (>=0.2.1)"]
@@ -4815,4 +5327,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "3183347cd7cbe83df8e7e60b9281de1f799c86cd4f271ae1c888109fd754d077"
+content-hash = "bcdd3870afa11917e4cb4327800df187906b974438051c570cb88ff1fd91ef88"

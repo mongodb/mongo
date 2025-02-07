@@ -14,15 +14,18 @@
     ],
     "words": [
         "absl",
-        "ABSON", // e.g. "is a bson object" -> isABSONObj.
+        "ABSON",
         "AGCFR",
         "bazel",
+        "bazelrc",
         "bson",
         "bsonobj",
         "bufbuilder",
         "checkpointing",
         "ckpts",
         "cohosted",
+        "compdb",
+        "compiledb",
         "configsvr",
         "constexpr",
         "coverity",
@@ -105,15 +108,15 @@
         "unyieldable",
         "upserted",
         "valgrind",
-        "vartype",
         "varname",
+        "vartype",
         "wiredtiger",
         "WTCHKPT",
         "WTCMPCT",
         "WTOK",
         "WTRU",
         "WUOW",
-        "zstd",
+        "zstd"
     ],
     "ignoreRegExpList": [
         "\\w*assert(ed)?"

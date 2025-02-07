@@ -355,6 +355,15 @@ common:clang-tidy-v5 --config=clang-tidy
 common:clang-tidy-v5 --//bazel/config:mongo_toolchain_version=v5
 common:clang-tidy-v5 --//bazel/config:clang_tidy_toolchain_version=v5
 
+--config=mod-scanner
+common:mod-scanner --config=dbg
+common:mod-scanner --build_tag_filters=-third_party,-mongo-tidy-tests
+common:mod-scanner --//bazel/config:compiler_type=clang
+common:mod-scanner --//bazel/config:mongo_toolchain_version=v5
+common:mod-scanner --output_groups=report
+common:mod-scanner --aspects //modules_poc:mod_scanner.bzl%mod_scanner_aspect
+common:mod-scanner --remote_download_regex=.*\.mod_scanner_decls.json$
+
 # if you don't have access to the remote execution cluster above, use the local config
 # described below.
 # pass local config to SCons like:

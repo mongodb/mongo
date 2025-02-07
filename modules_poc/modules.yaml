@@ -4,6 +4,17 @@ core:
   - src/mongo/platform/
   - src/mongo/stdx/
   - src/mongo/util/
+  - src/mongo/db/jsobj.h
+  - src/mongo/db/json.h
+
+core.service:
+  - src/mongo/db/commands[._]* # not the commands directory
+  - src/mongo/db/*operation_context*
+  - src/mongo/db/client*
+  - src/mongo/db/service_context*
+
+core.unittest:
+  - src/mongo/unittest/
 
 query:
   - src/mongo/db/commands/query_cmd/
@@ -66,6 +77,7 @@ logging:
 networking:
   - src/mongo/db/rpc/
   - src/mongo/util/net
+  - src/mongo/transport
 
 timeseries_bucket_catalog: # authoritative: @10gen/server-timeseries-bucket-catalog
   - src/mongo/db/timeseries/bucket_catalog
@@ -76,6 +88,7 @@ collection_write_path: # authoritative: @10gen/server-collection-write-path
   - src/mongo/db/commands/collection_to_capped* # specific files
 
 bsoncolumn: # authoritative: @10gen/server-bsoncolumn
+  - src/mongo/bson/util/bsonobj_traversal.h
   - src/mongo/bson/column
 
 external_sorter: # authoritative: @10gen/server-external-sorter

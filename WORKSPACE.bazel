@@ -228,6 +228,9 @@ load("@rules_poetry//rules_poetry:poetry.bzl", "poetry")
 
 poetry(
     name = "poetry",
+    excludes = [
+        "mdit-py-plugins",  # plugins for markdown-it-py. Introduces an optional circular dependency that bazel does not like.
+    ],
     lockfile = "//:poetry.lock",
     pyproject = "//:pyproject.toml",
     python_interpreter_target_default = "@py_host//:dist/bin/python3",
