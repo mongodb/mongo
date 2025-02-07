@@ -5,8 +5,12 @@ import sys
 from typing import List
 
 import jsonschema
+from referencing import Registry, Resource
 
-SCHEMA_LOCATION = os.path.join("buildscripts", "tests", "sbom_linter", "bom-1.5.schema.json")
+BOM_SCHEMA_LOCATION = os.path.join("buildscripts", "tests", "sbom_linter", "bom-1.5.schema.json")
+SPDX_SCHEMA_LOCATION = os.path.join("buildscripts", "tests", "sbom_linter", "spdx.schema.json")
+SPDX_SCHEMA_REF = "spdx.schema.json"
+
 # directory to scan for third party libraries
 THIRD_PARTY_DIR = os.path.join("src", "third_party")
 # platform independent prefix of third party libraries
@@ -70,8 +74,16 @@ class ErrorManager:
 
 
 def get_schema() -> dict:
-    with open(SCHEMA_LOCATION, "r") as schema_data:
+    with open(BOM_SCHEMA_LOCATION, "r") as schema_data:
         return json.load(schema_data)
+
+
+def local_schema_registry():
+    "Create a local registry which is used to resolve references to external schema"
+
+    with open(SPDX_SCHEMA_LOCATION, "r") as spdx:
+        spdx_schema = Resource.from_contents(json.load(spdx))
+    return Registry().with_resources([(SPDX_SCHEMA_REF, spdx_schema)])
 
 
 # The script_path is a file which may contain a line where two tokens script_version_key and
@@ -186,7 +198,10 @@ def lint_sbom(
         return error_manager
 
     try:
-        jsonschema.validate(sbom, get_schema())
+        schema = get_schema()
+        jsonschema.validators.validator_for(schema)(
+            schema, registry=local_schema_registry()
+        ).validate(sbom)
     except jsonschema.ValidationError as error:
         error_manager.append(f"{SCHEMA_MATCH_FAILURE} {input_file}")
         error_manager.append(error.message)
