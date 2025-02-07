@@ -41,6 +41,8 @@ namespace mongo::executor {
 
 /**
  * Abstract interface for AsyncDBClient factories to be used by NetworkInterfaceTL.
+ * The factory dictates which transport protocol the TransportLayer provided to startup() should
+ * communicate over.
  */
 class AsyncClientFactory : public EgressConnectionCloser {
 public:
@@ -82,6 +84,8 @@ public:
          */
         virtual void indicateUsed() = 0;
     };
+
+    virtual transport::TransportProtocol getTransportProtocol() const = 0;
 
     virtual void startup(ServiceContext* svcCtx,
                          transport::TransportLayer* tl,

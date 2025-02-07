@@ -31,11 +31,15 @@
 #include "mongo/platform/basic.h"
 
 #include <fstream>
+#include <memory>
+#include <string>
 
 #include "mongo/client/authenticate.h"
 #include "mongo/db/auth/authorization_session_impl.h"
+#include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_integration_fixture.h"
 #include "mongo/logv2/log.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/ssl_options.h"
@@ -74,7 +78,14 @@ public:
         auth::setInternalUserAuthParams(
             auth::createInternalX509AuthDocument(boost::optional<StringData>("Ignored")));
 
-        ConnectionPool::Options options;
+        createNet();
+        net().startup();
+    }
+
+    std::unique_ptr<NetworkInterface> _makeNet(std::string instanceName,
+                                               transport::TransportProtocol protocol) override {
+        LOGV2(5181101, "Initializing the test connection with transient SSL params");
+        ConnectionPool::Options options = makeDefaultConnectionPoolOptions();
         options.transientSSLParams.emplace([] {
             ClusterConnection clusterConnection;
             clusterConnection.targetedClusterConnectionString = ConnectionString::forLocal();
@@ -83,9 +94,7 @@ public:
             TransientSSLParams params(clusterConnection);
             return params;
         }());
-        LOGV2(5181101, "Initializing the test connection with transient SSL params");
-        createNet(nullptr, std::move(options));
-        net().startup();
+        return makeNetworkInterface(instanceName, nullptr, nullptr, std::move(options));
     }
 
     void tearDown() override {

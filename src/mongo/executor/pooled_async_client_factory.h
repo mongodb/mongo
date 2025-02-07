@@ -49,14 +49,20 @@ namespace mongo::executor {
  */
 class PooledAsyncClientFactory : public executor::AsyncClientFactory {
 public:
-    explicit PooledAsyncClientFactory(std::string name,
-                                      ConnectionPool::Options options,
-                                      std::unique_ptr<NetworkConnectionHook> hook)
-        : _name(std::move(name)), _poolOpts(std::move(options)), _onConnectHook(std::move(hook)) {}
+    explicit PooledAsyncClientFactory(
+        std::string name,
+        ConnectionPool::Options options,
+        std::unique_ptr<NetworkConnectionHook> hook,
+        transport::TransportProtocol protocol = transport::TransportProtocol::MongoRPC)
+        : _name(std::move(name)),
+          _poolOpts(std::move(options)),
+          _onConnectHook(std::move(hook)),
+          _protocol(protocol) {}
 
     void startup(ServiceContext* svcCtx,
                  transport::TransportLayer* tl,
                  transport::ReactorHandle reactor) override {
+        invariant(tl->getTransportProtocol() == getTransportProtocol());
 
         std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext;
 #ifdef MONGO_CONFIG_SSL
@@ -68,6 +74,10 @@ public:
         auto typeFactory = std::make_unique<connection_pool_tl::TLTypeFactory>(
             reactor, tl, std::move(_onConnectHook), _poolOpts, transientSSLContext);
         _pool = std::make_shared<ConnectionPool>(std::move(typeFactory), _name, _poolOpts);
+    }
+
+    transport::TransportProtocol getTransportProtocol() const override {
+        return _protocol;
     }
 
     SemiFuture<std::shared_ptr<AsyncClientHandle>> get(
@@ -160,7 +170,7 @@ private:
     transport::TransportLayer* _tl;
     ConnectionPool::Options _poolOpts;
     std::unique_ptr<NetworkConnectionHook> _onConnectHook;
-
     std::shared_ptr<ConnectionPool> _pool;
+    transport::TransportProtocol _protocol;
 };
 }  // namespace mongo::executor

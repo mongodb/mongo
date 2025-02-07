@@ -31,6 +31,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/logv2/log.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/transport/grpc/reactor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
@@ -102,6 +103,7 @@ void GRPCReactor::drain() {
         _processCompletionQueueNotification(tag, ok);
     }
 
+    stdx::lock_guard lk(_taskMutex);
     invariant(_cqTaskStash.size() == 0, "GRPCReactor did not properly drain all tasks");
 }
 

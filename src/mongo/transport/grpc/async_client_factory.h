@@ -34,6 +34,7 @@
 #include "mongo/executor/async_client_factory.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/transport/grpc/grpc_transport_layer.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -58,6 +59,10 @@ public:
     void startup(ServiceContext* svcCtx,
                  transport::TransportLayer* tl,
                  transport::ReactorHandle reactor) override;
+
+    transport::TransportProtocol getTransportProtocol() const override {
+        return transport::TransportProtocol::GRPC;
+    }
 
     SemiFuture<std::shared_ptr<AsyncClientHandle>> get(
         const HostAndPort& target,
@@ -117,10 +122,12 @@ private:
 
         void indicateSuccess() override {
             // TODO SERVER-99246: properly record success stats.
+            _outcome = Status::OK();
         }
 
         void indicateFailure(Status s) override {
             // TODO SERVER-99246: properly record failure stats.
+            _outcome = std::move(s);
         }
 
     private:
@@ -131,6 +138,8 @@ private:
         std::shared_ptr<Timer> _acquiredTimer;
         // Iterator pointing to this handle's entry in one of the factory's active handles lists.
         boost::optional<std::list<AsyncDBClient*>::iterator> _it;
+
+        boost::optional<Status> _outcome;
     };
 
     struct EndpointState {
@@ -170,7 +179,7 @@ private:
     std::list<FinishingClientState> _finishingClientList;
 
     ServiceContext* _svcCtx;
-    transport::TransportLayer* _tl;
+    GRPCTransportLayer* _tl;
     transport::ReactorHandle _reactor;
 };
 }  // namespace mongo::transport::grpc

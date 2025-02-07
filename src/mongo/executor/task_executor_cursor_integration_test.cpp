@@ -79,10 +79,16 @@ public:
     TaskExecutorCursorFixture() = default;
 
     void setUp() override {
-        auto protocol = unittest::shouldUseGRPCEgress() ? transport::TransportProtocol::GRPC
-                                                        : transport::TransportProtocol::MongoRPC;
-        _ni = makeNetworkInterface(
-            "TaskExecutorCursorTest", nullptr, nullptr, ConnectionPool::Options(), protocol);
+        if (!unittest::shouldUseGRPCEgress()) {
+            _ni = makeNetworkInterface(
+                "TaskExecutorCursorTest", nullptr, nullptr, ConnectionPool::Options());
+        } else {
+#ifdef MONGO_CONFIG_GRPC
+            _ni = makeNetworkInterfaceGRPC("TaskExecutorCursorTest");
+#else
+            MONGO_UNREACHABLE;
+#endif
+        }
         auto tp = std::make_unique<NetworkInterfaceThreadPool>(_ni.get());
 
         _executor = ThreadPoolTaskExecutor::create(std::move(tp), _ni);
@@ -160,7 +166,8 @@ TEST_F(TaskExecutorCursorFixture, Basic) {
                                   << "batchSize" << 10),
                              opCtx.get());
 
-    executor::TaskExecutorCursorOptions opts(/*pinConnection*/ gPinTaskExecCursorConns.load(),
+    executor::TaskExecutorCursorOptions opts(/*pinConnection*/ gPinTaskExecCursorConns.load() ||
+                                                 unittest::shouldUseGRPCEgress(),
                                              /*batchSize*/ 10);
     auto tec = std::make_unique<TaskExecutorCursor>(executor(), rcr, std::move(opts));
 
@@ -252,6 +259,11 @@ TEST_F(TaskExecutorCursorFixture, PinnedExecutorDestroyedOnUnderlying) {
  * See SERVER-65317 for more context.
  */
 TEST_F(TaskExecutorCursorFixture, ConnectionRemainsOpenAfterKillingTheCursor) {
+    // TODO SERVER-99246: unskip this test when using gRPC.
+    if (unittest::shouldUseGRPCEgress()) {
+        return;
+    }
+
     const size_t numDocs = 100;
     ASSERT_EQ(createTestData("test.test", numDocs), numDocs);
 

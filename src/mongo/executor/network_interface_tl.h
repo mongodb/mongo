@@ -46,7 +46,6 @@
 #include "mongo/db/baton.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/async_client_factory.h"
-#include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
@@ -74,9 +73,7 @@ namespace executor {
 class NetworkInterfaceTL : public NetworkInterface {
 public:
     NetworkInterfaceTL(std::string instanceName,
-                       transport::TransportProtocol protocol,
-                       ConnectionPool::Options connPoolOpts,
-                       std::unique_ptr<NetworkConnectionHook> onConnectHook,
+                       std::shared_ptr<AsyncClientFactory> factory,
                        std::unique_ptr<rpc::EgressMetadataHook> metadataHook);
     ~NetworkInterfaceTL() override;
 
@@ -125,8 +122,8 @@ public:
     /**
      * NetworkInterfaceTL's implementation of a leased network-stream
      * provided for manual use outside of the NITL's usual RPC API.
-     * When this type is destroyed, the destructor of the ConnectionHandle
-     * member will return the connection to this NetworkInterface's ConnectionPool.
+     * When this type is destroyed, the destructor of the AsyncClientHandle
+     * member will return the connection to this NetworkInterface's AsyncClientFactory.
      */
     class LeasedStream : public NetworkInterface::LeasedStream {
     public:
@@ -136,7 +133,7 @@ public:
             : _clientHandle{std::move(client)} {}
 
         // These pass-through indications of the health of the leased
-        // stream to the underlying ConnectionHandle
+        // stream to the underlying AsyncClientFactory.
         void indicateSuccess() override;
         void indicateUsed() override;
         void indicateFailure(Status) override;
@@ -167,7 +164,7 @@ private:
         SemiFuture<std::shared_ptr<AsyncClientFactory::AsyncClientHandle>> getClient(
             AsyncClientFactory& factory);
 
-        Status handleConnectionAcquisitionError(Status status);
+        Status handleClientAcquisitionError(Status status);
 
         ExecutorFuture<RemoteCommandResponse> sendRequest(
             std::shared_ptr<AsyncClientFactory::AsyncClientHandle> client);
@@ -175,11 +172,11 @@ private:
             RemoteCommandRequest toSend) = 0;
 
         /**
-         * Return the current connection to the pool and unset it locally.
+         * Release the current client handle back to its factory.
          *
          * This must be called from the networking thread (i.e. the reactor).
          */
-        void returnConnection(Status status);
+        void releaseClientHandle(Status status);
 
         /**
          * Set a timer to cancel the request at the requested deadline, if any.
@@ -297,10 +294,6 @@ private:
 
     std::string _instanceName;
     transport::ReactorHandle _reactor;
-    transport::TransportProtocol _protocol;
-
-    const ConnectionPool::Options _connPoolOpts;
-    std::unique_ptr<NetworkConnectionHook> _onConnectHook;
     std::shared_ptr<AsyncClientFactory> _clientFactory;
 
     // A lock-free way to check that the reactor and connection pool have been initialized. We need

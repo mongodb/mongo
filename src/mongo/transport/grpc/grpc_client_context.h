@@ -75,6 +75,20 @@ public:
         _ctx.set_deadline(deadline.toSystemTimePoint());
     }
 
+    /**
+     * Sets whether stream establishment should wait (up to the deadline) for the underlying channel
+     * to become connected or not. If set to false, stream establishment will
+     * immediately return an error if the channel is not connected.
+     *
+     * The default is false.
+     *
+     * See: https://grpc.github.io/grpc/cpp/md_doc_wait-for-ready.html
+     * See: https://github.com/grpc/grpc/blob/master/doc/wait-for-ready.md
+     */
+    void setWaitForReady(bool wait) {
+        _ctx.set_wait_for_ready(wait);
+    }
+
     // Similar to getServerInitialMetadata(), we parse the URI in each invocation of this method to
     // not violate const here or require any locking. This too should only need to be called once,
     // so again the performance impact should be negligible.

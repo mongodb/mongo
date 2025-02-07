@@ -132,7 +132,13 @@ StatusWith<std::shared_ptr<Session>> GRPCTransportLayerMock::connectWithAuthToke
     ConnectSSLMode sslMode,
     Milliseconds timeout,
     boost::optional<std::string> authToken) {
-    return asyncConnectWithAuthToken(peer, sslMode, _reactor, timeout, nullptr, authToken)
+    return asyncConnectWithAuthToken(peer,
+                                     sslMode,
+                                     _reactor,
+                                     timeout,
+                                     nullptr,
+                                     CancellationToken::uncancelable(),
+                                     authToken)
         .getNoThrow();
 }
 
@@ -150,6 +156,7 @@ Future<std::shared_ptr<Session>> GRPCTransportLayerMock::asyncConnectWithAuthTok
     const ReactorHandle& reactor,
     Milliseconds timeout,
     std::shared_ptr<ConnectionMetrics> connectionMetrics,
+    const CancellationToken& token,
     boost::optional<std::string> authToken) {
     if (!_client) {
         return Status(
@@ -158,9 +165,10 @@ Future<std::shared_ptr<Session>> GRPCTransportLayerMock::asyncConnectWithAuthTok
     }
     return _client
         ->connect(std::move(peer),
-                  _reactor,
+                  checked_pointer_cast<GRPCReactor>(reactor),
                   std::move(timeout),
                   {std::move(authToken), sslMode},
+                  token,
                   connectionMetrics)
         .then([](std::shared_ptr<EgressSession> egressSession) -> std::shared_ptr<Session> {
             return egressSession;

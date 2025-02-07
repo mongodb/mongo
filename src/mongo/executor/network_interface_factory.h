@@ -32,6 +32,7 @@
 #include <memory>
 #include <string>
 
+#include "mongo/executor/async_client_factory.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
@@ -42,19 +43,37 @@ namespace mongo {
 namespace executor {
 
 /**
- * Returns a new NetworkInterface.
+ * Returns a new NetworkInterface that uses a connection pool with the default options.
  */
-std::unique_ptr<NetworkInterface> makeNetworkInterface(std::string instanceName);
+std::unique_ptr<NetworkInterface> makeNetworkInterface(StringData instanceName);
 
 /**
  * Returns a new NetworkInterface with the given connection hook set.
  */
 std::unique_ptr<NetworkInterface> makeNetworkInterface(
-    std::string instanceName,
+    StringData instanceName,
     std::unique_ptr<NetworkConnectionHook> hook,
     std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
     ConnectionPool::Options options = ConnectionPool::Options(),
     transport::TransportProtocol protocol = transport::TransportProtocol::MongoRPC);
+
+#ifdef MONGO_CONFIG_GRPC
+/**
+ * Returns a new NetworkInterface that uses gRPC as its transport layer.
+ * Note that transport::Sessions established by this NetworkInterface do not perform the MongoDB
+ * Handshake (e.g. hello/auth) during setup.
+ */
+std::unique_ptr<NetworkInterface> makeNetworkInterfaceGRPC(
+    StringData instanceName, std::unique_ptr<rpc::EgressMetadataHook> metadataHook = nullptr);
+#endif
+
+/**
+ * Returns a new NetworkInterface that uses the provided AsyncClientFactory.
+ */
+std::unique_ptr<NetworkInterface> makeNetworkInterfaceWithClientFactory(
+    StringData instanceName,
+    std::shared_ptr<AsyncClientFactory> clientFactory,
+    std::unique_ptr<rpc::EgressMetadataHook> metadataHook = nullptr);
 
 }  // namespace executor
 }  // namespace mongo

@@ -36,12 +36,11 @@
 #include "mongo/transport/grpc/client.h"
 #include "mongo/transport/grpc/grpc_transport_layer.h"
 #include "mongo/transport/grpc/reactor.h"
+#include "mongo/transport/grpc/server.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/util/duration.h"
 
 namespace mongo::transport::grpc {
-
-class Server;
 
 class GRPCTransportLayerImpl : public GRPCTransportLayer {
 public:
@@ -91,6 +90,7 @@ public:
         const ReactorHandle& reactor,
         Milliseconds timeout,
         std::shared_ptr<ConnectionMetrics> connectionMetrics,
+        const CancellationToken& token = CancellationToken::uncancelable(),
         boost::optional<std::string> authToken = boost::none) override;
 
     Future<std::shared_ptr<Session>> asyncConnect(

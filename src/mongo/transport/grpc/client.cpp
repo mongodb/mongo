@@ -147,6 +147,7 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
     const std::shared_ptr<GRPCReactor>& reactor,
     Milliseconds timeout,
     ConnectOptions options,
+    const CancellationToken& token,
     std::shared_ptr<ConnectionMetrics> connectionMetrics) {
     // TODO SERVER-98254: this implementation currently acquires _mutex twice, which will have
     // negative performance implications. Egress performance is not a priority at the moment, but we
@@ -161,9 +162,8 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
                 makeShutdownTerminationStatus());
         }
 
-        streamState = std::make_shared<PendingStreamState>();
-        auto iter = _pendingStreamStates.insert(_pendingStreamStates.end(), streamState);
-        _pendingStreamStates.back()->iter = iter;
+        streamState = std::make_shared<PendingStreamState>(token);
+        streamState->registerWithClient(lk, *this);
     }
 
     LOGV2_DEBUG(9715300,
@@ -190,93 +190,119 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
             });
     }
 
-    return future_util::withCancellation(
-               _streamFactory(
-                   remote, reactor, timeout, options, streamState->getCancellationToken())
-                   .then([this, reactor, connMetrics = std::move(connectionMetrics)](
-                             CallContext call) -> StatusWith<std::shared_ptr<EgressSession>> {
-                       if (connMetrics) {
-                           // We don't have visibility into these events in gRPC, so mark them
-                           // all as complete once the rpc call has been started.
-                           connMetrics->onDNSResolved();
-                           connMetrics->onTCPConnectionEstablished();
-                           connMetrics->onTLSHandshakeFinished();
-                       }
+    return _streamFactory(remote, reactor, timeout, options, streamState->getCancellationToken())
+        .then([this, reactor, connMetrics = std::move(connectionMetrics)](
+                  CallContext call) -> StatusWith<std::shared_ptr<EgressSession>> {
+            if (connMetrics) {
+                // We don't have visibility into these events in gRPC, so mark them
+                // all as complete once the rpc call has been started.
+                connMetrics->onDNSResolved();
+                connMetrics->onTCPConnectionEstablished();
+                connMetrics->onTLSHandshakeFinished();
+            }
 
-                       auto session = std::make_shared<EgressSession>(_tl,
-                                                                      reactor,
-                                                                      std::move(call.ctx),
-                                                                      std::move(call.stream),
-                                                                      std::move(call.sslConfig),
-                                                                      _id,
-                                                                      _sharedState);
+            auto session = std::make_shared<EgressSession>(_tl,
+                                                           reactor,
+                                                           std::move(call.ctx),
+                                                           std::move(call.stream),
+                                                           std::move(call.sslConfig),
+                                                           _id,
+                                                           _sharedState);
 
-                       stdx::lock_guard lk(_mutex);
-                       if (MONGO_unlikely(_state == ClientState::kShutdown)) {
-                           auto status = makeShutdownTerminationStatus();
-                           session->cancel(status);
-                           return status;
-                       }
+            stdx::lock_guard lk(_mutex);
+            if (MONGO_unlikely(_state == ClientState::kShutdown)) {
+                auto status = makeShutdownTerminationStatus();
+                session->cancel(status);
+                return status;
+            }
 
-                       auto it = _sessions.insert(_sessions.begin(), session);
-                       _numCurrentStreams.increment();
+            auto it = _sessions.insert(_sessions.begin(), session);
+            _numCurrentStreams.increment();
 
-                       session->setCleanupCallback([this,
-                                                    client = weak_from_this(),
-                                                    it = std::move(it)](Status terminationStatus) {
-                           if (terminationStatus.isOK()) {
-                               _numSuccessfulStreams.increment();
-                           } else {
-                               _numFailedStreams.increment();
-                           }
 
-                           if (auto anchor = client.lock()) {
-                               stdx::lock_guard lk(_mutex);
-                               _sessions.erase(it);
-                               _numCurrentStreams.decrement();
+            session->setCleanupCallback(
+                [this, client = weak_from_this(), it = std::move(it)](Status terminationStatus) {
+                    if (terminationStatus.isOK()) {
+                        _numSuccessfulStreams.increment();
+                    } else {
+                        _numFailedStreams.increment();
+                    }
+                    if (auto anchor = client.lock()) {
+                        stdx::lock_guard lk(_mutex);
+                        _sessions.erase(it);
+                        _numCurrentStreams.decrement();
 
-                               if (MONGO_unlikely(_isShutdownComplete_inlock())) {
-                                   _shutdownCV.notify_one();
-                               }
-                           }
-                       });
+                        if (MONGO_unlikely(_isShutdownComplete_inlock())) {
+                            _shutdownCV.notify_one();
+                        }
+                    }
+                });
 
-                       return session;
-                   })
-                   .onError<ErrorCodes::CallbackCanceled>(
-                       [streamState](
-                           const Status& s) -> StatusWith<std::shared_ptr<EgressSession>> {
-                           if (streamState->getCancellationToken().isCanceled()) {
-                               // Use the outer Future's cancellation reason if stream establishment
-                               // failed due to token cancellation.
-                               return s;
-                           }
+            return session;
+        })
+        .tapAll([this, streamState](const StatusWith<std::shared_ptr<EgressSession>>& swSession) {
+            streamState->cancelTimer();
 
-                           return Status(ErrorCodes::HostUnreachable,
-                                         "Could not contact remote host to establish gRPC stream");
-                       })
-                   .onCompletion(
-                       [this, streamState](StatusWith<std::shared_ptr<EgressSession>> swSession) {
-                           streamState->cancelTimer();
-
-                           stdx::lock_guard lk(_mutex);
-                           _pendingStreamStates.erase(streamState->iter);
-                           if (MONGO_unlikely(_isShutdownComplete_inlock())) {
-                               _shutdownCV.notify_one();
-                           }
-
-                           return swSession;
-                       }),
-               streamState->getCancellationToken())
-        .thenRunOn(reactor)
+            stdx::lock_guard lk(_mutex);
+            streamState->unregisterFromClient(lk, *this);
+            if (MONGO_unlikely(_isShutdownComplete_inlock())) {
+                _shutdownCV.notify_one();
+            }
+        })
         .onError<ErrorCodes::CallbackCanceled>(
             [streamState](const Status& s) -> StatusWith<std::shared_ptr<EgressSession>> {
-                return streamState->getCancellationReason();
+                // The completion queue produces CallbackCanceled errors for any tag that does not
+                // complete successfully, so we need to catch them here and add more
+                // context-specific information to them.
+                if (auto reason = streamState->getCancellationReason(); !reason.isOK()) {
+                    return reason;
+                }
+
+                // If the failure was not due to cancellation, we can assume it is because the
+                // remote is unreachable.
+                return Status(ErrorCodes::HostUnreachable, "gRPC stream establishment failed");
             })
-        .unsafeToInlineFuture();  // If cancellation occurred, this will be guaranteed to be running
-                                  // on the reactor thread due to the onError continuation, and in a
-                                  // success case this will already be running on the reactor
-                                  // thread.
+        .tapError([](const Status& s) {
+            LOGV2_DEBUG(9936109, 1, "Stream establishment failed", "error"_attr = s);
+        });
+}
+
+void Client::PendingStreamState::registerWithClient(WithLock, Client& client) {
+    _iter =
+        client._pendingStreamStates.insert(client._pendingStreamStates.end(), shared_from_this());
+}
+
+void Client::PendingStreamState::unregisterFromClient(WithLock, Client& client) {
+    client._pendingStreamStates.erase(_iter);
+}
+
+void Client::PendingStreamState::cancel(Status reason) {
+    invariant(!reason.isOK());
+
+    {
+        stdx::lock_guard lg(_mutex);
+        if (!_cancellationReason.isOK()) {
+            // Already cancelled, can early return.
+            return;
+        }
+        _cancellationReason = reason;
+    }
+
+    LOGV2_DEBUG(9936110, 3, "Canceling gRPC stream establishment", "reason"_attr = reason);
+    _cancelSource.cancel();
+    cancelTimer();
+}
+
+Status Client::PendingStreamState::getCancellationReason() {
+    if (!_cancelSource.token().isCanceled()) {
+        return Status::OK();
+    }
+
+    stdx::lock_guard lg(_mutex);
+    if (!_cancellationReason.isOK()) {
+        return _cancellationReason;
+    }
+    return Status(ErrorCodes::CallbackCanceled, "gRPC stream establishment was cancelled");
 }
 
 namespace {
@@ -667,10 +693,12 @@ Future<Client::CallContext> GRPCClient::_streamFactory(const HostAndPort& remote
                     .createStub(std::move(remote), options.sslMode, connectTimeout);
     auto ctx = std::make_shared<GRPCClientContext>();
     setMetadataOnClientContext(*ctx, options);
+    ctx->setWaitForReady(false);
     token.onCancel().unsafeToInlineFuture().getAsync([ctx, reactor](Status s) {
         if (!s.isOK()) {
             return;
         }
+
         // Send a best-effort attempt to cancel the ongoing stream establishment.
         reactor->schedule([ctx](Status s) {
             if (!s.isOK()) {

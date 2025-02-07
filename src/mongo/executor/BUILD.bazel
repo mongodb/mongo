@@ -164,28 +164,36 @@ mongo_cc_library(
 )
 
 idl_generator(
-    name = "network_interface_tl_gen",
-    src = "network_interface_tl.idl",
+    name = "egress_networking_parameters_gen",
+    src = "egress_networking_parameters.idl",
+)
+
+mongo_cc_library(
+    name = "egress_networking_parameters",
+    srcs = [
+        "egress_networking_parameters.cpp",
+        ":egress_networking_parameters_gen",
+    ],
+    hdrs = [],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
 )
 
 mongo_cc_library(
     name = "network_interface_tl",
     srcs = [
-        "connection_pool_tl.cpp",
         "exhaust_response_reader_tl.cpp",
         "network_interface_tl.cpp",
-        ":network_interface_tl_gen",
         "//src/mongo/util:strong_weak_finish_line.h",
     ],
     hdrs = [
-        "connection_pool_tl.h",
         "exhaust_response_reader_tl.h",
         "network_interface_tl.h",
         "pooled_async_client_factory.h",
     ],
     deps = [
         ":async_client_factory",
-        ":connection_pool_executor",
         ":network_interface",
         "//src/mongo/client:async_client",
         "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
@@ -193,6 +201,26 @@ mongo_cc_library(
         "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
         "//src/mongo/transport:transport_layer",  # TODO(SERVER-93876): Remove.
         "//src/mongo/transport:transport_layer_manager",
+    ],
+)
+
+mongo_cc_library(
+    name = "connection_pool_tl",
+    srcs = [
+        "connection_pool_tl.cpp",
+    ],
+    hdrs = [
+        "connection_pool_tl.h",
+        "pooled_async_client_factory.h",
+    ],
+    deps = [
+        ":async_client_factory",
+        ":connection_pool_executor",
+        ":egress_networking_parameters",
+        "//src/mongo/client:async_client",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/transport:transport_layer",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -205,11 +233,16 @@ mongo_cc_library(
         "network_interface_factory.h",
     ],
     deps = [
+        ":async_client_factory",
         ":connection_pool_executor",  # TODO(SERVER-93876): Remove.
+        ":connection_pool_tl",
         ":egress_connection_closer_manager",  # TODO(SERVER-93876): Remove.
         ":network_interface",  # TODO(SERVER-93876): Remove.
         ":network_interface_tl",
-    ],
+    ] + select({
+        "//bazel/config:build_grpc_enabled": ["//src/mongo/transport/grpc:grpc_async_client_factory"],
+        "//conditions:default": [],
+    }),
 )
 
 idl_generator(
@@ -434,6 +467,7 @@ mongo_cc_library(
         "connection_pool.h",
     ],
     deps = [
+        ":async_client_factory",
         ":connection_pool_stats",
         ":egress_connection_closer_manager",
         ":remote_command",  # TODO(SERVER-93876): Remove.

@@ -97,13 +97,18 @@ public:
     };
 
     std::shared_ptr<ThreadPoolTaskExecutor> makeExecutor(StringData name) {
-        ConnectionPool::Options cpOptions{};
-        cpOptions.minConnections = 0;
-
-        auto protocol = unittest::shouldUseGRPCEgress() ? transport::TransportProtocol::GRPC
-                                                        : transport::TransportProtocol::MongoRPC;
-        std::shared_ptr<NetworkInterface> net =
-            makeNetworkInterface(name.toString(), nullptr, nullptr, std::move(cpOptions), protocol);
+        std::shared_ptr<NetworkInterface> net;
+        if (!unittest::shouldUseGRPCEgress()) {
+            ConnectionPool::Options cpOptions{};
+            cpOptions.minConnections = 0;
+            net = makeNetworkInterface(name.toString(), nullptr, nullptr, std::move(cpOptions));
+        } else {
+#ifdef MONGO_CONFIG_GRPC
+            net = makeNetworkInterfaceGRPC("FixtureNet");
+#else
+            MONGO_UNREACHABLE;
+#endif
+        }
 
         ThreadPool::Options tpOptions;
         tpOptions.threadNamePrefix = "TaskExecutorTestThreadPool-";
@@ -161,6 +166,11 @@ public:
      */
     void assertConnectionStatsSoon(std::function<bool(const ConnectionStatsPer&)> f,
                                    StringData errMsg) {
+        // TODO SERVER-99246: unskip these assertions.
+        if (unittest::shouldUseGRPCEgress()) {
+            return;
+        }
+
         auto start = getGlobalServiceContext()->getFastClockSource()->now();
         while (getGlobalServiceContext()->getFastClockSource()->now() - start < Seconds(30)) {
             if (f(getPoolStats())) {

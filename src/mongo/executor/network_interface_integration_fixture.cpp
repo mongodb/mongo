@@ -52,6 +52,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/util/assert_util.h"
@@ -66,8 +67,24 @@ namespace executor {
 
 MONGO_FAIL_POINT_DEFINE(networkInterfaceFixtureHangOnCompletion);
 
-void NetworkInterfaceIntegrationFixture::createNet(
-    std::unique_ptr<NetworkConnectionHook> connectHook, ConnectionPool::Options options) {
+std::unique_ptr<NetworkInterface> NetworkInterfaceIntegrationFixture::_makeNet(
+    std::string instanceName, transport::TransportProtocol protocol) {
+    switch (protocol) {
+        case transport::TransportProtocol::MongoRPC:
+            return makeNetworkInterface(
+                instanceName, nullptr, nullptr, makeDefaultConnectionPoolOptions());
+        case transport::TransportProtocol::GRPC:
+#ifdef MONGO_CONFIG_GRPC
+            return makeNetworkInterfaceGRPC(instanceName);
+#else
+            MONGO_UNREACHABLE;
+#endif
+    }
+    MONGO_UNREACHABLE;
+}
+
+ConnectionPool::Options NetworkInterfaceIntegrationFixture::makeDefaultConnectionPoolOptions() {
+    ConnectionPool::Options options{};
     options.minConnections = 0u;
 
 #ifdef _WIN32
@@ -77,20 +94,33 @@ void NetworkInterfaceIntegrationFixture::createNet(
 #else
     options.maxConnections = 256u;
 #endif
-    auto protocol = unittest::shouldUseGRPCEgress() ? transport::TransportProtocol::GRPC
-                                                    : transport::TransportProtocol::MongoRPC;
-    _net = makeNetworkInterface("NetworkInterfaceIntegrationFixture",
-                                std::move(connectHook),
-                                nullptr,
-                                std::move(options),
-                                protocol);
-    _fixtureNet =
-        makeNetworkInterface("FixtureNet", nullptr, nullptr, ConnectionPool::Options(), protocol);
+    return options;
 }
 
-void NetworkInterfaceIntegrationFixture::startNet(
-    std::unique_ptr<NetworkConnectionHook> connectHook) {
-    createNet(std::move(connectHook));
+void NetworkInterfaceIntegrationFixture::createNet() {
+    auto protocol = unittest::shouldUseGRPCEgress() ? transport::TransportProtocol::GRPC
+                                                    : transport::TransportProtocol::MongoRPC;
+    _net = _makeNet("NetworkInterfaceIntegrationFixture", protocol);
+
+    switch (protocol) {
+        case transport::TransportProtocol::MongoRPC:
+            _fixtureNet =
+                makeNetworkInterface("FixtureNet", nullptr, nullptr, ConnectionPool::Options());
+            break;
+        case transport::TransportProtocol::GRPC:
+#ifdef MONGO_CONFIG_GRPC
+            _fixtureNet = makeNetworkInterfaceGRPC("FixtureNet");
+#else
+            MONGO_UNREACHABLE;
+#endif
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+void NetworkInterfaceIntegrationFixture::startNet() {
+    createNet();
     net().startup();
     _fixtureNet->startup();
 }

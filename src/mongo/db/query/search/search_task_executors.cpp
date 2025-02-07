@@ -31,6 +31,7 @@
 
 #include "search_task_executors.h"
 
+#include <memory>
 #include <utility>
 
 #include "mongo/executor/connection_pool_controllers.h"
@@ -53,7 +54,6 @@ namespace {
 
 ConnectionPool::Options makeMongotConnPoolOptions() {
     ConnectionPool::Options mongotOptions;
-    mongotOptions.singleUseConnections = globalMongotParams.useGRPC;
     mongotOptions.skipAuthentication = globalMongotParams.skipAuthToMongot;
     mongotOptions.controllerFactory = [] {
         return std::make_shared<DynamicLimitController>(
@@ -66,33 +66,44 @@ ConnectionPool::Options makeMongotConnPoolOptions() {
 
 struct State {
     State() {
-        transport::TransportProtocol protocol = globalMongotParams.useGRPC
-            ? transport::TransportProtocol::GRPC
-            : transport::TransportProtocol::MongoRPC;
+        constexpr StringData kMongotExecutorName = "MongotExecutor";
+        constexpr StringData kSearchIndexManagementExecutorName = "SearchIndexMgmtExecutor";
 
-        // Make the MongotExecutor and associated NetworkInterface.
-        auto mongotExecutorNetworkInterface = makeNetworkInterface(
-            "MongotExecutor", nullptr, nullptr, makeMongotConnPoolOptions(), protocol);
+        std::unique_ptr<NetworkInterface> mongotExecutorNetworkInterface;
+        std::unique_ptr<NetworkInterface> searchIdxNetworkInterface;
+
+        if (globalMongotParams.useGRPC) {
+#ifdef MONGO_CONFIG_GRPC
+            mongotExecutorNetworkInterface = makeNetworkInterfaceGRPC(kMongotExecutorName);
+            searchIdxNetworkInterface =
+                makeNetworkInterfaceGRPC(kSearchIndexManagementExecutorName);
+#else
+            MONGO_UNREACHABLE;
+#endif
+        } else {
+            mongotExecutorNetworkInterface = makeNetworkInterface(
+                kMongotExecutorName, nullptr, nullptr, makeMongotConnPoolOptions());
+
+            // Make a separate search index management NetworkInterface that's independently
+            // configurable.
+            ConnectionPool::Options searchIndexPoolOptions;
+            searchIndexPoolOptions.skipAuthentication =
+                globalSearchIndexParams.skipAuthToSearchIndexServer;
+            searchIdxNetworkInterface = makeNetworkInterface(kSearchIndexManagementExecutorName,
+                                                             nullptr,
+                                                             nullptr,
+                                                             std::move(searchIndexPoolOptions));
+        }
+
         auto mongotThreadPool =
             std::make_unique<NetworkInterfaceThreadPool>(mongotExecutorNetworkInterface.get());
         mongotExecutor = ThreadPoolTaskExecutor::create(std::move(mongotThreadPool),
                                                         std::move(mongotExecutorNetworkInterface));
 
-        // Make a separate searchIndexMgmtExecutor that's independently configurable.
-        ConnectionPool::Options searchIndexPoolOptions;
-        searchIndexPoolOptions.singleUseConnections = globalMongotParams.useGRPC;
-        searchIndexPoolOptions.skipAuthentication =
-            globalSearchIndexParams.skipAuthToSearchIndexServer;
-        std::shared_ptr<NetworkInterface> searchIdxNI =
-            makeNetworkInterface("SearchIndexMgmtExecutor",
-                                 nullptr,
-                                 nullptr,
-                                 std::move(searchIndexPoolOptions),
-                                 protocol);
         auto searchIndexThreadPool =
-            std::make_unique<NetworkInterfaceThreadPool>(searchIdxNI.get());
-        searchIndexMgmtExecutor = ThreadPoolTaskExecutor::create(std::move(searchIndexThreadPool),
-                                                                 std::move(searchIdxNI));
+            std::make_unique<NetworkInterfaceThreadPool>(searchIdxNetworkInterface.get());
+        searchIndexMgmtExecutor = ThreadPoolTaskExecutor::create(
+            std::move(searchIndexThreadPool), std::move(searchIdxNetworkInterface));
     }
 
     auto getMongotExecutorPtr() {

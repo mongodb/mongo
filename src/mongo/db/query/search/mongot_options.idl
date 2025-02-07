@@ -52,7 +52,7 @@ server_parameters:
     mongotConnectionPoolMinSize:
       description: <-
           The minimum number of connections for the TaskExecutor ConnectionPool used for outgoing
-          communication to mongot.
+          communication to mongot. Note that this option has no effect when useGrpcForSearch=true.
       set_at: [ startup, runtime ]
       cpp_varname: 'globalMongotParams.minConnections'
       validator:
@@ -63,7 +63,7 @@ server_parameters:
     mongotConnectionPoolMaxSize:
       description: <-
           The maximum number of connections for the TaskExecutor ConnectionPool used for outgoing
-          communication to mongot.
+          communication to mongot. Note that this option has no effect when useGrpcForSearch=true.
       set_at: [ startup, runtime ]
       cpp_varname: 'globalMongotParams.maxConnections'
       validator:

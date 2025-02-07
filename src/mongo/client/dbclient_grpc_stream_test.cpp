@@ -135,6 +135,8 @@ public:
 private:
     MockRPCQueue::Pipe _pipe;
     std::unique_ptr<MockServer> _server;
+    unittest::MinimumLoggedSeverityGuard logSeverityGuardNetwork{logv2::LogComponent::kNetwork,
+                                                                 logv2::LogSeverity::Debug(4)};
 };
 
 TEST_F(DBClientGRPCTest, BasicConnect) {

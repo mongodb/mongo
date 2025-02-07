@@ -29,6 +29,8 @@
 
 #include "mongo/executor/exhaust_response_reader_tl.h"
 
+#include <memory>
+
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/async_client.h"
@@ -59,6 +61,10 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 
+#ifdef MONGO_CONFIG_GRPC
+#include "mongo/transport/grpc/async_client_factory.h"
+#endif
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::executor {
@@ -77,10 +83,18 @@ public:
             _reactor->drain();
         });
 
-        ConnectionPool::Options connPoolOptions;
-        connPoolOptions.minConnections = 0;
-        _pool = std::make_shared<PooledAsyncClientFactory>(
-            "ExhaustResponseReader", connPoolOptions, nullptr);
+        if (!unittest::shouldUseGRPCEgress()) {
+            ConnectionPool::Options connPoolOptions;
+            connPoolOptions.minConnections = 0;
+            _pool = std::make_shared<PooledAsyncClientFactory>(
+                "ExhaustResponseReader", connPoolOptions, nullptr);
+        } else {
+#ifdef MONGO_CONFIG_GRPC
+            _pool = std::make_shared<transport::grpc::GRPCAsyncClientFactory>();
+#else
+            MONGO_UNREACHABLE;
+#endif
+        }
         _pool->startup(sc, tl, _reactor);
     }
 
@@ -166,6 +180,10 @@ public:
      */
     void assertConnectionStatsSoon(std::function<bool(const ConnectionStatsPer&)> f,
                                    StringData errMsg) {
+        // TODO SERVER-99246: reenable these assertions.
+        if (unittest::shouldUseGRPCEgress()) {
+            return;
+        }
         auto start = getGlobalServiceContext()->getFastClockSource()->now();
         while (getGlobalServiceContext()->getFastClockSource()->now() - start < Seconds(30)) {
             if (f(getPoolStats())) {

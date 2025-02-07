@@ -29,6 +29,8 @@
 
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/executor/async_client_factory.h"
+#include "mongo/executor/network_interface.h"
+#include "mongo/executor/network_interface_factory.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -38,6 +40,7 @@
 #include "mongo/transport/grpc/grpc_session_manager.h"
 #include "mongo/transport/grpc/grpc_transport_layer.h"
 #include "mongo/transport/grpc/grpc_transport_layer_impl.h"
+#include "mongo/transport/grpc/grpc_transport_layer_mock.h"
 #include "mongo/transport/grpc/test_fixtures.h"
 #include "mongo/transport/session_workflow_test_util.h"
 #include "mongo/transport/transport_layer.h"
@@ -45,8 +48,11 @@
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/periodic_runner_factory.h"
+#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -180,6 +186,7 @@ private:
 TEST_F(GRPCAsyncClientFactoryTest, Ping) {
     {
         auto handle = getClient();
+        ON_BLOCK_EXIT([&] { handle->indicateSuccess(); });
         auto msg = makeUniqueMessage();
         auto resp = handle->getClient().runCommand(OpMsgRequest::parse(msg)).get();
         ASSERT_OK(getStatusFromCommandResult(resp->getCommandReply()));
@@ -200,8 +207,8 @@ TEST_F(GRPCAsyncClientFactoryTest, ConcurrentUsage) {
                 for (int req = 0; req < 5; req++) {
                     auto msg = makeUniqueMessage();
                     auto resp = handle->getClient().runCommand(OpMsgRequest::parse(msg)).get();
+                    ON_BLOCK_EXIT([&] { handle->indicateSuccess(); });
                     ASSERT_OK(getStatusFromCommandResult(resp->getCommandReply()));
-                    handle->indicateSuccess();
                 }
             });
             threads.push_back(std::move(th));
@@ -219,7 +226,9 @@ TEST_F(GRPCAsyncClientFactoryTest, ConcurrentUsage) {
 TEST_F(GRPCAsyncClientFactoryTest, DropAllConnections) {
     {
         auto handle1 = getClient();
+        ON_BLOCK_EXIT([&] { handle1->indicateSuccess(); });
         auto handle2 = getClient();
+        ON_BLOCK_EXIT([&] { handle2->indicateSuccess(); });
 
         getFactory().dropConnections();
         auto msg = OpMsgRequest::parseOwned(makeUniqueMessage());
@@ -233,6 +242,7 @@ TEST_F(GRPCAsyncClientFactoryTest, DropAllConnections) {
 TEST_F(GRPCAsyncClientFactoryTest, KeepOpen) {
     {
         auto handle = getClient();
+        ON_BLOCK_EXIT([&] { handle->indicateSuccess(); });
         getFactory().setKeepOpen(handle->getClient().remote(), true);
         getFactory().dropConnections();
         auto msg = OpMsgRequest::parseOwned(makeUniqueMessage());
@@ -243,15 +253,20 @@ TEST_F(GRPCAsyncClientFactoryTest, KeepOpen) {
 }
 
 TEST_F(GRPCAsyncClientFactoryTest, Shutdown) {
+    auto pf = makePromiseFuture<void>();
+    stdx::thread shutdownThread;
+
     {
         auto handle1 = getClient();
+        ON_BLOCK_EXIT([&] { handle1->indicateSuccess(); });
         auto handle2 = getClient();
+        ON_BLOCK_EXIT([&] { handle2->indicateSuccess(); });
 
-        auto pf = makePromiseFuture<void>();
-        auto shutdownThread = stdx::thread([&] {
+        shutdownThread = stdx::thread([&] {
             getFactory().shutdown();
             pf.promise.emplaceValue();
         });
+
         waitForDisconnected(handle1);
         waitForDisconnected(handle2);
         auto msg = OpMsgRequest::parseOwned(makeUniqueMessage());
@@ -259,40 +274,145 @@ TEST_F(GRPCAsyncClientFactoryTest, Shutdown) {
         ASSERT_EQ(handle2->getClient().runCommand(msg).getNoThrow(), ErrorCodes::CallbackCanceled);
 
         ASSERT_FALSE(pf.future.isReady());
-
-        handle1.reset();
-        handle2.reset();
-
-        pf.future.get();
-        shutdownThread.join();
     }
 
+    pf.future.get();
+    shutdownThread.join();
     shutdownAndAssertOnTransportStats(0 /*successful streams*/, 2 /*failed streams*/);
 }
 
 TEST_F(GRPCAsyncClientFactoryTest, RefuseShutdownWithActiveClient) {
-    auto handle1 = getClient();
-
     auto pf = makePromiseFuture<void>();
-    auto shutdownThread = stdx::thread([&] {
-        getFactory().shutdown();
-        pf.promise.emplaceValue();
-    });
-    waitForDisconnected(handle1);
-    auto msg = OpMsgRequest::parseOwned(makeUniqueMessage());
-    ASSERT_EQ(handle1->getClient().runCommand(msg).getNoThrow(), ErrorCodes::CallbackCanceled);
+    stdx::thread shutdownThread;
+    {
+        auto handle1 = getClient();
+        ON_BLOCK_EXIT([&] { handle1->indicateSuccess(); });
 
-    ASSERT_FALSE(pf.future.isReady());
+        shutdownThread = stdx::thread([&] {
+            getFactory().shutdown();
+            pf.promise.emplaceValue();
+        });
+        waitForDisconnected(handle1);
+        auto msg = OpMsgRequest::parseOwned(makeUniqueMessage());
+        ASSERT_EQ(handle1->getClient().runCommand(msg).getNoThrow(), ErrorCodes::CallbackCanceled);
 
-    auto client = ServiceContextTest::getClient();
-    auto opCtx = getServiceContext()->makeOperationContext(client);
-    opCtx->setDeadlineAfterNowBy(Milliseconds(500), ErrorCodes::ExceededTimeLimit);
-    ASSERT_THROWS_CODE(pf.future.get(opCtx.get()), DBException, ErrorCodes::ExceededTimeLimit);
+        ASSERT_FALSE(pf.future.isReady());
 
-    // Now destroy the client so that shutdown can succeed.
-    handle1.reset();
+        auto client = ServiceContextTest::getClient();
+        auto opCtx = getServiceContext()->makeOperationContext(client);
+        opCtx->setDeadlineAfterNowBy(Milliseconds(500), ErrorCodes::ExceededTimeLimit);
+        ASSERT_THROWS_CODE(pf.future.get(opCtx.get()), DBException, ErrorCodes::ExceededTimeLimit);
+
+        // Now destroy the client so that shutdown can succeed.
+    }
     pf.future.get();
     shutdownThread.join();
 }
 
+class MockGRPCAsyncClientFactoryTest : public MockGRPCTransportLayerTest {
+public:
+    void setUp() override {
+        MockGRPCTransportLayerTest::setUp();
+
+        _net = executor::makeNetworkInterfaceWithClientFactory(
+            "MockGRPCAsyncClientFactoryTest", std::make_shared<GRPCAsyncClientFactory>());
+        _net->startup();
+    }
+
+    void tearDown() override {
+        _net->shutdown();
+        MockGRPCTransportLayerTest::tearDown();
+    }
+
+    executor::NetworkInterface& getNet() {
+        return *_net;
+    }
+
+    void runStreamEstablishmentTimeoutTest(boost::optional<ErrorCodes::Error> customCode);
+
+private:
+    std::unique_ptr<executor::NetworkInterface> _net;
+};
+
+
+TEST_F(MockGRPCAsyncClientFactoryTest, ConnectionErrorAssociatedWithRemote) {
+    FailPointEnableBlock fpb("grpcFailChannelEstablishment");
+
+    auto target = HostAndPort("localhost", 12345);
+    auto cb = executor::TaskExecutor::CallbackHandle();
+    executor::RemoteCommandRequest request(
+        target, DatabaseName::kAdmin, BSON("ping" << 1), nullptr);
+    auto result = getNet().startCommand(cb, request).get();
+
+    ASSERT_EQ(ErrorCodes::HostUnreachable, result.status);
+    ASSERT_EQ(result.target, target);
+}
+
+TEST_F(MockGRPCAsyncClientFactoryTest, CancelStreamEstablishment) {
+    boost::optional<FailPointEnableBlock> fpb("grpcHangOnStreamEstablishment");
+    auto cbh = executor::TaskExecutor::CallbackHandle();
+    CancellationSource cancellationSource;
+
+    auto pf = makePromiseFuture<executor::RemoteCommandResponse>();
+
+    executor::RemoteCommandRequest request(HostAndPort("localhost", 12345),
+                                           DatabaseName::kAdmin,
+                                           BSON("ping" << 1),
+                                           nullptr,
+                                           Minutes(1));
+    auto cmdThread = stdx::thread([&] {
+        pf.promise.setFrom(
+            getNet().startCommand(cbh, request, nullptr, cancellationSource.token()).getNoThrow());
+    });
+    ON_BLOCK_EXIT([&] { cmdThread.join(); });
+
+    fpb.get()->waitForTimesEntered(fpb->initialTimesEntered() + 1);
+    cancellationSource.cancel();
+    fpb.reset();
+
+    ASSERT_EQ(getNet().getCounters().sent, 0);
+
+    // Wait for op to complete, assert that it was canceled.
+    auto result = pf.future.get();
+    ASSERT_EQ(ErrorCodes::CallbackCanceled, result.status);
+    ASSERT(result.elapsed);
+
+    auto counters = getNet().getCounters();
+    ASSERT_EQ(1, counters.canceled);
+    ASSERT_EQ(0, counters.timedOut);
+    ASSERT_EQ(0, counters.failed);
+    ASSERT_EQ(0, counters.succeeded);
+    ASSERT_EQ(0, counters.failedRemotely);
+}
+
+void MockGRPCAsyncClientFactoryTest::runStreamEstablishmentTimeoutTest(
+    boost::optional<ErrorCodes::Error> customCode) {
+    FailPointEnableBlock fpb("grpcHangOnStreamEstablishment");
+
+    auto cbh = executor::TaskExecutor::CallbackHandle();
+    executor::RemoteCommandRequest request(HostAndPort("localhost", 12345),
+                                           DatabaseName::kAdmin,
+                                           BSON("ping" << 1),
+                                           nullptr,
+                                           Milliseconds(100));
+    request.timeoutCode = customCode;
+    auto res = getNet().startCommand(cbh, request).get();
+    ASSERT_EQ(res.status, customCode.value_or(ErrorCodes::NetworkTimeout));
+    ASSERT_EQ(getNet().getCounters().sent, 0);
+
+    auto counters = getNet().getCounters();
+    ASSERT_EQ(0, counters.canceled);
+    ASSERT_EQ(1, counters.timedOut);
+    ASSERT_EQ(0, counters.failed);
+    ASSERT_EQ(0, counters.succeeded);
+    ASSERT_EQ(0, counters.failedRemotely);
+}
+
+TEST_F(MockGRPCAsyncClientFactoryTest, TimeoutStreamEstablishment) {
+    runStreamEstablishmentTimeoutTest({});
+}
+
+TEST_F(MockGRPCAsyncClientFactoryTest, TimeoutStreamEstablishmentCustomCode) {
+    runStreamEstablishmentTimeoutTest(ErrorCodes::MaxTimeMSExpired);
+}
 }  // namespace mongo::transport::grpc

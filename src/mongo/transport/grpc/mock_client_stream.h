@@ -95,6 +95,6 @@ private:
 
     BidirectionalPipe::End _pipe;
 
-    const std::shared_ptr<GRPCReactor>& _reactor;
+    std::shared_ptr<GRPCReactor> _reactor;
 };
 }  // namespace mongo::transport::grpc

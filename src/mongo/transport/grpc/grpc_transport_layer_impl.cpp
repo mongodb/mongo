@@ -39,6 +39,7 @@
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_options.h"
 
@@ -307,6 +308,7 @@ Future<std::shared_ptr<Session>> GRPCTransportLayerImpl::asyncConnectWithAuthTok
     const ReactorHandle& reactor,
     Milliseconds timeout,
     std::shared_ptr<ConnectionMetrics> connectionMetrics,
+    const CancellationToken& token,
     boost::optional<std::string> authToken) {
     invariant(_client);
     return _client
@@ -314,6 +316,7 @@ Future<std::shared_ptr<Session>> GRPCTransportLayerImpl::asyncConnectWithAuthTok
                   checked_pointer_cast<GRPCReactor>(reactor),
                   timeout,
                   {std::move(authToken), sslMode},
+                  token,
                   connectionMetrics)
         .then([](std::shared_ptr<EgressSession> egressSession) -> std::shared_ptr<Session> {
             return egressSession;

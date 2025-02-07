@@ -61,7 +61,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/executor/connection_pool_tl.h"
-#include "mongo/executor/network_interface_tl_gen.h"
+#include "mongo/executor/egress_networking_parameters_gen.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"

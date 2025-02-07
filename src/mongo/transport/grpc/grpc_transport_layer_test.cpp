@@ -977,41 +977,6 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest, ClientUsesOldCertsUntilRotate) 
         CommandServiceTestFixtures::makeTLOptions());
 }
 
-class MockGRPCTransportLayerTest : public ServiceContextTest {
-public:
-    inline static const HostAndPort kServerHostAndPort = HostAndPort("localhost", 12345);
-
-    void setUp() override {
-        ServiceContextTest::setUp();
-
-        // Mock resolver that automatically returns the producer end of the test's pipe.
-        auto resolver = [&](const HostAndPort&) -> MockRPCQueue::Producer {
-            return _pipe.producer;
-        };
-        auto options = CommandServiceTestFixtures::makeTLOptions();
-        options.enableIngress = false;
-
-        auto tl = std::make_unique<GRPCTransportLayerMock>(
-            getServiceContext(),
-            CommandServiceTestFixtures::makeTLOptions(),
-            resolver,
-            HostAndPort(MockStubTestFixtures::kClientAddress));
-
-        getServiceContext()->setTransportLayerManager(
-            std::make_unique<transport::TransportLayerManagerImpl>(std::move(tl)));
-        uassertStatusOK(getServiceContext()->getTransportLayerManager()->setup());
-        uassertStatusOK(getServiceContext()->getTransportLayerManager()->start());
-    }
-
-    void tearDown() override {
-        getServiceContext()->getTransportLayerManager()->shutdown();
-        ServiceContextTest::tearDown();
-    }
-
-private:
-    MockRPCQueue::Pipe _pipe;
-};
-
 TEST_F(MockGRPCTransportLayerTest, ConnectionTimeout) {
     FailPointEnableBlock fp("grpcHangOnStreamEstablishment");
 

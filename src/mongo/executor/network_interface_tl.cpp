@@ -49,7 +49,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/service_context.h"
@@ -57,8 +56,6 @@
 #include "mongo/executor/async_client_factory.h"
 #include "mongo/executor/exhaust_response_reader_tl.h"
 #include "mongo/executor/network_interface.h"
-#include "mongo/executor/network_interface_tl_gen.h"
-#include "mongo/executor/pooled_async_client_factory.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
@@ -87,36 +84,6 @@
 namespace mongo {
 namespace executor {
 
-
-void OpportunisticSecondaryTargetingParameter::append(OperationContext*,
-                                                      BSONObjBuilder* b,
-                                                      StringData name,
-                                                      const boost::optional<TenantId>&) {
-    return;
-}
-
-Status OpportunisticSecondaryTargetingParameter::set(const BSONElement& newValueElement,
-                                                     const boost::optional<TenantId>&) {
-    LOGV2_WARNING(
-        9206304,
-        "Opportunistic secondary targeting has been deprecated and the "
-        "opportunisticSecondaryTargeting parameter has no effect. For more information please "
-        "see https://dochub.mongodb.org/core/hedged-reads-deprecated");
-
-    return Status::OK();
-}
-
-Status OpportunisticSecondaryTargetingParameter::setFromString(StringData modeStr,
-                                                               const boost::optional<TenantId>&) {
-    LOGV2_WARNING(
-        9206305,
-        "Opportunistic secondary targeting has been deprecated and the "
-        "opportunisticSecondaryTargeting parameter has no effect. For more information please "
-        "see https://dochub.mongodb.org/core/hedged-reads-deprecated");
-
-    return Status::OK();
-}
-
 using namespace fmt::literals;
 
 namespace {
@@ -138,15 +105,8 @@ void appendMetadata(RemoteCommandRequest* request,
     }
 }
 
-template <typename IA, typename IB, typename F>
-int compareTransformed(IA a1, IA a2, IB b1, IB b2, F&& f) {
-    for (;; ++a1, ++b1)
-        if (a1 == a2)
-            return b1 == b2 ? 0 : -1;
-        else if (b1 == b2)
-            return 1;
-        else if (int r = f(*a1) - f(*b1))
-            return r;
+bool isTimeout(const Status& s) {
+    return ErrorCodes::isExceededTimeLimitError(s) || ErrorCodes::isNetworkTimeoutError(s);
 }
 }  // namespace
 
@@ -166,7 +126,7 @@ public:
         if (status.isOK()) {
             // Increment the count of commands that received a valid response
             ++_data.succeeded;
-        } else if (ErrorCodes::isExceededTimeLimitError(status)) {
+        } else if (isTimeout(status)) {
             // Increment the count of commands that experienced a local timeout
             // Note that these commands do not count as "failed".
             ++_data.timedOut;
@@ -201,14 +161,10 @@ constexpr auto kNotYetStartedUpMsg = "NetworkInterface has not started yet"_sd;
 }  // namespace
 
 NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
-                                       transport::TransportProtocol protocol,
-                                       ConnectionPool::Options connPoolOpts,
-                                       std::unique_ptr<NetworkConnectionHook> onConnectHook,
+                                       std::shared_ptr<AsyncClientFactory> factory,
                                        std::unique_ptr<rpc::EgressMetadataHook> metadataHook)
     : _instanceName(std::move(instanceName)),
-      _protocol(protocol),
-      _connPoolOpts(std::move(connPoolOpts)),
-      _onConnectHook(std::move(onConnectHook)),
+      _clientFactory(std::move(factory)),
       _metadataHook(std::move(metadataHook)),
       _state(kDefault) {}
 
@@ -258,9 +214,11 @@ std::string NetworkInterfaceTL::getHostName() {
 
 void NetworkInterfaceTL::startup() {
     stdx::lock_guard lk(_mutex);
+    invariant(_state != kStarted, "NetworkInterface has already started");
+
     if (_state != kDefault) {
         LOGV2_INFO(9446800,
-                   "Skipping NetworkInterface startup: interface is in an invalid startup state",
+                   "Skipping NetworkInterface startup due to shutdown",
                    "state"_attr = toString(_state));
         return;
     }
@@ -269,14 +227,9 @@ void NetworkInterfaceTL::startup() {
     auto tlm = _svcCtx->getTransportLayerManager();
     invariant(tlm, "Cannot start NetworkInterface without a TransportLayer!");
 
-    auto tl = tlm->getTransportLayer(_protocol);
+    auto tl = tlm->getTransportLayer(_clientFactory->getTransportProtocol());
     invariant(tl && tl->isEgress());
-
     _reactor = tl->getReactor(transport::TransportLayer::kNewReactor);
-    _clientFactory = std::make_shared<PooledAsyncClientFactory>(std::string("NetworkInterfaceTL-") +
-                                                                    _instanceName,
-                                                                _connPoolOpts,
-                                                                std::move(_onConnectHook));
     _clientFactory->startup(_svcCtx, tl, _reactor);
     _initialized.store(true);
 
@@ -539,18 +492,18 @@ void NetworkInterfaceTL::CommandStateBase::setTimer() {
         });
 }
 
-void NetworkInterfaceTL::CommandStateBase::returnConnection(Status status) {
+void NetworkInterfaceTL::CommandStateBase::releaseClientHandle(Status status) {
     invariant(clientHandle);
 
-    auto connToReturn = std::exchange(clientHandle, {});
+    auto clientHandleToRelease = std::exchange(clientHandle, {});
 
     if (!status.isOK()) {
-        connToReturn->indicateFailure(std::move(status));
+        clientHandleToRelease->indicateFailure(std::move(status));
         return;
     }
 
-    connToReturn->indicateUsed();
-    connToReturn->indicateSuccess();
+    clientHandleToRelease->indicateUsed();
+    clientHandleToRelease->indicateSuccess();
 }
 
 void NetworkInterfaceTL::_unregisterCommand(const TaskExecutor::CallbackHandle& cbHandle) {
@@ -607,7 +560,7 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::CommandState::sendRequ
         .onCompletion(
             [this, anchor = shared_from_this()](StatusWith<RemoteCommandResponse> swResp) {
                 auto status = swResp.isOK() ? swResp.getValue().status : swResp.getStatus();
-                returnConnection(status);
+                releaseClientHandle(status);
                 return swResp;
             });
 }
@@ -652,7 +605,7 @@ NetworkInterfaceTL::startExhaustCommand(const TaskExecutor::CallbackHandle& cbHa
 
             if (!resp.isOK()) {
                 if (cmdState->clientHandle) {
-                    cmdState->returnConnection(resp.status);
+                    cmdState->releaseClientHandle(resp.status);
                 }
                 return resp.status;
             }
@@ -929,24 +882,28 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::CommandStateBase::send
     return sendRequestImpl(std::move(requestToSend));
 }
 
-Status NetworkInterfaceTL::CommandStateBase::handleConnectionAcquisitionError(Status status) {
-    // Time limit exceeded from ConnectionPool waiting to acquire a connection.
-    if (status == ErrorCodes::PooledConnectionAcquisitionExceededTimeLimit) {
-        auto connTimeoutWaitTime = stopwatch.elapsed();
-        numConnectionNetworkTimeouts.increment(1);
-        timeSpentWaitingBeforeConnectionTimeoutMillis.increment(
-            durationCount<Milliseconds>(connTimeoutWaitTime));
-        auto timeoutCode = request.timeoutCode;
-        if (timeoutCode && connTimeoutWaitTime >= request.timeout) {
-            status = Status(*timeoutCode, status.reason());
-        }
-        if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
-            LOGV2(6496500,
-                  "Operation timed out while waiting to acquire connection",
-                  "requestId"_attr = request.id,
-                  "duration"_attr = connTimeoutWaitTime);
-        }
+Status NetworkInterfaceTL::CommandStateBase::handleClientAcquisitionError(Status status) {
+    if (!isTimeout(status)) {
+        return status;
     }
+
+    auto connTimeoutWaitTime = stopwatch.elapsed();
+    numConnectionNetworkTimeouts.increment(1);
+    timeSpentWaitingBeforeConnectionTimeoutMillis.increment(
+        durationCount<Milliseconds>(connTimeoutWaitTime));
+
+    auto timeoutCode = request.timeoutCode;
+    if (timeoutCode && connTimeoutWaitTime >= request.timeout) {
+        status = Status(*timeoutCode, status.reason());
+    }
+
+    if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
+        LOGV2(6496500,
+              "Operation timed out while waiting to acquire connection",
+              "requestId"_attr = request.id,
+              "duration"_attr = connTimeoutWaitTime);
+    }
+
     return status;
 }
 
@@ -960,7 +917,7 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::_runCommand(
         .thenRunOn(cmdState->makeGuaranteedExecutor())
         .onError([cmdState](Status status)
                      -> StatusWith<std::shared_ptr<AsyncClientFactory::AsyncClientHandle>> {
-            return cmdState->handleConnectionAcquisitionError(status);
+            return cmdState->handleClientAcquisitionError(status);
         })
         .then(
             [this, cmdState](std::shared_ptr<AsyncClientFactory::AsyncClientHandle> retrievedConn) {

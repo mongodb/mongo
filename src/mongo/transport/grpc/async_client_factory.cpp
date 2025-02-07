@@ -32,6 +32,7 @@
 #include "mongo/client/async_client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/async_client_factory.h"
+#include "mongo/logv2/log.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/grpc/grpc_session.h"
 #include "mongo/transport/transport_layer.h"
@@ -53,6 +54,8 @@ GRPCAsyncClientFactory::~GRPCAsyncClientFactory() {
 void GRPCAsyncClientFactory::startup(ServiceContext* svcCtx,
                                      transport::TransportLayer* tl,
                                      transport::ReactorHandle reactor) {
+    invariant(tl->getTransportProtocol() == getTransportProtocol());
+
     stdx::lock_guard lk(_mutex);
 
     if (_state == State::kShutdown) {
@@ -62,8 +65,7 @@ void GRPCAsyncClientFactory::startup(ServiceContext* svcCtx,
     invariant(_state == State::kNew);
     _state = State::kStarted;
     _svcCtx = svcCtx;
-    invariant(tl->getTransportProtocol() == TransportProtocol::GRPC);
-    _tl = tl;
+    _tl = checked_cast<GRPCTransportLayer*>(tl);
     _reactor = std::move(reactor);
 }
 
@@ -161,7 +163,11 @@ Future<std::shared_ptr<GRPCAsyncClientFactory::AsyncClientHandle>> GRPCAsyncClie
                 "hostAndPort"_attr = target,
                 "timeout"_attr = timeout);
 
-    return AsyncDBClient::connect(target, sslMode, _svcCtx, _tl, _reactor, timeout, nullptr)
+    return _tl->asyncConnectWithAuthToken(target, sslMode, _reactor, timeout, nullptr, token)
+        .then([target, reactor = _reactor, svcCtx = _svcCtx](
+                  std::shared_ptr<transport::Session> session) {
+            return std::make_shared<AsyncDBClient>(target, std::move(session), svcCtx, reactor);
+        })
         .tapError([target](Status s) {
             LOGV2_DEBUG(9936103,
                         kDiagnosticLogLevel,
@@ -187,6 +193,12 @@ Future<std::shared_ptr<GRPCAsyncClientFactory::AsyncClientHandle>> GRPCAsyncClie
 }
 
 void GRPCAsyncClientFactory::_destroyHandle(Handle& handle) {
+    // If handle was marked as unsuccessful, ensure that the underlying gRPC call was canceled
+    // before retrieving the remote status.
+    if (!handle._outcome || !handle._outcome->isOK()) {
+        handle._client->cancel();
+    }
+
     FinishingClientState* cs;
     {
         stdx::lock_guard lk(_mutex);

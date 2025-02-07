@@ -31,8 +31,9 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/transport/grpc/server.h"
+#include "mongo/transport/grpc/service.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/cancellation.h"
 
 namespace mongo::transport::grpc {
 
@@ -94,6 +95,7 @@ public:
         const ReactorHandle& reactor,
         Milliseconds timeout,
         std::shared_ptr<ConnectionMetrics> connectionMetrics,
+        const CancellationToken& token = CancellationToken::uncancelable(),
         boost::optional<std::string> authToken = boost::none) = 0;
 
     StringData getNameForLogging() const override {

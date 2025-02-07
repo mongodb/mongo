@@ -200,6 +200,7 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db:service_context",
         "//src/mongo/rpc:client_metadata",
+        "//src/mongo/transport:transport_layer_manager",
     ],
 )
 
