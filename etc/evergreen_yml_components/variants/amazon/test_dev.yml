@@ -303,6 +303,7 @@ buildvariants:
         MONGO_DISTMOD=amazon2
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
+        --remote-exec-release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       evergreen_remote_exec: on
     run_on:
@@ -323,6 +324,7 @@ buildvariants:
         MONGO_DISTMOD=amazon2023
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
+        --remote-exec-release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       evergreen_remote_exec: on
     run_on:
@@ -343,6 +345,7 @@ buildvariants:
         MONGO_DISTMOD=amazon2
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
+        --remote-exec-release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       evergreen_remote_exec: on
     run_on:
@@ -363,6 +366,7 @@ buildvariants:
         MONGO_DISTMOD=amazon2023
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
+        --remote-exec-release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       evergreen_remote_exec: on
     run_on:
@@ -386,6 +390,7 @@ buildvariants:
         MONGO_DISTMOD=amazon2
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
+        --remote-exec-release
         --thin-lto
         --pgo
         --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
@@ -411,6 +416,7 @@ buildvariants:
         MONGO_DISTMOD=amazon2023
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
+        --remote-exec-release
         --thin-lto
         --pgo
         --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
@@ -436,6 +442,7 @@ buildvariants:
         MONGO_DISTMOD=amazon2023
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
+        --remote-exec-release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --bolt
         BAZEL_FLAGS="--linkopt=-Wl,--emit-relocs --local_resources=cpu=HOST_CPUS*.1"
@@ -460,6 +467,7 @@ buildvariants:
         MONGO_DISTMOD=amazon2023
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
+        --remote-exec-release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --bolt
         BAZEL_FLAGS="--linkopt=-Wl,--emit-relocs --local_resources=cpu=HOST_CPUS*.1"
@@ -482,6 +490,7 @@ buildvariants:
         MONGO_DISTMOD=amazon2
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
+        --remote-exec-release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --allocator=system
         --enterprise-features=fle
@@ -510,6 +519,7 @@ buildvariants:
         MONGO_DISTMOD=amazon2023
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
+        --remote-exec-release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --allocator=system
         --enterprise-features=fle
@@ -537,6 +547,7 @@ buildvariants:
         MONGO_DISTMOD=amazon2
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
+        --remote-exec-release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --streams-release-build
         BAZEL_FLAGS="--local_resources=cpu=HOST_CPUS*.1"
@@ -558,6 +569,7 @@ buildvariants:
         MONGO_DISTMOD=amazon2023
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
+        --remote-exec-release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --streams-release-build
         BAZEL_FLAGS="--local_resources=cpu=HOST_CPUS*.1"
