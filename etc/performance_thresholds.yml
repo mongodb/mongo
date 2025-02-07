@@ -48,16 +48,16 @@ tests:
       # means of these metrics in them, and then multiply them by 1.002 (+ .2%). Please make sure the new values
       # are above the maximum values reported in those patches to prevent any future flakiness.
       #
-      # The below thresholds are based on the stable region mean as of 1/30/25 * 1.004.
+      # The below thresholds are based on the stable region mean as of 2/06/25 * 1.004.
       - thread_level: 1
         metrics:
           - name: instructions_per_iteration_mean
-            value: 20346
+            value: 20399
             bound_direction: upper
       - thread_level: 32
         metrics:
           - name: instructions_per_iteration_mean
-            value: 20391
+            value: 20437
             bound_direction: upper
   ServiceEntryPointShardRoleBenchmarkFixture/BM_SEP_PING:
     al2023-arm64-sep-benchmark:
