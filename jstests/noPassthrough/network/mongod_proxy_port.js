@@ -2,6 +2,8 @@
  * Tests the mongod proxyPort CLI argument
  * @tags: [
  *   requires_fcv_81,
+ *   featureFlagMongodProxyProcolSupport,
+ *   grpc_incompatible,
  * ]
  */
 
