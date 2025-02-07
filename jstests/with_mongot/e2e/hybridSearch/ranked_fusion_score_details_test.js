@@ -50,11 +50,16 @@ const searchStage = {
     $search: searchStageSpec
 };
 
+const scoreDetailsDescription =
+    "value output by reciprocal rank fusion algorithm, computed as sum of (weight * (1 / (60 " +
+    "+ rank))) across input pipelines from which this document is output, from:";
+
 // Test search/vectorSearch where only search has scoreDetails.
 let testQuery = [
     {
         $rankFusion: {
             input: {pipelines: {vector: [vectorStage], search: [searchStage, {$limit: limit}]}},
+            combination: {weights: {search: 2}},
             scoreDetails: true,
         },
     },
@@ -74,6 +79,8 @@ for (const foundDoc of results) {
     assert(fieldPresent("value", details), details);
     // We don't care about the actual score, just assert that its been calculated.
     assert.gt(details["value"], 0, details);
+    assert(fieldPresent("description", details), details);
+    assert.eq(details["description"], scoreDetailsDescription);
 
     function assertFieldPresent(field, obj) {
         assert(fieldPresent(field, obj),
@@ -88,6 +95,8 @@ for (const foundDoc of results) {
     assertFieldPresent("inputPipelineName", searchDetails);
     assert.eq(searchDetails["inputPipelineName"], "search");
     assertFieldPresent("rank", searchDetails);
+    assertFieldPresent("weight", searchDetails);
+    assert.eq(searchDetails["weight"], 2);
     // If there isn't a value, we didn't get this back from search at all.
     if (searchDetails.hasOwnProperty("value")) {
         assertFieldPresent("value", searchDetails);  // Output of rank calculation.
@@ -104,6 +113,8 @@ for (const foundDoc of results) {
     assertFieldPresent("details", vectorDetails);
     assert.eq(vectorDetails["details"], []);
     assertFieldPresent("rank", vectorDetails);
+    assertFieldPresent("weight", vectorDetails);
+    assert.eq(vectorDetails["weight"], 1);
 }
 
 // Test vectorSearch/vectorSearch where neither has score details.
@@ -111,6 +122,7 @@ testQuery = [
     {
         $rankFusion: {
             input: {pipelines: {vector: [vectorStage], secondVector: [vectorStage]}},
+            combination: {weights: {vector: 0.5, secondVector: 2.8}},
             scoreDetails: true,
         },
     },
@@ -125,6 +137,8 @@ for (const foundDoc of results) {
     // The output of the rank calculation.
     // We don't care about the actual score, just assert that its been calculated.
     assert.gt(details["value"], 0);
+    assert(fieldPresent("description", details), details);
+    assert.eq(details["description"], scoreDetailsDescription);
 
     function assertFieldPresent(field, obj) {
         assert(fieldPresent(field, obj),
@@ -139,6 +153,8 @@ for (const foundDoc of results) {
     assertFieldPresent("inputPipelineName", secondVectorDetails);
     assert.eq(secondVectorDetails["inputPipelineName"], "secondVector");
     assertFieldPresent("rank", secondVectorDetails);
+    assertFieldPresent("weight", secondVectorDetails);
+    assert.eq(secondVectorDetails["weight"], 2.8);
     assertFieldPresent("value", secondVectorDetails);  // Original 'score' AKA vectorSearchScore.
     assertFieldPresent("details",
                        secondVectorDetails);  // Not checking description contents, just that its
@@ -152,6 +168,8 @@ for (const foundDoc of results) {
     assert.eq(vectorDetails["details"], []);
     assertFieldPresent("value", vectorDetails);  // Original 'score' AKA vectorSearchScore.
     assertFieldPresent("rank", vectorDetails);
+    assertFieldPresent("weight", vectorDetails);
+    assert.eq(vectorDetails["weight"], 0.5);
 }
 
 // Test search/vectorSearch where search scoreDetails is off.
@@ -185,6 +203,8 @@ for (const foundDoc of results) {
     assert(fieldPresent("value", details), details);
     // We don't care about the actual score, just assert that its been calculated.
     assert.gt(details["value"], 0);
+    assert(fieldPresent("description", details), details);
+    assert.eq(details["description"], scoreDetailsDescription);
 
     function assertFieldPresent(field, obj) {
         assert(fieldPresent(field, obj),
@@ -199,6 +219,8 @@ for (const foundDoc of results) {
     assertFieldPresent("inputPipelineName", searchDetails);
     assert.eq(searchDetails["inputPipelineName"], "search");
     assertFieldPresent("rank", searchDetails);
+    assertFieldPresent("weight", searchDetails);
+    assert.eq(searchDetails["weight"], 1);
     // If there isn't a value, we didn't get this back from search at all.
     if (searchDetails.hasOwnProperty("value")) {
         assertFieldPresent("value", searchDetails);  // Output of rank calculation.
@@ -213,6 +235,8 @@ for (const foundDoc of results) {
     assertFieldPresent("details", vectorDetails);
     assert.eq(vectorDetails["details"], []);
     assertFieldPresent("rank", vectorDetails);
+    assertFieldPresent("weight", vectorDetails);
+    assert.eq(vectorDetails["weight"], 1);
 }
 
 // TODO SERVER-93218 Test scoreDetails with nested rankFusion.

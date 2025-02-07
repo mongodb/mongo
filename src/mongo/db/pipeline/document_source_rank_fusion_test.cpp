@@ -2457,6 +2457,11 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
                     ]
                 }
             },
+            combination: {
+                weights: {
+                    agatha: 5
+                }
+            },
             scoreDetails: true
         }
     })");
@@ -2518,7 +2523,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
                                     ]
                                 },
                                 {
-                                    "$const": 1
+                                    "$const": 5
                                 }
                             ]
                         }
@@ -2590,7 +2595,10 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
                                         "inputPipelineName": {
                                             "$const": "agatha"
                                         },
-                                        "rank": "$agatha_rank"
+                                        "rank": "$agatha_rank",
+                                        "weight": {
+                                            "$const": 5
+                                        }
                                     },
                                     "$agatha_scoreDetails"
                                 ]
@@ -2602,6 +2610,9 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
                     "$setMetadata": {
                         "scoreDetails": {
                             "value": "$score",
+                            "description": {
+                                "$const": "value output by reciprocal rank fusion algorithm, computed as sum of (weight * (1 / (60 + rank))) across input pipelines from which this document is output, from:"
+                            },
                             "details": "$calculatedScoreDetails"
                         }
                     }
@@ -2636,7 +2647,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                         { $match : { author : "Agatha Christie" } },
                         { $sort: {author: 1} }
                     ],
-                    searchPipe : [
+                    searchPipe: [
                         {
                             $search: {
                                 index: "search_index",
@@ -2648,6 +2659,11 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                             }
                         }
                     ]
+                }
+            },
+            combination: {
+                weights: {
+                    searchPipe: 2
                 }
             },
             scoreDetails: true
@@ -2787,7 +2803,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                                                 ]
                                             },
                                             {
-                                                "$const": 1
+                                                "$const": 2
                                             }
                                         ]
                                     }
@@ -2886,7 +2902,10 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                                         "inputPipelineName": {
                                             "$const": "agatha"
                                         },
-                                        "rank": "$agatha_rank"
+                                        "rank": "$agatha_rank",
+                                        "weight": {
+                                            "$const": 1
+                                        }
                                     },
                                     "$agatha_scoreDetails"
                                 ]
@@ -2897,7 +2916,10 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                                         "inputPipelineName": {
                                             "$const": "searchPipe"
                                         },
-                                        "rank": "$searchPipe_rank"
+                                        "rank": "$searchPipe_rank",
+                                        "weight": {
+                                            "$const": 2
+                                        }
                                     },
                                     "$searchPipe_scoreDetails"
                                 ]
@@ -2909,6 +2931,9 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                     "$setMetadata": {
                         "scoreDetails": {
                             "value": "$score",
+                            "description": {
+                                "$const": "value output by reciprocal rank fusion algorithm, computed as sum of (weight * (1 / (60 + rank))) across input pipelines from which this document is output, from:"
+                            },
                             "details": "$calculatedScoreDetails"
                         }
                     }

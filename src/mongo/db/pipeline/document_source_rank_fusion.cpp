@@ -74,6 +74,10 @@ REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(rankFusion,
                                            feature_flags::gFeatureFlagRankFusionBasic);
 
 namespace {
+static const std::string scoreDetailsDescription =
+    "value output by reciprocal rank fusion algorithm, computed as sum of (weight * (1 / "
+    "(60 + rank))) across input pipelines from which this document is output, from:";
+
 /**
  * Checks that the input pipeline is a valid ranked pipeline. This means it is either one of
  * $search, $vectorSearch, $geoNear, $rankFusion, $scoreFusion (which have ordered output) or has an
@@ -346,10 +350,9 @@ std::vector<BSONObj> getPipeline(BSONElement inputPipeElem) {
     return parsePipelineFromBSON(inputPipeElem);
 }
 
-auto stageToBson(const auto stagePtr) {
-    std::vector<Value> array;
-    stagePtr->serializeToArray(array);
-    return array[0].getDocument().toBson();
+double getPipelineWeight(const StringMap<double>& weights, const std::string& pipelineName) {
+    // If no weight is provided, default to 1.
+    return weights.contains(pipelineName) ? weights.at(pipelineName) : 1;
 }
 
 auto setWindowFields(const auto& expCtx, const std::string& rankFieldName) {
@@ -520,6 +523,7 @@ BSONObj calculateFinalScore(
 
 boost::intrusive_ptr<DocumentSource> calculateFinalScoreDetails(
     const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputs,
+    const StringMap<double>& weights,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     // Create the following object:
     /*
@@ -527,13 +531,13 @@ boost::intrusive_ptr<DocumentSource> calculateFinalScoreDetails(
             calculatedScoreDetails: [
             {
                 $mergeObjects: [
-                    {inputPipelineName: "name1", rank: "$name1_rank"},
+                    {inputPipelineName: "name1", rank: "$name1_rank", weight: <weight>},
                     "$name1_scoreDetails"
                 ]
             },
             {
                 $mergeObjects: [
-                    {inputPipelineName: "name2", rank: "$name2_rank"},
+                    {inputPipelineName: "name2", rank: "$name2_rank", weight: <weight>},
                     "$name2_scoreDetails"
                 ]
             },
@@ -543,13 +547,16 @@ boost::intrusive_ptr<DocumentSource> calculateFinalScoreDetails(
     */
     std::vector<boost::intrusive_ptr<Expression>> detailsChildren;
     for (auto it = inputs.begin(); it != inputs.end(); it++) {
-        const std::string rankFieldName = fmt::format("${}_rank", it->first);
-        const std::string scoreDetailsFieldName = fmt::format("${}_scoreDetails", it->first);
+        const std::string& pipelineName = it->first;
+        const std::string rankFieldName = fmt::format("${}_rank", pipelineName);
+        const std::string scoreDetailsFieldName = fmt::format("${}_scoreDetails", pipelineName);
+        double weight = getPipelineWeight(weights, pipelineName);
 
         auto mergeObjectsObj =
-            BSON("$mergeObjects"_sd
-                 << BSON_ARRAY(BSON("inputPipelineName" << it->first << "rank"_sd << rankFieldName)
-                               << scoreDetailsFieldName));
+            BSON("$mergeObjects"_sd << BSON_ARRAY(BSON("inputPipelineName"_sd
+                                                       << pipelineName << "rank"_sd << rankFieldName
+                                                       << "weight"_sd << weight)
+                                                  << scoreDetailsFieldName));
         boost::intrusive_ptr<Expression> mergeObjectsExpr =
             ExpressionFromAccumulator<AccumulatorMergeObjects>::parse(
                 expCtx.get(), mergeObjectsObj.firstElement(), expCtx->variablesParseState);
@@ -591,6 +598,7 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipeline(
 
 std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
     const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputPipelines,
+    const StringMap<double>& weights,
     const bool includeScoreDetails,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto group = DocumentSourceGroup::createFromBson(
@@ -612,13 +620,13 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
 
     if (includeScoreDetails) {
         boost::intrusive_ptr<DocumentSource> addFieldsDetails =
-            calculateFinalScoreDetails(inputPipelines, expCtx);
+            calculateFinalScoreDetails(inputPipelines, weights, expCtx);
         auto setDetails = DocumentSourceSetMetadata::create(
             expCtx,
             Expression::parseObject(expCtx.get(),
                                     BSON("value"
                                          << "$score"
-                                         << "details"
+                                         << "description" << scoreDetailsDescription << "details"
                                          << "$calculatedScoreDetails"),
                                     expCtx->variablesParseState),
             DocumentMetadataFields::kScoreDetails);
@@ -690,7 +698,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
 
         // Check if an explicit weight for this pipeline has been specified.
         // If not, the default is one.
-        double pipelineWeight = weights.contains(name) ? weights.at(name) : 1;
+        double pipelineWeight = getPipelineWeight(weights, name);
 
         if (outputStages.empty()) {
             // First pipeline.
@@ -715,7 +723,8 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
     }
 
     // Build all remaining stages to perform the fusion.
-    auto finalStages = buildScoreAndMergeStages(inputPipelines, includeScoreDetails, pExpCtx);
+    auto finalStages =
+        buildScoreAndMergeStages(inputPipelines, weights, includeScoreDetails, pExpCtx);
     for (const auto& stage : finalStages) {
         outputStages.push_back(stage);
     }
