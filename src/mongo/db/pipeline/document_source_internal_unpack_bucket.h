@@ -115,6 +115,19 @@ public:
         MONGO_UNREACHABLE_TASSERT(7484305);
     }
 
+    /**
+     * This factory function creates a BSONObj representation of a $_internalUnpackBucket stage with
+     * the parameters provided and inserts it into a copy of the provided pipeline. The altered
+     * pipeline is returned, leaving the original pipeline unchanged.
+     */
+    static std::vector<BSONObj> generateStageInPipeline(
+        const std::vector<BSONObj>& pipeline,
+        const StringData timeField,
+        const boost::optional<StringData>& metaField,
+        const boost::optional<std::int32_t>& bucketMaxSpanSeconds,
+        const mongo::OptionalBool& timeseriesBucketsMayHaveMixedSchemaData,
+        const mongo::OptionalBool& timeseriesBucketingParametersHaveChanged);
+
     bool includeMetaField() const {
         return _bucketUnpacker.includeMetaField();
     }

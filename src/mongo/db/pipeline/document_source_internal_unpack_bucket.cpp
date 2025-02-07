@@ -1016,6 +1016,32 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
     }
 }
 
+std::vector<BSONObj> DocumentSourceInternalUnpackBucket::generateStageInPipeline(
+    const std::vector<BSONObj>& pipeline,
+    const StringData timeField,
+    const boost::optional<StringData>& metaField,
+    const boost::optional<std::int32_t>& bucketMaxSpanSeconds,
+    const mongo::OptionalBool& timeseriesBucketsMayHaveMixedSchemaData,
+    const mongo::OptionalBool& timeseriesBucketingParametersHaveChanged) {
+    auto bob = BSONObjBuilder{};
+
+    // TODO(SERVER-99494): Handle timeseriesBucketsMayHaveMixedSchemaData.
+
+    // TODO(SERVER-99495): Handle timeseriesBucketingParametersHaveChanged.
+
+    // TODO(SERVER-100423): Handle timeField.
+
+    // TODO(SERVER-100424): Handle metaField.
+
+    // TODO(SERVER-100425): Handle bucketMaxSpanSeconds.
+
+    // Build the stage and make it the first stage in the pipeline.
+    auto pipelineWithStage = std::vector{BSON(kStageNameInternal << bob.obj())};
+    pipelineWithStage.insert(pipelineWithStage.end(), pipeline.begin(), pipeline.end());
+
+    return pipelineWithStage;
+}
+
 boost::optional<Document> DocumentSourceInternalUnpackBucket::getNextMatchingMeasure() {
     while (_bucketUnpacker.hasNext()) {
         if (_eventFilter) {
