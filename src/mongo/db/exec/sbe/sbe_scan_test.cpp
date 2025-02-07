@@ -106,6 +106,7 @@ TEST_F(ScanStageTest, scanStage) {
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
 
     auto makeStageFn = [uuid, dbName](value::SlotId scanSlot, std::unique_ptr<PlanStage> stage) {
+        sbe::value::SlotVector scanFieldSlots;
         auto scanStage = sbe::makeS<sbe::ScanStage>(uuid,
                                                     dbName,
                                                     scanSlot,
@@ -116,7 +117,7 @@ TEST_F(ScanStageTest, scanStage) {
                                                     boost::none /* indexKeyPatternSlot */,
                                                     boost::none /* oplogTsSlot */,
                                                     std::vector<std::string>{} /* scanFieldNames */,
-                                                    value::SlotVector{} /* scanFieldSlots */,
+                                                    scanFieldSlots,
                                                     boost::none /* seekRecordIdSlot */,
                                                     boost::none /* minRecordIdSlot */,
                                                     boost::none /* maxRecordIdSlot */,
@@ -151,6 +152,7 @@ TEST_F(ScanStageTest, ParallelScanStage) {
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
 
     auto makeStageFn = [uuid, dbName](value::SlotId scanSlot, std::unique_ptr<PlanStage> stage) {
+        sbe::value::SlotVector scanFieldSlots;
         auto scanStage =
             sbe::makeS<sbe::ParallelScanStage>(uuid,
                                                dbName,
@@ -161,7 +163,7 @@ TEST_F(ScanStageTest, ParallelScanStage) {
                                                boost::none /* indexKeySlot */,
                                                boost::none /* indexKeyPatternSlot */,
                                                std::vector<std::string>{} /* scanFieldNames */,
-                                               value::SlotVector{} /* scanFieldSlots */,
+                                               scanFieldSlots,
                                                nullptr /* yieldPolicy */,
                                                kEmptyPlanNodeId,
                                                ScanCallbacks{},

@@ -679,12 +679,13 @@ buildvariants:
           - amazon2-latest-large
 
   - name: &amazon-linux2-arm64-static-compile-toolchain-v5 amazon-linux2-arm64-static-compile-toolchain-v5
-    display_name: "Amazon Linux 2 arm64 Enterprise Shared Library Compile & Static Analysis (v5 toolchain)"
-    tags: ["forbid_tasks_tagged_with_experimental"]
+    display_name: "! Amazon Linux 2 arm64 Enterprise Shared Library Compile & Static Analysis (v5 toolchain)"
+    tags: ["required", "bazel_check", "forbid_tasks_tagged_with_experimental"]
     run_on:
       - amazon2-arm64-latest-large
     activate: false
     stepback: false
+    cron: "0 0 * * *" # Run once a day
     expansions:
       scons_cache_scope: shared
       scons_cache_mode: all
@@ -705,10 +706,14 @@ buildvariants:
     tasks:
       - name: compile_ninja_quick_TG
       - name: compile_test_parallel_unittest_stream_TG
-      - name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG
-        distros:
-          - amazon2-arm64-latest-nvme
-      - name: compile_all_but_not_unittests_TG
+      # TODO SERVER-99531 reenable when pretty printer tests work.
+      # - name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG
+      #   distros:
+      #     - amazon2-arm64-latest-nvme
+      #- name: compile_all_but_not_unittests_TG
+      #  distros:
+      #    - amazon2-arm64-latest-nvme
+      - name: compile_test_parallel_core_stream_TG
         distros:
           - amazon2-arm64-latest-nvme
       - name: compile_test_parallel_dbtest_stream_TG
@@ -743,8 +748,11 @@ buildvariants:
           - amazon2-arm64-latest-xlarge
 
   - name: enterprise-amazon-linux2-arm64-all-feature-flags-toolchain-v5
-    display_name: "Amazon Linux 2 arm64 Atlas Enterprise (all feature flags) (v5 toolchain)"
-    tags: ["forbid_tasks_tagged_with_experimental"]
+    display_name: "! Amazon Linux 2 arm64 Atlas Enterprise (all feature flags) (v5 toolchain)"
+    tags: ["required", "forbid_tasks_tagged_with_experimental"]
+    activate: false
+    stepback: false
+    cron: "0 0 * * *" # Run once a day
     run_on:
       - amazon2-arm64-atlas-latest-small
     depends_on:
@@ -757,8 +765,6 @@ buildvariants:
         # This is added because of EVG-18211.
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
-    activate: false
-    stepback: false
     expansions:
       <<: *amazon_linux2_arm64_dynamic_expansions
       scons_cache_scope: shared
@@ -791,12 +797,14 @@ buildvariants:
           - amazon2-arm64-atlas-latest-large
       - name: .fuzzer_deterministic
 
-  - <<: *linux-arm64-dynamic-compile-params
-    name: &amazon-linux2-arm64-crypt-compile-toolchain-v5 amazon-linux2-arm64-crypt-compile-toolchain-v5
-    display_name: "Amazon Linux 2 arm64 Crypt Compile (v5 toolchain)"
-    tags: []
+  - name: &amazon-linux2-arm64-crypt-compile-toolchain-v5 amazon-linux2-arm64-crypt-compile-toolchain-v5
+    display_name: "! Amazon Linux 2 arm64 Crypt Compile (v5 toolchain)"
+    tags: ["required", "bazel_check"]
     activate: false
     stepback: false
+    cron: "0 0 * * *" # Run once a day
+    run_on:
+      - amazon2-arm64-latest-large
     expansions:
       scons_cache_scope: shared
       scons_cache_mode: all
