@@ -122,7 +122,7 @@ BSONObj listFiles(const BSONObj& _args, void* data) {
             b << "baseName" << p.filename().generic_string();
             const bool isDirectory = is_directory(p);
             b.appendBool("isDirectory", isDirectory);
-            if (!isDirectory) {
+            if (boost::filesystem::exists(p) && boost::filesystem::is_regular_file(p)) {
                 b.append("size", (double)boost::filesystem::file_size(p));
             }
 
