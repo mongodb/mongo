@@ -3,7 +3,12 @@
  * the catalog cache refresh succeeds and after it finishes all persisted cache entries are intact.
  */
 
-const st = new ShardingTest({shards: 1, rs: {nodes: 3}, initiateWithDefaultElectionTimeout: true});
+const st = new ShardingTest({
+    shards: 1,
+    rs: {nodes: 3},
+    initiateWithDefaultElectionTimeout: true,
+    other: {configOptions: {setParameter: {enableShardedIndexConsistencyCheck: false}}}
+});
 
 assert.commandWorked(
     st.s.adminCommand({enableSharding: 'test', primaryShard: st.shard0.shardName}));
