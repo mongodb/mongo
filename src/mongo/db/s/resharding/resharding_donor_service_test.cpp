@@ -119,6 +119,28 @@ public:
     }
 };
 
+struct TestOptions {
+    bool isAlsoRecipient;
+    bool performVerification = true;
+
+    BSONObj toBSON() const {
+        BSONObjBuilder bob;
+        bob.append("isAlsoRecipient", isAlsoRecipient);
+        bob.append("performVerification", performVerification);
+        return bob.obj();
+    }
+};
+
+std::vector<TestOptions> makeAllTestOptions() {
+    std::vector<TestOptions> testOptions;
+    for (bool isAlsoRecipient : {false, true}) {
+        for (bool performVerification : {false, true}) {
+            testOptions.push_back({isAlsoRecipient, performVerification});
+        }
+    }
+    return testOptions;
+}
+
 class ReshardingDonorServiceForTest : public ReshardingDonorService {
 public:
     explicit ReshardingDonorServiceForTest(ServiceContext* serviceContext)
@@ -165,14 +187,15 @@ public:
         return _controller.get();
     }
 
-    ReshardingDonorDocument makeStateDocument(bool isAlsoRecipient) {
+    ReshardingDonorDocument makeStateDocument(const TestOptions& testOptions) {
         DonorShardContext donorCtx;
         donorCtx.setState(DonorStateEnum::kPreparingToDonate);
 
-        ReshardingDonorDocument doc(std::move(donorCtx),
-                                    {ShardId{"recipient1"},
-                                     isAlsoRecipient ? donorShardId : ShardId{"recipient2"},
-                                     ShardId{"recipient3"}});
+        ReshardingDonorDocument doc(
+            std::move(donorCtx),
+            {ShardId{"recipient1"},
+             testOptions.isAlsoRecipient ? donorShardId : ShardId{"recipient2"},
+             ShardId{"recipient3"}});
 
         NamespaceString sourceNss =
             NamespaceString::createNamespaceString_forTest("sourcedb.sourcecollection");
@@ -272,17 +295,17 @@ private:
 };
 
 TEST_F(ReshardingDonorServiceTest, CanTransitionThroughEachStateToCompletion) {
-    for (bool isAlsoRecipient : {false, true}) {
+    for (auto& testOptions : makeAllTestOptions()) {
         LOGV2(5641800,
               "Running case",
               "test"_attr = _agent.getTestName(),
-              "isAlsoRecipient"_attr = isAlsoRecipient);
+              "testOptions"_attr = testOptions);
 
-        auto doc = makeStateDocument(isAlsoRecipient);
+        auto doc = makeStateDocument(testOptions);
         auto opCtx = makeOperationContext();
 
         createSourceCollection(opCtx.get(), doc);
-        if (isAlsoRecipient) {
+        if (testOptions.isAlsoRecipient) {
             createTemporaryReshardingCollection(opCtx.get(), doc);
         }
 
@@ -302,7 +325,7 @@ TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryOnReshardingBegin) {
     boost::optional<PauseDuringStateTransitions> donatingInitialDataTransitionGuard;
     donatingInitialDataTransitionGuard.emplace(controller(), DonorStateEnum::kDonatingInitialData);
 
-    auto doc = makeStateDocument(false /* isAlsoRecipient */);
+    auto doc = makeStateDocument({.isAlsoRecipient = false});
     auto opCtx = makeOperationContext();
     auto rawOpCtx = opCtx.get();
     DonorStateMachine::insertStateDocument(rawOpCtx, doc);
@@ -343,7 +366,7 @@ TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryToGenerateMinFetchTimesta
     boost::optional<PauseDuringStateTransitions> donatingInitialDataTransitionGuard;
     donatingInitialDataTransitionGuard.emplace(controller(), DonorStateEnum::kDonatingInitialData);
 
-    auto doc = makeStateDocument(false /* isAlsoRecipient */);
+    auto doc = makeStateDocument({.isAlsoRecipient = false});
     auto opCtx = makeOperationContext();
     DonorStateMachine::insertStateDocument(opCtx.get(), doc);
     auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
@@ -378,7 +401,7 @@ TEST_F(ReshardingDonorServiceTest, WritesFinalReshardOpOplogEntriesWhileWritesBl
     boost::optional<PauseDuringStateTransitions> blockingWritesTransitionGuard;
     blockingWritesTransitionGuard.emplace(controller(), DonorStateEnum::kBlockingWrites);
 
-    auto doc = makeStateDocument(false /* isAlsoRecipient */);
+    auto doc = makeStateDocument({.isAlsoRecipient = false});
     auto opCtx = makeOperationContext();
     DonorStateMachine::insertStateDocument(opCtx.get(), doc);
     auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
@@ -441,14 +464,14 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
         {DonorStateEnum::kBlockingWrites, true},
         {DonorStateEnum::kDone, true}};
 
-    for (bool isAlsoRecipient : {false, true}) {
+    for (auto& testOptions : makeAllTestOptions()) {
         LOGV2(5641801,
               "Running case",
               "test"_attr = _agent.getTestName(),
-              "isAlsoRecipient"_attr = isAlsoRecipient);
+              "testOptions"_attr = testOptions);
 
         PauseDuringStateTransitions stateTransitionsGuard{controller(), donorStates};
-        auto doc = makeStateDocument(isAlsoRecipient);
+        auto doc = makeStateDocument(testOptions);
         auto instanceId =
             BSON(ReshardingDonorDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
 
@@ -462,7 +485,7 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
             auto donor = [&] {
                 if (prevState == DonorStateEnum::kUnused) {
                     createSourceCollection(opCtx.get(), doc);
-                    if (isAlsoRecipient) {
+                    if (testOptions.isAlsoRecipient) {
                         createTemporaryReshardingCollection(opCtx.get(), doc);
                     }
 
@@ -551,7 +574,7 @@ TEST_F(ReshardingDonorServiceTest, ReportForCurrentOpAfterCompletion) {
     const auto donorState = DonorStateEnum::kDonatingInitialData;
 
     PauseDuringStateTransitions stateTransitionsGuard{controller(), donorState};
-    auto doc = makeStateDocument(false /* isAlsoRecipient */);
+    auto doc = makeStateDocument({.isAlsoRecipient = false});
     auto instanceId =
         BSON(ReshardingDonorDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
 
@@ -597,7 +620,7 @@ TEST_F(ReshardingDonorServiceTest, ReportForCurrentOpAfterCompletion) {
 }
 
 DEATH_TEST_REGEX_F(ReshardingDonorServiceTest, CommitFn, "4457001.*tripwire") {
-    auto doc = makeStateDocument(false /* isAlsoRecipient */);
+    auto doc = makeStateDocument({.isAlsoRecipient = false});
     auto opCtx = makeOperationContext();
 
     createSourceCollection(opCtx.get(), doc);
@@ -618,7 +641,7 @@ DEATH_TEST_REGEX_F(ReshardingDonorServiceTest, CommitFn, "4457001.*tripwire") {
 }
 
 TEST_F(ReshardingDonorServiceTest, DropsSourceCollectionWhenDone) {
-    auto doc = makeStateDocument(false /* isAlsoRecipient */);
+    auto doc = makeStateDocument({.isAlsoRecipient = false});
     auto opCtx = makeOperationContext();
 
     createSourceCollection(opCtx.get(), doc);
@@ -646,7 +669,7 @@ TEST_F(ReshardingDonorServiceTest, DropsSourceCollectionWhenDone) {
 }
 
 TEST_F(ReshardingDonorServiceTest, RenamesTemporaryReshardingCollectionWhenDone) {
-    auto doc = makeStateDocument(true /* isAlsoRecipient */);
+    auto doc = makeStateDocument({.isAlsoRecipient = true});
     auto opCtx = makeOperationContext();
 
     createSourceCollection(opCtx.get(), doc);
@@ -676,23 +699,23 @@ TEST_F(ReshardingDonorServiceTest, RenamesTemporaryReshardingCollectionWhenDone)
 }
 
 TEST_F(ReshardingDonorServiceTest, CompletesWithStepdownAfterAbort) {
-    for (bool isAlsoRecipient : {false, true}) {
+    for (auto& testOptions : makeAllTestOptions()) {
         LOGV2(5641802,
               "Running case",
               "test"_attr = _agent.getTestName(),
-              "isAlsoRecipient"_attr = isAlsoRecipient);
+              "testOptions"_attr = testOptions);
 
         boost::optional<PauseDuringStateTransitions> doneTransitionGuard;
         doneTransitionGuard.emplace(controller(), DonorStateEnum::kDone);
 
-        auto doc = makeStateDocument(isAlsoRecipient);
+        auto doc = makeStateDocument(testOptions);
         auto instanceId =
             BSON(ReshardingDonorDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
 
         auto opCtx = makeOperationContext();
 
         createSourceCollection(opCtx.get(), doc);
-        if (isAlsoRecipient) {
+        if (testOptions.isAlsoRecipient) {
             createTemporaryReshardingCollection(opCtx.get(), doc);
         }
 
@@ -736,17 +759,17 @@ TEST_F(ReshardingDonorServiceTest, CompletesWithStepdownAfterAbort) {
 }
 
 TEST_F(ReshardingDonorServiceTest, RetainsSourceCollectionOnAbort) {
-    for (bool isAlsoRecipient : {false, true}) {
+    for (auto& testOptions : makeAllTestOptions()) {
         LOGV2(5641803,
               "Running case",
               "test"_attr = _agent.getTestName(),
-              "isAlsoRecipient"_attr = isAlsoRecipient);
+              "testOptions"_attr = testOptions);
 
-        auto doc = makeStateDocument(isAlsoRecipient);
+        auto doc = makeStateDocument(testOptions);
         auto opCtx = makeOperationContext();
 
         createSourceCollection(opCtx.get(), doc);
-        if (isAlsoRecipient) {
+        if (testOptions.isAlsoRecipient) {
             createTemporaryReshardingCollection(opCtx.get(), doc);
         }
 
@@ -775,17 +798,17 @@ TEST_F(ReshardingDonorServiceTest, RetainsSourceCollectionOnAbort) {
 }
 
 TEST_F(ReshardingDonorServiceTest, TruncatesXLErrorOnDonorDocument) {
-    for (bool isAlsoRecipient : {false, true}) {
+    for (auto& testOptions : makeAllTestOptions()) {
         LOGV2(5568601,
               "Running case",
               "test"_attr = _agent.getTestName(),
-              "isAlsoRecipient"_attr = isAlsoRecipient);
+              "testOptions"_attr = testOptions);
 
         std::string xlErrMsg(6000, 'x');
         FailPointEnableBlock failpoint("reshardingDonorFailsAfterTransitionToDonatingOplogEntries",
                                        BSON("errmsg" << xlErrMsg));
 
-        auto doc = makeStateDocument(isAlsoRecipient);
+        auto doc = makeStateDocument(testOptions);
         auto opCtx = makeOperationContext();
         DonorStateMachine::insertStateDocument(opCtx.get(), doc);
         auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
@@ -823,7 +846,7 @@ TEST_F(ReshardingDonorServiceTest, RestoreMetricsOnKBlockingWrites) {
     auto kDoneState = DonorStateEnum::kDone;
     PauseDuringStateTransitions stateTransitionsGuard{controller(), kDoneState};
     auto opCtx = makeOperationContext();
-    auto doc = makeStateDocument(false);
+    auto doc = makeStateDocument({.isAlsoRecipient = false});
 
     auto makeDonorCtx = [&]() {
         DonorShardContext donorCtx;
@@ -876,22 +899,22 @@ TEST_F(ReshardingDonorServiceTest, AbortAfterStepUpWithAbortReasonFromCoordinato
     repl::primaryOnlyServiceTestStepUpWaitForRebuildComplete.setMode(FailPoint::alwaysOn);
     const auto abortErrMsg = "Recieved abort from the resharding coordinator";
 
-    for (bool isAlsoRecipient : {false, true}) {
+    for (auto& testOptions : makeAllTestOptions()) {
         LOGV2(8743302,
               "Running case",
               "test"_attr = _agent.getTestName(),
-              "isAlsoRecipient"_attr = isAlsoRecipient);
+              "testOptions"_attr = testOptions);
 
         auto removeDonorDocFailpoint = globalFailPointRegistry().find("removeDonorDocFailpoint");
         auto timesEnteredFailPoint = removeDonorDocFailpoint->setMode(FailPoint::alwaysOn);
 
-        auto doc = makeStateDocument(isAlsoRecipient);
+        auto doc = makeStateDocument(testOptions);
         auto instanceId =
             BSON(ReshardingDonorDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
 
         auto opCtx = makeOperationContext();
         createSourceCollection(opCtx.get(), doc);
-        if (isAlsoRecipient) {
+        if (testOptions.isAlsoRecipient) {
             createTemporaryReshardingCollection(opCtx.get(), doc);
         }
 
@@ -935,17 +958,17 @@ TEST_F(ReshardingDonorServiceTest, AbortAfterStepUpWithAbortReasonFromCoordinato
 }
 
 TEST_F(ReshardingDonorServiceTest, FailoverAfterDonorErrorsPriorToObtainingTimestamp) {
-    for (bool isAlsoRecipient : {false, true}) {
+    for (auto& testOptions : makeAllTestOptions()) {
         LOGV2(8743303,
               "Running case",
               "test"_attr = _agent.getTestName(),
-              "isAlsoRecipient"_attr = isAlsoRecipient);
+              "testOptions"_attr = testOptions);
 
         std::string errMsg("Simulating an unrecoverable error for testing");
         FailPointEnableBlock failpoint("reshardingDonorFailsBeforeObtainingTimestamp",
                                        BSON("errmsg" << errMsg));
 
-        auto doc = makeStateDocument(isAlsoRecipient);
+        auto doc = makeStateDocument(testOptions);
         auto instanceId =
             BSON(ReshardingDonorDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
 
