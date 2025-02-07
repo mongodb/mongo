@@ -40,6 +40,9 @@
 
 #pragma once
 
+// IWYU pragma: private, include "mongo/unittest/unittest.h"
+// IWYU pragma: friend "mongo/unittest/.*"
+
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/optional.hpp>

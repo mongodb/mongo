@@ -29,6 +29,9 @@
 
 #pragma once
 
+// IWYU pragma: private, include "mongo/unittest/unittest.h"
+// IWYU pragma: friend "mongo/unittest/.*"
+
 #include <string>
 
 #include "mongo/base/string_data.h"

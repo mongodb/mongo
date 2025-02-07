@@ -33,6 +33,9 @@
 
 #pragma once
 
+// IWYU pragma: private, include "mongo/unittest/unittest.h"
+// IWYU pragma: friend "mongo/unittest/.*"
+
 #include <cmath>
 #include <fmt/format.h>
 #include <functional>
