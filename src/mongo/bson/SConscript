@@ -32,6 +32,11 @@ env.CppLibfuzzerTest(
     source=[],
 )
 
+env.CppLibfuzzerTest(
+    target="fromjson_fuzzer",
+    source=[],
+)
+
 env.CppIntegrationTest(
     target="bson_integration_test",
     source=[],

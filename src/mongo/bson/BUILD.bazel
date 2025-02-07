@@ -95,6 +95,17 @@ mongo_cc_fuzzer_test(
     ],
 )
 
+mongo_cc_fuzzer_test(
+    name = "fromjson_fuzzer",
+    srcs = [
+        "fromjson_fuzzer.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+    ],
+)
+
 mongo_cc_benchmark(
     name = "bson_bm",
     srcs = [
