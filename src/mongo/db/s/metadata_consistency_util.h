@@ -44,9 +44,9 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-
 
 namespace mongo {
 namespace metadata_consistency_util {
@@ -148,6 +148,23 @@ std::vector<MetadataInconsistencyItem> checkZonesConsistency(OperationContext* o
  */
 std::vector<MetadataInconsistencyItem> checkCollectionShardingMetadataConsistency(
     OperationContext* opCtx, const CollectionType& collection);
+
+// TODO (SERVER-99804): Move this function into the unnamed namespace.
+std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardLocalCatalogCache(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    const DatabaseVersion& dbVersionInGlobalCatalog,
+    const ShardId& primaryShard);
+
+/**
+ * Checks for inconsistencies in the database's metadata between the global catalog and the
+ * shard-local catalog.
+ *
+ * The list of inconsistencies is returned as a vector of MetadataInconsistencies objects. If
+ * there is no inconsistency, it returns an empty vector.
+ */
+std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistency(
+    OperationContext* opCtx, const DatabaseType& dbInGlobalCatalog);
 
 }  // namespace metadata_consistency_util
 }  // namespace mongo

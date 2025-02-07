@@ -7,6 +7,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Configure initial sharding cluster
@@ -980,6 +981,13 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 })();
 
 (function testFindingInconsistenciesWithDbPrimaryShardWithUnknownDbMetadata() {
+    if (FeatureFlagUtil.isPresentAndEnabled(st.s, "ShardAuthoritativeDbMetadata")) {
+        jsTestLog(
+            "Skipping test since featureFlagShardAuthoritativeDbMetadata is enabled and do \
+         not refresh database metadata.");
+        return;
+    }
+
     if (jsTest.options().storageEngine === "inMemory") {
         jsTestLog(
             "Skipping testFindingInconsistenciesWithDbPrimaryShardWithUnknownDbMetadata because we \

@@ -82,6 +82,7 @@
 #include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/util/assert_util.h"
@@ -156,6 +157,21 @@ public:
                                            std::make_move_iterator(indexInconsistencies.end()));
                 }
 
+                if (feature_flags::gShardAuthoritativeDbMetadata.isEnabled(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+                    !nss.isConfigDB()) {
+                    const auto dbInGlobalCatalog =
+                        getDatabaseMetadataFromConfigServer(opCtx, nss.dbName());
+
+                    auto dbMetadataInconsistencies =
+                        metadata_consistency_util::checkDatabaseMetadataConsistency(
+                            opCtx, dbInGlobalCatalog);
+                    inconsistencies.insert(
+                        inconsistencies.end(),
+                        std::make_move_iterator(dbMetadataInconsistencies.begin()),
+                        std::make_move_iterator(dbMetadataInconsistencies.end()));
+                }
+
                 auto collMetadataInconsistencies =
                     metadata_consistency_util::checkCollectionMetadataConsistencyAcrossShards(
                         opCtx, configsvrCollections);
@@ -218,6 +234,12 @@ public:
                 default:
                     MONGO_UNREACHABLE;
             }
+        }
+
+        DatabaseType getDatabaseMetadataFromConfigServer(OperationContext* opCtx,
+                                                         const DatabaseName& dbName) {
+            return Grid::get(opCtx)->catalogClient()->getDatabase(
+                opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern);
         }
 
         std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(

@@ -90,6 +90,7 @@
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/s/query/exec/establish_cursors.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -299,7 +300,23 @@ public:
                 auto status = dbCheckWithDeadlineIfSet();
                 if (!status.isOK()) {
                     auto extraInfo = status.extraInfo<StaleDbRoutingVersion>();
-                    if (!extraInfo || extraInfo->getVersionWanted()) {
+                    tassert(9980500, "StaleDbVersion must have extraInfo", extraInfo);
+
+                    if (feature_flags::gShardAuthoritativeDbMetadata.isEnabled(
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                        // If versionWanted exists:
+                        //    - This means that the wanted version is higher than the one initially
+                        //      looked at the config server. There has been a drop-create under the
+                        //      same primary shard or a move out and move in again. There is no harm
+                        //      to skip it.
+                        //
+                        // Otherwise:
+                        //    - In the authoritative world, this means that this shard is no longer
+                        //      the db primary shard. There has been a drop or move between taking
+                        //      the information about the databases from the config server and
+                        //      taking the DDL lock.
+                        skippedMetadataChecks = true;
+                    } else if (extraInfo->getVersionWanted()) {
                         // In case there is a wanted shard version means that the metadata is stale
                         // and we are going to skip the checks.
                         skippedMetadataChecks = true;
