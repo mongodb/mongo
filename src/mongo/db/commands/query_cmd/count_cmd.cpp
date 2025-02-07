@@ -85,6 +85,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
@@ -180,6 +181,10 @@ public:
                                   << "context",
                     !request().getNamespaceOrUUID().isUUID());
 
+            uassert(ErrorCodes::InvalidOptions,
+                    "rawData is not enabled",
+                    !request().getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
+
             if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
                 processFLECountD(opCtx, _ns, request());
             }
@@ -235,6 +240,10 @@ public:
 
         CountCommandReply typedRun(OperationContext* opCtx) final {
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+
+            uassert(ErrorCodes::InvalidOptions,
+                    "rawData is not enabled",
+                    !request().getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
 
             if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
                 processFLECountD(opCtx, _ns, request());

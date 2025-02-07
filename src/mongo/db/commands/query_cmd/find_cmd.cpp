@@ -114,6 +114,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/query_analysis_writer.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -420,6 +421,10 @@ public:
             // path, we have already parsed the FindCommandRequest, so start timing here.
             CurOp::get(opCtx)->beginQueryPlanningTimer();
 
+            uassert(ErrorCodes::InvalidOptions,
+                    "rawData is not enabled",
+                    !_cmdRequest->getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
+
             // Acquire locks. The RAII object is optional, because in the case of a view, the locks
             // need to be released.
             // TODO SERVER-79175: Make nicer. We need to instantiate the AutoStatsTracker before the
@@ -562,6 +567,10 @@ public:
             }
             // Start the query planning timer right after parsing.
             CurOp::get(opCtx)->beginQueryPlanningTimer();
+
+            uassert(ErrorCodes::InvalidOptions,
+                    "rawData is not enabled",
+                    !_cmdRequest->getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
 
             _rewriteFLEPayloads(opCtx);
             auto respSc =

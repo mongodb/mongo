@@ -80,6 +80,7 @@
 #include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/tailable_mode_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -285,6 +286,10 @@ void performValidationChecks(const OperationContext* opCtx,
     liteParsedPipeline.validate(opCtx);
     aggregation_request_helper::validateRequestForAPIVersion(opCtx, request);
     aggregation_request_helper::validateRequestFromClusterQueryWithoutShardKey(request);
+
+    uassert(ErrorCodes::InvalidOptions,
+            "rawData is not enabled",
+            !request.getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
 
     uassert(51028, "Cannot specify exchange option to a router", !request.getExchange());
     uassert(51143,

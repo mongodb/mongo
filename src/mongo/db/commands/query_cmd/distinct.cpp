@@ -95,6 +95,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/stats/top.h"
@@ -145,6 +146,10 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
             "BSON field 'querySettings' is an unknown field",
             query_settings::utils::allowQuerySettingsFromClient(opCtx->getClient()) ||
                 !distinctCommand->getQuerySettings().has_value());
+
+    uassert(ErrorCodes::InvalidOptions,
+            "rawData is not enabled",
+            !distinctCommand->getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
 
     auto expCtx = ExpressionContextBuilder{}
                       .fromRequest(opCtx, *distinctCommand, defaultCollator)

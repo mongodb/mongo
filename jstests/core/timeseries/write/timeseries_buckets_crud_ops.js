@@ -2,7 +2,7 @@
  * Performs basic CRUD operations on a time-series buckets collection.
  * @tags: [
  *   does_not_support_transactions,
- *   requires_fcv_81,
+ *   featureFlagRawDataCrudOperations,
  *   requires_non_retryable_writes,
  * ]
  */

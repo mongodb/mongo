@@ -324,6 +324,9 @@ DBQuery.prototype._convertToCountCmd = function(applySkipLimit) {
     if (this._additionalCmdParams["collation"]) {
         cmd["collation"] = this._additionalCmdParams["collation"];
     }
+    if (this._additionalCmdParams["rawData"]) {
+        cmd["rawData"] = this._additionalCmdParams["rawData"];
+    }
 
     if (applySkipLimit) {
         if (this._limit) {
@@ -878,6 +881,11 @@ const QueryHelpers = {
         if (typeof opts.collation == 'object') {
             query.collation(opts.collation);
         }
+
+        if (opts.rawData) {
+            query.rawData();
+        }
+
         return query;
     }
 };

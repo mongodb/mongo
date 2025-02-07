@@ -44,6 +44,7 @@
 #include "mongo/db/query/query_settings/query_settings_utils.h"
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/idl/idl_parser.h"
@@ -189,6 +190,10 @@ public:
                      rpc::ReplyBuilderInterface* result) override {
             Impl::checkCanExplainHere(opCtx);
 
+            uassert(ErrorCodes::InvalidOptions,
+                    "rawData is not enabled",
+                    !_cmdRequest->getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
+
             auto curOp = CurOp::get(opCtx);
             curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
 
@@ -298,6 +303,10 @@ public:
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
             Impl::checkCanRunHere(opCtx);
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+
+            uassert(ErrorCodes::InvalidOptions,
+                    "rawData is not enabled",
+                    !_cmdRequest->getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
 
             if (_cmdRequest->getRawData() &&
                 _cmdRequest->getNamespaceOrUUID().isNamespaceString() &&

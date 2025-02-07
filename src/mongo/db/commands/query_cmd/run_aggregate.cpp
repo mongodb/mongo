@@ -101,6 +101,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/query_analysis_writer.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -1094,6 +1095,10 @@ Status runAggregate(
     rpc::ReplyBuilderInterface* result,
     const std::vector<std::pair<NamespaceString, std::vector<ExternalDataSourceInfo>>>&
         usedExternalDataSources) {
+
+    if (request.getRawData() && !gFeatureFlagRawDataCrudOperations.isEnabled()) {
+        return {ErrorCodes::InvalidOptions, "rawData is not enabled"};
+    }
 
     AggExState aggExState(
         opCtx, request, liteParsedPipeline, cmdObj, privileges, usedExternalDataSources, verbosity);

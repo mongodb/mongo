@@ -50,6 +50,7 @@ var DBExplainQuery = (function() {
             "max",
             "maxTimeMS",
             "min",
+            "rawData",
             "readPref",
             "showDiskLoc",
             "skip",

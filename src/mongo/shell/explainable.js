@@ -161,9 +161,11 @@ var Explainable = (function() {
             if (options && options.hasOwnProperty("maxTimeMS")) {
                 distinctCmd.maxTimeMS = options.maxTimeMS;
             }
-
             if (options && options.hasOwnProperty("hint")) {
                 distinctCmd.hint = options.hint;
+            }
+            if (options && options.hasOwnProperty("rawData")) {
+                distinctCmd.rawData = options.rawData;
             }
 
             var explainCmd = buildExplainCmd(distinctCmd, this._verbosity);

@@ -41,6 +41,7 @@
 #include "mongo/db/query/query_stats/count_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/view_response_formatter.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -164,6 +165,11 @@ public:
             }();
 
             auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
+
+            uassert(ErrorCodes::InvalidOptions,
+                    "rawData is not enabled",
+                    !countRequest.getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
+
             if (prepareForFLERewrite(opCtx, countRequest.getEncryptionInformation())) {
                 processFLECountS(opCtx, nss, countRequest);
             }
@@ -333,6 +339,10 @@ public:
                 str::stream() << "Invalid namespace specified '" << nss.toStringForErrorMsg()
                               << "'",
                 nss.isValid());
+
+        uassert(ErrorCodes::InvalidOptions,
+                "rawData is not enabled",
+                !countRequest.getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
 
         // If the command has encryptionInformation, rewrite the query as necessary.
         if (prepareForFLERewrite(opCtx, countRequest.getEncryptionInformation())) {

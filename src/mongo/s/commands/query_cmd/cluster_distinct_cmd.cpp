@@ -78,6 +78,7 @@
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/views/resolved_view.h"
@@ -130,6 +131,10 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
     uassert(7923001,
             "BSON field 'querySettings' is an unknown field",
             !distinctCommand->getQuerySettings().has_value());
+
+    uassert(ErrorCodes::InvalidOptions,
+            "rawData is not enabled",
+            !distinctCommand->getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
 
     auto expCtx = ExpressionContextBuilder{}
                       .fromRequest(opCtx, *distinctCommand, defaultCollator)
