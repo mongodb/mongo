@@ -2578,7 +2578,10 @@ mongo_cc_unit_test(
         "database_cloner_test.cpp",
         "initial_sync_shared_data_test.cpp",
     ],
-    tags = ["mongo_unittest_first_group"],
+    tags = [
+        "compile_requires_large_memory_gcc",
+        "mongo_unittest_first_group",
+    ],
     deps = [
         ":cloner_test_fixtures",
         ":initial_sync_cloners",

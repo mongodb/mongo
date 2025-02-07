@@ -1368,6 +1368,9 @@ mongo_cc_library(
     header_deps = [
         "//src/mongo/unittest",
     ],
+    tags = [
+        "compile_requires_large_memory_gcc",
+    ],
     deps = [
         "audit",
         "commands",
