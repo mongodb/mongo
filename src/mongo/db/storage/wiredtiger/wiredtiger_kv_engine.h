@@ -659,6 +659,9 @@ private:
     // Returns true if directories were removed (or there weren't any to remove).
     bool _removeIdentDirectoryIfEmpty(StringData ident, size_t startPos = 0);
 
+    // Wrapped method call to WT_SESSION::drop that handles sub-level error codes if applicable.
+    Status _drop(WiredTigerSession& session, const char* uri, const char* config);
+
     mutable stdx::mutex _oldestActiveTransactionTimestampCallbackMutex;
     StorageEngine::OldestActiveTransactionTimestampCallback
         _oldestActiveTransactionTimestampCallback;

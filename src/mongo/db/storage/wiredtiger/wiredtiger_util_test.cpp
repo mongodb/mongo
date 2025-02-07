@@ -1133,5 +1133,133 @@ TEST_F(WiredTigerUtilTest, CursorOldestForEviction) {
     ASSERT(tryCount <= kRetryLimit);
 }
 
+TEST_F(WiredTigerUtilTest, DropWithConflictingDHandle) {
+    WiredTigerEventHandler eventHandler;
+
+    const std::string connection_cfg = "json_output=[error,message],verbose=[compact]";
+    WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
+    WiredTigerSession wtSession = harnessHelper.openSession();
+
+    const std::string uri = "table:conflicting_dhandle";
+    startCapturingLogMessages();
+    ASSERT_OK(wtRCToStatus(wtSession.create(uri.c_str(), nullptr), wtSession));
+
+    // Open and don't close the cursor.
+    WT_CURSOR* cursor;
+    ASSERT_EQUALS(0, wtSession.open_cursor(uri.c_str(), nullptr, nullptr, &cursor));
+
+    // Expect the drop call to fail because the cursor is still open.
+    int ret = wtSession.drop(uri.c_str(), nullptr);
+    Status status = wtRCToStatus(ret, wtSession);
+
+    ASSERT_EQUALS(EBUSY, ret);
+    ASSERT_EQUALS(ErrorCodes::ConflictingOperationInProgress, status);
+
+    int err, sub_level_err;
+    const char* err_msg;
+    wtSession.get_last_error(&err, &sub_level_err, &err_msg);
+
+    ASSERT_EQUALS(WT_CONFLICT_DHANDLE, sub_level_err);
+    ASSERT_EQUALS("another thread is currently holding the data handle of the table"_sd,
+                  StringData(err_msg));
+}
+
+TEST_F(WiredTigerUtilTest, DropWithUncommittedData) {
+    WiredTigerEventHandler eventHandler;
+
+    const std::string connection_cfg = "json_output=[error,message],verbose=[compact]";
+    WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
+    WiredTigerSession wtSession = harnessHelper.openSession();
+
+    const std::string uri = "table:conflicting_dhandle";
+    startCapturingLogMessages();
+    ASSERT_OK(
+        wtRCToStatus(wtSession.create(uri.c_str(), "key_format=S,value_format=S"), wtSession));
+
+    // Start a transaction to insert a key-value pair but do not commit it.
+    ASSERT_OK(wtRCToStatus(wtSession.begin_transaction(nullptr), wtSession));
+    WT_CURSOR* cursor;
+    ASSERT_EQUALS(0, wtSession.open_cursor(uri.c_str(), nullptr, nullptr, &cursor));
+
+    cursor->set_key(cursor, "dummy key");
+    cursor->set_value(cursor, "dummy value");
+    ASSERT_EQUALS(0, cursor->insert(cursor));
+    ASSERT_EQUALS(0, cursor->close(cursor));
+
+    // Expect the call to drop to fail because the transaction was not committed.
+    int ret = wtSession.drop(uri.c_str(), nullptr);
+    Status status = wtRCToStatus(ret, wtSession);
+
+    ASSERT_EQUALS(EBUSY, ret);
+    ASSERT_EQUALS(ErrorCodes::OngoingTransaction, status);
+
+    int err, sub_level_err;
+    const char* err_msg;
+    wtSession.get_last_error(&err, &sub_level_err, &err_msg);
+
+    ASSERT_EQUALS(WT_UNCOMMITTED_DATA, sub_level_err);
+    ASSERT_EQUALS("the table has uncommitted data and cannot be dropped yet"_sd,
+                  StringData(err_msg));
+}
+
+TEST_F(WiredTigerUtilTest, DropWithDirtyData) {
+    WiredTigerEventHandler eventHandler;
+
+    const std::string connection_cfg = "json_output=[error,message],verbose=[compact]";
+    WiredTigerUtilHarnessHelper harnessHelper(connection_cfg.c_str(), &eventHandler);
+    WiredTigerSession wtSession = harnessHelper.openSession();
+
+    const std::string uri = "table:dirty_data";
+    startCapturingLogMessages();
+    ASSERT_OK(
+        wtRCToStatus(wtSession.create(uri.c_str(), "key_format=S,value_format=S"), wtSession));
+
+    // Create and commit a transaction, but don't checkpoint so the data is still dirty.
+    WT_CURSOR* cursor;
+    ASSERT_EQUALS(0, wtSession.open_cursor(uri.c_str(), nullptr, nullptr, &cursor));
+    ASSERT_OK(wtRCToStatus(wtSession.begin_transaction(nullptr), wtSession));
+
+    cursor->set_key(cursor, "dummy key");
+    cursor->set_value(cursor, "dummy value");
+    ASSERT_EQUALS(0, cursor->insert(cursor));
+    ASSERT_EQUALS(0, wtSession.commit_transaction(nullptr));
+    ASSERT_EQUALS(0, cursor->close(cursor));
+
+    // The transaction takes time to be committed to disk, so we may get
+    // ErrorCodes::UncheckpointedData if it is still committing in WT. In this case we should sleep,
+    // then retry with increasing sleep time.
+    int tryCount = 1;
+    const int kRetryLimit = 5;
+    do {
+        sleepsecs(tryCount);
+        int ret = wtSession.drop(uri.c_str(), nullptr);
+        Status status = wtRCToStatus(ret, wtSession);
+
+        // We can get ErrorCodes::OngoingTransaction if WT is still committing, so we retry.
+        if (status == ErrorCodes::OngoingTransaction) {
+            ++tryCount;
+            continue;
+        }
+
+        // We should expect this drop to fail because the data has been committed
+        // but not checkpointed.
+        ASSERT_EQUALS(EBUSY, ret);
+        ASSERT_EQUALS(ErrorCodes::UncheckpointedData, status);
+
+        int err, sub_level_err;
+        const char* err_msg;
+        wtSession.get_last_error(&err, &sub_level_err, &err_msg);
+
+        ASSERT_EQUALS(WT_DIRTY_DATA, sub_level_err);
+        ASSERT_EQUALS("the table has dirty data and can not be dropped yet"_sd,
+                      StringData(err_msg));
+        break;
+    } while (tryCount <= kRetryLimit);
+
+    // If we tried more times than the limit, then we were not able to successfully recreate the
+    // error and should fail.
+    ASSERT(tryCount <= kRetryLimit);
+}
+
 }  // namespace
 }  // namespace mongo

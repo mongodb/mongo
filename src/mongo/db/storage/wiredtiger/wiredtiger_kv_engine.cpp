@@ -923,17 +923,8 @@ Status WiredTigerKVEngine::_rebuildIdent(WiredTigerSession& session, const char*
                     "error"_attr = status);
         return status;
     }
-
-    int rc = session.drop(uri, nullptr);
-    // WT may return EBUSY if the database contains dirty data. If we checkpoint and retry the
-    // operation it will attempt to clean up the dirty elements during checkpointing, thus allowing
-    // the operation to succeed if it was the only reason to fail.
-    if (rc == EBUSY) {
-        _checkpoint(session);
-        rc = session.drop(uri, nullptr);
-    }
-    if (rc != 0) {
-        auto status = wtRCToStatus(rc, session);
+    Status status = _drop(session, uri, nullptr);
+    if (!status.isOK()) {
         LOGV2_ERROR(22358,
                     "Rebuilding ident failed: failed to drop",
                     "uri"_attr = uri,
@@ -941,7 +932,7 @@ Status WiredTigerKVEngine::_rebuildIdent(WiredTigerSession& session, const char*
         return status;
     }
 
-    rc = session.create(uri, swMetadata.getValue().c_str());
+    int rc = session.create(uri, swMetadata.getValue().c_str());
     if (rc != 0) {
         auto status = wtRCToStatus(rc, session);
         LOGV2_ERROR(22359,
@@ -1860,13 +1851,13 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
 
     WiredTigerSession session(_connection.get());
 
-    int ret = session.drop(uri.c_str(), "checkpoint_wait=false");
-    LOGV2_DEBUG(22338, 1, "WT drop", "uri"_attr = uri, "ret"_attr = ret);
+    Status status = _drop(session, uri.c_str(), "checkpoint_wait=false");
+    LOGV2_DEBUG(22338, 1, "WT drop", "uri"_attr = uri, "status"_attr = status);
 
-    if (ret == EBUSY || MONGO_unlikely(WTDropEBUSY.shouldFail())) {
-        // Drop requires exclusive access to the table. EBUSY will be returned if there's a
-        // checkpoint running, there's dirty data pending to be written to disk, there are any open
-        // cursors on the ident, or the ident is otherwise in use.
+    if (isBusy(status)) {
+        return status;
+    }
+    if (MONGO_unlikely(WTDropEBUSY.shouldFail())) {
         return {ErrorCodes::ObjectIsBusy,
                 str::stream() << "Failed to remove drop-pending ident " << ident};
     }
@@ -1881,12 +1872,11 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
         onDrop();
     }
 
-    if (ret == ENOENT) {
+    if (status == ErrorCodes::NoSuchFile) {
         // Ident doesn't exist, it is effectively dropped.
         return Status::OK();
     }
-
-    invariantWTOK(ret, session);
+    invariant(status);
     return Status::OK();
 }
 
@@ -1908,17 +1898,17 @@ void WiredTigerKVEngine::dropIdentForImport(Interruptible& interruptible,
     // can potentially be waiting for a short period of time for WT_SESSION::drop() to run, but
     // would rather get EBUSY than wait a long time for a checkpoint to complete.
     const std::string config = "checkpoint_wait=false,lock_wait=true,remove_files=false";
-    int ret = 0;
+    Status dropStatus = Status::OK();
     size_t attempt = 0;
     do {
-        Status status = interruptible.checkForInterruptNoAssert();
-        if (status.code() == ErrorCodes::InterruptedAtShutdown) {
+        Status interruptibleStatus = interruptible.checkForInterruptNoAssert();
+        if (interruptibleStatus.code() == ErrorCodes::InterruptedAtShutdown) {
             return;
         }
 
         ++attempt;
 
-        ret = session.drop(uri.c_str(), config.c_str());
+        dropStatus = _drop(session, uri.c_str(), config.c_str());
         logAndBackoff(5114600,
                       ::mongo::logv2::LogComponent::kStorage,
                       logv2::LogSeverity::Debug(1),
@@ -1926,13 +1916,13 @@ void WiredTigerKVEngine::dropIdentForImport(Interruptible& interruptible,
                       "WiredTiger dropping ident for import",
                       "uri"_attr = uri,
                       "config"_attr = config,
-                      "ret"_attr = ret);
-    } while (ret == EBUSY);
-    if (ret == ENOENT) {
+                      "status"_attr = dropStatus);
+    } while (KVEngine::isBusy(dropStatus));
+    if (dropStatus == ErrorCodes::NoSuchFile) {
         // If the ident doesn't exist then it has already been dropped.
         return;
     }
-    invariantWTOK(ret, session);
+    invariant(dropStatus);
 }
 
 bool WiredTigerKVEngine::supportsDirectoryPerDB() const {
@@ -2984,6 +2974,22 @@ Status WiredTigerKVEngine::autoCompact(RecoveryUnit& ru, const AutoCompactOption
                     "WiredTigerKVEngine::autoCompact() failed",
                     "config"_attr = config.str(),
                     "error"_attr = status);
+    return status;
+}
+
+Status WiredTigerKVEngine::_drop(WiredTigerSession& session, const char* uri, const char* config) {
+    Status status = wtRCToStatus(session.drop(uri, config), session);
+
+    // If we failed due to uncheckpointed data, checkpoint and retry the operation so that it will
+    // attempt to clean up the dirty elements during checkpointing, thus allowing the operation to
+    // succeed if it was the only reason to fail.
+    if (status == ErrorCodes::UncheckpointedData) {
+        _checkpoint(session);
+        status = wtRCToStatus(session.drop(uri, config), session);
+    }
+
+    // TODO: SERVER-100390 add dump and debug info if we the drop failed.
+
     return status;
 }
 
