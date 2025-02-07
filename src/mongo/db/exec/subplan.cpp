@@ -224,7 +224,7 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
             CardinalityEstimate{
                 CardinalityType{plannerParams.mainCollectionInfo.collStats->getCardinality()},
                 EstimationSource::Metadata},
-            SamplingConfidenceIntervalEnum::k95,
+            _query->getExpCtx()->getQueryKnobConfiguration().getConfidenceInterval(),
             samplingMarginOfError.load(),
             internalQueryNumChunksForChunkBasedSampling.load());
     }

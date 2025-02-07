@@ -471,7 +471,7 @@ public:
                         CardinalityType{
                             _plannerParams->mainCollectionInfo.collStats->getCardinality()},
                         EstimationSource::Metadata},
-                    SamplingConfidenceIntervalEnum::k95,
+                    _cq->getExpCtx()->getQueryKnobConfiguration().getConfidenceInterval(),
                     samplingMarginOfError.load(),
                     internalQueryNumChunksForChunkBasedSampling.load());
             }
