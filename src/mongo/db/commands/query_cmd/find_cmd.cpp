@@ -647,8 +647,8 @@ public:
                                 nss,
                                 Top::LockType::ReadLocked,
                                 AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                                0 /* dbProfilingLevel */
-                );
+                                DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                    .getDatabaseProfileLevel(nss.dbName()));
             };
             auto const nssOrUUID = _cmdRequest->getNamespaceOrUUID();
             if (nssOrUUID.isNamespaceString()) {
@@ -662,19 +662,6 @@ public:
                 req.expectedUUID = _cmdRequest->getCollectionUUID();
                 return req;
             }();
-
-            // The acquireCollection can throw before we raise the profile level, and some callers
-            // expect to see profiler entries on errors that can throw in the acquisition. To avoid
-            // getting an expensive CollectionCatalog snapshot an extra time before the collection
-            // acquisition path, only do this if the collection acquisition fails. Note that this
-            // still doesn't work correctly if UUID resolution fails.
-            auto setProfileLevelOnError = ScopeGuard([&] {
-                if (nssOrUUID.isNamespaceString()) {
-                    CurOp::get(opCtx)->raiseDbProfileLevel(
-                        DatabaseProfileSettings::get(opCtx->getServiceContext())
-                            .getDatabaseProfileLevel(nssOrUUID.dbName()));
-                }
-            });
 
             boost::optional<CollectionOrViewAcquisition> collectionOrView =
                 acquireCollectionOrViewMaybeLockFree(opCtx, acquisitionRequest);
@@ -690,13 +677,6 @@ public:
                 }
             }
             const NamespaceString nss = collectionOrView->nss();
-
-            // It is cheaper to raise the profiling level here, now that a CollectionCatalog
-            // snapshot is stashed on the OpCtx.
-            CurOp::get(opCtx)->raiseDbProfileLevel(
-                DatabaseProfileSettings::get(opCtx->getServiceContext())
-                    .getDatabaseProfileLevel(nss.dbName()));
-            setProfileLevelOnError.dismiss();
 
             if (!tracker) {
                 initializeTracker(nss);
