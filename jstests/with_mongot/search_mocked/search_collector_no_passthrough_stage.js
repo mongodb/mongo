@@ -27,13 +27,14 @@ const testDB = mongos.getDB(dbName);
 const testColl = testDB.getCollection(collName);
 const foreignColl = testDB.getCollection(foreignCollName);
 
+// Ensure primary shard is shard1 so we only set the correct mongot to have history.
+assert.commandWorked(
+    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard1.name}));
+
 assert.commandWorked(testColl.insert({_id: 1, shardKey: 0, x: "ow"}));
 assert.commandWorked(testColl.insert({_id: 2, shardKey: 0, x: "now", y: "lorem"}));
 assert.commandWorked(testColl.insert({_id: 11, shardKey: 100, x: "brown", y: "ipsum"}));
 assert.commandWorked(testColl.insert({_id: 12, shardKey: 100, x: "cow", y: "lorem ipsum"}));
-// Ensure primary shard is shard1 so we only set the correct mongot to have history.
-assert.commandWorked(
-    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard1.name}));
 
 const shard0Conn = st.rs0.getPrimary();
 const shard1Conn = st.rs1.getPrimary();
