@@ -78,6 +78,7 @@ public:
                                                        _streamFixtures->clientCtx,
                                                        _streamFixtures->clientStream,
                                                        /* sslConfig */ boost::none,
+                                                       /**channelId */ UUID::gen(),
                                                        std::move(clientId),
                                                        /* shared state */ nullptr);
 

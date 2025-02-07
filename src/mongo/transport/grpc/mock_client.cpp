@@ -93,7 +93,7 @@ Future<Client::CallContext> MockClient::_streamFactory(const HostAndPort& remote
         stream = stub->stub().unauthenticatedCommandStream(ctx.get(), reactor);
     }
 
-    return Future<CallContext>::makeReady(CallContext{ctx, std::move(stream), {}});
+    return Future<CallContext>::makeReady(CallContext{ctx, std::move(stream), {}, UUID::gen()});
 }
 
 

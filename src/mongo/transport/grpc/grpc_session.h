@@ -419,6 +419,7 @@ public:
                   std::shared_ptr<ClientContext> ctx,
                   std::shared_ptr<ClientStream> stream,
                   boost::optional<SSLConfiguration> sslConfig,
+                  UUID channelId,
                   UUID clientId,
                   std::shared_ptr<SharedState> sharedState);
 
@@ -479,6 +480,10 @@ public:
         return _clientId;
     }
 
+    UUID getChannelId() const {
+        return _channelId;
+    }
+
     void appendToBSON(BSONObjBuilder& bb) const override;
 
 #ifdef MONGO_CONFIG_SSL
@@ -502,6 +507,7 @@ private:
     AtomicWord<bool> _checkedWireVersion;
     const std::shared_ptr<ClientContext> _ctx;
     const std::shared_ptr<ClientStream> _stream;
+    UUID _channelId;
     UUID _clientId;
     std::shared_ptr<SharedState> _sharedState;
 

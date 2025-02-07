@@ -69,6 +69,7 @@ public:
         std::shared_ptr<ClientContext> ctx;
         std::shared_ptr<ClientStream> stream;
         boost::optional<SSLConfiguration> sslConfig;
+        UUID channelUUID;
     };
 
     explicit Client(TransportLayer* tl, ServiceContext* svcCtx, const BSONObj& clientMetadata);

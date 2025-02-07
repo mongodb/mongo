@@ -206,6 +206,7 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
                                                            std::move(call.ctx),
                                                            std::move(call.stream),
                                                            std::move(call.sslConfig),
+                                                           std::move(call.channelUUID),
                                                            _id,
                                                            _sharedState);
 
@@ -342,9 +343,10 @@ class StubFactoryImpl : public GRPCClient::StubFactory {
     struct Channel {
         std::shared_ptr<::grpc::Channel> grpcChannel;
         boost::optional<SSLConfiguration> sslConfig;
+        UUID uuid;
 
-        Channel(std::shared_ptr<::grpc::Channel> ch, boost::optional<SSLConfiguration> ssl)
-            : grpcChannel(std::move(ch)), sslConfig(std::move(ssl)) {}
+        Channel(std::shared_ptr<::grpc::Channel> ch, boost::optional<SSLConfiguration> ssl, UUID id)
+            : grpcChannel(std::move(ch)), sslConfig(std::move(ssl)), uuid(std::move(id)) {}
     };
 
     class Stub {
@@ -375,6 +377,10 @@ class StubFactoryImpl : public GRPCClient::StubFactory {
 
         boost::optional<SSLConfiguration>& getSSLConfiguration() {
             return _channel->sslConfig;
+        }
+
+        UUID& getChannelUUID() {
+            return _channel->uuid;
         }
 
     private:
@@ -456,6 +462,7 @@ public:
                     return {::grpc::experimental::TlsCredentials(_makeTlsOptions(**tlsCache)),
                             (*tlsCache)->sslConfig};
                 }();
+                auto uuid = UUID::gen();
 
                 ::grpc::ChannelArguments channel_args;
                 channel_args.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS,
@@ -466,8 +473,12 @@ public:
                 channel_args.SetMaxSendMessageSize(MaxMessageSizeBytes);
                 channel_args.SetCompressionAlgorithm(
                     ::grpc_compression_algorithm::GRPC_COMPRESS_NONE);
+                // We must set unique channel arguments on each channel object to force gRPC to use
+                // a separate TCP connection per channel:
+                // https://stackoverflow.com/questions/53564748
+                channel_args.SetString("channelId", uuid.toString());
                 return std::make_shared<StubFactoryImpl::Channel>(
-                    ::grpc::CreateCustomChannel(uri, credentials, channel_args), sslConfig);
+                    ::grpc::CreateCustomChannel(uri, credentials, channel_args), sslConfig, uuid);
             },
             [](std::shared_ptr<Channel>& channel, Milliseconds connectTimeout) {
                 return Stub(channel);
@@ -718,8 +729,10 @@ Future<Client::CallContext> GRPCClient::_streamFactory(const HostAndPort& remote
 
     return std::move(fut).then(
         [clientContext = std::move(ctx),
-         sslConfig = stub->stub().getSSLConfiguration()](std::shared_ptr<ClientStream> stream) {
-            return Client::CallContext{std::move(clientContext), std::move(stream), sslConfig};
+         sslConfig = stub->stub().getSSLConfiguration(),
+         channelUUID = stub->stub().getChannelUUID()](std::shared_ptr<ClientStream> stream) {
+            return Client::CallContext{
+                std::move(clientContext), std::move(stream), sslConfig, channelUUID};
         });
 }
 

@@ -468,6 +468,72 @@ TEST_F(GRPCClientTest, GRPCClientAppendStatsFailedSession) {
     CommandServiceTestFixtures::runWithServer(serverHandler, clientThreadBody, std::move(options));
 }
 
+TEST_F(GRPCClientTest, UniqueChannelIds) {
+    auto serverHandler = [&](std::shared_ptr<IngressSession>) {
+    };
+
+    auto clientThreadBody = [&](auto& server, auto&) {
+        auto client = makeClient();
+        client->start();
+
+        auto session1 = client
+                            ->connect(server.getListeningAddresses().at(0),
+                                      getReactor(),
+                                      CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                      {})
+                            .get();
+
+        auto session2 = client
+                            ->connect(server.getListeningAddresses().at(1),
+                                      getReactor(),
+                                      CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                      {})
+                            .get();
+
+        ASSERT_NE(session1->getChannelId(), session2->getChannelId());
+    };
+
+    auto options = CommandServiceTestFixtures::makeServerOptions();
+    options.addresses.push_back(
+        HostAndPort(CommandServiceTestFixtures::kBindAddress, test::kLetKernelChoosePort));
+
+    CommandServiceTestFixtures::runWithServer(serverHandler, clientThreadBody, std::move(options));
+}
+
+TEST_F(GRPCClientTest, UniqueChannelIdsAfterDropChannel) {
+    auto serverHandler = [&](std::shared_ptr<IngressSession>) {
+    };
+
+    auto clientThreadBody = [&](auto& server, auto&) {
+        auto client = makeClient();
+        client->start();
+
+        auto session1 = client
+                            ->connect(server.getListeningAddresses().at(0),
+                                      getReactor(),
+                                      CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                      {})
+                            .get();
+
+        client->dropAllChannels_forTest();
+
+        auto session2 = client
+                            ->connect(server.getListeningAddresses().at(0),
+                                      getReactor(),
+                                      CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                      {})
+                            .get();
+
+        ASSERT_NE(session1->getChannelId(), session2->getChannelId());
+    };
+
+    auto options = CommandServiceTestFixtures::makeServerOptions();
+    options.addresses.push_back(
+        HostAndPort(CommandServiceTestFixtures::kBindAddress, test::kLetKernelChoosePort));
+
+    CommandServiceTestFixtures::runWithServer(serverHandler, clientThreadBody, std::move(options));
+}
+
 TEST_F(GRPCClientTest, GRPCClientMetadata) {
     boost::optional<UUID> clientId;
 
