@@ -930,6 +930,8 @@ void TransactionParticipant::Participant::_continueMultiDocumentTransaction(
     uassert(ErrorCodes::NoSuchTransaction,
             str::stream()
                 << "Given transaction number " << txnNumberAndRetryCounter.getTxnNumber()
+                << " on session " << _sessionId() << " using txnRetryCounter "
+                << txnNumberAndRetryCounter.getTxnRetryCounter()
                 << " does not match any in-progress transactions. The active transaction number is "
                 << o().activeTxnNumberAndRetryCounter.getTxnNumber(),
             txnNumberAndRetryCounter.getTxnNumber() ==
