@@ -446,7 +446,7 @@ DepsTracker::State DocumentSourceSort::getDependencies(DepsTracker* deps) const 
     _sortExecutor->sortPattern().addDependencies(deps);
 
     if (_requiredMetadata.any()) {
-        deps->requestMetadata(_requiredMetadata);
+        deps->setNeedsMetadata(_requiredMetadata);
     }
 
     return DepsTracker::State::SEE_NEXT;

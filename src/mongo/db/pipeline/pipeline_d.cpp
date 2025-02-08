@@ -667,7 +667,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSample(
         // case where a DocumentSourceCursor has been created (yet hasn't been put into a
         // Pipeline) and an exception is thrown, an invariant will trigger in the
         // DocumentSourceCursor. This is a design flaw in DocumentSourceCursor.
-        auto deps = pipeline->getDependencies(DepsTracker::kAllMetadata);
+        auto deps = pipeline->getDependencies(DepsTracker::kNoMetadata);
         const auto cursorType = deps.hasNoRequirements()
             ? DocumentSourceCursor::CursorType::kEmptyDocuments
             : DocumentSourceCursor::CursorType::kRegular;
@@ -923,7 +923,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
     const intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     Pipeline* pipeline,
-    QueryMetadataBitSet unavailableMetadata,
+    QueryMetadataBitSet availableMetadata,
     const BSONObj& queryObj,
     boost::intrusive_ptr<DocumentSourceMatch> leadingMatch,
     const boost::optional<SortPattern>& sortPattern,
@@ -991,7 +991,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
     // Perform dependency analysis. In order to minimize the dependency set, we only analyze the
     // stages that remain in the pipeline after pushdown. In particular, any dependencies for a
     // $match or $sort pushed down into the query layer will not be reflected here.
-    auto deps = pipeline->getDependencies(unavailableMetadata);
+    auto deps = pipeline->getDependencies(availableMetadata);
     *shouldProduceEmptyDocs = deps.hasNoRequirements();
 
     BSONObj projObj;
@@ -1112,7 +1112,7 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
                            const MultipleCollectionAccessor& collections,
                            const NamespaceString& nss,
                            Pipeline* pipeline,
-                           QueryMetadataBitSet unavailableMetadata,
+                           QueryMetadataBitSet availableMetadata,
                            const BSONObj& queryObj,
                            boost::intrusive_ptr<DocumentSourceMatch> leadingMatch,
                            const AggregateCommandRequest* aggRequest,
@@ -1141,7 +1141,7 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
     auto swCq = createCanonicalQuery(expCtx,
                                      nss,
                                      pipeline,
-                                     unavailableMetadata,
+                                     availableMetadata,
                                      queryObj,
                                      leadingMatch,
                                      std::move(sortPatternForCanonicalQuery),
@@ -1290,7 +1290,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
     const MultipleCollectionAccessor& collections,
     const NamespaceString& nss,
     Pipeline* pipeline,
-    QueryMetadataBitSet unavailableMetadata,
+    QueryMetadataBitSet availableMetadata,
     const BSONObj& queryObj,
     boost::intrusive_ptr<DocumentSourceMatch> leadingMatch,
     const AggregateCommandRequest* aggRequest,
@@ -1305,7 +1305,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
                                                  collections,
                                                  nss,
                                                  pipeline,
-                                                 unavailableMetadata,
+                                                 availableMetadata,
                                                  queryObj,
                                                  leadingMatch,
                                                  aggRequest,
@@ -1365,7 +1365,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
                                     plannerOpts,
                                     pipeline,
                                     expCtx->getNeedsMerge(),
-                                    unavailableMetadata,
                                     std::move(traversalPreference),
                                     shardFilterPolicy);
 
@@ -1392,7 +1391,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
     // While constructing the executor, some stages might have been lowered from the 'pipeline' into
     // the executor, so we need to recheck whether the executor's layer can still produce an empty
     // document.
-    *shouldProduceEmptyDocs = pipeline->getDependencies(unavailableMetadata).hasNoRequirements();
+    *shouldProduceEmptyDocs = pipeline->getDependencies(availableMetadata).hasNoRequirements();
     if (executor.isOK()) {
         executor.getValue()->setReturnOwnedData(!*shouldProduceEmptyDocs);
     }
@@ -1737,9 +1736,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
         }
     }
 
-    auto unavailableMetadata = isTextQuery
-        ? DepsTracker::kDefaultUnavailableMetadata & ~DepsTracker::kOnlyTextScore
-        : DepsTracker::kDefaultUnavailableMetadata;
+    auto availableMetadata = isTextQuery ? DepsTracker::kOnlyTextScore : DepsTracker::kNoMetadata;
 
     // If this is a query on a time-series collection we might need to keep it fully classic to
     // ensure no perf regressions until we implement the corresponding scenarios fully in SBE.
@@ -1794,7 +1791,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
                                                 collections,
                                                 nss,
                                                 pipeline,
-                                                unavailableMetadata,
+                                                availableMetadata,
                                                 queryObj,
                                                 std::move(leadingMatch),
                                                 aggRequest,
@@ -1872,18 +1869,17 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeoNear(
     BSONObj fullQuery = geoNearStage->asNearQuery(nearFieldName);
 
     bool shouldProduceEmptyDocs = false;
-    auto exec = uassertStatusOK(
-        prepareExecutor(expCtx,
-                        collections,
-                        nss,
-                        pipeline,
-                        DepsTracker::kDefaultUnavailableMetadata & ~DepsTracker::kAllGeoNearData,
-                        fullQuery,
-                        nullptr,
-                        aggRequest,
-                        Pipeline::kGeoNearMatcherFeatures,
-                        &shouldProduceEmptyDocs,
-                        false /* timeseriesBoundedSortOptimization */));
+    auto exec = uassertStatusOK(prepareExecutor(expCtx,
+                                                collections,
+                                                nss,
+                                                pipeline,
+                                                DepsTracker::kAllGeoNearData,
+                                                fullQuery,
+                                                nullptr,
+                                                aggRequest,
+                                                Pipeline::kGeoNearMatcherFeatures,
+                                                &shouldProduceEmptyDocs,
+                                                false /* timeseriesBoundedSortOptimization */));
 
     auto attachExecutorCallback = [distanceField = geoNearStage->getDistanceField(),
                                    locationField = geoNearStage->getLocationField(),

@@ -222,11 +222,11 @@ public:
     }
 
     void visit(const ExpressionMeta* expr) final {
-        _deps->setNeedsMetadata(expr->getMetaType(), true);
+        _deps->setNeedsMetadata(expr->getMetaType());
     }
 
     void visit(const ExpressionInternalRawSortKey* expr) final {
-        _deps->setNeedsMetadata(DocumentMetadataFields::MetaType::kSortKey, true);
+        _deps->setNeedsMetadata(DocumentMetadataFields::MetaType::kSortKey);
     }
 
     void visit(const ExpressionRandom* expr) final {

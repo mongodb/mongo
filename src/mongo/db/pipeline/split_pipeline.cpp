@@ -436,7 +436,7 @@ private:
      */
     void _limitFieldsSentFromShardsToMerger() {
         DepsTracker mergeDeps(
-            _splitPipeline.mergePipeline->getDependencies(DepsTracker::kNoMetadata));
+            _splitPipeline.mergePipeline->getDependencies(DepsTracker::NoMetadataValidation()));
         if (mergeDeps.needWholeDocument)
             return;  // the merge needs all fields, so nothing we can do.
 
@@ -454,7 +454,7 @@ private:
         // 2) Optimization IS NOT applied immediately following a $project or $group since it would
         //    add an unnecessary project (and therefore a deep-copy).
         for (auto&& source : _splitPipeline.shardsPipeline->getSources()) {
-            DepsTracker dt(DepsTracker::kNoMetadata);
+            DepsTracker dt;
             if (source->getDependencies(&dt) & DepsTracker::State::EXHAUSTIVE_FIELDS)
                 return;
         }
@@ -473,10 +473,14 @@ private:
      */
     void _prepopulateTextScoreMetadata() const {
         auto queryObj = _splitPipeline.mergePipeline->getInitialQuery();
-        auto unavailableMetadata = DocumentSourceMatch::isTextQuery(queryObj)
-            ? DepsTracker::kNoMetadata
-            : DepsTracker::kOnlyTextScore;
-        (void)_splitPipeline.mergePipeline->getDependencies(unavailableMetadata);
+        auto availableMetadata = DocumentSourceMatch::isTextQuery(queryObj)
+            ? DepsTracker::kOnlyTextScore
+            : DepsTracker::kNoMetadata;
+
+        // TODO SERVER-35424 Right now we don't validate geo near metadata here, so we mark it as
+        // available. We should implement better dependency tracking for $geoNear.
+        availableMetadata |= DepsTracker::kAllGeoNearData;
+        (void)_splitPipeline.mergePipeline->getDependencies(availableMetadata);
     }
 
     /**

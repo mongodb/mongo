@@ -74,6 +74,16 @@ typedef std::set<std::string, PathComparator> OrderedPathSet;
  * This struct allows components in an agg pipeline to report what they need from their input.
  */
 struct DepsTracker {
+    struct NoMetadataValidation {
+        // Nothing.
+    };
+
+    /**
+     * std::variant type used for tracking metadata dependency validation (i.e., if a metadata field
+     * is requested, validate that it will provided to the pipeline), used for _availableMetadata.
+     */
+    using MetadataDependencyValidation = std::variant<NoMetadataValidation, QueryMetadataBitSet>;
+
     /**
      * Used by aggregation stages to report whether or not dependency resolution is complete, or
      * must continue to the next stage.
@@ -102,28 +112,21 @@ struct DepsTracker {
     /**
      * Represents a state where all geo metadata is available.
      */
-    static constexpr auto kAllGeoNearData = QueryMetadataBitSet(
-        (1 << DocumentMetadataFields::kGeoNearDist) | (1 << DocumentMetadataFields::kGeoNearPoint));
+    static constexpr auto kAllGeoNearData =
+        QueryMetadataBitSet((1 << DocumentMetadataFields::MetaType::kGeoNearDist) |
+                            (1 << DocumentMetadataFields::MetaType::kGeoNearPoint));
 
     /**
      * Represents a state where all metadata is available.
      */
     static constexpr auto kAllMetadata =
-        QueryMetadataBitSet(~(1 << DocumentMetadataFields::kNumFields));
+        QueryMetadataBitSet(~(1 << DocumentMetadataFields::MetaType::kNumFields));
 
     /**
      * Represents a state where only text score metadata is available.
      */
     static constexpr auto kOnlyTextScore =
-        QueryMetadataBitSet(1 << DocumentMetadataFields::kTextScore);
-
-    /**
-     * By default, certain metadata is unavailable to the pipeline, unless explicitly specified
-     * that it is available. This state represents all metadata which is not available by default.
-     */
-    static constexpr auto kDefaultUnavailableMetadata = QueryMetadataBitSet(
-        (1 << DocumentMetadataFields::kTextScore) | (1 << DocumentMetadataFields::kGeoNearDist) |
-        (1 << DocumentMetadataFields::kGeoNearPoint));
+        QueryMetadataBitSet(1 << DocumentMetadataFields::MetaType::kTextScore);
 
     /**
      * Represents a state where no metadata is available.
@@ -131,11 +134,11 @@ struct DepsTracker {
     static constexpr auto kNoMetadata = QueryMetadataBitSet();
 
     /**
-     * If left unspecified, default to no metadata being unavailable - i.e., all metadata is
-     * available.
+     * If left unspecified, default to NoMetadataValidation(), which means we don't want to
+     * track available metadata and will skip dependency validation.
      */
-    DepsTracker(const QueryMetadataBitSet& unavailableMetadata = kNoMetadata)
-        : _unavailableMetadata{unavailableMetadata} {}
+    explicit DepsTracker(MetadataDependencyValidation availableMetadata = NoMetadataValidation())
+        : _availableMetadata{availableMetadata} {}
 
     enum class TruncateToRootLevel : bool { no, yes };
 
@@ -152,7 +155,7 @@ struct DepsTracker {
     /**
      * Helper function to determine whether the query has a dependency on the $text score metadata.
      *
-     * TODO SERVER-99596 Consider finding a better home for this helper.
+     * TODO SERVER-99169 Consider finding a better home for this helper.
      */
     static bool needsTextScoreMetadata(const QueryMetadataBitSet& metadataDeps);
 
@@ -177,20 +180,27 @@ struct DepsTracker {
     }
 
     /**
-     * Returns a value with bits set indicating the types of metadata not available to the
-     * pipeline.
+     * Returns a value with bits set indicating the types of metadata available to the pipeline. If
+     * available metadata isn't being tracked, returns kAllMetadata.
      */
-    QueryMetadataBitSet getUnavailableMetadata() const {
-        return _unavailableMetadata;
+    QueryMetadataBitSet getAvailableMetadata() const {
+        return std::visit(
+            OverloadedVisitor{
+                [](NoMetadataValidation) { return kAllMetadata; },
+                [](QueryMetadataBitSet availableMetadata) { return availableMetadata; },
+            },
+            _availableMetadata);
     }
 
+
     /**
-     * Sets whether or not metadata 'type' is required. Throws if 'required' is true but that
-     * metadata is not available to the pipeline.
+     * Marks that the given metadata type (or set of metadata types) is required by this pipeline.
      *
-     * Except for MetadataType::SORT_KEY, once 'type' is required, it cannot be unset.
+     * If _validateMetadataRequests is set and the type is marked as one that should be validated,
+     * throws a UserException if the type has not been marked as available.
      */
-    void setNeedsMetadata(DocumentMetadataFields::MetaType type, bool required);
+    void setNeedsMetadata(DocumentMetadataFields::MetaType type);
+    void setNeedsMetadata(const QueryMetadataBitSet& metadata);
 
     /**
      * Returns true if the DepsTracker requires that metadata of type 'type' is present.
@@ -217,18 +227,6 @@ struct DepsTracker {
     }
 
     /**
-     * Request that all metadata in the given QueryMetadataBitSet be added as dependencies. Throws a
-     * UserException if any of the requested metadata fields have been marked as unavailable.
-     */
-    void requestMetadata(const QueryMetadataBitSet& metadata) {
-        for (size_t i = 1; i < DocumentMetadataFields::kNumFields; ++i) {
-            if (metadata[i]) {
-                setNeedsMetadata(static_cast<DocumentMetadataFields::MetaType>(i), true);
-            }
-        }
-    }
-
-    /**
      * Return names of needed fields in dotted notation.  A custom comparator orders the fields
      * such that a parent is immediately before its children.
      */
@@ -242,8 +240,11 @@ struct DepsTracker {
     bool needRandomGenerator = false;
 
 private:
-    // Represents all metadata not available to the pipeline.
-    QueryMetadataBitSet _unavailableMetadata;
+    // Struct to track metadata dependency validation: either NoMetadataValidation, or a bitset of
+    // metadata fields that have been marked available to the pipeline. Used for validating that
+    // downstream metadata dependencies are requesting metadata that will actually be available to
+    // the pipeline.
+    MetadataDependencyValidation _availableMetadata;
 
     // Represents which metadata is used by the pipeline. This is populated while performing
     // dependency analysis.

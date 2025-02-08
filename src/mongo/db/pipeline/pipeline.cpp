@@ -689,24 +689,22 @@ void Pipeline::addVariableRefs(std::set<Variables::Id>* refs) const {
 }
 
 DepsTracker Pipeline::getDependencies(
-    boost::optional<QueryMetadataBitSet> unavailableMetadata) const {
-    return getDependenciesForContainer(getContext(), _sources, unavailableMetadata);
+    DepsTracker::MetadataDependencyValidation availableMetadata) const {
+    return getDependenciesForContainer(getContext(), _sources, availableMetadata);
 }
 
 DepsTracker Pipeline::getDependenciesForContainer(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const SourceContainer& container,
-    boost::optional<QueryMetadataBitSet> unavailableMetadata) {
-    // If 'unavailableMetadata' was not specified, we assume all metadata is available. This allows
-    // us to call 'deps.setNeedsMetadata()' without throwing.
-    DepsTracker deps(unavailableMetadata.get_value_or(DepsTracker::kNoMetadata));
+    DepsTracker::MetadataDependencyValidation availableMetadata) {
+    DepsTracker deps(availableMetadata);
 
     OrderedPathSet generatedPaths;
     bool hasUnsupportedStage = false;
     bool knowAllFields = false;
     bool knowAllMeta = false;
     for (auto&& source : container) {
-        DepsTracker localDeps(deps.getUnavailableMetadata());
+        DepsTracker localDeps(deps.getAvailableMetadata());
         DepsTracker::State status = source->getDependencies(&localDeps);
 
         deps.needRandomGenerator |= localDeps.needRandomGenerator;
@@ -751,7 +749,7 @@ DepsTracker Pipeline::getDependenciesForContainer(
         }
 
         if (!hasUnsupportedStage && !knowAllMeta) {
-            deps.requestMetadata(localDeps.metadataDeps());
+            deps.setNeedsMetadata(localDeps.metadataDeps());
             knowAllMeta = status & DepsTracker::State::EXHAUSTIVE_META;
         }
     }
@@ -759,16 +757,13 @@ DepsTracker Pipeline::getDependenciesForContainer(
     if (!knowAllFields)
         deps.needWholeDocument = true;  // don't know all fields we need
 
-    if (!deps.getUnavailableMetadata()[DocumentMetadataFields::kTextScore]) {
+    if (deps.getAvailableMetadata()[DocumentMetadataFields::kTextScore]) {
         // There is a text score available. If we are the first half of a split pipeline, then we
         // have to assume future stages might depend on the textScore (unless we've encountered a
         // stage that doesn't preserve metadata).
         if (expCtx->getNeedsMerge() && !knowAllMeta) {
-            deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
+            deps.setNeedsMetadata(DocumentMetadataFields::kTextScore);
         }
-    } else {
-        // There is no text score available, so we don't need to ask for it.
-        deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, false);
     }
 
     return deps;

@@ -133,8 +133,9 @@ SortPattern::SortPattern(const BSONObj& obj,
     }
 }
 
-QueryMetadataBitSet SortPattern::metadataDeps(QueryMetadataBitSet unavailableMetadata) const {
-    DepsTracker depsTracker{unavailableMetadata};
+QueryMetadataBitSet SortPattern::metadataDeps(
+    DepsTracker::MetadataDependencyValidation availableMetadata) const {
+    DepsTracker depsTracker{availableMetadata};
     for (auto&& part : _sortPattern) {
         if (part.expression) {
             expression::addDependencies(part.expression.get(), &depsTracker);

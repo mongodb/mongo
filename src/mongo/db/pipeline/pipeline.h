@@ -415,12 +415,12 @@ public:
         const SerializationOptions& opts = SerializationOptions{}) const;
 
     /**
-     * Returns the dependencies needed by this pipeline. 'unavailableMetadata' should reflect what
-     * metadata is not present on documents that are input to the front of the pipeline. If
-     * 'unavailableMetadata' is specified, this method will throw if any of the dependencies
+     * Returns the dependencies needed by this pipeline. 'availableMetadata' should reflect what
+     * metadata is present on documents that are input to the front of the pipeline. If
+     * 'availableMetadata' is specified, this method will throw if any of the dependencies
      * reference unavailable metadata.
      */
-    DepsTracker getDependencies(boost::optional<QueryMetadataBitSet> unavailableMetadata) const;
+    DepsTracker getDependencies(DepsTracker::MetadataDependencyValidation availableMetadata) const;
 
     /**
      * Populate 'refs' with the variables referred to by this pipeline, including user and system
@@ -429,15 +429,15 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const;
 
     /**
-     * Returns the dependencies needed by the SourceContainer. 'unavailableMetadata' should reflect
-     * what metadata is not present on documents that are input to the front of the pipeline. If
-     * 'unavailableMetadata' is specified, this method will throw if any of the dependencies
+     * Returns the dependencies needed by the SourceContainer. 'availableMetadata' should reflect
+     * what metadata is present on documents that are input to the front of the pipeline. If
+     * 'availableMetadata' is specified, this method will throw if any of the dependencies
      * reference unavailable metadata.
      */
     static DepsTracker getDependenciesForContainer(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const SourceContainer& container,
-        boost::optional<QueryMetadataBitSet> unavailableMetadata);
+        DepsTracker::MetadataDependencyValidation availableMetadata);
 
     const SourceContainer& getSources() const {
         return _sources;

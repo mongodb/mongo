@@ -104,15 +104,30 @@ BSONObj DepsTracker::toProjectionWithoutMetadata(
     return bb.obj();
 }
 
-void DepsTracker::setNeedsMetadata(DocumentMetadataFields::MetaType type, bool required) {
-    uassert(40218,
-            str::stream() << "query requires " << type << " metadata, but it is not available",
-            !required || !_unavailableMetadata[type]);
+void DepsTracker::setNeedsMetadata(DocumentMetadataFields::MetaType type) {
+    // TODO SERVER-99169 Validate 'score' and 'scoreDetails' too.
+    static const std::set<DocumentMetadataFields::MetaType> kMetadataFieldsToBeValidated = {
+        DocumentMetadataFields::MetaType::kTextScore,
+        DocumentMetadataFields::MetaType::kGeoNearDist,
+        DocumentMetadataFields::MetaType::kGeoNearPoint};
 
-    // If the metadata type is not required, then it should not be recorded as a metadata
-    // dependency.
-    invariant(required || !_metadataDeps[type]);
-    _metadataDeps[type] = required;
+    // Perform validation if necessary.
+    if (!std::holds_alternative<NoMetadataValidation>(_availableMetadata) &&
+        kMetadataFieldsToBeValidated.contains(type)) {
+        auto& availableMetadataBitSet = std::get<QueryMetadataBitSet>(_availableMetadata);
+        uassert(40218,
+                str::stream() << "query requires " << type << " metadata, but it is not available",
+                availableMetadataBitSet[type]);
+    }
+    _metadataDeps[type] = true;
+}
+
+void DepsTracker::setNeedsMetadata(const QueryMetadataBitSet& metadata) {
+    for (size_t i = 1; i < DocumentMetadataFields::kNumFields; ++i) {
+        if (metadata[i]) {
+            setNeedsMetadata(static_cast<DocumentMetadataFields::MetaType>(i));
+        }
+    }
 }
 
 // Returns true if the lhs value should sort before the rhs, false otherwise.

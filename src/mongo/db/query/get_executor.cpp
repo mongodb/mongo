@@ -1143,7 +1143,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     std::size_t plannerOptions,
     Pipeline* pipeline,
     bool needsMerge,
-    QueryMetadataBitSet unavailableMetadata,
     boost::optional<TraversalPreference> traversalPreference,
     ExecShardFilterPolicy execShardFilterPolicy) {
     invariant(canonicalQuery);
@@ -1258,7 +1257,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     } else if (canCommitToSbe()) {
         // Commit to using SBE by removing the pushed-down aggregation stages from the original
         // pipeline and by mutating the canonical query with search specific metadata.
-        finalizePipelineStages(pipeline, unavailableMetadata, canonicalQuery.get());
+        finalizePipelineStages(pipeline, canonicalQuery.get());
     }
 
 
@@ -1340,7 +1339,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
             canonicalQuery->resetDistinct();
             if (canonicalQuery->isSbeCompatible()) {
                 // Stages still need to be finalized for SBE since classic was used previously.
-                finalizePipelineStages(pipeline, unavailableMetadata, canonicalQuery.get());
+                finalizePipelineStages(pipeline, canonicalQuery.get());
             }
             return makePlanner(makeQueryPlannerParams(plannerOptions));
         }

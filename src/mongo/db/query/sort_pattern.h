@@ -163,8 +163,8 @@ public:
      * available. In this case, throws a UserException if any unavailable metadata type is also a
      * metadata dependency.
      */
-    QueryMetadataBitSet metadataDeps(
-        QueryMetadataBitSet unavailableMetadata = QueryMetadataBitSet{}) const;
+    QueryMetadataBitSet metadataDeps(DepsTracker::MetadataDependencyValidation availableMetadata =
+                                         DepsTracker::NoMetadataValidation()) const;
 
 private:
     std::vector<SortPatternPart> _sortPattern;

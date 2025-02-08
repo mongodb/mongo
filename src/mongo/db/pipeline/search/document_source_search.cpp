@@ -174,7 +174,7 @@ StageConstraints DocumentSourceSearch::constraints(Pipeline::SplitState pipeStat
 }
 bool checkRequiresSearchSequenceToken(Pipeline::SourceContainer::iterator itr,
                                       Pipeline::SourceContainer* container) {
-    DepsTracker deps = DepsTracker::kNoMetadata;
+    DepsTracker deps;
     while (itr != container->end()) {
         auto nextStage = itr->get();
         nextStage->getDependencies(&deps);

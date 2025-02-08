@@ -84,9 +84,9 @@ struct ParsedFindCommand {
     boost::optional<projection_ast::Projection> proj;
     boost::optional<SortPattern> sort;
 
-    // Based on parsing the query, which metadata will *not* be available. For example, if there is
-    // no $text clause, then a text score will not be available.
-    QueryMetadataBitSet unavailableMetadata;
+    // Based on parsing the query, which metadata will be available. For example, if there is
+    // a $text clause, then a text score will be available.
+    QueryMetadataBitSet availableMetadata;
 
     // This is saved for an edge case where we need to re-parse a projection later. Only populated
     // if there is a non-empty projection.

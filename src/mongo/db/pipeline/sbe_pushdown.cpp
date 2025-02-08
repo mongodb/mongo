@@ -579,9 +579,7 @@ bool findSbeCompatibleStagesForPushdown(
 }  // findSbeCompatibleStagesForPushdown
 }  // namespace
 
-void finalizePipelineStages(Pipeline* pipeline,
-                            QueryMetadataBitSet unavailableMetadata,
-                            CanonicalQuery* canonicalQuery) {
+void finalizePipelineStages(Pipeline* pipeline, CanonicalQuery* canonicalQuery) {
     if (!pipeline || pipeline->getSources().empty()) {
         return;
     }

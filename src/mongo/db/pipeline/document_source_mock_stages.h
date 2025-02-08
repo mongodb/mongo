@@ -238,7 +238,7 @@ public:
     DocumentSourceNeedsOnlyTextScore(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourceDependencyDummy(expCtx) {}
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
-        deps->setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
+        deps->setNeedsMetadata(DocumentMetadataFields::kTextScore);
         return DepsTracker::State::EXHAUSTIVE_META;
     }
 

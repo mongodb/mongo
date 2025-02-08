@@ -1193,7 +1193,7 @@ void DocumentSourceInternalUnpackBucket::setEventFilter(BSONObj eventFilterBson,
     pExpCtx->setSbeCompatibility(
         std::min(originalSbeCompatibility, _isEventFilterSbeCompatible.get()));
 
-    _eventFilterDeps = {};
+    _eventFilterDeps = DepsTracker();
     match_expression::addDependencies(_eventFilter.get(), &_eventFilterDeps);
 }
 
@@ -1758,7 +1758,9 @@ DepsTracker DocumentSourceInternalUnpackBucket::getRestPipelineDependencies(
     Pipeline::SourceContainer* container,
     bool includeEventFilter) const {
     auto deps = Pipeline::getDependenciesForContainer(
-        pExpCtx, Pipeline::SourceContainer{std::next(itr), container->end()}, boost::none);
+        pExpCtx,
+        Pipeline::SourceContainer{std::next(itr), container->end()},
+        DepsTracker::NoMetadataValidation());
     if (_eventFilter && includeEventFilter) {
         match_expression::addDependencies(_eventFilter.get(), &deps);
     }

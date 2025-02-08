@@ -5859,7 +5859,7 @@ TEST_F(PipelineDependenciesTest, ShouldThrowIfTextScoreIsNeededButNotPresent) {
     auto needsText = DocumentSourceNeedsOnlyTextScore::create(ctx);
     auto pipeline = makePipeline({needsText});
 
-    ASSERT_THROWS(pipeline->getDependencies(DepsTracker::kAllMetadata), AssertionException);
+    ASSERT_THROWS(pipeline->getDependencies(DepsTracker::kNoMetadata), AssertionException);
 }
 
 TEST_F(PipelineDependenciesTest,
@@ -5870,22 +5870,22 @@ TEST_F(PipelineDependenciesTest,
     ctx->setNeedsMerge(true);
 
     auto pipeline = makePipeline({});
-    auto deps = pipeline->getDependencies(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
+    auto deps = pipeline->getDependencies(DepsTracker::kOnlyTextScore);
     ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 
     pipeline = makePipeline({DocumentSourceNeedsASeeNext::create(ctx)});
-    deps = pipeline->getDependencies(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
+    deps = pipeline->getDependencies(DepsTracker::kOnlyTextScore);
     ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 
     // When needsMerge is false, if no stage explicitly uses textScore then we know it isn't needed.
     ctx->setNeedsMerge(false);
 
     pipeline = makePipeline({});
-    deps = pipeline->getDependencies(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
+    deps = pipeline->getDependencies(DepsTracker::kOnlyTextScore);
     ASSERT_FALSE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 
     pipeline = makePipeline({DocumentSourceNeedsASeeNext::create(ctx)});
-    deps = pipeline->getDependencies(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
+    deps = pipeline->getDependencies(DepsTracker::kOnlyTextScore);
     ASSERT_FALSE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 }
 
@@ -5895,8 +5895,7 @@ TEST_F(PipelineDependenciesTest, ShouldNotRequireTextScoreIfAvailableButDefinite
     auto needsText = DocumentSourceNeedsOnlyTextScore::create(ctx);
     auto pipeline = makePipeline({stripsTextScore, needsText});
 
-    auto depsTracker =
-        pipeline->getDependencies(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
+    auto depsTracker = pipeline->getDependencies(DepsTracker::kOnlyTextScore);
 
     // 'stripsTextScore' claims that no further stage will need metadata information, so we
     // shouldn't have the text score as a dependency.

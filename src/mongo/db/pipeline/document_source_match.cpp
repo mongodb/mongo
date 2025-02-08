@@ -115,8 +115,7 @@ void DocumentSourceMatch::rebuild(BSONObj predicate, std::unique_ptr<MatchExpres
     _backingBsonForPredicate = std::move(predicate);
     _isTextQuery = containsTextOperator(*expr);
     DepsTracker dependencies =
-        DepsTracker(_isTextQuery ? DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore
-                                 : DepsTracker::kAllMetadata);
+        DepsTracker(_isTextQuery ? DepsTracker::kOnlyTextScore : DepsTracker::kNoMetadata);
     getDependencies(expr.get(), &dependencies);
     _matchProcessor.emplace(MatchProcessor(std::move(expr), std::move(dependencies)));
 }
@@ -629,7 +628,7 @@ DepsTracker::State DocumentSourceMatch::getDependencies(const MatchExpression* e
         // A $text aggregation field should return EXHAUSTIVE_FIELDS, since we don't necessarily
         // know what field it will be searching without examining indices.
         deps->needWholeDocument = true;
-        deps->setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
+        deps->setNeedsMetadata(DocumentMetadataFields::kTextScore);
         return DepsTracker::State::EXHAUSTIVE_FIELDS;
     }
 
