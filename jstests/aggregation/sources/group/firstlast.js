@@ -115,3 +115,20 @@ assert.commandWorked(coll.insert({a: 1, b: 1}));
 assert.commandWorked(coll.insert({a: 1, b: 2}));
 assertFirstLast(1, 0, [], {$mod: ['$b', 2]});
 assertFirstLast(0, 1, [], {$mod: [{$add: ['$b', 1]}, 2]});
+
+// Multikey projections without sort. Sort-handling logic correctly preserves the projection if some
+// sort exists. Here, we ensure that arrays do not get unwound.
+assert(coll.drop());
+assert.commandWorked(coll.insertOne({mk: [1, 2, 3], notMk: 4}));
+assert.commandWorked(coll.createIndex({notMk: 1, mk: 1}));
+assert.commandWorked(coll.createIndex({notMk: -1, mk: -1}));
+
+const runAndConfirmResult = (pipeline, expected) => {
+    const result = coll.aggregate(pipeline).toArray();
+    assert.eq(result, expected);
+};
+
+runAndConfirmResult([{$group: {_id: "$notMk", acc: {$first: "$mk"}}}], [{_id: 4, acc: [1, 2, 3]}]);
+runAndConfirmResult([{$group: {_id: "$notMk", acc: {$last: "$mk"}}}], [{_id: 4, acc: [1, 2, 3]}]);
+runAndConfirmResult([{$match: {notMk: {$eq: 4}}}, {$group: {_id: "$notMk", acc: {$last: "$mk"}}}],
+                    [{_id: 4, acc: [1, 2, 3]}]);

@@ -36,6 +36,8 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_types.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 namespace mongo {
 
 namespace {
@@ -47,9 +49,11 @@ namespace {
  */
 bool isIndexSuitableForDistinct(const IndexEntry& index,
                                 const std::string& field,
+                                const OrderedPathSet& projectionFields,
                                 const BSONObj& filter,
                                 bool flipDistinctScanDirection,
-                                bool strictDistinctOnly) {
+                                bool strictDistinctOnly,
+                                bool hasSort) {
     // If the caller did not request a "strict" distinct scan then we may choose a plan which
     // unwinds arrays and treats each element in an array as its own key.
     const bool mayUnwindArrays = !strictDistinctOnly;
@@ -69,8 +73,12 @@ bool isIndexSuitableForDistinct(const IndexEntry& index,
             return false;
         }
         if (!mayUnwindArrays &&
-            isAnyComponentOfPathMultikey(
-                index.keyPattern, index.multikey, index.multikeyPaths, field)) {
+            isAnyComponentOfPathOrProjectionMultikey(index.keyPattern,
+                                                     index.multikey,
+                                                     index.multikeyPaths,
+                                                     field,
+                                                     projectionFields,
+                                                     hasSort)) {
             // If the caller requested "strict" distinct that does not "pre-unwind" arrays,
             // then an index which is multikey on the distinct field may not be used. This is
             // because when indexing an array each element gets inserted individually. Any plan
@@ -170,14 +178,20 @@ bool getDistinctNodeIndex(const std::vector<IndexEntry>& indices,
                           const CollatorInterface* collator,
                           bool flipDistinctScanDirection,
                           bool strictDistinctOnly,
+                          bool hasSort,
                           size_t* indexOut) {
     tassert(951520, "indexOut must be initialized", indexOut);
     size_t minIndexFields = Ordering::kMaxCompoundIndexKeys + 1;
     bool someIndexCoversProj = false;
     for (size_t i = 0; i < indices.size(); ++i) {
         // If we're here, it means the query does not have a filter.
-        if (!isIndexSuitableForDistinct(
-                indices[i], key, {} /*filter*/, flipDistinctScanDirection, strictDistinctOnly)) {
+        if (!isIndexSuitableForDistinct(indices[i],
+                                        key,
+                                        projectionFields,
+                                        {} /*filter*/,
+                                        flipDistinctScanDirection,
+                                        strictDistinctOnly,
+                                        hasSort)) {
             continue;
         }
         if (isAFullIndexScanPreferable(indices[i], key, collator)) {
@@ -219,6 +233,8 @@ std::unique_ptr<QuerySolution> constructCoveredDistinctScan(
                              collator,
                              canonicalDistinct.isDistinctScanDirectionFlipped(),
                              strictDistinctOnly,
+                             canonicalQuery.getDistinct()->getSortRequirement().has_value() ||
+                                 canonicalQuery.getSortPattern(),
                              &distinctNodeIndex)) {
         // Hand-construct a distinct scan plan. Note that this is not a valid plan yet.
         // 'analyzeDataAccess()' will add additional stages as needed and call
@@ -297,16 +313,17 @@ std::unique_ptr<QuerySolution> createDistinctScanSolution(const CanonicalQuery& 
     return nullptr;  // no suitable solution has been found
 }
 
-bool isAnyComponentOfPathMultikey(const BSONObj& indexKeyPattern,
-                                  bool isMultikey,
-                                  const MultikeyPaths& indexMultikeyInfo,
-                                  StringData path) {
+bool isAnyComponentOfPathOrProjectionMultikey(const BSONObj& indexKeyPattern,
+                                              bool isMultikey,
+                                              const MultikeyPaths& indexMultikeyInfo,
+                                              StringData path,
+                                              const OrderedPathSet& projFields,
+                                              bool hasSort) {
     if (!isMultikey) {
         return false;
     }
 
     size_t keyPatternFieldIndex = 0;
-    bool found = false;
     if (indexMultikeyInfo.empty()) {
         // There is no path-level multikey information available, so we must assume 'path' is
         // multikey.
@@ -314,16 +331,27 @@ bool isAnyComponentOfPathMultikey(const BSONObj& indexKeyPattern,
     }
 
     for (auto&& elt : indexKeyPattern) {
-        if (elt.fieldNameStringData() == path) {
-            found = true;
-            break;
+        const auto field = elt.fieldNameStringData();
+        // If we are checking for a multikey projection and have not specified a sort, plan
+        // enumeration will be bypassed. This will skip checks that would usually stop us from
+        // creating a covered IXSCAN (and, by extension, a DISTINCT_SCAN), so we need to prevent
+        // that case here.
+        if (field == path || (!hasSort && projFields.find(field) != projFields.end())) {
+            LOGV2_DEBUG(9723800,
+                        5,
+                        "Checking multikeyness",
+                        "keyPatternFieldIndex"_attr = keyPatternFieldIndex,
+                        "indexMultikeyInfoSize"_attr = indexMultikeyInfo.size());
+            tassert(9723801,
+                    "Smaller than expected indexMultikeyInfo size",
+                    indexMultikeyInfo.size() > keyPatternFieldIndex);
+            if (!indexMultikeyInfo[keyPatternFieldIndex].empty()) {
+                return true;
+            }
         }
         keyPatternFieldIndex++;
     }
-    invariant(found);
-
-    invariant(indexMultikeyInfo.size() > keyPatternFieldIndex);
-    return !indexMultikeyInfo[keyPatternFieldIndex].empty();
+    return false;
 }
 
 bool finalizeDistinctScan(const CanonicalQuery& canonicalQuery,
@@ -419,8 +447,13 @@ bool finalizeDistinctScan(const CanonicalQuery& canonicalQuery,
     // DISTINCT_SCAN, for e.g. if the distinct key is not part of the index. In the former case, we
     // have not done this check yet, so we filter out ineligible indexes here.
     if (isShardFilteringDistinctScanEnabled) {
-        if (!isIndexSuitableForDistinct(
-                indexEntry, field, filter, flipDistinctScanDirection, strictDistinctOnly)) {
+        if (!isIndexSuitableForDistinct(indexEntry,
+                                        field,
+                                        OrderedPathSet{},
+                                        filter,
+                                        flipDistinctScanDirection,
+                                        strictDistinctOnly,
+                                        !hasSort)) {
             return false;
         }
         if (filter.isEmpty() && !hasSort &&

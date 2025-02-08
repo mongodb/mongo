@@ -606,10 +606,11 @@ std::vector<IndexEntry> getIndexEntriesForDistinct(
             }
 
             if (!mayUnwindArrays &&
-                isAnyComponentOfPathMultikey(desc->keyPattern(),
-                                             ice->isMultikey(opCtx, collectionPtr),
-                                             ice->getMultikeyPaths(opCtx, collectionPtr),
-                                             key)) {
+                isAnyComponentOfPathOrProjectionMultikey(
+                    desc->keyPattern(),
+                    ice->isMultikey(opCtx, collectionPtr),
+                    ice->getMultikeyPaths(opCtx, collectionPtr),
+                    key)) {
                 // If the caller requested "strict" distinct that does not "pre-unwind" arrays,
                 // then an index which is multikey on the distinct field may not be used. This is
                 // because when indexing an array each element gets inserted individually. Any plan

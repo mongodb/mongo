@@ -38,12 +38,19 @@ namespace mongo {
  * Return whether or not any component of the path 'path' is multikey given an index key pattern
  * and multikeypaths. If no multikey metdata is available for the index, and the index is marked
  * multikey, conservatively assumes that a component of 'path' _is_ multikey. The 'isMultikey'
- * property of an index is false for indexes that definitely have no multikey paths.
+ * property of an index is false for indexes that definitely have no multikey paths. If the query
+ * has no specified sort, we must also consider whether any of the projection fields are multikey
+ * when determining eligibility for DISTINCT_SCAN. We pass the hasSort parameter to confirm that we
+ * only check for projection multikeyness if no sort order has been specified. If a sort does exist,
+ * plan enumeration will properly handle checking the (in)validity of a covered IXSCAN or
+ * DISTINCT_SCAN in this case. Without a sort, these checks are bypassed so we check them here.
  */
-bool isAnyComponentOfPathMultikey(const BSONObj& indexKeyPattern,
-                                  bool isMultikey,
-                                  const MultikeyPaths& indexMultikeyInfo,
-                                  StringData path);
+bool isAnyComponentOfPathOrProjectionMultikey(const BSONObj& indexKeyPattern,
+                                              bool isMultikey,
+                                              const MultikeyPaths& indexMultikeyInfo,
+                                              StringData path,
+                                              const OrderedPathSet& projFields = {},
+                                              bool hasSort = true);
 
 /**
  * If possible, turn the provided QuerySolution into a QuerySolution that uses a DistinctNode

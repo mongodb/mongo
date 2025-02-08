@@ -292,28 +292,44 @@ TEST_F(QueryPlannerParamsTest, isComponentOfPathMultikeyNoMetadata) {
     BSONObj indexKey = BSON("a" << 1 << "b.c" << -1);
     MultikeyPaths multikeyInfo = {};
 
-    ASSERT_TRUE(isAnyComponentOfPathMultikey(indexKey, true, multikeyInfo, "a"));
-    ASSERT_TRUE(isAnyComponentOfPathMultikey(indexKey, true, multikeyInfo, "b.c"));
+    ASSERT_TRUE(isAnyComponentOfPathOrProjectionMultikey(indexKey, true, multikeyInfo, "a"));
+    ASSERT_TRUE(isAnyComponentOfPathOrProjectionMultikey(indexKey, true, multikeyInfo, "b.c"));
 
-    ASSERT_FALSE(isAnyComponentOfPathMultikey(indexKey, false, multikeyInfo, "a"));
-    ASSERT_FALSE(isAnyComponentOfPathMultikey(indexKey, false, multikeyInfo, "b.c"));
+    ASSERT_FALSE(isAnyComponentOfPathOrProjectionMultikey(indexKey, false, multikeyInfo, "a"));
+    ASSERT_FALSE(isAnyComponentOfPathOrProjectionMultikey(indexKey, false, multikeyInfo, "b.c"));
 }
 
 TEST_F(QueryPlannerParamsTest, isComponentOfPathMultikeyWithMetadata) {
     BSONObj indexKey = BSON("a" << 1 << "b.c" << -1);
     MultikeyPaths multikeyInfo = {{}, {1}};
 
-    ASSERT_FALSE(isAnyComponentOfPathMultikey(indexKey, true, multikeyInfo, "a"));
-    ASSERT_TRUE(isAnyComponentOfPathMultikey(indexKey, true, multikeyInfo, "b.c"));
+    ASSERT_FALSE(isAnyComponentOfPathOrProjectionMultikey(indexKey, true, multikeyInfo, "a"));
+    ASSERT_TRUE(isAnyComponentOfPathOrProjectionMultikey(indexKey, true, multikeyInfo, "b.c"));
 }
 
 TEST_F(QueryPlannerParamsTest, isComponentOfPathMultikeyWithEmptyMetadata) {
     BSONObj indexKey = BSON("a" << 1 << "b.c" << -1);
 
-
     MultikeyPaths multikeyInfoAllPathsScalar = {{}, {}};
-    ASSERT_FALSE(isAnyComponentOfPathMultikey(indexKey, false, multikeyInfoAllPathsScalar, "a"));
-    ASSERT_FALSE(isAnyComponentOfPathMultikey(indexKey, false, multikeyInfoAllPathsScalar, "b.c"));
+    ASSERT_FALSE(
+        isAnyComponentOfPathOrProjectionMultikey(indexKey, false, multikeyInfoAllPathsScalar, "a"));
+    ASSERT_FALSE(isAnyComponentOfPathOrProjectionMultikey(
+        indexKey, false, multikeyInfoAllPathsScalar, "b.c"));
+}
+
+TEST_F(QueryPlannerParamsTest, isComponentOfProjectionMultikeyWithMetadata) {
+    BSONObj indexKey = BSON("a" << 1 << "b.c" << -1);
+    MultikeyPaths multikeyInfo = {{}, {1}};
+
+    ASSERT_FALSE(isAnyComponentOfPathOrProjectionMultikey(indexKey, true, multikeyInfo, "a"));
+
+    OrderedPathSet projectionFields = {"b.c"};
+    ASSERT_TRUE(isAnyComponentOfPathOrProjectionMultikey(
+        indexKey, true, multikeyInfo, "a", projectionFields, false));
+    ASSERT_FALSE(isAnyComponentOfPathOrProjectionMultikey(
+        indexKey, true, multikeyInfo, "a", projectionFields, true));
+    ASSERT_TRUE(isAnyComponentOfPathOrProjectionMultikey(
+        indexKey, true, multikeyInfo, "b.c", projectionFields, false));
 }
 
 }  // namespace

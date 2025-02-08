@@ -169,7 +169,6 @@ subSection("No available indexes");
 outputAggregationPlanAndResults(
     coll, [{$group: {_id: "$a", accum: {$top: {sortBy: {a: 1, b: 1}, output: "$b"}}}}]);
 
-// TODO SERVER-97238: Ensure we don't unwind the array here (i.e. we should fetch).
 section("$group by non-multikey field with $first/$last on a multikey field");
 outputAggregationPlanAndResults(coll, [{$group: {_id: "$b", accum: {$first: "$a"}}}]);
 outputAggregationPlanAndResults(coll, [{$group: {_id: "$b", accum: {$last: "$a"}}}]);

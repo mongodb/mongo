@@ -4320,7 +4320,7 @@ Execution Engine: sbe
 ```json
 {  "_id" : 2,  "accum" : 4 }
 {  "_id" : 3,  "accum" : 4 }
-{  "_id" : 4,  "accum" : 1 }
+{  "_id" : 4,  "accum" : 5 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -4333,38 +4333,23 @@ Execution Engine: classic
 				"rejectedPlans" : [ ],
 				"winningPlan" : [
 					{
-						"stage" : "PROJECTION_COVERED",
-						"transformBy" : {
-							"_id" : 0,
-							"a" : 1,
-							"b" : 1
-						}
-					},
-					{
 						"direction" : "forward",
 						"indexBounds" : {
-							"a" : [
-								"[MinKey, MaxKey]"
-							],
 							"b" : [
 								"[MinKey, MaxKey]"
 							]
 						},
-						"indexName" : "b_1_a_1",
-						"isFetching" : false,
-						"isMultiKey" : true,
+						"indexName" : "b_1",
+						"isFetching" : true,
+						"isMultiKey" : false,
 						"isPartial" : false,
 						"isShardFiltering" : false,
 						"isSparse" : false,
 						"isUnique" : false,
 						"keyPattern" : {
-							"a" : 1,
 							"b" : 1
 						},
 						"multiKeyPaths" : {
-							"a" : [
-								"a"
-							],
 							"b" : [ ]
 						},
 						"stage" : "DISTINCT_SCAN"
