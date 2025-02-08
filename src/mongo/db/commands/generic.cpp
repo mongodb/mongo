@@ -73,6 +73,10 @@
 namespace mongo {
 namespace {
 
+using std::string;
+using std::stringstream;
+using std::vector;
+
 class PingCommand : public PingCmdVersion1Gen<PingCommand> {
 public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
@@ -114,24 +118,35 @@ MONGO_REGISTER_COMMAND(PingCommand).forRouter().forShard();
 
 class EchoCommand final : public TypedCommand<EchoCommand> {
 public:
-    class Request : public BasicTypedRequest {
-    public:
+    struct Request {
         static constexpr auto kCommandName = "echo"_sd;
         static Request parse(const IDLParserContext&,
-                             const OpMsgRequest& opMsgRequest,
-                             DeserializationContext*) {
-            return Request{opMsgRequest};
+                             const OpMsgRequest& request,
+                             DeserializationContext* dctx = nullptr) {
+            return Request{
+                request,
+                GenericArguments::parse(IDLParserContext("GenericArguments",
+                                                         request.validatedTenancyScope,
+                                                         request.getValidatedTenantId(),
+                                                         request.getSerializationContext()),
+                                        request.body),
+                request.parseDbName()};
         }
 
-        explicit Request(const OpMsgRequest& opMsgRequest)
-            : BasicTypedRequest{opMsgRequest}, _opMsgRequest{opMsgRequest} {}
-
-        const OpMsgRequest& opMsgRequest() const {
-            return _opMsgRequest;
+        const GenericArguments& getGenericArguments() const {
+            return stableArgs;
+        }
+        GenericArguments& getGenericArguments() {
+            return stableArgs;
         }
 
-    private:
-        const OpMsgRequest& _opMsgRequest;
+        const DatabaseName& getDbName() const {
+            return dbName;
+        }
+
+        const OpMsgRequest& request;
+        GenericArguments stableArgs;
+        DatabaseName dbName;
     };
 
     class Invocation final : public MinimalInvocationBase {
@@ -146,11 +161,11 @@ public:
         void doCheckAuthorization(OperationContext* opCtx) const override {}
 
         NamespaceString ns() const override {
-            return NamespaceString(request().getDbName());
+            return NamespaceString(request().request.parseDbName());
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
-            auto sequences = request().opMsgRequest().sequences;
+            auto sequences = request().request.sequences;
             for (auto& docSeq : sequences) {
                 auto docBuilder = result->getDocSequenceBuilder(docSeq.name);
                 for (auto& bson : docSeq.objs) {
@@ -158,7 +173,7 @@ public:
                 }
             }
 
-            result->getBodyBuilder().append("echo", request().opMsgRequest().body);
+            result->getBodyBuilder().append("echo", request().request.body);
         }
     };
 
@@ -170,48 +185,48 @@ public:
         return false;
     }
 };
+constexpr StringData EchoCommand::Request::kCommandName;
 
 MONGO_REGISTER_COMMAND(EchoCommand).testOnly().forRouter().forShard();
 
-class ListCommandsCmd final : public TypedCommand<ListCommandsCmd> {
+class ListCommandsCmd : public BasicCommand {
 public:
-    class Request : public BasicTypedRequest {
-    public:
-        static constexpr StringData kCommandName = "listCommands";
-        static Request parse(const IDLParserContext&,
-                             const OpMsgRequest& opMsgRequest,
-                             DeserializationContext*) {
-            return Request{opMsgRequest};
-        }
+    std::string help() const override {
+        return "get a list of all db commands";
+    }
 
-        using BasicTypedRequest::BasicTypedRequest;
-    };
+    ListCommandsCmd() : BasicCommand("listCommands") {}
 
-    class Invocation final : public MinimalInvocationBase {
-    public:
-        using MinimalInvocationBase::MinimalInvocationBase;
-
-        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
-            auto&& bob = result->getBodyBuilder();
-            _run(opCtx, bob);
-        }
-
-        NamespaceString ns() const override {
-            return NamespaceString(request().getDbName());
-        }
-
-        bool supportsWriteConcern() const override {
-            return false;
-        }
-
-        void doCheckAuthorization(OperationContext*) const override {}
-    };
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 
-    static void _run(OperationContext* opCtx, BSONObjBuilder& result) {
+    bool adminOnly() const override {
+        return false;
+    }
+
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();  // No auth required
+    }
+
+    bool requiresAuth() const final {
+        return false;
+    }
+
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
+    bool run(OperationContext* opCtx,
+             const DatabaseName&,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         // Sort the command names before building the result BSON.
         std::vector<Command*> commands;
         getCommandRegistry(opCtx)->forEachCommand([&](Command* c) { commands.push_back(c); });
@@ -234,7 +249,12 @@ public:
                 temp.append("secondaryOverrideOk", true);
             temp.append("apiVersions", command->apiVersions());
             temp.append("deprecatedApiVersions", command->deprecatedApiVersions());
+            temp.done();
         }
+
+        b.done();
+
+        return 1;
     }
 };
 MONGO_REGISTER_COMMAND(ListCommandsCmd).forRouter().forShard();
