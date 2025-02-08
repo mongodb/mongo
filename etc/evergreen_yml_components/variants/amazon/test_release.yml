@@ -24,6 +24,10 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --modules=
+      unittest_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
+      integration_test_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
       multiversion_platform: amazon2
       multiversion_edition: targeted
       has_packages: true
@@ -70,6 +74,10 @@ buildvariants:
         MONGO_DISTMOD=amazon2
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      unittest_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
+      integration_test_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
         CCFLAGS="-fno-gnu-unique"
@@ -117,6 +125,10 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --modules=
+      unittest_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
+      integration_test_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
         --enableEnterpriseTests=off
@@ -161,6 +173,10 @@ buildvariants:
         MONGO_DISTMOD=amazon2023
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      unittest_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
+      integration_test_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
       crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
       test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source
       has_packages: true
@@ -255,6 +271,10 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         BAZEL_FLAGS="--subcommands"
         --modules=
+      unittest_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
+      integration_test_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
         --enableEnterpriseTests=off
@@ -300,6 +320,10 @@ buildvariants:
         MONGO_DISTMOD=amazon2023
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      unittest_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
+      integration_test_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
       crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
       test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source
       has_packages: true

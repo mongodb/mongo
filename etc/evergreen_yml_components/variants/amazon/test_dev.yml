@@ -25,6 +25,8 @@ variables:
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=static
+    unittest_library_compile_flags: >-
+      --link-model=dynamic
     unittest_compile_flags: >-
       --link-model=dynamic
 
