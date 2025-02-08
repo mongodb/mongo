@@ -8,10 +8,7 @@
 //   requires_fcv_63,
 // ]
 
-import {getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
-
-const sbeEnabled = checkSbeRestrictedOrFullyEnabled(db);
+import {getEngine, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
 
 const viewsDB = db.getSiblingDB("views_count");
 assert.commandWorked(viewsDB.dropDatabase());
@@ -86,7 +83,9 @@ if (explainPlan.hasOwnProperty("stages")) {
 assert.eq(explainPlan.queryPlanner.namespace, "views_count.coll");
 assert(explainPlan.hasOwnProperty("executionStats"));
 assert.eq(explainPlan.executionStats.nReturned,
-          sbeEnabled ? 1 : 2,  // SBE group push down causes count to be emitted in first stage.
+          getEngine(explainPlan) === "sbe"
+              ? 1
+              : 2,  // SBE group push down causes count to be emitted in first stage.
           tojson(explainPlan));
 assert(!explainPlan.executionStats.hasOwnProperty("allPlansExecution"));
 
@@ -99,7 +98,9 @@ if (explainPlan.hasOwnProperty("stages")) {
 assert.eq(explainPlan.queryPlanner.namespace, "views_count.coll");
 assert(explainPlan.hasOwnProperty("executionStats"));
 assert.eq(explainPlan.executionStats.nReturned,
-          sbeEnabled ? 1 : 2,  // SBE group push down causes count to be emitted in first stage.
+          getEngine(explainPlan) === "sbe"
+              ? 1
+              : 2,  // SBE group push down causes count to be emitted in first stage.
           tojson(explainPlan));
 assert(explainPlan.executionStats.hasOwnProperty("allPlansExecution"));
 
