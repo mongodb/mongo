@@ -38,8 +38,10 @@ namespace mongo::cost_based_ranker {
 constexpr double kEqualityScalingFactor = 0.5;
 constexpr double kTextSearchScalingFactor = 0.4;
 constexpr double kDefaultScalingFactor = 0.3;
-constexpr double kAverageElementsPerArray = 7;
+constexpr double kAverageElementsPerArray = 7.0;
 const SelectivityEstimate kIsArraySel =
+    SelectivityEstimate{SelectivityType{0.9}, EstimationSource::Heuristics};
+const SelectivityEstimate kIsObjectSel =
     SelectivityEstimate{SelectivityType{0.9}, EstimationSource::Heuristics};
 const SelectivityEstimate kExistsSel{SelectivityType{0.9}, EstimationSource::Heuristics};
 const SelectivityEstimate oneSelHeuristic{SelectivityType{1}, EstimationSource::Heuristics};

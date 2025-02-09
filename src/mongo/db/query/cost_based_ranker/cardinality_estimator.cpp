@@ -337,6 +337,31 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
         case MatchExpression::ELEM_MATCH_OBJECT:
             // TODO SERVER-100293
             return Status(ErrorCodes::UnsupportedCbrNode, "elemMatchObject supported");
+        case MatchExpression::INTERNAL_SCHEMA_XOR:
+            ceRes =
+                estimate(static_cast<const InternalSchemaXorMatchExpression*>(node), isFilterRoot);
+            break;
+        case MatchExpression::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
+            ceRes = estimate(
+                static_cast<const InternalSchemaAllElemMatchFromIndexMatchExpression*>(node),
+                isFilterRoot);
+            break;
+        case MatchExpression::INTERNAL_SCHEMA_COND:
+            ceRes =
+                estimate(static_cast<const InternalSchemaCondMatchExpression*>(node), isFilterRoot);
+            break;
+        case MatchExpression::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX:
+            ceRes = estimate(static_cast<const InternalSchemaMatchArrayIndexMatchExpression*>(node),
+                             isFilterRoot);
+            break;
+        case MatchExpression::INTERNAL_SCHEMA_OBJECT_MATCH:
+            ceRes = estimate(static_cast<const InternalSchemaObjectMatchExpression*>(node),
+                             isFilterRoot);
+            break;
+        case MatchExpression::INTERNAL_SCHEMA_ALLOWED_PROPERTIES:
+            ceRes =
+                estimate(static_cast<const InternalSchemaAllowedPropertiesMatchExpression*>(node));
+            break;
         default:
             MONGO_UNIMPLEMENTED_TASSERT(9586708);
     }
@@ -779,6 +804,24 @@ CEResult CardinalityEstimator::estimate(const NotMatchExpression* node, bool isF
     return ceRes;
 }
 
+CEResult CardinalityEstimator::estimateConjunction(const MatchExpression* conjunction) {
+    // Ignore selectivities pushed by other operators up to this point.
+    size_t selOffset = _conjSels.size();
+
+    for (size_t i = 0; i < conjunction->numChildren(); i++) {
+        auto ceRes = estimate(conjunction->getChild(i), false);
+        if (!ceRes.isOK()) {
+            return ceRes;
+        }
+        // Add the child selectivity to the conjunction selectivity stack so that it can be
+        // combined with selectivities of conjuncts or leaf nodes from parent QSNs.
+        SelectivityEstimate sel = ceRes.getValue() / _inputCard;
+        _conjSels.emplace_back(sel);
+    }
+
+    return conjCard(selOffset, _inputCard);
+}
+
 CEResult CardinalityEstimator::estimate(const AndMatchExpression* node) {
     // Find with an empty query "coll.find({})" generates a AndMatchExpression without children.
     if (node->isTriviallyTrue()) {
@@ -795,26 +838,13 @@ CEResult CardinalityEstimator::estimate(const AndMatchExpression* node) {
         if (ceRes.isOK()) {
             return ceRes.getValue();
         }
-        // Fallback to alternate AndMatchExpression estimation.
+        // Fallback to generic AndMatchExpression estimation.
     }
 
-    // Ignore selectivities pushed by other operators up to this point.
-    size_t selOffset = _conjSels.size();
-
-    for (size_t i = 0; i < node->numChildren(); i++) {
-        auto ceRes = estimate(node->getChild(i), false);
-        if (!ceRes.isOK()) {
-            return ceRes;
-        }
-        // Add the child selectivity to the conjunction selectivity stack so that it can be
-        // combined with selectivities of conjuncts or leaf nodes from parent QSNs.
-        SelectivityEstimate sel = ceRes.getValue() / _inputCard;
-        _conjSels.emplace_back(sel);
-    }
-
-    // Notice that the resulting selectivity is not being pushed onto the _conjSels stack
-    // because it would otherwise result in double counting when computing the parent selectivity.
-    return conjCard(selOffset, _inputCard);
+    // Notice that the combined selectivity of the children is not being pushed onto the _conjSels
+    // stack because it would otherwise result in double counting when computing the parent
+    // selectivity.
+    return estimateConjunction(node);
 }
 
 CEResult CardinalityEstimator::estimateDisjunction(
@@ -826,9 +856,9 @@ CEResult CardinalityEstimator::estimateDisjunction(
         if (!ceRes.isOK()) {
             return ceRes;
         }
-        popSelectivities(selOffset);
         disjSels.emplace_back(ceRes.getValue() / _inputCard);
     }
+    popSelectivities(selOffset);
     return disjCard(_inputCard, disjSels);
 }
 
@@ -900,11 +930,137 @@ CEResult CardinalityEstimator::estimate(const ElemMatchValueMatchExpression* nod
         _conjSels.emplace_back(sel);
     }
 
-    // Calculate selectivity relative to the original cardinality.
-    auto sel = conjCard(selOffset, originalCard);
-    // The implict 'isArray' predicate of $elemMatch is independent from the selectivity of its
+    // Calculate selectivity and result size relative to the original cardinality.
+    auto card = conjCard(selOffset, originalCard);
+    // The implicit 'isArray' predicate of $elemMatch is independent from the selectivity of its
     // children, so it can be combined by multiplication.
-    return sel * kIsArraySel;
+    auto res = card * kIsArraySel;
+    if (isFilterRoot) {
+        _conjSels.emplace_back(res / _inputCard);
+    }
+    return res;
+}
+
+CEResult CardinalityEstimator::estimate(const InternalSchemaXorMatchExpression* node,
+                                        bool isFilterRoot) {
+    if (node->numChildren() == 1) {
+        return estimate(node->getChild(0), isFilterRoot);
+    }
+    if (node->numChildren() > 2) {
+        // The semantics of XOR with >2 arguments is unclear, and is hard to estimate.
+        return Status(ErrorCodes::CEFailure, "Unable to estimate expression");
+    }
+
+    std::vector<SelectivityEstimate> childSels;
+    for (size_t i = 0; i < node->numChildren(); i++) {
+        auto ceRes = estimate(node->getChild(i), false);
+        if (!ceRes.isOK()) {
+            return ceRes;
+        }
+        childSels.emplace_back(ceRes.getValue() / _inputCard);
+    }
+
+    // XOR is estimated in a way similar to OR. To reflect the difference between OR and XOR,
+    // the overlap betwen the two sets is subtracted completely. Unlike OR exponential backoff is
+    // not applied because it is not clear how to extend it to XOR.
+    // XOR selectivity is thus: childSels[0] + childSels[1] - (2 * childSels[0] * childSels[1]);
+    // The expression terms are grouped to avoid intermediate results >1:
+    auto overlapSel = childSels[0] * childSels[1];
+    auto xorSel = (childSels[0] - overlapSel) + (childSels[1] - overlapSel);
+
+    size_t selOffset = _conjSels.size();
+    popSelectivities(selOffset);
+    // Add the child selectivity to the conjunction selectivity stack so that it can be
+    // combined with selectivities of conjuncts or leaf nodes from parent QSNs.
+    if (isFilterRoot) {
+        _conjSels.emplace_back(xorSel);
+    }
+    return xorSel * _inputCard;
+}
+
+CEResult CardinalityEstimator::estimate(
+    const InternalSchemaAllElemMatchFromIndexMatchExpression* node, bool isFilterRoot) {
+    // A match expression similar to $elemMatch, but only matches arrays for which every element
+    // matches the sub-expression.
+    auto ceRes = estimate(node->getChild(0), false);
+    if (!ceRes.isOK()) {
+        return ceRes;
+    }
+    // All array elements must match, therefore combine the individual selectivities via exponential
+    // backoff. Since we don't have stats over array contents, assume the same selectivity 's' for
+    // all of the array's elements. Using exponential backoff the combined selectivity of all
+    // children is: childSel = s * s^(1/2) * s^(1/4) * s^(1/8) = s^(1 + 1/2 + 1/4 + 1/8) = s^(15/8)
+    auto childSel = ceRes.getValue() / _inputCard;
+    auto sel = childSel.pow(15.0 / 8.0);
+    if (isFilterRoot) {
+        _conjSels.emplace_back(sel);
+    }
+    return sel * _inputCard;
+}
+
+CEResult CardinalityEstimator::estimate(const InternalSchemaCondMatchExpression* node,
+                                        bool isFilterRoot) {
+    // Since we don't know any better, assume that the probability of the condition being true is
+    // 50%
+    auto ceRes1 = estimate(node->thenBranch(), false);
+    if (!ceRes1.isOK()) {
+        return ceRes1;
+    }
+    auto ceRes2 = estimate(node->elseBranch(), false);
+    if (!ceRes2.isOK()) {
+        return ceRes2;
+    }
+    auto avgCard = (ceRes1.getValue() + ceRes2.getValue()) * 0.5;
+    auto avgSel = avgCard / _inputCard;
+    if (isFilterRoot) {
+        _conjSels.emplace_back(avgSel);
+    }
+    return avgCard;
+}
+
+CEResult CardinalityEstimator::estimate(const InternalSchemaMatchArrayIndexMatchExpression* node,
+                                        bool isFilterRoot) {
+    // Matches arrays based on whether or not a specific element in the array matches a
+    // sub-expression, or if array's size is less than  the element's index.
+    if (node->arrayIndex() > kAverageElementsPerArray) {
+        return _inputCard;
+    }
+    auto ceRes = estimate(node->getChild(0), false);
+    if (!ceRes.isOK()) {
+        return ceRes;
+    }
+    // Estimate the probability that a specific element matches an expression.
+    // Divide by the average number of array values to reflect the fact that there is lower
+    // probability to match a specific array element compared to any element.
+    double scaledSel = (ceRes.getValue() / _inputCard).toDouble() / kAverageElementsPerArray;
+    auto childSel = SelectivityEstimate{SelectivityType{scaledSel}, EstimationSource::Code};
+    if (isFilterRoot) {
+        _conjSels.emplace_back(childSel);
+    }
+    return childSel * _inputCard;
+}
+
+CEResult CardinalityEstimator::estimate(const InternalSchemaObjectMatchExpression* node,
+                                        bool isFilterRoot) {
+    // Returns true if the input value is an object, and that object matches the child expression.
+
+    // Currently assume 90% of values are obects. Could be computed via heuristics if available.
+    auto objMatchSel = kIsObjectSel;
+    auto ceRes = estimate(node->getChild(0), false);
+    if (!ceRes.isOK()) {
+        return ceRes;
+    }
+    auto exprSel = ceRes.getValue() / _inputCard;
+    auto sel = objMatchSel * exprSel;
+    if (isFilterRoot) {
+        _conjSels.emplace_back(sel);
+    }
+    return sel * _inputCard;
+}
+
+CEResult CardinalityEstimator::estimate(
+    const InternalSchemaAllowedPropertiesMatchExpression* node) {
+    return estimateConjunction(node);
 }
 
 /*

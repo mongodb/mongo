@@ -474,5 +474,32 @@ TEST(CardinalityEstimator, NestedElemMatchMoreSelectiveThanSingle) {
     ASSERT_GT(elemMatchEst, nestedElemMatchEst);
 }
 
+TEST(CardinalityEstimator, NAryXOR) {
+    BSONObj xorCond1 = fromjson("{$_internalSchemaXor: [{a: { $ne: 5 }}]}");
+    auto xorExpr1 = parse(xorCond1);
+    auto xorPlan1 = makeCollScanPlan(std::move(xorExpr1));
+
+    BSONObj xorCond2 = fromjson("{$_internalSchemaXor: [{a: { $lt: 0 }}, {b: 0}]}");
+    auto xorExpr2 = parse(xorCond2);
+    auto xorPlan2 = makeCollScanPlan(std::move(xorExpr2));
+
+    BSONObj xorCond3 =
+        fromjson("{$_internalSchemaXor: [{a: { $gt: 10 }}, {a: { $lt: 0 }}, {b: 0}]}");
+    auto xorExpr3 = parse(xorCond3);
+    auto xorPlan3 = makeCollScanPlan(std::move(xorExpr3));
+
+    double card = 1000.0;
+    auto collInfo = buildCollectionInfo({}, makeCollStats(card));
+
+    const auto ceRes1 = getPlanHeuristicCE(*xorPlan1, collInfo);
+    ASSERT_EQ(ceRes1, makeCard(968.377));
+
+    const auto ceRes2 = getPlanHeuristicCE(*xorPlan2, collInfo);
+    ASSERT_EQ(ceRes2, makeCard(340.752));
+
+    const auto ceRes3 = getPlanCE(*xorPlan3, collInfo, QueryPlanRankerModeEnum::kHistogramCE);
+    ASSERT(!ceRes3.isOK() && ceRes3.getStatus().code() == ErrorCodes::CEFailure);
+}
+
 }  // unnamed namespace
 }  // namespace mongo::cost_based_ranker

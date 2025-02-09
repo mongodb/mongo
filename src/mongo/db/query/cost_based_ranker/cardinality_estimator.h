@@ -30,6 +30,12 @@
 #pragma once
 
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/query/ce/sampling_estimator.h"
 #include "mongo/db/query/cost_based_ranker/ce_utils.h"
 #include "mongo/db/query/cost_based_ranker/estimates.h"
@@ -101,6 +107,13 @@ private:
     CEResult estimate(const OrMatchExpression* node, bool isFilterRoot);
     CEResult estimate(const NorMatchExpression* node, bool isFilterRoot);
     CEResult estimate(const ElemMatchValueMatchExpression* node, bool isFilterRoot);
+    CEResult estimate(const InternalSchemaXorMatchExpression* node, bool isFilterRoot);
+    CEResult estimate(const InternalSchemaAllElemMatchFromIndexMatchExpression* node,
+                      bool isFilterRoot);
+    CEResult estimate(const InternalSchemaCondMatchExpression* node, bool isFilterRoot);
+    CEResult estimate(const InternalSchemaMatchArrayIndexMatchExpression* node, bool isFilterRoot);
+    CEResult estimate(const InternalSchemaObjectMatchExpression* node, bool isFilterRoot);
+    CEResult estimate(const InternalSchemaAllowedPropertiesMatchExpression* node);
 
     // Intervals
     CEResult estimate(const IndexBounds* node);
@@ -154,6 +167,11 @@ private:
         return resultCard;
     }
 
+    /**
+     * Estimate the cardinality of the given vector of MatchExpressions as if they were a
+     * conjunction.
+     */
+    CEResult estimateConjunction(const MatchExpression* conjunction);
     /**
      * Estimate the cardinality of the given vector of MatchExpressions as if they were a
      * disjunction. This is a helper for the implementations of estimation of $or and $nor.
