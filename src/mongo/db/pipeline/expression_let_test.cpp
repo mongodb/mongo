@@ -213,30 +213,32 @@ TEST(ExpressionLetOptimizeTest, RemoveLetIfAllVariablesAreRemoved) {
         expression->serialize().getDocument());
 }
 
-void buildRecursiveLet(str::stream& stream, size_t iterationsLeft) {
-    stream << "{$let: {\n";
+void buildRecursiveLet(BSONObjBuilder& builder, size_t iterationsLeft) {
+    BSONObjBuilder subObjBuilder = builder.subobjStart("$let");
 
-    stream << "  vars: {\n";
-    stream << "    unused" << iterationsLeft << ": "
-           << "\"ununsed string " << iterationsLeft << "\",\n";
-    stream << "    iteration: " << iterationsLeft << "},\n";
-
-    stream << "  in: {$and: [\n";
-    stream << "    {$eq: [\"$field" << iterationsLeft << "\", \"$$iteration\"]}";
-
-    if (iterationsLeft > 0) {
-        stream << ",\n";
-        buildRecursiveLet(stream, iterationsLeft - 1);
+    {
+        BSONObjBuilder vars = subObjBuilder.subobjStart("vars");
+        vars.append(str::stream() << "unused" << iterationsLeft,
+                    str::stream() << "ununsed string " << iterationsLeft);
+        vars.appendNumber("iteration", static_cast<long long>(iterationsLeft));
     }
 
-    stream << "  ]}\n";
-    stream << "}}\n";
+    BSONObjBuilder in = subObjBuilder.subobjStart("in");
+    BSONArrayBuilder dollarAnd = in.subarrayStart("$and");
+    dollarAnd.append(
+        BSON("$eq" << BSON_ARRAY(((str::stream() << "$field" << iterationsLeft).ss.str())
+                                 << "$$iteration")));
+
+    if (iterationsLeft > 0) {
+        BSONObjBuilder sub(dollarAnd.subobjStart());
+        buildRecursiveLet(sub, iterationsLeft - 1);
+    }
 }
 
-std::string buildRecursiveLet(size_t depth, bool optimized) {
-    str::stream stream;
-    buildRecursiveLet(stream, depth);
-    return stream;
+BSONObj buildRecursiveLet(size_t depth, bool optimized) {
+    BSONObjBuilder builder;
+    buildRecursiveLet(builder, depth);
+    return builder.obj();
 }
 
 BSONObj buildOptimizedExpression(size_t depth) {
@@ -254,7 +256,7 @@ BSONObj buildOptimizedExpression(size_t depth) {
 TEST(ExpressionLetOptimizeTest, DoesNotCauseExponentialTraversals) {
     auto expCtx = ExpressionContextForTest{};
     auto expression = Expression::parseExpression(
-        &expCtx, fromjson(buildRecursiveLet(50, false /*optimized*/)), expCtx.variablesParseState);
+        &expCtx, buildRecursiveLet(50, false /*optimized*/), expCtx.variablesParseState);
     expression = expression->optimize();
     ASSERT_BSONOBJ_EQ(buildOptimizedExpression(50), expression->serialize().getDocument().toBson());
 }

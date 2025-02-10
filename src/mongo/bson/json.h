@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/util/time_support.h"
@@ -145,7 +146,7 @@ class JParse {
     friend class JParseUtil;
 
 public:
-    constexpr static int kMaxDepth = 250;
+    constexpr static int kMaxDepth = BSONDepth::kDefaultMaxAllowableDepth;
     explicit JParse(StringData str);
 
     /*
