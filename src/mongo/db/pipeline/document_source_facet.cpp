@@ -341,19 +341,8 @@ DepsTracker::State DocumentSourceFacet::getDependencies(DepsTracker* deps) const
         auto subDepsTracker = facet.pipeline->getDependencies(deps->getAvailableMetadata());
 
         deps->fields.insert(subDepsTracker.fields.begin(), subDepsTracker.fields.end());
-
         deps->needWholeDocument = deps->needWholeDocument || subDepsTracker.needWholeDocument;
-
-        // The text score and search sequence token are the only type of metadata that could be
-        // needed by $facet.
-        // TODO SERVER-100546 Try to handle this generically rather than specifying individual
-        // fields
-        if (subDepsTracker.getNeedsMetadata(DocumentMetadataFields::kTextScore)) {
-            deps->setNeedsMetadata(DocumentMetadataFields::kTextScore);
-        }
-        if (subDepsTracker.getNeedsMetadata(DocumentMetadataFields::kSearchSequenceToken)) {
-            deps->setNeedsMetadata(DocumentMetadataFields::kSearchSequenceToken);
-        }
+        deps->setNeedsMetadata(subDepsTracker.metadataDeps());
 
         if (deps->needWholeDocument && deps->getNeedsMetadata(DocumentMetadataFields::kTextScore)) {
             break;
