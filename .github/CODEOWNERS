@@ -2284,6 +2284,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/s/query/OWNERS.yml
 /src/mongo/s/query/**/* @10gen/query @svc-auto-approve-bot
+/src/mongo/s/query/**/README.md @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/s/query/**/README_aggregation.md @10gen/query @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/query/**/OWNERS.yml @10gen/query-execution-staff-leads @10gen/query-integration-staff-leads @10gen/query-optimization-staff-leads @svc-auto-approve-bot
 /src/mongo/s/query/**/document_source_visitor_docs_needed_bounds* @10gen/query-integration-search @svc-auto-approve-bot
 

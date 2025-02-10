@@ -7,8 +7,10 @@
 --------------------------------------- MODULE MoveRange -------------------------------------------
 \* This specification models the range migration commit protocol along with the routing and data
 \* ownership filtering protocols for untimestamped and at a point-in-time reads.
-\* The range migration commit protocol is described at
-\* https://github.com/mongodb/mongo/blob/master/src/mongo/db/s/README_migrations.md
+\* - The range migration commit protocol is described at
+\*   https://github.com/mongodb/mongo/blob/master/src/mongo/db/s/README_migrations.md
+\* - The CRUD operation, including routing and data ownership filtering, is described at
+\*   https://github.com/mongodb/mongo/blob/master/src/mongo/s/query/README.md
 \*
 \* This specification:
 \* - Models ranges as single-key ranges, for simplicity. The terms 'keys' and 'ranges' are used

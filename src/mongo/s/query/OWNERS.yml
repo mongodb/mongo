@@ -3,6 +3,13 @@ filters:
   - "*":
     approvers:
       - 10gen/query
+  - "README.md":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "README_aggregation.md":
+    approvers:
+      - 10gen/query
+      - 10gen/server-catalog-and-routing
   - "OWNERS.yml":
     approvers:
       - 10gen/query-execution-staff-leads
