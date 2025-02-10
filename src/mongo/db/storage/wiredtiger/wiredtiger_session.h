@@ -110,7 +110,6 @@ public:
     WRAPPED_WT_SESSION_METHOD(create)
     WRAPPED_WT_SESSION_METHOD(drop)
     WRAPPED_WT_SESSION_METHOD(get_last_error)
-    WRAPPED_WT_SESSION_METHOD(get_rollback_reason)
     WRAPPED_WT_SESSION_METHOD(log_flush)
     WRAPPED_WT_SESSION_METHOD(open_cursor)
     WRAPPED_WT_SESSION_METHOD(prepare_transaction)
