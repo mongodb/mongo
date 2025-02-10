@@ -126,7 +126,7 @@ public:
         const boost::optional<StringData>& metaField,
         const boost::optional<std::int32_t>& bucketMaxSpanSeconds,
         const mongo::OptionalBool& timeseriesBucketsMayHaveMixedSchemaData,
-        const mongo::OptionalBool& timeseriesBucketingParametersHaveChanged);
+        const bool timeseriesBucketsAreFixed);
 
     bool includeMetaField() const {
         return _bucketUnpacker.includeMetaField();

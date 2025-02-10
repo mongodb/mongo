@@ -1022,7 +1022,7 @@ std::vector<BSONObj> DocumentSourceInternalUnpackBucket::generateStageInPipeline
     const boost::optional<StringData>& metaField,
     const boost::optional<std::int32_t>& bucketMaxSpanSeconds,
     const mongo::OptionalBool& timeseriesBucketsMayHaveMixedSchemaData,
-    const mongo::OptionalBool& timeseriesBucketingParametersHaveChanged) {
+    const bool timeseriesBucketsAreFixed) {
     auto bob = BSONObjBuilder{};
 
     auto assumeNoMixedSchemaData = [&]() {
@@ -1033,7 +1033,8 @@ std::vector<BSONObj> DocumentSourceInternalUnpackBucket::generateStageInPipeline
     bob.append(DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData,
                assumeNoMixedSchemaData);
 
-    // TODO(SERVER-99495): Handle timeseriesBucketingParametersHaveChanged.
+    // Derived from timeseriesBucketingParametersHaveChanged.
+    bob.append(kFixedBuckets, timeseriesBucketsAreFixed);
 
     // TODO(SERVER-100423): Handle timeField.
 

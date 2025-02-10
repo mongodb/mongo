@@ -41,7 +41,7 @@ struct RewritePipelineHelperArgs {
     const boost::optional<StringData> metaField = boost::none;
     const boost::optional<std::int32_t> bucketMaxSpanSeconds = boost::none;
     const mongo::OptionalBool timeseriesBucketsMayHaveMixedSchemaData = {boost::none};
-    const mongo::OptionalBool timeseriesBucketingParametersHaveChanged = {boost::none};
+    const bool timeseriesBucketsAreFixed = {false};
 };
 
 // Helper function to call the factory function and ensure some basic expected truths.
@@ -54,7 +54,7 @@ std::tuple<std::vector<BSONObj>, BSONObj> rewritePipelineHelper(
         args.metaField,
         args.bucketMaxSpanSeconds,
         args.timeseriesBucketsMayHaveMixedSchemaData,
-        args.timeseriesBucketingParametersHaveChanged);
+        args.timeseriesBucketsAreFixed);
 
     ASSERT_EQ(alteredPipeline.size(), originalPipeline.size() + 1);
 
@@ -86,21 +86,40 @@ TEST_F(InternalUnpackBucketGenerateInPipelineTest, ValidateFields) {
         const auto& firstStage = *alteredPipeline.begin();
         ASSERT_BSONOBJ_EQ(
             BSON(DocumentSourceInternalUnpackBucket::kStageNameInternal
-                 << BSON(DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData << false)),
+                 << BSON(DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData
+                         << false << DocumentSourceInternalUnpackBucket::kFixedBuckets << false)),
             firstStage);
     }
 
     {
-        const auto [alteredPipeline, _] =
-            rewritePipelineHelper({.timeseriesBucketsMayHaveMixedSchemaData = false});
+        const auto [alteredPipeline, _] = rewritePipelineHelper({
+            .timeseriesBucketsMayHaveMixedSchemaData = false,
+            .timeseriesBucketsAreFixed = true,
+        });
         // The first stage should be the generated $_internalUnpackBucket stage.
         const auto& firstStage = *alteredPipeline.begin();
         ASSERT_BSONOBJ_EQ(
             BSON(DocumentSourceInternalUnpackBucket::kStageNameInternal
-                 << BSON(DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData << true)),
+                 << BSON(DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData
+                         << true << DocumentSourceInternalUnpackBucket::kFixedBuckets << true)),
             firstStage);
     }
 }
 
+TEST_F(InternalUnpackBucketGenerateInPipelineTest, BucketsFixedTest) {
+    {
+        const auto [_, internalUnpackBucketStage] =
+            rewritePipelineHelper({.timeseriesBucketsAreFixed = false});
+        ASSERT_FALSE(
+            internalUnpackBucketStage[DocumentSourceInternalUnpackBucket::kFixedBuckets].Bool());
+    }
+
+    {
+        const auto [_, internalUnpackBucketStage] =
+            rewritePipelineHelper({.timeseriesBucketsAreFixed = true});
+        ASSERT_TRUE(
+            internalUnpackBucketStage[DocumentSourceInternalUnpackBucket::kFixedBuckets].Bool());
+    }
+}
 }  // namespace
 }  // namespace mongo
