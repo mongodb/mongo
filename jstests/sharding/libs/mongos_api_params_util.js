@@ -1599,25 +1599,27 @@ export let MongosAPIParametersUtil = (function() {
 
         for (let i = 0; i < testInstances.length; ++i) {
             const {apiParameters, commandName, runOrExplain} = testInstances[i];
-
-            assert.commandWorked(
-                st.s.adminCommand({enableSharding: "db", primaryShard: st.shard0.shardName}));
-
-            if (shardedCollection) {
-                assert.commandWorked(
-                    st.s.adminCommand({shardCollection: "db.collection", key: {_id: 1}}));
-            }
-
-            assert.commandWorked(
-                st.s.getDB("db")["collection"].insert({_id: 0}, {writeConcern: {w: "majority"}}));
-
-            const configPrimary = st.configRS.getPrimary();
-            const shardPrimary =
-                runOrExplain.shardPrimary ? runOrExplain.shardPrimary() : st.rs0.getPrimary();
             const context = {apiParameters: apiParameters};
+
+            let shardPrimary, configPrimary;
 
             withRetryOnTransientTxnError(
                 () => {
+                    assert.commandWorked(st.s.adminCommand(
+                        {enableSharding: "db", primaryShard: st.shard0.shardName}));
+
+                    if (shardedCollection) {
+                        assert.commandWorked(
+                            st.s.adminCommand({shardCollection: "db.collection", key: {_id: 1}}));
+                    }
+
+                    assert.commandWorked(st.s.getDB("db")["collection"].insert(
+                        {_id: 0}, {writeConcern: {w: "majority"}}));
+
+                    configPrimary = st.configRS.getPrimary();
+                    shardPrimary = runOrExplain.shardPrimary ? runOrExplain.shardPrimary()
+                                                             : st.rs0.getPrimary();
+
                     const commandDbName = runOrExplain.runsAgainstAdminDb ? "admin" : "db";
                     if (inTransaction) {
                         context.session = st.s0.startSession();
