@@ -533,7 +533,7 @@ public:
 
     void waitForTimestampMonitorPass() {
         auto timestampMonitor =
-            dynamic_cast<StorageEngineImpl*>(_storageEngine)->getTimestampMonitor();
+            static_cast<StorageEngineImpl*>(_storageEngine)->getTimestampMonitor();
         using TimestampType = StorageEngineImpl::TimestampMonitor::TimestampType;
         using TimestampListener = StorageEngineImpl::TimestampMonitor::TimestampListener;
         auto pf = makePromiseFuture<void>();

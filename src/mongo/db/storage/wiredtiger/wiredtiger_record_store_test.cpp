@@ -411,7 +411,7 @@ StatusWith<RecordId> insertBSONWithSize(
 //  of the estimated size.
 TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_NoMarkersGeneratedFromScanning) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
-    auto wtHarnessHelper = dynamic_cast<WiredTigerHarnessHelper*>(harnessHelper.get());
+    auto wtHarnessHelper = static_cast<WiredTigerHarnessHelper*>(harnessHelper.get());
     std::unique_ptr<RecordStore> rs(wtHarnessHelper->newOplogRecordStoreNoInit());
 
     auto wtRS = static_cast<WiredTigerRecordStore::Oplog*>(rs.get());
@@ -462,7 +462,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_NoMarkersGeneratedFromScann
 // inaccurate.
 TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Duplicates) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
-    auto wtHarnessHelper = dynamic_cast<WiredTigerHarnessHelper*>(harnessHelper.get());
+    auto wtHarnessHelper = static_cast<WiredTigerHarnessHelper*>(harnessHelper.get());
     std::unique_ptr<RecordStore> rs(wtHarnessHelper->newOplogRecordStoreNoInit());
     auto engine = harnessHelper->getEngine();
 
@@ -795,7 +795,7 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     params.tracksSizeAdjustments = true;
     params.forceUpdateWithFullDocument = false;
 
-    const auto wtKvEngine = dynamic_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
+    const auto wtKvEngine = static_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
     auto rs = std::make_unique<WiredTigerRecordStore>(
         wtKvEngine,
         WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx.get())),

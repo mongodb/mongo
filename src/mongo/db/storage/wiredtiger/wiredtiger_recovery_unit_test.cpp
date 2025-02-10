@@ -199,7 +199,7 @@ public:
         ru2 = checked_cast<WiredTigerRecoveryUnit*>(
             shard_role_details::getRecoveryUnit(clientAndCtx2.second.get()));
         ru2->setOperationContext(clientAndCtx2.second.get());
-        snapshotManager = dynamic_cast<WiredTigerSnapshotManager*>(
+        snapshotManager = static_cast<WiredTigerSnapshotManager*>(
             harnessHelper->getEngine()->getSnapshotManager());
     }
 
@@ -709,7 +709,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorsAreNotCached) {
 
     std::unique_ptr<RecordStore> rs(
         harnessHelper->createRecordStore(opCtx, "test.checkpoint_cached"));
-    auto uri = dynamic_cast<WiredTigerRecordStore*>(rs.get())->getURI();
+    auto uri = static_cast<WiredTigerRecordStore*>(rs.get())->getURI();
 
     WiredTigerKVEngine* engine = harnessHelper->getEngine();
 
@@ -764,7 +764,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsCached) {
     auto opCtx = clientAndCtx1.second.get();
 
     std::unique_ptr<RecordStore> rs(harnessHelper->createRecordStore(opCtx, "test.read_once"));
-    auto uri = dynamic_cast<WiredTigerRecordStore*>(rs.get())->getURI();
+    auto uri = static_cast<WiredTigerRecordStore*>(rs.get())->getURI();
 
     // Insert a record.
     StorageWriteTransaction txn(*ru1);
