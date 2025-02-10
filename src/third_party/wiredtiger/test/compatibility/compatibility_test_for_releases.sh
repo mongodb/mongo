@@ -485,6 +485,15 @@ upgrade_downgrade()
                 echo "transaction.timestamps=1" >> $config
                 echo "transaction.implicit=0" >> $config
             fi
+	    # Older releases (8.0 and older) expect to find a BACKUP.copy
+	    # directory if BACKUP exists. After 8.0 the directory structure
+	    # changed. So copy it for older releases if testing against a
+	    # develop run that is doing backups.
+	    dir2=$top/$format_dir_branch2/RUNDIR.$am
+	    if [ -e $dir2/BACKUP -a ! -e $dir2/BACKUP.copy ] ; then
+                echo "Copying backup directory for older releases"
+		cp -rp $dir2/BACKUP $dir2/BACKUP.copy
+	    fi
             echo "$1 format running on $2 access method $am..."
             cd "$top/$format_dir_branch1"
             flags="-1Rq $(bflag $1)"

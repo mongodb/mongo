@@ -14,7 +14,7 @@ l=$(
         -e '/^[a-z]/!d' \
         -e 's/[	 ].*$//' \
         -e 's,^,../,' filelist
-    ls -1 ../src/include/*_inline.h ../src/include/os.h
+    ls -1 ../src/*/*_inline.h ../src/include/os.h
 )
 
 [[ -z "$( { echo ../src/include/stat.h; echo "$l"; } | filter_if_fast ../)" ]] && exit 0

@@ -92,20 +92,20 @@ static WT_EVENT_HANDLER event_handler = {
         printf("%s = %" PRId64 "\n", #KEY, VARIABLE);                     \
     } while (0)
 
-#define GET_STATS(CACHE_OPS_VAR, CACHE_TIME_VAR, CACHE_BUSY_OPS_VAR, CACHE_BUSY_TIME_VAR, \
-  CACHE_IDLE_OPS_VAR, CACHE_IDLE_TIME_VAR, BYTES_MAX_VAR, BYTES_INUSE_VAR)                \
-    do {                                                                                  \
-        WT_CURSOR *stat;                                                                  \
-        testutil_check(session->open_cursor(session, "statistics:", NULL, NULL, &stat));  \
-        GET_STAT(WT_STAT_CONN_APPLICATION_CACHE_OPS, CACHE_OPS_VAR);                      \
-        GET_STAT(WT_STAT_CONN_APPLICATION_CACHE_TIME, CACHE_TIME_VAR);                    \
-        GET_STAT(WT_STAT_CONN_APPLICATION_CACHE_BUSY_OPS, CACHE_BUSY_OPS_VAR);            \
-        GET_STAT(WT_STAT_CONN_APPLICATION_CACHE_BUSY_TIME, CACHE_BUSY_TIME_VAR);          \
-        GET_STAT(WT_STAT_CONN_APPLICATION_CACHE_IDLE_OPS, CACHE_IDLE_OPS_VAR);            \
-        GET_STAT(WT_STAT_CONN_APPLICATION_CACHE_IDLE_TIME, CACHE_IDLE_TIME_VAR);          \
-        GET_STAT(WT_STAT_CONN_CACHE_BYTES_MAX, BYTES_MAX_VAR);                            \
-        GET_STAT(WT_STAT_CONN_CACHE_BYTES_INUSE, BYTES_INUSE_VAR);                        \
-        testutil_check(stat->close(stat));                                                \
+#define GET_STATS(CACHE_OPS_VAR, CACHE_TIME_VAR, CACHE_BUSY_OPS_VAR, CACHE_BUSY_TIME_VAR,   \
+  CACHE_IDLE_OPS_VAR, CACHE_IDLE_TIME_VAR, BYTES_MAX_VAR, BYTES_INUSE_VAR)                  \
+    do {                                                                                    \
+        WT_CURSOR *stat;                                                                    \
+        testutil_check(session->open_cursor(session, "statistics:", NULL, NULL, &stat));    \
+        GET_STAT(WT_STAT_CONN_APPLICATION_CACHE_OPS, CACHE_OPS_VAR);                        \
+        GET_STAT(WT_STAT_CONN_APPLICATION_CACHE_TIME, CACHE_TIME_VAR);                      \
+        GET_STAT(WT_STAT_CONN_APPLICATION_CACHE_UNINTERRUPTIBLE_OPS, CACHE_BUSY_OPS_VAR);   \
+        GET_STAT(WT_STAT_CONN_APPLICATION_CACHE_UNINTERRUPTIBLE_TIME, CACHE_BUSY_TIME_VAR); \
+        GET_STAT(WT_STAT_CONN_APPLICATION_CACHE_INTERRUPTIBLE_OPS, CACHE_IDLE_OPS_VAR);     \
+        GET_STAT(WT_STAT_CONN_APPLICATION_CACHE_INTERRUPTIBLE_TIME, CACHE_IDLE_TIME_VAR);   \
+        GET_STAT(WT_STAT_CONN_CACHE_BYTES_MAX, BYTES_MAX_VAR);                              \
+        GET_STAT(WT_STAT_CONN_CACHE_BYTES_INUSE, BYTES_INUSE_VAR);                          \
+        testutil_check(stat->close(stat));                                                  \
     } while (0)
 
 #define GET_ALL_STATS(IDX)                                                                \

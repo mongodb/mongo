@@ -283,7 +283,7 @@ __eventv(WT_SESSION_IMPL *session, bool is_json, int error, const char *func, in
           p, remain, "\"ts_usec\":%" PRIuMAX ",", (uintmax_t)ts.tv_nsec / WT_THOUSAND);
         WT_ERROR_APPEND(p, remain, "\"thread\":\"%s\",", tid);
     } else
-        WT_ERROR_APPEND(p, remain, "[%" PRIuMAX ":%" PRIuMAX "][%s]", (uintmax_t)ts.tv_sec,
+        WT_ERROR_APPEND(p, remain, "[%" PRIuMAX ":%.6" PRIuMAX "][%s]", (uintmax_t)ts.tv_sec,
           (uintmax_t)ts.tv_nsec / WT_THOUSAND, tid);
 
     /* Error prefix. */

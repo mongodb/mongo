@@ -548,8 +548,8 @@ __wti_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize, uint32_t flags, W
     closed = raced = slept = false;
     wait_cnt = 0;
 #ifdef HAVE_DIAGNOSTIC
-    diag_yield = (++log->write_calls % 7) == 0;
-    force_unbuffered = (log->write_calls % WT_THOUSAND) == 0;
+    diag_yield = (__wt_atomic_add64(&log->write_calls, 1) % 7) == 0;
+    force_unbuffered = (__wt_atomic_load64(&log->write_calls) % WT_THOUSAND) == 0;
 #else
     diag_yield = force_unbuffered = false;
 #endif

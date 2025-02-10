@@ -1385,6 +1385,7 @@ static const char *const __stats_connection_desc[] = {
   "block-manager: number of times the file was remapped because it changed size via fallocate or "
   "truncate",
   "block-manager: number of times the region was remapped via write",
+  "cache: application requested eviction interrupt",
   "cache: application thread time evicting (usecs)",
   "cache: application threads page read from disk to cache count",
   "cache: application threads page read from disk to cache time (usecs)",
@@ -1979,11 +1980,11 @@ static const char *const __stats_connection_desc[] = {
   "thread-state: active filesystem read calls",
   "thread-state: active filesystem write calls",
   "thread-yield: application thread operations waiting for cache",
-  "thread-yield: application thread operations waiting for cache eviction while idle",
+  "thread-yield: application thread operations waiting for interruptible cache eviction",
   "thread-yield: application thread operations waiting for mandatory cache eviction",
   "thread-yield: application thread snapshot refreshed for eviction",
   "thread-yield: application thread time waiting for cache (usecs)",
-  "thread-yield: application thread time waiting for cache eviction while idle (usecs)",
+  "thread-yield: application thread time waiting for interruptible cache eviction (usecs)",
   "thread-yield: application thread time waiting for mandatory cache eviction (usecs)",
   "thread-yield: connection close blocked waiting for transaction state stabilization",
   "thread-yield: data handle lock yielded",
@@ -2168,6 +2169,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->block_byte_map_read = 0;
     stats->block_remap_file_resize = 0;
     stats->block_remap_file_write = 0;
+    stats->eviction_interupted_by_app = 0;
     stats->eviction_app_time = 0;
     stats->cache_read_app_count = 0;
     stats->cache_read_app_time = 0;
@@ -2740,12 +2742,12 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing thread_read_active */
     /* not clearing thread_write_active */
     stats->application_cache_ops = 0;
-    stats->application_cache_idle_ops = 0;
-    stats->application_cache_busy_ops = 0;
+    stats->application_cache_interruptible_ops = 0;
+    stats->application_cache_uninterruptible_ops = 0;
     stats->application_evict_snapshot_refreshed = 0;
     stats->application_cache_time = 0;
-    stats->application_cache_idle_time = 0;
-    stats->application_cache_busy_time = 0;
+    stats->application_cache_interruptible_time = 0;
+    stats->application_cache_uninterruptible_time = 0;
     stats->txn_release_blocked = 0;
     stats->dhandle_lock_blocked = 0;
     stats->page_index_slot_ref_blocked = 0;
@@ -2905,6 +2907,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->block_byte_map_read += WT_STAT_CONN_READ(from, block_byte_map_read);
     to->block_remap_file_resize += WT_STAT_CONN_READ(from, block_remap_file_resize);
     to->block_remap_file_write += WT_STAT_CONN_READ(from, block_remap_file_write);
+    to->eviction_interupted_by_app += WT_STAT_CONN_READ(from, eviction_interupted_by_app);
     to->eviction_app_time += WT_STAT_CONN_READ(from, eviction_app_time);
     to->cache_read_app_count += WT_STAT_CONN_READ(from, cache_read_app_count);
     to->cache_read_app_time += WT_STAT_CONN_READ(from, cache_read_app_time);
@@ -3577,13 +3580,17 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->thread_read_active += WT_STAT_CONN_READ(from, thread_read_active);
     to->thread_write_active += WT_STAT_CONN_READ(from, thread_write_active);
     to->application_cache_ops += WT_STAT_CONN_READ(from, application_cache_ops);
-    to->application_cache_idle_ops += WT_STAT_CONN_READ(from, application_cache_idle_ops);
-    to->application_cache_busy_ops += WT_STAT_CONN_READ(from, application_cache_busy_ops);
+    to->application_cache_interruptible_ops +=
+      WT_STAT_CONN_READ(from, application_cache_interruptible_ops);
+    to->application_cache_uninterruptible_ops +=
+      WT_STAT_CONN_READ(from, application_cache_uninterruptible_ops);
     to->application_evict_snapshot_refreshed +=
       WT_STAT_CONN_READ(from, application_evict_snapshot_refreshed);
     to->application_cache_time += WT_STAT_CONN_READ(from, application_cache_time);
-    to->application_cache_idle_time += WT_STAT_CONN_READ(from, application_cache_idle_time);
-    to->application_cache_busy_time += WT_STAT_CONN_READ(from, application_cache_busy_time);
+    to->application_cache_interruptible_time +=
+      WT_STAT_CONN_READ(from, application_cache_interruptible_time);
+    to->application_cache_uninterruptible_time +=
+      WT_STAT_CONN_READ(from, application_cache_uninterruptible_time);
     to->txn_release_blocked += WT_STAT_CONN_READ(from, txn_release_blocked);
     to->dhandle_lock_blocked += WT_STAT_CONN_READ(from, dhandle_lock_blocked);
     to->page_index_slot_ref_blocked += WT_STAT_CONN_READ(from, page_index_slot_ref_blocked);
@@ -3670,7 +3677,7 @@ static const char *const __stats_session_desc[] = {
   "session: page write from cache to disk time (usecs)",
   "session: schema lock wait time (usecs)",
   "session: time waiting for cache (usecs)",
-  "session: time waiting for cache eviction while idle (usecs)",
+  "session: time waiting for cache interruptible eviction (usecs)",
   "session: time waiting for mandatory cache eviction (usecs)",
 };
 
@@ -3699,6 +3706,6 @@ __wt_stat_session_clear_single(WT_SESSION_STATS *stats)
     stats->write_time = 0;
     stats->lock_schema_wait = 0;
     stats->cache_time = 0;
-    stats->cache_time_idle = 0;
-    stats->cache_time_busy = 0;
+    stats->cache_time_interruptible = 0;
+    stats->cache_time_mandatory = 0;
 }

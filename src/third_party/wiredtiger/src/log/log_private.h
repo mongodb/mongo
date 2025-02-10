@@ -233,7 +233,7 @@ struct __wti_log {
     int32_t pool_index;                             /* Index into slot pool */
     size_t slot_buf_size;                           /* Buffer size for slots */
 #ifdef HAVE_DIAGNOSTIC
-    uint64_t write_calls; /* Calls to log_write */
+    wt_shared uint64_t write_calls; /* Calls to log_write */
 #endif
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */

@@ -1556,17 +1556,14 @@ tasks:
           directory: examples/c
 
   - name: examples-c-tsan
-    # There's a lot of TSan warnings to resolve and TSan is a runtime tool so they aren't always reliably detected.
-    # For now only run TSan tasks in patches until we're confident the tests are stable.
-    # tags: ["pull_request"]
-    patch_only: true
+    tags: ["pull_request"]
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
       - func: "make check directory"
         vars:
           directory: examples/c
-          ctest_extra_args: -E "(ex_all|ex_backup_block)" -j ${num_jobs}
+          ctest_extra_args: -E "(ex_all|ex_backup|ex_backup_block)" -j ${num_jobs}
 
   - name: examples-c-production-disable-shared-test
     tags: ["pull_request"]
@@ -2487,6 +2484,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
+            ${PREPARE_TEST_ENV}
             ../test/live_restore/short_test.sh
 
   - name: live-restore-long
@@ -2500,6 +2498,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
+            ${PREPARE_TEST_ENV}
             ../test/live_restore/long_test.sh
 
   # End of live restore tests
@@ -5331,7 +5330,8 @@ buildvariants:
 
 # FIXME-WT-13256
 # This variant runs all possible tasks under TSan but instructs TSan to not report any issues it
-# encounters. This allows us to check whether a TSan change may cause other unexpected failures
+# encounters. This allows us to check whether a TSan change may cause unexpected failures (for example
+# if adding a new field to a struct wrapped in #ifdef TSAN changes the struct layout and causes a segfault)
 # while also not having to fix every TSan issue discovered. At the conclusion of the TSan work this
 # variant will be deleted.
 - name: ubuntu2004-tsan-no-throw

@@ -2813,7 +2813,8 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
  * The function returns an error code from either __evict_page or __wt_txn_is_blocking.
  */
 int
-__wti_evict_app_assist_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, double pct_full)
+__wti_evict_app_assist_worker(
+  WT_SESSION_IMPL *session, bool busy, bool readonly, bool interruptible, double pct_full)
 {
     WT_DECL_RET;
     WT_TRACK_OP_DECL;
@@ -2908,7 +2909,7 @@ __wti_evict_app_assist_worker(WT_SESSION_IMPL *session, bool busy, bool readonly
             (__wt_atomic_loadv64(&evict->eviction_progress) > initial_progress + max_progress)))
             break;
 
-        if (!__evict_check_user_ok_with_eviction(session, busy))
+        if (!__evict_check_user_ok_with_eviction(session, interruptible))
             break;
 
         /* Evict a page. */
@@ -2932,14 +2933,14 @@ err:
         WT_STAT_CONN_INCR(session, application_cache_ops);
         WT_STAT_CONN_INCRV(session, application_cache_time, elapsed);
         WT_STAT_SESSION_INCRV(session, cache_time, elapsed);
-        if (busy) {
-            WT_STAT_CONN_INCR(session, application_cache_busy_ops);
-            WT_STAT_CONN_INCRV(session, application_cache_busy_time, elapsed);
-            WT_STAT_SESSION_INCRV(session, cache_time_busy, elapsed);
+        if (!interruptible) {
+            WT_STAT_CONN_INCR(session, application_cache_uninterruptible_ops);
+            WT_STAT_CONN_INCRV(session, application_cache_uninterruptible_time, elapsed);
+            WT_STAT_SESSION_INCRV(session, cache_time_mandatory, elapsed);
         } else {
-            WT_STAT_CONN_INCR(session, application_cache_idle_ops);
-            WT_STAT_CONN_INCRV(session, application_cache_idle_time, elapsed);
-            WT_STAT_SESSION_INCRV(session, cache_time_idle, elapsed);
+            WT_STAT_CONN_INCR(session, application_cache_interruptible_ops);
+            WT_STAT_CONN_INCRV(session, application_cache_interruptible_time, elapsed);
+            WT_STAT_SESSION_INCRV(session, cache_time_interruptible, elapsed);
         }
         session->cache_wait_us += elapsed;
         /*

@@ -593,17 +593,19 @@ __wti_evict_hs_dirty(WT_SESSION_IMPL *session)
  *     Check if the user wants to abort eviction in this session. #private
  */
 static bool
-__evict_check_user_ok_with_eviction(WT_SESSION_IMPL *session, bool busy)
+__evict_check_user_ok_with_eviction(WT_SESSION_IMPL *session, bool interruptible)
 {
     /* Ask the user only if eviction is optional and it's a user session. */
-    if (busy || F_ISSET(session, WT_SESSION_INTERNAL))
+    if (!interruptible || F_ISSET(session, WT_SESSION_INTERNAL))
         return (true);
 
     WT_EVENT_HANDLER *event_handler = session->event_handler;
     if (event_handler->handle_general != NULL &&
       event_handler->handle_general(
-        event_handler, &S2C(session)->iface, &session->iface, WT_EVENT_EVICTION, NULL) != 0)
+        event_handler, &S2C(session)->iface, &session->iface, WT_EVENT_EVICTION, NULL) != 0) {
+        WT_STAT_CONN_INCR(session, eviction_interupted_by_app);
         return (false);
+    }
 
     return (true);
 }
@@ -616,15 +618,16 @@ __evict_check_user_ok_with_eviction(WT_SESSION_IMPL *session, bool busy)
  *     Input parameters:
  *       (1) `busy`: A flag indicating if eviction is mandatory (true) or optional (false).
  *       (2) `readonly`: A flag indicating if the session is read-only, in which case dirty and
- *            update triggers are ignored.
- *       (3) `didworkp`: A pointer to indicate whether eviction work was done (optional).
+ *          update triggers are ignored.
+ *       (3) `interruptible`: A flag indicating if the user is allowed to interrupt eviction.
+ *       (4) `didworkp`: A pointer to indicate whether eviction work was done (optional).
  *
  *     Return an error code from `__wti_evict_app_assist_worker` if it is unable to perform
  *     meaningful work (eviction cache stuck).
  */
 static WT_INLINE int
 __wt_evict_app_assist_worker_check(
-  WT_SESSION_IMPL *session, bool busy, bool readonly, bool *didworkp)
+  WT_SESSION_IMPL *session, bool busy, bool readonly, bool interruptible, bool *didworkp)
 {
     if (didworkp != NULL)
         *didworkp = false;
@@ -701,7 +704,7 @@ __wt_evict_app_assist_worker_check(
         return (0);
 
     /* Last check if application wants to prevent the thread from evicting. */
-    if (!__evict_check_user_ok_with_eviction(session, busy))
+    if (!__evict_check_user_ok_with_eviction(session, interruptible))
         return (0);
 
     /*
@@ -711,7 +714,7 @@ __wt_evict_app_assist_worker_check(
     if (didworkp != NULL)
         *didworkp = true;
 
-    return (__wti_evict_app_assist_worker(session, busy, readonly, pct_full));
+    return (__wti_evict_app_assist_worker(session, busy, readonly, interruptible, pct_full));
 }
 
 /*
