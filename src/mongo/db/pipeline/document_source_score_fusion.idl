@@ -27,12 +27,18 @@
 #
 global:
   cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 imports:
   - "mongo/db/pipeline/document_source_score_fusion_inputs.idl"
   - "mongo/db/basic_types.idl"
 structs:
+  ScoreFusionCombinationSpec:
+    description: Specification for the 'combination' argument to $scoreFusion.
+    strict: true
+    fields:
+      weights:
+        description: Map (name -> double) of input weights. Default is 1 if unspecified.
+        type: object_owned
+        optional: true
   # The ScoreFusionSpec needs to be in a separate file because use of the 
   # validateScoreFusionMinInputs callback will otherwise create a circular dependency.
   ScoreFusionSpec:
@@ -41,10 +47,8 @@ structs:
     fields:
       inputs:
         description: The set of sub-pipelines' results to be merged with score fusion.
-        type: array<ScoreFusionInputsSpec>
+        type: ScoreFusionInputsSpec
         optional: false
-        validator:
-            {callback: "validateScoreFusionMinInputs"}
       score:
         description: Logic to combine all scores together
         type: IDLAnyType
@@ -53,9 +57,9 @@ structs:
         description: none for no normalization, sigmoid and minMaxScaler for the type of normalization
         type: string
         optional: false
-      weights:
-        description: A number to multiply the 'score' expression by, after normalization
-        type: array<safeDouble>
+      combination:
+        description: The set of pipeline weights to match up with the input pipelines.
+        type: ScoreFusionCombinationSpec
         optional: true
       scoreNulls:
         description: Value to assign missing or null scores

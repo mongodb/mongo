@@ -27,6 +27,8 @@
 #
 global:
   cpp_namespace: "mongo"
+  cpp_includes:
+  - "mongo/db/pipeline/document_source_hybrid_scoring_input_util.h"
 imports:
   - "mongo/db/basic_types.idl"
   - "mongo/db/pipeline/aggregate_command.idl"
@@ -35,11 +37,9 @@ structs:
     description: Specification for an input subpipeline to $scoreFusion.
     strict: true
     fields:
-      pipeline:
-        description: Scored pipeline operating on the same collection.
-        type: pipeline
+      pipelines:
+        description: Map (name -> scored pipeline) of inputs. Each pipeline must be operating on the same collection.
+        type: object_owned
         optional: false
-      as:
-        description: The name to associate with this pipeline in 'scoreDetails'.
-        type: string
-        optional: true
+        validator:
+            {callback: "validatePipelinesObject"}

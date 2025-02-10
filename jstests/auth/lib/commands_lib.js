@@ -8396,44 +8396,40 @@ export const authCommandsLib = {
       {
         testname: "aggregate_$scoreFusion",
         command: {
-            aggregate: "foo",
-            cursor: {},
-            pipeline: [{
-              $scoreFusion: {
-                inputs: [
-                  {
-                    pipeline: [
-                      {
-                        $match: {a: 1}
-                      },
-                      {
-                        $score: {
-                          score: 5.0
-                        }
-                      },
-                    ]
-                  },
-                  {
-                    pipeline: [
-                      {
-                        $search: {
-                          // empty query
-                        }
+          aggregate: "foo",
+          cursor: {},
+          pipeline: [{
+            $scoreFusion: {
+              inputs: {
+                pipelines: {
+                  matchScore1: [
+                    {
+                      $match: {a: 1}
+                    },
+                    {
+                      $score: {
+                        score: 5.0
                       }
-                    ]
-                  },
-                  {
-                    pipeline: [
-                      {
-                        $vectorSearch: {
-                          // empty query
-                        }
+                    }
+                  ],
+                  search1: [
+                    {
+                      $search: {
+                        // empty query
                       }
-                    ]
-                  }
-                ],
-                inputNormalization: "none"
-              }
+                    }
+                  ],
+                  vectorSearch1: [
+                    {
+                      $vectorSearch: {
+                        // empty query
+                      }
+                    }
+                  ]
+                }
+              },
+              inputNormalization: "none"
+            }
           }]
         },
         setup: function(db) {

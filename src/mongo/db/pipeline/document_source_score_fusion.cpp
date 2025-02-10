@@ -34,11 +34,15 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_rank_fusion.h"
+#include "mongo/db/pipeline/document_source_add_fields.h"
+#include "mongo/db/pipeline/document_source_group.h"
+#include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_score_fusion.h"
 #include "mongo/db/pipeline/document_source_score_fusion_gen.h"
 #include "mongo/db/pipeline/document_source_set_metadata.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
+#include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
@@ -52,14 +56,13 @@ REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(scoreFusion,
                                            DocumentSourceScoreFusion::createFromBson,
                                            AllowedWithApiStrict::kNeverInVersion1,
                                            feature_flags::gFeatureFlagSearchHybridScoringFull);
-
 namespace {
 
 /**
  * Checks is this stage is a $score stage, where it has been desugared to $setMetadata with the meta
  * type MetaType::kScore.
  */
-bool isScoreStage(boost::intrusive_ptr<DocumentSource> stage) {
+bool isScoreStage(const boost::intrusive_ptr<DocumentSource>& stage) {
     if (stage->getSourceName() != DocumentSourceSetMetadata::kStageName) {
         return false;
     }
@@ -67,6 +70,160 @@ bool isScoreStage(boost::intrusive_ptr<DocumentSource> stage) {
     auto setMetadataTransform =
         static_cast<SetMetadataTransformation*>(&singleDocTransform->getTransformer());
     return setMetadataTransform->getMetaType() == DocumentMetadataFields::MetaType::kScore;
+}
+
+/**
+ * Validates the weights inputs. If weights are specified by the user, there must be exactly one
+ * weight per input pipeline.
+ */
+static void scoreFusionWeightsValidator(
+    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& pipelines,
+    const StringMap<double>& weights) {
+    // The size of weights and pipelines should actually be equal, but if we have more pipelines
+    // than weights, we'll throw a more specific error below that specifies which pipeline is
+    // missing a weight.
+    uassert(9402201,
+            "$scoreFusion input has more weights than pipelines. If combination.weights is "
+            "specified, there must be only one weight per named input pipeline.",
+            weights.size() <= pipelines.size());
+
+    // TODO (SERVER-100194): Change $scoreFusion weights object to accept a specified subset of
+    // pipelines
+    // TODO (SERVER-100511): Add typo suggestion logic for incorrectly spelled weight pipelines
+    for (const auto& pipelineIt : pipelines) {
+        auto pipelineName = pipelineIt.first;
+        uassert(9402202,
+                str::stream()
+                    << "$scoreFusion input pipeline \"" << pipelineName
+                    << "\" is missing a weight, even though combination.weights is specified.",
+                weights.contains(pipelineName));
+    }
+}
+
+/**
+ * Parses and validates the weights for pipelines that have been explicitly specified in the
+ * ScoreFusionSpec. Returns a map from the pipeline name to the specified weight (as a double)
+ * for that pipeline.
+ */
+StringMap<double> extractAndValidateWeights(
+    const ScoreFusionSpec& spec,
+    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& pipelines) {
+    StringMap<double> weights;
+
+    const auto& combinationSpec = spec.getCombination();
+    if (!combinationSpec.has_value() || !combinationSpec->getWeights().has_value()) {
+        return weights;
+    }
+
+    for (const auto& elem : *combinationSpec->getWeights()) {
+        // elem.Number() throws a uassert if non-numeric.
+        double weight = elem.Number();
+        uassert(9402200,
+                str::stream() << "Score fusion pipeline weight must be non-negative, but given "
+                              << weight,
+                weight >= 0);
+        weights[elem.fieldName()] = weight;
+    }
+    scoreFusionWeightsValidator(pipelines, weights);
+    return weights;
+}
+
+// TODO (SERVER-100209): Save $rankFusion/$scoreFusion output score to { $meta: "score" }. After
+// doing so, this method (findScorePath) can be eliminated.
+/**
+ * Returns the appropriate scorePath to use as the input score for any given scored selection
+ * pipeline.
+ */
+BSONObj findScorePath(const Pipeline& pipeline) {
+    auto sources = pipeline.getSources();
+    auto firstStageName = sources.front()->getSourceName();
+    BSONObj scorePath;
+    if (firstStageName == DocumentSourceVectorSearch::kStageName ||
+        firstStageName == DocumentSourceSearch::kStageName ||
+        std::any_of(sources.begin(), sources.end(), isScoreStage)) {
+        // The "score" metadata field works as an alias for all 3 metadata score fields:
+        // searchScore, vectorSearchScore, score.
+        scorePath = BSON("$meta"
+                         << "score");
+    } else {
+        // Scores are saved as "score" on documents outputted by $rankFusion and $scoreFusion
+        // stages.
+        scorePath = BSONObj("$score");
+    }
+    return scorePath;
+}
+
+/**
+ * Builds and returns an $addFields stage, like the following:
+ * {$addFields:
+ *     {prefix_score:
+ *         {$multiply:
+ *             [{"$score"}, 0.5] // or [{$meta: "vectorSearchScore"}, 0.5]
+ *         },
+ *     }
+ * }
+ */
+boost::intrusive_ptr<DocumentSource> buildScoreAddFieldsStage(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const StringData inputPipelineName,
+    const BSONObj& scorePath,
+    const StringData inputNormalization,
+    const double weight) {
+    const std::string score = fmt::format("{}_score", inputPipelineName);
+    BSONObjBuilder bob;
+    {
+        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
+        {
+            BSONObjBuilder scoreField(addFieldsBob.subobjStart(score));
+            {
+                BSONArrayBuilder multiplyArray(scoreField.subarrayStart("$multiply"_sd));
+                multiplyArray.append(scorePath);
+                multiplyArray.append(weight);
+            }
+        }
+    }
+
+    const BSONObj spec = bob.obj();
+    return DocumentSourceAddFields::createFromBson(spec.firstElement(), expCtx);
+}
+
+/**
+ * Builds and returns a $replaceRoot stage: {$replaceWith: {docs: "$$ROOT"}}.
+ * This has the effect of storing the unmodified user's document in the path '$docs'.
+ */
+boost::intrusive_ptr<DocumentSource> buildReplaceRootStage(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return DocumentSourceReplaceRoot::createFromBson(BSON("$replaceWith" << BSON("docs"
+                                                                                 << "$$ROOT"))
+                                                         .firstElement(),
+                                                     expCtx);
+}
+
+/**
+ * Build stages for first pipeline. Example where the first pipeline is called "name1" and has a
+ * weight of 5.0:
+ * { ... stages of first pipeline ... }
+ * { "$replaceRoot": { "newRoot": { "docs": "$$ROOT" } } },
+ * { "$addFields": { "name1_score": { "$multiply": [ { $meta: "score" }, { "$const": 5.0 } ] } } }
+ */
+std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
+    const StringData inputPipelineOneName,
+    const BSONObj& scorePath,
+    const StringData inputNormalization,
+    const double weight,
+    const std::unique_ptr<Pipeline, PipelineDeleter>& firstInputPipeline,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
+
+    while (!firstInputPipeline->getSources().empty()) {
+        // These stages are being copied over from the original pipeline.
+        outputStages.push_back(firstInputPipeline->popFront());
+    }
+
+    outputStages.emplace_back(buildReplaceRootStage(expCtx));
+    outputStages.emplace_back(buildScoreAddFieldsStage(
+        expCtx, inputPipelineOneName, scorePath, inputNormalization, weight));
+    return outputStages;
 }
 
 /**
@@ -82,15 +239,18 @@ static void scoreFusionPipelineValidator(const Pipeline& pipeline) {
     static const std::set<StringData> implicitlyScoredStages{DocumentSourceVectorSearch::kStageName,
                                                              DocumentSourceSearch::kStageName};
     auto sources = pipeline.getSources();
+
+    static const std::string scorePipelineMsg =
+        "All subpipelines to the $scoreFusion stage must begin with one of $search, "
+        "$vectorSearch, $rankFusion, $scoreFusion or have a custom $score in the pipeline.";
+    uassert(9402503,
+            str::stream() << "$scoreFusion input pipeline cannot be empty. " << scorePipelineMsg,
+            !sources.empty());
+
     auto firstStageName = sources.front()->getSourceName();
     auto isScoredPipeline = implicitlyScoredStages.contains(firstStageName) ||
         std::any_of(sources.begin(), sources.end(), isScoreStage);
-    uassert(
-        9402500,
-        str::stream()
-            << "All subpipelines to the $scoreFusion stage must begin with one of $search, "
-               "$vectorSearch, $rankFusion, $scoreFusion or have a custom $score in the pipeline.",
-        isScoredPipeline);
+    uassert(9402500, scorePipelineMsg, isScoredPipeline);
 
 
     std::for_each(sources.begin(), sources.end(), [](auto& stage) {
@@ -112,6 +272,118 @@ static void scoreFusionPipelineValidator(const Pipeline& pipeline) {
         }
     });
 }
+
+/**
+ * Group all the input documents across all pipelines and their respective score fields. Turn null
+ * scores into 0.
+ * { "$group": { "_id": "$docs._id", "docs": { "$first": "$docs" },
+ * "name1_score": { "$max": {"$ifNull": [ "$name1_score", 0 ] } } } }
+ */
+BSONObj groupEachScore(
+    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& pipelines) {
+    // For each sub-pipeline, build the following obj:
+    // name_score: {$max: {ifNull: ["$name_score", 0]}}
+    BSONObjBuilder bob;
+    {
+        BSONObjBuilder groupBob(bob.subobjStart("$group"_sd));
+        groupBob.append("_id", "$docs._id");
+        groupBob.append("docs",
+                        BSON("$first"
+                             << "$docs"));
+
+        for (auto it = pipelines.begin(); it != pipelines.end(); it++) {
+            const auto& pipelineName = it->first;
+            const std::string scoreName = fmt::format("{}_score", pipelineName);
+            groupBob.append(
+                scoreName,
+                BSON("$max" << BSON("$ifNull" << BSON_ARRAY(fmt::format("${}", scoreName) << 0))));
+        }
+        groupBob.done();
+    }
+    bob.done();
+    return bob.obj();
+}
+
+/**
+ * Calculate the final score by summing the score fields on each input document and adding it as a
+ * new field to the document.
+ * { "$addFields": { "score": { "$add": ["$name1_score", "$name2_score"] } } },
+ */
+BSONObj calculateFinalScore(
+    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputs) {
+    // Generate a $add object with an array of all the fields containing a score for a given
+    // pipeline.
+    const auto& allInputs = [&] {
+        BSONObjBuilder addBob;
+
+        BSONArrayBuilder addArrBuilder(addBob.subarrayStart("$add"_sd));
+        for (auto it = inputs.begin(); it != inputs.end(); it++) {
+            StringBuilder sb;
+            sb << "$" << it->first << "_score";
+            addArrBuilder.append(sb.str());
+        }
+        addArrBuilder.done();
+        return addBob.obj();
+    };
+    return BSON("$addFields" << BSON("score" << allInputs()));
+}
+
+/**
+ * Build the pipeline input to $unionWith (consists of a $replaceRoot and $addFields stage). Returns
+ * a $unionWith stage that looks something like this:
+ * { "$unionWith": { "coll": "pipeline_test", "pipeline": [inputPipeline stage(ex: $vectorSearch),
+ * $replaceRoot stage, $addFields stage] } }
+ */
+boost::intrusive_ptr<DocumentSource> buildUnionWithPipelineStage(
+    const std::string& inputPipelineName,
+    const BSONObj& scorePath,
+    const StringData inputNormalization,
+    const double weight,
+    const std::unique_ptr<Pipeline, PipelineDeleter>& oneInputPipeline,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    // Here, a copy of the original input pipeline is created,
+    // as additional stages need to be appended to it before it can be wrapped in the $unionWith.
+    std::unique_ptr<Pipeline, PipelineDeleter> inputPipelineStages = oneInputPipeline->clone();
+
+    inputPipelineStages->pushBack(buildReplaceRootStage(expCtx));
+    inputPipelineStages->pushBack(
+        buildScoreAddFieldsStage(expCtx, inputPipelineName, scorePath, inputNormalization, weight));
+    std::vector<BSONObj> bsonPipeline = inputPipelineStages->serializeToBson();
+
+    auto collName = expCtx->getNamespaceString().coll();
+
+    BSONObj inputToUnionWith =
+        BSON("$unionWith" << BSON("coll" << collName << "pipeline" << bsonPipeline));
+    return DocumentSourceUnionWith::createFromBson(inputToUnionWith.firstElement(), expCtx);
+}
+
+/**
+ * After all the pipelines have been executed and unioned, builds the $group stage to merge the
+ * scoreFields/apply score nulls behavior, calculate the final score field to add to each document,
+ * sorts the documents by score and id, and replaces the root with the final set of outputted
+ * documents.
+ * The $sort stage looks like this: { "$sort": { "score": -1, "_id": 1 } }
+ * The $replaceRoot stage looks like this: { "$replaceRoot": { "newRoot": "$docs" } }
+ */
+std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
+    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputPipelines,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto group =
+        DocumentSourceGroup::createFromBson(groupEachScore(inputPipelines).firstElement(), expCtx);
+    auto addFields = DocumentSourceAddFields::createFromBson(
+        calculateFinalScore(inputPipelines).firstElement(), expCtx);
+
+    const SortPattern sortingPattern{BSON("score" << -1 << "_id" << 1), expCtx};
+    auto sort = DocumentSourceSort::create(expCtx, sortingPattern);
+
+    auto restoreUserDocs =
+        DocumentSourceReplaceRoot::create(expCtx,
+                                          ExpressionFieldPath::createPathFromString(
+                                              expCtx.get(), "docs", expCtx->variablesParseState),
+                                          "documents",
+                                          SbeCompatibility::noRequirements);
+    return {group, addFields, sort, restoreUserDocs};
+}
 }  // namespace
 
 std::unique_ptr<DocumentSourceScoreFusion::LiteParsed> DocumentSourceScoreFusion::LiteParsed::parse(
@@ -121,15 +393,102 @@ std::unique_ptr<DocumentSourceScoreFusion::LiteParsed> DocumentSourceScoreFusion
             spec.type() == BSONType::Object);
 
     auto parsedSpec = ScoreFusionSpec::parse(IDLParserContext(kStageName), spec.embeddedObject());
+    auto inputPipesObj = parsedSpec.getInputs().getPipelines();
 
-    // Ensure that all pipelines are valid scored selection pipelines.
+    // Parse each pipeline.
     std::vector<LiteParsedPipeline> liteParsedPipelines;
-    for (const auto& input : parsedSpec.getInputs()) {
-        liteParsedPipelines.emplace_back(nss, input.getPipeline());
+    for (const auto& elem : inputPipesObj) {
+        liteParsedPipelines.emplace_back(nss, parsePipelineFromBSON(elem));
     }
 
-    return std::make_unique<DocumentSourceScoreFusion::LiteParsed>(spec.fieldName(),
-                                                                   std::move(liteParsedPipelines));
+    return std::make_unique<DocumentSourceScoreFusion::LiteParsed>(
+        spec.fieldName(), nss, std::move(liteParsedPipelines));
+}
+
+/**
+ * Validate that each pipeline is a valid scored selection pipeline. Returns a pair of the map of
+ * the input pipeline names to pipeline objects and a map of pipeline names to score paths.
+ */
+std::pair<std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>,
+          std::map<std::string, BSONObj>>
+parseAndValidateScoredSelectionPipelines(const BSONElement& elem,
+                                         const ScoreFusionSpec& spec,
+                                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
+    std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>> inputPipelines;
+    std::map<std::string, BSONObj> scorePaths;
+    for (const auto& elem : spec.getInputs().getPipelines()) {
+        auto pipeline = Pipeline::parse(parsePipelineFromBSON(elem), pExpCtx);
+        // Ensure that all pipelines are valid scored selection pipelines.
+        scoreFusionPipelineValidator(*pipeline);
+
+        // Validate pipeline name.
+        auto inputName = elem.fieldName();
+        uassertStatusOKWithContext(
+            FieldPath::validateFieldName(inputName),
+            "$scoreFusion pipeline names must follow the naming rules of field path expressions.");
+        uassert(9402203,
+                str::stream()
+                    << "$scoreFusion pipeline names must be unique, but found duplicate name '"
+                    << inputName << "'.",
+                !inputPipelines.contains(inputName));
+        BSONObj scorePath = findScorePath(*pipeline);
+
+        // Input pipeline has been validated; save it in the resulting maps.
+        scorePaths[inputName] = findScorePath(*pipeline);
+        inputPipelines[inputName] = std::move(pipeline);
+    }
+    return {std::move(inputPipelines), std::move(scorePaths)};
+}
+
+// To fully understand the structure of the desugared output returned from this function, you
+// can read the desugared output in the CheckOnePipelineAllowed and
+// CheckMultiplePipelinesAllowed test cases under document_source_score_fusion_test.cpp.
+std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
+    const ScoreFusionSpec& spec,
+    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputPipelines,
+    const std::map<std::string, BSONObj>& scorePaths,
+    const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
+    StringMap<double> weights = extractAndValidateWeights(spec, inputPipelines);
+    // TODO (SERVER-94663): Validate inputNormalization field is one of the following: "none",
+    // "sigmoid", "minMaxScaler"
+    StringData inputNormalization = spec.getInputNormalization();
+    std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
+    for (auto it = inputPipelines.begin(); it != inputPipelines.end(); it++) {
+        const auto& [inputPipelineName, inputPipelineStages] = *it;
+
+        // Check if an explicit weight for this pipeline has been specified.
+        // If not, the default is one.
+        double pipelineWeight = weights.empty() ? 1 : weights.at(inputPipelineName);
+
+        if (it == inputPipelines.begin()) {
+            // Stages for the first pipeline.
+            auto firstPipelineStages = buildFirstPipelineStages(inputPipelineName,
+                                                                scorePaths.at(inputPipelineName),
+                                                                inputNormalization,
+                                                                pipelineWeight,
+                                                                inputPipelineStages,
+                                                                pExpCtx);
+            for (auto&& stage : firstPipelineStages) {
+                outputStages.emplace_back(stage);
+            }
+        } else {
+            // For the input pipelines other than the first,
+            // we wrap then in a $unionWith stage to append it to the total desugared output.
+            auto unionWithStage = buildUnionWithPipelineStage(inputPipelineName,
+                                                              scorePaths.at(inputPipelineName),
+                                                              inputNormalization,
+                                                              pipelineWeight,
+                                                              inputPipelineStages,
+                                                              pExpCtx);
+            outputStages.emplace_back(unionWithStage);
+        }
+    }
+    // Build all remaining stages to perform the fusion.
+    auto finalStages = buildScoreAndMergeStages(inputPipelines, pExpCtx);
+    for (auto&& stage : finalStages) {
+        outputStages.emplace_back(stage);
+    }
+    return outputStages;
 }
 
 std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScoreFusion::createFromBson(
@@ -141,16 +500,8 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScoreFusion::creat
             elem.type() == BSONType::Object);
     auto spec = ScoreFusionSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
 
-    std::list<std::unique_ptr<Pipeline, PipelineDeleter>> inputPipelines;
-    // Ensure that all pipelines are valid scored selection pipelines.
-    for (const auto& input : spec.getInputs()) {
-        inputPipelines.push_back(
-            Pipeline::parse(input.getPipeline(),
-                            pExpCtx->copyForSubPipeline(pExpCtx->getNamespaceString()),
-                            scoreFusionPipelineValidator));
-    }
-
-    // TODO SERVER-94022: Desugar $scoreFusion (will return something then)
-    return {};
+    const auto& [inputPipelines, scorePaths] =
+        parseAndValidateScoredSelectionPipelines(elem, spec, pExpCtx);
+    return constructDesugaredOutput(spec, inputPipelines, scorePaths, pExpCtx);
 }
 }  // namespace mongo

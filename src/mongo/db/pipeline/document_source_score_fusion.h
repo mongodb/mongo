@@ -45,8 +45,19 @@ namespace mongo {
 /**
  * The $scoreFusion stage is syntactic sugar for generating an output of scored results by combining
  * the results of any number of scored subpipelines with relative score fusion.
- * TODO SERVER-94022: Elaborate on this header comment with more details to what the stage gets
- * desugared to.
+ *
+ * Given n input pipelines each with a unique name, desugars into a
+ * pipeline consisting of:
+ * - The first input pipeline (e.g. $vectorSearch).
+ * - $replaceRoot and $addFields that for each document returned will:
+ *     - Add a score field: <pipeline name>_score (e.g. vs_score).
+ *         - Score is calculated as the weight * the score field on the input documents.
+ * - n-1 $unionWith stages on the same collection, which take as input pipelines:
+ *     - The nth input pipeline.
+ *     - $replaceRoot and $addFields which do the same thing as described above.
+ * - $group by ID and turn null scores into 0.
+ * - $addFields for a 'score' field which will aggregate the n scores for each document.
+ * - $sort in descending order.
  */
 class DocumentSourceScoreFusion final {
 public:
@@ -63,9 +74,11 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        LiteParsed(std::string parseTimeName, std::vector<LiteParsedPipeline> pipelines)
+        LiteParsed(std::string parseTimeName,
+                   const NamespaceString& nss,
+                   std::vector<LiteParsedPipeline> pipelines)
             : LiteParsedDocumentSourceNestedPipelines(
-                  std::move(parseTimeName), boost::none, std::move(pipelines)) {}
+                  std::move(parseTimeName), nss, std::move(pipelines)) {}
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const final {
