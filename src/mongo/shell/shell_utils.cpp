@@ -268,6 +268,7 @@ bool isBalanced(const std::string& code) {
                 break;
             case '"':
             case '\'':
+                fassert(9879200, i < std::numeric_limits<std::size_t>::max());
                 i = skipOverString(code, i + 1, code[i]);
                 if (i >= code.size()) {
                     return true;  // Do not let unterminated strings enter multi-line mode
