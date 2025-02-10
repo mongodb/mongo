@@ -582,7 +582,30 @@ private:
 
             boost::optional<std::string> caCert;
             if (_options.tlsCAFile) {
+                uassert(
+                    9985600,
+                    "The use of both tlsCAFile and the System Certificate store is not supported.",
+                    !sslGlobalParams.sslUseSystemCA);
                 caCert.emplace(ssl_util::readPEMFile(_options.tlsCAFile.get()).getValue());
+            } else if (sslGlobalParams.sslUseSystemCA) {
+                // If sslUseSystemCA is specified, read the CA file path from the SSL_CERT_FILE env
+                // var.
+                StringData caPath;
+                if (char* env = getenv(kSSLCertFileEnvVar); env && *env) {
+                    caPath = env;
+                } else {
+                    uasserted(9985601,
+                              "tlsUseSystemCA enabled, but SSL_CERT_FILE has not been set in "
+                              "environment");
+                }
+                LOGV2(9985602,
+                      "tlsUseSystemCA enabled, using value from environment variable",
+                      "SSL_CERT_FILE"_attr = caPath);
+                caCert.emplace(ssl_util::readPEMFile(caPath).getValue());
+            } else if (_options.tlsAllowInvalidCertificates) {
+                LOGV2_WARNING(9985603, "No tlsCAFile specified, and tlsUseSystemCA not specified");
+            } else {
+                uasserted(9985604, "No tlsCAFile specified, and tlsUseSystemCA not specified");
             }
 
             boost::optional<const ::grpc::experimental::IdentityKeyCertPair&> certPair;
@@ -613,7 +636,7 @@ private:
             tlsOps.watch_identity_key_cert_pairs();
         }
 
-        if (_options.tlsCAFile) {
+        if (_options.tlsCAFile || sslGlobalParams.sslUseSystemCA) {
             tlsOps.watch_root_certs();
         }
 

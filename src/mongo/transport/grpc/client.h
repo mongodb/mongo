@@ -57,6 +57,7 @@ constexpr auto kStreamsSubsectionFieldName = "streams"_sd;
 constexpr auto kCurrentStreamsFieldName = "current"_sd;
 constexpr auto kSuccessfulStreamsFieldName = "successful"_sd;
 constexpr auto kFailedStreamsFieldName = "failed"_sd;
+constexpr auto kSSLCertFileEnvVar = "SSL_CERT_FILE";
 
 class Client : public std::enable_shared_from_this<Client> {
 public:
