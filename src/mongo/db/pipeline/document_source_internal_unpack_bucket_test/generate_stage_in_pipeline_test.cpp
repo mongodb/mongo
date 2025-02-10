@@ -36,11 +36,11 @@ namespace {
 using InternalUnpackBucketGenerateInPipelineTest = AggregationContextFixture;
 
 TEST_F(InternalUnpackBucketGenerateInPipelineTest, EnsureStageIsGeneratedInReturnedPipeline) {
-    const auto originalPipeline = std::vector{BSONObjBuilder{}.obj()};
+    const auto originalPipeline = std::vector{BSON("$match" << BSON("a" << 1))};
 
     const auto alteredPipeline = DocumentSourceInternalUnpackBucket::generateStageInPipeline(
         originalPipeline,
-        "timeField"_sd,
+        "time"_sd,
         boost::none /* metaField */,
         boost::none /* bucketMaxSpanSeconds */,
         {boost::none} /* timeseriesBucketsMayHaveMixedSchemaData */,
@@ -58,6 +58,44 @@ TEST_F(InternalUnpackBucketGenerateInPipelineTest, EnsureStageIsGeneratedInRetur
          oitr != originalPipeline.end() && aitr != alteredPipeline.end();
          ++oitr, ++aitr) {
         ASSERT_BSONOBJ_EQ(*aitr, *oitr);
+    }
+}
+
+TEST_F(InternalUnpackBucketGenerateInPipelineTest, ValidateFields) {
+    const auto originalPipeline = std::vector{BSON("$match" << BSON("a" << 1))};
+
+    {
+        const auto alteredPipeline = DocumentSourceInternalUnpackBucket::generateStageInPipeline(
+            originalPipeline,
+            "time"_sd,
+            boost::none /* metaField */,
+            boost::none /* bucketMaxSpanSeconds */,
+            {boost::none} /* timeseriesBucketsMayHaveMixedSchemaData */,
+            {boost::none} /* timeseriesBucketingParametersMayHaveChanged */);
+
+        // The first stage should be the generated $_internalUnpackBucket stage.
+        const auto& firstStage = *alteredPipeline.begin();
+        ASSERT_BSONOBJ_EQ(
+            BSON(DocumentSourceInternalUnpackBucket::kStageNameInternal
+                 << BSON(DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData << false)),
+            firstStage);
+    }
+
+    {
+        const auto alteredPipeline = DocumentSourceInternalUnpackBucket::generateStageInPipeline(
+            originalPipeline,
+            "time"_sd,
+            boost::none /* metaField */,
+            boost::none /* bucketMaxSpanSeconds */,
+            {false} /* timeseriesBucketsMayHaveMixedSchemaData */,
+            {boost::none} /* timeseriesBucketingParametersMayHaveChanged */);
+
+        // The first stage should be the generated $_internalUnpackBucket stage.
+        const auto& firstStage = *alteredPipeline.begin();
+        ASSERT_BSONOBJ_EQ(
+            BSON(DocumentSourceInternalUnpackBucket::kStageNameInternal
+                 << BSON(DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData << true)),
+            firstStage);
     }
 }
 

@@ -1025,7 +1025,13 @@ std::vector<BSONObj> DocumentSourceInternalUnpackBucket::generateStageInPipeline
     const mongo::OptionalBool& timeseriesBucketingParametersHaveChanged) {
     auto bob = BSONObjBuilder{};
 
-    // TODO(SERVER-99494): Handle timeseriesBucketsMayHaveMixedSchemaData.
+    auto assumeNoMixedSchemaData = [&]() {
+        if (timeseriesBucketsMayHaveMixedSchemaData.has_value())
+            return !timeseriesBucketsMayHaveMixedSchemaData.value_or(false);
+        return false;
+    }();
+    bob.append(DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData,
+               assumeNoMixedSchemaData);
 
     // TODO(SERVER-99495): Handle timeseriesBucketingParametersHaveChanged.
 
