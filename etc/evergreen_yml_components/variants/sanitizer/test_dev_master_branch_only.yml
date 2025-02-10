@@ -824,14 +824,12 @@ buildvariants:
         distros:
           - *enterprise-rhel8-debug-tsan-large-distro-name
 
-  - <<: *generic_linux_compile_params
-    name: &linux-x86-dynamic-debug-compile-toolchain-v5 linux-x86-dynamic-debug-compile-toolchain-v5
+  - name: &linux-x86-dynamic-debug-compile-toolchain-v5 linux-x86-dynamic-debug-compile-toolchain-v5
     display_name: "! Linux x86 Shared Library DEBUG Compile (v5 toolchain)"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
     run_on:
       - rhel8.8-xlarge
     cron: "0 0 * * *" # Run once a day
-    activate: false
     stepback: false
     expansions:
       scons_cache_scope: shared
@@ -919,7 +917,6 @@ buildvariants:
     display_name: "! Linux x86 Shared Library DEBUG (v5 toolchain)"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
     cron: "0 0 * * *" # From the ${project_required_suggested_cron} parameter
-    activate: false
     stepback: false
     run_on:
       - rhel8.8-medium

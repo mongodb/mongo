@@ -683,7 +683,6 @@ buildvariants:
     tags: ["required", "bazel_check", "forbid_tasks_tagged_with_experimental"]
     run_on:
       - amazon2-arm64-latest-large
-    activate: false
     stepback: false
     cron: "0 0 * * *" # Run once a day
     expansions:
@@ -752,7 +751,6 @@ buildvariants:
   - name: enterprise-amazon-linux2-arm64-all-feature-flags-toolchain-v5
     display_name: "! Amazon Linux 2 arm64 Atlas Enterprise (all feature flags) (v5 toolchain)"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
-    activate: false
     stepback: false
     cron: "0 0 * * *" # Run once a day
     run_on:
@@ -802,7 +800,6 @@ buildvariants:
   - name: &amazon-linux2-arm64-crypt-compile-toolchain-v5 amazon-linux2-arm64-crypt-compile-toolchain-v5
     display_name: "! Amazon Linux 2 arm64 Crypt Compile (v5 toolchain)"
     tags: ["required", "bazel_check"]
-    activate: false
     stepback: false
     cron: "0 0 * * *" # Run once a day
     run_on:
