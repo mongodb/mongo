@@ -323,6 +323,9 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kCloning) {
                            _tellAllRecipientsToRefresh(executor);
                        }
+                       if (_coordinatorDoc.getState() <= CoordinatorStateEnum::kBlockingWrites) {
+                           _tellAllDonorsToStartChangeStreamsMonitor(executor);
+                       }
                    })
                    .then([this, executor] {
                        return _fetchAndPersistNumDocumentsToCloneFromDonors(executor);
@@ -1665,6 +1668,24 @@ void ReshardingCoordinator::_tellAllDonorsToRefresh(
                                                         **executor,
                                                         _ctHolder->getStepdownToken());
     generic_argument_util::setMajorityWriteConcern(opts->cmd, &resharding::kMajorityWriteConcern);
+    opts->cmd.setDbName(DatabaseName::kAdmin);
+    _sendCommandToAllDonors(executor, opts);
+}
+
+void ReshardingCoordinator::_tellAllDonorsToStartChangeStreamsMonitor(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    // The donors do not need to monitor the changes to the collection being resharded if
+    // verification is not enabled.
+    if (!_metadata.getPerformVerification()) {
+        return;
+    }
+    invariant(_coordinatorDoc.getCloneTimestamp());
+    ShardsvrReshardingDonorStartChangeStreamsMonitor cmd(_coordinatorDoc.getSourceNss(),
+                                                         _coordinatorDoc.getReshardingUUID(),
+                                                         *_coordinatorDoc.getCloneTimestamp());
+    auto opts = std::make_shared<
+        async_rpc::AsyncRPCOptions<ShardsvrReshardingDonorStartChangeStreamsMonitor>>(
+        **executor, _ctHolder->getStepdownToken(), cmd);
     opts->cmd.setDbName(DatabaseName::kAdmin);
     _sendCommandToAllDonors(executor, opts);
 }

@@ -201,6 +201,7 @@ let viewsCommandTests = {
     _shardsvrRenameIndexMetadata: {skip: isAnInternalCommand},
     _shardsvrReshardCollection: {skip: isAnInternalCommand},
     _shardsvrReshardingDonorFetchFinalCollectionStats: {skip: isAnInternalCommand},
+    _shardsvrReshardingDonorStartChangeStreamsMonitor: {skip: isAnInternalCommand},
     _shardsvrReshardingOperationTime: {skip: isAnInternalCommand},
     _shardsvrSetAllowMigrations: {skip: isAnInternalCommand},
     _shardsvrResolveView: {skip: isAnInternalCommand},

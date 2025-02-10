@@ -248,6 +248,25 @@ commands:
             lte: 256
         optional: true
 
+  _shardsvrReshardingDonorStartChangeStreamsMonitor:
+      command_name: _shardsvrReshardingDonorStartChangeStreamsMonitor
+      cpp_name: ShardsvrReshardingDonorStartChangeStreamsMonitor
+      description: "The internal command for making a resharding donor shard start monitoring the
+                    changes in the collection being resharded between the start of
+                    the cloning phase and the start of the critical section."
+      namespace: type
+      type: namespacestring
+      reply_type: OkReply
+      api_version: ""
+      strict: false
+      fields:
+        reshardingUUID:
+          type: uuid
+          description: "The UUID for the resharding operation."
+        cloneTimestamp:
+          type: timestamp
+          description: "The clone timestamp for the resharding operation."
+
   _shardsvrReshardingDonorFetchFinalCollectionStats:
       command_name: _shardsvrReshardingDonorFetchFinalCollectionStats
       cpp_name: ShardsvrReshardingDonorFetchFinalCollectionStats

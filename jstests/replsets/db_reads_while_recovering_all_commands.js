@@ -141,6 +141,7 @@ const allCommands = {
     _shardsvrBeginMigrationBlockingOperation: {skip: isAnInternalCommand},
     _shardsvrEndMigrationBlockingOperation: {skip: isAnInternalCommand},
     _shardsvrReshardingDonorFetchFinalCollectionStats: {skip: isAnInternalCommand},
+    _shardsvrReshardingDonorStartChangeStreamsMonitor: {skip: isAnInternalCommand},
     _shardsvrUntrackUnsplittableCollection: {skip: isAnInternalCommand},
     streams_startStreamProcessor: {skip: isAnInternalCommand},
     streams_startStreamSample: {skip: isAnInternalCommand},

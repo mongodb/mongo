@@ -469,6 +469,13 @@ private:
     void _tellAllDonorsToRefresh(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
+     * If verification is enabled, sends '_shardsvrReshardingDonorStartChangeStreamsMonitor' to all
+     * donor shards.
+     */
+    void _tellAllDonorsToStartChangeStreamsMonitor(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    /**
      * Sends '_shardsvrCommitReshardCollection' to all participant shards.
      */
     void _tellAllParticipantsToCommit(

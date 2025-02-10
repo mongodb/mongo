@@ -704,6 +704,14 @@ const internalCommandsMap = {
             reshardingUUID: UUID(),
         },
     },
+    _shardsvrReshardingDonorStartChangeStreamsMonitor: {
+        testname: "_shardsvrReshardingDonorStartChangeStreamsMonitor",
+        command: {
+            _shardsvrReshardingDonorStartChangeStreamsMonitor: "test.x",
+            reshardingUUID: UUID(),
+            cloneTimestamp: Timestamp(),
+        },
+    },
     _shardsvrReshardingOperationTime: {
         testname: "_shardsvrReshardingOperationTime",
         command: {
