@@ -334,8 +334,9 @@ private:
         std::function<void(DonorShardEntry& donorShard, int64_t value)> setter);
 
     /**
-     * Fetches the number of documents to clone from all donor shards involved in resharding and
-     * persists the value for each donor shard in the coordinator state document.
+     * If verification is enabled, fetches the number of documents to clone from all donor shards
+     * involved in resharding and persists the value for each donor shard in the coordinator state
+     * document.
      */
     ExecutorFuture<void> _fetchAndPersistNumDocumentsToCloneFromDonors(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
@@ -345,6 +346,15 @@ private:
      * cloning. Transitions to 'kApplying'.
      */
     ExecutorFuture<void> _awaitAllRecipientsFinishedCloning(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    /**
+     * If verification is enabled, fetches the change in the number of documents from all donor
+     * shards involved in resharding between the clone timestamp and blocking-writes timestamp, and
+     * persists the final number of documents for each donor shard in the coordinator state
+     * document.
+     */
+    ExecutorFuture<void> _fetchAndPersistNumDocumentsFinalFromDonors(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**

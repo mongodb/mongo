@@ -65,8 +65,9 @@ public:
     }
 
     std::string help() const override {
-        return "Internal command used by the resharding coordinator to query donor shards for "
-               "changes in the number of documents involved in the resharding of a collection.";
+        return "Internal command for querying a resharding donor shard for the change in the "
+               "number of documents in the collection being resharded between the start of the "
+               "cloning phase and the start of the critical section.";
     }
 
     class Invocation final : public InvocationBase {
@@ -74,7 +75,7 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
-            return ShardsvrReshardingDonorFetchFinalCollectionStatsResponse((int64_t)76);
+            return {0};
         }
 
     private:

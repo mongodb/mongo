@@ -461,6 +461,35 @@ ReshardingCoordinatorExternalStateImpl::_getDocumentsCopiedFromRecipients(
     return docsCopied;
 }
 
+std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsDeltaFromDonors(
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    CancellationToken token,
+    const UUID& reshardingUUID,
+    const NamespaceString& nss,
+    const std::vector<ShardId>& shardIds) {
+    ShardsvrReshardingDonorFetchFinalCollectionStats cmd(nss, reshardingUUID);
+    const auto opts = std::make_shared<
+        async_rpc::AsyncRPCOptions<ShardsvrReshardingDonorFetchFinalCollectionStats>>(
+        executor, token, cmd);
+    opts->cmd.setDbName(DatabaseName::kAdmin);
+    auto responses = sendCommandToShards(opCtx, opts, shardIds);
+
+    std::map<ShardId, int64_t> docsDelta;
+
+    for (auto&& response : responses) {
+        const auto& donorShardId = response.shardId;
+
+        uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
+        auto collStatsResponse = ShardsvrReshardingDonorFetchFinalCollectionStatsResponse::parse(
+            IDLParserContext("getDocumentsDeltaFromDonors"), response.swResponse.getValue().data);
+
+        docsDelta.emplace(donorShardId, collStatsResponse.getDocumentsDelta());
+    }
+
+    return docsDelta;
+}
+
 void ReshardingCoordinatorExternalStateImpl::verifyClonedCollection(
     OperationContext* opCtx,
     const std::shared_ptr<executor::TaskExecutor>& executor,

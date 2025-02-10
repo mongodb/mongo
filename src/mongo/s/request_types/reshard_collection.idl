@@ -251,16 +251,15 @@ commands:
   _shardsvrReshardingDonorFetchFinalCollectionStats:
       command_name: _shardsvrReshardingDonorFetchFinalCollectionStats
       cpp_name: ShardsvrReshardingDonorFetchFinalCollectionStats
-      description: ""
+      description: "The internal command for querying a resharding donor shard for the changes in
+                    the number of documents in the collection being resharded between the start of
+                    the cloning phase and the start of the critical section."
       namespace: type
       type: namespacestring
       reply_type: ShardsvrReshardingDonorFetchFinalCollectionStatsResponse
       api_version: ""
       strict: false
       fields:
-        cloneTimestamp:
-          type: timestamp
-          description: "The clone timestamp for the resharding operation. This is the timestamp in which we will start to track the change in the number of documents in the collection."
         reshardingUUID:
           type: uuid
-          description: "The resharding operation associated with this request."
+          description: "The UUID for the resharding operation."
