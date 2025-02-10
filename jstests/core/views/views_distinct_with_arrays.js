@@ -5,6 +5,8 @@
  *   requires_fcv_60,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
+ *   # Explain doesn't support read concern majority in sharding.
+ *   assumes_read_concern_unchanged,
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
