@@ -241,6 +241,9 @@ struct SerializationOptions {
     // If set to true, serializes each stage and expression as needed for FLE2.
     bool serializeForFLE2 = false;
 
+    // If set to true, serializes each stage and expression as needed for query analysis.
+    bool serializeForQueryAnalysis = false;
+
     // Serialization state check helpers.
     bool isDefaultSerialization() const;
     bool isKeepingLiteralsUnchanged() const;
