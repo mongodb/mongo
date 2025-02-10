@@ -245,11 +245,6 @@ bool GeoHash::isBitSet(unsigned val, unsigned bit) {
     return mask32For(bit) & val;
 }
 
-/** Return a GeoHash with one bit of precision lost. */
-GeoHash GeoHash::up() const {
-    return GeoHash(_hash, _bits - 1);
-}
-
 bool GeoHash::hasPrefix(const GeoHash& other) const {
     MONGO_verify(other._bits <= _bits);
     if (other._bits == 0)
@@ -286,36 +281,6 @@ void GeoHash::setBit(unsigned pos, bool value) {
 
 bool GeoHash::getBit(unsigned pos) const {
     return _hash & mask64For(pos);
-}
-
-bool GeoHash::getBitX(unsigned pos) const {
-    MONGO_verify(pos < 32);
-    return getBit(pos * 2);
-}
-
-bool GeoHash::getBitY(unsigned pos) const {
-    MONGO_verify(pos < 32);
-    return getBit((pos * 2) + 1);
-}
-
-// TODO(hk): Comment this.
-BSONObj GeoHash::wrap(const char* name) const {
-    BSONObjBuilder b(20);
-    appendHashMin(&b, name);
-    BSONObj o = b.obj();
-    if ('\0' == name[0])
-        MONGO_verify(o.objsize() == 20);
-    return o;
-}
-
-// Do we have a non-trivial GeoHash?
-bool GeoHash::constrains() const {
-    return _bits > 0;
-}
-
-// Could our GeoHash have higher precision?
-bool GeoHash::canRefine() const {
-    return _bits < 32;
 }
 
 /**
@@ -415,31 +380,6 @@ bool GeoHash::operator<(const GeoHash& h) const {
     return _bits < h._bits;
 }
 
-// Append the hash in s to our current hash.  We expect s to be '0' or '1' or '\0',
-// though we also treat non-'1' values as '0'.
-GeoHash& GeoHash::operator+=(const char* s) {
-    unsigned pos = _bits * 2;
-    _bits += strlen(s) / 2;
-    MONGO_verify(_bits <= 32);
-    while ('\0' != s[0]) {
-        if (s[0] == '1')
-            setBit(pos, 1);
-        pos++;
-        s++;
-    }
-    return *this;
-}
-
-GeoHash GeoHash::operator+(const char* s) const {
-    GeoHash n = *this;
-    n += s;
-    return n;
-}
-
-GeoHash GeoHash::operator+(const std::string& s) const {
-    return operator+(s.c_str());
-}
-
 // Keep the most significant _bits*2 bits of _hash, clear the least significant bits. If shorter
 // than 64 bits, the hash occupies the higher order bits, so we ensure that the lower order bits are
 // zeroed.
@@ -492,11 +432,6 @@ void GeoHash::appendHashMin(BSONObjBuilder* builder, const char* fieldName) cons
     appendHashToBuilder(_hash, builder, fieldName);
 }
 
-void GeoHash::appendHashMin(key_string::Builder* ks) const {
-    // The min bound of a GeoHash region has all the unused suffix bits set to 0
-    appendHashToKeyString(_hash, ks);
-}
-
 void GeoHash::appendHashMin(key_string::PooledBuilder* ks) const {
     // The min bound of a GeoHash region has all the unused suffix bits set to 0
     appendHashToKeyString(_hash, ks);
@@ -517,18 +452,6 @@ long long GeoHash::getHash() const {
 unsigned GeoHash::getBits() const {
     return _bits;
 }
-
-GeoHash GeoHash::commonPrefix(const GeoHash& other) const {
-    unsigned i = 0;
-    for (; i < _bits && i < other._bits; i++) {
-        if (getBitX(i) == other.getBitX(i) && getBitY(i) == other.getBitY(i))
-            continue;
-        break;
-    }
-    // i is how many bits match between this and other.
-    return GeoHash(_hash, i);
-}
-
 
 bool GeoHash::subdivide(GeoHash children[4]) const {
     if (_bits == 32) {
@@ -749,13 +672,8 @@ double GeoHashConverter::distanceBetweenHashes(const GeoHash& a, const GeoHash& 
  * Point
  * double, double
  */
-
 GeoHash GeoHashConverter::hash(const Point& p) const {
     return hash(p.x, p.y);
-}
-
-GeoHash GeoHashConverter::hash(const BSONObj& o) const {
-    return hash(o, nullptr);
 }
 
 // src is printed out as debugging information.  Maybe it is actually somehow the 'source' of o?
@@ -804,22 +722,12 @@ GeoHash GeoHashConverter::hash(double x, double y) const {
  * Possible outputs:
  * double, double
  * Point
- * BSONObj
  */
 // TODO(hk): these should have consistent naming
 Point GeoHashConverter::unhashToPoint(const GeoHash& h) const {
     Point point;
     unhash(h, &point.x, &point.y);
     return point;
-}
-
-BSONObj GeoHashConverter::unhashToBSONObj(const GeoHash& h) const {
-    unsigned x, y;
-    h.unhash(&x, &y);
-    BSONObjBuilder b;
-    b.append("x", convertFromHashScale(x));
-    b.append("y", convertFromHashScale(y));
-    return b.obj();
 }
 
 void GeoHashConverter::unhash(const GeoHash& h, double* x, double* y) const {
@@ -848,13 +756,6 @@ Box GeoHashConverter::unhashToBoxCovering(const GeoHash& h) const {
 double GeoHashConverter::calcUnhashToBoxError(const GeoHashConverter::Parameters& params) {
     return std::max(fabs(params.min), fabs(params.max)) * GeoHashConverter::kMachinePrecision * 8;
 }
-
-double GeoHashConverter::sizeOfDiag(const GeoHash& a) const {
-    GeoHash b = a;
-    b.move(1, 1);
-    return distanceBetweenHashes(a, b);
-}
-
 
 // Relative error = epsilon_(max-min). ldexp() is just a direct translation to
 // floating point exponent, and should be exact.
