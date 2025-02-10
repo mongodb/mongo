@@ -89,10 +89,11 @@ function createHistogram(field) {
 }
 
 try {
-    // TODO SERVER-99347: Add test with samplingCE
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "heuristicCE"}));
-    testNonExistentColl();
-    testEmptyColl();
+    for (const mode of ["heuristicCE", "samplingCE"]) {
+        assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: mode}));
+        testNonExistentColl();
+        testEmptyColl();
+    }
 
     {
         createHistogram("a");
