@@ -16,10 +16,17 @@ assert.commandWorked(
 // Shard testColl on {x:1}, split it at {x:0}, and move chunk {x:1} to shard1.
 st.shardColl(testColl, {x: 1}, {x: 0}, {x: 1});
 
+let mongosServerStatus = testDB.adminCommand({serverStatus: 1});
+
+let initialUpdateOneUnshardedCount = mongosServerStatus.metrics.query.updateOneUnshardedCount;
+let inititalUpdateOneOpStyleBroadcastWithExactIDCount =
+    mongosServerStatus.metrics.query.updateOneOpStyleBroadcastWithExactIDCount;
+let initialUpdateOneNonTargetedShardedCount =
+    mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount;
+
 // Insert one document on each shard.
 assert.commandWorked(testColl.insert({x: 1, _id: 1}));
 assert.commandWorked(testColl.insert({x: -1, _id: 0}));
-
 assert.commandWorked(unshardedColl.insert({x: 1, _id: 1}));
 
 // Verification for 'updateOneOpStyleBroadcastWithExactIDCount' metric.
@@ -34,10 +41,12 @@ assert.commandFailedWithCode(testColl.update({_id: 1}, {$set: {x: 2}}, {multi: f
 assert.commandFailedWithCode(testColl.update({_id: 1}, {$set: {x: 12}, $hello: 1}, {multi: false}),
                              ErrorCodes.FailedToParse);
 
-let mongosServerStatus = testDB.adminCommand({serverStatus: 1});
+mongosServerStatus = testDB.adminCommand({serverStatus: 1});
 
 // Verify that the above four updates incremented the metric counter.
-assert.eq(4, mongosServerStatus.metrics.query.updateOneOpStyleBroadcastWithExactIDCount);
+assert.eq(4,
+          mongosServerStatus.metrics.query.updateOneOpStyleBroadcastWithExactIDCount -
+              inititalUpdateOneOpStyleBroadcastWithExactIDCount);
 
 // Shouldn't increment the metric when {multi:true}.
 assert.commandWorked(testColl.update({_id: 1}, {$set: {a: 3}}, {multi: true}));
@@ -96,7 +105,10 @@ assert.commandFailedWithCode(
 mongosServerStatus = testDB.adminCommand({serverStatus: 1});
 
 // Verifying metrics for updateOnes commands.
-assert.eq(5, mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount);
-assert.eq(2, mongosServerStatus.metrics.query.updateOneUnshardedCount);
+assert.eq(5,
+          mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount -
+              initialUpdateOneNonTargetedShardedCount);
+assert.eq(
+    2, mongosServerStatus.metrics.query.updateOneUnshardedCount - initialUpdateOneUnshardedCount);
 
 st.stop();
