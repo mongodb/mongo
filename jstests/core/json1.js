@@ -558,7 +558,7 @@ x = {
     "data_numberlong": NumberLong("12345"),
     "data_numberint": NumberInt(5),
     "data_numberdecimal": NumberDecimal(3.14),
-    "data_date": new Date(1970, 0, 1, 23, 59, 59, 999)
+    "data_date": new Date(Date.UTC(1970, 0, 1, 23, 59, 59, 999))
 };
 
 assert.eq(
