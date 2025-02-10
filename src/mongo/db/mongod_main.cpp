@@ -140,6 +140,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
+#include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/query/stats/stats_cache_loader_impl.h"
 #include "mongo/db/query/stats/stats_catalog.h"
@@ -298,7 +299,6 @@
 #include "mongo/watchdog/watchdog_mongod.h"
 
 #ifdef MONGO_CONFIG_GRPC
-#include "mongo/db/query/search/mongot_options.h"
 #include "mongo/transport/grpc/grpc_feature_flag_gen.h"
 #endif
 
@@ -362,15 +362,20 @@ auto makeTransportLayer(ServiceContext* svcCtx) {
     }
 
     bool useEgressGRPC = false;
-#ifdef MONGO_CONFIG_GRPC
     if (globalMongotParams.useGRPC) {
+#ifdef MONGO_CONFIG_GRPC
         uassert(9715900,
                 "Egress GRPC for search is not enabled",
                 feature_flags::gEgressGrpcForSearch.isEnabledUseLatestFCVWhenUninitialized(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
         useEgressGRPC = true;
-    }
+#else
+        LOGV2_ERROR(
+            10049101,
+            "useGRPCForSearch is only supported on Linux platforms built with TLS support.");
+        quickExit(ExitCode::badOptions);
 #endif
+    }
 
     return transport::TransportLayerManagerImpl::createWithConfig(
         &serverGlobalParams, svcCtx, useEgressGRPC, std::move(proxyPort), std::move(routerPort));

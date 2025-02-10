@@ -78,6 +78,7 @@
 #include "mongo/db/profile_filter_impl.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
+#include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/server_options.h"
@@ -174,7 +175,6 @@
 #include "mongo/util/version/releases.h"
 
 #ifdef MONGO_CONFIG_GRPC
-#include "mongo/db/query/search/mongot_options.h"
 #include "mongo/transport/grpc/grpc_feature_flag_gen.h"
 #endif
 
@@ -794,15 +794,20 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
         }
 
         bool useEgressGRPC = false;
-#ifdef MONGO_CONFIG_GRPC
         if (globalMongotParams.useGRPC) {
+#ifdef MONGO_CONFIG_GRPC
             uassert(9925000,
                     "Egress GRPC for search is not enabled",
                     feature_flags::gEgressGrpcForSearch.isEnabledUseLatestFCVWhenUninitialized(
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             useEgressGRPC = true;
-        }
+#else
+            LOGV2_ERROR(
+                10049100,
+                "useGRPCForSearch is only supported on Linux platforms built with TLS support.");
+            quickExit(ExitCode::badOptions);
 #endif
+        }
 
         TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                                   "Set up transport layer listener",
