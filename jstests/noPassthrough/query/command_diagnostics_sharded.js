@@ -46,7 +46,7 @@ function runTest({
         "flowControl: {}",
     ]);
 
-    print("Running test case:", tojson({description, command, expectedDiagnosticInfo, redact}));
+    jsTestLog("Running test case:", tojson({description, command, expectedDiagnosticInfo, redact}));
 
     const {failpointName, failpointOpts, errorCode} = queryPlannerAlwaysFails;
     runWithFailpoint(db, failpointName, failpointOpts, () => {
@@ -80,6 +80,22 @@ const shardKey = {
     c: 1
 };
 
+const defaultExpCtxLog = [
+    'ExpCtxDiagnostics\: {collator: ',
+    'uuid: ',
+    'needsMerge: ',
+    'allowDiskUse: ',
+    'isMapReduceCommand: ',
+    'inLookup: ',
+    'inUnionWith: ',
+    'forcePlanCache: ',
+    'sbeCompatibility: ',
+    'sbeGroupCompatibility: ',
+    'sbeWindowCompatibility: ',
+    'sbePipelineCompatibility: ',
+    'subPipelineDepth: '
+];
+
 function runTests() {
     // Find
     runTest({
@@ -89,6 +105,7 @@ function runTests() {
             "{\'currentOp\': { ",
             `ns: \\"${ns}\\"`,
             `\'opDescription\': { find: \\"${collName}\\", filter: { a: 1.0, b: 1.0 }, limit: 1.0`,
+            ...defaultExpCtxLog
         ],
     });
     runTest({
@@ -98,6 +115,7 @@ function runTests() {
         expectedDiagnosticInfo: [
             '{\'currentOp\': { op: \\"###\\", ns: \\"###\\"',
             '\'opDescription\': { find: \\"###\\", filter: { a: \\"###\\", b: \\"###\\" }, limit: \\"###\\"',
+            ...defaultExpCtxLog
         ],
     });
 
@@ -109,6 +127,7 @@ function runTests() {
             `{\'currentOp\': { op: \\"command\\", ns: \\"${ns}\\"`,
             `\'opDescription\': { aggregate: \\"${
                 collName}\\", pipeline: [ { $match: { a: 1.0, b: 1.0 } } ]`,
+            ...defaultExpCtxLog
         ]
     });
 
@@ -119,6 +138,7 @@ function runTests() {
         expectedDiagnosticInfo: [
             `{\'currentOp\': { op: \\"command\\", ns: \\"${ns}\\"`,
             `\'opDescription\': { count: \\"${collName}\\", query: { a: 1.0, b: 1.0 }`,
+            ...defaultExpCtxLog
         ]
     });
 
@@ -130,6 +150,7 @@ function runTests() {
             `{\'currentOp\': { op: \\"command\\", ns: \\"${ns}\\"`,
             `\'opDescription\': { distinct: \\"${
                 collName}\\", key: \\"a\\", query: { a: 1.0, b: 1.0 }`,
+            ...defaultExpCtxLog
         ]
     });
 
@@ -141,6 +162,7 @@ function runTests() {
             `{\'currentOp\': { op: \\"command\\", ns: \\"${ns}\\"`,
             `\'opDescription\': { mapReduce: \\"${
                 collName}\\", map: () => emit(0, 0), reduce: () => 1, out: { inline: 1.0 }`,
+            ...defaultExpCtxLog
         ]
     });
 
@@ -212,6 +234,7 @@ function runTests() {
             `{\'currentOp\': { op: \\"command\\", ns: \\"test.`,
             `\'opDescription\': { explain: { find: \\"${
                 collName}\\", filter: { a: 1.0, b: 1.0 }, limit: 1.0`,
+            ...defaultExpCtxLog
         ],
     });
     runTest({
@@ -224,6 +247,17 @@ function runTests() {
             `{\'currentOp\': { op: \\"command\\", ns: \\"test.`,
             `\'opDescription\': { explain: { aggregate: \\"${
                 collName}\\", pipeline: [ { $match: { a: 1.0, b: 1.0 } }, { $unwind: \\"$arr\\" } ]`,
+            ...defaultExpCtxLog
+        ]
+    });
+    runTest({
+        description: "explain distinct",
+        command: {explain: {distinct: collName, key: "a", query: query}},
+        expectedDiagnosticInfo: [
+            `{\'currentOp\': { op: \\"command\\", ns: \\"test.`,
+            `\'opDescription\': { explain: { distinct: \\"${
+                collName}\\", key: \\"a\\", query: { a: 1.0, b: 1.0 } }`,
+            ...defaultExpCtxLog
         ]
     });
 }

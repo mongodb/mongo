@@ -2602,6 +2602,7 @@ mongo_cc_library(
         "//src/mongo/db/matcher/schema:json_schema_parser.h",
         "//src/mongo/db/pipeline:expression.h",
         "//src/mongo/db/pipeline:expression_context.h",
+        "//src/mongo/db/pipeline:expression_context_diagnostic_printer.h",
         "//src/mongo/db/pipeline:expression_dependencies.h",
         "//src/mongo/db/pipeline:expression_find_internal.h",
         "//src/mongo/db/pipeline:expression_function.h",

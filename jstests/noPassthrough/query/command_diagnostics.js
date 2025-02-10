@@ -103,11 +103,22 @@ const failAllRemoves = {
     failpointOpts: {'tassert': true},
     errorCode: [9276703, 9276704],
 };
-const failAllFindAndModify = {
-    failpointName: "failAllFindAndModify",
-    failpointOpts: {'tassert': true},
-    errorCode: 9276705,
-};
+
+const defaultExpCtxLog = [
+    'ExpCtxDiagnostics\: {collator: ',
+    'uuid: ',
+    'needsMerge: ',
+    'allowDiskUse: ',
+    'isMapReduceCommand: ',
+    'inLookup: ',
+    'inUnionWith: ',
+    'forcePlanCache: ',
+    'sbeCompatibility: ',
+    'sbeGroupCompatibility: ',
+    'sbeWindowCompatibility: ',
+    'sbePipelineCompatibility: ',
+    'subPipelineDepth: '
+];
 
 // Test the find command.
 runTest({
@@ -118,8 +129,10 @@ runTest({
         ...commonQueryDiagnostics,
         `{\'currentOp\': { op: \\"query\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { find: \\"command_diagnostics\\", filter: { a: 1.0, b: 1.0 }, limit: 1.0',
+        ...defaultExpCtxLog
     ],
 });
+
 runTest({
     ...planExecutorAlwaysFails,
     description: "simple find with log redaction",
@@ -129,6 +142,7 @@ runTest({
         '{\'currentOp\': { op: \\"###\\", ns: \\"###\\"',
         '\'opDescription\': { find: \\"###\\", filter: { a: \\"###\\", b: \\"###\\" }, limit: \\"###\\"',
         'planSummary: \\"###\\"',
+        ...defaultExpCtxLog
     ],
 });
 
@@ -141,6 +155,7 @@ runTest({
         ...commonQueryDiagnostics,
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { aggregate: \\"command_diagnostics\\", pipeline: [ { $match: { a: 1.0, b: 1.0 } } ]',
+        ...defaultExpCtxLog
     ]
 });
 const outCmd = {
@@ -159,6 +174,7 @@ runTest({
         ...commonQueryDiagnostics,
         outCmdDescription,
         '{\'currentOp\': { op: \\"command\\", ns: \\"test.tmp.agg_out.',
+        ...defaultExpCtxLog
     ]
 });
 runTest({
@@ -170,6 +186,7 @@ runTest({
         outCmdDescription,
         '{\'currentOp\': { op: \\"insert\\", ns: \\"test.tmp.agg_out.',
         'ninserted: 0',
+        ...defaultExpCtxLog
     ]
 });
 
@@ -182,6 +199,7 @@ runTest({
         ...commonDiagnostics,
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { count: \\"command_diagnostics\\", query: { a: 1.0, b: 1.0 }',
+        ...defaultExpCtxLog
     ]
 });
 
@@ -194,6 +212,7 @@ runTest({
         ...commonQueryDiagnostics,
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { distinct: \\"command_diagnostics\\", key: \\"a\\", query: { a: 1.0, b: 1.0 }',
+        ...defaultExpCtxLog
     ]
 });
 
@@ -211,6 +230,7 @@ runTest({
         ...commonDiagnostics,
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { mapReduce: \\"command_diagnostics\\", map: () => emit(0, 0), reduce: () => 1, out: { inline: 1.0 }',
+        ...defaultExpCtxLog
     ]
 });
 
@@ -239,6 +259,7 @@ runTest({
         ...commonDiagnostics,
         `{\'currentOp\': { op: \\"remove\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { q: { a: 1.0, b: 1.0 }, limit: 1 }',
+        ...defaultExpCtxLog
     ]
 });
 
@@ -254,12 +275,13 @@ runTest({
         ...commonDiagnostics,
         `{\'currentOp\': { op: \\"update\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { q: { a: 1.0, b: 1.0 }, u: { a: 2.0, b: 2.0 }',
+        ...defaultExpCtxLog
     ]
 });
 
 // Test the findAndModify command.
 runTest({
-    ...failAllFindAndModify,
+    ...failAllRemoves,
     description: 'findAndModify remove',
     command: {
         findAndModify: collName,
@@ -270,10 +292,11 @@ runTest({
         ...commonDiagnostics,
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { findAndModify: \\"command_diagnostics\\", query: { a: 1.0, b: 1.0 }, remove: true',
+        ...defaultExpCtxLog
     ]
 });
 runTest({
-    ...failAllFindAndModify,
+    ...failAllUpdates,
     description: 'findAndModify update',
     command: {
         findAndModify: collName,
@@ -284,6 +307,7 @@ runTest({
         ...commonDiagnostics,
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { findAndModify: \\"command_diagnostics\\", query: { a: 1.0, b: 1.0 }, update: { a: 2.0, b: 2.0 }',
+        ...defaultExpCtxLog
     ]
 });
 
@@ -311,6 +335,7 @@ runTest({
         `{\'currentOp\': { op: \\"bulkWrite\\", ns: \\"test.${jsTestName()}\\"`,
         // Ensure the failing sub-operation is included in the diagnostic log.
         '\'opDescription\': { delete: 0, filter: { a: 1.0 }',
+        ...defaultExpCtxLog
     ]
 });
 runTest({
@@ -324,6 +349,7 @@ runTest({
         `{\'currentOp\': { op: \\"bulkWrite\\", ns: \\"test.${jsTestName()}\\"`,
         // Ensure the failing sub-operation is included in the diagnostic log.
         '\'opDescription\': { update: 0, filter: { a: 0.0 }, multi: false, updateMods: { a: 1.0 }',
+        ...defaultExpCtxLog
     ]
 });
 runTest({
@@ -346,6 +372,7 @@ runTest({
     expectedDiagnosticInfo: [
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { explain: { find: \\"command_diagnostics\\", filter: { a: 1.0, b: 1.0 }, limit: 1.0',
+        ...defaultExpCtxLog
     ],
 });
 runTest({
@@ -358,6 +385,28 @@ runTest({
     expectedDiagnosticInfo: [
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
         '\'opDescription\': { explain: { aggregate: \\"command_diagnostics\\", pipeline: [ { $match: { a: 1.0, b: 1.0 } }, { $unwind: \\"$arr\\" } ]',
+        ...defaultExpCtxLog
+    ]
+});
+runTest({
+    ...queryPlannerAlwaysFails,
+    description: "explain count",
+    command: {explain: {count: collName, query: {a: 1, b: 1}}},
+    expectedDiagnosticInfo: [
+        ...commonDiagnostics,
+        `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
+        '\'opDescription\': { explain: { count: \\"command_diagnostics\\", query: { a: 1.0, b: 1.0 } }',
+        ...defaultExpCtxLog
+    ]
+});
+runTest({
+    ...queryPlannerAlwaysFails,
+    description: "explain distinct",
+    command: {explain: {distinct: collName, key: "a", query: {a: 1, b: 1}}},
+    expectedDiagnosticInfo: [
+        `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
+        '\'opDescription\': { explain: { distinct: \\"command_diagnostics\\", key: \\"a\\", query: { a: 1.0, b: 1.0 } }',
+        ...defaultExpCtxLog
     ]
 });
 
@@ -432,6 +481,7 @@ runTest({
         // Log the full command untruncated.
         '\'opDescription\': { find: \\"command_diagnostics\\", filter: { a: { $in: [ 1.0, 1.0, 1.0',
         'afterIn: \\"b\\"',
+        ...defaultExpCtxLog
     ],
 });
 

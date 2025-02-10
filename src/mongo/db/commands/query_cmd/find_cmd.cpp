@@ -82,6 +82,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/profile_settings.h"
@@ -475,6 +476,12 @@ public:
                     .tmpDir(storageGlobalParams.dbpath + "/_tmp")
                     .build();
             expCtx->startExpressionCounters();
+
+            // Create an RAII object that prints useful information about the ExpressionContext in
+            // the case of a tassert or crash.
+            ScopedDebugInfo expCtxDiagnostics(
+                "ExpCtxDiagnostics", command_diagnostics::ExpressionContextPrinter{expCtx});
+
             auto parsedRequest = uassertStatusOK(parsed_find_command::parse(
                 expCtx,
                 {.findCommand = std::move(_cmdRequest),
@@ -760,6 +767,12 @@ public:
             auto cq = parseQueryAndBeginOperation(
                 opCtx, *collectionOrView, nss, _request.body, std::move(_cmdRequest));
             const auto& findCommandReq = cq->getFindCommandRequest();
+
+            // Create an RAII object that prints useful information about the ExpressionContext in
+            // the case of a tassert or crash.
+            ScopedDebugInfo expCtxDiagnostics(
+                "ExpCtxDiagnostics",
+                command_diagnostics::ExpressionContextPrinter{cq->getExpCtx()});
 
             tassert(7922501,
                     "CanonicalQuery namespace should match catalog namespace",

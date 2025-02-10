@@ -52,6 +52,7 @@
 #include "mongo/db/exec/disk_use_options_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
@@ -165,6 +166,11 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     curop->beginQueryPlanningTimer();
 
     auto expCtx = makeExpressionContext(opCtx, parsedMr, verbosity);
+
+    // Create an RAII object that prints useful information about the ExpressionContext in the case
+    // of a tassert or crash.
+    ScopedDebugInfo expCtxDiagnostics("ExpCtxDiagnostics",
+                                      command_diagnostics::ExpressionContextPrinter{expCtx});
     auto runnablePipeline = [&]() {
         auto pipeline = map_reduce_common::translateFromMR(parsedMr, expCtx);
         return expCtx->getMongoProcessInterface()->attachCursorSourceToPipelineForLocalRead(

@@ -65,6 +65,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
 #include "mongo/db/query/client_cursor/collect_query_stats_mongod.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
@@ -213,6 +214,12 @@ public:
 
             auto expCtx = makeExpressionContextForGetExecutor(
                 opCtx, request().getCollation().value_or(BSONObj()), _ns, verbosity);
+
+            // Create an RAII object that prints useful information about the ExpressionContext in
+            // the case of a tassert or crash.
+            ScopedDebugInfo expCtxDiagnostics(
+                "ExpCtxDiagnostics", command_diagnostics::ExpressionContextPrinter{expCtx});
+
             const auto extensionsCallback = getExtensionsCallback(collection, opCtx, _ns);
             auto parsedFind = uassertStatusOK(
                 parsed_find_command::parseFromCount(expCtx, request(), *extensionsCallback, _ns));
@@ -288,6 +295,11 @@ public:
                                                     request().getCollation().value_or(BSONObj()),
                                                     ns,
                                                     boost::none /* verbosity*/);
+
+            // Create an RAII object that prints useful information about the ExpressionContext in
+            // the case of a tassert or crash.
+            ScopedDebugInfo expCtxDiagnostics(
+                "ExpCtxDiagnostics", command_diagnostics::ExpressionContextPrinter{expCtx});
 
             const auto& collection = ctx->getCollection();
             const auto extensionsCallback = getExtensionsCallback(collection, opCtx, ns);

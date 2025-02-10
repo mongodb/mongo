@@ -59,6 +59,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
@@ -225,6 +226,11 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     auto cri = uassertStatusOK(
         sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, parsedMr.getNamespace()));
     auto expCtx = makeExpressionContext(opCtx, parsedMr, cri.cm, verbosity);
+
+    // Create an RAII object that prints useful information about the ExpressionContext in the case
+    // of a tassert or crash.
+    ScopedDebugInfo expCtxDiagnostics("ExpCtxDiagnostics",
+                                      command_diagnostics::ExpressionContextPrinter{expCtx});
 
     auto pipeline = map_reduce_common::translateFromMR(parsedMr, expCtx);
 

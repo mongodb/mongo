@@ -86,6 +86,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/not_primary_error_tracker.h"
+#include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/profile_collection.h"
@@ -747,12 +748,6 @@ UpdateResult performUpdate(OperationContext* opCtx,
         },
         nss);
 
-    if (auto scoped = failAllUpdates.scoped(); MONGO_unlikely(scoped.isActive())) {
-        tassert(9276701,
-                "failAllUpdates failpoint active!",
-                !scoped.getData().hasField("tassert") || !scoped.getData().getBoolField("tassert"));
-        uasserted(ErrorCodes::InternalError, "failAllUpdates failpoint active!");
-    }
 
     auto collection =
         acquireCollection(opCtx,
@@ -818,6 +813,18 @@ UpdateResult performUpdate(OperationContext* opCtx,
                               false /*forgoOpCounterIncrements*/,
                               isTimeseriesViewUpdate);
     uassertStatusOK(parsedUpdate.parseRequest());
+
+    // Create an RAII object that prints useful information about the ExpressionContext in the case
+    // of a tassert or crash.
+    ScopedDebugInfo expCtxDiagnostics(
+        "ExpCtxDiagnostics", command_diagnostics::ExpressionContextPrinter{parsedUpdate.expCtx()});
+
+    if (auto scoped = failAllUpdates.scoped(); MONGO_unlikely(scoped.isActive())) {
+        tassert(9276701,
+                "failAllUpdates failpoint active!",
+                !scoped.getData().hasField("tassert") || !scoped.getData().getBoolField("tassert"));
+        uasserted(ErrorCodes::InternalError, "failAllUpdates failpoint active!");
+    }
 
     const auto exec = uassertStatusOK(
         getExecutorUpdate(&curOp->debug(), collection, &parsedUpdate, boost::none /* verbosity
@@ -905,12 +912,6 @@ long long performDelete(OperationContext* opCtx,
                   "Batch remove - hangDuringBatchRemove fail point enabled. Blocking until fail "
                   "point is disabled");
         });
-    if (auto scoped = failAllRemoves.scoped(); MONGO_unlikely(scoped.isActive())) {
-        tassert(9276703,
-                "failAllRemoves failpoint active!",
-                !scoped.getData().hasField("tassert") || !scoped.getData().getBoolField("tassert"));
-        uasserted(ErrorCodes::InternalError, "failAllRemoves failpoint active!");
-    }
 
     const auto collection =
         acquireCollection(opCtx,
@@ -933,6 +934,18 @@ long long performDelete(OperationContext* opCtx,
 
     ParsedDelete parsedDelete(opCtx, deleteRequest, collectionPtr, isTimeseriesViewDelete);
     uassertStatusOK(parsedDelete.parseRequest());
+
+    // Create an RAII object that prints useful information about the ExpressionContext in the case
+    // of a tassert or crash.
+    ScopedDebugInfo expCtxDiagnostics(
+        "ExpCtxDiagnostics", command_diagnostics::ExpressionContextPrinter{parsedDelete.expCtx()});
+
+    if (auto scoped = failAllRemoves.scoped(); MONGO_unlikely(scoped.isActive())) {
+        tassert(9276703,
+                "failAllRemoves failpoint active!",
+                !scoped.getData().hasField("tassert") || !scoped.getData().getBoolField("tassert"));
+        uasserted(ErrorCodes::InternalError, "failAllRemoves failpoint active!");
+    }
 
     auto dbName = nsString.dbName();
     if (DatabaseHolder::get(opCtx)->getDb(opCtx, dbName)) {
@@ -1345,13 +1358,6 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         },
         ns);
 
-    if (auto scoped = failAllUpdates.scoped(); MONGO_unlikely(scoped.isActive())) {
-        tassert(9276702,
-                "failAllUpdates failpoint active!",
-                !scoped.getData().hasField("tassert") || !scoped.getData().getBoolField("tassert"));
-        uasserted(ErrorCodes::InternalError, "failAllUpdates failpoint active!");
-    }
-
     const CollectionAcquisition collection = [&]() {
         const auto acquisitionRequest = CollectionAcquisitionRequest::fromOpCtx(
             opCtx, ns, AcquisitionPrerequisites::kWrite, opCollectionUUID);
@@ -1411,6 +1417,18 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                               forgoOpCounterIncrements,
                               updateRequest->source() == OperationSource::kTimeseriesUpdate);
     uassertStatusOK(parsedUpdate.parseRequest());
+
+    // Create an RAII object that prints useful information about the ExpressionContext in the case
+    // of a tassert or crash.
+    ScopedDebugInfo expCtxDiagnostics(
+        "ExpCtxDiagnostics", command_diagnostics::ExpressionContextPrinter{parsedUpdate.expCtx()});
+
+    if (auto scoped = failAllUpdates.scoped(); MONGO_unlikely(scoped.isActive())) {
+        tassert(9276702,
+                "failAllUpdates failpoint active!",
+                !scoped.getData().hasField("tassert") || !scoped.getData().getBoolField("tassert"));
+        uasserted(ErrorCodes::InternalError, "failAllUpdates failpoint active!");
+    }
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangWithLockDuringBatchUpdate, opCtx, "hangWithLockDuringBatchUpdate");
@@ -1839,12 +1857,6 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                   "Batch remove - hangDuringBatchRemove fail point enabled. Blocking until fail "
                   "point is disabled");
         });
-    if (auto scoped = failAllRemoves.scoped(); MONGO_unlikely(scoped.isActive())) {
-        tassert(9276704,
-                "failAllRemoves failpoint active!",
-                !scoped.getData().hasField("tassert") || !scoped.getData().getBoolField("tassert"));
-        uasserted(ErrorCodes::InternalError, "failAllRemoves failpoint active!");
-    }
 
     auto acquisitionRequest = CollectionAcquisitionRequest::fromOpCtx(
         opCtx, ns, AcquisitionPrerequisites::kWrite, opCollectionUUID);
@@ -1863,6 +1875,18 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                               collection.getCollectionPtr(),
                               source == OperationSource::kTimeseriesDelete);
     uassertStatusOK(parsedDelete.parseRequest());
+
+    // Create an RAII object that prints useful information about the ExpressionContext in the case
+    // of a tassert or crash.
+    ScopedDebugInfo expCtxDiagnostics(
+        "ExpCtxDiagnostics", command_diagnostics::ExpressionContextPrinter{parsedDelete.expCtx()});
+
+    if (auto scoped = failAllRemoves.scoped(); MONGO_unlikely(scoped.isActive())) {
+        tassert(9276704,
+                "failAllRemoves failpoint active!",
+                !scoped.getData().hasField("tassert") || !scoped.getData().getBoolField("tassert"));
+        uasserted(ErrorCodes::InternalError, "failAllRemoves failpoint active!");
+    }
 
     if (DatabaseHolder::get(opCtx)->getDb(opCtx, ns.dbName())) {
         curOp.raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())

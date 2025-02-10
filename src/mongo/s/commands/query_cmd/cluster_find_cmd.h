@@ -38,6 +38,7 @@
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/query_planner_common.h"
@@ -204,6 +205,12 @@ public:
                               .fromRequest(opCtx, *_cmdRequest)
                               .explain(verbosity)
                               .build();
+
+            // Create an RAII object that prints useful information about the ExpressionContext in
+            // the case of a tassert or crash.
+            ScopedDebugInfo expCtxDiagnostics(
+                "ExpCtxDiagnostics", command_diagnostics::ExpressionContextPrinter{expCtx});
+
             auto parsedFind = uassertStatusOK(parsed_find_command::parse(
                 expCtx,
                 {.findCommand = std::move(_cmdRequest),
@@ -320,6 +327,12 @@ public:
             doFLERewriteIfNeeded(opCtx);
 
             auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx, *_cmdRequest).build();
+
+            // Create an RAII object that prints useful information about the ExpressionContext in
+            // the case of a tassert or crash.
+            ScopedDebugInfo expCtxDiagnostics(
+                "ExpCtxDiagnostics", command_diagnostics::ExpressionContextPrinter{expCtx});
+
             auto parsedFind = uassertStatusOK(parsed_find_command::parse(
                 expCtx,
                 {.findCommand = std::move(_cmdRequest),

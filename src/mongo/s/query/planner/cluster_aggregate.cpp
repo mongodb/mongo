@@ -63,6 +63,7 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
@@ -609,6 +610,11 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         }
         return pipeline;
     }();
+
+    // Create an RAII object that prints useful information about the ExpressionContext in the case
+    // of a tassert or crash.
+    ScopedDebugInfo expCtxDiagnostics("ExpCtxDiagnostics",
+                                      command_diagnostics::ExpressionContextPrinter{expCtx});
 
     auto targeter = cluster_aggregation_planner::AggregationTargeter::make(
         opCtx,

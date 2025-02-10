@@ -910,6 +910,10 @@ public:
         return _featureFlagStreams.get();
     }
 
+    bool isMapReduceCommand() const {
+        return _params.isMapReduceCommand;
+    }
+
 protected:
     struct ExpressionContextParams {
         OperationContext* opCtx = nullptr;

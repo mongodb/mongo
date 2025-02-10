@@ -68,6 +68,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/query/canonical_distinct.h"
@@ -409,6 +410,12 @@ public:
                                                defaultCollator,
                                                verbosity);
 
+        // Create an RAII object that prints useful information about the ExpressionContext in the
+        // case of a tassert or crash.
+        ScopedDebugInfo expCtxDiagnostics(
+            "ExpCtxDiagnostics",
+            command_diagnostics::ExpressionContextPrinter{canonicalQuery->getExpCtx()});
+
         if (collectionOrView->isView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
             collectionOrView.reset();
@@ -537,6 +544,12 @@ public:
                                                defaultCollation,
                                                {});
         const CanonicalDistinct& canonicalDistinct = *canonicalQuery->getDistinct();
+
+        // Create an RAII object that prints useful information about the ExpressionContext in the
+        // case of a tassert or crash.
+        ScopedDebugInfo expCtxDiagnostics(
+            "ExpCtxDiagnostics",
+            command_diagnostics::ExpressionContextPrinter{canonicalQuery->getExpCtx()});
 
         if (canonicalDistinct.isMirrored()) {
             const auto& invocation = CommandInvocation::get(opCtx);
