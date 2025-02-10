@@ -96,6 +96,12 @@ public:
                           _collectionPtrOrAcquisition);
     }
 
+    const RecordStore* getRecordStore() const {
+        return std::visit(
+            [](const auto& choice) -> const RecordStore* { return recordStore(choice); },
+            _collectionPtrOrAcquisition);
+    }
+
 private:
     static const NamespaceString& nss(const CollectionPtr* collectionPtr) {
         return (*collectionPtr)->ns();
@@ -103,6 +109,14 @@ private:
 
     static const NamespaceString& nss(const CollectionAcquisition& acquisition) {
         return acquisition.nss();
+    }
+
+    static const RecordStore* recordStore(const CollectionPtr* collectionPtr) {
+        return (*collectionPtr)->getRecordStore();
+    }
+
+    static const RecordStore* recordStore(const CollectionAcquisition& acquisition) {
+        return acquisition.getCollectionPtr()->getRecordStore();
     }
 
     std::variant<const CollectionPtr*, CollectionAcquisition> _collectionPtrOrAcquisition;

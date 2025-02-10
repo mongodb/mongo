@@ -230,7 +230,7 @@ private:
     static BuildQueryExecutorResult buildInnerQueryExecutorSample(
         DocumentSourceSample* sampleStage,
         DocumentSourceInternalUnpackBucket* unpackBucketStage,
-        const CollectionPtr& collection,
+        const VariantCollectionPtrOrAcquisition& collection,
         Pipeline* pipeline);
 
     /**
@@ -246,7 +246,7 @@ private:
      * returned by multiple shards.
      */
     static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-    createRandomCursorExecutor(const CollectionPtr& coll,
+    createRandomCursorExecutor(const VariantCollectionPtrOrAcquisition& coll,
                                const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                Pipeline* pipeline,
                                long long sampleSize,

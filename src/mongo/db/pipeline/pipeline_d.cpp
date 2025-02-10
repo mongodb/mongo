@@ -385,7 +385,7 @@ SortAndUnpackInPipeline findUnpackAndSort(const Pipeline::SourceContainer& sourc
 }  // namespace
 
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRandomCursorExecutor(
-    const CollectionPtr& coll,
+    const VariantCollectionPtrOrAcquisition& coll,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Pipeline* pipeline,
     long long sampleSize,
@@ -397,7 +397,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
     // locks ourselves in this function because double-locking forces any PlanExecutor we create to
     // adopt an INTERRUPT_ONLY policy.
     invariant(opCtx->isLockFreeReadsOp() ||
-              shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(coll->ns(), MODE_IS));
+              shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(coll.nss(), MODE_IS));
 
     auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
     auto* randomCursorSampleRatioParam =
@@ -431,7 +431,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
     }
 
     // Attempt to get a random cursor from the RecordStore.
-    auto rsRandCursor = coll->getRecordStore()->getRandomCursor(opCtx);
+    auto rsRandCursor = coll.getRecordStore()->getRandomCursor(opCtx);
     if (!rsRandCursor) {
         // The storage engine has no random cursor support.
         return nullptr;
@@ -440,14 +440,14 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
     // Build a MultiIteratorStage and pass it the random-sampling RecordCursor.
     auto ws = std::make_unique<WorkingSet>();
     std::unique_ptr<PlanStage> root =
-        std::make_unique<MultiIteratorStage>(expCtx.get(), ws.get(), &coll);
+        std::make_unique<MultiIteratorStage>(expCtx.get(), ws.get(), coll);
     static_cast<MultiIteratorStage*>(root.get())->addIterator(std::move(rsRandCursor));
 
     TrialStage* trialStage = nullptr;
 
     const auto [isSharded, optOwnershipFilter] = [&]() {
         auto scopedCss =
-            CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, coll->ns());
+            CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, coll.nss());
         const bool isSharded = scopedCss->getCollectionDescription(opCtx).isSharded();
         boost::optional<ScopedCollectionFilter> optFilter = isSharded
             ? boost::optional<ScopedCollectionFilter>(scopedCss->getOwnershipFilter(
@@ -526,7 +526,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
             gTimeseriesBucketMaxCount);
 
         std::unique_ptr<PlanStage> collScanPlan = std::make_unique<CollectionScan>(
-            expCtx.get(), &coll, CollectionScanParams{}, ws.get(), nullptr);
+            expCtx.get(), coll, CollectionScanParams{}, ws.get(), nullptr);
 
         if (isSharded) {
             // In the sharded case, we need to add a shard-filterer stage to the backup plan to
@@ -578,7 +578,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
             expCtx.get(), *optOwnershipFilter, ws.get(), std::move(root));
         // The backup plan is SHARDING_FILTER-COLLSCAN.
         std::unique_ptr<PlanStage> collScanPlan = std::make_unique<CollectionScan>(
-            expCtx.get(), &coll, CollectionScanParams{}, ws.get(), nullptr);
+            expCtx.get(), coll, CollectionScanParams{}, ws.get(), nullptr);
         collScanPlan = std::make_unique<ShardFilterStage>(
             expCtx.get(), *optOwnershipFilter, ws.get(), std::move(collScanPlan));
         // Place a TRIAL stage at the root of the plan tree, and pass it the trial and backup plans.
@@ -594,10 +594,10 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
     constexpr auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
     if (trialStage) {
         auto classicTrialPolicy = makeClassicYieldPolicy(expCtx->getOperationContext(),
-                                                         coll->ns(),
+                                                         coll.nss(),
                                                          static_cast<PlanStage*>(trialStage),
                                                          yieldPolicy,
-                                                         VariantCollectionPtrOrAcquisition{&coll});
+                                                         coll);
         if (auto status = trialStage->pickBestPlan(classicTrialPolicy.get()); !status.isOK()) {
             return status;
         }
@@ -611,7 +611,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
         if (isStorageOptimizedSample) {
             // Replace $sample stage with $sampleFromRandomCursor stage.
             pipeline->popFront();
-            std::string idString = coll->ns().isOplog() ? "ts" : "_id";
+            std::string idString = coll.nss().isOplog() ? "ts" : "_id";
             pipeline->addInitialSource(DocumentSourceSampleFromRandomCursor::create(
                 expCtx, sampleSize, idString, numRecords));
         }
@@ -635,23 +635,23 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
     return plan_executor_factory::make(expCtx,
                                        std::move(ws),
                                        std::move(root),
-                                       &coll,
+                                       coll,
                                        yieldPolicy,
                                        QueryPlannerParams::RETURN_OWNED_DATA,
-                                       coll->ns());
+                                       coll.nss());
 }
 
 PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSample(
     DocumentSourceSample* sampleStage,
     DocumentSourceInternalUnpackBucket* unpackBucketStage,
-    const CollectionPtr& collection,
+    const VariantCollectionPtrOrAcquisition& collection,
     Pipeline* pipeline) {
     tassert(5422105, "sampleStage cannot be a nullptr", sampleStage);
 
     auto expCtx = pipeline->getContext();
 
     const long long sampleSize = sampleStage->getSampleSize();
-    const long long numRecords = collection->getRecordStore()->numRecords();
+    const long long numRecords = collection.getRecordStore()->numRecords();
 
     boost::optional<timeseries::BucketUnpacker> bucketUnpacker;
     if (unpackBucketStage) {
@@ -708,12 +708,14 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutor(
         // Try to inspect if the DocumentSourceSample or a DocumentSourceInternalUnpackBucket stage
         // can be optimized for sampling backed by a storage engine supplied random cursor.
         auto&& [sampleStage, unpackBucketStage] = extractSampleUnpackBucket(sources);
-        const auto& collection = collections.getMainCollection();
 
         // Optimize an initial $sample stage if possible.
-        if (collection && sampleStage) {
+        if (collections.hasMainCollection() && sampleStage) {
             auto queryExecutors =
-                buildInnerQueryExecutorSample(sampleStage, unpackBucketStage, collection, pipeline);
+                buildInnerQueryExecutorSample(sampleStage,
+                                              unpackBucketStage,
+                                              collections.getMainCollectionPtrOrAcquisition(),
+                                              pipeline);
             if (queryExecutors.mainExecutor) {
                 return queryExecutors;
             }
