@@ -1810,6 +1810,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
                                            cq->getFindCommandRequest().getNamespaceOrUUID().nss());
     }
 
+    // Can't encode plan cache key for non-existent collections. Add plan cache key information to
+    // curOp here so both FastCountStage and multi-planner codepaths properly populate it.
+    auto planCache = plan_cache_key_factory::make<PlanCacheKey>(*cq, collection);
+    setOpDebugPlanCacheInfo(opCtx,
+                            PlanCacheInfo{.planCacheKey = planCache.planCacheKeyHash(),
+                                          .planCacheShapeHash = planCache.planCacheShapeHash()});
+
     // If the query is empty, then we can determine the count by just asking the collection
     // for its number of records. This is implemented by the CountStage, and we don't need
     // to create a child for the count stage in this case.

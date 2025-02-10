@@ -44,6 +44,8 @@ assert.eq(profileObj.command.count, coll.getName(), tojson(profileObj));
 assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
 assert.eq(profileObj.planSummary, "RECORD_STORE_FAST_COUNT", tojson(profileObj));
 assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
+assert(profileObj.hasOwnProperty("queryHash"), tojson(profileObj));
+assert(profileObj.hasOwnProperty("planCacheKey"), tojson(profileObj));
 assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
 if (isLinux()) {
     assert(profileObj.hasOwnProperty("cpuNanos"), tojson(profileObj));
@@ -67,6 +69,8 @@ profileObj = getLatestProfilerEntry(testDB);
 
 assert.eq(profileObj.command.query, query, tojson(profileObj));
 assert.eq(profileObj.docsExamined, 10, tojson(profileObj));
+assert(profileObj.hasOwnProperty("queryHash"), tojson(profileObj));
+assert(profileObj.hasOwnProperty("planCacheKey"), tojson(profileObj));
 
 //
 // Count with indexed query.
@@ -85,6 +89,8 @@ profileObj = getLatestProfilerEntry(testDB);
 
 assert.eq(profileObj.command.query, query, tojson(profileObj));
 assert.eq(profileObj.keysExamined, 6, tojson(profileObj));
+assert(profileObj.hasOwnProperty("queryHash"), tojson(profileObj));
+assert(profileObj.hasOwnProperty("planCacheKey"), tojson(profileObj));
 assert.eq(profileObj.planSummary, "COUNT_SCAN { a: 1 }", tojson(profileObj));
 assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
 assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));

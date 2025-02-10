@@ -47,6 +47,8 @@ assert.eq(profileObj.ns, coll.getFullName(), profileObj);
 assert.eq(profileObj.keysExamined, 1, profileObj);
 assert.eq(profileObj.docsExamined, 1, profileObj);
 assert.eq(profileObj.nreturned, 1, profileObj);
+assert(profileObj.hasOwnProperty("queryHash"), tojson(profileObj));
+assert(profileObj.hasOwnProperty("planCacheKey"), tojson(profileObj));
 assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", profileObj);
 assert(profileObj.execStats.hasOwnProperty("stage"), profileObj);
 assert.eq(profileObj.command.filter, {a: 1}, profileObj);

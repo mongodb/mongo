@@ -67,6 +67,8 @@ assert.eq(profileObj.ndeleted, 1, tojson(profileObj));
 assert.eq(profileObj.keysExamined, 1, tojson(profileObj));
 assert.eq(profileObj.docsExamined, 1, tojson(profileObj));
 assert.eq(profileObj.keysDeleted, expectedKeysDeleted, tojson(profileObj));
+assert(profileObj.hasOwnProperty("queryHash"), tojson(profileObj));
+assert(profileObj.hasOwnProperty("planCacheKey"), tojson(profileObj));
 assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", tojson(profileObj));
 assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
 if (isLinux()) {

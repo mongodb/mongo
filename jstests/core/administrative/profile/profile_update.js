@@ -49,6 +49,8 @@ assert.eq(profileObj.keysInserted, 1, tojson(profileObj));
 assert.eq(profileObj.keysDeleted, 1, tojson(profileObj));
 assert.eq(profileObj.nMatched, 1, tojson(profileObj));
 assert.eq(profileObj.nModified, 1, tojson(profileObj));
+assert(profileObj.hasOwnProperty("queryHash"), tojson(profileObj));
+assert(profileObj.hasOwnProperty("planCacheKey"), tojson(profileObj));
 assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", tojson(profileObj));
 assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
 assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));

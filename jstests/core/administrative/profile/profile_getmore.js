@@ -55,6 +55,8 @@ assert.eq(profileObj.command.collection, coll.getName(), profileObj);
 assert.eq(profileObj.command.batchSize, 2, profileObj);
 assert.eq(profileObj.originatingCommand.filter, {a: {$gt: 0}});
 assert.eq(profileObj.originatingCommand.sort, {a: 1});
+assert(profileObj.hasOwnProperty("queryHash"), tojson(profileObj));
+assert(profileObj.hasOwnProperty("planCacheKey"), tojson(profileObj));
 assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", profileObj);
 assert(profileObj.hasOwnProperty("execStats"), profileObj);
 assert(profileObj.execStats.hasOwnProperty("stage"), profileObj);

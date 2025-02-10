@@ -43,6 +43,8 @@ assert.eq(profileObj.op, "command", tojson(profileObj));
 assert.eq(profileObj.nreturned, 8, tojson(profileObj));
 assert.eq(profileObj.keysExamined, 8, tojson(profileObj));
 assert.eq(profileObj.docsExamined, 8, tojson(profileObj));
+assert(profileObj.hasOwnProperty("queryHash"), tojson(profileObj));
+assert(profileObj.hasOwnProperty("planCacheKey"), tojson(profileObj));
 assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", tojson(profileObj));
 assert.eq(profileObj.protocol, "op_msg", tojson(profileObj));
 assert.eq(profileObj.command.aggregate, coll.getName(), tojson(profileObj));
