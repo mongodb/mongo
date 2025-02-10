@@ -125,6 +125,9 @@ protected:
     const NamespaceString mainNss =
         NamespaceString::createNamespaceString_forTest(dbNameTestDb, "main");
 
+    const NamespaceString mainView =
+        NamespaceString::createNamespaceString_forTest(dbNameTestDb, "mainView");
+
     const NamespaceString secondaryNss1 =
         NamespaceString::createNamespaceString_forTest(dbNameTestDb, "secondary1");
     const NamespaceString secondaryNss2 =
@@ -162,6 +165,7 @@ void MultipleCollectionAccessorTest::setUp() {
     }
 
     // Create all the required views
+    createTestView(operationContext(), mainView, mainNss, {});
     createTestView(operationContext(), secondaryView1, secondaryNss1, {});
     createTestView(operationContext(), secondaryView2, secondaryNss2, {});
 }
@@ -237,9 +241,25 @@ TEST_F(MultipleCollectionAccessorTest, mainCollectionViaAcquisition) {
     auto accessor = MultipleCollectionAccessor(acquisition);
     ASSERT_TRUE(accessor.isAcquisition());
     ASSERT_EQ(acquisition.getCollectionPtr(), accessor.getMainCollection());
-    ASSERT_EQ(acquisition.uuid(), accessor.getMainAcquisition().uuid());
+    ASSERT_EQ(acquisition.uuid(), accessor.getMainCollectionAcquisition().uuid());
     ASSERT_TRUE(accessor.getMainCollectionPtrOrAcquisition().isAcquisition());
 }
+
+TEST_F(MultipleCollectionAccessorTest, mainViewViaAcquisition) {
+    const auto acquisition =
+        acquireCollectionOrView(operationContext(),
+                                CollectionOrViewAcquisitionRequest::fromOpCtx(
+                                    operationContext(),
+                                    NamespaceStringOrUUID(mainView),
+                                    AcquisitionPrerequisites::OperationType::kWrite,
+                                    AcquisitionPrerequisites::ViewMode::kCanBeView),
+                                MODE_IX);
+
+    auto accessor = MultipleCollectionAccessor(acquisition);
+    ASSERT_TRUE(accessor.isAcquisition());
+    ASSERT_FALSE(accessor.hasMainCollection());
+}
+
 
 TEST_F(MultipleCollectionAccessorTest, secondaryCollectionsViaAutoGetter) {
     AutoGetCollection coll(operationContext(), mainNss, MODE_IX);
@@ -287,10 +307,10 @@ TEST_F(MultipleCollectionAccessorTest, secondaryViewsViaAutoGetter) {
 
 TEST_F(MultipleCollectionAccessorTest, secondaryCollectionsViaAcquisition) {
     const auto acquisitionMain =
-        acquireCollection(operationContext(),
-                          CollectionAcquisitionRequest::fromOpCtx(
-                              operationContext(), mainNss, AcquisitionPrerequisites::kWrite),
-                          MODE_IX);
+        acquireCollectionOrView(operationContext(),
+                                CollectionAcquisitionRequest::fromOpCtx(
+                                    operationContext(), mainNss, AcquisitionPrerequisites::kWrite),
+                                MODE_IX);
 
     const auto acquisitionSecondary1 = acquireCollectionOrView(
         operationContext(),
@@ -304,12 +324,13 @@ TEST_F(MultipleCollectionAccessorTest, secondaryCollectionsViaAcquisition) {
             operationContext(), secondaryNss2, AcquisitionPrerequisites::kWrite),
         MODE_IX);
 
-    auto accessor =
-        MultipleCollectionAccessor(acquisitionMain, {acquisitionSecondary1, acquisitionSecondary2});
+    auto accessor = MultipleCollectionAccessor(
+        acquisitionMain, makeAcquisitionMap({acquisitionSecondary1, acquisitionSecondary2}), false);
     // Check the main collection is correctly returned.
     ASSERT_TRUE(accessor.isAcquisition());
     ASSERT_TRUE(accessor.getMainCollectionPtrOrAcquisition().isAcquisition());
-    ASSERT_EQ(acquisitionMain.uuid(), accessor.getMainAcquisition().uuid());
+    ASSERT_EQ(acquisitionMain.getCollection().uuid(),
+              accessor.getMainCollectionAcquisition().uuid());
 
     // Check the secondary collections are correctly returned.
     auto secondaryCollectionMap = accessor.getSecondaryCollections();
@@ -324,10 +345,10 @@ TEST_F(MultipleCollectionAccessorTest, secondaryCollectionsViaAcquisition) {
 
 TEST_F(MultipleCollectionAccessorTest, secondaryViewsViaAcquisition) {
     const auto acquisitionMain =
-        acquireCollection(operationContext(),
-                          CollectionAcquisitionRequest::fromOpCtx(
-                              operationContext(), mainNss, AcquisitionPrerequisites::kWrite),
-                          MODE_IX);
+        acquireCollectionOrView(operationContext(),
+                                CollectionAcquisitionRequest::fromOpCtx(
+                                    operationContext(), mainNss, AcquisitionPrerequisites::kWrite),
+                                MODE_IX);
 
     const auto acquisitionSecondary1 =
         acquireCollectionOrView(operationContext(),
@@ -351,8 +372,8 @@ TEST_F(MultipleCollectionAccessorTest, secondaryViewsViaAcquisition) {
                                 },
                                 MODE_IX);
 
-    auto accessor =
-        MultipleCollectionAccessor(acquisitionMain, {acquisitionSecondary1, acquisitionSecondary2});
+    auto accessor = MultipleCollectionAccessor(
+        acquisitionMain, makeAcquisitionMap({acquisitionSecondary1, acquisitionSecondary2}), false);
 
     // Check the main collection is correctly returned.
     ASSERT_TRUE(accessor.isAcquisition());

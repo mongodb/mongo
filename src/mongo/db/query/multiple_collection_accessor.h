@@ -77,18 +77,21 @@ public:
     explicit MultipleCollectionAccessor(const CollectionPtr& mainColl)
         : MultipleCollectionAccessor(&mainColl) {}
 
-    explicit MultipleCollectionAccessor(CollectionAcquisition mainAcq) : _mainAcq(mainAcq) {}
-    MultipleCollectionAccessor(
-        CollectionAcquisition mainAcq,
-        const std::vector<CollectionOrViewAcquisition>& secondaryAcquisitions)
-        : _mainAcq(mainAcq) {
-        for (auto& acq : secondaryAcquisitions) {
-            _secondaryAcq.emplace(acq.nss(), acq);
-        }
-    }
+    explicit MultipleCollectionAccessor(CollectionAcquisition mainAcq)
+        : _mainAcq(CollectionOrViewAcquisition(std::move(mainAcq))) {}
+
+    explicit MultipleCollectionAccessor(CollectionOrViewAcquisition mainAcq) : _mainAcq(mainAcq) {}
+
+    MultipleCollectionAccessor(const CollectionOrViewAcquisition& mainAcq,
+                               const CollectionOrViewAcquisitionMap& secondaryAcquisitions,
+                               bool isAnySecondaryNamespaceAViewOrNotFullyLocal)
+        : _mainAcq(mainAcq),
+          _secondaryAcq(secondaryAcquisitions),
+          _isAnySecondaryNamespaceAViewOrNotFullyLocal(
+              isAnySecondaryNamespaceAViewOrNotFullyLocal) {}
 
     bool hasMainCollection() const {
-        return (_mainColl && _mainColl->get()) || (_mainAcq && _mainAcq->exists());
+        return (_mainColl && _mainColl->get()) || (_mainAcq && _mainAcq->collectionExists());
     }
 
     const CollectionPtr& getMainCollection() const {
@@ -111,12 +114,12 @@ public:
         return bool(_mainAcq);
     }
 
-    const CollectionAcquisition& getMainAcquisition() const {
-        return *_mainAcq;
+    const CollectionAcquisition& getMainCollectionAcquisition() const {
+        return _mainAcq->getCollection();
     }
 
     VariantCollectionPtrOrAcquisition getMainCollectionPtrOrAcquisition() const {
-        return isAcquisition() ? VariantCollectionPtrOrAcquisition(*_mainAcq)
+        return isAcquisition() ? VariantCollectionPtrOrAcquisition(_mainAcq->getCollection())
                                : VariantCollectionPtrOrAcquisition(_mainColl);
     }
 
@@ -192,7 +195,7 @@ private:
     }
 
     // Shard role api collection access.
-    boost::optional<CollectionAcquisition> _mainAcq;
+    boost::optional<CollectionOrViewAcquisition> _mainAcq;
     CollectionOrViewAcquisitionMap _secondaryAcq;
 
     // Manual collection access state

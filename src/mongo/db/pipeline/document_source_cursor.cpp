@@ -298,7 +298,7 @@ Value DocumentSourceCursor::serialize(const SerializationOptions& opts) const {
                                  secondaryNssList.cbegin(), secondaryNssList.cend()));
         };
         bool isAnySecondaryCollectionNotLocal =
-            intializeAutoGet(opCtx, _exec->nss(), secondaryNssList, initAutoGetFn);
+            initializeAutoGet(opCtx, _exec->nss(), secondaryNssList, initAutoGetFn);
         tassert(8322003,
                 "Should have initialized AutoGet* after calling 'initializeAutoGet'",
                 readLock.has_value());

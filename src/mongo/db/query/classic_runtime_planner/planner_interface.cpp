@@ -101,7 +101,8 @@ void ClassicPlannerInterface::addDeleteStage(ParsedDelete* parsedDelete,
                                              std::unique_ptr<DeleteStageParams> deleteStageParams) {
     invariant(_state == kNotInitialized);
     invariant(collections().isAcquisition());
-    const auto& coll = collections().getMainAcquisition();
+    invariant(collections().hasMainCollection());
+    const auto& coll = collections().getMainCollectionAcquisition();
     const auto& collectionPtr = coll.getCollectionPtr();
 
     // TODO (SERVER-64506): support change streams' pre- and post-images.
@@ -154,6 +155,7 @@ void ClassicPlannerInterface::addUpdateStage(ParsedUpdate* parsedUpdate,
                                              UpdateStageParams updateStageParams) {
     invariant(_state == kNotInitialized);
     invariant(collections().isAcquisition());
+    invariant(collections().hasMainCollection());
     const auto& request = parsedUpdate->getRequest();
     const bool isUpsert = updateStageParams.request->isUpsert();
     const auto timeseriesOptions = collections().getMainCollection()->getTimeseriesOptions();
@@ -169,7 +171,7 @@ void ClassicPlannerInterface::addUpdateStage(ParsedUpdate* parsedUpdate,
                 TimeseriesModifyParams(&updateStageParams),
                 ws(),
                 std::move(_root),
-                collections().getMainAcquisition(),
+                collections().getMainCollectionAcquisition(),
                 timeseries::BucketUnpacker(*timeseriesOptions),
                 parsedUpdate->releaseResidualExpr(),
                 parsedUpdate->releaseOriginalExpr(),
@@ -180,7 +182,7 @@ void ClassicPlannerInterface::addUpdateStage(ParsedUpdate* parsedUpdate,
                 TimeseriesModifyParams(&updateStageParams),
                 ws(),
                 std::move(_root),
-                collections().getMainAcquisition(),
+                collections().getMainCollectionAcquisition(),
                 timeseries::BucketUnpacker(*timeseriesOptions),
                 parsedUpdate->releaseResidualExpr(),
                 parsedUpdate->releaseOriginalExpr());
@@ -189,13 +191,13 @@ void ClassicPlannerInterface::addUpdateStage(ParsedUpdate* parsedUpdate,
         _root = std::make_unique<UpsertStage>(cq()->getExpCtxRaw(),
                                               updateStageParams,
                                               ws(),
-                                              collections().getMainAcquisition(),
+                                              collections().getMainCollectionAcquisition(),
                                               _root.release());
     } else {
         _root = std::make_unique<UpdateStage>(cq()->getExpCtxRaw(),
                                               updateStageParams,
                                               ws(),
-                                              collections().getMainAcquisition(),
+                                              collections().getMainCollectionAcquisition(),
                                               _root.release());
     }
 

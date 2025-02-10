@@ -257,8 +257,9 @@ public:
      * Create an AggCatalogState instance for this pipeline. This method may also have the side
      * effect of updating the execution namespace and adjusting the read concern in the case of
      * change stream pipelines.
+     * If useAcquisition is set, the internal acquisition will happen via shard role api.
      */
-    std::unique_ptr<AggCatalogState> createAggCatalogState();
+    std::unique_ptr<AggCatalogState> createAggCatalogState(bool useAcquisition);
 
 private:
     /**
@@ -475,12 +476,14 @@ public:
     /**
      * Create an AggCatalogState instance for a pipeline that has a $changeStream stage.
      */
-    static std::unique_ptr<AggCatalogState> createOplogAggCatalogState(const AggExState&);
+    static std::unique_ptr<AggCatalogState> createOplogAggCatalogState(const AggExState&,
+                                                                       bool useAcquisition);
 
     /**
      * Create an AggCatalogState instance for "normal" pipelines.
      */
-    static std::unique_ptr<AggCatalogState> createDefaultAggCatalogState(const AggExState&);
+    static std::unique_ptr<AggCatalogState> createDefaultAggCatalogState(const AggExState&,
+                                                                         bool useAcquisition);
 };
 
 }  // namespace mongo

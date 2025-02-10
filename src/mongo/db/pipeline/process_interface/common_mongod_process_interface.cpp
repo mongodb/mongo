@@ -587,7 +587,7 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
                          AutoStatsTracker::LogMode::kUpdateTop);
     };
 
-    bool isAnySecondaryCollectionNotLocal = intializeAutoGet(
+    bool isAnySecondaryCollectionNotLocal = initializeAutoGet(
         opCtx, expCtx->getNamespaceString(), secondaryNamespaces, initAutoGetCallback);
 
     tassert(8322002,

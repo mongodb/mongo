@@ -137,10 +137,10 @@ private:
                              _secondaryExecNssList.cbegin(), _secondaryExecNssList.cend()),
                          AutoStatsTracker::LogMode::kUpdateTopAndCurOp);
         };
-        bool anySecondaryCollectionNotLocal = intializeAutoGet(_aggExState.getOpCtx(),
-                                                               _aggExState.getExecutionNss(),
-                                                               _secondaryExecNssList,
-                                                               initAutoGetCallback);
+        bool anySecondaryCollectionNotLocal = initializeAutoGet(_aggExState.getOpCtx(),
+                                                                _aggExState.getExecutionNss(),
+                                                                _secondaryExecNssList,
+                                                                initAutoGetCallback);
         tassert(8322000,
                 "Should have initialized AutoGet* after calling 'initializeAutoGet'",
                 _ctx.has_value());
@@ -185,6 +185,161 @@ protected:
 };
 
 /**
+ * This class is like DefaultAggCatalogState but the shard role api is used to acquire collections
+ * and their resources.
+ */
+class DefaultAggCatalogStateWithAcquisition : public AggCatalogState {
+public:
+    DefaultAggCatalogStateWithAcquisition(const DefaultAggCatalogStateWithAcquisition&) = delete;
+    DefaultAggCatalogStateWithAcquisition(DefaultAggCatalogStateWithAcquisition&&) = delete;
+
+    explicit DefaultAggCatalogStateWithAcquisition(const AggExState& aggExState)
+        : AggCatalogState{aggExState},
+          _secondaryExecNssList{aggExState.getForeignExecutionNamespaces()} {
+        initContext(AcquisitionPrerequisites::ViewMode::kCanBeView);
+        if (_collections.hasMainCollection()) {
+            _uuid = _collections.getMainCollection()->uuid();
+        }
+    }
+
+    bool lockAcquired() const override {
+        return _mainAcq.has_value();
+    }
+
+    std::pair<std::unique_ptr<CollatorInterface>, ExpressionContextCollationMatchesDefault>
+    resolveCollator() const override {
+        return ::mongo::resolveCollator(
+            _aggExState.getOpCtx(),
+            _aggExState.getRequest().getCollation().get_value_or(BSONObj()),
+            _collections.getMainCollection());
+    }
+
+    const CollectionPtr& getPrimaryCollection() const override {
+        invariant(lockAcquired());
+        return _mainAcq->getCollection().getCollectionPtr();
+    }
+
+    query_shape::CollectionType getPrimaryCollectionType() const override {
+        invariant(lockAcquired());
+        return _mainAcq->getCollectionType();
+    }
+
+    const ViewDefinition* getPrimaryView() const override {
+        invariant(lockAcquired());
+        if (_mainAcq->isView()) {
+            return &_mainAcq->getView().getViewDefinition();
+        }
+        return nullptr;
+    }
+
+    void getStatsTrackerIfNeeded(boost::optional<AutoStatsTracker>& statsTracker) const override {
+        // By default '_mainAcq' will create a stats tracker, so no need to need to instantiate an
+        // AutoStatsTracker here.
+    }
+
+    const MultipleCollectionAccessor& getCollections() const override {
+        return _collections;
+    }
+
+    StatusWith<ResolvedView> resolveView(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<BSONObj> timeSeriesCollator) const override {
+        return view_catalog_helpers::resolveView(opCtx, _catalog, nss, timeSeriesCollator);
+    }
+
+    boost::optional<UUID> getUUID() const override {
+        return _uuid;
+    }
+
+    void relinquishLocks() override {
+        _mainAcq.reset();
+        _collections.clear();
+    }
+
+private:
+    /**
+     * This is the method that does the actual acquisition and initialization of catalog data
+     * structures, during construction of subclass instances.
+     */
+    void initContext(const AcquisitionPrerequisites::ViewMode& viewMode) {
+
+        auto opCtx = _aggExState.getOpCtx();
+        auto executionNss = _aggExState.getExecutionNss();
+
+        CollectionOrViewAcquisitionMap secondaryAcquisitions;
+        secondaryAcquisitions.reserve(_secondaryExecNssList.size() + 1);
+        auto initAutoGetCallback = [&]() {
+            CollectionOrViewAcquisitionRequests acquisitionRequests;
+            acquisitionRequests.reserve(_secondaryExecNssList.size() + 1);
+
+            // Emplace the main acquisition request.
+            acquisitionRequests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
+                opCtx, executionNss, AcquisitionPrerequisites::kRead, viewMode));
+
+            // Emplace a request for every secondary nss.
+            for (auto& nss : _secondaryExecNssList) {
+                auto r = CollectionOrViewAcquisitionRequest::fromOpCtx(
+                    opCtx, nss, AcquisitionPrerequisites::kRead, viewMode);
+                acquisitionRequests.emplace_back(std::move(r));
+            }
+
+            // Acquire all the collection and extract the main acquisition
+            secondaryAcquisitions = makeAcquisitionMap(
+                acquireCollectionsOrViewsMaybeLockFree(opCtx, acquisitionRequests));
+            _mainAcq.emplace(secondaryAcquisitions.extract(executionNss).mapped());
+        };
+
+        bool isAnySecondaryCollectionNotLocal = initializeAutoGet(_aggExState.getOpCtx(),
+                                                                  _aggExState.getExecutionNss(),
+                                                                  _secondaryExecNssList,
+                                                                  initAutoGetCallback);
+
+        bool isAnySecondaryNamespaceAView =
+            std::any_of(secondaryAcquisitions.begin(),
+                        secondaryAcquisitions.end(),
+                        [](const auto& acq) { return acq.second.isView(); });
+
+        bool isAnySecondaryNamespaceAViewOrNotFullyLocal =
+            isAnySecondaryNamespaceAView || isAnySecondaryCollectionNotLocal;
+
+        _collections = MultipleCollectionAccessor(
+            *_mainAcq, secondaryAcquisitions, isAnySecondaryNamespaceAViewOrNotFullyLocal);
+        // Return the catalog that gets implicitly stashed during the collection acquisition
+        // above, which also implicitly opened a storage snapshot. This catalog object can
+        // be potentially different than the one obtained before and will be in sync with
+        // the opened snapshot.
+        _catalog = CollectionCatalog::get(_aggExState.getOpCtx());
+
+        hangAfterAcquiringCollectionCatalog.executeIf(
+            [&](const auto&) { hangAfterAcquiringCollectionCatalog.pauseWhileSet(); },
+            [&](const BSONObj& data) {
+                return _aggExState.getExecutionNss().coll() == data["collection"].valueStringData();
+            });
+    }
+
+
+protected:
+    /**
+     * Constructor used by Oplog subclass.
+     */
+    DefaultAggCatalogStateWithAcquisition(const AggExState& aggExState,
+                                          const AcquisitionPrerequisites::ViewMode& viewMode)
+        : AggCatalogState{aggExState} {
+        initContext(viewMode);
+    }
+
+    const std::vector<NamespaceStringOrUUID> _secondaryExecNssList;
+
+    // If the namespace is a view, the lock will be released before re-running the expanded
+    // aggregation.
+    boost::optional<CollectionOrViewAcquisition> _mainAcq;
+    MultipleCollectionAccessor _collections;
+    std::shared_ptr<const CollectionCatalog> _catalog;
+    boost::optional<UUID> _uuid;
+};
+
+/**
  * Change stream pipelines have some subtle differences from normal pipelines. This class
  * encapsulates them.
  */
@@ -215,8 +370,8 @@ public:
     std::pair<std::unique_ptr<CollatorInterface>, ExpressionContextCollationMatchesDefault>
     resolveCollator() const override {
         // If the user specified an explicit collation, adopt it; otherwise, use the simple
-        // collation. We do not inherit the collection's default collation or UUID, since the stream
-        // may be resuming from a point before the current UUID existed.
+        // collation. We do not inherit the collection's default collation or UUID, since the
+        // stream may be resuming from a point before the current UUID existed.
         return ::mongo::resolveCollator(
             _aggExState.getOpCtx(),
             _aggExState.getRequest().getCollation().get_value_or(BSONObj()),
@@ -225,6 +380,50 @@ public:
 
     ~OplogAggCatalogState() override {}
 };
+
+/**
+ * Change stream pipelines have some subtle differences from normal pipelines. This class
+ * encapsulates them.
+ */
+class OplogAggCatalogStateWithAcquisition : public DefaultAggCatalogStateWithAcquisition {
+public:
+    explicit OplogAggCatalogStateWithAcquisition(const AggExState& aggExState)
+        : DefaultAggCatalogStateWithAcquisition{
+              aggExState, AcquisitionPrerequisites::ViewMode::kMustBeCollection} {}
+
+    void validate() const override {
+        AggCatalogState::validate();
+
+        // Raise an error if original nss is a view. We do not need to check this if we are opening
+        // a stream on an entire db or across the cluster.
+        if (!_aggExState.getOriginalNss().isCollectionlessAggregateNS()) {
+            auto view = _catalog->lookupView(_aggExState.getOpCtx(), _aggExState.getOriginalNss());
+            uassert(ErrorCodes::CommandNotSupportedOnView,
+                    str::stream() << "Cannot run aggregation on timeseries with namespace "
+                                  << _aggExState.getOriginalNss().toStringForErrorMsg(),
+                    !view || !view->timeseries());
+            uassert(ErrorCodes::CommandNotSupportedOnView,
+                    str::stream() << "Namespace "
+                                  << _aggExState.getOriginalNss().toStringForErrorMsg()
+                                  << " is a view, not a collection",
+                    !view);
+        }
+    }
+
+    std::pair<std::unique_ptr<CollatorInterface>, ExpressionContextCollationMatchesDefault>
+    resolveCollator() const override {
+        // If the user specified an explicit collation, adopt it; otherwise, use the simple
+        // collation. We do not inherit the collection's default collation or UUID, since the
+        // stream may be resuming from a point before the current UUID existed.
+        return ::mongo::resolveCollator(
+            _aggExState.getOpCtx(),
+            _aggExState.getRequest().getCollation().get_value_or(BSONObj()),
+            CollectionPtr{});
+    }
+
+    ~OplogAggCatalogStateWithAcquisition() override {}
+};
+
 
 /**
  * AggCatalogState subclass for pipelines that do not access any collections. They do not have a
@@ -242,8 +441,8 @@ public:
     }
 
     void getStatsTrackerIfNeeded(boost::optional<AutoStatsTracker>& tracker) const override {
-        // If this is a collectionless aggregation, we won't create '_ctx' but will still need an
-        // AutoStatsTracker to record CurOp and Top entries.
+        // If this is a collectionless aggregation, we won't create '_ctx' but will still need
+        // an AutoStatsTracker to record CurOp and Top entries.
         tracker.emplace(_aggExState.getOpCtx(),
                         _aggExState.getExecutionNss(),
                         Top::LockType::NotLocked,
@@ -546,7 +745,7 @@ void AggExState::adjustChangeStreamReadConcern() {
         _opCtx, readConcernArgs, PrepareConflictBehavior::kIgnoreConflicts);
 }
 
-std::unique_ptr<AggCatalogState> AggExState::createAggCatalogState() {
+std::unique_ptr<AggCatalogState> AggExState::createAggCatalogState(bool useAcquisition) {
     std::unique_ptr<AggCatalogState> collectionState;
     if (hasChangeStream()) {
         // If this is a change stream, perform special checks and change the execution
@@ -584,8 +783,7 @@ std::unique_ptr<AggCatalogState> AggExState::createAggCatalogState() {
 
         // Upgrade and wait for read concern if necessary.
         adjustChangeStreamReadConcern();
-
-        collectionState = AggCatalogStateFactory::createOplogAggCatalogState(*this);
+        collectionState = AggCatalogStateFactory::createOplogAggCatalogState(*this, useAcquisition);
     } else if (getExecutionNss().isCollectionlessAggregateNS() && getInvolvedNamespaces().empty()) {
         // We get here for aggregations that are not against a specific collection, e.g.,
         //   { aggregate: 1, pipeline: [...] }
@@ -596,7 +794,8 @@ std::unique_ptr<AggCatalogState> AggExState::createAggCatalogState() {
                 !getRequest().getCollectionUUID());
         collectionState = AggCatalogStateFactory::createCollectionlessAggCatalogState(*this);
     } else {
-        collectionState = AggCatalogStateFactory::createDefaultAggCatalogState(*this);
+        collectionState =
+            AggCatalogStateFactory::createDefaultAggCatalogState(*this, useAcquisition);
 
         if (getRequest().getRawData()) {
             auto [isTimeseriesViewRequest, translatedNs] =
@@ -604,7 +803,8 @@ std::unique_ptr<AggCatalogState> AggExState::createAggCatalogState() {
             if (isTimeseriesViewRequest) {
                 setExecutionNss(translatedNs);
                 collectionState->relinquishLocks();
-                collectionState = AggCatalogStateFactory::createDefaultAggCatalogState(*this);
+                collectionState =
+                    AggCatalogStateFactory::createDefaultAggCatalogState(*this, useAcquisition);
             }
         }
     }
@@ -691,13 +891,21 @@ query_shape::CollectionType AggCatalogState::determineCollectionType() const {
 }
 
 std::unique_ptr<AggCatalogState> AggCatalogStateFactory::createDefaultAggCatalogState(
-    const AggExState& aggExState) {
-    return std::make_unique<DefaultAggCatalogState>(aggExState);
+    const AggExState& aggExState, bool useAcquisition) {
+    if (useAcquisition) {
+        return std::make_unique<DefaultAggCatalogStateWithAcquisition>(aggExState);
+    } else {
+        return std::make_unique<DefaultAggCatalogState>(aggExState);
+    }
 }
 
 std::unique_ptr<AggCatalogState> AggCatalogStateFactory::createOplogAggCatalogState(
-    const AggExState& aggExState) {
-    return std::make_unique<OplogAggCatalogState>(aggExState);
+    const AggExState& aggExState, bool useAcquisition) {
+    if (useAcquisition) {
+        return std::make_unique<OplogAggCatalogStateWithAcquisition>(aggExState);
+    } else {
+        return std::make_unique<OplogAggCatalogState>(aggExState);
+    }
 }
 
 std::unique_ptr<AggCatalogState> AggCatalogStateFactory::createCollectionlessAggCatalogState(

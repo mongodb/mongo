@@ -48,7 +48,7 @@ void populateShardFiltererSlot(OperationContext* opCtx,
                                const MultipleCollectionAccessor& collections) {
     auto shardFilterer = [&]() -> std::unique_ptr<ShardFilterer> {
         if (collections.isAcquisition()) {
-            auto acquisition = collections.getMainAcquisition();
+            auto acquisition = collections.getMainCollectionAcquisition();
             tassert(7900701,
                     "Setting shard filterer slot on un-sharded collection",
                     acquisition.getShardingDescription().isSharded());

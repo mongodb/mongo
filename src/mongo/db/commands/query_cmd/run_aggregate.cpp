@@ -1035,7 +1035,10 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
     InterruptibleLockGuard interruptibleLockAcquisition(aggExState.getOpCtx());
 
     // Acquire any catalog locks needed by the pipeline, and create catalog-dependent state.
-    std::unique_ptr<AggCatalogState> aggCatalogState = aggExState.createAggCatalogState();
+    // Do not use acquisition for now.
+    const bool useAcquisition = false;
+    std::unique_ptr<AggCatalogState> aggCatalogState =
+        aggExState.createAggCatalogState(useAcquisition);
 
     boost::optional<AutoStatsTracker> statsTracker;
     aggCatalogState->getStatsTrackerIfNeeded(statsTracker);

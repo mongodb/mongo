@@ -1733,6 +1733,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:dbcheck_test_fixture",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/repl:storage_interface_impl",
+        "//src/mongo/db/s:shard_server_test_fixture",
         "//src/mongo/db/storage:record_store_base",
         "//src/mongo/idl:idl_parser",
         "//src/mongo/idl:server_parameter_test_util",
