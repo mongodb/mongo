@@ -49,8 +49,6 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/assert.h"

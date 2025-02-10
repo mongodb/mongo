@@ -50,8 +50,6 @@
 #include "mongo/db/pipeline/percentile_algo.h"
 #include "mongo/db/pipeline/percentile_algo_tdigest.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 

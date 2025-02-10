@@ -45,7 +45,6 @@
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"

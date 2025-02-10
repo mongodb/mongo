@@ -52,8 +52,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/rewrite_state_change_errors_server_parameter_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"

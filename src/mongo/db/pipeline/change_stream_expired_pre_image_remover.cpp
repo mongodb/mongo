@@ -41,7 +41,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/decorable.h"

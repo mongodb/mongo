@@ -38,9 +38,6 @@
 #include "mongo/base/status.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/logv2/log_severity.h"
-#include "mongo/logv2/redaction.h"
 #include "mongo/unittest/benchmark_options_gen.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/util/exit_code.h"

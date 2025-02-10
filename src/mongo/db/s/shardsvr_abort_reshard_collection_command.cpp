@@ -56,8 +56,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/request_types/abort_reshard_collection_gen.h"
 #include "mongo/s/resharding/common_types_gen.h"

@@ -31,8 +31,6 @@
 
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/tools/workload_simulation/simulator_options.h"
 #include "mongo/util/pcre.h"
 

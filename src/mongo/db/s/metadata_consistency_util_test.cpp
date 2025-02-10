@@ -49,8 +49,6 @@
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/unittest/assert.h"

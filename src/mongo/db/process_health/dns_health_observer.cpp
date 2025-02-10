@@ -52,7 +52,6 @@
 #include "mongo/db/process_health/health_observer_registration.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"

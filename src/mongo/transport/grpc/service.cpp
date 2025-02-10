@@ -45,7 +45,6 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_severity.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/transport/grpc/grpc_server_context.h"
 #include "mongo/transport/grpc/grpc_server_stream.h"

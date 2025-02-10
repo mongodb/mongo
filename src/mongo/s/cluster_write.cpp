@@ -36,7 +36,6 @@
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/ns_targeter.h"

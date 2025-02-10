@@ -42,7 +42,6 @@
 #include "mongo/db/operation_killer.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"

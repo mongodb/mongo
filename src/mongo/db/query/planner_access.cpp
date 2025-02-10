@@ -87,8 +87,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/str.h"

@@ -57,8 +57,6 @@
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/assert.h"

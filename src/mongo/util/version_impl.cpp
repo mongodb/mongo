@@ -35,7 +35,6 @@
 #include "mongo/base/initializer.h"
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/util/version.h"
 #include "mongo/util/version_constants.h"
 

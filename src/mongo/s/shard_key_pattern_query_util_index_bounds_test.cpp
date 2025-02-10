@@ -54,8 +54,6 @@
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/interval.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"

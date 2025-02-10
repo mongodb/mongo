@@ -37,8 +37,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/logv2/log_tag.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/net/ssl_options.h"
 

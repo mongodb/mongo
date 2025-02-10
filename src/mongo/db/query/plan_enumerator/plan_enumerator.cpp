@@ -55,8 +55,6 @@
 #include "mongo/db/query/plan_enumerator/memo_prune.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"

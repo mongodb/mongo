@@ -54,8 +54,6 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_shard.h"

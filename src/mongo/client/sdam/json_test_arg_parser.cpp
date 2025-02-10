@@ -37,8 +37,6 @@
 #include "mongo/base/status.h"
 #include "mongo/client/sdam/json_test_runner_cli_options_gen.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"

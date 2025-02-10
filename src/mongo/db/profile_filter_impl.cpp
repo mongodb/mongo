@@ -47,7 +47,6 @@
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

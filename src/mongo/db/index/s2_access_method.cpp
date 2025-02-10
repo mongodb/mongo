@@ -49,8 +49,6 @@
 #include "mongo/db/index/s2_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

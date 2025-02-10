@@ -35,8 +35,6 @@
 #include "mongo/db/session/session.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit.h"

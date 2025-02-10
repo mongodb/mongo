@@ -51,7 +51,6 @@
 #include "mongo/db/s/sharding_migration_critical_section.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"

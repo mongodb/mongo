@@ -43,7 +43,6 @@
 #include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/resharding/common_types_gen.h"

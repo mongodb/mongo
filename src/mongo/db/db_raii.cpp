@@ -70,8 +70,6 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/message.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_state.h"

@@ -69,8 +69,6 @@
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/untrack_unsplittable_collection_coordinator.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/redaction.h"
 #include "mongo/s/sharding_cluster_parameters_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"

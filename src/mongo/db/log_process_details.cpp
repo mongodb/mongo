@@ -43,8 +43,6 @@
 #include "mongo/db/server_options_server_helpers.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/processinfo.h"

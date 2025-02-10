@@ -38,8 +38,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/operation_key_manager.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 

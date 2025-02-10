@@ -39,8 +39,6 @@
 #include "mongo/db/admission/throughput_probing_gen.h"
 #include "mongo/db/dump_lock_manager.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/testing_proctor.h"

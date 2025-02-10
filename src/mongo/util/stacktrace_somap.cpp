@@ -38,8 +38,6 @@
 #include "mongo/base/initializer.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/util/stacktrace_somap.h"
 
 #if defined(__linux__)

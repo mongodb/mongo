@@ -41,8 +41,6 @@
 #include "mongo/db/matcher/rewrite_expr.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 

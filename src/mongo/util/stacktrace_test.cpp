@@ -62,9 +62,6 @@
 #include "mongo/bson/json.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/logv2/log_truncation.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"

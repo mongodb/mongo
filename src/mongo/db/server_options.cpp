@@ -30,8 +30,6 @@
 #include "mongo/db/server_options.h"
 
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version/releases.h"
 

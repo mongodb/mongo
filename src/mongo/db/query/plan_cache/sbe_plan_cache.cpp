@@ -37,8 +37,6 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/synchronized_value.h"

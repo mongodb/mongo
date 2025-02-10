@@ -40,9 +40,6 @@
 #include "mongo/db/repl/roll_back_local_operations.h"
 #include "mongo/db/storage/remove_saver.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

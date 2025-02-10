@@ -32,8 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/database_name.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/str.h"

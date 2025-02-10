@@ -45,8 +45,6 @@
 #include "mongo/db/repl/sync_source_feedback.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"

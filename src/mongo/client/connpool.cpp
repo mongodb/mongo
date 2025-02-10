@@ -59,8 +59,6 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"

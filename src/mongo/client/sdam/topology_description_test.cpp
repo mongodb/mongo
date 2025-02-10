@@ -44,8 +44,6 @@
 #include "mongo/client/sdam/topology_description.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"

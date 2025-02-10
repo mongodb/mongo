@@ -41,8 +41,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/test_info.h"
 #include "mongo/util/errno_util.h"

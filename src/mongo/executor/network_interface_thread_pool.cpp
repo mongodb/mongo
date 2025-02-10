@@ -36,7 +36,6 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/functional.h"
 

@@ -36,8 +36,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/service_executor_utils.h"
 #include "mongo/util/assert_util.h"

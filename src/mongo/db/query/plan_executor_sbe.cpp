@@ -61,7 +61,6 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"

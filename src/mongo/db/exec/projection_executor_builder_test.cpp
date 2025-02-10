@@ -53,8 +53,6 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"

@@ -54,9 +54,6 @@
 #include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/logv2/log_tag.h"
 #include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"

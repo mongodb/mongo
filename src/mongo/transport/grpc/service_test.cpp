@@ -42,8 +42,6 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/constants.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/logv2/log_severity.h"
 #include "mongo/rpc/message.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/grpc/grpc_server_context.h"

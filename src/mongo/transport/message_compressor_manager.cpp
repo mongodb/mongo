@@ -44,8 +44,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/message.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/message_compressor_registry.h"

@@ -45,8 +45,6 @@
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"

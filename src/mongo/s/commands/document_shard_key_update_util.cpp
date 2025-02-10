@@ -43,7 +43,6 @@
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/cluster_write.h"

@@ -32,7 +32,6 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_severity.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/grpc/async_client_factory.h"

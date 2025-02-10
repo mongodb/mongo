@@ -54,9 +54,6 @@
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/logv2/redaction.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/overloaded_visitor.h"
 

@@ -44,8 +44,6 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/stdx/unordered_set.h"

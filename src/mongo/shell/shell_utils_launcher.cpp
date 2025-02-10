@@ -75,8 +75,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/traffic_reader.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/named_pipe_test_helper.h"
 #include "mongo/shell/program_runner.h"

@@ -80,8 +80,6 @@
 #include "mongo/db/shard_role.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"

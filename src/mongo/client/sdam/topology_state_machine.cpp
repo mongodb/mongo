@@ -38,8 +38,6 @@
 #include "mongo/client/sdam/election_id_set_version_pair.h"
 #include "mongo/client/sdam/server_description.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork

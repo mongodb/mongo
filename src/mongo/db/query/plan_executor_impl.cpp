@@ -71,7 +71,6 @@
 #include "mongo/db/shard_role.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"

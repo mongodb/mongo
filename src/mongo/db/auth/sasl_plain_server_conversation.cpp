@@ -47,8 +47,6 @@
 #include "mongo/db/auth/user.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/password_digest.h"

@@ -56,8 +56,6 @@
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/type_traits.h"

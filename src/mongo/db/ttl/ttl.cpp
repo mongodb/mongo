@@ -89,8 +89,6 @@
 #include "mongo/db/ttl/ttl_collection_cache.h"
 #include "mongo/db/ttl/ttl_gen.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/s/catalog_cache.h"

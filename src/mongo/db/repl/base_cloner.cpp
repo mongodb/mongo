@@ -35,7 +35,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/repl/base_cloner.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"

@@ -42,7 +42,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_options.h"
 #include "mongo/transport/grpc/util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/socket_utils.h"

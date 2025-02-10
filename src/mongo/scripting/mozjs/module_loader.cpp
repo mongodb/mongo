@@ -64,8 +64,6 @@
 #include <js/TypeDecls.h>
 
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/module_loader.h"
 #include "mongo/util/file.h"

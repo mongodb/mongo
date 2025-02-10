@@ -37,7 +37,6 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/transport_layer_integration_test_fixture.h"

@@ -39,8 +39,6 @@
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/assert_util.h"
 

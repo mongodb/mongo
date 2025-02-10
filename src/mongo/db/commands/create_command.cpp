@@ -72,7 +72,6 @@
 #include "mongo/db/views/view.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"

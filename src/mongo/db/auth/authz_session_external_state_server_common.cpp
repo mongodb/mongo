@@ -34,7 +34,6 @@
 #include "mongo/db/auth/enable_localhost_auth_bypass_parameter_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 

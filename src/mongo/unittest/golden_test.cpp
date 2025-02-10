@@ -38,8 +38,6 @@
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/util/shell_exec.h"
