@@ -32,6 +32,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/unittest/assert.h"
@@ -352,7 +353,6 @@ TEST_F(CurOpStatsTest, CheckWorkingMillisWithBlockedTimeAtStart) {
 }
 
 TEST_F(CurOpStatsTest, MultipleUnstashingAndStashingTransaction) {
-    // Initialize two operation contexts.
     auto serviceContext = getGlobalServiceContext();
     auto client1 = serviceContext->getService()->makeClient("client1");
     auto opCtx1 = client1->makeOperationContext();
@@ -503,6 +503,63 @@ TEST_F(CurOpStatsTest, CheckAdmissionQueueStats) {
 
     ASSERT_BSONOBJ_EQ(currentQueue, expectedCurrentQueue);
     ASSERT_BSONOBJ_EQ_UNORDERED(queueStats, expectedQueueStats);
+}
+
+TEST_F(CurOpStatsTest, StashAndUnstashingMultipleRecoveryUnits) {
+    auto serviceContext = getGlobalServiceContext();
+    auto client = serviceContext->getService()->makeClient("client");
+    auto opCtx = client->makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+    std::unique_ptr<RecoveryUnit> recoveryUnit1 = std::make_unique<RecoveryUnitNoop>();
+    std::unique_ptr<RecoveryUnit> recoveryUnit2 = std::make_unique<RecoveryUnitNoop>();
+    auto ruState = WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork;
+    ClientLock lk(client.get());
+
+    // Setup recovery unit.
+    shard_role_details::setRecoveryUnit(opCtx.get(), std::move(recoveryUnit1), ruState, lk);
+
+    {
+        // Storage metrics remain 0 when stashing and unstashing recovery unit with zeroed stats.
+        curop->updateStorageMetricsOnRecoveryUnitStash(lk);
+        recoveryUnit1 = shard_role_details::releaseRecoveryUnit(opCtx.get(), lk);
+        shard_role_details::setRecoveryUnit(opCtx.get(), std::move(recoveryUnit2), ruState, lk);
+        curop->updateStorageMetricsOnRecoveryUnitUnstash(lk);
+        ASSERT_EQ(curop->getOperationStorageMetrics().prepareReadConflicts, 0);
+    }
+
+    {
+        // Increment stats on recovery unit currently used by operation.
+        shard_role_details::getRecoveryUnit(opCtx.get())
+            ->getStorageMetrics()
+            .incrementPrepareReadConflicts(1);
+        ASSERT_EQ(curop->getOperationStorageMetrics().prepareReadConflicts, 1);
+
+        // Stats from stashed recovery unit are still reported in curop.
+        curop->updateStorageMetricsOnRecoveryUnitStash(lk);
+        recoveryUnit2 = shard_role_details::releaseRecoveryUnit(opCtx.get(), lk);
+        shard_role_details::setRecoveryUnit(opCtx.get(), std::move(recoveryUnit1), ruState, lk);
+        curop->updateStorageMetricsOnRecoveryUnitUnstash(lk);
+        ASSERT_EQ(curop->getOperationStorageMetrics().prepareReadConflicts, 1);
+    }
+
+    {
+        // Storage metrics report cumulative stats of previously stashed recovery unit and current
+        // recovery unit.
+        shard_role_details::getRecoveryUnit(opCtx.get())
+            ->getStorageMetrics()
+            .incrementPrepareReadConflicts(2);
+        ASSERT_EQ(curop->getOperationStorageMetrics().prepareReadConflicts, 3);
+
+        // Without unstashing recovery unit metrics, stats from recoveryUnit2 are double
+        curop->updateStorageMetricsOnRecoveryUnitStash(lk);
+        recoveryUnit1 = shard_role_details::releaseRecoveryUnit(opCtx.get(), lk);
+        shard_role_details::setRecoveryUnit(opCtx.get(), std::move(recoveryUnit2), ruState, lk);
+        ASSERT_EQ(curop->getOperationStorageMetrics().prepareReadConflicts, 4);
+
+        // Only report stats from both recovery units once.
+        curop->updateStorageMetricsOnRecoveryUnitUnstash(lk);
+        ASSERT_EQ(curop->getOperationStorageMetrics().prepareReadConflicts, 3);
+    }
 }
 
 }  // namespace

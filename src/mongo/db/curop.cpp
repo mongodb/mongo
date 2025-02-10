@@ -535,9 +535,7 @@ void CurOp::updateStatsOnTransactionUnstash(ClientLock&) {
     // Store lock stats and storage metrics from the locker and recovery unit after unstashing.
     // These stats have accrued outside of this CurOp instance so we will ignore/subtract them when
     // reporting on this operation.
-    if (!_resourceStatsBase) {
-        _resourceStatsBase.emplace();
-    }
+    _initializeResourceStatsBaseIfNecessary();
     _resourceStatsBase->addForUnstash(getAdditiveResourceStats(boost::none));
 }
 
@@ -546,18 +544,22 @@ void CurOp::updateStatsOnTransactionStash(ClientLock&) {
     // and recovery unit are stashed. We take the delta of the stats before stashing and the base
     // stats which includes the snapshot of stats when it was unstashed. This stats delta on
     // stashing is added when reporting on this operation.
-    if (!_resourceStatsBase) {
-        _resourceStatsBase.emplace();
-    }
+    _initializeResourceStatsBaseIfNecessary();
     _resourceStatsBase->subtractForStash(getAdditiveResourceStats(boost::none));
 }
 
-void CurOp::updateStorageMetricsOnRecoveryUnitChange(ClientLock&) {
-    auto storageMetrics = shard_role_details::getRecoveryUnit(opCtx())->getStorageMetrics();
-    if (!storageMetrics.isEmpty()) {
-        if (!_resourceStatsBase) {
-            _resourceStatsBase.emplace();
-        }
+void CurOp::updateStorageMetricsOnRecoveryUnitUnstash(ClientLock&) {
+    if (auto storageMetrics = shard_role_details::getRecoveryUnit(opCtx())->getStorageMetrics();
+        !storageMetrics.isEmpty()) {
+        _initializeResourceStatsBaseIfNecessary();
+        _resourceStatsBase->storageMetrics += storageMetrics;
+    }
+}
+
+void CurOp::updateStorageMetricsOnRecoveryUnitStash(ClientLock&) {
+    if (auto storageMetrics = shard_role_details::getRecoveryUnit(opCtx())->getStorageMetrics();
+        !storageMetrics.isEmpty()) {
+        _initializeResourceStatsBaseIfNecessary();
         _resourceStatsBase->storageMetrics -= storageMetrics;
     }
 }

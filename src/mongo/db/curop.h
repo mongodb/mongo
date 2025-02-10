@@ -1044,10 +1044,16 @@ public:
     void updateStatsOnTransactionStash(ClientLock&);
 
     /**
+     * Captures metrics from the recovery unit when it is unstashed to the operation context to
+     * correctly ignore stats from outside this CurOp instance. Requires holding the client lock.
+     */
+    void updateStorageMetricsOnRecoveryUnitUnstash(ClientLock&);
+
+    /**
      * Captures metrics from the recovery unit that happened during this CurOp instance before a new
      * recovery unit is set to the operation. Requires holding the client lock.
      */
-    void updateStorageMetricsOnRecoveryUnitChange(ClientLock&);
+    void updateStorageMetricsOnRecoveryUnitStash(ClientLock&);
 
     /*
      * Gets the message for FailPoints used.
@@ -1203,6 +1209,12 @@ private:
      */
     AdditiveResourceStats getAdditiveResourceStats(
         const boost::optional<ExecutionAdmissionContext>& admCtx);
+
+    void _initializeResourceStatsBaseIfNecessary() {
+        if (!_resourceStatsBase) {
+            _resourceStatsBase.emplace();
+        }
+    }
 
     /**
      * Returns the time operation spends blocked waiting for locks and tickets.

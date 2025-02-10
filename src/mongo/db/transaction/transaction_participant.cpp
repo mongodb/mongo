@@ -2208,7 +2208,7 @@ void TransactionParticipant::Participant::_commitStorageTransaction(OperationCon
     // writes.
     {
         ClientLock clientLock(opCtx->getClient());
-        CurOp::get(opCtx)->updateStorageMetricsOnRecoveryUnitChange(clientLock);
+        CurOp::get(opCtx)->updateStorageMetricsOnRecoveryUnitStash(clientLock);
         shard_role_details::setRecoveryUnit(
             opCtx,
             std::unique_ptr<RecoveryUnit>(
@@ -2619,7 +2619,7 @@ void TransactionParticipant::Participant::_cleanUpTxnResourceOnOpCtx(
     // transactional settings such as a read timestamp.
     {
         ClientLock clientLock(opCtx->getClient());
-        CurOp::get(opCtx)->updateStorageMetricsOnRecoveryUnitChange(clientLock);
+        CurOp::get(opCtx)->updateStorageMetricsOnRecoveryUnitStash(clientLock);
         shard_role_details::setRecoveryUnit(
             opCtx,
             std::unique_ptr<RecoveryUnit>(
