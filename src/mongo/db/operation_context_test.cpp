@@ -202,24 +202,6 @@ TEST_F(OperationContextTest, OpCtxGroup) {
         ASSERT(opCtx.opCtx() == nullptr);
         ASSERT_TRUE(group2.isEmpty());
     }
-
-    OperationContextGroup group3;
-    OperationContextGroup group4;
-    {
-        auto serviceCtx = ServiceContext::make();
-        auto client = serviceCtx->getService()->makeClient("OperationContextTest");
-        auto opCtx1 = group3.makeOperationContext(*client);
-        auto p1 = opCtx1.opCtx();
-        auto opCtx2 = group4.take(std::move(opCtx1));
-        ASSERT_EQ(p1, opCtx2.opCtx());
-        ASSERT(opCtx1.opCtx() == nullptr);  // NOLINT(bugprone-use-after-move)
-        ASSERT_TRUE(group3.isEmpty());
-        ASSERT_FALSE(group4.isEmpty());
-        group3.interrupt(ErrorCodes::InternalError);
-        ASSERT_TRUE(opCtx2->checkForInterruptNoAssert().isOK());
-        group4.interrupt(ErrorCodes::InternalError);
-        ASSERT_FALSE(opCtx2->checkForInterruptNoAssert().isOK());
-    }
 }
 
 TEST_F(OperationContextTest, IgnoreInterruptsWorks) {

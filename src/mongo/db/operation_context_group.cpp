@@ -85,20 +85,6 @@ auto OperationContextGroup::adopt(UniqueOperationContext opCtx) -> Context {
     return Context(*cp, *this);
 }
 
-auto OperationContextGroup::take(Context ctx) -> Context {
-    if (ctx._movedFrom || &ctx._ctxGroup == this) {
-        return ctx;
-    }
-    {
-        stdx::lock_guard<stdx::mutex> lk(_lock);
-        auto it = find(ctx._ctxGroup._contexts, &ctx._opCtx);
-        _contexts.emplace_back(std::move(*it));
-        ctx._ctxGroup._contexts.erase(it);
-    }
-    ctx._movedFrom = true;
-    return Context(ctx._opCtx, *this);
-}
-
 void OperationContextGroup::interrupt(ErrorCodes::Error code) {
     invariant(code);
     stdx::lock_guard<stdx::mutex> lk(_lock);
