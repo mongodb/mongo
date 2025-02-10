@@ -33,7 +33,7 @@ parameters:
     description: "Patch id of evergreen patch to pull binaries from for testing."
 
   - key: bazel_build_tags
-    value: "--bazel-build-tag=dist_test --bazel-build-tag=mongo_library"
+    value: "--bazel-build-tag=dist_test"
     description: "Default build tags"
 
   - key: coverage_bazel_tags
