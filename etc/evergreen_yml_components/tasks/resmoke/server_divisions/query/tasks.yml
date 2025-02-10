@@ -1794,8 +1794,11 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_query_optimization",
-        "experimental",
+        "default",
         "query_correctness",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
       ]
     commands:
       - func: "do setup"
@@ -1813,14 +1816,18 @@ tasks:
         vars:
           suite: query_correctness_generated_test
           should_shuffle: false
+          resmoke_args: "--mongodSetParameters='{internalQueryFrameworkControl: trySbeEngine}'"
 
   - <<: *task_template
     name: query_correctness_generated_test_2
     tags:
       [
         "assigned_to_jira_team_server_query_optimization",
-        "experimental",
+        "default",
         "query_correctness",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
       ]
     commands:
       - func: "do setup"
@@ -1838,14 +1845,18 @@ tasks:
         vars:
           suite: query_correctness_generated_test
           should_shuffle: false
+          resmoke_args: "--mongodSetParameters='{internalQueryFrameworkControl: trySbeEngine}'"
 
   - <<: *task_template
     name: query_correctness_generated_test_3
     tags:
       [
         "assigned_to_jira_team_server_query_optimization",
-        "experimental",
+        "default",
         "query_correctness",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
       ]
     commands:
       - func: "do setup"
@@ -1863,14 +1874,18 @@ tasks:
         vars:
           suite: query_correctness_generated_test
           should_shuffle: false
+          resmoke_args: "--mongodSetParameters='{internalQueryFrameworkControl: trySbeEngine}'"
 
   - <<: *task_template
     name: query_correctness_generated_test_4
     tags:
       [
         "assigned_to_jira_team_server_query_optimization",
-        "experimental",
+        "default",
         "query_correctness",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
       ]
     commands:
       - func: "do setup"
@@ -1888,14 +1903,18 @@ tasks:
         vars:
           suite: query_correctness_generated_test
           should_shuffle: false
+          resmoke_args: "--mongodSetParameters='{internalQueryFrameworkControl: trySbeEngine}'"
 
   - <<: *task_template
     name: query_correctness_manual_test
     tags:
       [
         "assigned_to_jira_team_server_query_optimization",
-        "experimental",
+        "default",
         "query_correctness",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
       ]
     commands:
       - func: "do setup"
