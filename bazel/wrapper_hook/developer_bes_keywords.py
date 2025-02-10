@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import socket
+import sys
 
 import git
 
@@ -60,10 +61,12 @@ def write_workstation_bazelrc(args):
 
     developer_build = os.environ.get("CI") is None
     b64_cmd_line = base64.b64encode(json.dumps(args[1:]).encode()).decode()
+    normalized_os = sys.platform.replace("win32", "windows").replace("darwin", "macos")
     bazelrc_contents = f"""\
 # Generated file, do not modify
 common --bes_keywords=developerBuild={developer_build}
 common --bes_keywords=user_email={user}
+common --bes_keywords=operating_system={normalized_os}
 common --bes_keywords=engflow:BuildScmRemote={remote}
 common --bes_keywords=engflow:BuildScmBranch={branch}
 common --bes_keywords=engflow:BuildScmRevision={commit}
