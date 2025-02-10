@@ -478,13 +478,15 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
             // There may not be any endpoints if this connection is directly
             // from the proxy itself or the information isn't available.
             if (results->endpoints) {
-                const auto& sourceEndpointAddr = results->endpoints->sourceAddress;
-                const auto& dstEndpointAddr = results->endpoints->destinationAddress;
+                _proxiedSrcRemoteAddr = results->endpoints->sourceAddress;
                 _proxiedSrcEndpoint =
-                    HostAndPort(sourceEndpointAddr.getAddr(), sourceEndpointAddr.getPort());
+                    HostAndPort(_proxiedSrcRemoteAddr->getAddr(), _proxiedSrcRemoteAddr->getPort());
+
+                const auto& dstEndpointAddr = results->endpoints->destinationAddress;
                 _proxiedDstEndpoint =
                     HostAndPort(dstEndpointAddr.getAddr(), dstEndpointAddr.getPort());
             } else {
+                _proxiedSrcRemoteAddr = {};
                 _proxiedSrcEndpoint = {};
                 _proxiedDstEndpoint = {};
             }
@@ -876,7 +878,8 @@ Future<Message> CommonAsioSession::sendHTTPResponse(const BatonHandle& baton) {
 
 bool CommonAsioSession::shouldOverrideMaxConns(
     const std::vector<std::variant<CIDR, std::string>>& exemptions) const {
-    return transport::util::shouldOverrideMaxConns(remoteAddr(), localAddr(), exemptions);
+    return transport::util::shouldOverrideMaxConns(
+        getProxiedSrcRemoteAddr(), localAddr(), exemptions);
 }
 
 }  // namespace mongo::transport
