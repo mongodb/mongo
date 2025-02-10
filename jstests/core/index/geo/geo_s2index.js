@@ -175,8 +175,8 @@ assert.neq(null,
 
 {
     const created = t.getIndexes().filter((idx) => idx.hasOwnProperty("2dsphereIndexVersion"))[0];
-    assert.eq(created.finestIndexedLevel, 30, created, dumpCollection);
-    assert.eq(created.coarsestIndexedLevel, 0, created, dumpCollection);
+    assert.eq(created.finestIndexedLevel, 30, created);
+    assert.eq(created.coarsestIndexedLevel, 0, created);
 }
 
 t.drop();

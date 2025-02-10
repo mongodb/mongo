@@ -42,9 +42,12 @@ let assertChunkSizes = function(splitVec, numDocs, maxChunkSize, msg) {
         // need to be exactly a multiple of maxChunkSize.
         if (i < splitVec.length - 2) {
             // We are within one object of the correct chunk size.
-            assert.lt(Math.abs(maxChunkSize - size), avgObjSize, "A" + i);
+            assert.lt(Math.abs(maxChunkSize - size),
+                      avgObjSize,
+                      "Assertion failed",
+                      {msg: msg + "b", chunk: "A" + i});
         } else {
-            assert.gt(maxChunkSize, size, "A" + i, msg + "b");
+            assert.gt(maxChunkSize, size, "Assertion failed", {msg: msg + "b", chunk: "A" + i});
         }
     }
 };
