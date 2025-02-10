@@ -98,6 +98,17 @@ spider_monkey_dbg = rule(
 )
 
 # =========
+# include_mongot
+# =========
+
+include_mongot_provider = provider(doc = "Enable including mongot in the final binary archive from a local mongot-localdev folder.", fields = ["enabled"])
+
+include_mongot = rule(
+    implementation = lambda ctx: include_mongot_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
 # allocator
 # =========
 

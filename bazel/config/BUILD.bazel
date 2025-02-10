@@ -19,6 +19,7 @@ load(
     "fsan",
     "gcov",
     "http_client",
+    "include_mongot",
     "js_engine",
     "libunwind",
     "linker",
@@ -943,6 +944,22 @@ config_setting(
     name = "spider_monkey_dbg_enabled",
     flag_values = {
         "//bazel/config:spider_monkey_dbg": "True",
+    },
+)
+
+# --------------------------------------
+# Include MongoT options
+# --------------------------------------
+
+include_mongot(
+    name = "include_mongot",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "include_mongot_enabled",
+    flag_values = {
+        "//bazel/config:include_mongot": "True",
     },
 )
 

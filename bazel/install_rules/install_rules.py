@@ -56,7 +56,8 @@ def install(src, install_type):
                                 dest_dir = os.path.dirname(os.path.join(root, name)).replace(
                                     src, dst
                                 )
-                                os.makedirs(dest_dir)
+                                if not os.path.exists(dest_dir):
+                                    os.makedirs(dest_dir)
                                 os.link(os.path.join(root, name), os.path.join(dest_dir, name))
                     else:
                         os.link(src, dst)

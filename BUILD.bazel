@@ -4,6 +4,7 @@ load("//bazel/toolchains:mongo_toolchain.bzl", "setup_mongo_toolchain_aliases")
 load("//bazel/config:render_template.bzl", "render_template")
 load("@npm//:eslint/package_json.bzl", eslint_bin = "bin")
 load("@aspect_rules_js//js:defs.bzl", "js_library")
+load("@aspect_bazel_lib//lib:copy_to_directory.bzl", "copy_to_directory")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -142,6 +143,17 @@ mongo_install(
     ],
 )
 
+copy_to_directory(
+    name = "mongot_folder",
+    srcs = ["@mongot_localdev//:mongot_binaries"],
+    out = "mongot-localdev",
+    include_external_repositories = ["mongot_localdev"],
+    tags = [
+        "local",
+        "no-cache",
+    ],
+)
+
 mongo_install(
     name = "dist-test",
     srcs = [
@@ -158,6 +170,9 @@ mongo_install(
         "//src/third_party/wiredtiger:wt",
     ] + select({
         "@platforms//os:windows": ["@windows_sasl//:bins"],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:include_mongot_enabled": ["//:mongot_folder"],
         "//conditions:default": [],
     }),
     deps = [

@@ -46,9 +46,9 @@ http_archive(
 # aspect_rules_lint depends on aspect_bazel_lib.
 http_archive(
     name = "aspect_bazel_lib",
-    sha256 = "6d758a8f646ecee7a3e294fbe4386daafbe0e5966723009c290d493f227c390b",
-    strip_prefix = "bazel-lib-2.7.7",
-    url = "https://github.com/aspect-build/bazel-lib/releases/download/v2.7.7/bazel-lib-v2.7.7.tar.gz",
+    sha256 = "57a777c5d4d0b79ad675995ee20fc1d6d2514a1ef3000d98f5c70cf0c09458a3",
+    strip_prefix = "bazel-lib-2.13.0",
+    url = "https://github.com/bazel-contrib/bazel-lib/releases/download/v2.13.0/bazel-lib-v2.13.0.tar.gz",
 )
 
 load("@aspect_bazel_lib//lib:repositories.bzl", "aspect_bazel_lib_dependencies")
@@ -353,3 +353,16 @@ setup_pigz(
 load("//bazel/format:shfmt.bzl", "shfmt")
 
 shfmt()
+
+# This repository is normally created by db-contrib-tool or manually extracting the binaries at the proper location
+new_local_repository(
+    name = "mongot_localdev",
+    build_file_content = """
+package(default_visibility = ["//visibility:public"])
+filegroup(
+    name = "mongot_binaries",
+    srcs = glob(["**"], exclude = ["BUILD.bazel", "WORKSPACE"]),
+)
+""",
+    path = "mongot-localdev",
+)

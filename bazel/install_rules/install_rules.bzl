@@ -71,7 +71,23 @@ def check_debug(ctx, basename):
         ctx.fail("Unknown OS")
         return False
 
-def sort_file(ctx, file, install_dir, file_map):
+def declare_output(ctx, output, is_directory):
+    """Declare an output as either a file or directory
+
+    Args:
+        ctx: rule ctx
+        output: output file to declare
+        is_directory: determines if the file is a directory
+
+    Returns:
+        File object representing output
+    """
+    if is_directory:
+        return ctx.actions.declare_directory(output)
+    else:
+        return ctx.actions.declare_file(output)
+
+def sort_file(ctx, file, install_dir, file_map, is_directory):
     """Determine location a file should be installed to
 
     Args:
@@ -79,6 +95,7 @@ def sort_file(ctx, file, install_dir, file_map):
         file: file to sort
         install_dir: the directory to install to
         file_map: dict containing specific file designations
+        is_directory: determines if the file is a directory
 
     """
     _, macos_constraint, _ = get_constraints(ctx)
@@ -89,22 +106,16 @@ def sort_file(ctx, file, install_dir, file_map):
     if check_binary(ctx, basename):
         if not check_debug(ctx, basename):
             if ctx.attr.debug != "debug":
-                file_map["binaries"][file] = ctx.actions.declare_file(bin_install)
+                file_map["binaries"][file] = declare_output(ctx, bin_install, is_directory)
         elif ctx.attr.debug != "stripped":
-            if ctx.target_platform_has_constraint(macos_constraint):
-                file_map["binaries_debug"][file] = ctx.actions.declare_directory(bin_install)
-            else:
-                file_map["binaries_debug"][file] = ctx.actions.declare_file(bin_install)
+            file_map["binaries_debug"][file] = declare_output(ctx, bin_install, is_directory)
 
     elif not check_debug(ctx, basename):
         if ctx.attr.debug != "debug":
-            file_map["dynamic_libs"][file] = ctx.actions.declare_file(lib_install)
+            file_map["dynamic_libs"][file] = declare_output(ctx, lib_install, is_directory)
 
     elif ctx.attr.debug != "stripped":
-        if ctx.target_platform_has_constraint(macos_constraint):
-            file_map["dynamic_libs_debug"][file] = ctx.actions.declare_directory(lib_install)
-        else:
-            file_map["dynamic_libs_debug"][file] = ctx.actions.declare_file(lib_install)
+        file_map["dynamic_libs_debug"][file] = declare_output(ctx, lib_install, is_directory)
 
 def mongo_install_rule_impl(ctx):
     """Perform install actions
@@ -130,16 +141,18 @@ def mongo_install_rule_impl(ctx):
     # sort direct sources
     for input_bin in ctx.attr.srcs:
         for bin in input_bin.files.to_list():
-            sort_file(ctx, bin.path, install_dir, file_map)
+            sort_file(ctx, bin.path, install_dir, file_map, bin.is_directory)
 
     # sort dependency install files
     for dep in ctx.attr.deps:
+        # Create a map of filename to if its a directory, ie. { coolfolder: True, coolfile: False } as the json loses that info
+        file_directory_map = {file_dep.basename: file_dep.is_directory for file_dep in dep[DefaultInfo].files.to_list()}
         src_map = json.decode(dep[MongoInstallInfo].src_map.to_list()[0])
         files = []
         for key in src_map:
             files.extend(src_map[key])
         for file in files:
-            sort_file(ctx, file, install_dir, file_map)
+            sort_file(ctx, file, install_dir, file_map, file_directory_map[file.split("/")[-1]])
 
     # aggregate based on type of installs
     if ctx.attr.debug == "stripped":
