@@ -55,6 +55,7 @@ env.Library(
 env.Library(
     target="bucket_unpacker",
     source=[
+        "bucket_level_id_predicate_generator.cpp",
         "bucket_unpacker.cpp",
     ],
     LIBDEPS=[

@@ -569,6 +569,10 @@ last-continuous:
     ticket: SERVER-95670
   - test_file: jstests/sharding/query/owning_shard_expression.js
     ticket: SERVER-95670
+  - test_file: jstests/sharding/timeseries_query_extended_range.js
+    ticket: SERVER-73641
+  - test_file: jstests/core/timeseries/timeseries_index_partial.js
+    ticket: SERVER-73641
   suites: null
 last-lts:
   all:
@@ -1190,4 +1194,8 @@ last-lts:
     ticket: SERVER-95670
   - test_file: jstests/sharding/query/owning_shard_expression.js
     ticket: SERVER-95670
+  - test_file: jstests/sharding/timeseries_query_extended_range.js
+    ticket: SERVER-73641
+  - test_file: jstests/core/timeseries/timeseries_index_partial.js
+    ticket: SERVER-73641
   suites: null
