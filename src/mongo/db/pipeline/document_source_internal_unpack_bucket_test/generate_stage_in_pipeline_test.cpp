@@ -35,16 +35,26 @@ namespace {
 
 using InternalUnpackBucketGenerateInPipelineTest = AggregationContextFixture;
 
-TEST_F(InternalUnpackBucketGenerateInPipelineTest, EnsureStageIsGeneratedInReturnedPipeline) {
-    const auto originalPipeline = std::vector{BSON("$match" << BSON("a" << 1))};
+// Helper datatype to make it easier to write tests by specifying only the arguments of interest.
+struct RewritePipelineHelperArgs {
+    const StringData timeField = "time"_sd;
+    const boost::optional<StringData> metaField = boost::none;
+    const boost::optional<std::int32_t> bucketMaxSpanSeconds = boost::none;
+    const mongo::OptionalBool timeseriesBucketsMayHaveMixedSchemaData = {boost::none};
+    const mongo::OptionalBool timeseriesBucketingParametersHaveChanged = {boost::none};
+};
 
+// Helper function to call the factory function and ensure some basic expected truths.
+std::tuple<std::vector<BSONObj>, BSONObj> rewritePipelineHelper(
+    const RewritePipelineHelperArgs& args = {},
+    const std::vector<BSONObj>& originalPipeline = std::vector{BSON("$match" << BSON("a" << 1))}) {
     const auto alteredPipeline = DocumentSourceInternalUnpackBucket::generateStageInPipeline(
         originalPipeline,
-        "time"_sd,
-        boost::none /* metaField */,
-        boost::none /* bucketMaxSpanSeconds */,
-        {boost::none} /* timeseriesBucketsMayHaveMixedSchemaData */,
-        {boost::none} /* timeseriesBucketingParametersMayHaveChanged */);
+        args.timeField,
+        args.metaField,
+        args.bucketMaxSpanSeconds,
+        args.timeseriesBucketsMayHaveMixedSchemaData,
+        args.timeseriesBucketingParametersHaveChanged);
 
     ASSERT_EQ(alteredPipeline.size(), originalPipeline.size() + 1);
 
@@ -52,6 +62,14 @@ TEST_F(InternalUnpackBucketGenerateInPipelineTest, EnsureStageIsGeneratedInRetur
     const auto firstStage = *alteredPipeline.begin();
     ASSERT_EQ(firstStage.firstElementFieldName(),
               DocumentSourceInternalUnpackBucket::kStageNameInternal);
+
+    return {alteredPipeline,
+            firstStage[DocumentSourceInternalUnpackBucket::kStageNameInternal].Obj()};
+}
+
+TEST_F(InternalUnpackBucketGenerateInPipelineTest, EnsureStageIsGeneratedInReturnedPipeline) {
+    const auto originalPipeline = std::vector{BSON("$match" << BSON("a" << 1))};
+    const auto [alteredPipeline, _] = rewritePipelineHelper({}, originalPipeline);
 
     // The rest of the stages should be unchanged.
     for (auto oitr = originalPipeline.begin(), aitr = alteredPipeline.begin() + 1;
@@ -62,17 +80,8 @@ TEST_F(InternalUnpackBucketGenerateInPipelineTest, EnsureStageIsGeneratedInRetur
 }
 
 TEST_F(InternalUnpackBucketGenerateInPipelineTest, ValidateFields) {
-    const auto originalPipeline = std::vector{BSON("$match" << BSON("a" << 1))};
-
     {
-        const auto alteredPipeline = DocumentSourceInternalUnpackBucket::generateStageInPipeline(
-            originalPipeline,
-            "time"_sd,
-            boost::none /* metaField */,
-            boost::none /* bucketMaxSpanSeconds */,
-            {boost::none} /* timeseriesBucketsMayHaveMixedSchemaData */,
-            {boost::none} /* timeseriesBucketingParametersMayHaveChanged */);
-
+        const auto [alteredPipeline, _] = rewritePipelineHelper();
         // The first stage should be the generated $_internalUnpackBucket stage.
         const auto& firstStage = *alteredPipeline.begin();
         ASSERT_BSONOBJ_EQ(
@@ -82,14 +91,8 @@ TEST_F(InternalUnpackBucketGenerateInPipelineTest, ValidateFields) {
     }
 
     {
-        const auto alteredPipeline = DocumentSourceInternalUnpackBucket::generateStageInPipeline(
-            originalPipeline,
-            "time"_sd,
-            boost::none /* metaField */,
-            boost::none /* bucketMaxSpanSeconds */,
-            {false} /* timeseriesBucketsMayHaveMixedSchemaData */,
-            {boost::none} /* timeseriesBucketingParametersMayHaveChanged */);
-
+        const auto [alteredPipeline, _] =
+            rewritePipelineHelper({.timeseriesBucketsMayHaveMixedSchemaData = false});
         // The first stage should be the generated $_internalUnpackBucket stage.
         const auto& firstStage = *alteredPipeline.begin();
         ASSERT_BSONOBJ_EQ(
