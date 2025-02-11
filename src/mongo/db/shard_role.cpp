@@ -475,12 +475,16 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
             acquisitions.emplace_back(std::move(acquisition));
         } else {
             // It's a view.
-            auto& acquiredView =
-                txnResources.addAcquiredView({prerequisites,
-                                              std::move(acquisitionRequest.dbLock),
-                                              std::move(acquisitionRequest.collLock),
-                                              std::move(get<std::shared_ptr<const ViewDefinition>>(
-                                                  snapshotedServices.collectionPtrOrView))});
+            auto& acquiredView = txnResources.addAcquiredView(
+                {{currentAcquireCallNum,
+                  prerequisites,
+                  std::move(acquisitionRequest.dbLock),
+                  std::move(acquisitionRequest.collLock),
+                  std::move(acquisitionRequest.lockFreeReadsResources.lockFreeReadsBlock),
+                  std::move(acquisitionRequest.lockFreeReadsResources.globalLock),
+                  std::move(acquisitionRequest.acquisitionLocks)},
+                 std::move(get<std::shared_ptr<const ViewDefinition>>(
+                     snapshotedServices.collectionPtrOrView))});
 
             ViewAcquisition acquisition(txnResources, acquiredView);
             acquisitions.emplace_back(std::move(acquisition));
@@ -534,10 +538,15 @@ std::shared_ptr<const CollectionCatalog> getConsistentCatalogAndSnapshot(
 }
 
 NamespaceStringOrUUIDRequests toNamespaceStringOrUUIDs(
-    const TransactionResources::AcquiredCollections& acquiredCollections) {
+    const TransactionResources::AcquiredCollections& acquiredCollections,
+    const TransactionResources::AcquiredViews& acquiredViews) {
     NamespaceStringOrUUIDRequests requests;
     for (const auto& acquiredCollection : acquiredCollections) {
         const auto& prerequisites = acquiredCollection.prerequisites;
+        requests.emplace_back(prerequisites.nss);
+    }
+    for (const auto& acquiredView : acquiredViews) {
+        const auto& prerequisites = acquiredView.prerequisites;
         requests.emplace_back(prerequisites.nss);
     }
     return requests;
@@ -1434,11 +1443,6 @@ YieldedTransactionResources yieldTransactionResourcesFromOperationContext(Operat
                                                                           PreparedForYieldToken) {
     auto& transactionResources = TransactionResources::get(opCtx);
 
-    // Yielding view acquisitions is not supported.
-    tassert(7300502,
-            "Yielding view acquisitions is forbidden",
-            transactionResources.acquiredViews.empty());
-
     Locker::LockSnapshot lockSnapshot;
     shard_role_details::getLocker(opCtx)->saveLockStateAndUnlock(&lockSnapshot);
     transactionResources.yielded.emplace(
@@ -1456,21 +1460,24 @@ void stashTransactionResourcesFromOperationContext(OperationContext* opCtx,
 
     (void)prepareForYieldingTransactionResources(opCtx);
 
-    // Yielding view acquisitions is not supported.
-    tassert(7750701,
-            "Yielding view acquisitions is forbidden",
-            transactionResources.acquiredViews.empty());
-
     // TODO SERVER-77213: This should mostly go away once the Locker resides inside
     // TransactionResources and the underlying locks point to it instead of the opCtx.
     //
     // Release all locks acquired since we are going to yield externally and our opCtx is going to
     // be destroyed.
-    for (auto& acquisition : transactionResources.acquiredCollections) {
+    auto resetAcquisitionLocks = [](shard_role_details::AcquiredBase& acquisition) {
         acquisition.collectionLock.reset();
         acquisition.dbLock.reset();
         acquisition.globalLock.reset();
         acquisition.lockFreeReadsBlock.reset();
+    };
+
+    for (auto& acquisition : transactionResources.acquiredCollections) {
+        resetAcquisitionLocks(acquisition);
+    }
+
+    for (auto& acquisition : transactionResources.acquiredViews) {
+        resetAcquisitionLocks(acquisition);
     }
 
     auto originalState =
@@ -1518,7 +1525,8 @@ void restoreTransactionResourcesToOperationContext(
         });
 
         // Reestablish a consistent catalog snapshot (multi document transactions don't yield).
-        auto requests = toNamespaceStringOrUUIDs(transactionResources.acquiredCollections);
+        auto requests = toNamespaceStringOrUUIDs(transactionResources.acquiredCollections,
+                                                 transactionResources.acquiredViews);
         auto catalog = getConsistentCatalogAndSnapshot(opCtx, requests);
 
         // The catalog epoch changes every time a replication rollback is performed. If a rollback
@@ -1545,17 +1553,21 @@ void restoreTransactionResourcesToOperationContext(
                                  "restore");
             };
 
+            auto uassertedCollectionIsAViewAfterRestore = [&] {
+                uasserted(ErrorCodes::QueryPlanKilled,
+                          str::stream() << "Collection " << prerequisites.nss.toStringForErrorMsg()
+                                        << " is now a view after restore from yield");
+            };
+
             if (prerequisites.operationType == AcquisitionPrerequisites::OperationType::kRead) {
                 // Just reacquire the CollectionPtr. Reads don't care about placement changes
                 // because they have already established a ScopedCollectionFilter that acts as
                 // RangePreserver.
                 auto collOrView = acquireLocalCollectionOrView(opCtx, *catalog, prerequisites);
 
-                // We do not support yielding view acquisitions. Therefore it is not possible
-                // that upon restore 'acquireLocalCollectionOrView' snapshoted a view -- it
-                // would not have met the prerequisite that the collection instance is still the
-                // same as the one before yielding.
-                invariant(holds_alternative<CollectionPtr>(collOrView));
+                if (!holds_alternative<CollectionPtr>(collOrView)) {
+                    uassertedCollectionIsAViewAfterRestore();
+                }
                 if (!acquiredCollection.collectionPtr != !get<CollectionPtr>(collOrView)) {
                     uassertCollectionAppearedAfterRestore();
                 }
@@ -1573,12 +1585,10 @@ void restoreTransactionResourcesToOperationContext(
                 auto reacquiredServicesSnapshot =
                     acquireServicesSnapshot(opCtx, *catalog, prerequisites);
 
-                // We do not support yielding view acquisitions. Therefore it is not possible
-                // that upon restore 'acquireLocalCollectionOrView' snapshoted a view -- it
-                // would not have met the prerequisite that the collection instance is still the
-                // same as the one before yielding.
-                invariant(holds_alternative<CollectionPtr>(
-                    reacquiredServicesSnapshot.collectionPtrOrView));
+                if (!holds_alternative<CollectionPtr>(
+                        reacquiredServicesSnapshot.collectionPtrOrView)) {
+                    uassertedCollectionIsAViewAfterRestore();
+                }
                 if (!acquiredCollection.collectionPtr !=
                     !get<CollectionPtr>(reacquiredServicesSnapshot.collectionPtrOrView)) {
                     uassertCollectionAppearedAfterRestore();
@@ -1605,6 +1615,24 @@ void restoreTransactionResourcesToOperationContext(
                     acquiredCollection.collectionDescription->getKeyPattern());
             }
         }
+
+        for (auto& acquiredView : transactionResources.acquiredViews) {
+            const auto& prerequisites = acquiredView.prerequisites;
+            auto collOrView = acquireLocalCollectionOrView(opCtx, *catalog, prerequisites);
+
+            uassert(ErrorCodes::QueryPlanKilled,
+                    str::stream() << "Namespace '" << prerequisites.nss.toStringForErrorMsg()
+                                  << "' is no longer a view.",
+                    std::holds_alternative<std::shared_ptr<const ViewDefinition>>(collOrView));
+
+            const auto postRestoreViewDefinition =
+                get<std::shared_ptr<const ViewDefinition>>(collOrView);
+            uassert(ErrorCodes::QueryPlanKilled,
+                    str::stream() << "View definition for '"
+                                  << prerequisites.nss.toStringForErrorMsg() << "' has changed.",
+                    acquiredView.viewDefinition == postRestoreViewDefinition);
+        }
+
         removeStaleCollectionPtrReferences.dismiss();
         return catalog;
     };
@@ -1708,7 +1736,7 @@ HandleTransactionResourcesFromStasher::HandleTransactionResourcesFromStasher(
 
     // TODO SERVER-77213: This should mostly go away once the Locker resides inside
     // TransactionResources and the underlying locks point to it instead of the opCtx.
-    for (auto& acquisition : stashedResources._yieldedResources->acquiredCollections) {
+    auto restoreLocksFn = [&](shard_role_details::AcquiredBase& acquisition) {
         const auto& locks = acquisition.locks;
         bool isFromDifferentAcquireCall =
             previousAcquireCollectionCallNum != acquisition.acquireCollectionCallNum;
@@ -1748,6 +1776,28 @@ HandleTransactionResourcesFromStasher::HandleTransactionResourcesFromStasher(
         }
 
         previousAcquireCollectionCallNum = acquisition.acquireCollectionCallNum;
+    };
+
+    auto& acquiredCollections = stashedResources._yieldedResources->acquiredCollections;
+    auto& acquiredViews = stashedResources._yieldedResources->acquiredViews;
+
+    auto itAcquiredCollections = acquiredCollections.begin();
+    auto itAcquiredViews = acquiredViews.begin();
+
+    // Two-pointers approach to iterate acquiredCollections and acquiredViews in
+    // acquireCollectionCallNum order.
+    while (itAcquiredCollections != acquiredCollections.end() ||
+           itAcquiredViews != acquiredViews.end()) {
+        if (itAcquiredCollections != acquiredCollections.end() &&
+            (itAcquiredViews == acquiredViews.end() ||
+             itAcquiredCollections->acquireCollectionCallNum <=
+                 itAcquiredViews->acquireCollectionCallNum)) {
+            restoreLocksFn(*itAcquiredCollections);
+            itAcquiredCollections++;
+        } else {
+            restoreLocksFn(*itAcquiredViews);
+            itAcquiredViews++;
+        }
     }
 
     // Wait for a configured amount of time after acquiring locks if the failpoint is enabled

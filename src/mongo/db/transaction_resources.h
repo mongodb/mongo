@@ -125,7 +125,44 @@ struct AcquisitionLocks {
     LockMode collLock = MODE_NONE;
 };
 
-struct AcquiredCollection {
+struct AcquiredBase {
+    AcquiredBase(int acquireCollectionCallNum,
+                 AcquisitionPrerequisites prerequisites,
+                 std::shared_ptr<Lock::DBLock> dbLock,
+                 boost::optional<Lock::CollectionLock> collectionLock,
+                 std::shared_ptr<LockFreeReadsBlock> lockFreeReadsBlock,
+                 std::shared_ptr<Lock::GlobalLock> globalLock,
+                 AcquisitionLocks locksRequirements)
+        : acquireCollectionCallNum(acquireCollectionCallNum),
+          prerequisites(std::move(prerequisites)),
+          dbLock(std::move(dbLock)),
+          collectionLock(std::move(collectionLock)),
+          lockFreeReadsBlock(std::move(lockFreeReadsBlock)),
+          globalLock(std::move(globalLock)),
+          locks(std::move(locksRequirements)) {}
+
+    // The number containing at which acquireCollection call this acquisition was built. All
+    // acquisitions created on the same call to acquireCollection will share the same number
+    // and contain shared_ptrs to the Global/DB/Lock-free locks shared amongst them.
+    int acquireCollectionCallNum;
+
+    AcquisitionPrerequisites prerequisites;
+
+    std::shared_ptr<Lock::DBLock> dbLock;
+    boost::optional<Lock::CollectionLock> collectionLock;
+
+    std::shared_ptr<LockFreeReadsBlock> lockFreeReadsBlock;
+    std::shared_ptr<Lock::GlobalLock> globalLock;  // Only for lock-free acquisitions. Otherwise the
+                                                   // global lock is held by 'dbLock'.
+
+    AcquisitionLocks locks;
+
+    // Maintains a reference count to how many references there are to this acquisition by the
+    // CollectionAcquisition/ViewAcquisition class.
+    mutable int64_t refCount = 0;
+};
+
+struct AcquiredCollection : AcquiredBase {
     AcquiredCollection(int acquireCollectionCallNum,
                        AcquisitionPrerequisites prerequisites,
                        std::shared_ptr<Lock::DBLock> dbLock,
@@ -136,13 +173,13 @@ struct AcquiredCollection {
                        boost::optional<ScopedCollectionDescription> collectionDescription,
                        boost::optional<ScopedCollectionFilter> ownershipFilter,
                        CollectionPtr collectionPtr)
-        : acquireCollectionCallNum(acquireCollectionCallNum),
-          prerequisites(std::move(prerequisites)),
-          dbLock(std::move(dbLock)),
-          collectionLock(std::move(collectionLock)),
-          lockFreeReadsBlock(std::move(lockFreeReadsBlock)),
-          globalLock(std::move(globalLock)),
-          locks(std::move(locksRequirements)),
+        : AcquiredBase(acquireCollectionCallNum,
+                       std::move(prerequisites),
+                       std::move(dbLock),
+                       std::move(collectionLock),
+                       std::move(lockFreeReadsBlock),
+                       std::move(globalLock),
+                       std::move(locksRequirements)),
           collectionDescription(std::move(collectionDescription)),
           ownershipFilter(std::move(ownershipFilter)),
           collectionPtr(std::move(collectionPtr)),
@@ -165,22 +202,6 @@ struct AcquiredCollection {
                              boost::none,
                              std::move(collectionPtr)){};
 
-    // The number containing at which acquireCollection call this acquisition was built. All
-    // acquisitions created on the same call to acquireCollection will share the same number and
-    // contain shared_ptrs to the Global/DB/Lock-free locks shared amongst them.
-    int acquireCollectionCallNum;
-
-    AcquisitionPrerequisites prerequisites;
-
-    std::shared_ptr<Lock::DBLock> dbLock;
-    boost::optional<Lock::CollectionLock> collectionLock;
-
-    std::shared_ptr<LockFreeReadsBlock> lockFreeReadsBlock;
-    std::shared_ptr<Lock::GlobalLock> globalLock;  // Only for lock-free acquisitions. Otherwise the
-                                                   // global lock is held by 'dbLock'.
-
-    AcquisitionLocks locks;
-
     boost::optional<ScopedCollectionDescription> collectionDescription;
     boost::optional<ScopedCollectionFilter> ownershipFilter;
 
@@ -189,23 +210,10 @@ struct AcquiredCollection {
     // Indicates whether this acquisition has been invalidated after a ScopedLocalCatalogWriteFence
     // was unable to restore it on rollback.
     bool invalidated;
-
-    // Maintains a reference count to how many references there are to this acquisition by the
-    // CollectionAcquisition class.
-    mutable int64_t refCount = 0;
 };
 
-struct AcquiredView {
-    AcquisitionPrerequisites prerequisites;
-
-    std::shared_ptr<Lock::DBLock> dbLock;
-    boost::optional<Lock::CollectionLock> collectionLock;
-
+struct AcquiredView : AcquiredBase {
     std::shared_ptr<const ViewDefinition> viewDefinition;
-
-    // Maintains a reference count to how many references there are to this acquisition by the
-    // ViewAcquisition class.
-    mutable int64_t refCount = 0;
 };
 
 /**

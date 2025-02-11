@@ -198,6 +198,7 @@ void ShardRoleTest::setUp() {
 
     // Setup nssView
     createTestView(operationContext(), nssView, nssUnshardedCollection1, viewPipeline);
+    installUnshardedCollectionMetadata(operationContext(), nssView);
 }
 
 void ShardRoleTest::installDatabaseMetadata(OperationContext* opCtx,
@@ -210,7 +211,11 @@ void ShardRoleTest::installDatabaseMetadata(OperationContext* opCtx,
 
 void ShardRoleTest::installUnshardedCollectionMetadata(OperationContext* opCtx,
                                                        const NamespaceString& nss) {
-    AutoGetCollection coll(opCtx, nss, MODE_IX);
+    AutoGetCollection coll(
+        opCtx,
+        nss,
+        MODE_IX,
+        AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
     CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
         ->setFilteringMetadata(opCtx, CollectionMetadata());
 }
@@ -1497,6 +1502,109 @@ TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithoutLocks) {
                     ->isDbLockedForMode(nss.dbName(), MODE_NONE));
 }
 
+TEST_F(ShardRoleTest, YieldAndRestoreViewAcquisitionWithLocks) {
+    const auto opCtx = operationContext();
+    const auto nss = nssView;
+
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    const auto acquisition = acquireCollectionOrView(opCtx,
+                                                     {
+                                                         nss,
+                                                         placementConcern,
+                                                         repl::ReadConcernArgs(),
+                                                         AcquisitionPrerequisites::kRead,
+                                                     },
+                                                     MODE_IS);
+
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isDbLockedForMode(nss.dbName(), MODE_IS));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IS));
+
+    // Yield the resources
+    auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx);
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+
+    ASSERT_FALSE(shard_role_details::getLocker(opCtx)->isDbLockedForMode(nss.dbName(), MODE_IS));
+    ASSERT_FALSE(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IS));
+
+    // Restore the resources
+    restoreTransactionResourcesToOperationContext(opCtx, std::move(yieldedTransactionResources));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isDbLockedForMode(nss.dbName(), MODE_IS));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IS));
+
+    // Yield the resources
+    yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx);
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+
+    // Change the view definition
+    {
+        DBDirectClient client(opCtx);
+        client.dropCollection(nss);
+        createTestView(opCtx,
+                       nssView,
+                       nssUnshardedCollection1,
+                       {BSON("$match" << BSON("somethingDifferent" << 1))});
+    }
+
+    // Attempt to restore. It must fail.
+    ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
+                           opCtx, std::move(yieldedTransactionResources)),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
+}
+
+TEST_F(ShardRoleTest, YieldAndRestoreViewAcquisitionWithoutLocks) {
+    const auto opCtx = operationContext();
+    const auto nss = nssView;
+
+    PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+    const auto acquisition =
+        acquireCollectionOrViewMaybeLockFree(opCtx,
+                                             {
+                                                 nss,
+                                                 placementConcern,
+                                                 repl::ReadConcernArgs(),
+                                                 AcquisitionPrerequisites::kRead,
+                                             });
+
+    ASSERT_TRUE(acquisition.isView());
+
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isLockHeldForMode(resourceIdGlobal, MODE_IS));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isDbLockedForMode(nss.dbName(), MODE_NONE));
+
+    // Yield the resources
+    auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx);
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+
+    ASSERT_FALSE(
+        shard_role_details::getLocker(opCtx)->isLockHeldForMode(resourceIdGlobal, MODE_IS));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isDbLockedForMode(nss.dbName(), MODE_NONE));
+
+    // Restore the resources
+    restoreTransactionResourcesToOperationContext(opCtx, std::move(yieldedTransactionResources));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isLockHeldForMode(resourceIdGlobal, MODE_IS));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isDbLockedForMode(nss.dbName(), MODE_NONE));
+
+    // Yield the resources
+    yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx);
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+
+    // Change the view definition
+    {
+        DBDirectClient client(opCtx);
+        client.dropCollection(nss);
+        createTestView(opCtx,
+                       nssView,
+                       nssUnshardedCollection1,
+                       {BSON("$match" << BSON("somethingDifferent" << 1))});
+    }
+
+    // Attempt to restore. It must fail.
+    ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
+                           opCtx, std::move(yieldedTransactionResources)),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
+}
+
 TEST_F(ShardRoleTest,
        RestoreForWriteInvalidatesAcquisitionIfPlacementConcernShardVersionNoLongerMet) {
     const auto nss = nssShardedCollection1;
@@ -1892,17 +2000,6 @@ TEST_F(ShardRoleTest, RestoreForReadSucceedsEvenIfPlacementHasChanged) {
 
     // Acquisition released. Now the range is no longer in use.
     ASSERT_TRUE(ongoingQueriesCompletionFuture.isReady());
-}
-
-DEATH_TEST_REGEX_F(ShardRoleTest, YieldingViewAcquisitionIsForbidden, "Tripwire assertion") {
-    const auto acquisition =
-        acquireCollectionOrView(operationContext(),
-                                CollectionOrViewAcquisitionRequest::fromOpCtx(
-                                    operationContext(), nssView, AcquisitionPrerequisites::kWrite),
-                                MODE_IX);
-
-    ASSERT_THROWS_CODE(
-        yieldTransactionResourcesFromOperationContext(operationContext()), DBException, 7300502);
 }
 
 void ShardRoleTest::testRestoreFailsIfCollectionIsNowAView(
