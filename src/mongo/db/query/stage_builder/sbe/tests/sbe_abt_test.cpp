@@ -69,8 +69,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::stage_builder::abt {

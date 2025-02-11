@@ -39,8 +39,7 @@
 #include <immer/set_transient.hpp>
 
 #include "mongo/base/string_data.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/immutable/unordered_map.h"
 #include "mongo/util/immutable/unordered_set.h"
 #include "mongo/util/string_map.h"

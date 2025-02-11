@@ -42,8 +42,7 @@
 #include "mongo/db/commands/parse_log_component_settings.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace {
 

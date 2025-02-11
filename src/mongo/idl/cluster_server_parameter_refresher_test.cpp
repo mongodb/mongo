@@ -35,8 +35,7 @@
 #include "mongo/idl/cluster_server_parameter_refresher.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

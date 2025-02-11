@@ -48,8 +48,7 @@
 #include "mongo/idl/cluster_server_parameter_initializer.h"
 #include "mongo/idl/cluster_server_parameter_test_gen.h"
 #include "mongo/idl/cluster_server_parameter_test_util.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

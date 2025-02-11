@@ -34,12 +34,7 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/assert_that.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
-#include "mongo/unittest/matcher.h"
-#include "mongo/unittest/matcher_core.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"

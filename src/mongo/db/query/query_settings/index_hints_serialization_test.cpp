@@ -31,8 +31,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::query_settings::index_hints {

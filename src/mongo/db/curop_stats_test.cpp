@@ -35,9 +35,7 @@
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/tick_source_mock.h"
 namespace mongo {
 

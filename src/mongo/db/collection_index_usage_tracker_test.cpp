@@ -36,9 +36,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
 

@@ -30,7 +30,7 @@
 #include <iostream>
 
 #include "mongo/db/exec/sbe/sbe_unittest.h"
-#include "mongo/unittest/assert.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

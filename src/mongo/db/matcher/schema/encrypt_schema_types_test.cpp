@@ -44,9 +44,8 @@
 #include "mongo/db/matcher/schema/encrypt_schema_gen.h"
 #include "mongo/db/matcher/schema/encrypt_schema_types.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

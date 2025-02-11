@@ -49,9 +49,7 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/wildcard_test_utils.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::wildcard_planning {
 

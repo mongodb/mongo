@@ -63,10 +63,9 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/golden_test_base.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/intrusive_counter.h"
 

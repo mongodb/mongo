@@ -35,8 +35,7 @@
 #include "mongo/db/concurrency/fast_map_noalloc.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 
 namespace mongo {

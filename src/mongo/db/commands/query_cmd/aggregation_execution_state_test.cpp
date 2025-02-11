@@ -41,8 +41,7 @@
 #include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/shard_version_factory.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

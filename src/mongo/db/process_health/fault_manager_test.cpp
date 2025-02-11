@@ -31,8 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/process_health/fault_manager_test_suite.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 

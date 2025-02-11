@@ -34,7 +34,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/insert_group.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
-#include "mongo/unittest/assert.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace repl {

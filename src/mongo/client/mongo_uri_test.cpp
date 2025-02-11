@@ -52,8 +52,7 @@
 #include "mongo/client/mongo_uri.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

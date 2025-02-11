@@ -50,8 +50,7 @@
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_graph.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

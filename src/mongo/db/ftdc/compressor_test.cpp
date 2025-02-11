@@ -49,8 +49,7 @@
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/decompressor.h"
 #include "mongo/db/ftdc/ftdc_test.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

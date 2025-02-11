@@ -32,9 +32,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 

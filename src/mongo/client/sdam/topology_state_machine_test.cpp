@@ -42,8 +42,7 @@
 #include "mongo/client/sdam/server_description.h"
 #include "mongo/client/sdam/server_description_builder.h"
 #include "mongo/client/sdam/topology_description.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 
 namespace mongo::sdam {

@@ -29,9 +29,7 @@
 #include "mongo/db/pipeline/visitors/docs_needed_bounds.h"
 
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include <variant>
 

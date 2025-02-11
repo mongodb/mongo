@@ -52,8 +52,7 @@
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/shard_version_gen.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

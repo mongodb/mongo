@@ -32,8 +32,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/in_list_data.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

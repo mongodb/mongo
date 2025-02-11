@@ -56,8 +56,7 @@
 #include "mongo/executor/async_rpc_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/executor_test_util.h"
 #include "mongo/util/future.h"
 

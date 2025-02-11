@@ -41,8 +41,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/s/commands/cluster_command_test_fixture.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

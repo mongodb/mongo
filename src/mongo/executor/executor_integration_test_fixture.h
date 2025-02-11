@@ -34,7 +34,6 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
-#include "mongo/unittest/framework.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"

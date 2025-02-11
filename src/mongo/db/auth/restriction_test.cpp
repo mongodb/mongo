@@ -38,9 +38,7 @@
 #include "mongo/db/auth/restriction_mock.h"
 #include "mongo/db/auth/restriction_set.h"
 #include "mongo/transport/mock_session.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/net/sockaddr.h"
 
 namespace mongo {

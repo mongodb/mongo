@@ -29,8 +29,7 @@
 
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/db/fts/stop_words.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace fts {

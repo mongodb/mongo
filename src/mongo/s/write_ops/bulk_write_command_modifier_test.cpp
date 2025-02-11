@@ -49,9 +49,7 @@
 #include "mongo/s/index_version.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/write_ops/bulk_write_command_modifier.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

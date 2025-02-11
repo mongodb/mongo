@@ -41,8 +41,7 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/shared_buffer.h"
 

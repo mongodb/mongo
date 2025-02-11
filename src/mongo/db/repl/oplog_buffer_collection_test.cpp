@@ -58,11 +58,9 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/barrier.h"
-#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 namespace {

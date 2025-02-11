@@ -28,8 +28,7 @@
  */
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::timeseries::bucket_catalog {
 /**

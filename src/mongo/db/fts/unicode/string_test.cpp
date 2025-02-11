@@ -31,8 +31,7 @@
 
 #include "mongo/db/fts/unicode/string.h"
 #include "mongo/shell/linenoise_utf8.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep

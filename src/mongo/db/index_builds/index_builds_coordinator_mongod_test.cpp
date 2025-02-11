@@ -46,8 +46,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 

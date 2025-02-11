@@ -38,8 +38,7 @@
 #include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/exec/mutable_bson/mutable_bson_test_utils.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/safe_num.h"
 
 namespace {

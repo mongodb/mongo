@@ -35,8 +35,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/timer.h"
 

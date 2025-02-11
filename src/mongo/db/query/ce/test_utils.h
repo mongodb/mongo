@@ -36,7 +36,7 @@
 #include "mongo/db/query/stats/maxdiff_test_utils.h"
 #include "mongo/db/query/stats/rand_utils_new.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/assert.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::ce {
 

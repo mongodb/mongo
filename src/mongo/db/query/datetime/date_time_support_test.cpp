@@ -34,8 +34,7 @@
 #include <limits>
 
 #include "mongo/db/query/datetime/date_time_support.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

@@ -34,9 +34,8 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

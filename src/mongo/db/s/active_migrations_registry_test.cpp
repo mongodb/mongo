@@ -43,8 +43,7 @@
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/stdx/future.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

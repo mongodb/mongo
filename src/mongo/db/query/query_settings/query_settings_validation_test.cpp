@@ -33,7 +33,7 @@
 #include "mongo/db/query/query_settings/query_settings_utils.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/s/sharding_state.h"
-#include "mongo/unittest/assert.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/serialization_context.h"
 
 namespace mongo::query_settings {

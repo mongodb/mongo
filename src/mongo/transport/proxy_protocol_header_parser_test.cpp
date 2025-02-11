@@ -40,11 +40,7 @@
 #include <sys/un.h>
 #endif
 
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/assert_that.h"
-#include "mongo/unittest/framework.h"
-#include "mongo/unittest/matcher.h"
-#include "mongo/unittest/matcher_core.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::transport {

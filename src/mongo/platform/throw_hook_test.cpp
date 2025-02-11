@@ -31,8 +31,7 @@
 #include <string>
 
 #include "mongo/platform/throw_hook.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 

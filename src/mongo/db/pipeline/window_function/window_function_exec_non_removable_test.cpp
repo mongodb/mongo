@@ -54,7 +54,7 @@
 #include "mongo/db/pipeline/window_function/window_function_exec_non_removable.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/sort_pattern.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

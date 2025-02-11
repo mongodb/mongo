@@ -33,9 +33,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_idl.h"
 #include "mongo/idl/generic_argument_gen.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

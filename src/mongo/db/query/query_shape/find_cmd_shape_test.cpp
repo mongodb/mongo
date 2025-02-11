@@ -32,8 +32,7 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::query_shape {
 

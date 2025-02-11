@@ -45,8 +45,7 @@
 #include "mongo/db/auth/builtin_roles.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/database_name_util.h"
 
 namespace mongo {

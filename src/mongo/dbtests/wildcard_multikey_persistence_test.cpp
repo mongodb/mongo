@@ -76,10 +76,7 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
-#include "mongo/unittest/inline_auto_update.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/uuid.h"
 
@@ -181,8 +178,8 @@ protected:
     }
 
     /**
-     * Verifes that the index access method associated with 'indexName' in the collection identified
-     * by 'nss' reports 'expectedPaths' as the set of multikey paths.
+     * Verifes that the index access method associated with 'indexName' in the collection
+     * identified by 'nss' reports 'expectedPaths' as the set of multikey paths.
      */
     void assertMultikeyPathSetEquals(const OrderedPathSet& expectedPaths,
                                      const NamespaceString& nss = kDefaultNSS,
@@ -508,7 +505,8 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, DoNotRemoveMultikeyPathsOnDocDele
 
     assertIndexContentsEquals(expectedKeys);
 
-    // Now remove all documents in the collection, and verify that only the multikey paths remain.
+    // Now remove all documents in the collection, and verify that only the multikey paths
+    // remain.
     assertRemoveDocuments(docs);
 
     expectedKeys = {{fromjson("{'': 1, '': 'b'}"), kMetadataId},
@@ -624,8 +622,8 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, OnlyIndexIncludedPathsOnUpdate) {
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b", "b.d.e", "d.e.f"});
 
-    // Now update RecordId(3), adding one new field 'd.e.g' within the included 'd.e' subpath and
-    // one new field 'd.h' which lies outside all included subtrees.
+    // Now update RecordId(3), adding one new field 'd.e.g' within the included 'd.e' subpath
+    // and one new field 'd.h' which lies outside all included subtrees.
     assertUpdateDocuments({{fromjson("{_id: 3}"), fromjson("{$set: {'d.e.g': 6, 'd.h': 7}}")}});
 
     {
@@ -711,8 +709,8 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, DoNotIndexExcludedPathsOnUpdate) 
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b"});
 
-    // Now update RecordId(3), adding one new field 'd.e.g' within the excluded 'd.e' subpath and
-    // one new field 'd.h' which lies outside all excluded subtrees.
+    // Now update RecordId(3), adding one new field 'd.e.g' within the excluded 'd.e' subpath
+    // and one new field 'd.h' which lies outside all excluded subtrees.
     assertUpdateDocuments({{fromjson("{_id: 3}"), fromjson("{$set: {'d.e.g': 6, 'd.h': 7}}")}});
 
     {
@@ -723,7 +721,8 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, DoNotIndexExcludedPathsOnUpdate) 
         ASSERT_BSONOBJ_EQ(result.value(), fromjson("{_id: 3, d: {e: {f: [5], g: 6}, h: 7}}"));
     }
 
-    // The key {d: {}} is no longer present, since it will be replaced by a key for subpath 'd.h'.
+    // The key {d: {}} is no longer present, since it will be replaced by a key for subpath
+    // 'd.h'.
     expectedKeys.back() = {fromjson("{'': 'd.h', '': 7}"), RecordId(3)};
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b"});
@@ -785,7 +784,8 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, DoNotMarkAsMultikeyIfNoArraysInBu
         {"{a: 1, b: {c: 2, d: {e: 3}}}", "{a: 2, b: {c: 3, d: {e: 4}}}", "{d: {e: {f: 5}}}"});
     assertSetupEnvironment(false, docs, fromjson("{'$**': 1}"));
 
-    // Verify that the data keys are present in the expected order, and the index is NOT multikey.
+    // Verify that the data keys are present in the expected order, and the index is NOT
+    // multikey.
     const bool expectIndexIsMultikey = false;
     std::vector<IndexKeyEntry> expectedKeys = {{fromjson("{'': 'a', '': 1}"), RecordId(1)},
                                                {fromjson("{'': 'a', '': 2}"), RecordId(2)},
@@ -805,7 +805,8 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, DoNotMarkAsMultikeyIfNoArraysInBa
         {"{a: 1, b: {c: 2, d: {e: 3}}}", "{a: 2, b: {c: 3, d: {e: 4}}}", "{d: {e: {f: 5}}}"});
     assertSetupEnvironment(true, docs, fromjson("{'$**': 1}"));
 
-    // Verify that the data keys are present in the expected order, and the index is NOT multikey.
+    // Verify that the data keys are present in the expected order, and the index is NOT
+    // multikey.
     const bool expectIndexIsMultikey = false;
     std::vector<IndexKeyEntry> expectedKeys = {{fromjson("{'': 'a', '': 1}"), RecordId(1)},
                                                {fromjson("{'': 'a', '': 2}"), RecordId(2)},
@@ -825,7 +826,8 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, IndexShouldBecomeMultikeyIfArrayI
         {"{a: 1, b: {c: 2, d: {e: 3}}}", "{a: 2, b: {c: 3, d: {e: 4}}}", "{d: {e: {f: 5}}}"});
     assertSetupEnvironment(false, docs, fromjson("{'$**': 1}"));
 
-    // Verify that the data keys are present in the expected order, and the index is NOT multikey.
+    // Verify that the data keys are present in the expected order, and the index is NOT
+    // multikey.
     bool expectIndexIsMultikey = false;
     std::vector<IndexKeyEntry> expectedKeys = {{fromjson("{'': 'a', '': 1}"), RecordId(1)},
                                                {fromjson("{'': 'a', '': 2}"), RecordId(2)},

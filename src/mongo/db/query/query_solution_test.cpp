@@ -59,8 +59,7 @@
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/query/wildcard_test_utils.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 

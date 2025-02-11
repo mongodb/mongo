@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 #include "mongo/crypto/libbsonvalue.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include <bson/bson.h>
 
 namespace mongo {

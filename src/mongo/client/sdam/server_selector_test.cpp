@@ -49,8 +49,7 @@
 #include "mongo/client/sdam/topology_state_machine.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/wire_version.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/system_clock_source.h"
 

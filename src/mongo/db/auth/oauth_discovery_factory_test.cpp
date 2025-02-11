@@ -36,8 +36,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/oauth_discovery_factory.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/http_client_mock.h"
 

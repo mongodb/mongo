@@ -39,7 +39,7 @@
 #include "mongo/db/exec/mutable_bson/const_element.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/exec/mutable_bson/mutable_bson_test_utils.h"
-#include "mongo/unittest/assert.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace mutablebson {

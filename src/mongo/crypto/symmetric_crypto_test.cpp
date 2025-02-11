@@ -52,8 +52,7 @@
 #include "mongo/crypto/block_packer.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/crypto/symmetric_key.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
 

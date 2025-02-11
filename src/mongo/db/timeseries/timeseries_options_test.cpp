@@ -37,8 +37,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/timeseries/timeseries_options.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
 

@@ -52,9 +52,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

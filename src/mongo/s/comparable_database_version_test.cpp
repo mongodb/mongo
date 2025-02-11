@@ -37,8 +37,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/database_version.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

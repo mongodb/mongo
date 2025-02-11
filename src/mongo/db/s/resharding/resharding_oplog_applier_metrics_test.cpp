@@ -40,8 +40,7 @@
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_test_fixture.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/uuid.h"
 

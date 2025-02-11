@@ -92,9 +92,8 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

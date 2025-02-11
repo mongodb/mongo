@@ -38,10 +38,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-#include "mongo/unittest/assert_that.h"
-#include "mongo/unittest/framework.h"
-#include "mongo/unittest/matcher.h"
-#include "mongo/unittest/matcher_core.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {

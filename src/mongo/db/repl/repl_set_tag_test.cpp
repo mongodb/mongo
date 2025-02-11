@@ -29,8 +29,7 @@
 
 #include "mongo/db/repl/repl_set_tag.h"
 
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace repl {

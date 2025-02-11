@@ -34,8 +34,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/exec/recordid_deduplicator.h"
 #include "mongo/db/pipeline/spilling/spilling_test_fixture.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 using namespace mongo;
 

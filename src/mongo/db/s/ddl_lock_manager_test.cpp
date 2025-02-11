@@ -39,7 +39,7 @@
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/s/database_version.h"
-#include "mongo/unittest/assert.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

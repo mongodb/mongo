@@ -36,9 +36,8 @@
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
 
 namespace {

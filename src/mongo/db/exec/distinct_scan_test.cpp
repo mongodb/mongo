@@ -38,7 +38,7 @@
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/shard_version_factory.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

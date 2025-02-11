@@ -38,7 +38,6 @@
 #include "mongo/transport/grpc/mock_wire_version_provider.h"
 #include "mongo/transport/grpc/test_fixtures.h"
 #include "mongo/transport/test_fixtures.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/notification.h"

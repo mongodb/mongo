@@ -30,7 +30,7 @@
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/session/session_catalog_test.h"
 #include "mongo/db/transaction/transaction_participant.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/tick_source_mock.h"
 
 namespace mongo {

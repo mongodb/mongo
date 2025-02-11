@@ -45,9 +45,7 @@
 #include "mongo/executor/async_rpc_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/rpc/topology_version_gen.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo::async_rpc {

@@ -34,8 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/s/catalog/type_mongos.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
 namespace {

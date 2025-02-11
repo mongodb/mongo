@@ -30,7 +30,6 @@
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/server_options.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/options_parser/environment.h"

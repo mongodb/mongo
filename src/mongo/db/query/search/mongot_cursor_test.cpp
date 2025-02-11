@@ -37,10 +37,8 @@
 #include "mongo/executor/task_executor_cursor.h"
 #include "mongo/executor/task_executor_cursor_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {

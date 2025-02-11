@@ -35,8 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

@@ -45,8 +45,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/stacktrace_libunwind_test_functions.h"
 #include "mongo/util/stacktrace_test_helpers.h"
 

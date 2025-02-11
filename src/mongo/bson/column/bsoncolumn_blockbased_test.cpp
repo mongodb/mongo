@@ -31,8 +31,7 @@
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/bson/json.h"
 
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace bsoncolumn {

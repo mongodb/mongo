@@ -41,9 +41,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/s/query/exec/router_stage_mock.h"
 #include "mongo/s/query/exec/router_stage_skip.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {

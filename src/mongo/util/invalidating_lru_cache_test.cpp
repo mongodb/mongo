@@ -40,8 +40,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/invalidating_lru_cache.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

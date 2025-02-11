@@ -40,8 +40,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {

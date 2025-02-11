@@ -52,7 +52,7 @@
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::sbe {
 class MkObjStageTest : public PlanStageTestFixture {

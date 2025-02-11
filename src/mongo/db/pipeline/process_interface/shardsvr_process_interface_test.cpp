@@ -49,9 +49,7 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/s/query/exec/sharded_agg_test_fixture.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

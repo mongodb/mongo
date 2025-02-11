@@ -40,9 +40,7 @@
 #include "mongo/db/update/delta_executor.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update_index_data.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

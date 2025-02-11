@@ -28,8 +28,7 @@
  */
 
 #include "mongo/db/pipeline/spilling/spilling_stats.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

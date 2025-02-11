@@ -40,7 +40,7 @@
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/matcher/doc_validation_error_test.h"
 #include "mongo/db/matcher/expression_type.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

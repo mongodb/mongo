@@ -59,8 +59,7 @@
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo::sbe {

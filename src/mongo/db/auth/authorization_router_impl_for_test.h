@@ -28,7 +28,7 @@
  */
 
 #include "mongo/db/auth/authorization_router_impl.h"
-#include "mongo/unittest/assert.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 

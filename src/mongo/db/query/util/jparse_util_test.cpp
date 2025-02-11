@@ -31,7 +31,6 @@
 
 #include "mongo/bson/bson_validate.h"
 #include "mongo/db/query/util/jparse_util.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

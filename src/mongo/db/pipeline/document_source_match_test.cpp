@@ -54,9 +54,8 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

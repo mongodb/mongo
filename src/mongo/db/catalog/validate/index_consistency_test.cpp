@@ -35,8 +35,7 @@
 #include "mongo/db/catalog/validate/validate_gen.h"
 #include "mongo/db/catalog/validate/validate_options.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

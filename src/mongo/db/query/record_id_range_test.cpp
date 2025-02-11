@@ -32,8 +32,7 @@
 #include "mongo/db/query/record_id_range.h"
 
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace {
 

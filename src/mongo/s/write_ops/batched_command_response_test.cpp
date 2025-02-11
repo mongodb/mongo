@@ -47,9 +47,7 @@
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

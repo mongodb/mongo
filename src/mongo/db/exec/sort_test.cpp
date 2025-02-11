@@ -56,8 +56,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 

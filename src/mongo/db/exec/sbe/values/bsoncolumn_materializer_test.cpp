@@ -32,8 +32,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/values/bsoncolumn_materializer.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::sbe::bsoncolumn {
 namespace {

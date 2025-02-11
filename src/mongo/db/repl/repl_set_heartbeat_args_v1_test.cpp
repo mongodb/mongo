@@ -31,8 +31,7 @@
 #include <memory>
 #include <ostream>
 
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "repl_set_heartbeat_args_v1.h"
 
 namespace mongo {

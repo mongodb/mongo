@@ -41,9 +41,8 @@
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/unittest/assert_that.h"
-#include "mongo/unittest/framework.h"
 #include "mongo/unittest/golden_test.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::sbe {
 

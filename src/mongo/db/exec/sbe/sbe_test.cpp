@@ -52,8 +52,8 @@
 #include "mongo/db/exec/sbe/vm/vm_printer.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/golden_test.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/represent_as.h"
 
 namespace mongo::sbe {

@@ -50,9 +50,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

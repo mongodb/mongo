@@ -36,8 +36,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/orphan_chunk_skipper.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

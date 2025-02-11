@@ -44,8 +44,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/process_interface/standalone_process_interface.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 

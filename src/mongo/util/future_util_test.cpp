@@ -42,11 +42,10 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/future_util.h"
 
 namespace mongo {

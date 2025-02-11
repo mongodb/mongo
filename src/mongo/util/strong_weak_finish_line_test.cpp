@@ -30,8 +30,7 @@
 #include <memory>
 
 #include "mongo/base/string_data.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/strong_weak_finish_line.h"
 
 namespace mongo {

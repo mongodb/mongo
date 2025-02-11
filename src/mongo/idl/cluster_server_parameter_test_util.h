@@ -53,7 +53,6 @@
 #include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/idl/cluster_server_parameter_test_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

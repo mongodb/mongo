@@ -44,9 +44,8 @@
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/barrier.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

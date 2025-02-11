@@ -46,8 +46,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/db/geo/shapes.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 // Wrap a BSON object to a BSON element.
 #define BSON_ELT(bson) BSON("" << (bson)).firstElement()

@@ -44,8 +44,7 @@
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/resharding/common_types_gen.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

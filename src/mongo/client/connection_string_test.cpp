@@ -31,8 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

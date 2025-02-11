@@ -35,7 +35,7 @@
 #include "mongo/executor/network_interface_integration_fixture.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

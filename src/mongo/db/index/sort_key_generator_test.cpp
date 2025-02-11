@@ -43,9 +43,8 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {

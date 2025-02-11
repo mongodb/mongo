@@ -35,11 +35,7 @@
 #include <ostream>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/assert_that.h"
-#include "mongo/unittest/framework.h"
-#include "mongo/unittest/matcher.h"
-#include "mongo/unittest/matcher_core.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
 

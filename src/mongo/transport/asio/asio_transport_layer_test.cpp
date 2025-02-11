@@ -58,8 +58,6 @@
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/transport/transport_options_gen.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/assert_that.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"

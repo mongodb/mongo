@@ -30,7 +30,7 @@
 #include "expression_context.h"
 #include "mongo/bson/json.h"
 
-#include "mongo/unittest/assert.h"
+#include "mongo/unittest/unittest.h"
 
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_rank_fusion.h"

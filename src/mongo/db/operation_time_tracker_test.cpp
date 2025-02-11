@@ -31,8 +31,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_time_tracker.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

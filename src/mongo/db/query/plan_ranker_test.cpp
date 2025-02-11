@@ -44,8 +44,7 @@
 #include "mongo/db/query/plan_ranker_util.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 using namespace mongo;
 

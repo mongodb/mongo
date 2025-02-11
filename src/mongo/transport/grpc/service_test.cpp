@@ -50,7 +50,6 @@
 #include "mongo/transport/grpc/test_fixtures.h"
 #include "mongo/transport/grpc/util.h"
 #include "mongo/transport/grpc/wire_version_provider.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"

@@ -61,7 +61,7 @@
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
-#include "mongo/unittest/assert.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/md5.h"
 #include "mongo/util/time_support.h"
 

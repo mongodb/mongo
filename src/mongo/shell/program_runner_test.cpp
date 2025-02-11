@@ -32,8 +32,7 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/shell/program_runner.h"
 
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::shell_utils {
 

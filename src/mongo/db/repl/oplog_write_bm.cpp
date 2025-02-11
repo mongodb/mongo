@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/unittest/assert.h"
+#include "mongo/unittest/unittest.h"
 #include <benchmark/benchmark.h>
 #include <chrono>
 #include <cstddef>

@@ -38,9 +38,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/logv2/log_debug.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

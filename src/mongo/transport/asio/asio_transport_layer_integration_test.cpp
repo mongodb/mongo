@@ -41,10 +41,9 @@
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/transport_layer_integration_test_fixture.h"
 #include "mongo/transport/transport_layer_manager.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/log_test.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 

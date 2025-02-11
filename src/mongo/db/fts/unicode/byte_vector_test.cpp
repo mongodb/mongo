@@ -34,8 +34,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/fts/unicode/byte_vector.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 #ifdef MONGO_HAVE_FAST_BYTE_VECTOR
 namespace mongo {

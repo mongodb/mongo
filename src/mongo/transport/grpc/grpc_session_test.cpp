@@ -37,7 +37,6 @@
 #include "mongo/transport/grpc/test_fixtures.h"
 #include "mongo/transport/grpc/util.h"
 #include "mongo/transport/test_fixtures.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"

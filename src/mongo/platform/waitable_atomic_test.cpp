@@ -39,9 +39,8 @@
 #include "mongo/platform/random.h"
 #include "mongo/platform/waitable_atomic.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
 #include "mongo/unittest/join_thread.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 

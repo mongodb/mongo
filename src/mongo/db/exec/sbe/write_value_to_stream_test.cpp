@@ -47,8 +47,7 @@
 #include "mongo/db/exec/sbe/util/print_options.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/datetime/date_time_support.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
 
 constexpr char kStringShort[] = "this is a short string!";

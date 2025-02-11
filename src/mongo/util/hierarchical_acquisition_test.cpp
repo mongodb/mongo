@@ -31,8 +31,7 @@
 #include <string>
 
 #include "mongo/platform/source_location.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {

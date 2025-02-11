@@ -52,9 +52,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/fle/encrypted_predicate_test_fixtures.h"
 #include "mongo/db/query/fle/equality_predicate.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 

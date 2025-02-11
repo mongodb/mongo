@@ -47,8 +47,7 @@
 #include "mongo/idl/server_parameter_with_storage_test.h"
 #include "mongo/idl/server_parameter_with_storage_test_gen.h"
 #include "mongo/idl/server_parameter_with_storage_test_structs_gen.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

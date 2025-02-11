@@ -29,8 +29,8 @@
 
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace repl {

@@ -40,8 +40,7 @@
 #include "mongo/transport/session_manager_common_mock.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/transport/transport_layer_mock.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::transport {
 namespace {

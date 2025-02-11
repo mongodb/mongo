@@ -39,8 +39,7 @@
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/database_version.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 

@@ -32,8 +32,7 @@
 #include <vector>
 
 #include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep
 
 using namespace mongo;

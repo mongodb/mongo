@@ -30,8 +30,7 @@
 #include <memory>
 
 #include "mongo/scripting/mozjs/implscope.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 

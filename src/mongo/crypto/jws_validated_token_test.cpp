@@ -37,7 +37,7 @@
 #include "mongo/crypto/jwk_manager_test_framework.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/base64.h"
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL

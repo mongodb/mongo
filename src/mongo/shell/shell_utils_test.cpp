@@ -35,9 +35,8 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

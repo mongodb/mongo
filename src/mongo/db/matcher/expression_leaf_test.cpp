@@ -44,9 +44,8 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

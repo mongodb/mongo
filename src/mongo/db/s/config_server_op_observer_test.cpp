@@ -39,9 +39,8 @@
 #include "mongo/db/s/config_server_op_observer.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/s/cluster_identity_loader.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

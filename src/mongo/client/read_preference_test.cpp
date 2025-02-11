@@ -36,8 +36,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 
 namespace {

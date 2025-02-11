@@ -47,8 +47,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/member_id.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
 

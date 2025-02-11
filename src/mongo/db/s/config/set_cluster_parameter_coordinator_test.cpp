@@ -29,8 +29,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/s/config/set_cluster_parameter_coordinator.h"
 #include "mongo/db/s/config/set_cluster_parameter_coordinator_document_gen.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

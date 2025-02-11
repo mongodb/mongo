@@ -36,9 +36,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/snapshot.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 

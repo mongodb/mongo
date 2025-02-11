@@ -44,8 +44,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 

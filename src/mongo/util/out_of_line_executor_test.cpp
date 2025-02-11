@@ -33,9 +33,8 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/executor_test_util.h"
 #include "mongo/util/out_of_line_executor.h"
 

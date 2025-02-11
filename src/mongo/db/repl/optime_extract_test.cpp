@@ -38,8 +38,7 @@
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 using namespace mongo;
 

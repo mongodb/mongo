@@ -33,8 +33,7 @@
 #include <fmt/format.h>
 
 #include "mongo/idl/command_generic_argument.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace test {

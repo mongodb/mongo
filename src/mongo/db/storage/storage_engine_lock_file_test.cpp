@@ -43,9 +43,8 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/platform/process_id.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"
+#include "mongo/unittest/unittest.h"
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>

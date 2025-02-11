@@ -44,9 +44,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/inline_auto_update.h"
-#include "mongo/unittest/test_info.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

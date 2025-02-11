@@ -33,8 +33,7 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/json.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

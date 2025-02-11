@@ -54,8 +54,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/mock_session.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/net/socket_utils.h"
 

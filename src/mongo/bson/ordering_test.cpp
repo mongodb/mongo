@@ -29,7 +29,6 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/ordering.h"
-#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

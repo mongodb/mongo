@@ -41,9 +41,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/testing_proctor.h"
 

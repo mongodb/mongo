@@ -40,7 +40,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/platform/waitable_atomic.h"
-#include "mongo/unittest/assert.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

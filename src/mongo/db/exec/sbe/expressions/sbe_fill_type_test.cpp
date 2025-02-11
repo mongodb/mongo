@@ -32,7 +32,6 @@
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/unittest/framework.h"
 
 namespace mongo::sbe {
 

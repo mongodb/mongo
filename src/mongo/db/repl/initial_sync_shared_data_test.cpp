@@ -33,8 +33,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/repl/initial_sync_shared_data.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {

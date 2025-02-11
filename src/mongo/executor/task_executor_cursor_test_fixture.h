@@ -39,7 +39,7 @@
 #include "mongo/executor/pinned_connection_task_executor_test_fixture.h"
 #include "mongo/executor/task_executor_cursor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/unittest/assert.h"
+#include "mongo/unittest/unittest.h"
 
 /**
  * Defines two test fixtures for task executor cursors: one with pinned cursors and the other with

@@ -28,8 +28,7 @@
  */
 
 #include "mongo/db/update_index_data.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 

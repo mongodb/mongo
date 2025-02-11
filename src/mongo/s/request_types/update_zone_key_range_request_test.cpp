@@ -32,8 +32,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
 #include "mongo/s/request_types/update_zone_key_range_gen.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

@@ -30,8 +30,7 @@
 #include <limits>
 
 #include "mongo/bson/util/builder.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

@@ -41,8 +41,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/operation_latency_histogram.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

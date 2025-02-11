@@ -32,7 +32,6 @@
 #include <memory>
 
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/unittest/framework.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/duration.h"
@@ -40,7 +39,7 @@
 #include "mongo/util/packaged_task.h"
 #include "mongo/util/tick_source_mock.h"
 
-#include "mongo/unittest/assert.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

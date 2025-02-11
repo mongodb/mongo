@@ -39,9 +39,8 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/json.h"
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

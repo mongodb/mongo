@@ -39,8 +39,7 @@
 #include "mongo/db/query/interval.h"
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

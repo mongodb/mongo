@@ -38,8 +38,7 @@
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/db/query/stage_builder/sbe/type_checker.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::stage_builder {
 namespace {

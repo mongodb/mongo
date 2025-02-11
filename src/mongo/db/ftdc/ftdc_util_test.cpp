@@ -33,8 +33,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/ftdc/util.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 

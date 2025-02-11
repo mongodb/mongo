@@ -30,8 +30,7 @@
 #include <string>
 
 #include "mongo/db/query/util/string_util.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::query_string_util {
 

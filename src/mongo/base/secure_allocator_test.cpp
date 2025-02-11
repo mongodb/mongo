@@ -31,8 +31,7 @@
 #include <cstdint>
 
 #include "mongo/base/secure_allocator.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/processinfo.h"
 
 namespace mongo {

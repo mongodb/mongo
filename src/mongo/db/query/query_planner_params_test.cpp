@@ -63,8 +63,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {

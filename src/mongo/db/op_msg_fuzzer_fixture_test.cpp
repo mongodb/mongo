@@ -33,8 +33,7 @@
 #include "mongo/db/op_msg_fuzzer_fixture.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

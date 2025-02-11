@@ -39,8 +39,7 @@
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
 #include "mongo/db/query/stage_builder/sbe/value_lifetime.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::stage_builder {
 namespace {

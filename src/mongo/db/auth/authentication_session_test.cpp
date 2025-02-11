@@ -40,8 +40,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_name.h"
 
 namespace mongo {

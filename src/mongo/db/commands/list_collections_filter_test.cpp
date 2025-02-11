@@ -33,8 +33,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace {
 

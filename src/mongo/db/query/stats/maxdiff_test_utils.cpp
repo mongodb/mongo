@@ -49,8 +49,8 @@
 #include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/db/query/stats/max_diff.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/temp_dir.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::stats {
 

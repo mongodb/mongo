@@ -32,9 +32,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/rewrite_expr.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

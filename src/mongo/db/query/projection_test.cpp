@@ -54,8 +54,7 @@
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/query_test_service_context.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 

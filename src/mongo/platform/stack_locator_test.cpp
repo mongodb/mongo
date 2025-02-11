@@ -38,8 +38,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/platform/stack_locator.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

@@ -40,8 +40,7 @@
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/platform/source_location.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/inline_auto_update.h"
+#include "mongo/unittest/unittest.h"
 
 
 namespace mongo::stage_builder::abt {

@@ -46,9 +46,7 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/sharding_test_fixture_common.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

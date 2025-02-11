@@ -43,9 +43,8 @@
 #include "mongo/db/concurrency/lock_stats.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

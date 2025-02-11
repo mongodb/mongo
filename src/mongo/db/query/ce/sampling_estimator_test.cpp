@@ -40,9 +40,8 @@
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::ce {
 

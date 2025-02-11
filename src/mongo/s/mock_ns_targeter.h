@@ -40,7 +40,6 @@
 #include "mongo/s/ns_targeter.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

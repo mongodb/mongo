@@ -29,8 +29,7 @@
 
 #include <tomcrypt.h>
 
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/md5.h"
 
 namespace mongo {

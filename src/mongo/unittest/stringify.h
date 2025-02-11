@@ -29,9 +29,6 @@
 
 #pragma once
 
-// IWYU pragma: private, include "mongo/unittest/unittest.h"
-// IWYU pragma: friend "mongo/unittest/.*"
-
 #include <algorithm>
 #include <array>
 #include <boost/optional.hpp>

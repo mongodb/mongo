@@ -33,8 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace {
 

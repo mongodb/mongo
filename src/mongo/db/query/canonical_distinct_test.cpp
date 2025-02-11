@@ -51,9 +51,7 @@
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

@@ -39,8 +39,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 

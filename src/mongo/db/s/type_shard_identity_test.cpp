@@ -35,9 +35,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/s/type_shard_identity.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

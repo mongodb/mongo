@@ -36,8 +36,7 @@
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/db/commands/query_cmd/map_reduce_gen.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

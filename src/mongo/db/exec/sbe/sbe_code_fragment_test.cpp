@@ -39,8 +39,8 @@
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/exec/sbe/vm/vm_printer.h"
 #include "mongo/db/exec/sbe/vm/vm_types.h"
-#include "mongo/unittest/framework.h"
 #include "mongo/unittest/golden_test.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::sbe {
 

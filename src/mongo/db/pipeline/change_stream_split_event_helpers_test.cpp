@@ -41,8 +41,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/resume_token.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 

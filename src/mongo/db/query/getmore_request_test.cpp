@@ -43,9 +43,7 @@
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace {
 

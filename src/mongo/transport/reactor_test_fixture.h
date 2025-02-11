@@ -32,7 +32,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/transport/transport_layer.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/notification.h"

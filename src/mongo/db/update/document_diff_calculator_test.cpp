@@ -42,10 +42,8 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/update/document_diff_calculator.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

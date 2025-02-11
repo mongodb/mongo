@@ -34,7 +34,7 @@
 #include "mongo/db/query/distinct_command_gen.h"
 #include "mongo/db/query/query_stats/distinct_key.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include <memory>
 #include <ostream>
 

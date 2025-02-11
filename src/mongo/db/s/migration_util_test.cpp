@@ -46,8 +46,7 @@
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/vector_clock.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

@@ -62,7 +62,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/transport/service_executor.h"
-#include "mongo/unittest/assert.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"

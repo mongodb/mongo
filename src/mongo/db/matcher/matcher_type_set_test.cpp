@@ -39,8 +39,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

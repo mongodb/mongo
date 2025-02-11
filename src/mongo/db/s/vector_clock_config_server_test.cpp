@@ -49,9 +49,8 @@
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/s/grid.h"
 #include "mongo/transport/session.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {

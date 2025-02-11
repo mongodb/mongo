@@ -40,8 +40,7 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

@@ -31,8 +31,7 @@
 #include <sys/prctl.h>
 #endif
 
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 

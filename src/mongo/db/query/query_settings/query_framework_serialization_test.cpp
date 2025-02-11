@@ -31,8 +31,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::query_settings::query_framework {

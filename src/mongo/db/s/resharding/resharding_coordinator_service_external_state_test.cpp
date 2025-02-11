@@ -38,7 +38,7 @@
 #include "mongo/executor/mock_async_rpc.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/s/shard_version_factory.h"
-#include "mongo/unittest/assert.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/future_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

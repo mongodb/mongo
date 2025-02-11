@@ -42,8 +42,7 @@
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/string_data.h"
 #include "mongo/platform/endian.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

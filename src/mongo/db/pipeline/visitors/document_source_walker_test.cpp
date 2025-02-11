@@ -42,9 +42,8 @@
 #include "mongo/db/pipeline/visitors/document_source_visitor_registry.h"
 #include "mongo/db/pipeline/visitors/document_source_walker.h"
 #include "mongo/db/query/util/make_data_structure.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 

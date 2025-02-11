@@ -39,9 +39,7 @@
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_literals.h"
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
-#include "mongo/unittest/inline_auto_update.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 
 

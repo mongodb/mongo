@@ -38,9 +38,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {

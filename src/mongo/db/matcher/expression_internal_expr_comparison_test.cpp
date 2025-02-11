@@ -41,9 +41,8 @@
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

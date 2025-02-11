@@ -35,9 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/resharding/common_types_gen.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
