@@ -4301,35 +4301,38 @@ ConstDataRange binDataToCDR(BSONElement element) {
     return ConstDataRange(data, data + len);
 }
 
-bool hasQueryType(const EncryptedField& field, QueryTypeEnum queryType) {
+bool hasQueryTypeMatching(const EncryptedField& field, const QueryTypeMatchFn& matcher) {
     if (!field.getQueries()) {
         return false;
     }
-
     return visit(OverloadedVisitor{
-                     [&](QueryTypeConfig query) { return (query.getQueryType() == queryType); },
+                     [&](QueryTypeConfig query) { return matcher(query.getQueryType()); },
                      [&](std::vector<QueryTypeConfig> queries) {
                          return std::any_of(
                              queries.cbegin(), queries.cend(), [&](const QueryTypeConfig& qtc) {
-                                 return qtc.getQueryType() == queryType;
+                                 return matcher(qtc.getQueryType());
                              });
                      }},
                  field.getQueries().get());
 }
-
-bool hasQueryType(const EncryptedFieldConfig& config, QueryTypeEnum queryType) {
-
+bool hasQueryTypeMatching(const EncryptedFieldConfig& config, const QueryTypeMatchFn& matcher) {
     for (const auto& field : config.getFields()) {
-
         if (field.getQueries().has_value()) {
-            bool hasQuery = hasQueryType(field, queryType);
+            bool hasQuery = hasQueryTypeMatching(field, matcher);
             if (hasQuery) {
                 return hasQuery;
             }
         }
     }
-
     return false;
+}
+
+bool hasQueryType(const EncryptedField& field, QueryTypeEnum queryType) {
+    return hasQueryTypeMatching(field, [queryType](QueryTypeEnum qt) { return qt == queryType; });
+}
+
+bool hasQueryType(const EncryptedFieldConfig& config, QueryTypeEnum queryType) {
+    return hasQueryTypeMatching(config, [queryType](QueryTypeEnum qt) { return qt == queryType; });
 }
 
 QueryTypeConfig getQueryType(const EncryptedField& field, QueryTypeEnum queryType) {

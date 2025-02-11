@@ -125,6 +125,9 @@ mongo_cc_library(
         "dist/src/mongocrypt-status.c",
         "dist/src/mongocrypt-traverse-util.c",
         "dist/src/mongocrypt-util.c",
+        "dist/src/unicode/case-fold-map.c",
+        "dist/src/unicode/diacritic-fold-map.c",
+        "dist/src/unicode/fold.c",
     ] + CRYPTO_SRCS + select({
         "@platforms//os:windows": [
             "dist/src/os_win/os_dll.c",

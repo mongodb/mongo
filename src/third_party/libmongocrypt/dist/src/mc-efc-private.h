@@ -46,6 +46,7 @@ typedef struct _mc_EncryptedField_t {
  * for the server IDL definition of EncryptedFieldConfig. */
 typedef struct {
     mc_EncryptedField_t *fields;
+    uint8_t str_encode_version;
 } mc_EncryptedFieldConfig_t;
 
 /* mc_EncryptedFieldConfig_parse parses a subset of the fields from @efc_bson

@@ -1331,6 +1331,10 @@ std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedBinData(const Value
 boost::optional<EncryptedBinDataType> getEncryptedBinDataType(const Value& value);
 boost::optional<EncryptedBinDataType> getEncryptedBinDataType(const BSONElement& elt);
 
+using QueryTypeMatchFn = std::function<bool(QueryTypeEnum)>;
+bool hasQueryTypeMatching(const EncryptedField& field, const QueryTypeMatchFn& matcher);
+bool hasQueryTypeMatching(const EncryptedFieldConfig& config, const QueryTypeMatchFn& matcher);
+
 bool hasQueryType(const EncryptedField& field, QueryTypeEnum queryType);
 bool hasQueryType(const EncryptedFieldConfig& config, QueryTypeEnum queryType);
 

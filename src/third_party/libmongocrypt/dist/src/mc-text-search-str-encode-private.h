@@ -40,11 +40,6 @@ typedef struct {
 // Run StrEncode with the given spec.
 mc_str_encode_sets_t *mc_text_search_str_encode(const mc_FLE2TextSearchInsertSpec_t *spec, mongocrypt_status_t *status);
 
-// TODO MONGOCRYPT-759 This helper only exists to test folded_len != unfolded_len; make the test actually use folding
-mc_str_encode_sets_t *mc_text_search_str_encode_helper(const mc_FLE2TextSearchInsertSpec_t *spec,
-                                                       uint32_t unfolded_len,
-                                                       mongocrypt_status_t *status);
-
 void mc_str_encode_sets_destroy(mc_str_encode_sets_t *sets);
 
 #endif /* MONGOCRYPT_TEXT_SEARCH_STR_ENCODE_PRIVATE_H */

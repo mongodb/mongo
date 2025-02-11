@@ -49,6 +49,10 @@
 
 #define MONGOCRYPT_DATA_AND_LEN(x) ((uint8_t *)x), (sizeof(x) / sizeof((x)[0]) - 1)
 
+#define LATEST_STR_ENCODE_VERSION 1
+
+#define MIN_STR_ENCODE_VERSION 1
+
 /* TODO: Move these to mongocrypt-log-private.h? */
 const char *tmp_json(const bson_t *bson);
 

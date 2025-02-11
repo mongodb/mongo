@@ -22,12 +22,13 @@
 #include "mongocrypt-ctx-private.h"
 #include "mongocrypt-key-broker-private.h"
 #include "mongocrypt-marking-private.h"
+#include "mongocrypt-private.h"
 #include "mongocrypt-traverse-util-private.h"
 #include "mongocrypt-util-private.h" // mc_iter_document_as_bson
 #include "mongocrypt.h"
 
 /* _fle2_append_encryptedFieldConfig copies encryptedFieldConfig and applies
- * default state collection names for escCollection, and ecocCollection if required. */
+ * default state collection names for escCollection and ecocCollection, and default strEncodeVersion, if required. */
 static bool _fle2_append_encryptedFieldConfig(const mongocrypt_ctx_t *ctx,
                                               bson_t *dst,
                                               bson_t *encryptedFieldConfig,
@@ -36,7 +37,9 @@ static bool _fle2_append_encryptedFieldConfig(const mongocrypt_ctx_t *ctx,
     bson_iter_t iter;
     bool has_escCollection = false;
     bool has_ecocCollection = false;
+    bool has_strEncodeVersion = false;
 
+    BSON_ASSERT_PARAM(ctx);
     BSON_ASSERT_PARAM(dst);
     BSON_ASSERT_PARAM(encryptedFieldConfig);
     BSON_ASSERT_PARAM(target_coll);
@@ -52,6 +55,9 @@ static bool _fle2_append_encryptedFieldConfig(const mongocrypt_ctx_t *ctx,
         }
         if (strcmp(bson_iter_key(&iter), "ecocCollection") == 0) {
             has_ecocCollection = true;
+        }
+        if (strcmp(bson_iter_key(&iter), "strEncodeVersion") == 0) {
+            has_strEncodeVersion = true;
         }
         if (!BSON_APPEND_VALUE(dst, bson_iter_key(&iter), bson_iter_value(&iter))) {
             CLIENT_ERR("unable to append field: %s", bson_iter_key(&iter));
@@ -76,6 +82,18 @@ static bool _fle2_append_encryptedFieldConfig(const mongocrypt_ctx_t *ctx,
             return false;
         }
         bson_free(default_ecocCollection);
+    }
+    if (!has_strEncodeVersion) {
+        _mongocrypt_ctx_encrypt_t *ectx = (_mongocrypt_ctx_encrypt_t *)ctx;
+        // Check str_encode_version on the EncryptedFieldConfig object to see whether we should append or not. 0
+        // indicates that there was no text search query in the EFC and the strEncodeVersion was not set on the EFC; in
+        // this case, we should not append strEncodeVersion, as mongocryptd/mongod may not understand it.
+        if (ectx->efc.str_encode_version != 0) {
+            if (!BSON_APPEND_INT32(dst, "strEncodeVersion", (int32_t)ectx->efc.str_encode_version)) {
+                CLIENT_ERR("unable to append strEncodeVersion");
+                return false;
+            }
+        }
     }
     return true;
 }
@@ -426,8 +444,7 @@ static bool _set_schema_from_collinfo(mongocrypt_ctx_t *ctx, bson_t *collinfo) {
                     return _mongocrypt_ctx_fail_w_msg(ctx, "malformed $jsonSchema");
                 }
                 found_jsonschema = true;
-            } else {
-                ectx->collinfo_has_siblings = true;
+                break;
             }
         }
     }
@@ -792,23 +809,8 @@ static bool _mongo_feed_markings(mongocrypt_ctx_t *ctx, mongocrypt_binary_t *in)
 
     if (bson_iter_init_find(&iter, &as_bson, "schemaRequiresEncryption") && !bson_iter_as_bool(&iter)) {
         /* TODO: update cache: this schema does not require encryption. */
-
-        /* If using a local schema, warn if there are no encrypted fields. */
-        if (ectx->used_local_schema) {
-            _mongocrypt_log(&ctx->crypt->log,
-                            MONGOCRYPT_LOG_LEVEL_WARNING,
-                            "local schema used but does not have encryption specifiers");
-        }
+        // Schema does not require encryption. Skip copying the `result`.
         return true;
-    } else {
-        /* if the schema requires encryption, but has sibling validators, error.
-         */
-        if (ectx->collinfo_has_siblings) {
-            return _mongocrypt_ctx_fail_w_msg(ctx,
-                                              "schema requires encryption, "
-                                              "but collection JSON schema "
-                                              "validator has siblings");
-        }
     }
 
     if (bson_iter_init_find(&iter, &as_bson, "hasEncryptedPlaceholders") && !bson_iter_as_bool(&iter)) {
@@ -1449,6 +1451,100 @@ fail:
     return ok;
 }
 
+/*
+ * Checks the "encryptedFields.strEncodeVersion" field for "create" commands for validity, and sets it to the default if
+ * it does not exist.
+ */
+static bool _fle2_fixup_encryptedFields_strEncodeVersion(const char *cmd_name,
+                                                         bson_t *cmd /* in and out */,
+                                                         const mc_EncryptedFieldConfig_t *efc,
+                                                         mongocrypt_status_t *status) {
+    BSON_ASSERT_PARAM(cmd_name);
+    BSON_ASSERT_PARAM(cmd);
+    BSON_ASSERT_PARAM(efc);
+
+    if (0 == strcmp(cmd_name, "create")) {
+        bson_iter_t ef_iter;
+        if (!bson_iter_init_find(&ef_iter, cmd, "encryptedFields")) {
+            // No encryptedFields, nothing to check or fix
+            return true;
+        }
+        if (!BSON_ITER_HOLDS_DOCUMENT(&ef_iter)) {
+            CLIENT_ERR("_fle2_fixup_encryptedFields_strEncodeVersion: Expected encryptedFields to be type obj, got: %s",
+                       mc_bson_type_to_string(bson_iter_type(&ef_iter)));
+            return false;
+        }
+        bson_iter_t sev_iter;
+        if (!bson_iter_recurse(&ef_iter, &sev_iter)) {
+            CLIENT_ERR("_fle2_fixup_encryptedFields_strEncodeVersion: Failed to recurse bson_iter");
+            return false;
+        }
+        if (!bson_iter_find(&sev_iter, "strEncodeVersion")) {
+            if (efc->str_encode_version == 0) {
+                // Unset StrEncodeVersion matches the EFC, nothing to fix.
+                return true;
+            }
+
+            // No strEncodeVersion and the EFC has a nonzero strEncodeVersion, add it.
+            // Initialize the new cmd object from the old one, excluding encryptedFields.
+            bson_t fixed = BSON_INITIALIZER;
+            bson_copy_to_excluding_noinit(cmd, &fixed, "encryptedFields", NULL);
+
+            // Recurse the original encryptedFields and copy everything over.
+            bson_iter_t copy_iter;
+            if (!bson_iter_recurse(&ef_iter, &copy_iter)) {
+                CLIENT_ERR("_fle2_fixup_encryptedFields_strEncodeVersion: Failed to recurse bson_iter");
+                goto fail;
+            }
+            bson_t fixed_ef;
+            if (!BSON_APPEND_DOCUMENT_BEGIN(&fixed, "encryptedFields", &fixed_ef)) {
+                CLIENT_ERR("_fle2_fixup_encryptedFields_strEncodeVersion: Failed to start appending encryptedFields");
+                goto fail;
+            }
+            while (bson_iter_next(&copy_iter)) {
+                if (!bson_append_iter(&fixed_ef, NULL, 0, &copy_iter)) {
+                    CLIENT_ERR("_fle2_fixup_encryptedFields_strEncodeVersion: Failed to copy element");
+                    goto fail;
+                }
+            }
+
+            // Add the EFC's strEncodeVersion to encryptedFields.
+            if (!BSON_APPEND_INT32(&fixed_ef, "strEncodeVersion", efc->str_encode_version)) {
+                CLIENT_ERR("_fle2_fixup_encryptedFields_strEncodeVersion: Failed to append strEncodeVersion");
+                goto fail;
+            }
+            if (!bson_append_document_end(&fixed, &fixed_ef)) {
+                CLIENT_ERR("_fle2_fixup_encryptedFields_strEncodeVersion: Failed to finish appending encryptedFields");
+                goto fail;
+            }
+
+            bson_destroy(cmd);
+            if (!bson_steal(cmd, &fixed)) {
+                CLIENT_ERR("_fle2_fixup_encryptedFields_strEncodeVersion: Failed to steal BSON");
+                goto fail;
+            }
+            return true;
+        fail:
+            bson_destroy(&fixed);
+            return false;
+        } else {
+            // Check strEncodeVersion for match against EFC
+            if (!BSON_ITER_HOLDS_INT32(&sev_iter)) {
+                CLIENT_ERR("expected 'strEncodeVersion' to be type int32, got: %d", bson_iter_type(&sev_iter));
+                return false;
+            }
+            int32_t version = bson_iter_int32(&sev_iter);
+            if (version != efc->str_encode_version) {
+                CLIENT_ERR("'strEncodeVersion' of %d does not match efc->str_encode_version of %d",
+                           version,
+                           efc->str_encode_version);
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 /* Process a call to mongocrypt_ctx_finalize when an encryptedFieldConfig is
  * associated with the command. */
 static bool _fle2_finalize(mongocrypt_ctx_t *ctx, mongocrypt_binary_t *out) {
@@ -1517,6 +1613,13 @@ static bool _fle2_finalize(mongocrypt_ctx_t *ctx, mongocrypt_binary_t *out) {
                                                         &ectx->efc,
                                                         ctx->status);
     if (!result.ok) {
+        bson_destroy(&converted);
+        return _mongocrypt_ctx_fail(ctx);
+    }
+
+    /* If this is a create command, append the encryptedFields.strEncodeVersion field if it's necessary. If the field
+     * already exists, check it against the EFC for correctness. */
+    if (!_fle2_fixup_encryptedFields_strEncodeVersion(command_name, &converted, &ectx->efc, ctx->status)) {
         bson_destroy(&converted);
         return _mongocrypt_ctx_fail(ctx);
     }

@@ -194,3 +194,9 @@ structs:
                 description: "Array of encrypted fields"
                 type: array<EncryptedField>
                 stability: unstable
+            strEncodeVersion:
+                description: "Version of StrEncode. Should be included if any field has a text search queryType."
+                type: int
+                optional: true
+                stability: unstable
+                validator: { gt: 0 }

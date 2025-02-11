@@ -18,6 +18,7 @@
 #include "mc-text-search-str-encode-private.h"
 #include "mongocrypt-buffer-private.h"
 #include "mongocrypt.h"
+#include "unicode/fold.h"
 #include <bson/bson.h>
 #include <stdint.h>
 
@@ -170,23 +171,47 @@ static uint32_t mc_get_utf8_codepoint_length(const char *buf, uint32_t len) {
     return codepoint_len;
 }
 
-// TODO MONGOCRYPT-759 This helper only exists to test folded len != unfolded len; make the test actually use folding
-mc_str_encode_sets_t *mc_text_search_str_encode_helper(const mc_FLE2TextSearchInsertSpec_t *spec,
-                                                       uint32_t unfolded_codepoint_len,
-                                                       mongocrypt_status_t *status) {
+mc_str_encode_sets_t *mc_text_search_str_encode(const mc_FLE2TextSearchInsertSpec_t *spec,
+                                                mongocrypt_status_t *status) {
     BSON_ASSERT_PARAM(spec);
+    if (spec->len > MAX_ENCODE_BYTE_LEN) {
+        CLIENT_ERR("StrEncode: String passed in was too long: String was %u bytes, but max is %u bytes",
+                   spec->len,
+                   MAX_ENCODE_BYTE_LEN);
+        return NULL;
+    }
 
     if (!bson_utf8_validate(spec->v, spec->len, false /* allow_null */)) {
         CLIENT_ERR("StrEncode: String passed in was not valid UTF-8");
         return NULL;
     }
+    uint32_t unfolded_codepoint_len = mc_get_utf8_codepoint_length(spec->v, spec->len);
+    if (unfolded_codepoint_len == 0) {
+        // Empty string: We set unfolded length to 1 so that we generate fake tokens.
+        unfolded_codepoint_len = 1;
+    }
 
-    const char *folded_str = spec->v;
-    uint32_t folded_str_bytes_len = spec->len;
+    mc_utf8_string_with_bad_char_t *base_string;
+    if (spec->casef || spec->diacf) {
+        char *folded_str;
+        size_t folded_str_bytes_len;
+        if (!unicode_fold(spec->v,
+                          spec->len,
+                          (spec->casef * kUnicodeFoldToLower) | (spec->diacf * kUnicodeFoldRemoveDiacritics),
+                          &folded_str,
+                          &folded_str_bytes_len,
+                          status)) {
+            return NULL;
+        }
+        base_string = mc_utf8_string_with_bad_char_from_buffer(folded_str, (uint32_t)folded_str_bytes_len);
+        bson_free(folded_str);
+    } else {
+        base_string = mc_utf8_string_with_bad_char_from_buffer(spec->v, spec->len);
+    }
 
     mc_str_encode_sets_t *sets = bson_malloc0(sizeof(mc_str_encode_sets_t));
     // Base string is the folded string plus the 0xFF character
-    sets->base_string = mc_utf8_string_with_bad_char_from_buffer(folded_str, folded_str_bytes_len);
+    sets->base_string = base_string;
     if (spec->suffix.set) {
         sets->suffix_set = generate_suffix_tree(sets->base_string, unfolded_codepoint_len, &spec->suffix.value);
     }
@@ -204,31 +229,9 @@ mc_str_encode_sets_t *mc_text_search_str_encode_helper(const mc_FLE2TextSearchIn
         }
         sets->substring_set = generate_substring_tree(sets->base_string, unfolded_codepoint_len, &spec->substr.value);
     }
-    // Exact string is always the first len characters of the base string
-    _mongocrypt_buffer_from_data(&sets->exact, sets->base_string->buf.data, folded_str_bytes_len);
+    // Exact string is always equal to the base string up until the bad character
+    _mongocrypt_buffer_from_data(&sets->exact, sets->base_string->buf.data, (uint32_t)sets->base_string->buf.len - 1);
     return sets;
-}
-
-mc_str_encode_sets_t *mc_text_search_str_encode(const mc_FLE2TextSearchInsertSpec_t *spec,
-                                                mongocrypt_status_t *status) {
-    BSON_ASSERT_PARAM(spec);
-    if (spec->len > MAX_ENCODE_BYTE_LEN) {
-        CLIENT_ERR("StrEncode: String passed in was too long: String was %u bytes, but max is %u bytes",
-                   spec->len,
-                   MAX_ENCODE_BYTE_LEN);
-        return NULL;
-    }
-    // TODO MONGOCRYPT-759 Implement and use CFold
-    if (!bson_utf8_validate(spec->v, spec->len, false /* allow_null */)) {
-        CLIENT_ERR("StrEncode: String passed in was not valid UTF-8");
-        return NULL;
-    }
-    uint32_t unfolded_codepoint_len = mc_get_utf8_codepoint_length(spec->v, spec->len);
-    if (unfolded_codepoint_len == 0) {
-        // Empty string: We set unfolded length to 1 so that we generate fake tokens.
-        unfolded_codepoint_len = 1;
-    }
-    return mc_text_search_str_encode_helper(spec, unfolded_codepoint_len, status);
 }
 
 void mc_str_encode_sets_destroy(mc_str_encode_sets_t *sets) {

@@ -19,6 +19,7 @@
 #include "mlib/str.h"
 #include "mongocrypt-private.h"
 #include "mongocrypt-util-private.h" // mc_iter_document_as_bson
+#include <stdint.h>
 
 static bool _parse_query_type_string(const char *queryType, supported_query_type_flags *out) {
     BSON_ASSERT_PARAM(queryType);
@@ -175,13 +176,14 @@ bool mc_EncryptedFieldConfig_parse(mc_EncryptedFieldConfig_t *efc,
         return false;
     }
     if (!BSON_ITER_HOLDS_ARRAY(&iter)) {
-        CLIENT_ERR("expected 'fields' to be type array, got: %d", bson_iter_type(&iter));
+        CLIENT_ERR("expected 'fields' to be type array, got: %s", mc_bson_type_to_string(bson_iter_type(&iter)));
         return false;
     }
     if (!bson_iter_recurse(&iter, &iter)) {
         CLIENT_ERR("unable to recurse into encrypted_field_config 'fields'");
         return false;
     }
+    supported_query_type_flags all_supported_queries = SUPPORTS_NO_QUERIES;
     while (bson_iter_next(&iter)) {
         bson_t field;
         if (!mc_iter_document_as_bson(&iter, &field, status)) {
@@ -190,6 +192,32 @@ bool mc_EncryptedFieldConfig_parse(mc_EncryptedFieldConfig_t *efc,
         if (!_parse_field(efc, &field, status, use_range_v2)) {
             return false;
         }
+        // The first element of efc->fields contains the newly parsed field.
+        all_supported_queries |= efc->fields->supported_queries;
+    }
+
+    if (!bson_iter_init_find(&iter, efc_bson, "strEncodeVersion")) {
+        if (all_supported_queries
+            & (SUPPORTS_SUBSTRING_PREVIEW_QUERIES | SUPPORTS_SUFFIX_PREVIEW_QUERIES
+               | SUPPORTS_PREFIX_PREVIEW_QUERIES)) {
+            // Has at least one text search query type, set to latest by default.
+            efc->str_encode_version = LATEST_STR_ENCODE_VERSION;
+        } else {
+            // Set to 0 to indicate no text search, and thus no strEncodeVersion needed.
+            efc->str_encode_version = 0;
+        }
+    } else {
+        if (!BSON_ITER_HOLDS_INT32(&iter)) {
+            CLIENT_ERR("expected 'strEncodeVersion' to be type int32, got: %s",
+                       mc_bson_type_to_string(bson_iter_type(&iter)));
+            return false;
+        }
+        int32_t version = bson_iter_int32(&iter);
+        if (version > LATEST_STR_ENCODE_VERSION || version < MIN_STR_ENCODE_VERSION) {
+            CLIENT_ERR("'strEncodeVersion' of %" PRId32 " is not supported", version);
+            return false;
+        }
+        efc->str_encode_version = (uint8_t)version;
     }
     return true;
 }
