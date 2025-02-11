@@ -225,18 +225,18 @@ public:
         runTestWithReactor([](ReactorHandle reactor, Atomic<bool>&, Notification<void>* shutdown) {
             auto timer = reactor->makeTimer();
 
-            auto pf1 = makePromiseFuture<void>();
-            timer->waitUntil(Date_t::now() + Seconds(1)).getAsync([&](Status s) {
-                std::move(pf1.promise).setFrom(s);
+            LOGV2(10075001, "Setting first timer");
+            auto fut1 = timer->waitUntil(Date_t::now() + Seconds(60)).tapAll([&](Status s) {
+                LOGV2(10075003, "First timer finished", "status"_attr = s);
             });
 
-            auto pf2 = makePromiseFuture<void>();
-            timer->waitUntil(Date_t::now() + Seconds(1)).getAsync([&](Status s) {
-                std::move(pf2.promise).setFrom(s);
+            LOGV2(10075002, "Resetting timer");
+            auto fut2 = timer->waitUntil(Date_t::now() + Milliseconds(250)).tapAll([&](Status s) {
+                LOGV2(10075004, "Second timer finished", "status"_attr = s);
             });
 
-            ASSERT_EQ(std::move(pf1.future).getNoThrow().code(), ErrorCodes::CallbackCanceled);
-            ASSERT_OK(std::move(pf2.future).getNoThrow());
+            ASSERT_EQ(fut1.getNoThrow().code(), ErrorCodes::CallbackCanceled);
+            ASSERT_OK(fut2.getNoThrow());
 
             reactor->stop();
             shutdown->get();
@@ -286,3 +286,5 @@ public:
 };
 
 }  // namespace mongo::transport
+
+#undef MONGO_LOGV2_DEFAULT_COMPONENT
