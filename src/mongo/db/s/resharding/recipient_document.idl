@@ -93,8 +93,7 @@ structs:
                 optional: true
                 description:  "The timestamp for the snapshot read while cloning from the donors."
             skipCloningAndApplying:
-                type: bool
-                optional: true
+                type: optionalBool
                 description: "Whether this recipient can skip cloning documents and
                               fetching/applying oplog entries because it is not going to own any
                               chunks for the collection after resharding."

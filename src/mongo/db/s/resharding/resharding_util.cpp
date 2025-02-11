@@ -554,7 +554,7 @@ void validatePerformVerification(boost::optional<bool> performVerification) {
 
 void validatePerformVerification(bool performVerification) {
     uassert(ErrorCodes::InvalidOptions,
-            str::stream() << "Cannot specify '"
+            str::stream() << "Cannot set '"
                           << CommonReshardingMetadata::kPerformVerificationFieldName
                           << "' to true when featureFlagReshardingVerification is not enabled",
             !performVerification ||

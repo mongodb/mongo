@@ -374,15 +374,16 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
     recipientDoc.setMetrics(std::move(metrics));
 
     recipientDoc.setCommonReshardingMetadata(std::move(commonMetadata));
-    const bool skipCloningAndApplying =
-        resharding::gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        !metadata.currentShardHasAnyChunks();
-    recipientDoc.setSkipCloningAndApplying(skipCloningAndApplying);
 
-    recipientDoc.setStoreOplogFetcherProgress(
-        resharding::gFeatureFlagReshardingStoreOplogFetcherProgress.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+    if (resharding::gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        !metadata.currentShardHasAnyChunks()) {
+        recipientDoc.setSkipCloningAndApplying(true);
+    }
+    if (resharding::gFeatureFlagReshardingStoreOplogFetcherProgress.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        recipientDoc.setStoreOplogFetcherProgress(true);
+    }
 
     recipientDoc.setOplogBatchTaskCount(recipientFields->getOplogBatchTaskCount());
 

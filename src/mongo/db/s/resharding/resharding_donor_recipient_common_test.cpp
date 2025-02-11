@@ -354,8 +354,12 @@ private:
 
 struct DonorFieldsValidator {
     void validate(ReshardingDonorDocument doc) {
+        // 'performVerification' should only be set if it is specified.
         if (performVerification) {
             ASSERT_EQ(doc.getPerformVerification(), *performVerification);
+        } else {
+            ASSERT_FALSE(doc.getPerformVerification().has_value());
+            ASSERT_EQ(doc.getPerformVerification(), false);
         }
     }
 
@@ -364,19 +368,31 @@ struct DonorFieldsValidator {
 
 struct RecipientFieldsValidator {
     void validate(ReshardingRecipientDocument doc) {
+        // 'skipCloningAndApplying' should only be set if it is true.
         if (skipCloningAndApplying) {
-            ASSERT_EQ(doc.getSkipCloningAndApplying(), *skipCloningAndApplying);
+            ASSERT_EQ(doc.getSkipCloningAndApplying(), skipCloningAndApplying);
+        } else {
+            ASSERT_FALSE(doc.getSkipCloningAndApplying().has_value());
+            ASSERT_EQ(doc.getSkipCloningAndApplying(), false);
         }
+        // 'storeOplogFetcherProgress' should only be set if it is true.
         if (storeOplogFetcherProgress) {
-            ASSERT_EQ(doc.getStoreOplogFetcherProgress(), *storeOplogFetcherProgress);
+            ASSERT_EQ(doc.getStoreOplogFetcherProgress(), storeOplogFetcherProgress);
+        } else {
+            ASSERT_FALSE(doc.getStoreOplogFetcherProgress().has_value());
+            ASSERT_EQ(doc.getStoreOplogFetcherProgress(), false);
         }
+        // 'performVerification' should only be set if it is specified.
         if (performVerification) {
             ASSERT_EQ(doc.getPerformVerification(), *performVerification);
+        } else {
+            ASSERT_FALSE(doc.getPerformVerification().has_value());
+            ASSERT_EQ(doc.getPerformVerification(), false);
         }
     }
 
-    boost::optional<bool> skipCloningAndApplying;
-    boost::optional<bool> storeOplogFetcherProgress;
+    bool skipCloningAndApplying;
+    bool storeOplogFetcherProgress;
     boost::optional<bool> performVerification;
 };
 
@@ -834,17 +850,35 @@ TEST_F(ReshardingDonorRecipientCommonTest,
                            false /* expectDonorStateMachine */);
 }
 
-TEST_F(ReshardingDonorRecipientCommonTest, ProcessDonorFieldsPerformVerificationUnspecified) {
+TEST_F(ReshardingDonorRecipientCommonTest,
+       ProcessDonorFieldsPerformVerificationUnspecified_FeatureFlagEnabled) {
+    RAIIServerParameterControllerForTest verificationFeatureFlagController(
+        "featureFlagReshardingVerification", true);
     auto performVerification = boost::none;
+
     testProcessDonorFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
                            kOtherShard.getShardId() /* primaryShard */,
                            performVerification,
                            true /* expectDonorStateMachine */,
-                           DonorFieldsValidator{.performVerification = false});
+                           DonorFieldsValidator{});
+}
+
+TEST_F(ReshardingDonorRecipientCommonTest,
+       ProcessDonorFieldsPerformVerificationUnspecified_FeatureFlagDisabled) {
+    RAIIServerParameterControllerForTest verificationFeatureFlagController(
+        "featureFlagReshardingVerification", false);
+    auto performVerification = boost::none;
+
+    testProcessDonorFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
+                           kOtherShard.getShardId() /* primaryShard */,
+                           performVerification,
+                           true /* expectDonorStateMachine */,
+                           DonorFieldsValidator{});
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest, ProcessDonorFieldsNotPerformVerification) {
     bool performVerification = false;
+
     testProcessDonorFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
                            kOtherShard.getShardId() /* primaryShard */,
                            performVerification,
@@ -856,8 +890,8 @@ TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessDonorFieldsPerformVerification_FeatureFlagEnabled) {
     RAIIServerParameterControllerForTest verificationFeatureFlagController(
         "featureFlagReshardingVerification", true);
-
     bool performVerification = true;
+
     testProcessDonorFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
                            kOtherShard.getShardId() /* primaryShard */,
                            performVerification,
@@ -869,8 +903,8 @@ TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessDonorFieldsPerformVerification_FeatureFlagDisabled) {
     RAIIServerParameterControllerForTest verificationFeatureFlagController(
         "featureFlagReshardingVerification", false);
-
     bool performVerification = true;
+
     ASSERT_THROWS_CODE(testProcessDonorFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
                                               kOtherShard.getShardId() /* primaryShard */,
                                               performVerification,
@@ -935,17 +969,35 @@ TEST_F(ReshardingDonorRecipientCommonTest,
                                RecipientFieldsValidator{.skipCloningAndApplying = false});
 }
 
-TEST_F(ReshardingDonorRecipientCommonTest, ProcessRecipientFieldsPerformVerificationUnspecified) {
-    auto performVerification = boost::none;
+TEST_F(ReshardingDonorRecipientCommonTest,
+       ProcessRecipientFieldsPerformVerificationUnspecified_FeatureFlagEnabled) {
+    RAIIServerParameterControllerForTest verificationFeatureFlagController(
+        "featureFlagReshardingVerification", true);
+    boost::optional<bool> performVerification = boost::none;
+
     testProcessRecipientFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
                                kOtherShard.getShardId() /* primaryShard */,
                                performVerification,
                                true /* expectRecipientStateMachine */,
-                               RecipientFieldsValidator{.performVerification = false});
+                               RecipientFieldsValidator{});
+}
+
+TEST_F(ReshardingDonorRecipientCommonTest,
+       ProcessRecipientFieldsPerformVerificationUnspecified_FeatureFlagDisabled) {
+    RAIIServerParameterControllerForTest verificationFeatureFlagController(
+        "featureFlagReshardingVerification", false);
+    auto performVerification = boost::none;
+
+    testProcessRecipientFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
+                               kOtherShard.getShardId() /* primaryShard */,
+                               performVerification,
+                               true /* expectRecipientStateMachine */,
+                               RecipientFieldsValidator{});
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest, ProcessRecipientFieldsNotPerformVerification) {
     bool performVerification = false;
+
     testProcessRecipientFields(
         kThisShard.getShardId() /* shardThatChunkExistsOn*/,
         kOtherShard.getShardId() /* primaryShard */,
