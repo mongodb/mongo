@@ -46,11 +46,59 @@ ExecutorFuture<void> RemoveShardCommitCoordinator::_runImpl(
             [this, executor = executor, anchor = shared_from_this()] {
                 _joinMigrationsAndCheckRangeDeletions();
             }))
-        .then([this] {
+        .then(_buildPhaseHandler(Phase::kStopDDLsAndCleanupData,
+                                 [this, executor = executor, anchor = shared_from_this()] {
+                                     const auto opCtxHolder = cc().makeOperationContext();
+                                     auto* opCtx = opCtxHolder.get();
+                                     getForwardableOpMetadata().setOn(opCtx);
+
+                                     _stopDDLOperations(opCtx);
+                                     _checkShardIsEmpty(opCtx);
+                                     if (_doc.getIsTransitionToDedicated()) {
+                                         _dropLocalCollections(opCtx);
+                                     }
+                                 }))
+        .then([this, anchor = shared_from_this()] {
+            const auto opCtxHolder = cc().makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            getForwardableOpMetadata().setOn(opCtx);
+
+            // TODO (SERVER-97827): remove once there is an actual phase which unblocks the
+            // coordinators along the happy path.
+            topology_change_helpers::unblockDDLCoordinators(opCtx);
+
             uasserted(ErrorCodes::NotImplemented,
                       "The removeShardCommit coordinator is still incomplete.");
         })
-        .onError([](const Status& status) { return status; });
+        .onError([this, anchor = shared_from_this()](const Status& status) {
+            if (_doc.getPhase() < Phase::kStopDDLsAndCleanupData) {
+                return status;
+            }
+
+            const auto opCtxHolder = cc().makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            getForwardableOpMetadata().setOn(opCtx);
+
+            if (!_isRetriableErrorForDDLCoordinator(status)) {
+                triggerCleanup(opCtx, status);
+            }
+
+            return status;
+        });
+}
+
+ExecutorFuture<void> RemoveShardCommitCoordinator::_cleanupOnAbort(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token,
+    const Status& status) noexcept {
+    return ExecutorFuture<void>(**executor)
+        .then([this, token, executor = executor, status, anchor = shared_from_this()] {
+            const auto opCtxHolder = cc().makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            getForwardableOpMetadata().setOn(opCtx);
+
+            topology_change_helpers::unblockDDLCoordinators(opCtx);
+        });
 }
 
 void RemoveShardCommitCoordinator::_joinMigrationsAndCheckRangeDeletions() {
@@ -73,6 +121,46 @@ void RemoveShardCommitCoordinator::_joinMigrationsAndCheckRangeDeletions() {
         uasserted(
             RemoveShardDrainingInfo(progress),
             "Range deletions must complete before transitioning to a dedicated config server.");
+    }
+}
+
+void RemoveShardCommitCoordinator::_stopDDLOperations(OperationContext* opCtx) {
+    // Note that we do not attach session information here because the block of DDL coordinators is
+    // done via a cluster parameter and so the only remote write commands are run as part of that
+    // coordinator which is responsible for handling the replay protection of those updates.
+    topology_change_helpers::blockDDLCoordinatorsAndDrain(opCtx);
+}
+
+void RemoveShardCommitCoordinator::_checkShardIsEmpty(OperationContext* opCtx) {
+    auto drainingProgress = topology_change_helpers::getDrainingProgress(
+        opCtx,
+        ShardingCatalogManager::get(opCtx)->localConfigShard(),
+        _doc.getShardId().toString());
+
+    if (!drainingProgress.isFullyDrained()) {
+        LOGV2(9782501,
+              "removeShard: more draining to do after having blocked DDLCoordinators",
+              "chunkCount"_attr = drainingProgress.totalChunks,
+              "shardedChunkCount"_attr = drainingProgress.removeShardCounts.getChunks(),
+              "unshardedCollectionsCount"_attr =
+                  drainingProgress.removeShardCounts.getCollectionsToMove(),
+              "databaseCount"_attr = drainingProgress.removeShardCounts.getDbs(),
+              "jumboCount"_attr = drainingProgress.removeShardCounts.getJumboChunks());
+        RemoveShardProgress progress(ShardDrainingStateEnum::kOngoing);
+        progress.setRemaining(drainingProgress.removeShardCounts);
+        uasserted(RemoveShardDrainingInfo(progress),
+                  "Draining of the shard being removed must complete before removing the shard.");
+    }
+}
+
+void RemoveShardCommitCoordinator::_dropLocalCollections(OperationContext* opCtx) {
+    auto trackedDbs = ShardingCatalogManager::get(opCtx)->localCatalogClient()->getAllDBs(
+        opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+
+    if (auto pendingCleanupState = topology_change_helpers::dropLocalCollectionsAndDatabases(
+            opCtx, trackedDbs, _doc.getShardId().toString())) {
+        uasserted(RemoveShardDrainingInfo(*pendingCleanupState),
+                  "All collections must be empty before removing the shard.");
     }
 }
 

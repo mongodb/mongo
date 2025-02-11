@@ -41,6 +41,7 @@ enums:
         values:
             kUnset: "unset"
             kJoinMigrationsAndCheckRangeDeletions: "joinMigrationsAndCheckRangeDeletions"
+            kStopDDLsAndCleanupData: "stopDDLsAndCleanupData"
 
 structs:
     RemoveShardCommitCoordinatorDocument:

@@ -85,15 +85,6 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
-
-struct DrainingShardUsage {
-    RemainingCounts removeShardCounts;
-    // This is a failsafe check to be sure we do not accidentally remove a shard which has chunks
-    // left, sharded or otherwise. It is not reported to the user and thus not included in
-    // RemainingCounts.
-    long long totalChunks;
-};
-
 /**
  * Implements modifications to the sharding catalog metadata.
  *
@@ -733,14 +724,6 @@ private:
                                                               RemoteCommandTargeter* targeter,
                                                               const DatabaseName& dbName,
                                                               const BSONObj& cmdObj);
-
-    /**
-     * Helper method for running a count command against the config server with appropriate error
-     * handling.
-     */
-    StatusWith<long long> _runCountCommandOnConfig(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
-                                                   BSONObj query);
 
     /**
      * Appends a read committed read concern to the request object.

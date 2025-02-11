@@ -62,9 +62,24 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
+    ExecutorFuture<void> _cleanupOnAbort(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                         const CancellationToken& token,
+                                         const Status& status) noexcept override;
+
     // Joins migrations on the config server if we are transitioning from dedicated and checks if
     // there are range deletions to wait for.
     void _joinMigrationsAndCheckRangeDeletions();
+
+    // Stops ongoing ddl operations (excluding topology changes) and waits for any ongoing
+    // coordinators to complete.
+    void _stopDDLOperations(OperationContext* opCtx);
+
+    // Checks whether there is any data left on the shard after stopping DDL operations.
+    void _checkShardIsEmpty(OperationContext* opCtx);
+
+    // Ensures none of the local collections have data in them and drops them. This should only be
+    // called during config transitions.
+    void _dropLocalCollections(OperationContext* opCtx);
 
     // Set on successful completion of the coordinator.
     boost::optional<RemoveShardProgress> _result;

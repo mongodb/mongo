@@ -191,5 +191,66 @@ std::unique_ptr<Fetcher> createFetcher(OperationContext* opCtx,
  */
 std::string getRemoveShardMessage(const ShardDrainingStateEnum& status);
 
+/**
+ * Runs a count with the given query against the localConfigShard. Returns the result of that count
+ * and throws any error that occurs while running this command.
+ */
+long long runCountCommandOnConfig(OperationContext* opCtx,
+                                  const std::shared_ptr<Shard> localConfigShard,
+                                  const NamespaceString& nss,
+                                  BSONObj query);
+
+struct DrainingShardUsage {
+    bool isFullyDrained() const {
+        return removeShardCounts.getChunks() == 0 &&
+            removeShardCounts.getCollectionsToMove() == 0 && removeShardCounts.getDbs() == 0 &&
+            totalChunks == 0;
+    }
+
+    RemainingCounts removeShardCounts;
+    // This is a failsafe check to be sure we do not accidentally remove a shard which has chunks
+    // left, sharded or otherwise. It is not reported to the user and thus not included in
+    // RemainingCounts.
+    long long totalChunks;
+};
+
+/**
+ * Counts the number of total chunks, sharded chunks, unsharded collections, and databases on the
+ * shard being removed.
+ */
+DrainingShardUsage getDrainingProgress(OperationContext* opCtx,
+                                       const std::shared_ptr<Shard> localConfigShard,
+                                       const std::string& shardName);
+
+/**
+ * Sends a command to all shards in the cluster to join ongoing DDL operations and retries until
+ * this command completes on all shards within a specified timeout. After this completes, it is
+ * assumed safe to block DDLs. After this, it sets a cluster parameter to prevent any new DDL
+ * operations from beginning. Additionally persists a recovery document which tells that DDLs are
+ * currently blocked.
+ */
+void blockDDLCoordinatorsAndDrain(OperationContext* opCtx);
+
+/**
+ * Unsets the cluster parameter which prevents DDL operations from running. Additionally, cleans up
+ * the recovery document.
+ */
+void unblockDDLCoordinators(OperationContext* opCtx);
+
+/**
+ * Checks every collection in every database tracked on the config server to ensure that the local
+ * copies of the collections are empty. If any collection is non-empty, returns RemoveShardProgress
+ * reflecting that. If all collections are empty, drops all of the local, tracked databases and
+ * returns boost::none.
+ *
+ * The sessions collection is an exception - this function will check that the collection is empty
+ * and return RemoveShardProgress if not but it will not drop this collection and will rely on the
+ * caller to drop this collection later on.
+ */
+boost::optional<RemoveShardProgress> dropLocalCollectionsAndDatabases(
+    OperationContext* opCtx,
+    const std::vector<DatabaseType>& trackedDBs,
+    const std::string& shardName);
+
 }  // namespace topology_change_helpers
 }  // namespace mongo

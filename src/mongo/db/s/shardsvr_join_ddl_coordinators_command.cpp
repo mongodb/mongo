@@ -36,6 +36,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/request_types/shardsvr_join_ddl_coordinators_request_gen.h"
@@ -56,7 +57,7 @@ public:
 
     std::string help() const override {
         return "Internal command invoked by the config server to join any ShardingDDLCoordinator "
-               "activity executed by the shard";
+               "activity other than add and remove shard executed by the shard";
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -81,8 +82,14 @@ public:
                         repl::ReplicationCoordinator::get(opCtx)->getMemberState().primary());
             }
 
+            // Exclude add and remove shard from this since it is used to drain operations for add
+            // and remove shard.
             ShardingDDLCoordinatorService::getService(opCtx)->waitForOngoingCoordinatorsToFinish(
-                opCtx, [](const ShardingDDLCoordinator&) { return true; });
+                opCtx, [](const ShardingDDLCoordinator& coordinatorInstance) -> bool {
+                    const auto& opType = coordinatorInstance.operationType();
+                    return opType != DDLCoordinatorTypeEnum::kRemoveShardCommit &&
+                        opType != DDLCoordinatorTypeEnum::kAddShard;
+                });
         }
 
     private:

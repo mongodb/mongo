@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connection_string.h"
@@ -47,6 +48,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog/drop_database.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/set_user_write_block_mode_gen.h"
 #include "mongo/db/database_name.h"
@@ -68,6 +70,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/remove_shard_draining_progress_gen.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/topology_change_helpers.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
@@ -86,8 +89,10 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/cluster_identity_loader.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/request_types/add_shard_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/request_types/shardsvr_join_ddl_coordinators_request_gen.h"
 #include "mongo/s/request_types/shardsvr_join_migrations_request_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/assert_util.h"
@@ -101,8 +106,229 @@
 namespace mongo {
 
 namespace {
+MONGO_FAIL_POINT_DEFINE(skipBlockingDDLCoordinatorsDuringAddAndRemoveShard);
+MONGO_FAIL_POINT_DEFINE(hangAfterDroppingDatabaseInTransitionToDedicatedConfigServer);
+
 const Seconds kRemoteCommandTimeout{60};
+const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
+constexpr StringData kAddOrRemoveShardInProgressRecoveryDocumentId =
+    "addOrRemoveShardInProgressRecovery"_sd;
+
+AggregateCommandRequest makeUnshardedCollectionsOnSpecificShardAggregation(OperationContext* opCtx,
+                                                                           const ShardId& shardId,
+                                                                           bool isCount = false) {
+    BSONObj listStage = BSON("$listClusterCatalog" << BSON("shards" << true));
+    BSONObj matchStage =
+        BSON("$match" << BSON("$and" << BSON_ARRAY(BSON("sharded" << false << "shards" << shardId)
+                                                   << BSON("db" << BSON("$ne"
+                                                                        << "config"))
+                                                   << BSON("db" << BSON("$ne"
+                                                                        << "admin")))));
+    BSONObj countStage = BSON("$count"
+                              << "totalCount");
+
+    auto dbName = NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin);
+
+    std::vector<mongo::BSONObj> pipeline;
+    pipeline.reserve(isCount ? 3 : 2);
+    pipeline.push_back(listStage);
+    pipeline.push_back(matchStage);
+    if (isCount) {
+        pipeline.push_back(countStage);
+    }
+
+    AggregateCommandRequest aggRequest{dbName, pipeline};
+    aggRequest.setReadConcern(repl::ReadConcernArgs::kLocal);
+    aggRequest.setWriteConcern({});
+    return aggRequest;
 }
+
+AggregateCommandRequest makeChunkCountAggregation(OperationContext* opCtx, const ShardId& shardId) {
+    std::vector<BSONObj> pipeline;
+
+    // Match documents in the chunks collection where shard is "shard01"
+    pipeline.emplace_back(BSON("$match" << BSON("shard" << shardId)));
+    // Perform a $group to count chunks by uuid
+    pipeline.emplace_back(fromjson(R"(
+            { $group: {
+                '_id': '$uuid',
+                'count': { $sum: 1 }
+            }})"));
+    // Fetch the collection global catalog
+    pipeline.emplace_back(fromjson(R"(
+            { $lookup: {
+                from: {
+                    db: "config",
+                    coll: "collections"
+                },
+                localField: "_id",
+                foreignField: "uuid",
+                as: "collectionInfo"
+            }})"));
+    pipeline.emplace_back(fromjson(R"(
+            { $unwind: "$collectionInfo"})"));
+    pipeline.emplace_back(fromjson(R"(
+            { $match: {
+                "collectionInfo.unsplittable": {$ne: true}
+            }})"));
+    // Deliver a single document with the aggregation of all the chunks
+    pipeline.emplace_back(fromjson(R"(
+            { $group: {
+                '_id': null,
+                'totalChunks': {$sum: '$count'}
+            }})"));
+
+    AggregateCommandRequest aggRequest{NamespaceString::kConfigsvrChunksNamespace, pipeline};
+    aggRequest.setReadConcern(repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern));
+    return aggRequest;
+}
+
+long long getCollectionsToMoveForShardCount(OperationContext* opCtx,
+                                            Shard* shard,
+                                            const ShardId& shardId) {
+
+    auto listCollectionAggReq =
+        makeUnshardedCollectionsOnSpecificShardAggregation(opCtx, shardId, true);
+
+    long long collectionsCounter = 0;
+
+    uassertStatusOK(shard->runAggregation(
+        opCtx,
+        listCollectionAggReq,
+        [&collectionsCounter](const std::vector<BSONObj>& batch,
+                              const boost::optional<BSONObj>& postBatchResumeToken) {
+            if (batch.size() > 0) {
+                tassert(8988300, "totalCount field is missing", batch[0].hasField("totalCount"));
+                collectionsCounter = batch[0].getField("totalCount").safeNumberLong();
+            }
+            return true;
+        }));
+
+    return collectionsCounter;
+}
+
+long long getChunkForShardCount(OperationContext* opCtx, Shard* shard, const ShardId& shardId) {
+
+    auto chunkCounterAggReq = makeChunkCountAggregation(opCtx, shardId);
+
+    long long chunkCounter = 0;
+
+    uassertStatusOK(shard->runAggregation(
+        opCtx,
+        chunkCounterAggReq,
+        [&chunkCounter](const std::vector<BSONObj>& batch,
+                        const boost::optional<BSONObj>& postBatchResumeToken) {
+            if (batch.size() > 0) {
+                chunkCounter = batch[0].getField("totalChunks").safeNumberLong();
+            }
+            return true;
+        }));
+
+    return chunkCounter;
+}
+
+void joinOngoingShardingDDLCoordinatorsOnShards(OperationContext* opCtx) {
+    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto allShards = shardRegistry->getAllShardIds(opCtx);
+    if (std::find(allShards.begin(), allShards.end(), ShardId::kConfigServerId) ==
+        allShards.end()) {
+        // The config server may be a shard, so only add if it isn't already in participants.
+        allShards.emplace_back(shardRegistry->getConfigShard()->getId());
+    }
+    auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+
+    ShardsvrJoinDDLCoordinators cmd;
+    cmd.setDbName(DatabaseName::kAdmin);
+
+    sharding_util::sendCommandToShards(
+        opCtx, DatabaseName::kAdmin, cmd.toBSON(), allShards, executor);
+}
+
+void setAddOrRemoveShardInProgressClusterParam(OperationContext* opCtx, bool newState) {
+    while (true) {
+        try {
+            ConfigsvrSetClusterParameter setClusterParameter(
+                BSON("addOrRemoveShardInProgress" << BSON("inProgress" << newState)));
+            setClusterParameter.setDbName(DatabaseName::kAdmin);
+
+            DBDirectClient client(opCtx);
+            BSONObj res;
+            client.runCommand(DatabaseName::kAdmin, setClusterParameter.toBSON(), res);
+            uassertStatusOK(getStatusFromWriteCommandReply(res));
+            break;
+        } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>&) {
+            // Retry on ErrorCodes::ConflictingOperationInProgress errors, which can be caused by an
+            // already running unrelated setClusterParameter.
+            opCtx->sleepFor(Milliseconds(500));
+            continue;
+        }
+    }
+}
+
+boost::optional<RemoveShardProgress> checkCollectionsAreEmpty(
+    OperationContext* opCtx, const std::vector<NamespaceString>& collections) {
+    for (const auto& nss : collections) {
+        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+        if (!autoColl) {
+            // Can't find the collection, so it must not have data.
+            continue;
+        }
+
+        if (!autoColl->isEmpty(opCtx)) {
+            LOGV2(9022300, "removeShard: found non-empty local collection", logAttrs(nss));
+            RemoveShardProgress progress(ShardDrainingStateEnum::kPendingDataCleanup);
+            progress.setFirstNonEmptyCollection(nss);
+            progress.setPendingRangeDeletions(
+                0);  // Set this to 0 so that it is serialized in the response
+            return {progress};
+        }
+    }
+
+    return boost::none;
+}
+
+void waitUntilReadyToBlockNewDDLCoordinators(OperationContext* opCtx) {
+    const auto wouldJoinCoordinatorsBlock = [](OperationContext* opCtx) -> bool {
+        // Check that all shards will be able to join ongoing DDLs quickly.
+        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+        auto allShards = shardRegistry->getAllShardIds(opCtx);
+        if (std::find(allShards.begin(), allShards.end(), ShardId::kConfigServerId) ==
+            allShards.end()) {
+            // The config server may be a shard, so only add if it isn't already in participants.
+            allShards.emplace_back(shardRegistry->getConfigShard()->getId());
+        }
+        auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+
+        ShardsvrJoinDDLCoordinators cmd;
+        cmd.setDbName(DatabaseName::kAdmin);
+
+        // Attach a short MaxTimeMS. If _shardsvrJoinDDLOperations fails with MaxTimeMSExpired on
+        // some shard, then it means that some long-running ShardingDDLCoordinators is executing.
+        cmd.setMaxTimeMS(30000);
+
+        try {
+            const auto responses = sharding_util::sendCommandToShards(
+                opCtx, DatabaseName::kAdmin, cmd.toBSON(), allShards, executor);
+        } catch (const ExceptionFor<ErrorCodes::MaxTimeMSExpired>&) {
+            // Return true if any of the shards failed with MaxTimeMSExpired.
+            return true;
+        }
+
+        return false;
+    };
+
+    while (true) {
+        if (wouldJoinCoordinatorsBlock(opCtx)) {
+            LOGV2(5687901,
+                  "Add/remove shard requires all DDL operations on the cluster to quiesce before it"
+                  "can proceed safely. 30 seconds have passed without DDLs quiescing. Waiting for "
+                  "DDL operations to quiesce before continuing.");
+            continue;
+        }
+        return;
+    }
+}
+}  // namespace
 
 namespace add_shard_util {
 
@@ -733,6 +959,169 @@ std::string getRemoveShardMessage(const ShardDrainingStateEnum& status) {
         default:
             MONGO_UNREACHABLE;
     }
+}
+
+long long runCountCommandOnConfig(OperationContext* opCtx,
+                                  const std::shared_ptr<Shard> localConfigShard,
+                                  const NamespaceString& nss,
+                                  BSONObj query) {
+    BSONObjBuilder countBuilder;
+    countBuilder.append("count", nss.coll());
+    countBuilder.append("query", query);
+
+    auto resultStatus = localConfigShard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        kConfigReadSelector,
+        nss.dbName(),
+        countBuilder.done(),
+        Milliseconds(defaultConfigCommandTimeoutMS.load()),
+        Shard::RetryPolicy::kIdempotent);
+
+    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(resultStatus));
+
+    auto responseObj = std::move(resultStatus.getValue().response);
+
+    long long result;
+    uassertStatusOK(bsonExtractIntegerField(responseObj, "n", &result));
+
+    return result;
+}
+
+DrainingShardUsage getDrainingProgress(OperationContext* opCtx,
+                                       const std::shared_ptr<Shard> localConfigShard,
+                                       const std::string& shardName) {
+    const auto totalChunkCount = runCountCommandOnConfig(opCtx,
+                                                         localConfigShard,
+                                                         NamespaceString::kConfigsvrChunksNamespace,
+                                                         BSON(ChunkType::shard(shardName)));
+
+    const auto shardedChunkCount = getChunkForShardCount(opCtx, localConfigShard.get(), shardName);
+
+    const auto unshardedCollectionsCount =
+        getCollectionsToMoveForShardCount(opCtx, localConfigShard.get(), shardName);
+
+    const auto databaseCount =
+        runCountCommandOnConfig(opCtx,
+                                localConfigShard,
+                                NamespaceString::kConfigDatabasesNamespace,
+                                BSON(DatabaseType::kPrimaryFieldName << shardName));
+
+    const auto jumboCount =
+        runCountCommandOnConfig(opCtx,
+                                localConfigShard,
+                                NamespaceString::kConfigsvrChunksNamespace,
+                                BSON(ChunkType::shard(shardName) << ChunkType::jumbo(true)));
+
+    return {
+        RemainingCounts(shardedChunkCount, unshardedCollectionsCount, databaseCount, jumboCount),
+        totalChunkCount};
+}
+
+// Sets the addOrRemoveShardInProgress cluster parameter to prevent new ShardingDDLCoordinators from
+// starting, and then drains the ongoing ones. Must be called under the _kAddRemoveShardLock lock.
+void blockDDLCoordinatorsAndDrain(OperationContext* opCtx) {
+    if (MONGO_unlikely(skipBlockingDDLCoordinatorsDuringAddAndRemoveShard.shouldFail())) {
+        return;
+    }
+
+    // Before we block new ShardingDDLCoordinator creations, first do a best-effort check that
+    // there's no currently running one. If there is any, we wait until there is none. This is to
+    // reduce impact to concurrent DDL operations.
+    waitUntilReadyToBlockNewDDLCoordinators(opCtx);
+
+    // Persist a recovery document before we set the addOrRemoveShardInProgress cluster parameter.
+    // This way, in case of crash, the new primary node will unset the parameter.
+    {
+        DBDirectClient client(opCtx);
+        write_ops::checkWriteErrors(client.insert(write_ops::InsertCommandRequest(
+            NamespaceString::kServerConfigurationNamespace,
+            {BSON("_id" << kAddOrRemoveShardInProgressRecoveryDocumentId)})));
+    }
+
+    // Prevent new DDL coordinators from starting across the cluster.
+    LOGV2(5687902,
+          "Requesting all shards to block any new DDL cluster-wide in order to perform topology "
+          "changes");
+    setAddOrRemoveShardInProgressClusterParam(opCtx, true);
+
+
+    // Wait for any ongoing DDL coordinator to finish.
+    LOGV2(5687903, "Draining ongoing ShardingDDLCoordinators for topology change");
+    joinOngoingShardingDDLCoordinatorsOnShards(opCtx);
+    LOGV2(5687904, "Drained ongoing ShardingDDLCoordinators for topology change");
+}
+
+// Unsets the addOrRemoveShardInProgress cluster parameter. Must be called under the
+// _kAddRemoveShardLock lock.
+void unblockDDLCoordinators(OperationContext* opCtx) {
+    if (MONGO_unlikely(skipBlockingDDLCoordinatorsDuringAddAndRemoveShard.shouldFail())) {
+        return;
+    }
+
+    // Allow new DDL coordinators to start across the cluster.
+    setAddOrRemoveShardInProgressClusterParam(opCtx, false);
+    LOGV2(5687905, "Unblocked new ShardingDDLCoordinators after topology change");
+
+    // Delete the recovery document.
+    {
+        DBDirectClient client(opCtx);
+        write_ops::checkWriteErrors(client.remove(write_ops::DeleteCommandRequest(
+            NamespaceString::kServerConfigurationNamespace,
+            {{BSON("_id" << kAddOrRemoveShardInProgressRecoveryDocumentId), false /* multi */}})));
+    }
+}
+
+boost::optional<RemoveShardProgress> dropLocalCollectionsAndDatabases(
+    OperationContext* opCtx,
+    const std::vector<DatabaseType>& trackedDBs,
+    const std::string& shardName) {
+    // Drop all tracked databases locally now that all user data has been drained so the
+    // config server can transition back to catalog shard mode without requiring users to
+    // manually drop them.
+
+    // First, verify all collections we would drop are empty. In normal operation, a
+    // collection may still have data because of a sharded drop (which non-atomically
+    // updates metadata before dropping user data). If this state persists, manual
+    // intervention will be required to complete the transition, so we don't accidentally
+    // delete real data.
+    LOGV2(9022301, "Checking all local collections are empty", "shardId"_attr = shardName);
+
+    for (auto&& db : trackedDBs) {
+        tassert(7783700,
+                "Cannot drop admin or config database from the config server",
+                !db.getDbName().isConfigDB() && !db.getDbName().isAdminDB());
+
+        auto collections = [&] {
+            Lock::DBLock dbLock(opCtx, db.getDbName(), MODE_S);
+            auto catalog = CollectionCatalog::get(opCtx);
+            return catalog->getAllCollectionNamesFromDb(opCtx, db.getDbName());
+        }();
+        if (auto pendingDataCleanupState = checkCollectionsAreEmpty(opCtx, collections)) {
+            return *pendingDataCleanupState;
+        }
+    }
+
+    // Now actually drop the databases; each request must either succeed or resolve into a
+    // no-op.
+    LOGV2(7509600, "Locally dropping drained databases", "shardId"_attr = shardName);
+
+    for (auto&& db : trackedDBs) {
+        const auto dropStatus = dropDatabase(opCtx, db.getDbName(), true /*markFromMigrate*/);
+        if (dropStatus != ErrorCodes::NamespaceNotFound) {
+            uassertStatusOK(dropStatus);
+        }
+        hangAfterDroppingDatabaseInTransitionToDedicatedConfigServer.pauseWhileSet(opCtx);
+    }
+
+    // Check if the sessions collection is empty. We defer dropping this collection to the caller
+    // since it should only be dropped if featureFlagSessionsCollectionCoordinatorOnConfigServer is
+    // disabled so the drop must be done in a fixed FCV region.
+    if (auto pendingDataCleanupState =
+            checkCollectionsAreEmpty(opCtx, {NamespaceString::kLogicalSessionsNamespace})) {
+        return *pendingDataCleanupState;
+    }
+
+    return boost::none;
 }
 
 }  // namespace topology_change_helpers

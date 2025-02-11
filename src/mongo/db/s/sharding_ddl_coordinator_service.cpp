@@ -385,16 +385,22 @@ void ShardingDDLCoordinatorService::checkIfConflictsWithOtherInstances(
     OperationContext* opCtx,
     BSONObj initialState,
     const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) {
-    auto* addOrRemoveShardInProgressParam =
-        ServerParameterSet::getClusterParameterSet()
-            ->get<ClusterParameterWithStorage<AddOrRemoveShardInProgressParam>>(
-                "addOrRemoveShardInProgress");
-    const auto addOrRemoveShardInProgressVal =
-        addOrRemoveShardInProgressParam->getValue(boost::none).getInProgress();
+    auto coorMetadata = extractShardingDDLCoordinatorMetadata(initialState);
+    const auto& opType = coorMetadata.getId().getOperationType();
+    if (opType != DDLCoordinatorTypeEnum::kRemoveShardCommit &&
+        opType != DDLCoordinatorTypeEnum::kAddShard) {
 
-    uassert(ErrorCodes::AddOrRemoveShardInProgress,
-            "Cannot start ShardingDDLCoordinator because a topology change is in progress",
-            !addOrRemoveShardInProgressVal);
+        auto* addOrRemoveShardInProgressParam =
+            ServerParameterSet::getClusterParameterSet()
+                ->get<ClusterParameterWithStorage<AddOrRemoveShardInProgressParam>>(
+                    "addOrRemoveShardInProgress");
+        const auto addOrRemoveShardInProgressVal =
+            addOrRemoveShardInProgressParam->getValue(boost::none).getInProgress();
+
+        uassert(ErrorCodes::AddOrRemoveShardInProgress,
+                "Cannot start ShardingDDLCoordinator because a topology change is in progress",
+                !addOrRemoveShardInProgressVal);
+    }
 }
 
 }  // namespace mongo
