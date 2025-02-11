@@ -176,7 +176,8 @@ CreateCollectionResponse createCollection(OperationContext* opCtx,
         if (!isValidRequest) {
             LOGV2_WARNING(
                 9733600,
-                "Detected an invalid creation request for {nss}. To guarantee the correct "
+                "Detected an invalid creation request for config.system.sessions. To guarantee "
+                "the correct "
                 "behavior, the request will be replaced with a shardCollection with internal "
                 "defaults",
                 "nss"_attr = nss.toStringForErrorMsg(),
