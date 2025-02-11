@@ -709,14 +709,6 @@ public:
         FLE2RangeInsertSpec spec,
         uint8_t sparsity,
         uint64_t contentionFactor);
-
-    // TODO: SERVER-99789 remove once placeholder to IUPv2 conversion is done entirely in
-    // libmongocrypt
-    static FLE2InsertUpdatePayloadV2 serializeInsertUpdatePayloadV2ForTextSearch(
-        FLEIndexKeyAndId indexKey,
-        FLEUserKeyAndId userKey,
-        const FLE2TextSearchInsertSpec& spec,
-        uint64_t contentionFactor);
 };
 
 FLE2InsertUpdatePayloadV2 EDCClientPayload::parseInsertUpdatePayloadV2(ConstDataRange cdr) {
@@ -948,116 +940,6 @@ FLE2InsertUpdatePayloadV2 EDCClientPayload::serializeInsertUpdatePayloadV2ForRan
 
     if (!edgeTokenSet.empty()) {
         iupayload.setEdgeTokenSet(edgeTokenSet);
-    }
-
-    return iupayload;
-}
-
-// TODO: SERVER-99789 remove once placeholder to IUPv2 conversion is done entirely in
-// libmongocrypt
-FLE2InsertUpdatePayloadV2 EDCClientPayload::serializeInsertUpdatePayloadV2ForTextSearch(
-    FLEIndexKeyAndId indexKey,
-    FLEUserKeyAndId userKey,
-    const FLE2TextSearchInsertSpec& spec,
-    uint64_t contentionFactor) {
-
-    auto obj = BSON("" << spec.getValue());
-    uassert(
-        9784100, "Text search insert/update value is not a valid UTF-8 string", isValidUTF8(obj));
-    auto element = obj.firstElement();
-    auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
-
-    auto collectionToken = CollectionsLevel1Token::deriveFrom(indexKey.key);
-    auto serverEncryptToken = ServerDataEncryptionLevel1Token::deriveFrom(indexKey.key);
-    auto serverDerivationToken = ServerTokenDerivationLevel1Token::deriveFrom(indexKey.key);
-
-    auto edcToken = EDCToken::deriveFrom(collectionToken);
-    auto escToken = ESCToken::deriveFrom(collectionToken);
-    auto ecocToken = ECOCToken::deriveFrom(collectionToken);
-
-    FLE2InsertUpdatePayloadV2 iupayload;
-    PrfBlock nullBlock;
-    // d, s, l, p are bogus data
-    iupayload.setEdcDerivedToken(EDCDerivedFromDataTokenAndContentionFactorToken(nullBlock));
-    iupayload.setEscDerivedToken(ESCDerivedFromDataTokenAndContentionFactorToken(nullBlock));
-    iupayload.setServerDerivedFromDataToken(ServerDerivedFromDataToken(nullBlock));
-    iupayload.setEncryptedTokens(
-        StateCollectionTokensV2(iupayload.getEscDerivedToken(), boost::none).encrypt(ecocToken));
-
-    // u, t, v, e, k
-    iupayload.setIndexKeyId(indexKey.keyId);
-    iupayload.setType(BSONType::String);
-
-    auto cipherText = uassertStatusOK(KeyIdAndValue::serialize(userKey, value));
-    iupayload.setValue(cipherText);
-
-    iupayload.setServerEncryptionToken(serverEncryptToken);
-    iupayload.setContentionFactor(contentionFactor);
-    iupayload.setTextSearchTokenSets(TextSearchTokenSets{{}, {}, {}, {}});
-
-    auto& tsts = iupayload.getTextSearchTokenSets().value();
-    {
-        auto& exact = tsts.getExactTokenSet();
-        exact.setEdcDerivedToken(
-            EDCTextExactDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-                EDCTextExactToken::deriveFrom(edcToken), value, contentionFactor));
-        exact.setEscDerivedToken(
-            ESCTextExactDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-                ESCTextExactToken::deriveFrom(escToken), value, contentionFactor));
-        exact.setServerDerivedFromDataToken(ServerTextExactDerivedFromDataToken::deriveFrom(
-            ServerTextExactToken::deriveFrom(serverDerivationToken), value));
-        exact.setEncryptedTokens(
-            StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
-                                        exact.getEscDerivedToken().asPrfBlock()),
-                                    boost::none)
-                .encrypt(ecocToken));
-    }
-    if (spec.getSubstringSpec().has_value()) {
-        tsts.getSubstringTokenSets().push_back({});
-        auto& ts = tsts.getSubstringTokenSets().back();
-        ts.setEdcDerivedToken(
-            EDCTextSubstringDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-                EDCTextSubstringToken::deriveFrom(edcToken), value, contentionFactor));
-        ts.setEscDerivedToken(
-            ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-                ESCTextSubstringToken::deriveFrom(escToken), value, contentionFactor));
-        ts.setServerDerivedFromDataToken(ServerTextSubstringDerivedFromDataToken::deriveFrom(
-            ServerTextSubstringToken::deriveFrom(serverDerivationToken), value));
-        ts.setEncryptedTokens(
-            StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
-                                        ts.getEscDerivedToken().asPrfBlock()),
-                                    boost::none)
-                .encrypt(ecocToken));
-    }
-    if (spec.getSuffixSpec().has_value()) {
-        tsts.getSuffixTokenSets().push_back({});
-        auto& ts = tsts.getSuffixTokenSets().back();
-        ts.setEdcDerivedToken(EDCTextSuffixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-            EDCTextSuffixToken::deriveFrom(edcToken), value, contentionFactor));
-        ts.setEscDerivedToken(ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-            ESCTextSuffixToken::deriveFrom(escToken), value, contentionFactor));
-        ts.setServerDerivedFromDataToken(ServerTextSuffixDerivedFromDataToken::deriveFrom(
-            ServerTextSuffixToken::deriveFrom(serverDerivationToken), value));
-        ts.setEncryptedTokens(
-            StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
-                                        ts.getEscDerivedToken().asPrfBlock()),
-                                    boost::none)
-                .encrypt(ecocToken));
-    }
-    if (spec.getPrefixSpec().has_value()) {
-        tsts.getPrefixTokenSets().push_back({});
-        auto& ts = tsts.getPrefixTokenSets().back();
-        ts.setEdcDerivedToken(EDCTextPrefixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-            EDCTextPrefixToken::deriveFrom(edcToken), value, contentionFactor));
-        ts.setEscDerivedToken(ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
-            ESCTextPrefixToken::deriveFrom(escToken), value, contentionFactor));
-        ts.setServerDerivedFromDataToken(ServerTextPrefixDerivedFromDataToken::deriveFrom(
-            ServerTextPrefixToken::deriveFrom(serverDerivationToken), value));
-        ts.setEncryptedTokens(
-            StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
-                                        ts.getEscDerivedToken().asPrfBlock()),
-                                    boost::none)
-                .encrypt(ecocToken));
     }
 
     return iupayload;
@@ -1343,20 +1225,9 @@ void convertToFLE2Payload(FLEKeyVault* keyVault,
                 uasserted(6775303, "Unsupported Queryable Encryption placeholder type");
             }
         } else if (ep.getAlgorithm() == Fle2AlgorithmInt::kTextSearch) {
-            if (ep.getType() == Fle2PlaceholderType::kInsert) {
-                IDLParserContext ctx("FLE2TextSearchInsertSpec");
-                auto textInsertSpec =
-                    FLE2TextSearchInsertSpec::parse(ctx, ep.getValue().getElement().Obj());
-
-                auto iupayload = EDCClientPayload::serializeInsertUpdatePayloadV2ForTextSearch(
-                    indexKey, userKey, textInsertSpec, contentionFactor(ep));
-                toEncryptedBinData(fieldNameToSerialize,
-                                   EncryptedBinDataType::kFLE2InsertUpdatePayloadV2,
-                                   iupayload,
-                                   builder);
-            } else {
-                uasserted(9784101, "Unsupported Queryable Encryption placeholder type");
-            }
+            uasserted(9978900,
+                      "Queryable Encryption text search placeholder conversion must be done "
+                      "through libmongocrypt");
         } else if (ep.getAlgorithm() == Fle2AlgorithmInt::kUnindexed) {
             uassert(6379102,
                     str::stream() << "Type '" << typeName(el.type())

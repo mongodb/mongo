@@ -93,6 +93,10 @@ std::string hexdump(const PrfBlock& buf) {
     return hexdump(buf.data(), buf.size());
 }
 
+std::string hexdump(const ConstDataRange& buf) {
+    return hexdump(buf.data(), buf.length());
+}
+
 std::vector<char> decode(StringData sd) {
     auto s = hexblob::decode(sd);
     return std::vector<char>(s.data(), s.data() + s.length());
@@ -2176,15 +2180,20 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads) {
     EDCServerPayloadInfo payload;
     auto& iupayload = payload.payload = generateTestIUPV2ForTextSearch(doc.firstElement());
 
-    generateTextTokenSetsForIUPV2(
-        iupayload, {"s", "ss", "sss", "ssss"}, QueryTypeEnum::SubstringPreview);
-    generateTextTokenSetsForIUPV2(iupayload, {"s", "ss"}, QueryTypeEnum::SuffixPreview);
-    generateTextTokenSetsForIUPV2(iupayload, {"s", "ss", "sss"}, QueryTypeEnum::PrefixPreview);
-    payload.counts = std::vector<uint64_t>(10);
-    std::iota(payload.counts.begin(), payload.counts.end(), 1);  // fill with values 1,2,3,...,10
+    const std::vector<StringData> substrs = {"s", "ss", "sss", "ssss", "fake", "fake"};
+    const std::vector<StringData> suffixes = {"s", "ss", "fake", "fake"};
+    const std::vector<StringData> prefixes = {"s", "ss", "sss", "fake", "fake"};
+    const size_t tagCount = 1 + substrs.size() + suffixes.size() + prefixes.size();
+
+    generateTextTokenSetsForIUPV2(iupayload, substrs, QueryTypeEnum::SubstringPreview);
+    generateTextTokenSetsForIUPV2(iupayload, suffixes, QueryTypeEnum::SuffixPreview);
+    generateTextTokenSetsForIUPV2(iupayload, prefixes, QueryTypeEnum::PrefixPreview);
+
+    payload.counts = std::vector<uint64_t>(tagCount);
+    std::iota(payload.counts.begin(), payload.counts.end(), 1);  // fill with values 1...tagCount
 
     std::vector<PrfBlock> tags = EDCServerCollection::generateTagsForTextSearch(payload);
-    ASSERT_EQ(tags.size(), 10);
+    ASSERT_EQ(tags.size(), tagCount);
 
     auto serverPayload =
         FLE2IndexedTextEncryptedValue::fromUnencrypted(iupayload, tags, payload.counts);
@@ -2194,10 +2203,10 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads) {
 
     ASSERT_EQ(parsed.getBsonType(), iupayload.getType());
     ASSERT_EQ(parsed.getKeyId(), iupayload.getIndexKeyId());
-    ASSERT_EQ(parsed.getTagCount(), 10);
-    ASSERT_EQ(parsed.getSubstringTagCount(), 4);
-    ASSERT_EQ(parsed.getSuffixTagCount(), 2);
-    ASSERT_EQ(parsed.getPrefixTagCount(), 3);
+    ASSERT_EQ(parsed.getTagCount(), tagCount);
+    ASSERT_EQ(parsed.getSubstringTagCount(), substrs.size());
+    ASSERT_EQ(parsed.getSuffixTagCount(), suffixes.size());
+    ASSERT_EQ(parsed.getPrefixTagCount(), prefixes.size());
 
     auto serverEncryptToken = ServerDataEncryptionLevel1Token::deriveFrom(getIndexKey());
     auto swValue =
@@ -2214,9 +2223,9 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads) {
     auto substrBlks = parsed.getSubstringMetadataBlocks();
     auto suffixBlks = parsed.getSuffixMetadataBlocks();
     auto prefixBlks = parsed.getPrefixMetadataBlocks();
-    ASSERT_EQ(substrBlks.size(), 4);
-    ASSERT_EQ(suffixBlks.size(), 2);
-    ASSERT_EQ(prefixBlks.size(), 3);
+    ASSERT_EQ(substrBlks.size(), substrs.size());
+    ASSERT_EQ(suffixBlks.size(), suffixes.size());
+    ASSERT_EQ(prefixBlks.size(), prefixes.size());
 
     std::vector<FLE2TagAndEncryptedMetadataBlockView> mblocks;
     mblocks.reserve(parsed.getTagCount());
@@ -2234,6 +2243,14 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads) {
         ASSERT_EQ(swMeta.getValue().contentionFactor, 0);
         ASSERT_EQ(swMeta.getValue().tag, tags[i]);
         ASSERT(FLE2TagAndEncryptedMetadataBlock::isValidZerosBlob(swMeta.getValue().zeros));
+    }
+
+    // Verify the metadata blocks have unique encrypted zeros blob
+    // This ensures the AES-CTR IV is randomly set for blocks that use the same keys
+    // like text search padding blocks.
+    stdx::unordered_set<std::string> encryptedZeroesSet;
+    for (auto& mblock : mblocks) {
+        ASSERT(encryptedZeroesSet.insert(hexdump(mblock.encryptedZeros)).second);
     }
 }
 

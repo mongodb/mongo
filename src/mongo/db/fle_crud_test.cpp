@@ -276,11 +276,22 @@ protected:
     ESCTwiceDerivedTagToken getTestESCToken(BSONObj obj);
     ESCTwiceDerivedTagToken getTestESCToken(StringData name, StringData value);
 
-    ESCTwiceDerivedTagToken getTestESCTokenForTextSearch(BSONElement value, QueryTypeEnum type);
+    ESCTwiceDerivedTagToken getTestESCTokenForTextSearch(BSONElement value,
+                                                         boost::optional<QueryTypeEnum> type);
 
     void assertECOCDocumentCountByField(StringData fieldName, uint64_t expect);
 
     std::vector<char> generatePlaceholder(UUID keyId, BSONElement value);
+
+    BSONObj transformElementForInsertUpdate(BSONElement element,
+                                            const std::vector<char>& placeholder,
+                                            const EncryptedFieldConfig& efc);
+    BSONObj findESCNonAnchorForTextSearchElement(BSONElement element,
+                                                 uint64_t cpos,
+                                                 boost::optional<QueryTypeEnum> type);
+    void checkSingleTextSearchElementInsert(StringData testString,
+                                            uint32_t padCount,
+                                            QueryTypeEnum type);
 
 protected:
     /**
@@ -398,25 +409,30 @@ ESCTwiceDerivedTagToken FleCrudTest::getTestESCToken(StringData name, StringData
     return ESCTwiceDerivedTagToken::deriveFrom(escContentionToken);
 }
 
-ESCTwiceDerivedTagToken FleCrudTest::getTestESCTokenForTextSearch(BSONElement element,
-                                                                  QueryTypeEnum type) {
+ESCTwiceDerivedTagToken FleCrudTest::getTestESCTokenForTextSearch(
+    BSONElement element, boost::optional<QueryTypeEnum> type) {
     auto c1token = CollectionsLevel1Token::deriveFrom(_keyVault.getIndexKeyById(indexKeyId).key);
     auto escToken = ESCToken::deriveFrom(c1token);
 
     PrfBlock escDataTokenBlk;
 
-    if (type == QueryTypeEnum::SubstringPreview) {
+    if (!type.has_value()) {
+        auto escTextToken = ESCTextExactToken::deriveFrom(escToken);
+        escDataTokenBlk = ESCTextExactDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
+                              escTextToken, toCDR(element), 0)
+                              .asPrfBlock();
+    } else if (*type == QueryTypeEnum::SubstringPreview) {
         auto escTextToken = ESCTextSubstringToken::deriveFrom(escToken);
         escDataTokenBlk = ESCTextSubstringDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
                               escTextToken, toCDR(element), 0)
                               .asPrfBlock();
-    } else if (type == QueryTypeEnum::SuffixPreview) {
+    } else if (*type == QueryTypeEnum::SuffixPreview) {
         auto escTextToken = ESCTextSuffixToken::deriveFrom(escToken);
         escDataTokenBlk = ESCTextSuffixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
                               escTextToken, toCDR(element), 0)
                               .asPrfBlock();
     } else {
-        invariant(type == QueryTypeEnum::PrefixPreview);
+        invariant(*type == QueryTypeEnum::PrefixPreview);
         auto escTextToken = ESCTextPrefixToken::deriveFrom(escToken);
         escDataTokenBlk = ESCTextPrefixDerivedFromDataTokenAndContentionFactorToken::deriveFrom(
                               escTextToken, toCDR(element), 0)
@@ -456,40 +472,40 @@ EncryptedFieldConfig getTestEncryptedFieldConfig(
     TextSearchTypeFlags textIndexTypes = TextSearchTypeFlags::INDEX_NONE) {
 
     constexpr auto schemaV2 = R"({
-    "escCollection": "enxcol_.coll.esc",
-    "ecocCollection": "enxcol_.coll.ecoc",
-    "fields": [
-        {
-            "keyId":
-                            {
-                                "$uuid": "12345678-1234-9876-1234-123456789012"
-                            }
-                        ,
-            "path": "encrypted",
-            "bsonType": "string",
-            "queries": {"queryType": "equality"}
+        "escCollection": "enxcol_.coll.esc",
+        "ecocCollection": "enxcol_.coll.ecoc",
+        "fields": [
+            {
+                "keyId":
+                                {
+                                    "$uuid": "12345678-1234-9876-1234-123456789012"
+                                }
+                            ,
+                "path": "encrypted",
+                "bsonType": "string",
+                "queries": {"queryType": "equality"}
 
-        }
-    ]
-})";
+            }
+        ]
+    })";
 
     constexpr auto rangeSchemaV2 = R"({
-    "escCollection": "enxcol_.coll.esc",
-    "ecocCollection": "enxcol_.coll.ecoc",
-    "fields": [
-        {
-            "keyId":
-                            {
-                                "$uuid": "12345678-1234-9876-1234-123456789012"
-                            }
-                        ,
-            "path": "encrypted",
-            "bsonType": "int",
-            "queries": {"queryType": "range", "min": 0, "max": 15, "sparsity": 1, "trimFactor": 0}
+        "escCollection": "enxcol_.coll.esc",
+        "ecocCollection": "enxcol_.coll.ecoc",
+        "fields": [
+            {
+                "keyId":
+                                {
+                                    "$uuid": "12345678-1234-9876-1234-123456789012"
+                                }
+                            ,
+                "path": "encrypted",
+                "bsonType": "int",
+                "queries": {"queryType": "range", "min": 0, "max": 15, "sparsity": 1, "trimFactor": 0}
 
-        }
-    ]
-})";
+            }
+        ]
+    })";
 
     constexpr auto textSearchSchema = R"({
         "escCollection": "enxcol_.coll.esc",
@@ -608,22 +624,20 @@ void FleCrudTest::doSingleWideInsert(int id, uint64_t fieldCount, ValueGenerator
     builder.append("_id", id);
     builder.append("plainText", "sample");
 
+    auto efc = getTestEncryptedFieldConfig();
+
     for (uint64_t i = 0; i < fieldCount; i++) {
         auto name = fieldNameFromInt(i);
         auto value = func(name, id);
-        auto doc = BSON("I" << value);
+        auto doc = BSON(name << value);
         UUID uuid = fieldNameToUUID(name);
         auto buf = generatePlaceholder(uuid, doc.firstElement());
-        builder.appendBinData(name, buf.size(), BinDataType::Encrypt, buf.data());
+        builder.append(
+            transformElementForInsertUpdate(doc.firstElement(), buf, efc).firstElement());
     }
-
-    auto clientDoc = builder.obj();
-
-    auto result = FLEClientCrypto::transformPlaceholders(clientDoc, &_keyVault);
+    auto result = builder.obj();
 
     auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(result);
-
-    auto efc = getTestEncryptedFieldConfig();
 
     uassertStatusOK(processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, result, false));
 }
@@ -732,6 +746,40 @@ void FleCrudTest::testValidateTags(BSONObj obj) {
     FLEClientCrypto::validateTagsArray(obj);
 }
 
+// Given a BSON element containing the plaintext value and fieldname, the placeholder
+// generated for the value, and the EncryptedFieldConfig with a schema for the fieldname,
+// returns a document {fieldname: BinData(<InsertUpdatePayloadV2>))}
+BSONObj FleCrudTest::transformElementForInsertUpdate(BSONElement element,
+                                                     const std::vector<char>& placeholder,
+                                                     const EncryptedFieldConfig& efc) {
+    // Wrap the element in a document in an insert command, so libmongocrypt can transform
+    // the placeholders.
+    auto origCmd = write_ops::InsertCommandRequest(_edcNs, {element.wrap()}).toBSON();
+    auto cryptdResponse = [&]() {
+        BSONObjBuilder docbob;
+        docbob.appendBinData(element.fieldNameStringData(),
+                             placeholder.size(),
+                             BinDataType::Encrypt,
+                             placeholder.data());
+        BSONObjBuilder bob;
+        bob.append("hasEncryptionPlaceholders", true);
+        bob.append("schemaRequiresEncryption", true);
+        bob.append("result", write_ops::InsertCommandRequest(_edcNs, {docbob.obj()}).toBSON());
+        return bob.obj();
+    }();
+    auto finalCmd =
+        FLEClientCrypto::transformPlaceholders(origCmd,
+                                               cryptdResponse,
+                                               BSON(_edcNs.toString_forTest() << efc.toBSON()),
+                                               &_keyVault,
+                                               _edcNs.db_forTest())
+            .addField(BSON("$db" << _edcNs.db_forTest()).firstElement());
+    return write_ops::InsertCommandRequest::parse(IDLParserContext("finalCmd"), finalCmd)
+        .getDocuments()
+        .front()
+        .getOwned();
+}
+
 void FleCrudTest::doSingleInsert(int id,
                                  BSONElement element,
                                  Fle2AlgorithmInt alg,
@@ -739,19 +787,16 @@ void FleCrudTest::doSingleInsert(int id,
                                  TextSearchTypeFlags textIndexTypes) {
 
     auto buf = generateSinglePlaceholder(element, alg, 0 /*contention max*/, textIndexTypes);
+    auto efc = getTestEncryptedFieldConfig(alg, textIndexTypes);
+
     BSONObjBuilder builder;
     builder.append("_id", id);
     builder.append("counter", 1);
     builder.append("plainText", "sample");
-    builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
-
-    auto clientDoc = builder.obj();
-
-    auto result = FLEClientCrypto::transformPlaceholders(clientDoc, &_keyVault);
+    builder.append(transformElementForInsertUpdate(element, buf, efc).firstElement());
+    auto result = builder.obj();
 
     auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(result);
-
-    auto efc = getTestEncryptedFieldConfig(alg, textIndexTypes);
 
     uassertStatusOK(processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, result, false));
 }
@@ -790,12 +835,13 @@ void FleCrudTest::doSingleUpdate(int id, BSONObj obj) {
 
 void FleCrudTest::doSingleUpdate(int id, BSONElement element, Fle2AlgorithmInt alg) {
     auto buf = generateSinglePlaceholder(element, alg);
+    auto efc = getTestEncryptedFieldConfig(alg);
+
     BSONObjBuilder builder;
     builder.append("$inc", BSON("counter" << 1));
-    builder.append("$set",
-                   BSON("encrypted" << BSONBinData(buf.data(), buf.size(), BinDataType::Encrypt)));
-    auto clientDoc = builder.obj();
-    auto result = FLEClientCrypto::transformPlaceholders(clientDoc, &_keyVault);
+    builder.append("$set", transformElementForInsertUpdate(element, buf, efc));
+
+    auto result = builder.obj();
 
     doSingleUpdateWithUpdateDoc(id, result, alg);
 }
@@ -950,63 +996,223 @@ TEST_F(FleCrudTest, InsertOneRange) {
     assertECOCDocumentCountByField("encrypted", 5);
 }
 
-TEST_F(FleCrudTest, InsertOneTextSearch) {
+BSONObj FleCrudTest::findESCNonAnchorForTextSearchElement(BSONElement element,
+                                                          uint64_t cpos,
+                                                          boost::optional<QueryTypeEnum> qtype) {
+    return _queryImpl->getById(
+        _escNs,
+        ESCCollection::generateNonAnchorId(getTestESCTokenForTextSearch(element, qtype), cpos));
+}
+
+void FleCrudTest::checkSingleTextSearchElementInsert(StringData testString,
+                                                     uint32_t padCount,
+                                                     QueryTypeEnum qtype) {
+    const std::string padString = testString.toString() + "\xff";
+    auto doc = BSON("encrypted" << testString);
+    auto element = doc.firstElement();
+    auto padDoc = BSON("encrypted" << padString);
+    auto padElement = padDoc.firstElement();
+
+    // check at most one qtype ESC entry for the whole string got inserted
+    ASSERT_FALSE(findESCNonAnchorForTextSearchElement(element, 1, qtype).isEmpty());
+    ASSERT_TRUE(findESCNonAnchorForTextSearchElement(element, 2, qtype).isEmpty());
+
+    // check at most one exact match ESC entry got inserted
+    ASSERT_FALSE(findESCNonAnchorForTextSearchElement(element, 1, boost::none).isEmpty());
+    ASSERT_TRUE(findESCNonAnchorForTextSearchElement(element, 2, boost::none).isEmpty());
+
+    // check at most padcount substring ESC entries got inserted
+    ASSERT_FALSE(findESCNonAnchorForTextSearchElement(padElement, padCount, qtype).isEmpty());
+    ASSERT_TRUE(findESCNonAnchorForTextSearchElement(padElement, padCount + 1, qtype).isEmpty());
+}
+
+TEST_F(FleCrudTest, InsertOneTextSearchSubstring) {
     RAIIServerParameterControllerForTest ffctrl("featureFlagQETextSearchPreview", true);
 
-    auto doc = BSON("encrypted"
-                    << "demonstration");
+    const std::string testString = "demonstration";
+    auto doc = BSON("encrypted" << testString);
     auto element = doc.firstElement();
 
-    // insert element as substring-indexed
+    // insert element as substring-indexed where lb = 10; ub = 100
+    // unique substrings of (len >= lb) = 10
+    // so cbclen = ceil(10/16) * 16 = 16
+    // so msize = (16 - 16 + 1) + (16 - 15 + 1) .. + (16- 10 + 1) = 1 + 2 ... + 7 = 28
+    uint32_t expectSubstrCount = 10;
+    uint32_t msize = 28;
+    uint32_t padcount = msize - expectSubstrCount;
+    uint32_t totalTags = msize + 1;  // include exact
     doSingleInsert(
         1, element, Fle2AlgorithmInt::kTextSearch, false, TextSearchTypeFlags::INDEX_SUBSTRING);
 
-    assertDocumentCounts(1, 2, 2);
-    assertECOCDocumentCountByField("encrypted", 2);
-    ASSERT_FALSE(
-        _queryImpl
-            ->getById(
-                _escNs,
-                ESCCollection::generateNonAnchorId(
-                    getTestESCTokenForTextSearch(element, QueryTypeEnum::SubstringPreview), 1))
-            .isEmpty());
+    assertDocumentCounts(1, totalTags, totalTags);
+    assertECOCDocumentCountByField("encrypted", totalTags);
+
+    checkSingleTextSearchElementInsert(testString, padcount, QueryTypeEnum::SubstringPreview);
+
+    // check each unique substring of the value (min length 10) have at most one substring ESC entry
+    uint32_t strCount = 0;
+    for (size_t len = 10; len <= testString.length(); len++) {
+        for (size_t start = 0; start <= (testString.length() - len); start++) {
+            auto strDoc = BSON("k" << testString.substr(start, len));
+            auto strElement = strDoc.firstElement();
+            ASSERT_FALSE(
+                findESCNonAnchorForTextSearchElement(strElement, 1, QueryTypeEnum::SubstringPreview)
+                    .isEmpty());
+            ASSERT_TRUE(
+                findESCNonAnchorForTextSearchElement(strElement, 2, QueryTypeEnum::SubstringPreview)
+                    .isEmpty());
+            strCount++;
+        }
+    }
+    ASSERT_EQ(strCount, expectSubstrCount);
+}
+
+TEST_F(FleCrudTest, InsertOneTextSearchSuffix) {
+    RAIIServerParameterControllerForTest ffctrl("featureFlagQETextSearchPreview", true);
+
+    const std::string testString = "demonstration";
+    auto doc = BSON("encrypted" << testString);
+    auto element = doc.firstElement();
+
+    // insert element as suffix-indexed where lb = 10; ub = 100
+    // suffixes of (len >= lb) = 4
+    // so cbclen = ceil(10/16) * 16 = 16
+    // so msize = cbclen - lb + 1 = 16 - 10 + 1
+    uint32_t expectSuffixCount = 4;
+    uint32_t msize = 16 - 10 + 1;  // cbclen - lb + 1
+    uint32_t padcount = msize - expectSuffixCount;
+    uint32_t totalTags = msize + 1;  // include exact
 
     // insert element as suffix-indexed
     doSingleInsert(
-        2, element, Fle2AlgorithmInt::kTextSearch, false, TextSearchTypeFlags::INDEX_SUFFIX);
+        1, element, Fle2AlgorithmInt::kTextSearch, false, TextSearchTypeFlags::INDEX_SUFFIX);
 
-    assertDocumentCounts(2, 4, 4);
-    assertECOCDocumentCountByField("encrypted", 4);
-    ASSERT_FALSE(
-        _queryImpl
-            ->getById(_escNs,
-                      ESCCollection::generateNonAnchorId(
-                          getTestESCTokenForTextSearch(element, QueryTypeEnum::SuffixPreview), 1))
-            .isEmpty());
+    assertDocumentCounts(1, totalTags, totalTags);
+    assertECOCDocumentCountByField("encrypted", totalTags);
+
+    checkSingleTextSearchElementInsert(testString, padcount, QueryTypeEnum::SuffixPreview);
+
+    // check each suffix of the value (min length 10) have at most one ESC entry
+    uint32_t strCount = 0;
+    for (size_t len = testString.length(); len >= 10; len--) {
+        size_t start = testString.length() - len;
+        auto strDoc = BSON("k" << testString.substr(start, len));
+        auto strElement = strDoc.firstElement();
+        ASSERT_FALSE(
+            findESCNonAnchorForTextSearchElement(strElement, 1, QueryTypeEnum::SuffixPreview)
+                .isEmpty());
+        ASSERT_TRUE(
+            findESCNonAnchorForTextSearchElement(strElement, 2, QueryTypeEnum::SuffixPreview)
+                .isEmpty());
+        strCount++;
+    }
+    ASSERT_EQ(strCount, expectSuffixCount);
+}
+
+TEST_F(FleCrudTest, InsertOneTextSearchPrefix) {
+    RAIIServerParameterControllerForTest ffctrl("featureFlagQETextSearchPreview", true);
+
+    const std::string testString = "demonstration";
+    auto doc = BSON("encrypted" << testString);
+    auto element = doc.firstElement();
+
+    // insert element as prefix-indexed where lb = 10; ub = 100
+    // prefixes of (len >= lb) = 4
+    // so cbclen = ceil(10/16) * 16 = 16
+    // so msize = cbclen - lb + 1 = 16 - 10 + 1
+    uint32_t expectPrefixCount = 4;
+    uint32_t msize = 16 - 10 + 1;  // cbclen - lb + 1
+    uint32_t padcount = msize - expectPrefixCount;
+    uint32_t totalTags = msize + 1;  // include exact
 
     // insert element as prefix-indexed
     doSingleInsert(
-        3, element, Fle2AlgorithmInt::kTextSearch, false, TextSearchTypeFlags::INDEX_PREFIX);
+        1, element, Fle2AlgorithmInt::kTextSearch, false, TextSearchTypeFlags::INDEX_PREFIX);
 
-    assertDocumentCounts(3, 6, 6);
-    assertECOCDocumentCountByField("encrypted", 6);
-    ASSERT_FALSE(
-        _queryImpl
-            ->getById(_escNs,
-                      ESCCollection::generateNonAnchorId(
-                          getTestESCTokenForTextSearch(element, QueryTypeEnum::PrefixPreview), 1))
-            .isEmpty());
+    assertDocumentCounts(1, totalTags, totalTags);
+    assertECOCDocumentCountByField("encrypted", totalTags);
+
+    checkSingleTextSearchElementInsert(testString, padcount, QueryTypeEnum::PrefixPreview);
+
+    // check each prefix of the value (min length 10) have at most one ESC entry
+    uint32_t strCount = 0;
+    for (size_t len = testString.length(); len >= 10; len--) {
+        auto strDoc = BSON("k" << testString.substr(0, len));
+        auto strElement = strDoc.firstElement();
+        ASSERT_FALSE(
+            findESCNonAnchorForTextSearchElement(strElement, 1, QueryTypeEnum::PrefixPreview)
+                .isEmpty());
+        ASSERT_TRUE(
+            findESCNonAnchorForTextSearchElement(strElement, 2, QueryTypeEnum::PrefixPreview)
+                .isEmpty());
+        strCount++;
+    }
+    ASSERT_EQ(strCount, expectPrefixCount);
+}
+
+TEST_F(FleCrudTest, InsertOneTextSearchPrefixAndSuffix) {
+    RAIIServerParameterControllerForTest ffctrl("featureFlagQETextSearchPreview", true);
+
+    const std::string testString = "demonstration";
+    auto doc = BSON("encrypted" << testString);
+    auto element = doc.firstElement();
+
+    // insert element as prefix and suffix indexed where lb = 10; ub = 100
+    // suffixes of (len >= lb) = 4
+    // so cbclen = ceil(10/16) * 16 = 16
+    // so msize = cbclen - lb + 1 = 16 - 10 + 1
+    uint32_t expectSuffixCount = 4;
+    uint32_t msizeSuffix = 16 - 10 + 1;  // cbclen - lb + 1
+    uint32_t suffixPadCount = msizeSuffix - expectSuffixCount;
+
+    // prefix counts are identical tp suffix because of the same lb
+    uint32_t expectPrefixCount = expectSuffixCount;
+    uint32_t msizePrefix = msizeSuffix;
+    uint32_t prefixPadCount = suffixPadCount;
+
+    uint32_t totalTags = msizeSuffix + msizePrefix + 1;  // include exact
 
     // insert element as suffix+prefix-indexed
-    doSingleInsert(4,
+    doSingleInsert(1,
                    element,
                    Fle2AlgorithmInt::kTextSearch,
                    false,
                    static_cast<TextSearchTypeFlags>(TextSearchTypeFlags::INDEX_SUFFIX |
                                                     TextSearchTypeFlags::INDEX_PREFIX));
+    assertDocumentCounts(1, totalTags, totalTags);
+    assertECOCDocumentCountByField("encrypted", totalTags);
 
-    assertDocumentCounts(4, 9, 9);
-    assertECOCDocumentCountByField("encrypted", 9);
+    checkSingleTextSearchElementInsert(testString, suffixPadCount, QueryTypeEnum::SuffixPreview);
+    checkSingleTextSearchElementInsert(testString, prefixPadCount, QueryTypeEnum::PrefixPreview);
+
+    // check each prefix of the value (min length 10) have at most one ESC entry
+    uint32_t strCount = 0;
+    for (size_t len = testString.length(); len >= 10; len--) {
+        auto strDoc = BSON("k" << testString.substr(0, len));
+        auto strElement = strDoc.firstElement();
+        ASSERT_FALSE(
+            findESCNonAnchorForTextSearchElement(strElement, 1, QueryTypeEnum::PrefixPreview)
+                .isEmpty());
+        ASSERT_TRUE(
+            findESCNonAnchorForTextSearchElement(strElement, 2, QueryTypeEnum::PrefixPreview)
+                .isEmpty());
+        strCount++;
+    }
+    ASSERT_EQ(strCount, expectPrefixCount);
+    strCount = 0;
+    for (size_t len = testString.length(); len >= 10; len--) {
+        size_t start = testString.length() - len;
+        auto strDoc = BSON("k" << testString.substr(start, len));
+        auto strElement = strDoc.firstElement();
+        ASSERT_FALSE(
+            findESCNonAnchorForTextSearchElement(strElement, 1, QueryTypeEnum::SuffixPreview)
+                .isEmpty());
+        ASSERT_TRUE(
+            findESCNonAnchorForTextSearchElement(strElement, 2, QueryTypeEnum::SuffixPreview)
+                .isEmpty());
+        strCount++;
+    }
+    ASSERT_EQ(strCount, expectSuffixCount);
 }
 
 // Insert two documents with same values
@@ -1211,6 +1417,25 @@ TEST_F(FleCrudTest, InsertUnindexedV1AgainstV2Protocol) {
         6379103);
 }
 
+// Test insert update payloads containing both the range edgeTokenSet array ('g') and the text
+// search token sets ('b') is rejected.
+TEST_F(FleCrudTest, InsertPayloadIsBothRangeAndTextSearch) {
+    auto bogusEncryptedTokens = StateCollectionTokensV2({{}}, false).encrypt({{}});
+    FLE2InsertUpdatePayloadV2 payload(
+        {}, {}, bogusEncryptedTokens, indexKeyId, BSONType::String, {}, {}, {}, 0);
+    payload.setEdgeTokenSet(std::vector<EdgeTokenSetV2>{{{}, {}, {}, bogusEncryptedTokens}});
+    payload.setTextSearchTokenSets(
+        TextSearchTokenSets{{{}, {}, {}, bogusEncryptedTokens}, {}, {}, {}});
+    auto iup = payload.toBSON();
+    std::vector<uint8_t> buf(iup.objsize() + 1);
+    buf[0] = static_cast<uint8_t>(EncryptedBinDataType::kFLE2InsertUpdatePayloadV2);
+    std::copy(iup.objdata(), iup.objdata() + iup.objsize(), buf.data() + 1);
+    BSONObjBuilder builder;
+    builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+    BSONObj document = builder.obj();
+
+    ASSERT_THROWS_CODE(EDCServerCollection::getEncryptedFieldInfo(document), DBException, 9783801);
+}
 
 // Insert and delete one document
 TEST_F(FleCrudTest, InsertAndDeleteOne) {
@@ -1381,13 +1606,12 @@ TEST_F(FleCrudTest, UpdateOneReplace) {
                         << "top secret");
 
     auto buf = generateSinglePlaceholder(replace.firstElement());
+    auto efc = getTestEncryptedFieldConfig();
 
-    auto replaceEP = BSON("plainText"
-                          << "fake"
-                          << "encrypted"
-                          << BSONBinData(buf.data(), buf.size(), BinDataType::Encrypt));
-
-    auto result = FLEClientCrypto::transformPlaceholders(replaceEP, &_keyVault);
+    auto result =
+        BSON("plainText"
+             << "fake"
+             << transformElementForInsertUpdate(replace.firstElement(), buf, efc).firstElement());
 
     doSingleUpdateWithUpdateDoc(
         1,
@@ -1416,13 +1640,12 @@ TEST_F(FleCrudTest, UpdateOneReplaceRange) {
 
     auto replace = BSON("encrypted" << 2);
     auto buf = generateSinglePlaceholder(replace.firstElement(), Fle2AlgorithmInt::kRange);
+    auto efc = getTestEncryptedFieldConfig(Fle2AlgorithmInt::kRange);
 
-    auto replaceEP = BSON("plaintext"
-                          << "fake"
-                          << "encrypted"
-                          << BSONBinData(buf.data(), buf.size(), BinDataType::Encrypt));
-
-    auto result = FLEClientCrypto::transformPlaceholders(replaceEP, &_keyVault);
+    auto result =
+        BSON("plaintext"
+             << "fake"
+             << transformElementForInsertUpdate(replace.firstElement(), buf, efc).firstElement());
 
     doSingleUpdateWithUpdateDoc(
         1,
@@ -1505,13 +1728,12 @@ TEST_F(FleCrudTest, FindAndModify_UpdateOne) {
                     << "top secret");
     auto element = doc.firstElement();
     auto buf = generateSinglePlaceholder(element);
+    auto efc = getTestEncryptedFieldConfig();
+
     BSONObjBuilder builder;
     builder.append("$inc", BSON("counter" << 1));
-    builder.append("$set",
-                   BSON("encrypted" << BSONBinData(buf.data(), buf.size(), BinDataType::Encrypt)));
-    auto clientDoc = builder.obj();
-    auto result = FLEClientCrypto::transformPlaceholders(clientDoc, &_keyVault);
-
+    builder.append("$set", transformElementForInsertUpdate(element, buf, efc));
+    auto result = builder.obj();
 
     write_ops::FindAndModifyCommandRequest req(_edcNs);
     req.setQuery(BSON("_id" << 1));
@@ -1542,13 +1764,12 @@ TEST_F(FleCrudTest, FindAndModify_UpdateOneRange) {
     auto doc = BSON("encrypted" << 2);
     auto element = doc.firstElement();
     auto buf = generateSinglePlaceholder(element, Fle2AlgorithmInt::kRange);
+    auto efc = getTestEncryptedFieldConfig(Fle2AlgorithmInt::kRange);
+
     BSONObjBuilder builder;
     builder.append("$inc", BSON("counter" << 1));
-    builder.append("$set",
-                   BSON("encrypted" << BSONBinData(buf.data(), buf.size(), BinDataType::Encrypt)));
-    auto clientDoc = builder.obj();
-    auto result = FLEClientCrypto::transformPlaceholders(clientDoc, &_keyVault);
-
+    builder.append("$set", transformElementForInsertUpdate(element, buf, efc));
+    auto result = builder.obj();
 
     write_ops::FindAndModifyCommandRequest req(_edcNs);
     req.setQuery(BSON("_id" << 1));
