@@ -1462,7 +1462,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         bazel_internal_flags.append(
             f"--developer_dir={os.environ.get('DEVELOPER_DIR', '/Applications/Xcode.app')}"
         )
-        minimum_macos_version = "11.0" if normalized_arch == "arm64" else "10.14"
+        minimum_macos_version = "11.0"
         bazel_internal_flags.append(f"--macos_minimum_os={minimum_macos_version}")
 
     if normalized_os == "windows":
@@ -1596,7 +1596,7 @@ def generate(env: SCons.Environment.Environment) -> None:
     # We always use --compilation_mode debug for now as we always want -g, so assume -dbg location
     out_dir_platform = "$TARGET_ARCH"
     if normalized_os == "macos":
-        out_dir_platform = "darwin_arm64" if normalized_arch == "arm64" else "darwin"
+        out_dir_platform = "darwin_arm64" if normalized_arch == "arm64" else "darwin_x86_64"
     elif normalized_os == "windows":
         out_dir_platform = "x64_windows"
     elif normalized_os == "linux" and normalized_arch == "amd64":
