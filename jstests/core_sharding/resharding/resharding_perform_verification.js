@@ -165,7 +165,7 @@ function testResharding(thread, countDownLatch, performVerification) {
             // specifies 'performVerification' to true, and the resharding command runs only on
             // configsvr or shardsvr nodes that know about the this field.
             assert.commandFailedWithCode(res, ErrorCodes.InvalidOptions);
-            assert(res.errmsg.includes("Cannot specify 'performVerification' to true when " +
+            assert(res.errmsg.includes("Cannot set 'performVerification' to true when " +
                                        "featureFlagReshardingVerification is not enabled"),
                    res);
             assert.eq(performVerification, true, res);
