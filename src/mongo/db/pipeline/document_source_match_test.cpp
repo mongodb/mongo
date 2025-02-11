@@ -293,7 +293,7 @@ TEST_F(DocumentSourceMatchTest,
         "       b: {$_internalSchemaObjectMatch: {"
         "           $or: [{c: {$type: 'string'}}, {c: {$gt: 0}}]"
         "       }}}"
-        "    }}}");
+        "    }}");
     auto match = DocumentSourceMatch::create(query, getExpCtx());
     DepsTracker dependencies;
     ASSERT_EQUALS(DepsTracker::State::SEE_NEXT, match->getDependencies(&dependencies));
@@ -440,7 +440,7 @@ TEST_F(DocumentSourceMatchTest, ShouldAddOuterFieldToDependenciesIfElemMatchCont
 }
 
 TEST_F(DocumentSourceMatchTest, ShouldAddNotClausesFieldAsDependency) {
-    auto match = DocumentSourceMatch::create(fromjson("{b: {$not: {$gte: 4}}}}"), getExpCtx());
+    auto match = DocumentSourceMatch::create(fromjson("{b: {$not: {$gte: 4}}}"), getExpCtx());
     DepsTracker dependencies;
     ASSERT_EQUALS(DepsTracker::State::SEE_NEXT, match->getDependencies(&dependencies));
     ASSERT_EQUALS(1U, dependencies.fields.count("b"));

@@ -126,7 +126,7 @@ TEST(InternalSchemaCondMatchExpressionTest, AppliesToSubobjectsViaObjectMatch) {
 
     ASSERT_FALSE(
         objMatch.matchesBSON(fromjson("{name: 'dave', team: 'server', subteam: 'query'}")));
-    ASSERT_FALSE(objMatch.matchesBSON(fromjson("{name: 'mateo', interests: ['perl', 'python']}}")));
+    ASSERT_FALSE(objMatch.matchesBSON(fromjson("{name: 'mateo', interests: ['perl', 'python']}")));
     ASSERT_FALSE(objMatch.matchesBSON(
         fromjson("{name: 'lucas', job: {team: 'competitor', subteam: 'query'}}")));
     ASSERT_FALSE(

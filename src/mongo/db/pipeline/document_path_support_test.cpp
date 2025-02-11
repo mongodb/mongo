@@ -360,13 +360,13 @@ TEST(ExtractElementAlongNonArrayPathTest, ReturnsValueIfPathExists) {
 }
 
 TEST(ExtractElementAlongNonArrayPathTest, FailsIfPathTerminatesAtEmptyArray) {
-    Document doc{fromjson("{a: {b: {c: {d: []}}}}}")};
+    Document doc{fromjson("{a: {b: {c: {d: []}}}}")};
     auto result = extractElementAlongNonArrayPath(doc, FieldPath{"a.b.c.d"});
     ASSERT_EQ(result.getStatus(), ErrorCodes::InternalError);
 }
 
 TEST(ExtractElementAlongNonArrayPathTest, FailsIfPathTerminatesAtNonEmptyArray) {
-    Document doc{fromjson("{a: {b: {c: {d: [1, 2, 3]}}}}}")};
+    Document doc{fromjson("{a: {b: {c: {d: [1, 2, 3]}}}}")};
     auto result = extractElementAlongNonArrayPath(doc, FieldPath{"a.b.c.d"});
     ASSERT_EQ(result.getStatus(), ErrorCodes::InternalError);
 }

@@ -270,7 +270,7 @@ TEST_F(Fle2MatchTest, MatchesIfNoEncryptedFieldsInObject) {
     ASSERT(expr->matchesBSON(fromjson(R"({a: {b: {}, x: { count: 23 }}})")));
 
     // non-object/non-array along the encrypted path
-    ASSERT(expr->matchesBSON(fromjson(R"({a: 1}})")));
+    ASSERT(expr->matchesBSON(fromjson(R"({a: 1})")));
     ASSERT(expr->matchesBSON(fromjson(R"({a: { b: 2, x: "foo"}})")));
 }
 

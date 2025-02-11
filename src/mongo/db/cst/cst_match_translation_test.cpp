@@ -282,13 +282,13 @@ TEST(CstMatchTranslationTest, TranslatesType) {
 
 TEST(CstMatchTranslationTest, TranslatesComment) {
     {
-        auto input = fromjson("{filter: {a: 1, $comment: \"hello, world\"}}}");
+        auto input = fromjson("{filter: {a: 1, $comment: \"hello, world\"}}");
         auto cst = parseMatchToCst(input);
         auto match = translate(cst);
         ASSERT_EQ(match->serialize().toString(), "{ $and: [ { a: { $eq: 1 } } ] }");
     }
     {
-        auto input = fromjson("{filter: {$comment: \"hello, world\"}}}");
+        auto input = fromjson("{filter: {$comment: \"hello, world\"}}");
         auto cst = parseMatchToCst(input);
         auto match = translate(cst);
         auto andExpr = dynamic_cast<AndMatchExpression*>(match.get());
@@ -296,7 +296,7 @@ TEST(CstMatchTranslationTest, TranslatesComment) {
         ASSERT_EQ(0, andExpr->numChildren());
     }
     {
-        auto input = fromjson("{filter: {a: {$exists: true}, $comment: \"hello, world\"}}}");
+        auto input = fromjson("{filter: {a: {$exists: true}, $comment: \"hello, world\"}}");
         auto cst = parseMatchToCst(input);
         auto match = translate(cst);
         ASSERT_EQ(match->serialize().toString(), "{ $and: [ { a: { $exists: true } } ] }");

@@ -1036,7 +1036,7 @@ TEST_F(IdempotencyTest, CollModCommandMultitenant) {
     ASSERT_OK(runOpInitialSync(
         buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600), kUuid)));
 
-    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}}");
+    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}");
     auto collModCmd = BSON("collMod" << nss.coll() << "index" << indexChange);
     auto op = makeCommandOplogEntry(nextOpTime(), nss, collModCmd, kUuid);
 
@@ -1077,7 +1077,7 @@ TEST_F(IdempotencyTest, CollModCommandMultitenantWrongTenant) {
     ASSERT_OK(runOpInitialSync(
         buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600), kUuid)));
 
-    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}}");
+    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}");
     auto collModCmd = BSON("collMod" << nssTenant2.coll() << "index" << indexChange);
     auto op = makeCommandOplogEntry(nextOpTime(), nssTenant2, collModCmd, kUuid);
 
@@ -4368,7 +4368,7 @@ TEST_F(IdempotencyTest, CollModNamespaceNotFound) {
     ASSERT_OK(runOpInitialSync(
         buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600), kUuid)));
 
-    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}}");
+    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}");
     auto collModCmd = BSON("collMod" << _nss.coll() << "index" << indexChange);
     auto collModOp = makeCommandOplogEntry(nextOpTime(), _nss, collModCmd, kUuid);
     auto dropCollOp = makeCommandOplogEntry(nextOpTime(), _nss, BSON("drop" << _nss.coll()), kUuid);
@@ -4385,7 +4385,7 @@ TEST_F(IdempotencyTest, CollModIndexNotFound) {
     ASSERT_OK(runOpInitialSync(
         buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600), kUuid)));
 
-    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}}");
+    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}");
     auto collModCmd = BSON("collMod" << _nss.coll() << "index" << indexChange);
     auto collModOp = makeCommandOplogEntry(nextOpTime(), _nss, collModCmd, kUuid);
     auto dropIndexOp = dropIndex("createdAt_index", kUuid);

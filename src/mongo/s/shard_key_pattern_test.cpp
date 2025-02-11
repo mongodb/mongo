@@ -198,8 +198,8 @@ TEST_F(ShardKeyPatternTest, ExtractDocShardKeySingle) {
     ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:{$dollarPrefixKey:true}}")),
                       fromjson("{a:{$dollarPrefixKey:true}}"));
     ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:{$gt:10}}")), fromjson("{a:{$gt:10}}"));
-    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:{$gt:{$dollarPrefixKey:10}}}}")),
-                      fromjson("{a:{$gt:{$dollarPrefixKey:10}}}}"));
+    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:{$gt:{$dollarPrefixKey:10}}}")),
+                      fromjson("{a:{$gt:{$dollarPrefixKey:10}}}"));
 
     ASSERT_BSONOBJ_EQ(docKey(pattern, BSONObj()), fromjson("{a: null}"));
 
@@ -286,7 +286,7 @@ TEST_F(ShardKeyPatternTest, ExtractDocShardKeyDeepNested) {
 
     ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:[{b:{c:10}},{b:{c:20}}]}")), BSONObj());
 
-    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:[{b:[{c:10},{c:20}]},{b:[{c:30},{c:40}]}]}}")),
+    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:[{b:[{c:10},{c:20}]},{b:[{c:30},{c:40}]}]}")),
                       BSONObj());
 }
 
@@ -465,7 +465,7 @@ TEST_F(ShardKeyPatternTest, ExtractQueryShardKeyDeepNested) {
     ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{a:{b:{c:[10, 20]}}}")), BSONObj());
     ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{a:{b:[{c:10}, {c:20}]}}")), BSONObj());
     ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{a:[{b:{c:10}},{b:{c:20}}]}")), BSONObj());
-    ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{a:[{b:[{c:10},{c:20}]},{b:[{c:30},{c:40}]}]}}")),
+    ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{a:[{b:[{c:10},{c:20}]},{b:[{c:30},{c:40}]}]}")),
                       BSONObj());
 }
 

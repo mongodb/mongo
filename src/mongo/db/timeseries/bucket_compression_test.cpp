@@ -116,7 +116,7 @@ const BSONObj bucketWithDuplicateIndexFieldNames = mongo::fromjson(R"({
                         "2" : {"$date": "2022-08-31T00:00:03Z"}
                 }
         }
-}})");
+})");
 
 void assertNoDuplicateIndexFieldNames(const BSONObj& column) {
     size_t curIdx = 0;

@@ -957,7 +957,7 @@ TEST(Documentation, Example2) {
     static const char outJson[] =
         "{"
         "    'petunias': { 'alive': true, 'dv': 0.0, 'height': 0 },"
-        "    'ex-whale': { 'attrs': [ 'big' ] } })"
+        "    'ex-whale': { 'attrs': [ 'big' ] }"
         "}";
 
     mongo::BSONObjBuilder builder;
@@ -1637,7 +1637,7 @@ TEST(Document, SetValueElementSetToOtherDocRoot) {
     mongo::BSONObj inObj = mongo::fromjson("{ a : { b : 4 } }");
     mmb::Document doc1(inObj);
 
-    mongo::BSONObj inObj2 = mongo::fromjson("{ c : 5 } }");
+    mongo::BSONObj inObj2 = mongo::fromjson("{ c : 5 }");
     mmb::Document doc2(inObj2);
 
     auto setTo = doc1.root().leftChild().leftChild();
@@ -1657,7 +1657,7 @@ TEST(Document, CreateElementWithEmptyFieldName) {
 }
 
 TEST(Document, CreateElementFromBSONElement) {
-    mongo::BSONObj obj = mongo::fromjson("{a:1}}");
+    mongo::BSONObj obj = mongo::fromjson("{a:1}");
     mmb::Document doc;
     ASSERT_OK(doc.root().appendElement(obj["a"]));
 
