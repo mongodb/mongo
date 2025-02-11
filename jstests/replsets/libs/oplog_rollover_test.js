@@ -76,26 +76,8 @@ export function rollOver1MBOplog(replSet) {
     assert.eq(2, numInsertOplogEntry(secondaryOplog));
 
     const awaitCheckpointer = function(timestamp) {
-        assert.soon(() => {
-            const primaryReplSetStatus =
-                assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
-            const primaryRecoveryTimestamp = primaryReplSetStatus.lastStableRecoveryTimestamp;
-            const primaryDurableTimestamp = primaryReplSetStatus.optimes.durableOpTime.ts;
-            const secondaryReplSetStatus =
-                assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
-            const secondaryRecoveryTimestamp = secondaryReplSetStatus.lastStableRecoveryTimestamp;
-            const secondaryDurableTimestamp = secondaryReplSetStatus.optimes.durableOpTime.ts;
-            jsTestLog("Awaiting durable & last stable recovery timestamp " +
-                      `(primary last stable recovery: ${tojson(primaryRecoveryTimestamp)}, ` +
-                      `primary durable: ${tojson(primaryDurableTimestamp)}, ` +
-                      `secondary last stable recovery: ${tojson(secondaryRecoveryTimestamp)}, ` +
-                      `secondary durable: ${tojson(secondaryDurableTimestamp)}) ` +
-                      `target: ${tojson(timestamp)}`);
-            return ((timestampCmp(primaryRecoveryTimestamp, timestamp) >= 0) &&
-                    (timestampCmp(primaryDurableTimestamp, timestamp) >= 0) &&
-                    (timestampCmp(secondaryDurableTimestamp, timestamp) >= 0) &&
-                    (timestampCmp(secondaryRecoveryTimestamp, timestamp) >= 0));
-        }, "Timeout waiting for checkpointing to catch up", ReplSetTest.kDefaultTimeoutMS, 2000);
+        replSet.waitForCheckpoint(primary, timestamp);
+        replSet.waitForCheckpoint(secondary, timestamp);
     };
 
     // Wait for checkpointing/stable timestamp to catch up with the second insert so oplog

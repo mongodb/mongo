@@ -72,18 +72,7 @@ checkLog.containsJson(primary, 6825301, {
 // Wait until majority read concern optime has advanced past the given timestamp. Then take a
 // checkpoint and assert that the checkpoint's stable time is past the oplog entry.
 const advanceMajorityThenCheckpoint = function(timestamp) {
-    assert.soon(
-        () => {
-            const replSetStatus = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
-            const majorityOpTime = replSetStatus.optimes.readConcernMajorityOpTime.ts;
-            jsTestLog("Awaiting read concern majority optime to advance. " +
-                      `Current: ${tojson(majorityOpTime)}, ` +
-                      `target: ${tojson(timestamp)}`);
-            return ((timestampCmp(majorityOpTime, timestamp) >= 0));
-        },
-        "Timeout waiting for read concern majority optime to catch up",
-        ReplSetTest.kDefaultTimeoutMS,
-        2000);
+    rst.waitForStableTimestampTobeAdvanced(primary, timestamp);
 
     assert.commandWorked(db.adminCommand({fsync: 1}));
 

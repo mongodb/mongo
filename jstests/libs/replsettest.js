@@ -3073,6 +3073,44 @@ export class ReplSetTest {
 
         return primary;
     }
+
+    /**
+     * Returns after stable_timestamp has been advanced to at least Timestamp ts. The stable
+     * timestamp is not exposed by replSetGetStatus, so we use the readConcernMajorityOpTime
+     * instead, because it reflects the time of the current committed snapshot. This time is
+     * determined before setting the stable timestamp, and both are done under the same mutex
+     * acquisition, so readConcernMajorityOpTime >= ts indicates stable_timestamp >= ts. See
+     * ReplicationCoordinatorImpl::_setStableTimestampForStorage for further
+     * implementation details.
+     * @param node The node to check for stable_timestamp.
+     * @param ts The timestamp to compare the stable_timestamp to.
+     * @param timeout How long to wait for state, defaults to global value.
+     */
+    waitForStableTimestampTobeAdvanced(node, ts, timeout = ReplSetTest.kDefaultTimeoutMS) {
+        assert.soon(function() {
+            jsTestLog("Waiting for stable_timestamp >= Timestamp " + ts.toStringIncomparable());
+            const replSetStatus = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
+            const readConcernMajorityOpTime = replSetStatus.optimes.readConcernMajorityOpTime.ts;
+            return (timestampCmp(readConcernMajorityOpTime, ts) >= 0);
+        }, "Timed out waiting for stable_timestamp", timeout);
+    }
+
+    /**
+     * Returns after lastStableRecoveryTimestamp has been advanced to at least Timestamp ts. Note
+     * that the checkpointer thread should be running for this function to return.
+     * @param node The node to check for last checkpoint time.
+     * @param ts The timestamp to compare the lastStableRecoveryTimestamp to.
+     * @param timeout How long to wait for state, defaults to global value.
+     */
+    waitForCheckpoint(node, ts, timeout = ReplSetTest.kDefaultTimeoutMS) {
+        this.waitForStableTimestampTobeAdvanced(node, ts, timeout);
+        assert.soon(function() {
+            jsTestLog("Waiting for checkpoint >= Timestamp " + ts.toStringIncomparable());
+            const replSetStatus = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
+            const lastStableRecoveryTimestamp = replSetStatus.lastStableRecoveryTimestamp;
+            return (timestampCmp(lastStableRecoveryTimestamp, ts) >= 0);
+        }, "Timed out waiting for checkpoint", timeout);
+    }
 }
 
 /**
