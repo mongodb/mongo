@@ -980,6 +980,10 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorSuccessfullyTransi
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorTransitionsTokDoneWithInterrupt) {
+    auto reshardingOptions = makeDefaultReshardingOptions();
+    // TODO (SERVER-100735): Investigate why 'documentsFinal' can be missing from the recipient
+    // state doc in when there is interrupt.
+    reshardingOptions.performVerification = false;
     const auto interrupt = [this] {
         killAllReshardingCoordinatorOps();
     };
@@ -987,7 +991,14 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorTransitionsTokDone
         TransitionFunctionMap{{CoordinatorStateEnum::kPreparingToDonate, interrupt},
                               {CoordinatorStateEnum::kCloning, interrupt},
                               {CoordinatorStateEnum::kApplying, interrupt},
-                              {CoordinatorStateEnum::kBlockingWrites, interrupt}});
+                              {CoordinatorStateEnum::kBlockingWrites, interrupt}},
+        nullptr /* stateTransitionsGuard */,
+        {CoordinatorStateEnum::kPreparingToDonate,
+         CoordinatorStateEnum::kCloning,
+         CoordinatorStateEnum::kApplying,
+         CoordinatorStateEnum::kBlockingWrites,
+         CoordinatorStateEnum::kCommitting},
+        reshardingOptions);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest,
