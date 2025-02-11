@@ -1541,7 +1541,9 @@ StatusWith<Date_t> JParse::parseDate() {
             return parseError("Date milliseconds overflow");
         }
         msSinceEpoch = static_cast<long long>(oldDate);
-    } else if (!parsedStatus.isOK()) {
+    }
+
+    if (!parsedStatus.isOK()) {
         return parseError("Date expecting integer milliseconds");
     }
     invariant(endptr != _input);
