@@ -779,9 +779,9 @@ selector:
   # - jstests/core/rename8.js
   - jstests/core/rename_change_target_type.js
   # - jstests/core/rename_stayTemp.js # renameCollection
-  # - jstests/core/repair_database.js # Unsupported feature.The Monograph storage engine does not require manual database repair.
-  # - jstests/core/repair_database_input_validation.js # Unsupported feature.The Monograph storage engine does not require manual database repair.
-  # - jstests/core/repair_server12955.js # Unsupported feature.The Monograph storage engine does not require manual database repair.
+  # - jstests/core/repair_database.js # Unsupported feature.The Eloq storage engine does not require manual database repair.
+  # - jstests/core/repair_database_input_validation.js # Unsupported feature.The Eloq storage engine does not require manual database repair.
+  # - jstests/core/repair_server12955.js # Unsupported feature.The Eloq storage engine does not require manual database repair.
   # - jstests/core/restart_catalog.js # 71: Storage engine does not support read concern
   - jstests/core/return_key.js
   - jstests/core/role_management_helpers.js

@@ -263,7 +263,7 @@ Collection* DatabaseImpl::_createCollectionHandler(OperationContext* opCtx,
     }
     auto cce = _dbEntry->getCollectionCatalogEntry(opCtx, nss.toStringData());
     if (!cce) {
-        // The collection not exists in the Monograph
+        // The collection not exists in the Eloq
         return nullptr;
     }
     CollectionCatalogEntry::MetaData metadata = cce->getMetaData(opCtx);
@@ -296,7 +296,7 @@ Collection* DatabaseImpl::_createCollectionHandler(OperationContext* opCtx,
                 // createCollection() may be called before the in-memory fCV parameter is
                 // initialized, so use the unsafe fCV getter here.
 
-                // There is no need for Monograph to call this function.
+                // There is no need for Eloq to call this function.
                 // The check for index specification has been done through `prepareSpecForCreate`
                 // during DatabaseImpl::createCollection.
 
@@ -1289,7 +1289,7 @@ StatusWith<BSONObj> fixIndexSpec(OperationContext* opCtx,
 // MongoDB processes the createCollection command in two distinct steps:
 // 1. creates the collection.
 // 2. creates the _id index.
-// In contrast, Monograph handles the createCollection command in a single step, consolidating the
+// In contrast, Eloq handles the createCollection command in a single step, consolidating the
 // process into the initial "create the collection" phase.
 //
 // However, during the creation of the _id index, MongoDB performs several validation checks that
@@ -1610,8 +1610,8 @@ MONGO_REGISTER_SHIM(Database::userCreateNS)
         return {ErrorCodes::BadValue, "Unsupported value for autoIndexId field: false."};
     }
 
-    // See https://github.com/monographdb/monographdb_engine_for_mongodb/issues/73
-    // Capped collections are not supported in Monograph, with the exception of certain
+    // See https://github.com/Eloqdb/Eloqdb_engine_for_mongodb/issues/73
+    // Capped collections are not supported in Eloq, with the exception of certain
     // system collections in the "local" database, which are explicitly allowed.
     if (collectionOptions.capped) {
         NamespaceString nss{ns};

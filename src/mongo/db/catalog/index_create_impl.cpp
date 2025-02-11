@@ -338,7 +338,7 @@ void failPointHangDuringBuild(FailPoint* fp, StringData where, const BSONObj& do
 }
 
 Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* dupsOut) {
-    // This is currently a no-op, as index building is handled by Monograph.
+    // This is currently a no-op, as index building is handled by Eloq.
     return Status::OK();
 
     invariant(!_opCtx->lockState()->inAWriteUnitOfWork());

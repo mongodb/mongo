@@ -453,7 +453,7 @@ public:
     }
 
 private:
-    // set true in monograph
+    // set true in eloq
     bool useNoopLockImpl{false};
 };
 

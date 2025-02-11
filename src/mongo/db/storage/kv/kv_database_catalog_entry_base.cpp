@@ -274,7 +274,7 @@ Status KVDatabaseCatalogEntryBase::createCollection(OperationContext* opCtx,
     auto status = _engine->getCatalog()->newCollection(opCtx, nss, options, idIndexSpec);
 
     if (status.isOK()) {
-        // Transaction which has created successfully in Monograph
+        // Transaction which has created successfully in Eloq
         // create KVCollectionCatalogEntry directly here.
         if (auto iter = _collections.find(nss.toStringData()); iter == _collections.end()) {
             // Create corresponding KVCollectionCatalogEntry on this node

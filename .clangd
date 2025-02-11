@@ -2,9 +2,9 @@ If:
   PathMatch: src/.*
   PathExclude:
     [
-      src/mongo/db/modules/monograph/cass/.*,
-      src/mongo/db/modules/monograph/tx_service/.*,
-      src/mongo/db/modules/monograph/mono_metrics/.*,
+      src/mongo/db/modules/eloq/cass/.*,
+      src/mongo/db/modules/eloq/tx_service/.*,
+      src/mongo/db/modules/eloq/eloq_metrics/.*,
     ]
 CompileFlags:
   CompilationDatabase: ./
@@ -30,12 +30,13 @@ Diagnostics:
 If:
   PathMatch:
     [
-      src/mongo/db/modules/monograph/cass/.*,
-      src/mongo/db/modules/monograph/tx_service/.*,
-      src/mongo/db/modules/monograph/mono_metrics/.*,
+      src/mongo/db/modules/eloq/cass/.*,
+      src/mongo/db/modules/eloq/tx_service/.*,
+      src/mongo/db/modules/eloq/log_service/.*,
+      src/mongo/db/modules/eloq/eloq_metrics/.*,
     ]
 CompileFlags:
-  CompilationDatabase: src/mongo/db/modules/monograph/build
+  CompilationDatabase: src/mongo/db/modules/eloq/build
   Add: [-Wall, -I/usr/lib/gcc/x86_64-linux-gnu/13/include]
 Diagnostics:
   Suppress: builtin_definition

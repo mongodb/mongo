@@ -5,14 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(gdb) Launch monograph",
+            "name": "(gdb) Launch EloqDoc",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/Debug/mongo/mongod",
             "args": [
                 "--config",
-                "src/mongo/db/modules/monograph/config/standalone/debug_coroutine.conf"
-                // "src/mongo/db/modules/monograph/config/multinode/node2.template.conf"
+                "src/mongo/db/modules/eloq/config/standalone/debug_coroutine.conf"
+                // "src/mongo/db/modules/eloq/config/multinode/node2.template.conf"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -20,11 +20,11 @@
                 {
                     // path to libtxservice.so, liblogservice.so
                     "name": "LD_LIBRARY_PATH",
-                    "value": "${workspaceFolder}/src/mongo/db/modules/monograph/build"
+                    "value": "${workspaceFolder}/src/mongo/db/modules/eloq/build"
                 },
                 {
                     // preload asan library and libbraft.so(libbrpc.so)
-                    // for more information, please refer to `src/mongo/db/modules/monograph/issues.md`
+                    // for more information, please refer to `src/mongo/db/modules/eloq/issues.md`
                     "name": "LD_PRELOAD",
                     "value": "/usr/lib/x86_64-linux-gnu/libasan.so.5:/usr/local/lib/libmimalloc.so:/usr/lib/libbrpc.so"
                 },
@@ -53,13 +53,13 @@
             ]
         },
         {
-            "name": "(gdb) Launch monograph RelWithDebInfo",
+            "name": "(gdb) Launch eloq RelWithDebInfo",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/RelWithDebInfo/mongo/mongod",
             "args": [
                 "--config",
-                "src/mongo/db/modules/monograph/test_folder/config/monograph/release_coroutine.conf"
+                "src/mongo/db/modules/eloq/test_folder/config/eloq/release_coroutine.conf"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -67,11 +67,11 @@
                 {
                     // path to libtxservice.so, liblogservice.so
                     "name": "LD_LIBRARY_PATH",
-                    "value": "${workspaceFolder}/src/mongo/db/modules/monograph/build"
+                    "value": "${workspaceFolder}/src/mongo/db/modules/eloq/build"
                 },
                 {
                     // preload asan library and libbraft.so(libbrpc.so)
-                    // for more information, please refer to `src/mongo/db/modules/monograph/issues.md`
+                    // for more information, please refer to `src/mongo/db/modules/eloq/issues.md`
                     "name": "LD_PRELOAD",
                     "value": "/usr/lib/libbrpc.so"
                 },
@@ -108,9 +108,9 @@
                 "--storageEngine",
                 "wiredTiger",
                 "--dbpath",
-                "${workspaceFolder}/src/mongo/db/modules/monograph/test_folder/test_wiredtiger",
+                "${workspaceFolder}/src/mongo/db/modules/eloq/test_folder/test_wiredtiger",
                 "--logpath",
-                "${workspaceFolder}/src/mongo/db/modules/monograph/test_folder/log/log.json",
+                "${workspaceFolder}/src/mongo/db/modules/eloq/test_folder/log/log.json",
                 "--setParameter",
                 "logComponentVerbosity={storage: 1}",
                 "--setParameter",
@@ -124,11 +124,11 @@
                 {
                     // path to libtxservice.so, liblogservice.so
                     "name": "LD_LIBRARY_PATH",
-                    "value": "${workspaceFolder}/src/mongo/db/modules/monograph/build"
+                    "value": "${workspaceFolder}/src/mongo/db/modules/eloq/build"
                 },
                 {
                     // preload asan library and libbraft.so(libbrpc.so)
-                    // for more information, please refer to `src/mongo/db/modules/monograph/issues.md`
+                    // for more information, please refer to `src/mongo/db/modules/eloq/issues.md`
                     "name": "LD_PRELOAD",
                     "value": "/usr/lib/x86_64-linux-gnu/libasan.so.5:/usr/lib/libbraft.so"
                 },

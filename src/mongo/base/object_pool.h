@@ -1,9 +1,10 @@
 #pragma once
 
-#include "mongo/db/modules/monograph/tx_service/include/circular_queue.h"
 #include <memory>
 #include <stack>
 #include <vector>
+
+#include "mongo/db/modules/eloq/tx_service/include/circular_queue.h"
 
 namespace mongo {
 template <typename T>
@@ -27,7 +28,7 @@ public:
 
     /*
       Implicitly convert type for classes which need a polymorphism Deleter.
-      For example, RecoveryUnit and MonographRecoveryUnit
+      For example, RecoveryUnit and EloqRecoveryUnit
     */
     template <typename Base>
     static void PolyDeleter(Base* ptr) {
@@ -136,7 +137,7 @@ thread_local CircularQueue<std::unique_ptr<T>> ObjectPool<T>::_localPool = {};
 
 //     /*
 //       Implicitly convert type for classes which need a polymorphism Deleter.
-//       For example, RecoveryUnit and MonographRecoveryUnit
+//       For example, RecoveryUnit and EloqRecoveryUnit
 //     */
 //     template <typename Base>
 //     static void PolyDeleter(Base* ptr) {
@@ -225,4 +226,3 @@ thread_local CircularQueue<std::unique_ptr<T>> ObjectPool<T>::_localPool = {};
 
 
 // }  // namespace mongo
-

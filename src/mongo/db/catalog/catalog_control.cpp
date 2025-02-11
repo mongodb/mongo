@@ -98,7 +98,7 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     storageEngine->loadCatalog(opCtx);
 
-    // Useless code for Monograph which provide consistency
+    // Useless code for Eloq which provide consistency
     //
     /*
         log() << "openCatalog: reconciling catalog and idents";

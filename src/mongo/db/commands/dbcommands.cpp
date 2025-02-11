@@ -200,7 +200,7 @@ public:
                    string& errmsg,
                    BSONObjBuilder& result) {
         errmsg =
-            "Unsupported feature. The Monograph storage engine does not require manual database "
+            "Unsupported feature. The Eloq storage engine does not require manual database "
             "repair.";
         return false;
 

@@ -4,7 +4,7 @@
         {
             "label": "clean",
             "type": "shell",
-            "command": "./src/mongo/db/modules/monograph/scripts/clean.sh"
+            "command": "./src/mongo/db/modules/eloq/scripts/clean.sh"
         }
     ]
 }

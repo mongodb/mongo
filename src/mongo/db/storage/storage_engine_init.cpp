@@ -35,8 +35,8 @@
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/concurrency/eloq_locker_noop.h"
 #include "mongo/db/concurrency/lock_state.h"
-#include "mongo/db/concurrency/monograph_locker_noop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
@@ -351,7 +351,7 @@ public:
             if (opCtx->lockState()) {
                 opCtx->resetLockState();
             } else {
-                opCtx->setLockState(stdx::make_unique<MonographLockerNoop>());
+                opCtx->setLockState(stdx::make_unique<EloqLockerNoop>());
             }
         } else if (storageEngine->isMmapV1()) {
             MONGO_UNREACHABLE;

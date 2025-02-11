@@ -89,9 +89,9 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
         if (kIndexesFieldName == cmdElemFieldName) {
             if (cmdElem.type() != BSONType::Array) {
                 return {ErrorCodes::TypeMismatch,
-                        str::stream() << "The field '" << kIndexesFieldName
-                                      << "' must be an array, but got "
-                                      << typeName(cmdElem.type())};
+                        str::stream()
+                            << "The field '" << kIndexesFieldName << "' must be an array, but got "
+                            << typeName(cmdElem.type())};
             }
 
             for (auto&& indexesElem : cmdElem.Obj()) {
@@ -135,16 +135,15 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
             continue;
         } else {
             return {ErrorCodes::BadValue,
-                    str::stream() << "Invalid field specified for " << kCommandName << " command: "
-                                  << cmdElemFieldName};
+                    str::stream() << "Invalid field specified for " << kCommandName
+                                  << " command: " << cmdElemFieldName};
         }
     }
 
     if (!hasIndexesField) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << "The '" << kIndexesFieldName
-                              << "' field is a required argument of the "
-                              << kCommandName
+                              << "' field is a required argument of the " << kCommandName
                               << " command"};
     }
 
@@ -376,8 +375,8 @@ public:
                 return uassertStatusOK(indexer.init(specs));
             });
 
-        // Comment out below codes. Monograph build index in tx_service.
-        // 
+        // Comment out below codes. Eloq build index in tx_service.
+        //
         // // If we're a background index, replace exclusive db lock with an intent lock, so that
         // // other readers and writers can proceed during this phase.
         // if (indexer.getBuildInBackground()) {
@@ -415,7 +414,8 @@ public:
         //     }
 
         //     uassert(28551, "database dropped during index build", db);
-        //     uassert(28552, "collection dropped during index build", db->getCollection(opCtx, ns));
+        //     uassert(28552, "collection dropped during index build", db->getCollection(opCtx,
+        //     ns));
         // }
 
         writeConflictRetry(opCtx, kCommandName, ns.ns(), [&] {
@@ -445,9 +445,9 @@ private:
             ShardKeyPattern shardKeyPattern(metadata->getKeyPattern());
             if (!shardKeyPattern.isUniqueIndexCompatible(newIdxKey)) {
                 return Status(ErrorCodes::CannotCreateIndex,
-                              str::stream() << "cannot create unique index over " << newIdxKey
-                                            << " with shard key pattern "
-                                            << shardKeyPattern.toBSON());
+                              str::stream()
+                                  << "cannot create unique index over " << newIdxKey
+                                  << " with shard key pattern " << shardKeyPattern.toBSON());
             }
         }
 
@@ -455,4 +455,4 @@ private:
         return Status::OK();
     }
 } cmdCreateIndex;
-}
+}  // namespace mongo

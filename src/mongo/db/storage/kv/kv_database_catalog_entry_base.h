@@ -84,7 +84,7 @@ public:
                             const BSONObj& idIndexSpec) override;
 
     /*
-     * For table which exists in Monograph, fetches the metadata and create KVCollectionCatalogEntry
+     * For table which exists in Eloq, fetches the metadata and create KVCollectionCatalogEntry
      */
     CollectionCatalogEntry* createKVCollectionCatalogEntry(OperationContext* opCtx,
                                                            StringData ns) override;

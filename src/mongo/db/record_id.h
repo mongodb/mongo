@@ -227,7 +227,7 @@ public:
 
     // repr() now just for Format::kLong
     int64_t repr() const {
-        // In the monograph engine, the RecordId is equivalent to the "_id" field and is stored as a
+        // In the Eloq engine, the RecordId is equivalent to the "_id" field and is stored as a
         // string. Therefore, the repr() function is meaningless.
         // Returning 0 ensures compatibility with the existing API.
         return 0;

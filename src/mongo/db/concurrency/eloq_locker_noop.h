@@ -37,7 +37,7 @@
 namespace mongo {
 // Global lock. Every server operation, which uses the Locker must acquire this lock at least
 // once. See comments in the header file (begin/endTransaction) for more information.
-const ResourceId resourceIdGlobalForMonograph =
+const ResourceId resourceIdGlobalForEloq =
     ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
 
 
@@ -46,9 +46,9 @@ const ResourceId resourceIdGlobalForMonograph =
  * whether a particular resource is locked. Do not use it for cases where actual locking
  * behaviour is expected or locking is performed.
  */
-class MonographLockerNoop final : public Locker {
+class EloqLockerNoop final : public Locker {
 public:
-    MonographLockerNoop() = default;
+    EloqLockerNoop() = default;
 
     void reset() override {
         _lockMap.clear();
@@ -108,7 +108,7 @@ public:
     }
 
     LockResult lockBegin(OperationContext* opCtx, const ResourceId& resId, LockMode mode) {
-        if (resId == resourceIdGlobalForMonograph) {
+        if (resId == resourceIdGlobalForEloq) {
             _recursiveCount++;
             if (!isModeCovered(mode, _globalLockMode)) {
                 _globalLockMode = mode;
@@ -122,7 +122,7 @@ public:
     }
 
     LockResult lockGlobalBegin(OperationContext* opCtx, LockMode mode, Date_t deadline) override {
-        return lockBegin(opCtx, resourceIdGlobalForMonograph, mode);
+        return lockBegin(opCtx, resourceIdGlobalForEloq, mode);
     }
 
     LockResult lockGlobalBegin(LockMode mode, Date_t deadline) override {
@@ -140,7 +140,7 @@ public:
     void lockMMAPV1Flush() override {}
 
     bool unlockGlobal() override {
-        unlock(resourceIdGlobalForMonograph);
+        unlock(resourceIdGlobalForEloq);
         return true;
     }
 
@@ -177,7 +177,7 @@ public:
     }
 
     bool unlock(ResourceId resId) override {
-        if (resId == resourceIdGlobalForMonograph) {
+        if (resId == resourceIdGlobalForEloq) {
             _recursiveCount--;
             if (_recursiveCount == 0) {
                 _globalLockMode = LockMode::MODE_NONE;
@@ -189,7 +189,7 @@ public:
     }
 
     LockMode getLockMode(ResourceId resId) const override {
-        if (resId == resourceIdGlobalForMonograph) {
+        if (resId == resourceIdGlobalForEloq) {
             return _globalLockMode;
         } else {
             auto iter = _lockMap.find(resId);
@@ -248,7 +248,7 @@ public:
         }
 
         stateOut->globalMode = _globalLockMode;
-        unlock(resourceIdGlobalForMonograph);
+        unlock(resourceIdGlobalForEloq);
         _recursiveCount = 0;
 
         for (auto it = _lockMap.begin(); it != _lockMap.end();) {
