@@ -81,26 +81,9 @@ void insertOplogEntry(OperationContext* opCtx,
 void notifyChangeStreamsOnShardCollection(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const UUID& uuid,
-                                          BSONObj cmd,
-                                          CommitPhase commitPhase,
-                                          const boost::optional<std::set<ShardId>>& shardIds) {
+                                          BSONObj cmd) {
     BSONObjBuilder cmdBuilder;
-    std::string opName;
-    switch (commitPhase) {
-        case mongo::CommitPhase::kSuccessful:
-            opName = "shardCollection";
-            break;
-        case CommitPhase::kAborted:
-            opName = "shardCollectionAbort";
-            break;
-        case CommitPhase::kPrepare:
-            // in case of prepare, shardsIds is required
-            cmdBuilder.append("shards", *shardIds);
-            opName = "shardCollectionPrepare";
-            break;
-        default:
-            MONGO_UNREACHABLE;
-    }
+    StringData opName("shardCollection");
 
     const auto nssStr = NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
     cmdBuilder.append(opName, nssStr);

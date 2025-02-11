@@ -825,8 +825,7 @@ void ReshardingRecipientService::RecipientStateMachine::
         notifyChangeStreamsOnShardCollection(opCtx.get(),
                                              _metadata.getTempReshardingNss(),
                                              _metadata.getReshardingUUID(),
-                                             createCollRequest,
-                                             CommitPhase::kSuccessful);
+                                             createCollRequest);
 
         if (resharding::gFeatureFlagReshardingVerification.isEnabled(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {

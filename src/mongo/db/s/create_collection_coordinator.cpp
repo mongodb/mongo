@@ -1296,14 +1296,11 @@ boost::optional<UUID> createCollectionAndIndexes(
     return *sharding_ddl_util::getCollectionUUID(opCtx, translatedNss);
 }
 
-void generateCommitEventForChangeStreams(
-    OperationContext* opCtx,
-    const NamespaceString& translatedNss,
-    const UUID& collUUID,
-    const ShardsvrCreateCollectionRequest& originalRequest,
-    mongo::TranslatedRequestParams& translatedRequestParams,
-    CommitPhase commitPhase,
-    const boost::optional<std::set<ShardId>>& shardsHostingCollection = boost::none) {
+void generateCommitEventForChangeStreams(OperationContext* opCtx,
+                                         const NamespaceString& translatedNss,
+                                         const UUID& collUUID,
+                                         const ShardsvrCreateCollectionRequest& originalRequest,
+                                         mongo::TranslatedRequestParams& translatedRequestParams) {
     if (originalRequest.getUnsplittable()) {
         // Do not generate any event; unsplittable collections cannot appear as sharded ones to
         // change stream users.
@@ -1318,12 +1315,7 @@ void generateCommitEventForChangeStreams(
     // but it is still kept in the request until it can be safely removed.
     patchedRequest.setNumInitialChunks(boost::none);
 
-    notifyChangeStreamsOnShardCollection(opCtx,
-                                         translatedNss,
-                                         collUUID,
-                                         patchedRequest.toBSON(),
-                                         commitPhase,
-                                         shardsHostingCollection);
+    notifyChangeStreamsOnShardCollection(opCtx, translatedNss, collUUID, patchedRequest.toBSON());
 }
 
 /**
@@ -2087,14 +2079,6 @@ void CreateCollectionCoordinator::_commitOnShardingCatalog(
         involvedShards.emplace(chunk.getShard());
     }
 
-    generateCommitEventForChangeStreams(opCtx,
-                                        nss(),
-                                        *_uuid,
-                                        _request,
-                                        *_doc.getTranslatedRequestParams(),
-                                        CommitPhase::kPrepare,
-                                        involvedShards);
-
     commit(opCtx,
            **executor,
            _request,
@@ -2171,12 +2155,8 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
     }
 
     // Ensure that the change stream event gets emitted at least once.
-    generateCommitEventForChangeStreams(opCtx,
-                                        nss(),
-                                        *_uuid,
-                                        _request,
-                                        *_doc.getTranslatedRequestParams(),
-                                        CommitPhase::kSuccessful);
+    generateCommitEventForChangeStreams(
+        opCtx, nss(), *_uuid, _request, *_doc.getTranslatedRequestParams());
 }
 
 void CreateCollectionCoordinator::_exitCriticalSection(
@@ -2225,19 +2205,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
             _performNoopRetryableWriteOnAllShardsAndConfigsvr(
                 opCtx, getNewSession(opCtx), **executor);
 
-            if (_doc.getPhase() >= Phase::kCommitOnShardingCatalog) {
-                _uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
-
-                // Notify change streams to abort the shard collection.
-                generateCommitEventForChangeStreams(opCtx,
-                                                    nss(),
-                                                    *_uuid,
-                                                    _request,
-                                                    *_doc.getTranslatedRequestParams(),
-                                                    CommitPhase::kAborted);
-            }
-
             if (_doc.getPhase() >= Phase::kCreateCollectionOnParticipants) {
+                _uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
                 // TODO SERVER-83774: Remove the following invariant and skip the broadcast if the
                 // _uuid does not exist.
                 invariant(_uuid);
