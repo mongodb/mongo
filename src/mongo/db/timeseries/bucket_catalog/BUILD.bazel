@@ -62,6 +62,7 @@ mongo_cc_unit_test(
     name = "db_bucket_catalog_test",
     srcs = [
         "bucket_catalog_helpers_test.cpp",
+        "bucket_catalog_internal_test.cpp",
         "bucket_catalog_test.cpp",
         "bucket_state_registry_test.cpp",
         "measurement_map_test.cpp",

@@ -405,6 +405,26 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     const StringDataComparator* comparator);
 
 /**
+ * Determines if and why 'bucket' needs to be rolled over to accommodate 'doc'.
+ * Will also update the bucket catalog stats incNumBucketsKeptOpenDueToLargeMeasurements as
+ * appropriate.
+ */
+RolloverReason determineRolloverReason(const BSONObj& doc,
+                                       ExecutionStatsController stats,
+                                       const TimeseriesOptions& timeseriesOptions,
+                                       Bucket& bucket,
+                                       uint32_t numberOfActiveBuckets,
+                                       Sizes& sizesToBeAdded,
+                                       const Date_t& time,
+                                       uint64_t storageCacheSizeBytes,
+                                       const StringDataComparator* comparator);
+
+/**
+ * Updates the stats based on the RolloverReason.
+ */
+void updateRolloverStats(ExecutionStatsController stats, RolloverReason reason);
+
+/**
  * Retrieves or initializes the execution stats for the given namespace, for writing.
  */
 ExecutionStatsController getOrInitializeExecutionStats(BucketCatalog& catalog,

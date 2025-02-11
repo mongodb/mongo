@@ -1461,6 +1461,91 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     return {RolloverAction::kNone, RolloverReason::kNone};
 }
 
+void updateRolloverStats(ExecutionStatsController stats, RolloverReason reason) {
+    switch (reason) {
+        case RolloverReason::kTimeForward:
+            stats.incNumBucketsClosedDueToTimeForward();
+            break;
+        case RolloverReason::kTimeBackward:
+            stats.incNumBucketsArchivedDueToTimeBackward();
+            break;
+        case RolloverReason::kCount:
+            stats.incNumBucketsClosedDueToCount();
+            break;
+        case RolloverReason::kCachePressure:
+            stats.incNumBucketsClosedDueToCachePressure();
+            break;
+        case RolloverReason::kSize:
+            stats.incNumBucketsClosedDueToSize();
+            break;
+        case RolloverReason::kSchemaChange:
+            stats.incNumBucketsClosedDueToSchemaChange();
+            break;
+        default:
+            break;
+    }
+}
+
+RolloverReason determineRolloverReason(const BSONObj& doc,
+                                       ExecutionStatsController stats,
+                                       const TimeseriesOptions& timeseriesOptions,
+                                       Bucket& bucket,
+                                       uint32_t numberOfActiveBuckets,
+                                       Sizes& sizesToBeAdded,
+                                       const Date_t& time,
+                                       uint64_t storageCacheSizeBytes,
+                                       const StringDataComparator* comparator) {
+    auto bucketTime = bucket.minTime;
+    if (time - bucketTime >= Seconds(*timeseriesOptions.getBucketMaxSpanSeconds())) {
+        return RolloverReason::kTimeForward;
+    }
+    if (time < bucketTime) {
+        return RolloverReason::kTimeBackward;
+    }
+    if (bucket.numMeasurements == static_cast<std::uint64_t>(gTimeseriesBucketMaxCount)) {
+        return RolloverReason::kCount;
+    }
+
+    // In scenarios where we have a high cardinality workload and face increased cache pressure
+    // we will decrease the size of buckets before we close them.
+    auto [effectiveMaxSize, cacheDerivedBucketMaxSize] =
+        getCacheDerivedBucketMaxSize(storageCacheSizeBytes, numberOfActiveBuckets);
+
+    // We restrict the ceiling of the bucket max size under cache pressure.
+    int32_t absoluteMaxSize =
+        std::min(Bucket::kLargeMeasurementsMaxBucketSize, cacheDerivedBucketMaxSize);
+    if (bucket.size + sizesToBeAdded.total() > effectiveMaxSize) {
+        bool keepBucketOpenForLargeMeasurements =
+            bucket.numMeasurements < static_cast<std::uint64_t>(gTimeseriesBucketMinCount);
+        if (keepBucketOpenForLargeMeasurements) {
+            if (bucket.size + sizesToBeAdded.total() > absoluteMaxSize) {
+                if (absoluteMaxSize != Bucket::kLargeMeasurementsMaxBucketSize) {
+                    return RolloverReason::kCachePressure;
+                }
+                return RolloverReason::kSize;
+            }
+
+            // There's enough space to add this measurement and we're still below the large
+            // measurement threshold.
+            if (!bucket.keptOpenDueToLargeMeasurements) {
+                // Only increment this metric once per bucket.
+                bucket.keptOpenDueToLargeMeasurements = true;
+                stats.incNumBucketsKeptOpenDueToLargeMeasurements();
+            }
+            return RolloverReason::kNone;
+        } else {
+            if (effectiveMaxSize == gTimeseriesBucketMaxSize) {
+                return RolloverReason::kSize;
+            }
+            return RolloverReason::kCachePressure;
+        }
+    }
+    if (schemaIncompatible(bucket, doc, timeseriesOptions.getMetaField(), comparator)) {
+        return RolloverReason::kSchemaChange;
+    }
+    return RolloverReason::kNone;
+}
+
 ExecutionStatsController getOrInitializeExecutionStats(BucketCatalog& catalog,
                                                        const UUID& collectionUUID) {
     stdx::lock_guard catalogLock{catalog.mutex};

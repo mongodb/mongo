@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,37 +27,22 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/timeseries/bucket_catalog/rollover.h"
 
 namespace mongo::timeseries::bucket_catalog {
-
-/**
- * Mode enum to determine the rollover type decision for a given bucket.
- */
-enum class RolloverAction {
-    kNone,       // Keep bucket open
-    kArchive,    // Archive bucket
-    kSoftClose,  // Close bucket so it remains eligible for reopening
-    kHardClose,  // Permanently close bucket
-};
-
-/**
- * Reasons why a bucket was rolled over.
- */
-enum class RolloverReason {
-    kNone,           // Not actually rolled over
-    kTimeForward,    // Measurement time would violate max span for this bucket
-    kTimeBackward,   // Measurement time was before bucket min time
-    kCount,          // Adding this measurement would violate max count
-    kSchemaChange,   // This measurement has a schema incompatible with existing measurements
-    kCachePressure,  // System is under cache pressure, and adding this measurement would make
-                     // the bucket larger than the dynamic size limit
-    kSize,  // Adding this measurement would make the bucket larger than the normal size limit
-};
-
-/**
- * Returns the RolloverAction based on the RolloverReason.
- */
-RolloverAction getRolloverAction(RolloverReason reason);
-
+RolloverAction getRolloverAction(RolloverReason reason) {
+    switch (reason) {
+        case RolloverReason::kCount:
+        case RolloverReason::kSchemaChange:
+        case RolloverReason::kCachePressure:
+        case RolloverReason::kSize:
+            return RolloverAction::kHardClose;
+        case RolloverReason::kTimeForward:
+            return RolloverAction::kSoftClose;
+        case RolloverReason::kTimeBackward:
+            return RolloverAction::kArchive;
+        default:
+            return RolloverAction::kNone;
+    }
+}
 }  // namespace mongo::timeseries::bucket_catalog
