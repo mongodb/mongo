@@ -24,6 +24,7 @@ env.CppUnitTest(
         'bson_validate_test.cpp',
         'bsonelement_test.cpp',
         'bsonobjbuilder_test.cpp',
+        'json_test.cpp',
         'oid_test.cpp',
         'simple_bsonobj_comparator_test.cpp',
     ],

@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/util/time_support.h"
@@ -104,6 +105,7 @@ std::string tojson(const BSONObj& obj,
  */
 class JParse {
 public:
+    constexpr static int kMaxDepth = BSONDepth::kDefaultMaxAllowableDepth;
     explicit JParse(StringData str);
 
     /*
@@ -139,7 +141,7 @@ public:
      *   | new CONSTRUCTOR
      */
 private:
-    Status value(StringData fieldName, BSONObjBuilder&);
+    Status value(StringData fieldName, BSONObjBuilder&, int depth);
 
     /*
      * OBJECT :
@@ -169,7 +171,7 @@ private:
      *
      */
 public:
-    Status object(StringData fieldName, BSONObjBuilder&, bool subObj = true);
+    Status object(StringData fieldName, BSONObjBuilder&, bool subObj = true, int depth = 0);
     Status parse(BSONObjBuilder& builder);
     bool isArray();
 
@@ -238,7 +240,7 @@ private:
      *   | { FIELD("$ref") : std::string , FIELD("$id") : OBJECTID }
      *   | { FIELD("$ref") : std::string , FIELD("$id") : OIDOBJECT }
      */
-    Status dbRefObject(StringData fieldName, BSONObjBuilder&);
+    Status dbRefObject(StringData fieldName, BSONObjBuilder&, int depth);
 
     /*
      * UNDEFINEDOBJECT :
@@ -291,7 +293,7 @@ private:
      *     VALUE
      *   | VALUE , ELEMENTS
      */
-    Status array(StringData fieldName, BSONObjBuilder&, bool subObj = true);
+    Status array(StringData fieldName, BSONObjBuilder&, bool subObj, int depth);
 
     /*
      * NOTE: Currently only Date can be preceded by the "new" keyword
@@ -349,7 +351,7 @@ private:
      * DBREF :
      *     Dbref( <namespace std::string> , <24 character hex std::string> )
      */
-    Status dbRef(StringData fieldName, BSONObjBuilder&);
+    Status dbRef(StringData fieldName, BSONObjBuilder&, int depth);
 
     /*
      * REGEX :
