@@ -85,14 +85,14 @@ selector:
     - jstests/core/query/query_settings/**/*.js
     - jstests/core/administrative/current_op/**/*.js
     - jstests/core/query/collation/collation.js
-    - jstests/core/operation_latency_histogram.js
+    - jstests/core/diagnostics/operation_latency_histogram.js
     - jstests/core/query/top/top.js
     - jstests/core/views/views_stats.js
     - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
     - jstests/core/timeseries/ddl/timeseries_sparse_index.js
     - jstests/core/administrative/getlog2.js
     - jstests/core/txns/speculative_snapshot_includes_all_writes.js
-    - jstests/core/commands_with_uuid.js
+    - jstests/core/query/commands_with_uuid.js
     - jstests/core/clustered/clustered_collection_collation.js
     - jstests/core/timeseries/write/timeseries_delete_multi.js
     - jstests/core/timeseries/write/timeseries_simple.js

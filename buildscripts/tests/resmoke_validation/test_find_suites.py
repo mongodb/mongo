@@ -8,7 +8,7 @@ from buildscripts.resmokelib.suitesconfig import get_suite
 
 class TestFindSuites(unittest.TestCase):
     def test_find_suites(self):
-        jstests = glob.glob("jstests/core/*.js")
+        jstests = glob.glob("jstests/core/testing/*.js")
         resmoke_process = subprocess.run(
             ["python3", "buildscripts/resmoke.py", "find-suites", jstests[0]],
             stdout=subprocess.PIPE,

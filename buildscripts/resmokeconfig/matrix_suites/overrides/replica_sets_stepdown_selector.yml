@@ -52,7 +52,7 @@
         - jstests/core/**/geo_s2ordering.js
 
         # This test may fail due to network errors and does not test server behavior, so exclude it.
-        - jstests/core/mixed_version_replica_set.js
+        - jstests/core/testing/mixed_version_replica_set.js
 
 - name: kill_primary_jscore_passthrough_exclude_files_fle
   value:
@@ -139,7 +139,7 @@
         - src/mongo/db/modules/*/jstests/fle2/**/*.js
 
         # This test may fail due to network errors and does not test server behavior, so exclude it.
-        - jstests/core/mixed_version_replica_set.js
+        - jstests/core/testing/mixed_version_replica_set.js
 
 - name: kill_primary_jscore_passthrough_exclude_with_any_tags
   value:

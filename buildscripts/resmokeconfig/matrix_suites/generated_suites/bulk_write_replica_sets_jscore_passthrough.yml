@@ -42,7 +42,7 @@ selector:
     - jstests/core/**/set_param1.js
     - jstests/core/query/awaitdata_getmore_cmd.js
     - jstests/core/administrative/current_op/currentop.js
-    - jstests/core/fsync.js
+    - jstests/core/administrative/fsync.js
     - jstests/core/txns/prepare_conflict.js
     - jstests/core/txns/prepare_conflict_aggregation_behavior.js
     - jstests/core/timeseries/write/timeseries_update_multi.js
@@ -50,11 +50,11 @@ selector:
     - jstests/core/**/set_param1.js
     - jstests/core/**/profile*.js
     - jstests/core/query/comment_field.js
-    - jstests/core/fsync.js
+    - jstests/core/administrative/fsync.js
     - jstests/core/write/insert/batch_write_command_insert.js
     - jstests/core/query/batch_write/batch_write_command_update.js
     - jstests/core/query/batch_write/batch_write_command_delete.js
-    - jstests/core/failcommand_failpoint.js
+    - jstests/core/testing/failcommand_failpoint.js
     - jstests/core/query/parsing/write_commands_reject_unknown_fields.js
     - jstests/core/query/explain/explain_uuid.js
     - jstests/core/query/explain/explain_includes_command.js

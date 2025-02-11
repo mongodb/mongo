@@ -66,7 +66,7 @@ selector:
 
     # The tests below are disabled because of embedded router role and replica set endpoint.
     # This test runs {find: uuid} commands which are not supported for replica set endpoints.
-    - jstests/core/commands_with_uuid.js
+    - jstests/core/query/commands_with_uuid.js
     # This test cares about command metrics, and fails under this suite.
     - jstests/core/query/query_settings/query_settings_reject_application.js
     # The 'queryShapeHash' is only computed on mongos in sharded clusters, therefore the test will fail

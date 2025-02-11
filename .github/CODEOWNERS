@@ -390,15 +390,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/concurrency/fsm_workloads_no_passthrough_with_mongod/**/external_data_source.js @10gen/query-integration-analytic-extensions @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/OWNERS.yml
-/jstests/core/**/connection_string_validation.js @10gen/server-networking-and-observability @svc-auto-approve-bot
-/jstests/core/**/hostinfo.js @10gen/server-networking-and-observability @svc-auto-approve-bot
-/jstests/core/**/diagdata.js @10gen/server-networking-and-observability @svc-auto-approve-bot
-/jstests/core/**/failcommand_failpoint.js @10gen/server-programmability @svc-auto-approve-bot
 /jstests/core/capped/* @10gen/server-collection-write-path @svc-auto-approve-bot
 /jstests/core/clustered/* @10gen/server-collection-write-path @svc-auto-approve-bot
-/jstests/core/**/splitvector.js @10gen/server-cluster-scalability @svc-auto-approve-bot
-/jstests/core/**/opcounters_write_cmd.js @10gen/query-integration-observability @svc-auto-approve-bot
-/jstests/core/**/operation_latency_histogram.js @10gen/query-integration-observability @svc-auto-approve-bot
 /jstests/core/**/version_api* @10gen/query-optimization-parsers @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/administrative/current_op/OWNERS.yml
@@ -416,6 +409,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/core/cluster_parameters/OWNERS.yml
 /jstests/core/cluster_parameters/**/* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/core/cluster_scalability_misc/OWNERS.yml
+/jstests/core/cluster_scalability_misc/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/core/ddl/OWNERS.yml
 /jstests/core/ddl/**/* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
@@ -424,6 +420,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/index/OWNERS.yml
 /jstests/core/index/**/* @10gen/query @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/core/js/OWNERS.yml
+/jstests/core/js/**/* @10gen/query-integration-javascript @svc-auto-approve-bot
+/jstests/core/js/**/json1.js @10gen/query-optimization-parsers @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/query/OWNERS.yml
 /jstests/core/query/**/* @10gen/query @svc-auto-approve-bot
@@ -527,6 +527,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/replicate_record_ids/OWNERS.yml
 /jstests/core/replicate_record_ids/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/core/testing/OWNERS.yml
+/jstests/core/testing/**/* @10gen/server-programmability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/timeseries/OWNERS.yml
 /jstests/core/timeseries/**/* @10gen/server-collection-write-path @svc-auto-approve-bot

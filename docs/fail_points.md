@@ -58,5 +58,5 @@ between nodes like invalid replica set configurations. For examples of use, see 
 [fail_point_commands]: ../src/mongo/db/commands/fail_point_cmd.cpp
 [fail_point_util]: ../jstests/libs/fail_point_util.js
 [fail_point_javascript_test]: ../jstests/fail_point/fail_point.js
-[fail_command_javascript_test]: ../jstests/core/failcommand_failpoint.js
+[fail_command_javascript_test]: ../jstests/core/testing/failcommand_failpoint.js
 [test_only]: test_commands.md

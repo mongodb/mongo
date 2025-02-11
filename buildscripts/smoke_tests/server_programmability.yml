@@ -6,7 +6,7 @@
 
 suites:
   core:
-    - jstests/core/failcommand_failpoint.js
+    - jstests/core/testing/failcommand_failpoint.js
 
   failpoints:
     - jstests/fail_point/*.js

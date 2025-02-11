@@ -29,7 +29,7 @@ selector:
     # These tests fails while DbCheck running in the background:
     - jstests/core/query/awaitdata_getmore_cmd.js
     - jstests/core/administrative/current_op/currentop.js
-    - jstests/core/fsync.js
+    - jstests/core/administrative/fsync.js
     - jstests/core/txns/prepare_conflict.js
     - jstests/core/txns/prepare_conflict_aggregation_behavior.js
   exclude_with_any_tags:

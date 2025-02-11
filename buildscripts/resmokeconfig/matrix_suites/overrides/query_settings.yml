@@ -13,7 +13,7 @@
       # this suite might cause the tests to fail.
       - jstests/core/administrative/current_op/**/*.js
       - jstests/core/query/collation/collation.js
-      - jstests/core/operation_latency_histogram.js
+      - jstests/core/diagnostics/operation_latency_histogram.js
       - jstests/core/query/top/top.js
       - jstests/core/views/views_stats.js
       - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js # failpoint 'timesEntered'
@@ -24,7 +24,7 @@
       # Failpoint interferes with majority commited writes.
       - jstests/core/txns/speculative_snapshot_includes_all_writes.js
       # Using collection UUID in explain is forbidden.
-      - jstests/core/commands_with_uuid.js
+      - jstests/core/query/commands_with_uuid.js
       # This test performs an '{_id: <id>}' query with a collator. This will not pass query settings validation. This
       # is a design decision due to mongos lacking collation information.
       - jstests/core/clustered/clustered_collection_collation.js

@@ -18,14 +18,14 @@
       # BulkWrite profiling and currentOp output format is not the same as normal writes.
       - jstests/core/**/profile*.js
       - jstests/core/query/comment_field.js
-      - jstests/core/fsync.js
+      - jstests/core/administrative/fsync.js
       # Runs an update with illegal format (no 'updates'). We could work around this in the override
       # but it is very annoying.
       - jstests/core/write/insert/batch_write_command_insert.js
       - jstests/core/query/batch_write/batch_write_command_update.js
       - jstests/core/query/batch_write/batch_write_command_delete.js
       # Requires specific commands to be run to trigger failpoint (i.e. requires insert, we run bulkWrite).
-      - jstests/core/failcommand_failpoint.js
+      - jstests/core/testing/failcommand_failpoint.js
       # This test adds unknown fields to insert/update/delete ops which we ignore
       - jstests/core/query/parsing/write_commands_reject_unknown_fields.js
       # Expects explain to fail for using UUID instead of collection name.

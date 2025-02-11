@@ -105,7 +105,7 @@ selector:
     - jstests/core/**/geo_s2ordering.js
     - jstests/fle2/**/*.js
     - src/mongo/db/modules/*/jstests/fle2/**/*.js
-    - jstests/core/mixed_version_replica_set.js
+    - jstests/core/testing/mixed_version_replica_set.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - requires_getmore

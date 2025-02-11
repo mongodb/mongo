@@ -74,7 +74,7 @@ selector:
     - jstests/core/query/queryable_encryption/**/*.js
     # Failpoints do not support passing in tenancy information.
     - jstests/core/administrative/profile/profile_hide_index.js
-    - jstests/core/failcommand_failpoint.js
+    - jstests/core/testing/failcommand_failpoint.js
     - jstests/core/query/comment_field.js
 
 executor:

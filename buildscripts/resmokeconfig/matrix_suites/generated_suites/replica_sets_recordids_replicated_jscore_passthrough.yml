@@ -42,7 +42,7 @@ selector:
     - jstests/core/**/set_param1.js
     - jstests/core/query/awaitdata_getmore_cmd.js
     - jstests/core/administrative/current_op/currentop.js
-    - jstests/core/fsync.js
+    - jstests/core/administrative/fsync.js
     - jstests/core/txns/prepare_conflict.js
     - jstests/core/txns/prepare_conflict_aggregation_behavior.js
     - jstests/core/timeseries/write/timeseries_update_multi.js
@@ -56,11 +56,11 @@ selector:
     - jstests/core/catalog/agg_list_cluster_catalog_with_match.js
     - jstests/core/write/bulk/bulk_write_timeseries_basic.js
     - jstests/core/ddl/convert_to_capped.js
-    - jstests/core/rename_system_buckets_collections.js
+    - jstests/core/timeseries/ddl/rename_system_buckets_collections.js
     - jstests/core/query/index_correctness_pbt.js
     - jstests/core/query/plan_cache/cache_correctness_pbt.js
     - jstests/core/write/empty_ts/bypass_empty_ts_replacement_timeseries.js
-    - jstests/core/version_api_v1_command_coverage.js
+    - jstests/core/stable_api/version_api_v1_command_coverage.js
     - jstests/core/query/api/*.js
     - jstests/core/query/distinct/*.js
     - jstests/core/query/cursor/cursora.js
@@ -70,7 +70,7 @@ selector:
     - jstests/core/query/find_and_modify/find_and_modify_concurrent_update.js
     - jstests/core/administrative/compact_keeps_indexes.js
     - jstests/core/query/update/update_namespace_details.js
-    - jstests/core/loadserverscripts.js
+    - jstests/core/shell/loadserverscripts.js
     - jstests/core/shell/shellstartparallel.js
     - jstests/core/txns/*.js
     - jstests/core/query/map_reduce/mr_killop.js

@@ -48,7 +48,7 @@ selector:
     # along with the MovePrimaryInProgress error. Since this test sets times: n
     # for some of the failpoints, by the time we retry, the failpoint will no
     # longer be active and the test will fail.
-    - jstests/core/failcommand_failpoint.js
+    - jstests/core/testing/failcommand_failpoint.js
 
     # TODO (SERVER-90646): Re-enable background_unique_indexes.js in config transition suites.
     - jstests/core/ddl/background_unique_indexes.js
@@ -57,7 +57,7 @@ selector:
     # concurrent migration fails due to the config shard transitioning to dedicated.
     - jstests/core/administrative/cleanup_orphaned.js
     - jstests/core/views/views_all_commands.js
-    - jstests/core/commands_namespace_parsing.js
+    - jstests/core/repro/commands_namespace_parsing.js
     # TODO SERVER-96199 Re-enable this test once FLE updates to a document's shard key work
     - src/mongo/db/modules/enterprise/jstests/fle2/find_and_modify_replace.js
     # TODO SERVER-86443 Enable test once featureFlagTrackUnshardedCollectionsUponCreation is enabled

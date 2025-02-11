@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query-integration-javascript
+  - "json1.js":
+    approvers:
+      - 10gen/query-optimization-parsers

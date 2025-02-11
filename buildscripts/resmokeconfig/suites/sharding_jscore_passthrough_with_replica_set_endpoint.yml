@@ -42,7 +42,7 @@ selector:
     - jstests/core/query/find_and_modify/find_and_modify_metrics.js
     - jstests/core/query/update/update_metrics.js
     # This test runs {find: uuid} commands which are not supported for replica set endpoints.
-    - jstests/core/commands_with_uuid.js
+    - jstests/core/query/commands_with_uuid.js
     # TODO (SERVER-80416): cloneCollectionAsCapped command stops working after a replica set
     # is bootstrapped as a sharded cluster.
     - jstests/core/query/collation/collation.js

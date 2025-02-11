@@ -68,7 +68,7 @@ selector:
     # clusters for non-existent dbs.
     - jstests/core/query/explain/explain_missing_database.js
     # This test runs {find: uuid} commands which are not supported for replica set endpoints.
-    - jstests/core/commands_with_uuid.js
+    - jstests/core/query/commands_with_uuid.js
     # TODO (SERVER-80416): cloneCollectionAsCapped command stops working after a replica set
     # is bootstrapped as a sharded cluster.
     - jstests/core/query/collation/collation.js
@@ -84,7 +84,7 @@ selector:
     # writes the test database, it should remain empty or non-existent. This suite breaks this
     # assumption since it enables profiling which creates the system.profile collection.
     - jstests/core/ddl/clone_collection_as_capped_non_existent.js
-    - jstests/core/no_db_created.js
+    - jstests/core/write/no_db_created.js
     - jstests/core/query/explain/explain_find_and_modify.js
     # The test below expects the listCollections command that it runs to not validate the views
     # that the collection has since the command uses the special filter used by initial sync which

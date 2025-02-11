@@ -174,7 +174,7 @@ selector:
     # concurrent migration fails due to the config shard transitioning to dedicated.
     - jstests/core/administrative/cleanup_orphaned.js
     - jstests/core/views/views_all_commands.js
-    - jstests/core/commands_namespace_parsing.js
+    - jstests/core/repro/commands_namespace_parsing.js
     # Runs commands using legacy queries, which are not supported on sessions.
     - jstests/core/**/query/exhaust.js
     # TODO SERVER-96199 Re-enable this test once FLE updates to a document's shard key work

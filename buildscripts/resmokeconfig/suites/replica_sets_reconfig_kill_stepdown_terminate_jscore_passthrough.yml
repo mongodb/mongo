@@ -75,7 +75,7 @@ selector:
     # Inserts enough data that recovery takes more than 8 seconds, so we never get a working primary.
     - jstests/core/**/geo_s2ordering.js
     # This test may fail due to network errors and does not test server behavior, so exclude it.
-    - jstests/core/mixed_version_replica_set.js
+    - jstests/core/testing/mixed_version_replica_set.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

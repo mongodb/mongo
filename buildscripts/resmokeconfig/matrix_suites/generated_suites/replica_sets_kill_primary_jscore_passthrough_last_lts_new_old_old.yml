@@ -102,7 +102,7 @@ selector:
     - jstests/core/**/startup_log.js
     - jstests/core/**/shell_connection_strings.js
     - jstests/core/**/geo_s2ordering.js
-    - jstests/core/mixed_version_replica_set.js
+    - jstests/core/testing/mixed_version_replica_set.js
     - jstests/fle2/**/*.js
     - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_with_any_tags:

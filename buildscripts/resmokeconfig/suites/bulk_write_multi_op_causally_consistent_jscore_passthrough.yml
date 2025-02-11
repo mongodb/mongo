@@ -13,14 +13,14 @@ selector:
     # BulkWrite profiling and currentOp output format is not the same as normal writes.
     - jstests/core/**/profile*.js
     - jstests/core/query/comment_field.js
-    - jstests/core/fsync.js
+    - jstests/core/administrative/fsync.js
     # Runs an update with illegal format (no 'updates'). We could work around this in the override
     # but it is very annoying.
     - jstests/core/write/insert/batch_write_command_insert.js
     - jstests/core/query/batch_write/batch_write_command_update.js
     - jstests/core/query/batch_write/batch_write_command_delete.js
     # Requires specific commands to be run to trigger failpoint (i.e. requires insert, we run bulkWrite).
-    - jstests/core/failcommand_failpoint.js
+    - jstests/core/testing/failcommand_failpoint.js
     # This test adds unknown fields to insert/update/delete ops which we ignore
     - jstests/core/query/parsing/write_commands_reject_unknown_fields.js
     # Checks for op names which bulkWrite will not show up as
@@ -42,7 +42,7 @@ selector:
     - jstests/core/query/update/update_affects_indexes.js
     - jstests/core/index/index_arr2.js
     - jstests/core/index/index_stats.js
-    - jstests/core/ts1.js
+    - jstests/core/write/ts1.js
     - jstests/core/query/compare_timestamps.js
     - jstests/core/query/command_let_variables.js
     - jstests/core/query/update/update_min_max_examples.js
@@ -91,8 +91,8 @@ selector:
     - jstests/core/txns/no_snapshot_writes_outside_txn.js
 
     # override does not suppot benchRun
-    - jstests/core/benchrun_pipeline_updates.js
-    - jstests/core/bench_test1.js
+    - jstests/core/shell/benchrun_pipeline_updates.js
+    - jstests/core/shell/bench_test1.js
 
     # errors out due to invalid DB name
     - jstests/core/query/invalid_db_name.js
@@ -145,7 +145,7 @@ selector:
     # Grabs specific stats from mongod directly which causes failure due to there being
     # multiple clusters.
     - jstests/core/administrative/current_op/currentop_cursors.js
-    - jstests/core/operation_latency_histogram.js
+    - jstests/core/diagnostics/operation_latency_histogram.js
     - jstests/core/views/views_stats.js
 
     # Sets cluster parameters, which do writes with timestamps that will vary b/w clusters.

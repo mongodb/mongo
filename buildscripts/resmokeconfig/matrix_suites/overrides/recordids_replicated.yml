@@ -16,12 +16,12 @@
       - jstests/core/catalog/agg_list_cluster_catalog_with_match.js
       - jstests/core/write/bulk/bulk_write_timeseries_basic.js
       - jstests/core/ddl/convert_to_capped.js
-      - jstests/core/rename_system_buckets_collections.js
+      - jstests/core/timeseries/ddl/rename_system_buckets_collections.js
       - jstests/core/query/index_correctness_pbt.js
       - jstests/core/query/plan_cache/cache_correctness_pbt.js
       - jstests/core/write/empty_ts/bypass_empty_ts_replacement_timeseries.js
       # due to error: "BSON field 'create.recordIdsReplicated' is not allowed with apiStrict:true."
-      - jstests/core/version_api_v1_command_coverage.js
+      - jstests/core/stable_api/version_api_v1_command_coverage.js
       - jstests/core/query/api/*.js
       # due to error: Error: [0] != [1] are not equal : encountered an error in the parallel shell
       - jstests/core/query/distinct/*.js
@@ -32,7 +32,7 @@
       - jstests/core/query/find_and_modify/find_and_modify_concurrent_update.js
       - jstests/core/administrative/compact_keeps_indexes.js
       - jstests/core/query/update/update_namespace_details.js
-      - jstests/core/loadserverscripts.js
+      - jstests/core/shell/loadserverscripts.js
       - jstests/core/shell/shellstartparallel.js
       # due to error: "Transaction with { txnNumber: 0 } has been aborted."
       # The overrides don't work with renaming collections in general.

@@ -40,7 +40,7 @@ selector:
     - jstests/core/**/write_change_stream_pit_preimage.js
 
     # Will fail all commands including those needed to forward command to initial sync node.
-    - jstests/core/failcommand_failpoint.js
+    - jstests/core/testing/failcommand_failpoint.js
     # Starts MongoCryptD instead of mongod nodes
     - src/mongo/db/modules/*/jstests/fle2/fle2_bulk_write.js
     # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
