@@ -1668,6 +1668,21 @@ tasks:
           exec_timeout_secs: 18000 # 5 hour timeout.
           resmoke_jobs_max: 1
 
+  ## Standalone generational fuzzer for checking optimized and unoptimized aggregation pipelines with embedded NUL bytes
+  - <<: *jstestfuzz_template
+    name: aggregation_optimization_nul_bytes_fuzzer_gen
+    tags:
+      ["assigned_to_jira_team_server_query_optimization", "non_deterministic"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 2
+          num_tasks: 2
+          jstestfuzz_vars: --diffTestingMode optimization --numPipelines=3000 --embedNulBytes
+          suite: generational_fuzzer
+          npm_command: agg-fuzzer
+
   ## Standalone generational fuzzer for checking optimized and unoptimized change stream pipelines ##
   - <<: *jstestfuzz_template
     name: change_stream_optimization_fuzzer_gen
