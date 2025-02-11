@@ -125,7 +125,7 @@ server_parameters:
         default: 600000
         redact: false
 
-    autoMergerMaxTimeProcessingChunksMS::
+    autoMergerMaxTimeProcessingChunksMS:
         description: >-
             Maximum time in milliseconds the command mergeAllChunksOnShard scheduled by the 
             autoMerger will spend looking for mergeable chunks.
