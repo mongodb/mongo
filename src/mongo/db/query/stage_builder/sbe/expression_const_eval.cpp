@@ -429,6 +429,14 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
             swapAndUpdate(n, optimizer::make<optimizer::Constant>(tag, val));
         }
     }
+    if (op.name() == "isInList") {
+        // If the child node is a Constant, check if the type is inList, then directly set to
+        // true/false.
+        if (args.size() == 1 && args[0].is<optimizer::Constant>()) {
+            const auto tag = args[0].cast<optimizer::Constant>()->get().first;
+            swapAndUpdate(n, optimizer::Constant::boolean(tag == sbe::value::TypeTags::inList));
+        }
+    }
 }
 
 void ExpressionConstEval::transport(optimizer::ABT& n,
@@ -446,6 +454,9 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
                    !sbe::value::bitcastTo<bool>(condValue)) {
             // if false -> elseBranch
             swapAndUpdate(n, std::exchange(elseBranch, optimizer::make<optimizer::Blackhole>()));
+        } else if (condTag == sbe::value::TypeTags::Nothing) {
+            // if Nothing then x else y -> Nothing
+            swapAndUpdate(n, optimizer::Constant::nothing());
         }
     } else if (auto condNot = cond.cast<optimizer::UnaryOp>();
                condNot && condNot->op() == optimizer::Operations::Not) {
@@ -467,6 +478,31 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
                           optimizer::Operations::FillEmpty,
                           std::exchange(thenBranch, optimizer::make<optimizer::Blackhole>()),
                           std::exchange(elseBranch, optimizer::make<optimizer::Blackhole>())));
+    } else if (auto thenConst = thenBranch.cast<optimizer::Constant>(),
+               elseConst = elseBranch.cast<optimizer::Constant>();
+               thenConst && elseConst) {
+        // If both branches are boolean constants then we can simplify.
+        if (auto [thenTag, thenValue] = thenConst->get();
+            thenTag == sbe::value::TypeTags::Boolean) {
+            const bool v1 = sbe::value::bitcastTo<bool>(thenValue);
+            if (auto [elseTag, elseValue] = elseConst->get();
+                elseTag == sbe::value::TypeTags::Boolean) {
+                const bool v2 = sbe::value::bitcastTo<bool>(elseValue);
+                if (v1 && !v2) {
+                    // if (x) then true else false -> (x).
+                    swapAndUpdate(n, std::exchange(cond, optimizer::make<optimizer::Blackhole>()));
+                } else if (!v1 && v2) {
+                    // If (x) then false else true -> !(x).
+                    swapAndUpdate(
+                        n,
+                        optimizer::make<optimizer::UnaryOp>(
+                            optimizer::Operations::Not,
+                            std::exchange(cond, optimizer::make<optimizer::Blackhole>())));
+                }
+                // "if (x) then true else true" and "if (x) then false else false" cannot be folded
+                // because we need to return Nothing if non-const 'x' is Nothing.
+            }
+        }
     }
 }
 

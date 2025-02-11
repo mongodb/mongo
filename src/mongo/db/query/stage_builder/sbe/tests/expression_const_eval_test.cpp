@@ -199,8 +199,7 @@ TEST(ConstEvalTest, AndOrFoldNonNothingLhs) {
     /* OR */
     // nullable lhs (variable) || false -> lhs.
     ABT abt = _binary("Or", _binary("Lte", "x"_var, "2"_cint64), _cbool(false))._n;
-    while (evaluator.optimize(abt))
-        ;
+    evaluator.optimize(abt);
     ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
         "BinaryOp [Lte]\n"
         "|   Const [2]\n"
@@ -209,8 +208,7 @@ TEST(ConstEvalTest, AndOrFoldNonNothingLhs) {
 
     // nullable lhs (variable) || true -> no change.
     abt = _binary("Or", _binary("Lte", "x"_var, "2"_cint64), _cbool(true))._n;
-    while (evaluator.optimize(abt))
-        ;
+    evaluator.optimize(abt);
     ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
         "BinaryOp [Or]\n"
         "|   Const [true]\n"
@@ -221,8 +219,7 @@ TEST(ConstEvalTest, AndOrFoldNonNothingLhs) {
 
     // nothing lhs (const) || true -> no change.
     abt = _binary("Or", _cnothing(), _cbool(true))._n;
-    while (evaluator.optimize(abt))
-        ;
+    evaluator.optimize(abt);
     ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
         "BinaryOp [Or]\n"
         "|   Const [true]\n"
@@ -232,8 +229,7 @@ TEST(ConstEvalTest, AndOrFoldNonNothingLhs) {
     /* AND */
     // nullable lhs (if) && true -> lhs.
     abt = _binary("And", _if("x"_var, "y"_var, "z"_var), _cbool(true))._n;
-    while (evaluator.optimize(abt))
-        ;
+    evaluator.optimize(abt);
     ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
         "If []\n"
         "|   |   Variable [z]\n"
@@ -243,8 +239,7 @@ TEST(ConstEvalTest, AndOrFoldNonNothingLhs) {
 
     // nullable lhs (if) && false -> no change.
     abt = _binary("And", _if("x"_var, "y"_var, "z"_var), _cbool(false))._n;
-    while (evaluator.optimize(abt))
-        ;
+    evaluator.optimize(abt);
     ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
         "BinaryOp [And]\n"
         "|   Const [false]\n"
@@ -253,6 +248,70 @@ TEST(ConstEvalTest, AndOrFoldNonNothingLhs) {
         "|   Variable [y]\n"
         "Variable [x]\n",
         abt);
+}
+
+TEST(ConstEvalTest, ConstantEquality) {
+    ExpressionConstEval evaluator{nullptr};
+    auto tree = make<If>(make<BinaryOp>(Operations::Eq, Constant::int32(9), Constant::nothing()),
+                         Constant::boolean(true),
+                         Constant::boolean(false));
+    evaluator.optimize(tree);
+    ASSERT_TRUE(tree.is<Constant>());
+}
+
+TEST(ConstEvalTest, FoldIsInListForConstants) {
+    ExpressionConstEval evaluator{nullptr};
+    ABT abt = make<FunctionCall>("isInList", makeSeq(Constant::int32(1)));
+    evaluator.optimize(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [false]\n",
+        abt);
+
+    sbe::InList* inList = nullptr;
+    abt = make<FunctionCall>(
+        "isInList",
+        makeSeq(make<Constant>(TypeTags::inList, sbe::value::bitcastFrom<sbe::InList*>(inList))));
+    evaluator.optimize(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [true]\n",
+        abt);
+}
+
+TEST(Optimizer, ConstFoldIf) {
+    ExpressionConstEval evaluator{nullptr};
+    auto tree = _if("x"_var, _cbool(true), _cbool(false))._n;
+    evaluator.optimize(tree);
+
+    // Simplify "if (x) then true else false" -> x.
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Variable [x]\n",
+        tree);
+}
+
+TEST(Optimizer, ConstFoldIf1) {
+    ExpressionConstEval evaluator{nullptr};
+    auto tree = _if("x"_var, _cbool(false), _cbool(true))._n;
+    evaluator.optimize(tree);
+
+    // Simplify "if (x) then false else true" -> NOT x.
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "UnaryOp [Not]\n"
+        "Variable [x]\n",
+        tree);
+}
+
+TEST(Optimizer, ConstFoldIf2) {
+    ExpressionConstEval evaluator{nullptr};
+    auto tree = _if(_unary("Not", "x"_var), "y"_var, "z"_var)._n;
+    evaluator.optimize(tree);
+
+    // Simplify "if (not (x)) then y else z" -> "if (x) then z else y"
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "If []\n"
+        "|   |   Variable [y]\n"
+        "|   Variable [z]\n"
+        "Variable [x]\n",
+        tree);
 }
 
 }  // namespace
