@@ -92,6 +92,7 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/ttl/ttl_collection_cache.h"
@@ -970,10 +971,10 @@ void CollectionImpl::setRequiresTimeseriesExtendedRangeSupport(OperationContext*
 }
 
 bool CollectionImpl::areTimeseriesBucketsFixed() const {
-    auto tsOptions = getTimeseriesOptions();
-    boost::optional<bool> parametersChanged = timeseriesBucketingParametersHaveChanged();
-    return parametersChanged.has_value() && !parametersChanged.get() && tsOptions &&
-        tsOptions->getBucketMaxSpanSeconds() == tsOptions->getBucketRoundingSeconds();
+    const auto tsOptions = getTimeseriesOptions();
+    // Assume parameters have changed unless otherwise specified.
+    const auto parametersChanged = timeseriesBucketingParametersHaveChanged().value_or(true);
+    return tsOptions && timeseries::areTimeseriesBucketsFixed(*tsOptions, parametersChanged);
 }
 
 bool CollectionImpl::isClustered() const {

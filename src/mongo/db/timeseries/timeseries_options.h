@@ -45,6 +45,14 @@ namespace mongo {
 namespace timeseries {
 
 /**
+ * Evaluates whether the timeseries bucket's options are fixed (unchanged).
+ *
+ * Returns true if `options.bucketRoundingSeconds` and `options.bucketMaxSpanSeconds` are equal and
+ * the `parametersChanged` argument is `false`.
+ */
+bool areTimeseriesBucketsFixed(const TimeseriesOptions& options, const bool parametersChanged);
+
+/**
  * Evaluates whether the transition of timeseries granularities is valid (returning Status::OK if
  * the transition is acceptable) and if a pointer is given, it will be modified to reflect if the
  * options have changed.

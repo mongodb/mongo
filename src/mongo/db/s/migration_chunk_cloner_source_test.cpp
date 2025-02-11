@@ -97,6 +97,7 @@
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
@@ -315,10 +316,10 @@ public:
     }
 
     bool areTimeseriesBucketsFixed() const override {
-        auto tsOptions = getTimeseriesOptions();
-        boost::optional<bool> parametersChanged = timeseriesBucketingParametersHaveChanged();
-        return parametersChanged.has_value() && !parametersChanged.get() && tsOptions &&
-            tsOptions->getBucketMaxSpanSeconds() == tsOptions->getBucketRoundingSeconds();
+        const auto tsOptions = getTimeseriesOptions();
+        // Assume parameters have changed unless otherwise specified.
+        const auto parametersChanged = timeseriesBucketingParametersHaveChanged().value_or(true);
+        return tsOptions && timeseries::areTimeseriesBucketsFixed(*tsOptions, parametersChanged);
     }
 
     StatusWith<bool> doesTimeseriesBucketsDocContainMixedSchemaData(

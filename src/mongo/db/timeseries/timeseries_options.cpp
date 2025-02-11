@@ -135,6 +135,11 @@ Status checkBucketingParameters(TimeseriesOptions& timeseriesOptions,
 
 }  // namespace
 
+bool areTimeseriesBucketsFixed(const TimeseriesOptions& options, const bool parametersChanged) {
+    return !parametersChanged &&
+        options.getBucketMaxSpanSeconds() == options.getBucketRoundingSeconds();
+}
+
 Status isTimeseriesGranularityValidAndUnchanged(const TimeseriesOptions& currentOptions,
                                                 const CollModTimeseries& targetOptions,
                                                 bool* shouldUpdateOptions) {

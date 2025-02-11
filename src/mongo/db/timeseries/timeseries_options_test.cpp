@@ -49,6 +49,15 @@ auto createTimeseriesOptionsWithGranularity(BucketGranularityEnum granularity) {
     return options;
 }
 
+auto createTimeseriesOptionsWithBucketMaxSpanAndRoundingSeconds(
+    const boost::optional<std::int32_t>& bucketMaxSpanSeconds,
+    const boost::optional<std::int32_t>& bucketRoundingSeconds) {
+    auto options = TimeseriesOptions{};
+    options.setBucketMaxSpanSeconds(bucketMaxSpanSeconds);
+    options.setBucketRoundingSeconds(bucketRoundingSeconds);
+    return options;
+}
+
 TEST(TimeseriesOptionsTest, RoundTimestampToGranularity) {
     TimeseriesOptions optionsSeconds =
         createTimeseriesOptionsWithGranularity(BucketGranularityEnum::Seconds);
@@ -231,6 +240,94 @@ TEST(TimeseriesOptionsTest, ExtendedRoundMilliTimestampBySeconds) {
     for (const auto& [roundingSeconds, input, expectedOutput] : testCases) {
         auto roundedDate = timeseries::roundTimestampBySeconds(input, roundingSeconds);
         ASSERT_EQ(roundedDate, expectedOutput);
+    }
+}
+
+TEST(TimeseriesOptionsTest, AreTimeseriesBucketsFixed) {
+    const auto optionsEqualAndNone =
+        createTimeseriesOptionsWithBucketMaxSpanAndRoundingSeconds(boost::none, boost::none);
+    const auto optionsEqualNotNone =
+        createTimeseriesOptionsWithBucketMaxSpanAndRoundingSeconds(8675309, 8675309);
+    const auto optionsMaxSpanAndNone =
+        createTimeseriesOptionsWithBucketMaxSpanAndRoundingSeconds(42, boost::none);
+    const auto optionsNoneAndRounding =
+        createTimeseriesOptionsWithBucketMaxSpanAndRoundingSeconds(boost::none, 10019);
+    const auto optionsValuesNotEqual =
+        createTimeseriesOptionsWithBucketMaxSpanAndRoundingSeconds(1633, 77);
+
+    {
+        const auto parametersChanged = false;
+        ASSERT_TRUE(timeseries::areTimeseriesBucketsFixed(optionsEqualAndNone, parametersChanged))
+            << "BucketMaxSpanSeconds=none, BucketRoundingSeconds=none, "
+            << "BucketingParametersChanged=false implies buckets should be fixed.";
+    }
+
+    {
+        const auto parametersChanged = false;
+        ASSERT_TRUE(timeseries::areTimeseriesBucketsFixed(optionsEqualNotNone, parametersChanged))
+            << "BucketMaxSpanSeconds=value, BucketRoundingSeconds=value, "
+            << "BucketingParametersChanged=false implies buckets should be fixed.";
+    }
+
+    {
+        const auto parametersChanged = false;
+        ASSERT_FALSE(
+            timeseries::areTimeseriesBucketsFixed(optionsMaxSpanAndNone, parametersChanged))
+            << "BucketMaxSpanSeconds=value, BucketRoundingSeconds=none, "
+            << "BucketingParametersChanged=false implies buckets should not be fixed.";
+    }
+
+    {
+        const auto parametersChanged = false;
+        ASSERT_FALSE(
+            timeseries::areTimeseriesBucketsFixed(optionsNoneAndRounding, parametersChanged))
+            << "BucketMaxSpanSeconds=none, BucketRoundingSeconds=value, "
+            << "BucketingParametersChanged=false implies buckets should not be fixed.";
+    }
+
+    {
+        const auto parametersChanged = false;
+        ASSERT_FALSE(
+            timeseries::areTimeseriesBucketsFixed(optionsValuesNotEqual, parametersChanged))
+            << "BucketMaxSpanSeconds=value1, BucketRoundingSeconds=value2, "
+            << "BucketingParametersChanged=false implies buckets should not be fixed.";
+    }
+    {
+        const auto parametersChanged = true;
+        ASSERT_FALSE(timeseries::areTimeseriesBucketsFixed(optionsEqualAndNone, parametersChanged))
+            << "BucketMaxSpanSeconds=none, BucketRoundingSeconds=none, "
+            << "BucketingParametersChanged=true implies buckets should not be fixed.";
+    }
+
+    {
+        const auto parametersChanged = true;
+        ASSERT_FALSE(timeseries::areTimeseriesBucketsFixed(optionsEqualNotNone, parametersChanged))
+            << "BucketMaxSpanSeconds=value, BucketRoundingSeconds=value, "
+            << "BucketingParametersChanged=true implies buckets should not be fixed.";
+    }
+
+    {
+        const auto parametersChanged = true;
+        ASSERT_FALSE(
+            timeseries::areTimeseriesBucketsFixed(optionsMaxSpanAndNone, parametersChanged))
+            << "BucketMaxSpanSeconds=value, BucketRoundingSeconds=none, "
+            << "BucketingParametersChanged=true implies buckets should not be fixed.";
+    }
+
+    {
+        const auto parametersChanged = true;
+        ASSERT_FALSE(
+            timeseries::areTimeseriesBucketsFixed(optionsNoneAndRounding, parametersChanged))
+            << "BucketMaxSpanSeconds=none, BucketRoundingSeconds=value, "
+            << "BucketingParametersChanged=true implies buckets should not be fixed.";
+    }
+
+    {
+        const auto parametersChanged = true;
+        ASSERT_FALSE(
+            timeseries::areTimeseriesBucketsFixed(optionsValuesNotEqual, parametersChanged))
+            << "BucketMaxSpanSeconds=value1, BucketRoundingSeconds=value2, "
+            << "BucketingParametersChanged=true implies buckets should not be fixed.";
     }
 }
 

@@ -431,6 +431,7 @@ public:
      * only transition from true to false.
      */
     virtual bool areTimeseriesBucketsFixed() const = 0;
+
     /*
      * Returns true if this collection is clustered. That is, its RecordIds store the value of the
      * cluster key. If the collection is clustered on _id, there is no separate _id index.
