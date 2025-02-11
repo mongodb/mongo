@@ -37,3 +37,13 @@ render_template(
     ],
     output = "mongohelpers_js.cpp",
 )
+
+load("@aspect_rules_js//js:defs.bzl", "js_library")
+
+js_library(
+    name = "all",
+    srcs = glob([
+        "*.js",
+    ]),
+    visibility = ["//visibility:public"],
+)

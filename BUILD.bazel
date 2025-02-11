@@ -145,7 +145,10 @@ mongo_install(
 
 copy_to_directory(
     name = "mongot_folder",
-    srcs = ["@mongot_localdev//:mongot_binaries"],
+    srcs = select({
+        "//bazel/config:include_mongot_enabled": ["@mongot_localdev//:mongot_binaries"],
+        "//conditions:default": [],
+    }),
     out = "mongot-localdev",
     include_external_repositories = ["mongot_localdev"],
     tags = [

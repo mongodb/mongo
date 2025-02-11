@@ -548,3 +548,13 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_fifth_group"],
     deps = ["shell_test_dependencies"],
 )
+
+load("@aspect_rules_js//js:defs.bzl", "js_library")
+
+js_library(
+    name = "all",
+    srcs = glob([
+        "*.js",
+    ]),
+    visibility = ["//visibility:public"],
+)

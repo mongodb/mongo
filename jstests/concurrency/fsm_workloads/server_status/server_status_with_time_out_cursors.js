@@ -36,7 +36,7 @@ export const $config = (function() {
                                .batchSize(2)
                                .maxTimeMS(10);
 
-                const c = curs.itcount();  // eslint-disable-line
+                const c = curs.itcount();
             } catch (e) {
                 assert.commandFailedWithCode(
                     e, [ErrorCodes.MaxTimeMSExpired, ErrorCodes.NetworkInterfaceExceededTimeLimit]);

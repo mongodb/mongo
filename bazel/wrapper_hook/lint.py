@@ -13,15 +13,20 @@ def list_files_without_targets(bazel_bin: str):
     # rules_lint only checks files that are in targets, verify that all files in the source tree
     # are contained within targets.
 
-    js_files_in_targets = [
-        line.strip()
-        for line in subprocess.check_output(
+    try:
+        proc = subprocess.check_output(
             [bazel_bin, "cquery", 'kind("source file", deps(//...))', "--output", "files"],
             stderr=subprocess.STDOUT,
         )
-        .decode("utf-8")
-        .splitlines()
-        if line.strip().endswith("js")
+    except subprocess.CalledProcessError as ex:
+        print("ERROR: bazel query failed:")
+        print(ex.cmd)
+        print(ex.stdout)
+        print(ex.stderr)
+        sys.exit(1)
+
+    js_files_in_targets = [
+        line.strip() for line in proc.decode("utf-8").splitlines() if line.strip().endswith("js")
     ]
 
     print("Checking that all javascript files have BUILD.bazel targets...")

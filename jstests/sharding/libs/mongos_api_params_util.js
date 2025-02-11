@@ -1473,7 +1473,10 @@ export let MongosAPIParametersUtil = (function() {
         // mongos command, and that the test cases are well formed.
         for (const command of Object.keys(listCommandsRes.commands)) {
             const matchingCases = testCases.filter(elem => elem.commandName === command);
-            assert(matchingCases !== [],
+            // TODO(SERVER-100573): Fix invariant, this currently is never going to be hit even if
+            // length is zero.
+            // eslint-disable-next-line
+            assert(matchingCases.length !== [],
                    "coverage failure: must define a test case for " + command);
             for (const testCase of matchingCases) {
                 validateTestCase(testCase);

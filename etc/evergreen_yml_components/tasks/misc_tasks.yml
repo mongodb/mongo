@@ -783,7 +783,7 @@ tasks:
             - "buildscripts/errorcodes.py"
             - "--quiet"
 
-  - name: lint_eslint
+  - name: bazel_run_lint
     tags:
       [
         "assigned_to_jira_team_devprod_build",
@@ -806,18 +806,11 @@ tasks:
       - func: "cleanup environment"
       - func: "set up venv"
       - func: "upload pip requirements"
-      - command: subprocess.exec
-        type: test
-        params:
-          binary: bash
-          args:
-            - "./src/evergreen/run_python_script_with_report.sh"
-            - "lint-eslint"
-            - "buildscripts/eslint.py"
-            - "--dirmode"
-            - "lint"
-            - "jstests/"
-            - "src/mongo"
+      - func: "get engflow creds"
+      - func: "bazel run"
+        vars:
+          target: >-
+            lint
 
   # Check that the mutational fuzzer can parse all JS filess.
   - name: lint_fuzzer_sanity_all

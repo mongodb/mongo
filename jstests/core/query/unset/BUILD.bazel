@@ -1,0 +1,10 @@
+load("@aspect_rules_js//js:defs.bzl", "js_library")
+
+package(default_visibility = ["//visibility:public"])
+
+js_library(
+    name = "all_javascript_files",
+    srcs = glob([
+        "*.js",
+    ]),
+)
