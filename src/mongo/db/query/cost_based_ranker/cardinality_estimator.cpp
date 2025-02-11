@@ -900,7 +900,7 @@ CEResult CardinalityEstimator::estimate(const ElemMatchValueMatchExpression* nod
 
     // Sampling and histogram handle this case higher up.
     tassert(9808601,
-            "direct estimatation of $elemMatch is currently on supported for heuristicCE",
+            "direct estimation of $elemMatch is currently only supported for heuristicCE",
             _rankerMode == QueryPlanRankerModeEnum::kHeuristicCE);
 
     size_t selOffset = _conjSels.size();
