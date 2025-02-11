@@ -38,6 +38,7 @@
 
 #include "mongo/client/dbclient_base.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/database_holder_impl.h"
@@ -52,8 +53,6 @@
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/control/storage_control.h"
-#include "mongo/db/storage/recovery_unit_noop.h"
-#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/dbtests/framework_options.h"
 #include "mongo/logv2/log.h"
@@ -93,7 +92,7 @@ int runDbTests(int argc, char** argv) {
         if (!serviceContext->getStorageEngine())
             return;
 
-        shutdownGlobalStorageEngineCleanly(serviceContext);
+        catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(serviceContext);
     });
 
     ThreadClient tc("testsuite", serviceContext->getService());
@@ -110,15 +109,7 @@ int runDbTests(int argc, char** argv) {
     auto runner = makePeriodicRunner(serviceContext);
     serviceContext->setPeriodicRunner(std::move(runner));
 
-    {
-        auto initializeStorageEngineOpCtx = serviceContext->makeOperationContext(&cc());
-        shard_role_details::setRecoveryUnit(initializeStorageEngineOpCtx.get(),
-                                            std::make_unique<RecoveryUnitNoop>(),
-                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-
-        initializeStorageEngine(initializeStorageEngineOpCtx.get(), StorageEngineInitFlags{});
-    }
-
+    catalog::startUpStorageEngineAndCollectionCatalog(serviceContext, &cc());
     StorageControl::startStorageControls(serviceContext, true /*forTestOnly*/);
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
     Collection::Factory::set(serviceContext, std::make_unique<CollectionImpl::FactoryImpl>());

@@ -46,6 +46,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/execution_admission_context.h"
+#include "mongo/db/catalog/catalog_control.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/database.h"
@@ -411,8 +412,7 @@ Status StorageInterfaceImpl::insertDocuments(OperationContext* opCtx,
 Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* opCtx) {
     Lock::GlobalWrite globalWriteLock(opCtx);
 
-    std::vector<DatabaseName> dbNames =
-        opCtx->getServiceContext()->getStorageEngine()->listDatabases();
+    std::vector<DatabaseName> dbNames = catalog::listDatabases();
     invariant(!dbNames.empty());
     LOGV2(21754,
           "dropReplicatedDatabases - dropping databases",
@@ -564,8 +564,7 @@ Status StorageInterfaceImpl::dropCollectionsWithPrefix(OperationContext* opCtx,
         NamespaceString::createNamespaceString_forTest(dbName, collectionNamePrefix),
         [&] {
             AutoGetDb autoDB(opCtx, dbName, MODE_X);
-            StorageEngine* storageEngine = opCtx->getServiceContext()->getStorageEngine();
-            return storageEngine->dropCollectionsWithPrefix(opCtx, dbName, collectionNamePrefix);
+            return catalog::dropCollectionsWithPrefix(opCtx, dbName, collectionNamePrefix);
         });
 }
 
@@ -1485,6 +1484,8 @@ Timestamp StorageInterfaceImpl::recoverToStableTimestamp(OperationContext* opCtx
     Status reason = Status(ErrorCodes::InterruptedDueToReplStateChange, "Rollback in progress.");
     StorageControl::stopStorageControls(serviceContext, reason, /*forRestart=*/true);
 
+    serviceContext->getStorageEngine()->stopTimestampMonitor();
+    auto state = catalog::closeCatalog(opCtx);
     auto swStableTimestamp = serviceContext->getStorageEngine()->recoverToStableTimestamp(opCtx);
     if (!swStableTimestamp.isOK()) {
         // Dump storage engine contents (including transaction information) before fatally
@@ -1492,6 +1493,8 @@ Timestamp StorageInterfaceImpl::recoverToStableTimestamp(OperationContext* opCtx
         serviceContext->getStorageEngine()->dump();
     }
     fassert(31049, swStableTimestamp);
+    catalog::openCatalog(opCtx, state, swStableTimestamp.getValue());
+    serviceContext->getStorageEngine()->restartTimestampMonitor();
 
     StorageControl::startStorageControls(serviceContext);
 

@@ -38,6 +38,7 @@
 #include "mongo/db/auth/authorization_router_impl.h"
 #include "mongo/db/auth/authorization_router_impl_for_test.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/database_holder_impl.h"
@@ -54,9 +55,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/db/storage/control/storage_control.h"
-#include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/util/clock_source_mock.h"
@@ -171,15 +170,7 @@ MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest
 
     // Since unit tests start in their own directories, by default skip lock file and metadata file
     // for faster startup.
-    {
-        auto initializeStorageEngineOpCtx = serviceContext->makeOperationContext(&cc());
-        shard_role_details::setRecoveryUnit(initializeStorageEngineOpCtx.get(),
-                                            std::make_unique<RecoveryUnitNoop>(),
-                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-
-        initializeStorageEngine(initializeStorageEngineOpCtx.get(), options._initFlags);
-    }
-
+    catalog::startUpStorageEngineAndCollectionCatalog(serviceContext, &cc(), options._initFlags);
     StorageControl::startStorageControls(serviceContext, true /*forTestOnly*/);
 
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
@@ -217,7 +208,7 @@ MongoDScopedGlobalServiceContextForTest::~MongoDScopedGlobalServiceContextForTes
         databaseHolder->closeAll(opCtx.get());
     }
 
-    shutdownGlobalStorageEngineCleanly(getServiceContext());
+    catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(getServiceContext());
 
     std::swap(storageGlobalParams.engine, _stashedStorageParams.engine);
     std::swap(storageGlobalParams.engineSetByUser, _stashedStorageParams.engineSetByUser);

@@ -53,9 +53,9 @@ struct PreviousCatalogState {
 PreviousCatalogState closeCatalog(OperationContext* opCtx);
 
 /**
- * Restores the catalog and all in-memory state after a call to closeCatalog().
- *
- * Must be called with the global lock acquired in exclusive mode.
+ * Restores the catalog and all in-memory state after a call to closeCatalog(). Used by replication
+ * after it recovers to the stable timestamp, whereas initial sync goes through a different sequence
+ * that reinitializes storage engine and restores the catalog, and so does not use this function.
  */
 void openCatalog(OperationContext* opCtx,
                  const PreviousCatalogState& catalogState,

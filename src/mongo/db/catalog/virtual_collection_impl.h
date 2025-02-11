@@ -147,7 +147,7 @@ public:
     }
 
     // A virtual collection can't have an 'ident' because 'ident' is an identifier to a WT table
-    // which a virtual colelction does not have. So returns nullptr.
+    // which a virtual collection does not have. So returns nullptr.
     std::shared_ptr<Ident> getSharedIdent() const final {
         return nullptr;
     }
@@ -500,6 +500,10 @@ public:
 
     long long dataSize(OperationContext* opCtx) const final {
         return _shared->_recordStore->dataSize();
+    }
+
+    int64_t sizeOnDisk(OperationContext* opCtx, const StorageEngine& storageEngine) const final {
+        return 0;
     }
 
     bool isEmpty(OperationContext* opCtx) const final {

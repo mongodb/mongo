@@ -29,74 +29,14 @@
 
 #pragma once
 
-#include <memory>
 #include <vector>
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/record_id.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/storage/ident.h"
-#include "mongo/db/storage/write_unit_of_work.h"
 
 namespace mongo {
-namespace catalog {
-
-/**
- * Indicates whether the data drop (the data table) should occur immediately or be two-phased, which
- * delays data removal to support older PIT reads or rollback.
- */
-enum class DataRemoval {
-    kImmediate,
-    kTwoPhase,
-};
-
-/**
- * Performs two-phase index drop.
- *
- * Passthrough to DurableCatalog::removeIndex to execute the first phase of drop by removing the
- * index catalog entry, then registers an onCommit hook to schedule the second phase of drop to
- * delete the index data. The 'dataRemoval' field can be used to specify whether the second phase of
- * drop, table data deletion, should run immediately or delayed: immediate deletion should only be
- * used for incomplete indexes, where the index build is the only accessor and the data will not be
- * needed for earlier points in time.
- *
- * Uses IndexCatalogEntry::getSharedIdent() shared_ptr to ensure that the second phase of drop (data
- * table drop) will not execute until no users of the index (shared owners) remain.
- * IndexCatalogEntry::getSharedIdent() is allowed to be a nullptr, in which case the caller
- * guarantees that there are no remaining users of the index. This handles situations wherein there
- * is no in-memory state available for an index, such as during repair.
- */
-void removeIndex(OperationContext* opCtx,
-                 StringData indexName,
-                 Collection* collection,
-                 std::shared_ptr<IndexCatalogEntry> entry,
-                 DataRemoval dataRemoval = DataRemoval::kTwoPhase);
-
-/**
- * Performs two-phase collection drop.
- *
- * Passthrough to DurableCatalog::dropCollection to execute the first phase of drop by removing the
- * collection entry, then registers and onCommit hook to schedule the second phase of drop to delete
- * the collection data.
- *
- * Uses 'ident' shared_ptr to ensure that the second phase of drop (data table drop) will not
- * execute until no users of the collection record store (shared owners) remain. 'ident' is not
- * allowed to be nullptr.
- */
-Status dropCollection(OperationContext* opCtx,
-                      const NamespaceString& nss,
-                      RecordId collectionCatalogId,
-                      std::shared_ptr<Ident> ident);
-
-
-}  // namespace catalog
-
 namespace storage_helpers {
 
 /**

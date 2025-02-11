@@ -51,6 +51,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/catalog/catalog_control.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -7308,7 +7309,11 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
     opCtx->getServiceContext()->getStorageEngine()->setStableTimestamp(chosenStableTimestamp);
     {
         Lock::GlobalLock globalLock(opCtx, LockMode::MODE_X);
-        ASSERT_OK(opCtx->getServiceContext()->getStorageEngine()->recoverToStableTimestamp(opCtx));
+        auto state = catalog::closeCatalog(opCtx);
+        auto swStableTimestamp =
+            opCtx->getServiceContext()->getStorageEngine()->recoverToStableTimestamp(opCtx);
+        ASSERT_OK(swStableTimestamp);
+        catalog::openCatalog(opCtx, state, swStableTimestamp.getValue());
     }
     opCtx->setLogicalSessionId(lsid);
     opCtx->setTxnNumber(txnNum);

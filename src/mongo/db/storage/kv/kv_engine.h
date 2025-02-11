@@ -84,7 +84,7 @@ public:
      * Requesting multiple copies for the same ns/ident is a rules violation; Calling on a
      * non-created ident is invalid and may crash.
      *
-     * Trying to access this record store in the future will retreive the pointer from the
+     * Trying to access this record store in the future will retrieve the pointer from the
      * collection object, and therefore this function can only be called once per namespace.
      *
      * @param ident Will be created if it does not already exist.

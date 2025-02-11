@@ -53,6 +53,7 @@
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/index_catalog_entry_impl.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/collection_index_usage_tracker.h"
@@ -629,7 +630,7 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
     }
 
     auto engine = opCtx->getServiceContext()->getStorageEngine();
-    std::string ident = engine->getCatalog()->getIndexIdent(
+    std::string ident = engine->getDurableCatalog()->getIndexIdent(
         opCtx, collection->getCatalogId(), descriptor.indexName());
 
     bool isReadyIndex = CreateIndexEntryFlags::kIsReady & flags;

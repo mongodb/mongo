@@ -468,6 +468,7 @@ mongo_cc_library(
         "//src/mongo/db/stats:top",
         "//src/mongo/db/storage:index_entry_comparison",
         "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage:storage_engine_common",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/storage/key_string",
         "//src/mongo/db/timeseries:catalog_helper",
