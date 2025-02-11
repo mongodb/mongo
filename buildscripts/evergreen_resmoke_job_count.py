@@ -257,13 +257,14 @@ def maybe_override_num_jobs_on_required(task_name, variant, jobs):
         "unsplittable_collections_created_on_any_shard_jscore_passthrough": 0.5,
     }
 
-    if (
-        variant != "enterprise-amazon-linux2-arm64-all-feature-flags"
-        and variant != "linux-64-debug-required"
+    if variant in (
+        "enterprise-amazon-linux2-arm64-all-feature-flags",
+        "enterprise-amazon-linux2-arm64-all-feature-flags-toolchain-v5",
     ):
-        LOGGER.info(f"Variant '{variant}' cannot have its jobs increased. Keeping {jobs} jobs.")
-        return jobs
-    elif variant == "linux-64-debug-required":
+        all_factors |= {
+            "search_no_pinned_connections_auth": 0.5,
+        }
+    elif variant in ("linux-64-debug-required", "linux-64-debug-required-toolchain-v5"):
         all_factors |= {
             "^noPassthrough$": 0.5,
             "read_concern_linearizable_passthrough": 1,
@@ -271,9 +272,8 @@ def maybe_override_num_jobs_on_required(task_name, variant, jobs):
             "sharding_csrs_continuous_config_stepdown": 1,
         }
     else:
-        all_factors |= {
-            "search_no_pinned_connections_auth": 0.5,
-        }
+        LOGGER.info(f"Variant '{variant}' cannot have its jobs increased. Keeping {jobs} jobs.")
+        return jobs
 
     factor = global_task_factor(task_name, all_factors, -1)
 
