@@ -97,6 +97,10 @@ namespace mongo {
 namespace {
 const StringData kShardingIndexCatalogEntriesFieldName = "indexes"_sd;
 const auto serviceDecorator = ServiceContext::declareDecoration<ShardingRecoveryService>();
+const auto kViewsPermittedDontSkipRSTL =
+    AutoGetCollection::Options{}
+        .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
+        .globalLockSkipOptions({{.skipRSTLLock = false}});  // Make sure we don't skip the RSTL
 
 AggregateCommandRequest makeCollectionsAndIndexesAggregation(OperationContext* opCtx) {
     StringMap<ResolvedNamespace> resolvedNamespaces;
@@ -237,11 +241,8 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
                 dbLock.emplace(opCtx, nss.dbName(), MODE_IX);
             }
 
-            collLock.emplace(opCtx,
-                             nss,
-                             MODE_S,
-                             AutoGetCollection::Options{}.viewMode(
-                                 auto_get_collection::ViewMode::kViewsPermitted));
+            // The DBDirectClient below might acquire locks, make sure we don't skip the RSTL here.
+            collLock.emplace(opCtx, nss, MODE_S, kViewsPermittedDontSkipRSTL);
         }
 
         DBDirectClient dbClient(opCtx);
@@ -347,11 +348,8 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
         if (nss.isDbOnly()) {
             dbLock.emplace(opCtx, nss.dbName(), MODE_X);
         } else {
-            collLock.emplace(opCtx,
-                             nss,
-                             MODE_X,
-                             AutoGetCollection::Options{}.viewMode(
-                                 auto_get_collection::ViewMode::kViewsPermitted));
+            // The DBDirectClient below might acquire locks, make sure we don't skip the RSTL here.
+            collLock.emplace(opCtx, nss, MODE_X, kViewsPermittedDontSkipRSTL);
         }
 
         DBDirectClient dbClient(opCtx);
@@ -475,11 +473,8 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
         if (nss.isDbOnly()) {
             dbLock.emplace(opCtx, nss.dbName(), MODE_X);
         } else {
-            collLock.emplace(opCtx,
-                             nss,
-                             MODE_X,
-                             AutoGetCollection::Options{}.viewMode(
-                                 auto_get_collection::ViewMode::kViewsPermitted));
+            // The DBDirectClient below might acquire locks, make sure we don't skip the RSTL here.
+            collLock.emplace(opCtx, nss, MODE_X, kViewsPermittedDontSkipRSTL);
         }
 
         DBDirectClient dbClient(opCtx);
