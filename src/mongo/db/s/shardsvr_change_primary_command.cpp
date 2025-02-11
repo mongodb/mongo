@@ -102,6 +102,10 @@ public:
             const auto coordinatorFuture = [&] {
                 FixedFCVRegion fcvRegion(opCtx);
 
+                const bool shardAuthoritativeDbMetadataFeatureFlagEnabled =
+                    feature_flags::gShardAuthoritativeDbMetadata.isEnabled(
+                        (*fcvRegion).acquireFCVSnapshot());
+
                 // TODO (SERVER-76436): Remove once 8.0 becomes last LTS.
                 uassert(
                     ErrorCodes::IllegalOperation,
@@ -123,6 +127,7 @@ public:
                     doc.setShardingDDLCoordinatorMetadata(
                         {{dbNss, DDLCoordinatorTypeEnum::kMovePrimary}});
                     doc.setToShardId(toShard->getId());
+                    doc.setAuthoritativeShardCommit(shardAuthoritativeDbMetadataFeatureFlagEnabled);
                     return doc.toBSON();
                 }();
 

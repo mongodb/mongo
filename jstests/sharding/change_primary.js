@@ -5,8 +5,6 @@
  * @tags: [
  *   featureFlagBalanceUnshardedCollections,
  *   requires_fcv_80,
- *   # TODO (SERVER-100584): Enable this test if applies
- *   incompatible_with_authoritative_shards,
  * ]
  */
 
