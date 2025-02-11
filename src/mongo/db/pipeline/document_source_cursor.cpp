@@ -192,13 +192,23 @@ void DocumentSourceCursor::loadBatch() {
     try {
         ON_BLOCK_EXIT([&] {
             recordPlanSummaryStats();
-            // At any given time only one operation can own the entirety of resources used by a
-            // multi-document transaction. As we can perform a remote call during the query
-            // execution we will check in the session to avoid deadlocks. If we don't release
-            // the storage engine resources used here then we could have two operations
-            // interacting with resources of a session at the same time. This will leave the
-            // plan in the saved state as a side-effect.
-            _exec->releaseAllAcquiredResources();
+            try {
+                // At any given time only one operation can own the entirety of resources used by a
+                // multi-document transaction. As we can perform a remote call during the query
+                // execution we will check in the session to avoid deadlocks. If we don't release
+                // the storage engine resources used here then we could have two operations
+                // interacting with resources of a session at the same time. This will leave the
+                // plan in the saved state as a side-effect.
+                _exec->releaseAllAcquiredResources();
+            } catch (const ExceptionFor<ErrorCodes::WriteConflict>&) {
+                // The storage engine can throw a WriteConflict when releasing resources, as the
+                // operation is failing anyways it's fine to swallow the exception here since
+                // otherwise it will crash the server.
+            } catch (const ExceptionFor<ErrorCodes::TemporarilyUnavailable>&) {
+                // The storage engine can also technically throw a TemporarilyUnavailable when
+                // releasing resources, as the operation is failing anyways it's fine to swallow the
+                // exception here since otherwise it will crash the server.
+            }
         });
 
         while ((state = _exec->getNextDocument(&resultObj, nullptr)) == PlanExecutor::ADVANCED) {
