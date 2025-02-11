@@ -8,6 +8,7 @@ suites:
     - jstests/core/catalog/db_stats.js
     - jstests/core/catalog/list_catalog.js
     - jstests/core/catalog/list_catalog_stage_consistency.js
+    - jstests/core/catalog/list_collections.js
     - jstests/core/catalog/list_databases.js
     - jstests/core/catalog/list_indexes.js
     - jstests/core/cluster_parameters/cluster_parameter_commands.js
@@ -42,8 +43,6 @@ suites:
     - jstests/core/ddl/drop_database.js
 
   replica_sets_jscore_passthrough:
-    # TODO SERVER-100135 run list_collections.js on sharding_jscore_passthrough
-    # after extracting the incompatible test cases to a separate file.
     - jstests/core/catalog/list_collections.js
     - jstests/core/ddl/clone_collection_as_capped.js
 

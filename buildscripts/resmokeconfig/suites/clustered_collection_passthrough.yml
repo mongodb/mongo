@@ -14,7 +14,6 @@ selector:
     # Uses returnKey().
     - jstests/core/**/index_diag.js
     # Expects 'idIndex' field in the listCollections output.
-    - jstests/core/catalog/list_collections.js
     - jstests/core/**/explain_shell_helpers.js
     - jstests/core/txns/list_collections_not_blocked_by_txn.js
     # Assumes the collection is not clustered by default.

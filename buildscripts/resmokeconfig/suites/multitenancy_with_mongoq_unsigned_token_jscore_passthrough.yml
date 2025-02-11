@@ -37,7 +37,7 @@ selector:
     - jstests/core/**/query/collation/collation.js
     - jstests/core/ddl/coll_mod_convert_to_unique_apply_ops.js
     - jstests/core/ddl/coll_mod_without_uuid.js
-    - jstests/core/catalog/list_collections.js
+    - jstests/core/catalog/list_collections_vs_apply_ops.js
     - jstests/core/**/list_collections_filter.js
     - jstests/core/**/list_collections_no_views.js
     - jstests/core/**/rename_collection_staytemp.js

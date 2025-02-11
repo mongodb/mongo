@@ -179,6 +179,7 @@ selector:
     - jstests/core/**/getmore_invalidated_documents.js
     - jstests/core/**/query/kill_cursors.js
     - jstests/core/catalog/list_collections.js
+    - jstests/core/catalog/list_collections_vs_apply_ops.js
     - jstests/core/**/list_indexes.js
     - jstests/core/**/list_indexes_invalidation.js
     - jstests/core/**/list_namespaces_invalidation.js
