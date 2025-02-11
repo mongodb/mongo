@@ -137,7 +137,7 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest, NonLastpointDoesNotParticipate
         {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: 'm', "
          "bucketMaxSpanSeconds: 60}}",
          "{$group: {_id: '$nonMeta', lastpoint1: {$top: {output: {b: '$b', c: '$c'}, sortBy: "
-         "{'m.a': 1, t: -1}}}}}, lastpoint2: {$bottom: {output: {b: '$b', c: '$c'}, sortBy: "
+         "{'m.a': 1, t: -1}}}, lastpoint2: {$bottom: {output: {b: '$b', c: '$c'}, sortBy: "
          "{'m.a': 1, t: 1}}}}}"});
 
     // We disallow the rewrite for firstpoint queries due to rounding behaviour on control.min.time.
