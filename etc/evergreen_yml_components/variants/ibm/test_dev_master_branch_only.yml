@@ -33,6 +33,10 @@ buildvariants:
         MONGO_DISTMOD=rhel81
         -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
         --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
+      unittest_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
+      integration_test_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
         -Wl,--no-gnu-unique"
@@ -88,6 +92,10 @@ buildvariants:
         -j3
         --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
         --linker=gold
+      unittest_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
+      integration_test_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
         CCFLAGS="-fno-gnu-unique"

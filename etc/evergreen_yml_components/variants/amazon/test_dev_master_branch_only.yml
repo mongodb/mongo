@@ -494,6 +494,10 @@ buildvariants:
         MONGO_DISTMOD=amazon2023
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
+      unittest_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
+      integration_test_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
       crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
       test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source
       multiversion_platform: amazon2023
@@ -540,6 +544,10 @@ buildvariants:
         MONGO_DISTMOD=amazon2023
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
+      unittest_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
+      integration_test_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
       crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
       test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source
       multiversion_platform: amazon2023
@@ -580,6 +588,10 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
         --streams-release-build
+      unittest_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
+      integration_test_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
       has_packages: true
       packager_arch: x86_64
       packager_distro: amazon2
@@ -649,6 +661,10 @@ buildvariants:
         MONGO_DISTMOD=amazon2
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
+      unittest_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
+      integration_test_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
         CCFLAGS="-fno-gnu-unique"
@@ -696,6 +712,8 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
         --link-model=static
+      integration_test_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
       unittest_library_compile_flags: >-
         --link-model=dynamic
       unittest_compile_flags: >-
@@ -815,6 +833,8 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
         --link-model=static
+      integration_test_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
       unittest_library_compile_flags: >-
         --link-model=dynamic
       unittest_compile_flags: >-

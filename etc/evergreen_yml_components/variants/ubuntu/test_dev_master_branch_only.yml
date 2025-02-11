@@ -128,6 +128,10 @@ buildvariants:
         --ssl MONGO_DISTMOD=ubuntu2004
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
+      unittest_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
+      integration_test_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
       test_flags: --excludeWithAnyTags=requires_external_data_source
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
@@ -174,6 +178,10 @@ buildvariants:
       push_name: linux
       push_path: linux
       compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
+      unittest_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
+      integration_test_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
       test_flags: --excludeWithAnyTags=requires_external_data_source
       crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
       resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
@@ -221,6 +229,10 @@ buildvariants:
       push_name: linux
       push_path: linux
       compile_flags: --ssl MONGO_DISTMOD=ubuntu2404 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
+      unittest_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
+      integration_test_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
       test_flags: --excludeWithAnyTags=requires_external_data_source,requires_updated_oscrypto
       crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
       resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
@@ -274,6 +286,10 @@ buildvariants:
         --ssl MONGO_DISTMOD=ubuntu2004
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
+      unittest_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
+      integration_test_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
       test_flags: --excludeWithAnyTags=requires_external_data_source
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
@@ -339,6 +355,10 @@ buildvariants:
         MONGO_DISTMOD=ubuntu2204
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
+      unittest_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
+      integration_test_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
       test_flags: --excludeWithAnyTags=requires_external_data_source
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
@@ -392,6 +412,10 @@ buildvariants:
         MONGO_DISTMOD=ubuntu2404
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
+      unittest_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
+      integration_test_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
       test_flags: --excludeWithAnyTags=requires_external_data_source,requires_updated_oscrypto
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"

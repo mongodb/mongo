@@ -32,6 +32,10 @@ buildvariants:
         --ssl MONGO_DISTMOD=debian12
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_v5_gcc.vars
+      unittest_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
+      integration_test_compile_flags: >-
+        BAZEL_FLAGS=--jobs=4
       test_flags: --excludeWithAnyTags=requires_external_data_source,requires_updated_oscrypto
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
