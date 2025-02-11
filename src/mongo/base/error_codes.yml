@@ -832,6 +832,11 @@ error_codes:
   - {code: 437, name: UncheckpointedData, categories: [RetriableError]}
   - {code: 438, name: OngoingTransaction, categories: [RetriableError]}
   - {code: 439, name: NoSuchFile}
+  - {
+      code: 440,
+      name: StreamProcessorExternalFunctionConnectionError,
+      categories: [StreamProcessorUserError, StreamProcessorRetryableError],
+    }
 
   # Error codes 4000-8999 are reserved.
 
