@@ -746,12 +746,12 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteExprWithOperationType) {
                         {case: {$eq: ['$op', {$const: 'd'}]}, then: {$const: 'delete'}},
                         {case: {$ne: ['$op', {$const: 'c'}]}, then: '$$REMOVE'},
                         {case: {$ne: ['$o.drop', '$$REMOVE']}, then: {$const: 'drop'}},
+                        {case: {$ne: ['$o.create', '$$REMOVE']}, then: {$const: 'create'}},
                         {
                             case: {$ne: ['$o.dropDatabase', '$$REMOVE']},
                             then: {$const: 'dropDatabase'}
                         },
                         {case: {$ne: ['$o.renameCollection', '$$REMOVE']}, then: {$const: 'rename'}},
-                        {case: {$ne: ['$o.create', '$$REMOVE']}, then: {$const: 'create'}},
                         {
                             case: {$ne: ['$o.createIndexes', '$$REMOVE']},
                             then: {$const: 'createIndexes'}
@@ -784,6 +784,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteExprWithOperationType) {
         ]
     }
 })";
+
     ASSERT_BSONOBJ_EQ(rewrittenPredicate, fromjson(expectedRewrite));
 }
 
@@ -2668,12 +2669,12 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnFullObject) {
         "{$substrBytes: ['$ns', {$add: [{$strLenBytes: ['$$dbName']}, {$const: 1}]}, {$const: "
         "-1}]}}"s;
     auto caseNotCmd = "{case: { $ne: ['$op', {$const: 'c'}]}, then: '$$REMOVE'}";
-    auto caseDrop = "{case: {$ne: ['$o.drop', '$$REMOVE']}, then: '$o.drop'}";
     auto caseDropDatabase = "{case: {$ne: ['$o.dropDatabase', '$$REMOVE']}, then: '$$REMOVE'}";
     auto caseRenameCollection =
         "{case: {$ne: ['$o.renameCollection', '$$REMOVE']}, then: {$substrBytes: "
         "['$o.renameCollection', {$add: [{$strLenBytes: ['$$dbName']}, {$const: 1}]}, {$const: "
         "-1}]}}";
+    auto caseDrop = "{case: {$ne: ['$o.drop', '$$REMOVE']}, then: '$o.drop'}";
     auto caseCreate = "{case: {$ne: ['$o.create', '$$REMOVE']}, then: '$o.create'}";
     auto caseCreateIndexes =
         "{case: {$ne: ['$o.createIndexes', '$$REMOVE']}, then: '$o.createIndexes'}";
@@ -2688,9 +2689,9 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnFullObject) {
 
     const auto cases = boost::algorithm::join(std::vector<std::string>{caseCRUD,
                                                                        caseNotCmd,
-                                                                       caseDrop,
                                                                        caseDropDatabase,
                                                                        caseRenameCollection,
+                                                                       caseDrop,
                                                                        caseCreate,
                                                                        caseCreateIndexes,
                                                                        caseCommitIndexBuild,
@@ -2741,12 +2742,12 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnFullObjectWithOnlyDb) {
         "{$substrBytes: ['$ns', {$add: [{$strLenBytes: ['$$dbName']}, {$const: 1}]}, {$const: "
         "-1}]}}"s;
     auto caseNotCmd = "{case: { $ne: ['$op', {$const: 'c'}]}, then: '$$REMOVE'}";
-    auto caseDrop = "{case: {$ne: ['$o.drop', '$$REMOVE']}, then: '$o.drop'}";
     auto caseDropDatabase = "{case: {$ne: ['$o.dropDatabase', '$$REMOVE']}, then: '$$REMOVE'}";
     auto caseRenameCollection =
         "{case: {$ne: ['$o.renameCollection', '$$REMOVE']}, then: {$substrBytes: "
         "['$o.renameCollection', {$add: [{$strLenBytes: ['$$dbName']}, {$const: 1}]}, {$const: "
         "-1}]}}";
+    auto caseDrop = "{case: {$ne: ['$o.drop', '$$REMOVE']}, then: '$o.drop'}";
     auto caseCreate = "{case: {$ne: ['$o.create', '$$REMOVE']}, then: '$o.create'}";
     auto caseCreateIndexes =
         "{case: {$ne: ['$o.createIndexes', '$$REMOVE']}, then: '$o.createIndexes'}";
@@ -2761,9 +2762,9 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnFullObjectWithOnlyDb) {
 
     const auto cases = boost::algorithm::join(std::vector<std::string>{caseCRUD,
                                                                        caseNotCmd,
-                                                                       caseDrop,
                                                                        caseDropDatabase,
                                                                        caseRenameCollection,
+                                                                       caseDrop,
                                                                        caseCreate,
                                                                        caseCreateIndexes,
                                                                        caseCommitIndexBuild,
@@ -2844,12 +2845,12 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnCollFieldPath) {
         "{$substrBytes: ['$ns', {$add: [{$strLenBytes: ['$$dbName']}, {$const: 1}]}, {$const: "
         "-1}]}}"s;
     auto caseNotCmd = "{case: { $ne: ['$op', {$const: 'c'}]}, then: '$$REMOVE'}";
-    auto caseDrop = "{case: {$ne: ['$o.drop', '$$REMOVE']}, then: '$o.drop'}";
     auto caseDropDatabase = "{case: {$ne: ['$o.dropDatabase', '$$REMOVE']}, then: '$$REMOVE'}";
     auto caseRenameCollection =
         "{case: {$ne: ['$o.renameCollection', '$$REMOVE']}, then: {$substrBytes: "
         "['$o.renameCollection', {$add: [{$strLenBytes: ['$$dbName']}, {$const: 1}]}, {$const: "
         "-1}]}}";
+    auto caseDrop = "{case: {$ne: ['$o.drop', '$$REMOVE']}, then: '$o.drop'}";
     auto caseCreate = "{case: {$ne: ['$o.create', '$$REMOVE']}, then: '$o.create'}";
     auto caseCreateIndexes =
         "{case: {$ne: ['$o.createIndexes', '$$REMOVE']}, then: '$o.createIndexes'}";
@@ -2864,9 +2865,9 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnCollFieldPath) {
 
     const auto cases = boost::algorithm::join(std::vector<std::string>{caseCRUD,
                                                                        caseNotCmd,
-                                                                       caseDrop,
                                                                        caseDropDatabase,
                                                                        caseRenameCollection,
+                                                                       caseDrop,
                                                                        caseCreate,
                                                                        caseCreateIndexes,
                                                                        caseCommitIndexBuild,
