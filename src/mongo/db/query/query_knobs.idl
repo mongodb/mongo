@@ -1450,6 +1450,18 @@ server_parameters:
       gt: 0
     redact: false
 
+  internalOrStageMaxMemoryBytes:
+    description: "Maximum size of the data that the OrStage stage will cache in-memory before spilling to disk."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalOrStageMaxMemoryBytes"
+    cpp_vartype: AtomicWord<long long>
+    # TODO SERVER-99279 Enable automatic spilling by setting a reasonable default value.
+    default:
+      expr: std::numeric_limits<long long>::max()
+    validator:
+      gt: 0
+    redact: false
+
   planRankerMode:
     description: "Control ranking method of query plans."
     set_at: [ startup, runtime ]

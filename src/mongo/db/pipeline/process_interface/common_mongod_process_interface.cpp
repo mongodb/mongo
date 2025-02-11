@@ -981,7 +981,12 @@ void CommonMongodProcessInterface::writeRecordsToRecordStore(
         "MPI::writeRecordsToRecordStore",
         expCtx->getNamespaceString(),
         [&] {
-            Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
+            // After SERVER-99150, it will assert in DEBUG builds if we try to get the global lock
+            // when we already have it.
+            boost::optional<Lock::GlobalLock> lk;
+            if (!shard_role_details::getLocker(expCtx->getOperationContext())->isLocked()) {
+                lk.emplace(expCtx->getOperationContext(), MODE_IS);
+            }
             WriteUnitOfWork wuow(expCtx->getOperationContext());
             auto writeResult = rs->insertRecords(expCtx->getOperationContext(), records, ts);
             tassert(5643002,
@@ -1016,7 +1021,12 @@ bool CommonMongodProcessInterface::checkRecordInRecordStore(
     const RecordStore* rs,
     RecordId rID) const {
     RecordData possibleRecord;
-    Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
+    // After SERVER-99150, it will assert in DEBUG builds if we try to get the global lock when we
+    // already have it.
+    boost::optional<Lock::GlobalLock> lk;
+    if (!shard_role_details::getLocker(expCtx->getOperationContext())->isLocked()) {
+        lk.emplace(expCtx->getOperationContext(), MODE_IS);
+    }
     return rs->findRecord(expCtx->getOperationContext(), RecordId(rID), &possibleRecord);
 }
 

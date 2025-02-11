@@ -771,6 +771,7 @@ struct OrStats : public SpecificStats {
 
     size_t dupsTested = 0u;
     size_t dupsDropped = 0u;
+    SpillingStats spillingStats;
 };
 
 struct ProjectionStats : public SpecificStats {

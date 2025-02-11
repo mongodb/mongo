@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include "mongo/util/assert_util.h"
-
 // Prevent macro redefinition warning.
 #ifdef IS_BIG_ENDIAN
 #undef IS_BIG_ENDIAN
@@ -39,6 +37,9 @@
 #undef IS_BIG_ENDIAN
 
 #include <absl/container/btree_map.h>
+#include <absl/container/flat_hash_set.h>
+
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 /**
@@ -165,17 +166,21 @@ private:
 
 public:
     /**
-     * Add the value to the bitmaps. Returns true if a new values was added, false otherwise.
+     * Add the value to the bitmap. Returns true if a new value was added, false otherwise.
      */
     bool addChecked(uint64_t value) {
-        return get(highBytes(value)).addChecked(lowBytes(value));
+        if (get(highBytes(value)).addChecked(lowBytes(value))) {
+            increaseBytesSize(value);
+            return true;
+        }
+        return false;
     }
 
     /**
-     * Add the value to the bitmaps.
+     * Add the value to the bitmap.
      */
     void add(uint64_t value) {
-        get(highBytes(value)).add(lowBytes(value));
+        addChecked(value);
     }
 
     /**
@@ -193,6 +198,23 @@ public:
 
     bool empty() const {
         return _roarings.empty();
+    }
+
+    uint64_t getApproximateSize() const {
+        return _roarings.size() * sizeof(uint32_t) + _approximateRoaringsSize;
+    }
+
+    /* This method uses statistics provided by roaring to compute a more accurate memory consumption
+     * but should be used less frequently since it traverses the whole structure in order to compute
+     * the statistics. complexity: O(N*M), N the number of keys in _roarings, M the number of
+     * containers in each roaring.*/
+    uint64_t computeMemorySize() const {
+        uint64_t memoryUsage{0};
+        for (const auto& roaring : _roarings) {
+            memoryUsage += (sizeof(uint32_t) + computeRoaringMemorySize(&roaring.second.roaring));
+        }
+
+        return memoryUsage;
     }
 
     /* Creates an iterator on the Roaring64BTree. The iterator iterates the elements in the
@@ -216,13 +238,46 @@ private:
         return uint32_t(in);
     }
 
+    // This method should be called when a new recordId is added to increase the
+    // _approximateRoaringsSize.
+    void increaseBytesSize(uint64_t value) {
+        // roaring uses the highest 16 bits as indexes to containers. In the containers it stores
+        // the lowest 16 bits. According to the paper each container should not use more than
+        // 16bits/integer and the whole container should not use more than 8KB.
+
+        // 2 bytes added because a new RecordId was added in a container.
+        _approximateRoaringsSize += 2;
+
+        // The key used to track a container in a roaring array. It is the value with the last 16
+        // bits zet to 0.
+        const uint64_t mask = 0xFFFFFFFFFFFF0000ULL;
+        const uint16_t containerKey = value & mask;
+
+        // If the key has not been seen in the past, a new container has been created adding an
+        // entry in the roaring array (i.e. 2 bytes). Additionally, a new entry will be added in the
+        // local hashset (i.e. 4 more bytes).
+        _approximateRoaringsSize += static_cast<uint64_t>(
+            (2 + sizeof(uint64_t)) * (_existingContainers.insert(containerKey).second ? 1 : 0));
+    }
+
+    uint64_t computeRoaringMemorySize(const roaring::api::roaring_bitmap_t* r) const {
+        roaring::api::roaring_statistics_t stats;
+        roaring::api::roaring_bitmap_statistics(r, &stats);
+        return stats.n_bytes_array_containers + stats.n_bytes_bitset_containers +
+            stats.n_bytes_run_containers;
+    }
+
     roaring::Roaring& get(uint32_t key) {
-        auto& roaring = _roarings[key];
+        roaring::Roaring& roaring = _roarings[key];
         roaring.setCopyOnWrite(false);
         return roaring;
     }
 
     absl::btree_map<uint32_t, roaring::Roaring> _roarings;
+
+    // Approximate size in bytes of the roarings.
+    uint64_t _approximateRoaringsSize{0};
+    absl::flat_hash_set<uint64_t> _existingContainers;
 };
 
 }  // namespace mongo
