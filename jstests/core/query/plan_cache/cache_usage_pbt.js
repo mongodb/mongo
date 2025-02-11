@@ -15,15 +15,15 @@
  * ]
  */
 import {
+    indexModel,
+    timeseriesIndexModel
+} from "jstests/libs/property_test_helpers/models/index_models.js";
+import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {
     defaultPbtDocuments,
     getPlanCache,
     testProperty
 } from "jstests/libs/property_test_helpers/property_testing_utils.js";
-import {
-    aggPipelineModel,
-    indexModel,
-    timeseriesIndexModel
-} from "jstests/libs/property_test_helpers/query_models.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {getRejectedPlans} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
@@ -84,12 +84,14 @@ function repeatQueriesUseCache(getQuery, testHelpers) {
     return {passed: true};
 }
 
+const aggModel = getAggPipelineModel();
+
 // Run the property with a regular collection.
 assert(experimentColl.drop());
 assert.commandWorked(experimentColl.insert(defaultPbtDocuments()));
 testProperty(repeatQueriesUseCache,
              experimentColl,
-             {aggModel: aggPipelineModel, indexModel: indexModel, numRuns, numQueriesPerRun: 20});
+             {aggModel, indexModel: indexModel, numRuns, numQueriesPerRun: 20});
 
 // Run the property with a TS collection.
 assert(experimentColl.drop());
@@ -97,7 +99,6 @@ assert.commandWorked(db.createCollection(experimentColl.getName(), {
     timeseries: {timeField: 't', metaField: 'm'},
 }));
 assert.commandWorked(experimentColl.insert(defaultPbtDocuments()));
-testProperty(
-    repeatQueriesUseCache,
-    experimentColl,
-    {aggModel: aggPipelineModel, indexModel: timeseriesIndexModel, numRuns, numQueriesPerRun: 20});
+testProperty(repeatQueriesUseCache,
+             experimentColl,
+             {aggModel, indexModel: timeseriesIndexModel, numRuns, numQueriesPerRun: 20});

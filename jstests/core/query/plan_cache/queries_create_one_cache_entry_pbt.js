@@ -14,15 +14,15 @@
  * ]
  */
 import {
+    indexModel,
+    timeseriesIndexModel
+} from "jstests/libs/property_test_helpers/models/index_models.js";
+import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {
     defaultPbtDocuments,
     getPlanCache,
     testProperty
 } from "jstests/libs/property_test_helpers/property_testing_utils.js";
-import {
-    aggPipelineNoOrsModel,
-    indexModel,
-    timeseriesIndexModel
-} from "jstests/libs/property_test_helpers/query_models.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 
 let numRuns = 200;
@@ -61,12 +61,14 @@ function identicalQueryCreatesAtMostOneCacheEntry(getQuery, testHelpers) {
     return {passed: true};
 }
 
+const aggModel = getAggPipelineModel({allowOrs: false});
+
 // Run the property with a regular collection.
 assert(experimentColl.drop());
 assert.commandWorked(experimentColl.insert(defaultPbtDocuments()));
 testProperty(identicalQueryCreatesAtMostOneCacheEntry,
              experimentColl,
-             {aggModel: aggPipelineNoOrsModel, indexModel, numRuns, numQueriesPerRun: 20});
+             {aggModel, indexModel, numRuns, numQueriesPerRun: 20});
 
 // Run the property with a TS collection.
 assert(experimentColl.drop());
@@ -74,9 +76,6 @@ assert.commandWorked(db.createCollection(experimentColl.getName(), {
     timeseries: {timeField: 't', metaField: 'm'},
 }));
 assert.commandWorked(experimentColl.insert(defaultPbtDocuments()));
-testProperty(identicalQueryCreatesAtMostOneCacheEntry, experimentColl, {
-    aggModel: aggPipelineNoOrsModel,
-    indexModel: timeseriesIndexModel,
-    numRuns,
-    numQueriesPerRun: 20
-});
+testProperty(identicalQueryCreatesAtMostOneCacheEntry,
+             experimentColl,
+             {aggModel, indexModel: timeseriesIndexModel, numRuns, numQueriesPerRun: 20});

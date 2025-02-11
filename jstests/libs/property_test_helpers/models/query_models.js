@@ -1,5 +1,5 @@
 /*
- * Fast-check models for aggregation pipelines and index definitions. Works for time-series
+ * Fast-check models for aggregation pipelines. Works for time-series
  * collections but also is general enough for regular collections.
  *
  * For our agg model, we generate query shapes with a list of concrete values the parameters could
@@ -120,100 +120,50 @@ const groupArb =
             return {$group: {_id: gbField, [outputField]: accSpec}};
         });
 
-// Arbitrary for single stage.
-function getAggStageArb(allowOrs) {
-    // TODO SERVER-91164 include $limit
-    return fc.oneof(projectArb,
-                    getMatchArb(allowOrs),
-                    addFieldsConstArb,
-                    computedProjectArb,
-                    addFieldsVarArb,
-                    sortArb,
-                    groupArb);
+const limitArb = fc.record({$limit: fc.integer({min: 1, max: 5})});
+const skipArb = fc.record({$skip: fc.integer({min: 1, max: 5})});
+
+/*
+ * Return the arbitraries for agg stages that are allowed given:
+ *    - `allowOrs` for whether we allow $or in $match
+ *    - `deterministicBag` for whether the query needs to return the same bag of results every time.
+ *       $limit and $skip prevent the bag from being consistent for each run, so we exclude these
+ *       when a deterministic bag is required.
+ * The output is in order from simplest agg stages to most complex, for minimization.
+ */
+function getAllowedStages(allowOrs, deterministicBag) {
+    if (deterministicBag) {
+        return [
+            projectArb,
+            getMatchArb(allowOrs),
+            addFieldsConstArb,
+            computedProjectArb,
+            addFieldsVarArb,
+            sortArb,
+            groupArb
+        ];
+    } else {
+        // If we don't require a deterministic bag, we can allow $skip and $limit anywhere.
+        return [
+            limitArb,
+            skipArb,
+            projectArb,
+            getMatchArb(allowOrs),
+            addFieldsConstArb,
+            computedProjectArb,
+            addFieldsVarArb,
+            sortArb,
+            groupArb
+        ];
+    }
 }
 
-// Our full model for aggregation pipelines. Length 6 seems long enough to cover interactions
-// between stages.
-export const aggPipelineModel =
-    fc.array(getAggStageArb(true /* allowOrs */), {minLength: 0, maxLength: 6});
-export const aggPipelineNoOrsModel =
-    fc.array(getAggStageArb(false /* allowOrs */), {minLength: 0, maxLength: 6});
-
-// ------------------------------------- Index Def Arbitraries -----------------------------------
-const indexFieldArb = fc.constantFrom('_id', 't', 'm', 'm.m1', 'm.m2', 'a', 'b', 'array');
-
-// Regular indexes
-// Tuple of indexed field, and it's sort direction.
-const singleIndexDefArb = fc.tuple(indexFieldArb, fc.constantFrom(1, -1));
-// Unique array of [[a, true], [b, false], ...] to be mapped to an index definition. Unique on the
-// indexed field. Filter out any indexes that only use the _id field.
-const arrayOfSingleIndexDefsArb = fc.uniqueArray(singleIndexDefArb, {
-                                        minLength: 1,
-                                        maxLength: 5,
-                                        selector: fieldAndSort => fieldAndSort[0],
-                                    }).filter(arrayOfIndexDefs => {
-    // We can run into errors if we try to make an {_id: -1} index.
-    if (arrayOfIndexDefs.length === 1 && arrayOfIndexDefs[0][0] === '_id') {
-        return false;
-    }
-    return true;
-});
-const simpleIndexDefArb = arrayOfSingleIndexDefsArb.map(arrayOfIndexDefs => {
-    // Convert to a valid index definition structure.
-    let fullDef = {};
-    for (const [field, sortDirection] of arrayOfIndexDefs) {
-        fullDef = Object.assign(fullDef, {[field]: sortDirection});
-    }
-    return fullDef;
-});
-const simpleIndexOptionsArb = fc.constantFrom({}, {sparse: true});
-const simpleIndexDefAndOptionsArb =
-    fc.record({def: simpleIndexDefArb, options: simpleIndexOptionsArb});
-
-// Hashed indexes
-const hashedIndexDefArb =
-    fc.tuple(arrayOfSingleIndexDefsArb, fc.integer({min: 0, max: 4 /* Inclusive */}))
-        .map(([arrayOfIndexDefs, positionOfHashed]) => {
-            // Inputs are an index definition, and the position of the hashed field in the index
-            // def.
-            positionOfHashed %= arrayOfIndexDefs.length;
-            let fullDef = {};
-            let i = 0;
-            for (const [field, sortDir] of arrayOfIndexDefs) {
-                const sortDirOrHashed = i === positionOfHashed ? 'hashed' : sortDir;
-                fullDef = Object.assign(fullDef, {[field]: sortDirOrHashed});
-                i++;
-            }
-            return fullDef;
-        })
-        .filter(fullDef => {
-            // Can't create hashed index on array field.
-            return !Object.keys(fullDef).includes('array');
-        });
-// No index options for hashed or wildcard indexes.
-const hashedIndexDefAndOptionsArb = fc.record({def: hashedIndexDefArb, options: fc.constant({})});
-
-// Wildcard indexes. TODO SERVER-91164 expand coverage.
-const wildcardIndexDefAndOptionsArb =
-    fc.record({def: fc.constant({"$**": 1}), options: fc.constant({})});
-
-// Map to an object with the definition and options, so it's more clear what each object is.
-export const indexModel = fc.oneof(
-    simpleIndexDefAndOptionsArb, wildcardIndexDefAndOptionsArb, hashedIndexDefAndOptionsArb);
-
-function isMultikey(indexDef) {
-    for (const field of Object.keys(indexDef)) {
-        if (field === 'array') {
-            return true;
-        }
-    }
-    return false;
+/*
+ * Our full model for aggregation pipelines. See `getAllowedStages` for description of `allowOrs`
+ * and `deterministicBag`. By default, ORs are allowed and the bag of results will be deterministic.
+ */
+export function getAggPipelineModel({allowOrs = true, deterministicBag = true} = {}) {
+    const aggStageArb = fc.oneof(...getAllowedStages(allowOrs, deterministicBag));
+    // Length 6 seems long enough to cover interactions between stages.
+    return fc.array(aggStageArb, {minLength: 0, maxLength: 6});
 }
-// Wildcard, hashed, sparse, and multikey indexes are not compatible with time-series collections.
-export const timeseriesIndexModel = simpleIndexDefAndOptionsArb.filter(({def, options}) => {
-    // Filter out any indexes that won't work for time-series.
-    if (options.sparse || isMultikey(def)) {
-        return false;
-    }
-    return true;
-});

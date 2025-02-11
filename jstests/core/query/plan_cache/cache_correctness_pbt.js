@@ -16,15 +16,15 @@
  * ]
  */
 import {
+    indexModel,
+    timeseriesIndexModel
+} from "jstests/libs/property_test_helpers/models/index_models.js";
+import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {
     defaultPbtDocuments,
     runDeoptimizedQuery,
     testProperty
 } from "jstests/libs/property_test_helpers/property_testing_utils.js";
-import {
-    aggPipelineModel,
-    indexModel,
-    timeseriesIndexModel
-} from "jstests/libs/property_test_helpers/query_models.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 
 let numRuns = 100;
@@ -71,6 +71,8 @@ function queriesUsingCacheHaveSameResultsAsControl(getQuery, testHelpers) {
     return {passed: true};
 }
 
+const aggModel = getAggPipelineModel();
+
 assert(controlColl.drop());
 assert.commandWorked(controlColl.insert(defaultPbtDocuments()));
 
@@ -79,7 +81,7 @@ assert(experimentColl.drop());
 assert.commandWorked(experimentColl.insert(defaultPbtDocuments()));
 testProperty(queriesUsingCacheHaveSameResultsAsControl,
              experimentColl,
-             {aggModel: aggPipelineModel, indexModel: indexModel, numRuns, numQueriesPerRun});
+             {aggModel, indexModel: indexModel, numRuns, numQueriesPerRun});
 
 // Run the property with a TS collection.
 assert(experimentColl.drop());
@@ -87,7 +89,6 @@ assert.commandWorked(db.createCollection(experimentColl.getName(), {
     timeseries: {timeField: 't', metaField: 'm'},
 }));
 assert.commandWorked(experimentColl.insert(defaultPbtDocuments()));
-testProperty(
-    queriesUsingCacheHaveSameResultsAsControl,
-    experimentColl,
-    {aggModel: aggPipelineModel, indexModel: timeseriesIndexModel, numRuns, numQueriesPerRun});
+testProperty(queriesUsingCacheHaveSameResultsAsControl,
+             experimentColl,
+             {aggModel, indexModel: timeseriesIndexModel, numRuns, numQueriesPerRun});
