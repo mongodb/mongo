@@ -463,7 +463,7 @@ void CollectionRoutingInfoTargeterTest::
     }
 
     res = criTargeter.targetInsert(operationContext(),
-                                   fromjson("{a: {b: 0}}, c: 5}"),
+                                   fromjson("{a: {b: 0}, c: 5}"),
                                    checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.shardName, "1");
     if (checkChunkRanges) {

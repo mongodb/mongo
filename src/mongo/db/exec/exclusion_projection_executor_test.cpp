@@ -401,8 +401,8 @@ TEST(ExclusionProjectionExecutionTest, ShouldAddMetaExpressionsToDependencies) {
                                                             "i: {$meta: 'recordId'}, "
                                                             "j: {$meta: 'indexKey'}, "
                                                             "k: {$meta: 'sortKey'}, "
-                                                            "l: {$meta: 'searchScoreDetails'}}, "
-                                                            "m: {$meta: 'vectorSearchScore'}"));
+                                                            "l: {$meta: 'searchScoreDetails'}, "
+                                                            "m: {$meta: 'vectorSearchScore'}}"));
 
     DepsTracker deps;
     exclusion->addDependencies(&deps);

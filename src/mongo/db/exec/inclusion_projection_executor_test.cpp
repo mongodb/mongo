@@ -812,8 +812,8 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
                                                             "i: {$meta: 'recordId'}, "
                                                             "j: {$meta: 'indexKey'}, "
                                                             "k: {$meta: 'sortKey'}, "
-                                                            "l: {$meta: 'searchScoreDetails'}}, "
-                                                            "m: {$meta: 'vectorSearchScore'}"));
+                                                            "l: {$meta: 'searchScoreDetails'}, "
+                                                            "m: {$meta: 'vectorSearchScore'}}"));
 
     DepsTracker deps;
     inclusion->addDependencies(&deps);
