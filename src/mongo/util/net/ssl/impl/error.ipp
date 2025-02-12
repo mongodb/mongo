@@ -91,6 +91,10 @@ public:
         switch (value) {
             case stream_truncated:
                 return "stream truncated";
+            case unspecified_system_error:
+                return "unspecified system error";
+            case unexpected_result:
+                return "unexpected result";
             default:
                 return "asio.ssl.stream error";
         }
