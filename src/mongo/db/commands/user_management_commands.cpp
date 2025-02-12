@@ -182,7 +182,7 @@ Status checkOkayToGrantRolesToRole(OperationContext* opCtx,
     }
 
     auto swData = authzManager->resolveRoles(
-        opCtx, rolesToAdd, AuthorizationManager::ResolveRoleOption::kRoles);
+        opCtx, rolesToAdd, AuthorizationManager::ResolveRoleOption::kRoles());
     if (!swData.isOK()) {
         return {swData.getStatus().code(),
                 str::stream() << "Cannot grant roles to '" << role
@@ -1648,7 +1648,10 @@ void CmdUMCTyped<GrantPrivilegesToRoleCommand>::Invocation::typedRun(OperationCo
 
     // Add additional privileges to existing set.
     auto data = uassertStatusOK(authzManager->resolveRoles(
-        opCtx, {roleName}, AuthorizationManager::ResolveRoleOption::kDirectPrivileges));
+        opCtx,
+        {roleName},
+        AuthorizationManager::ResolveRoleOption::kPrivileges().setDirectOnly(
+            true /* shouldEnable */)));
     auto privileges = std::move(data.privileges.get());
     for (const auto& priv : cmd.getPrivileges()) {
         Privilege::addPrivilegeToPrivilegeVector(&privileges, priv);
@@ -1694,7 +1697,10 @@ void CmdUMCTyped<RevokePrivilegesFromRoleCommand>::Invocation::typedRun(Operatio
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
     auto data = uassertStatusOK(authzManager->resolveRoles(
-        opCtx, {roleName}, AuthorizationManager::ResolveRoleOption::kDirectPrivileges));
+        opCtx,
+        {roleName},
+        AuthorizationManager::ResolveRoleOption::kPrivileges().setDirectOnly(
+            true /* shouldEnable */)));
     auto privileges = std::move(data.privileges.get());
     for (const auto& rmPriv : cmd.getPrivileges()) {
         for (auto it = privileges.begin(); it != privileges.end(); ++it) {
@@ -1754,7 +1760,9 @@ void CmdUMCTyped<GrantRolesToRoleCommand>::Invocation::typedRun(OperationContext
 
     // Add new roles to existing roles
     auto data = uassertStatusOK(authzManager->resolveRoles(
-        opCtx, {roleName}, AuthorizationManager::ResolveRoleOption::kDirectRoles));
+        opCtx,
+        {roleName},
+        AuthorizationManager::ResolveRoleOption::kRoles().setDirectOnly(true /* shouldEnable */)));
     auto directRoles = std::move(data.roles.get());
     directRoles.insert(rolesToAdd.cbegin(), rolesToAdd.cend());
 
@@ -1791,7 +1799,9 @@ void CmdUMCTyped<RevokeRolesFromRoleCommand>::Invocation::typedRun(OperationCont
 
     // Remove roles from existing set.
     auto data = uassertStatusOK(authzManager->resolveRoles(
-        opCtx, {roleName}, AuthorizationManager::ResolveRoleOption::kDirectRoles));
+        opCtx,
+        {roleName},
+        AuthorizationManager::ResolveRoleOption::kRoles().setDirectOnly(true /* shouldEnable */)));
     auto roles = std::move(data.roles.get());
     for (const auto& roleToRemove : rolesToRemove) {
         roles.erase(roleToRemove);

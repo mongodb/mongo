@@ -287,7 +287,7 @@ public:
 };
 
 TEST_F(SCRAMFixture, testServerStep1DoesNotIncludeNonceFromClientStep1) {
-    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+    ASSERT_OK(authzManagerExternalState->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -309,7 +309,7 @@ TEST_F(SCRAMFixture, testServerStep1DoesNotIncludeNonceFromClientStep1) {
 }
 
 TEST_F(SCRAMFixture, testClientStep2DoesNotIncludeNonceFromServerStep1) {
-    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+    ASSERT_OK(authzManagerExternalState->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -331,7 +331,7 @@ TEST_F(SCRAMFixture, testClientStep2DoesNotIncludeNonceFromServerStep1) {
 }
 
 TEST_F(SCRAMFixture, testClientStep2GivesBadProof) {
-    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+    ASSERT_OK(authzManagerExternalState->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -356,7 +356,7 @@ TEST_F(SCRAMFixture, testClientStep2GivesBadProof) {
 }
 
 TEST_F(SCRAMFixture, testServerStep2GivesBadVerifier) {
-    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+    ASSERT_OK(authzManagerExternalState->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -389,7 +389,7 @@ TEST_F(SCRAMFixture, testServerStep2GivesBadVerifier) {
 
 
 TEST_F(SCRAMFixture, testSCRAM) {
-    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+    ASSERT_OK(authzManagerExternalState->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -402,7 +402,7 @@ TEST_F(SCRAMFixture, testSCRAM) {
 }
 
 TEST_F(SCRAMFixture, testSCRAMWithChannelBindingSupportedByClient) {
-    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+    ASSERT_OK(authzManagerExternalState->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -420,7 +420,7 @@ TEST_F(SCRAMFixture, testSCRAMWithChannelBindingSupportedByClient) {
 }
 
 TEST_F(SCRAMFixture, testSCRAMWithChannelBindingRequiredByClient) {
-    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+    ASSERT_OK(authzManagerExternalState->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -441,7 +441,7 @@ TEST_F(SCRAMFixture, testSCRAMWithChannelBindingRequiredByClient) {
 }
 
 TEST_F(SCRAMFixture, testSCRAMWithInvalidChannelBinding) {
-    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+    ASSERT_OK(authzManagerExternalState->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -462,7 +462,7 @@ TEST_F(SCRAMFixture, testSCRAMWithInvalidChannelBinding) {
 }
 
 TEST_F(SCRAMFixture, testNULLInPassword) {
-    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+    ASSERT_OK(authzManagerExternalState->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "saj\0ack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -476,7 +476,7 @@ TEST_F(SCRAMFixture, testNULLInPassword) {
 
 
 TEST_F(SCRAMFixture, testCommasInUsernameAndPassword) {
-    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+    ASSERT_OK(authzManagerExternalState->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("s,a,jack", "s,a,jack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "s,a,jack");
@@ -502,7 +502,7 @@ TEST_F(SCRAMFixture, testIncorrectUser) {
 }
 
 TEST_F(SCRAMFixture, testIncorrectPassword) {
-    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+    ASSERT_OK(authzManagerExternalState->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -519,7 +519,7 @@ TEST_F(SCRAMFixture, testIncorrectPassword) {
 
 TEST_F(SCRAMFixture, testOptionalClientExtensions) {
     // Verify server ignores unknown/optional extensions sent by client.
-    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+    ASSERT_OK(authzManagerExternalState->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
@@ -543,7 +543,7 @@ TEST_F(SCRAMFixture, testOptionalClientExtensions) {
 
 TEST_F(SCRAMFixture, testOptionalServerExtensions) {
     // Verify client errors on unknown/optional extensions sent by server.
-    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+    ASSERT_OK(authzManagerExternalState->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");

@@ -429,7 +429,7 @@ public:
                                                   << "test"_sd)));
 
         auto opCtx = _client->makeOperationContext();
-        ASSERT_OK(_managerState->insertPrivilegeDocument(opCtx.get(), userDoc, {}));
+        ASSERT_OK(_managerState->insertUserDocument(opCtx.get(), userDoc, {}));
     }
 
 protected:
