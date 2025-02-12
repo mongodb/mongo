@@ -575,6 +575,8 @@ last-continuous:
     ticket: SERVER-73641
   - test_file: jstests/core/timeseries/timeseries_index_partial.js
     ticket: SERVER-73641
+  - test_file: jstests/change_streams/change_streams_namespace_match_expressions.js
+    ticket: SERVER-100489
   suites: null
 last-lts:
   all:
@@ -1202,4 +1204,6 @@ last-lts:
     ticket: SERVER-73641
   - test_file: jstests/core/timeseries/timeseries_index_partial.js
     ticket: SERVER-73641
+  - test_file: jstests/change_streams/change_streams_namespace_match_expressions.js
+    ticket: SERVER-100489
   suites: null
