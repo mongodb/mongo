@@ -37,6 +37,7 @@ selector:
     # TODO SERVER-100144
     - jstests/core/query/elemmatch/elemmatch_or_pushdown.js
     - jstests/core/query/index_correctness_pbt.js
+    - jstests/core/query/run_all_plans_pbt.js
     # TODO SERVER-100417
     - jstests/core/query/explain/explain_multi_plan_count.js
     # TODO SERVER-100434

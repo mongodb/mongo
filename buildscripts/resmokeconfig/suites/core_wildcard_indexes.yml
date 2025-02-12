@@ -49,6 +49,7 @@ selector:
     - jstests/core/query/index_correctness_pbt.js
     - jstests/core/query/plan_cache/cache_correctness_pbt.js
     - jstests/core/query/plan_cache/queries_create_one_cache_entry_pbt.js
+    - jstests/core/query/run_all_plans_pbt.js
 
     - jstests/core/catalog/list_catalog_stage_consistency.js
 

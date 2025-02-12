@@ -229,6 +229,7 @@ selector:
     - jstests/core/query/type/null_undefined.js
     - jstests/core/query/type/type_array.js
     - jstests/core/query/update/update_numeric_field_name.js
+    - jstests/core/query/run_all_plans_pbt.js
     # Time-series collections have different indexes from regular collections.
     - jstests/core/query/array/arrayfind4.js
     - jstests/core/query/array/arrayfind9.js

@@ -84,6 +84,7 @@
       - jstests/core/index/wildcard/*.js
       - jstests/core/query/index_correctness_pbt.js
       - jstests/core/query/plan_cache/cache_correctness_pbt.js
+      - jstests/core/query/run_all_plans_pbt.js
       # TODO SERVER-89207: Ensure that the fallback mechanism works for '$_requestResumeToken'
       # queries.
       - jstests/core/query/find_with_resume_after_param.js
