@@ -48,8 +48,8 @@ TEST(ExpressionTypeTest, MatchesElementStringType) {
                          << "abc");
     BSONObj notMatch = BSON("a" << 5);
     TypeMatchExpression type(""_sd, String);
-    ASSERT(type.matchesSingleElement(match["a"]));
-    ASSERT(!type.matchesSingleElement(notMatch["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&type, match["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
 
 TEST(ExpressionTypeTest, MatchesElementNullType) {
@@ -57,8 +57,8 @@ TEST(ExpressionTypeTest, MatchesElementNullType) {
     BSONObj notMatch = BSON("a"
                             << "abc");
     TypeMatchExpression type(""_sd, jstNULL);
-    ASSERT(type.matchesSingleElement(match["a"]));
-    ASSERT(!type.matchesSingleElement(notMatch["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&type, match["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
 
 TEST(ExpressionTypeTest, MatchesElementNumber) {
@@ -76,10 +76,10 @@ TEST(ExpressionTypeTest, MatchesElementNumber) {
     TypeMatchExpression typeExpr("a"_sd, std::move(typeSet));
 
     ASSERT_EQ("a", typeExpr.path());
-    ASSERT_TRUE(typeExpr.matchesSingleElement(match1["a"]));
-    ASSERT_TRUE(typeExpr.matchesSingleElement(match2["a"]));
-    ASSERT_TRUE(typeExpr.matchesSingleElement(match3["a"]));
-    ASSERT_FALSE(typeExpr.matchesSingleElement(notMatch["a"]));
+    ASSERT_TRUE(exec::matcher::matchesSingleElement(&typeExpr, match1["a"]));
+    ASSERT_TRUE(exec::matcher::matchesSingleElement(&typeExpr, match2["a"]));
+    ASSERT_TRUE(exec::matcher::matchesSingleElement(&typeExpr, match3["a"]));
+    ASSERT_FALSE(exec::matcher::matchesSingleElement(&typeExpr, notMatch["a"]));
 }
 
 TEST(ExpressionTypeTest, MatchesScalar) {
@@ -241,72 +241,72 @@ TEST(ExpressionBinDataSubTypeTest, MatchesBinDataGeneral) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::BinDataGeneral));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::bdtCustom));
     InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::BinDataGeneral);
-    ASSERT_TRUE(type.matchesSingleElement(match["a"]));
-    ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
+    ASSERT_TRUE(exec::matcher::matchesSingleElement(&type, match["a"]));
+    ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
 
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataFunction) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Function));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::MD5Type));
     InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::Function);
-    ASSERT_TRUE(type.matchesSingleElement(match["a"]));
-    ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
+    ASSERT_TRUE(exec::matcher::matchesSingleElement(&type, match["a"]));
+    ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
 
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataNewUUID) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::newUUID));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::BinDataGeneral));
     InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::newUUID);
-    ASSERT_TRUE(type.matchesSingleElement(match["a"]));
-    ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
+    ASSERT_TRUE(exec::matcher::matchesSingleElement(&type, match["a"]));
+    ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
 
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataMD5Type) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::MD5Type));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::newUUID));
     InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::MD5Type);
-    ASSERT_TRUE(type.matchesSingleElement(match["a"]));
-    ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
+    ASSERT_TRUE(exec::matcher::matchesSingleElement(&type, match["a"]));
+    ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
 
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataEncryptType) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Encrypt));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::newUUID));
     InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::Encrypt);
-    ASSERT_TRUE(type.matchesSingleElement(match["a"]));
-    ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
+    ASSERT_TRUE(exec::matcher::matchesSingleElement(&type, match["a"]));
+    ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
 
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataColumnType) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Column));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::newUUID));
     InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::Column);
-    ASSERT_TRUE(type.matchesSingleElement(match["a"]));
-    ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
+    ASSERT_TRUE(exec::matcher::matchesSingleElement(&type, match["a"]));
+    ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
 
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataSensitiveType) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Sensitive));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::newUUID));
     InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::Sensitive);
-    ASSERT_TRUE(type.matchesSingleElement(match["a"]));
-    ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
+    ASSERT_TRUE(exec::matcher::matchesSingleElement(&type, match["a"]));
+    ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
 
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataVectorType) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Vector));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::newUUID));
     InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::Vector);
-    ASSERT_TRUE(type.matchesSingleElement(match["a"]));
-    ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
+    ASSERT_TRUE(exec::matcher::matchesSingleElement(&type, match["a"]));
+    ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
 
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataBdtCustom) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::bdtCustom));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Function));
     InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::bdtCustom);
-    ASSERT_TRUE(type.matchesSingleElement(match["a"]));
-    ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
+    ASSERT_TRUE(exec::matcher::matchesSingleElement(&type, match["a"]));
+    ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
 
 TEST(ExpressionBinDataSubTypeTest, DoesNotMatchArrays) {
@@ -325,7 +325,7 @@ TEST(ExpressionBinDataSubTypeTest, DoesNotMatchString) {
     BSONObj notMatch = BSON("a"
                             << "str");
     InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::bdtCustom);
-    ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
+    ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
 
 TEST(ExpressionBinDataSubTypeTest, Equivalent) {

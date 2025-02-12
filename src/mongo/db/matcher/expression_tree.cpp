@@ -534,18 +534,6 @@ bool ListOfMatchExpression::equivalent(const MatchExpression* other) const {
     return true;
 }
 
-// -----
-
-bool AndMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
-    for (size_t i = 0; i < numChildren(); i++) {
-        if (!getChild(i)->matchesSingleElement(e, details)) {
-            return false;
-        }
-    }
-    return true;
-}
-
-
 void AndMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
     debug << "$and";
@@ -573,11 +561,6 @@ bool AndMatchExpression::isTriviallyTrue() const {
 
 // -----
 
-bool OrMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
-    MONGO_UNREACHABLE_TASSERT(5429901);
-}
-
-
 void OrMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
     debug << "$or";
@@ -604,15 +587,6 @@ bool OrMatchExpression::isTriviallyFalse() const {
 }
 
 // ----
-
-bool NorMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
-    for (size_t i = 0; i < numChildren(); i++) {
-        if (getChild(i)->matchesSingleElement(e, details)) {
-            return false;
-        }
-    }
-    return true;
-}
 
 void NorMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);

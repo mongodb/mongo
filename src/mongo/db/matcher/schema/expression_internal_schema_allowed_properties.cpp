@@ -92,39 +92,6 @@ bool InternalSchemaAllowedPropertiesMatchExpression::equivalent(const MatchExpre
                             });
 }
 
-bool InternalSchemaAllowedPropertiesMatchExpression::matchesSingleElement(const BSONElement& elem,
-                                                                          MatchDetails*) const {
-    if (elem.type() != BSONType::Object) {
-        return false;
-    }
-
-    return _matchesBSONObj(elem.embeddedObject());
-}
-
-bool InternalSchemaAllowedPropertiesMatchExpression::_matchesBSONObj(const BSONObj& obj) const {
-    for (auto&& property : obj) {
-        bool checkOtherwise = true;
-        for (auto&& constraint : _patternProperties) {
-            if (constraint.first.regex->matchView(property.fieldName())) {
-                checkOtherwise = false;
-                if (!constraint.second->matchesBSONElement(property)) {
-                    return false;
-                }
-            }
-        }
-
-        if (checkOtherwise &&
-            _properties.find(property.fieldNameStringData()) != _properties.end()) {
-            checkOtherwise = false;
-        }
-
-        if (checkOtherwise && !_otherwise->matchesBSONElement(property)) {
-            return false;
-        }
-    }
-    return true;
-}
-
 void InternalSchemaAllowedPropertiesMatchExpression::serialize(BSONObjBuilder* builder,
                                                                const SerializationOptions& opts,
                                                                bool includePath) const {

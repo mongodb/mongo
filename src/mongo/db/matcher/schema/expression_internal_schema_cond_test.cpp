@@ -108,7 +108,7 @@ TEST(InternalSchemaCondMatchExpressionTest, EmptyMatchAlwaysUsesThenBranch) {
     ASSERT_TRUE(exec::matcher::matchesBSON(cond.get(), BSON("value" << 2)));
 
     BSONObj match = BSON("value" << 10);
-    ASSERT_TRUE(cond->matchesSingleElement(match.firstElement()));
+    ASSERT_TRUE(exec::matcher::matchesSingleElement(cond.get(), match.firstElement()));
 }
 
 TEST(InternalSchemaCondMatchExpressionTest, AppliesToSubobjectsViaObjectMatch) {

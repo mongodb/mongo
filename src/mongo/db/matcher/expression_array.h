@@ -39,16 +39,13 @@
 #include <vector>
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_path.h"
 #include "mongo/db/matcher/expression_visitor.h"
-#include "mongo/db/matcher/match_details.h"
 #include "mongo/db/matcher/path.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
@@ -70,15 +67,6 @@ public:
                               ElementPath::NonLeafArrayBehavior::kTraverse,
                               std::move(annotation)) {}
 
-    /**
-     * Returns whether or not the nested array, represented as the object 'anArray', matches.
-     *
-     * 'anArray' must be the nested array at this expression's path.
-     */
-    virtual bool matchesArray(const BSONObj& anArray, MatchDetails* details) const = 0;
-
-    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
-
     bool equivalent(const MatchExpression* other) const override;
 
     MatchCategory getCategory() const final {
@@ -91,8 +79,6 @@ public:
     ElemMatchObjectMatchExpression(boost::optional<StringData> path,
                                    std::unique_ptr<MatchExpression> sub,
                                    clonable_ptr<ErrorAnnotation> annotation = nullptr);
-
-    bool matchesArray(const BSONObj& anArray, MatchDetails* details) const override;
 
     std::unique_ptr<MatchExpression> clone() const override {
         std::unique_ptr<ElemMatchObjectMatchExpression> e =
@@ -159,8 +145,6 @@ public:
                                            clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     void add(std::unique_ptr<MatchExpression> sub);
-
-    bool matchesArray(const BSONObj& anArray, MatchDetails* details) const override;
 
     std::unique_ptr<MatchExpression> clone() const override {
         std::unique_ptr<ElemMatchValueMatchExpression> e =
@@ -248,8 +232,6 @@ public:
     std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
         return nullptr;
     }
-
-    bool matchesArray(const BSONObj& anArray, MatchDetails* details) const override;
 
     void debugString(StringBuilder& debug, int indentationLevel) const override;
 

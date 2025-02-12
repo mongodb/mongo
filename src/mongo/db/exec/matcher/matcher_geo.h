@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,15 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
+#pragma once
+
+#include "mongo/db/geo/geometry_container.h"
+#include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/match_details.h"
 
 namespace mongo {
-constexpr StringData InternalSchemaCondMatchExpression::kName;
 
-bool InternalSchemaCondMatchExpression::matchesSingleElement(const BSONElement& elem,
-                                                             MatchDetails* details) const {
-    return condition()->matchesSingleElement(elem, details)
-        ? thenBranch()->matchesSingleElement(elem, details)
-        : elseBranch()->matchesSingleElement(elem, details);
-}
+namespace exec::matcher {
+
+bool geoContains(const GeometryContainer& queryGeom,
+                 const GeoExpression::Predicate& queryPredicate,
+                 bool skipValidation,
+                 const BSONElement& e);
+
+bool geoContains(const GeometryContainer& queryGeom,
+                 const GeoExpression::Predicate& queryPredicate,
+                 GeometryContainer& otherContainer);
+
+bool matchesGeoContainer(const GeoMatchExpression* expr, const GeometryContainer& input);
+
+}  // namespace exec::matcher
 }  // namespace mongo

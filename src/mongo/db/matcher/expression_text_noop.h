@@ -31,14 +31,11 @@
 
 #include <memory>
 
-#include "mongo/bson/bsonelement.h"
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/fts/fts_query_noop.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_text_base.h"
 #include "mongo/db/matcher/expression_visitor.h"
-#include "mongo/db/matcher/match_details.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -48,10 +45,6 @@ public:
 
     const fts::FTSQuery& getFTSQuery() const final {
         return _ftsQuery;
-    }
-
-    bool matchesSingleElement(const BSONElement& e, MatchDetails* details = nullptr) const final {
-        MONGO_UNREACHABLE;
     }
 
     std::unique_ptr<MatchExpression> clone() const final;

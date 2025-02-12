@@ -125,7 +125,7 @@ void MatchExpressionEvaluator::visitPathExpression(const PathMatchExpression* ex
     MatchableDocument::IteratorHolder cursor(_doc, &*expr->elementPath());
     while (cursor->more()) {
         ElementIterator::Context e = cursor->next();
-        if (!expr->matchesSingleElement(e.element(), _details)) {
+        if (!exec::matcher::matchesSingleElement(expr, e.element(), _details)) {
             continue;
         }
         if (_details && _details->needRecord() && !e.arrayOffset().eoo()) {
@@ -137,7 +137,13 @@ void MatchExpressionEvaluator::visitPathExpression(const PathMatchExpression* ex
     _result = false;
 }
 
-namespace {
+/**
+ * The input BSONObj matches if:
+ *  - each field that matches a regular expression in 'expr->getPatternProperties()' also matches
+ *    the corresponding match expression; and
+ *  - any field not contained in 'expr->getProperties()' nor matching a pattern in
+ *    'expr->getPatternProperties()' matches the 'expr->getOtherwise()' match expression.
+ */
 bool matchesBSONObj(const InternalSchemaAllowedPropertiesMatchExpression* expr,
                     const BSONObj& obj) {
     for (auto&& property : obj) {
@@ -163,8 +169,6 @@ bool matchesBSONObj(const InternalSchemaAllowedPropertiesMatchExpression* expr,
     }
     return true;
 }
-
-}  // namespace
 
 void MatchExpressionEvaluator::visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) {
     _result = matchesBSONObj(expr, _doc->toBSON());

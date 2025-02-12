@@ -66,9 +66,9 @@ TEST(InternalSchemaMinPropertiesMatchExpression, MatchesSingleElementTest) {
     BSONObj notMatch1 = BSON("a" << 1);
     BSONObj notMatch2 = BSON("a" << BSON("b" << 10));
 
-    ASSERT_TRUE(minProperties.matchesSingleElement(match.firstElement()));
-    ASSERT_FALSE(minProperties.matchesSingleElement(notMatch1.firstElement()));
-    ASSERT_FALSE(minProperties.matchesSingleElement(notMatch2.firstElement()));
+    ASSERT_TRUE(exec::matcher::matchesSingleElement(&minProperties, match.firstElement()));
+    ASSERT_FALSE(exec::matcher::matchesSingleElement(&minProperties, notMatch1.firstElement()));
+    ASSERT_FALSE(exec::matcher::matchesSingleElement(&minProperties, notMatch2.firstElement()));
 }
 
 TEST(InternalSchemaMinPropertiesMatchExpression, MinPropertiesZeroAllowsEmptyObjects) {

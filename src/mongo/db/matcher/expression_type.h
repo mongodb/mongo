@@ -41,7 +41,6 @@
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -52,7 +51,6 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_visitor.h"
-#include "mongo/db/matcher/match_details.h"
 #include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/matcher/path.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
@@ -90,11 +88,6 @@ public:
      * Returns the name of this MatchExpression.
      */
     virtual StringData name() const = 0;
-
-    bool matchesSingleElement(const BSONElement& elem,
-                              MatchDetails* details = nullptr) const override {
-        return _typeSet.hasType(elem.type());
-    }
 
     void debugString(StringBuilder& debug, int indentationLevel) const final {
         _debugAddSpace(debug, indentationLevel);
@@ -246,11 +239,6 @@ public:
         return kName;
     }
 
-    bool matchesSingleElement(const BSONElement& elem,
-                              MatchDetails* details = nullptr) const final {
-        return elem.type() == BSONType::BinData && elem.binDataType() == _binDataSubType;
-    }
-
     std::unique_ptr<MatchExpression> clone() const final {
         auto expr = std::make_unique<InternalSchemaBinDataSubTypeExpression>(
             path(), _binDataSubType, _errorAnnotation);
@@ -352,31 +340,6 @@ public:
         return MatchCategory::kOther;
     }
 
-    bool matchesSingleElement(const BSONElement& elem,
-                              MatchDetails* details = nullptr) const final {
-        if (elem.type() != BSONType::BinData)
-            return false;
-        if (elem.binDataType() != BinDataType::Encrypt)
-            return false;
-
-        int binDataLen;
-        auto binData = elem.binData(binDataLen);
-        if (static_cast<size_t>(binDataLen) < sizeof(FleBlobHeader))
-            return false;
-
-        auto fleBlobSubType = EncryptedBinDataType_parse(IDLParserContext("subtype"), binData[0]);
-        switch (fleBlobSubType) {
-            case EncryptedBinDataType::kDeterministic:
-            case EncryptedBinDataType::kRandom: {
-                // Verify the type of the encrypted data.
-                auto fleBlob = reinterpret_cast<const FleBlobHeader*>(binData);
-                return typeSet().hasType(static_cast<BSONType>(fleBlob->originalBsonType));
-            }
-            default:
-                return false;
-        }
-    }
-
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
     }
@@ -421,40 +384,6 @@ public:
 
     MatchCategory getCategory() const final {
         return MatchCategory::kOther;
-    }
-
-    bool matchesSingleElement(const BSONElement& elem,
-                              MatchDetails* details = nullptr) const final {
-        if (elem.type() != BSONType::BinData)
-            return false;
-        if (elem.binDataType() != BinDataType::Encrypt)
-            return false;
-
-        int binDataLen;
-        auto binData = elem.binData(binDataLen);
-        if (static_cast<size_t>(binDataLen) < sizeof(FleBlobHeader))
-            return false;
-
-        EncryptedBinDataType subTypeByte = static_cast<EncryptedBinDataType>(binData[0]);
-        switch (subTypeByte) {
-            case EncryptedBinDataType::kFLE2EqualityIndexedValue:
-            case EncryptedBinDataType::kFLE2RangeIndexedValue:
-            case EncryptedBinDataType::kFLE2EqualityIndexedValueV2:
-            case EncryptedBinDataType::kFLE2RangeIndexedValueV2:
-            case EncryptedBinDataType::kFLE2TextIndexedValue:
-            case EncryptedBinDataType::kFLE2UnindexedEncryptedValue:
-            case EncryptedBinDataType::kFLE2UnindexedEncryptedValueV2: {
-                // Verify the type of the encrypted data.
-                if (typeSet().isEmpty()) {
-                    return true;
-                } else {
-                    auto fleBlob = reinterpret_cast<const FleBlobHeader*>(binData);
-                    return typeSet().hasType(static_cast<BSONType>(fleBlob->originalBsonType));
-                }
-            }
-            default:
-                return false;
-        }
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {

@@ -52,8 +52,8 @@ TEST(ElemMatchObjectMatchExpression, MatchesElementSingle) {
     auto notMatch = BSON("a" << BSON_ARRAY(BSON("b" << 6)));
     auto eq = std::make_unique<EqualityMatchExpression>("b"_sd, baseOperand["b"]);
     auto op = ElemMatchObjectMatchExpression{"a"_sd, std::move(eq)};
-    ASSERT(op.matchesSingleElement(match["a"]));
-    ASSERT(!op.matchesSingleElement(notMatch["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&op, match["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&op, notMatch["a"]));
 }
 
 TEST(ElemMatchObjectMatchExpression, MatchesElementArray) {
@@ -62,8 +62,8 @@ TEST(ElemMatchObjectMatchExpression, MatchesElementArray) {
     auto notMatch = BSON("a" << BSON_ARRAY(BSON_ARRAY(5 << 6)));
     auto eq = std::make_unique<EqualityMatchExpression>("1"_sd, baseOperand["1"]);
     auto op = ElemMatchObjectMatchExpression{"a"_sd, std::move(eq)};
-    ASSERT(op.matchesSingleElement(match["a"]));
-    ASSERT(!op.matchesSingleElement(notMatch["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&op, match["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&op, notMatch["a"]));
 }
 
 TEST(ElemMatchObjectMatchExpression, MatchesElementMultiple) {
@@ -84,10 +84,10 @@ TEST(ElemMatchObjectMatchExpression, MatchesElementMultiple) {
     andOp->add(std::move(eq3));
 
     auto op = ElemMatchObjectMatchExpression{"a"_sd, std::move(andOp)};
-    ASSERT(!op.matchesSingleElement(notMatch1["a"]));
-    ASSERT(!op.matchesSingleElement(notMatch2["a"]));
-    ASSERT(!op.matchesSingleElement(notMatch3["a"]));
-    ASSERT(op.matchesSingleElement(match["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&op, notMatch1["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&op, notMatch2["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&op, notMatch3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&op, match["a"]));
 }
 
 TEST(ElemMatchObjectMatchExpression, MatchesNonArray) {
@@ -162,8 +162,8 @@ TEST(ElemMatchObjectMatchExpression, Collation) {
     auto op = ElemMatchObjectMatchExpression{"a"_sd, std::move(eq)};
     auto collator = CollatorInterfaceMock{CollatorInterfaceMock::MockType::kAlwaysEqual};
     op.setCollator(&collator);
-    ASSERT(op.matchesSingleElement(match["a"]));
-    ASSERT(op.matchesSingleElement(notMatch["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&op, match["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&op, notMatch["a"]));
 }
 
 DEATH_TEST_REGEX(ElemMatchObjectMatchExpression,
@@ -199,8 +199,8 @@ TEST(ElemMatchValueMatchExpression, MatchesElementSingle) {
     auto gt = std::make_unique<GTMatchExpression>(""_sd, baseOperand["$gt"]);
     auto op =
         ElemMatchValueMatchExpression{"a"_sd, std::unique_ptr<MatchExpression>{std::move(gt)}};
-    ASSERT(op.matchesSingleElement(match["a"]));
-    ASSERT(!op.matchesSingleElement(notMatch["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&op, match["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&op, notMatch["a"]));
 }
 
 TEST(ElemMatchValueMatchExpression, MatchesElementMultiple) {
@@ -216,9 +216,9 @@ TEST(ElemMatchValueMatchExpression, MatchesElementMultiple) {
     op.add(std::move(gt));
     op.add(std::move(lt));
 
-    ASSERT(!op.matchesSingleElement(notMatch1["a"]));
-    ASSERT(!op.matchesSingleElement(notMatch2["a"]));
-    ASSERT(op.matchesSingleElement(match["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&op, notMatch1["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&op, notMatch2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&op, match["a"]));
 }
 
 TEST(ElemMatchValueMatchExpression, MatchesNonArray) {
@@ -347,21 +347,21 @@ TEST(AndOfElemMatch, MatchesElement) {
     andOfEM->add(std::move(elemMatch2));
 
     auto nonArray = BSON("x" << 4);
-    ASSERT(!andOfEM->matchesSingleElement(nonArray["x"]));
+    ASSERT(!exec::matcher::matchesSingleElement(andOfEM.get(), nonArray["x"]));
     auto emptyArray = BSON("x" << BSONArray());
-    ASSERT(!andOfEM->matchesSingleElement(emptyArray["x"]));
+    ASSERT(!exec::matcher::matchesSingleElement(andOfEM.get(), emptyArray["x"]));
     auto nonObjArray = BSON("x" << BSON_ARRAY(4));
-    ASSERT(!andOfEM->matchesSingleElement(nonObjArray["x"]));
+    ASSERT(!exec::matcher::matchesSingleElement(andOfEM.get(), nonObjArray["x"]));
     auto singleObjMatch = BSON("x" << BSON_ARRAY(BSON("a" << 1 << "b" << 1)));
-    ASSERT(!andOfEM->matchesSingleElement(singleObjMatch["x"]));
+    ASSERT(!exec::matcher::matchesSingleElement(andOfEM.get(), singleObjMatch["x"]));
     auto otherObjMatch = BSON("x" << BSON_ARRAY(BSON("a" << 2 << "b" << 2)));
-    ASSERT(!andOfEM->matchesSingleElement(otherObjMatch["x"]));
+    ASSERT(!exec::matcher::matchesSingleElement(andOfEM.get(), otherObjMatch["x"]));
     auto bothObjMatch =
         BSON("x" << BSON_ARRAY(BSON("a" << 1 << "b" << 1) << BSON("a" << 2 << "b" << 2)));
-    ASSERT(andOfEM->matchesSingleElement(bothObjMatch["x"]));
+    ASSERT(exec::matcher::matchesSingleElement(andOfEM.get(), bothObjMatch["x"]));
     auto noObjMatch =
         BSON("x" << BSON_ARRAY(BSON("a" << 1 << "b" << 2) << BSON("a" << 2 << "b" << 1)));
-    ASSERT(!andOfEM->matchesSingleElement(noObjMatch["x"]));
+    ASSERT(!exec::matcher::matchesSingleElement(andOfEM.get(), noObjMatch["x"]));
 }
 
 TEST(AndOfElemMatch, Matches) {
@@ -411,8 +411,8 @@ TEST(SizeMatchExpression, MatchesElement) {
     auto match = BSON("a" << BSON_ARRAY(5 << 6));
     auto notMatch = BSON("a" << BSON_ARRAY(5));
     auto size = SizeMatchExpression{""_sd, 2};
-    ASSERT(size.matchesSingleElement(match.firstElement()));
-    ASSERT(!size.matchesSingleElement(notMatch.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&size, match.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&size, notMatch.firstElement()));
 }
 
 TEST(SizeMatchExpression, MatchesNonArray) {
@@ -422,9 +422,9 @@ TEST(SizeMatchExpression, MatchesNonArray) {
     auto numberValue = BSON("a" << 0);
     auto arrayValue = BSON("a" << BSONArray());
     auto size = SizeMatchExpression{""_sd, 0};
-    ASSERT(!size.matchesSingleElement(stringValue.firstElement()));
-    ASSERT(!size.matchesSingleElement(numberValue.firstElement()));
-    ASSERT(size.matchesSingleElement(arrayValue.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&size, stringValue.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&size, numberValue.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&size, arrayValue.firstElement()));
 }
 
 TEST(SizeMatchExpression, MatchesArray) {

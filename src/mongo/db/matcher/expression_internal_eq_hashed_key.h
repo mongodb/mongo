@@ -60,12 +60,6 @@ public:
         // Checking the type should happen earlier during parsing.
         : InternalEqHashedKey(path, value.numberLong()) {}
 
-    bool matchesSingleElement(const BSONElement& elem, MatchDetails* details) const final {
-        tassert(7281401, "hashed value must be a long", _rhs.type() == BSONType::NumberLong);
-        const auto hashVal = BSONElementHasher::hash64(elem, BSONElementHasher::DEFAULT_HASH_SEED);
-        return hashVal == _rhs.numberLong();
-    };
-
     std::unique_ptr<MatchExpression> clone() const final {
         auto clone = std::make_unique<InternalEqHashedKey>(path(), _rhs);
         clone->setCollator(_collator);

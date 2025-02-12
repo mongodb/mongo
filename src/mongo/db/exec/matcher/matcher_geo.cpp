@@ -32,12 +32,114 @@
 #include <s2regioncoverer.h>
 
 #include "mongo/db/exec/matcher/matcher.h"
+#include "mongo/db/geo/geoparser.h"
+#include "mongo/db/geo/shapes.h"
+#include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 
 namespace mongo {
 
 namespace exec::matcher {
+
+bool geoContains(const GeometryContainer& queryGeom,
+                 const GeoExpression::Predicate& queryPredicate,
+                 GeometryContainer& otherContainer) {
+    otherContainer.projectInto(queryGeom.getNativeCRS());
+    if (GeoExpression::WITHIN == queryPredicate) {
+        return queryGeom.contains(otherContainer);
+    } else {
+        MONGO_verify(GeoExpression::INTERSECT == queryPredicate);
+        return queryGeom.intersects(otherContainer);
+    }
+}
+
+bool geoContains(const GeometryContainer& queryGeom,
+                 const GeoExpression::Predicate& queryPredicate,
+                 bool skipValidation,
+                 const BSONElement& e) {
+    if (!e.isABSONObj()) {
+        return false;
+    }
+
+    GeometryContainer geometry;
+    if (!geometry.parseFromStorage(e, skipValidation).isOK()) {
+        return false;
+    }
+
+    // Never match big polygon
+    if (geometry.getNativeCRS() == STRICT_SPHERE) {
+        return false;
+    }
+
+    // Project this geometry into the CRS of the larger geometry.
+
+    // In the case of index validation, we are projecting the geometry of the query
+    // into the CRS of the index to confirm that the index region convers/includes
+    // the region described by the predicate.
+
+    if (!geometry.supportsProject(queryGeom.getNativeCRS())) {
+        return false;
+    }
+
+    return geoContains(queryGeom, queryPredicate, geometry);
+}
+
+
+bool matchesGeoContainer(const GeoMatchExpression* expr, const GeometryContainer& input) {
+    // Never match big polygon
+    if (input.getNativeCRS() == STRICT_SPHERE) {
+        return false;
+    }
+
+    const auto& query = expr->getGeoExpression();
+
+    // Project this geometry into the CRS of the larger geometry.
+
+    // In the case of index validation, we are projecting the geometry of the query
+    // into the CRS of the index to confirm that the index region convers/includes
+    // the region described by the predicate.
+
+    if (!input.supportsProject(query.getGeometry().getNativeCRS())) {
+        return false;
+    }
+
+    GeometryContainer geometry{input};
+    return geoContains(query.getGeometry(), query.getPred(), geometry);
+}
+
+void MatchesSingleElementEvaluator::visit(const GeoMatchExpression* expr) {
+    const auto& query = expr->getGeoExpression();
+    _result =
+        geoContains(query.getGeometry(), query.getPred(), expr->getCanSkipValidation(), _elem);
+}
+
+void MatchesSingleElementEvaluator::visit(const TwoDPtInAnnulusExpression* expr) {
+    if (!_elem.isABSONObj()) {
+        _result = false;
+        return;
+    }
+
+    PointWithCRS point;
+    if (!GeoParser::parseStoredPoint(_elem, &point).isOK()) {
+        _result = false;
+        return;
+    }
+
+    _result = expr->getAnnulus().contains(point.oldPoint);
+}
+
+/**
+ * Stub implementation that should never be called, since geoNear execution requires an
+ * appropriate geo index.
+ */
+void MatchesSingleElementEvaluator::visit(const GeoNearMatchExpression* expr) {
+    _result = true;
+}
+
+void MatchesSingleElementEvaluator::visit(const InternalBucketGeoWithinMatchExpression* expr) {
+    _result = false;
+}
 
 namespace {
 

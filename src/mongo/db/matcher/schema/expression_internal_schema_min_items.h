@@ -37,10 +37,8 @@
 
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_visitor.h"
-#include "mongo/db/matcher/match_details.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_num_array_items.h"
 
 namespace mongo {
@@ -60,10 +58,6 @@ public:
                                                      numItems,
                                                      "$_internalSchemaMinItems"_sd,
                                                      std::move(annotation)) {}
-
-    bool matchesArray(const BSONObj& anArray, MatchDetails* details) const final {
-        return (anArray.nFields() >= numItems());
-    }
 
     std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<InternalSchemaMinItemsMatchExpression> minItems =

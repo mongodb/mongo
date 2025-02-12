@@ -40,7 +40,16 @@ void MatchExpressionEvaluator::visit(const WhereMatchExpression* expr) {
 }
 
 void MatchExpressionEvaluator::visit(const WhereNoOpMatchExpression* expr) {
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(9713603);
 }
+
+void MatchesSingleElementEvaluator::visit(const WhereMatchExpression* expr) {
+    _result = false;
+}
+
+void MatchesSingleElementEvaluator::visit(const WhereNoOpMatchExpression* expr) {
+    _result = false;
+}
+
 }  // namespace exec::matcher
 }  // namespace mongo

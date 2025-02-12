@@ -39,8 +39,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_visitor.h"
-#include "mongo/db/matcher/match_details.h"
-#include "mongo/db/matcher/matchable.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_num_properties.h"
 
 namespace mongo {
@@ -58,14 +56,6 @@ public:
                                                      numProperties,
                                                      "$_internalSchemaMaxProperties",
                                                      std::move(annotation)) {}
-
-    bool matchesSingleElement(const BSONElement& elem,
-                              MatchDetails* details = nullptr) const final {
-        if (elem.type() != BSONType::Object) {
-            return false;
-        }
-        return (elem.embeddedObject().nFields() <= numProperties());
-    }
 
     std::unique_ptr<MatchExpression> clone() const final {
         auto maxProperties = std::make_unique<InternalSchemaMaxPropertiesMatchExpression>(

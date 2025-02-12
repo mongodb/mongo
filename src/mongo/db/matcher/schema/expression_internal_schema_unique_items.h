@@ -34,7 +34,6 @@
 #include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <memory>
-#include <set>
 #include <utility>
 #include <vector>
 
@@ -47,7 +46,6 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_visitor.h"
-#include "mongo/db/matcher/match_details.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
 
@@ -84,20 +82,6 @@ public:
         return nullptr;
     }
 
-    bool matchesArray(const BSONObj& array, MatchDetails*) const final {
-        return !findFirstDuplicateValue(array);
-    }
-
-    BSONElement findFirstDuplicateValue(const BSONObj& array) const {
-        auto set = _comparator.makeBSONEltSet();
-        for (auto&& elem : array) {
-            if (!get<bool>(set.insert(elem))) {
-                return elem;
-            }
-        }
-        return {};
-    }
-
     void debugString(StringBuilder& builder, int indentationLevel) const final;
 
     bool equivalent(const MatchExpression* other) const final;
@@ -114,6 +98,10 @@ public:
 
     void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
         visitor->visit(this);
+    }
+
+    const auto& getComparator() const {
+        return _comparator;
     }
 
 private:

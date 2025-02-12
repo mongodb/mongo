@@ -43,7 +43,6 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_visitor.h"
-#include "mongo/db/matcher/match_details.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
 
@@ -66,8 +65,6 @@ public:
                                     clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     std::unique_ptr<MatchExpression> clone() const final;
-
-    bool matchesSingleElement(const BSONElement&, MatchDetails*) const final;
 
     void debugString(StringBuilder& debug, int indentationLevel) const final;
 
@@ -97,8 +94,12 @@ public:
         visitor->visit(this);
     }
 
-    BSONElement getRhsElem() const {
+    const BSONElement& getRhsElem() const {
         return _rhsElem;
+    }
+
+    const UnorderedFieldsBSONElementComparator& getComparator() const {
+        return _eltCmp;
     }
 
 private:

@@ -130,10 +130,11 @@ TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, FindsFirstMismatchInArr
     auto elemMatchExpr = dynamic_cast<const InternalSchemaAllElemMatchFromIndexMatchExpression*>(
         expr.getValue().get());
     ASSERT(elemMatchExpr);
-    ASSERT_FALSE(elemMatchExpr->findFirstMismatchInArray(BSON("a" << BSON_ARRAY(1 << 2 << 3 << 4)),
-                                                         nullptr));
+    ASSERT_FALSE(exec::matcher::findFirstMismatchInArray(
+        elemMatchExpr, BSON("a" << BSON_ARRAY(1 << 2 << 3 << 4)), nullptr));
     auto inputArray = BSON_ARRAY(1 << 2 << 3 << 3 << 6 << 7);
-    auto mismatchedElement = elemMatchExpr->findFirstMismatchInArray(inputArray, nullptr);
+    auto mismatchedElement =
+        exec::matcher::findFirstMismatchInArray(elemMatchExpr, inputArray, nullptr);
     ASSERT_TRUE(mismatchedElement);
     ASSERT_EQ(mismatchedElement.Int(), 6);
 }

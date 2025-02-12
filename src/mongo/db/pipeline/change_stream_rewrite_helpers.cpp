@@ -51,6 +51,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_expr.h"
@@ -101,7 +102,7 @@ boost::intrusive_ptr<ExpressionFieldPath> cloneWithSubstitution(
  */
 std::unique_ptr<MatchExpression> resolvePredicateOnNonExistentField(
     const PathMatchExpression* predicate) {
-    if (predicate->matchesSingleElement({})) {
+    if (exec::matcher::matchesSingleElement(predicate, {})) {
         return std::make_unique<AlwaysTrueMatchExpression>();
     }
     return std::make_unique<AlwaysFalseMatchExpression>();
@@ -344,7 +345,7 @@ std::unique_ptr<MatchExpression> matchRewriteDocumentKey(
 
     // Handle the case of non-CRUD events. The 'documentKey' field never exists for such events, so
     // we evaluate the predicate against a non-existent field to see whether it matches.
-    if (predicate->matchesSingleElement({})) {
+    if (exec::matcher::matchesSingleElement(predicate, {})) {
         auto nonCRUDCase = MatchExpressionParser::parseAndNormalize(
             backingBsonObjs.emplace_back(BSON("$nor" << BSON_ARRAY(BSON("op"
                                                                         << "i")
@@ -482,7 +483,7 @@ std::unique_ptr<MatchExpression> matchRewriteFullDocument(
 
     // Handle the case of delete and non-CRUD events. The 'fullDocument' field never exists for such
     // events, so we evaluate the predicate against a non-existent field to see whether it matches.
-    if (predicate->matchesSingleElement({})) {
+    if (exec::matcher::matchesSingleElement(predicate, {})) {
         auto deleteCase = std::make_unique<EqualityMatchExpression>("op"_sd, Value("d"_sd));
         rewrittenPredicate->add(std::move(deleteCase));
 
@@ -534,7 +535,7 @@ std::unique_ptr<MatchExpression> matchRewriteUpdateDescription(
             // type-bracketed, which means that it will *only* match missing or null. None of these
             // fields will ever be null or undefined in the change stream event.
             if (ComparisonMatchExpression::isComparisonMatchExpression(predicate) &&
-                predicate->matchesSingleElement({})) {
+                exec::matcher::matchesSingleElement(predicate, {})) {
                 return std::make_unique<AlwaysFalseMatchExpression>();
             }
         }
@@ -562,7 +563,7 @@ std::unique_ptr<MatchExpression> matchRewriteUpdateDescription(
             // three potential locations, since at least two of them will always be missing. If not,
             // then we build an $or to match if the field is present at any of the locations.
             auto rewrittenUserPredicate = [predicate]() -> std::unique_ptr<ListOfMatchExpression> {
-                if (predicate->matchesSingleElement({})) {
+                if (exec::matcher::matchesSingleElement(predicate, {})) {
                     return std::make_unique<AndMatchExpression>();
                 }
                 return std::make_unique<OrMatchExpression>();
@@ -675,7 +676,8 @@ std::unique_ptr<MatchExpression> matchRewriteUpdateDescription(
     // also return nullptr if the predicate matches a missing field, since it is pointless to try
     // to continue; we would have to return all updates, because we don't know whether they will
     // match, and all non-updates, because they will always match.
-    if (!rewrittenUserPredicate && (!allowInexact || predicate->matchesSingleElement({}))) {
+    if (!rewrittenUserPredicate &&
+        (!allowInexact || exec::matcher::matchesSingleElement(predicate, {}))) {
         return nullptr;
     }
 
@@ -694,7 +696,7 @@ std::unique_ptr<MatchExpression> matchRewriteUpdateDescription(
 
     // Handle the case of non-update events. The 'updateDescription' field never exists for these
     // events, so we evaluate the predicate against a non-existent field to see whether it matches.
-    if (predicate->matchesSingleElement({})) {
+    if (exec::matcher::matchesSingleElement(predicate, {})) {
         auto nonUpdateCase = MatchExpressionParser::parseAndNormalize(
             backingBsonObjs.emplace_back(
                 BSON("$or" << BSON_ARRAY(BSON("op" << BSON("$ne"
@@ -1381,7 +1383,7 @@ std::unique_ptr<MatchExpression> matchRewriteFullDocumentBeforeChange(
     // such as this will match all non-update and non-delete operations, and we do not know whether
     // the post-image will be available later in the pipeline. We also cannot continue if an exact
     // rewrite is required. In both cases, return nullptr immediately.
-    if (!allowInexact || predicate->matchesSingleElement({})) {
+    if (!allowInexact || exec::matcher::matchesSingleElement(predicate, {})) {
         return nullptr;
     }
 

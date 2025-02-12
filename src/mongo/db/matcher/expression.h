@@ -436,13 +436,6 @@ public:
     // XXX document
     virtual bool equivalent(const MatchExpression* other) const = 0;
 
-    /**
-     * Determines if the element satisfies the tree-predicate.
-     * Not valid for all expressions (e.g. $where); in those cases, returns false.
-     */
-    virtual bool matchesSingleElement(const BSONElement& e,
-                                      MatchDetails* details = nullptr) const = 0;
-
     //
     // Tagging mechanism: Hang data off of the tree for retrieval later.
     //

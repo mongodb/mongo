@@ -527,9 +527,9 @@ TEST(MatchExpressionParserArrayTest, AllRegex1) {
     BSONObj matchesBoth = BSON("a"
                                << "ab");
 
-    ASSERT(!result.getValue()->matchesSingleElement(notMatchFirst["a"]));
-    ASSERT(!result.getValue()->matchesSingleElement(notMatchSecond["a"]));
-    ASSERT(result.getValue()->matchesSingleElement(matchesBoth["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(result.getValue().get(), notMatchFirst["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(result.getValue().get(), notMatchSecond["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(result.getValue().get(), matchesBoth["a"]));
 }
 
 TEST(MatchExpressionParserArrayTest, AllRegex2) {
@@ -552,8 +552,8 @@ TEST(MatchExpressionParserArrayTest, AllRegex2) {
     BSONObj matchesBoth = BSON("a"
                                << "abc");
 
-    ASSERT(!result.getValue()->matchesSingleElement(notMatchFirst["a"]));
-    ASSERT(result.getValue()->matchesSingleElement(matchesBoth["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(result.getValue().get(), notMatchFirst["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(result.getValue().get(), matchesBoth["a"]));
 }
 
 TEST(MatchExpressionParserArrayTest, AllNonArray) {

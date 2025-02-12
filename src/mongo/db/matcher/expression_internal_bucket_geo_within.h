@@ -44,11 +44,8 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/geo/geometry_container.h"
-#include "mongo/db/geo/geoparser.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_visitor.h"
-#include "mongo/db/matcher/match_details.h"
-#include "mongo/db/matcher/matchable.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
 
@@ -98,10 +95,6 @@ public:
 
     MatchCategory getCategory() const final {
         return MatchCategory::kLeaf;
-    }
-
-    bool matchesSingleElement(const BSONElement& element, MatchDetails* details) const final {
-        return false;
     }
 
     void serialize(BSONObjBuilder* builder,

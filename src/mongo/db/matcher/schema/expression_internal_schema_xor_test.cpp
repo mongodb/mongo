@@ -97,10 +97,12 @@ TEST(InternalSchemaXorOp, MatchesSingleElement) {
     BSONObj noMatch2 = BSON("c"
                             << "x");
 
-    ASSERT_TRUE(expr.getValue()->matchesSingleElement(match1.firstElement()));
-    ASSERT_TRUE(expr.getValue()->matchesSingleElement(match2.firstElement()));
-    ASSERT_FALSE(expr.getValue()->matchesSingleElement(noMatch1.firstElement()));
-    ASSERT_FALSE(expr.getValue()->matchesSingleElement(noMatch2.firstElement()));
+    ASSERT_TRUE(exec::matcher::matchesSingleElement(expr.getValue().get(), match1.firstElement()));
+    ASSERT_TRUE(exec::matcher::matchesSingleElement(expr.getValue().get(), match2.firstElement()));
+    ASSERT_FALSE(
+        exec::matcher::matchesSingleElement(expr.getValue().get(), noMatch1.firstElement()));
+    ASSERT_FALSE(
+        exec::matcher::matchesSingleElement(expr.getValue().get(), noMatch2.firstElement()));
 }
 
 TEST(InternalSchemaXorOp, DoesNotUseElemMatchKey) {

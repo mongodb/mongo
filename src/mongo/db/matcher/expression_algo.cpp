@@ -49,6 +49,8 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/exec/matcher/matcher.h"
+#include "mongo/db/exec/matcher/matcher_geo.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/matcher/expression.h"
@@ -763,8 +765,8 @@ bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
         }
 
         GeometryContainer geometry = queryMatchExpression->getGeoContainer();
-        if (GeoMatchExpression::contains(
-                indexMatchExpression->getGeoContainer(), GeoExpression::WITHIN, &geometry)) {
+        if (exec::matcher::geoContains(
+                indexMatchExpression->getGeoContainer(), GeoExpression::WITHIN, geometry)) {
             // The region described by query is within the region captured by the index.
             // For example, a query over the $geometry for the city of Houston is covered by an
             // index over the $geometry for the entire state of texas. Therefore this index can be
@@ -788,7 +790,7 @@ bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
         const auto* indexMatchExpression = static_cast<const GeoMatchExpression*>(rhs);
 
         auto geometryContainer = queryMatchExpression->getGeoExpression().getGeometry();
-        if (indexMatchExpression->matchesGeoContainer(geometryContainer)) {
+        if (exec::matcher::matchesGeoContainer(indexMatchExpression, geometryContainer)) {
             // The region described by query is within the region captured by the index.
             // Therefore this index can be used in a potential solution for this query.
             return true;
@@ -1103,7 +1105,8 @@ bool isIndependentOfImpl(E&& expr,
                 // No numeric components.
                 && !pathMatch->elementPath()->fieldRef().hasNumericPathComponents()
                 // Ignores missing fields.
-                && !pathMatch->matchesSingleElement(BSONObj{}.firstElement(), nullptr);
+                &&
+                !exec::matcher::matchesSingleElement(pathMatch, BSONObj{}.firstElement(), nullptr);
         }
 
         // Other cases may be allowable, but haven't been considered and tested yet.

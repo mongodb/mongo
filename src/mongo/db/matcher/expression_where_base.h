@@ -40,7 +40,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/match_details.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
 
@@ -72,10 +71,6 @@ public:
 
     std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
         return nullptr;
-    }
-
-    bool matchesSingleElement(const BSONElement& e, MatchDetails* details = nullptr) const final {
-        return false;
     }
 
     void debugString(StringBuilder& debug, int indentationLevel = 0) const final;

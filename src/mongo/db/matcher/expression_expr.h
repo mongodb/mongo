@@ -45,10 +45,7 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_visitor.h"
-#include "mongo/db/matcher/match_details.h"
-#include "mongo/db/matcher/matchable.h"
 #include "mongo/db/matcher/rewrite_expr.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -75,10 +72,6 @@ public:
     ExprMatchExpression(boost::intrusive_ptr<Expression> expr,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
                         clonable_ptr<ErrorAnnotation> annotation = nullptr);
-
-    bool matchesSingleElement(const BSONElement& e, MatchDetails* details = nullptr) const final {
-        MONGO_UNREACHABLE;
-    }
 
     std::unique_ptr<MatchExpression> clone() const final;
 

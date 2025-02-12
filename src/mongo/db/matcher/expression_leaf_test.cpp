@@ -102,7 +102,7 @@ TEST(ComparisonMatchExpression, UnequalLengthString) {
     BSONObj match = BSON("a"
                          << "abcd");
     EqualityMatchExpression eq(""_sd, operand["a"]);
-    ASSERT(!eq.matchesSingleElement(match.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&eq, match.firstElement()));
 }
 
 TEST(ComparisonMatchExpression, NaNComparison) {
@@ -110,28 +110,28 @@ TEST(ComparisonMatchExpression, NaNComparison) {
 
     BSONObj operand = BSON("a" << sqrt(-2));
     EqualityMatchExpression eq(""_sd, operand["a"]);
-    ASSERT(!eq.matchesSingleElement(match.firstElement()));
-    ASSERT(eq.matchesSingleElement(operand.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&eq, match.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&eq, operand.firstElement()));
 
     BSONObj gteOp = BSON("$gte" << sqrt(-2));
     GTEMatchExpression gte(""_sd, gteOp["$gte"]);
-    ASSERT(!gte.matchesSingleElement(match.firstElement()));
-    ASSERT(gte.matchesSingleElement(operand.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&gte, match.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&gte, operand.firstElement()));
 
     BSONObj gtOp = BSON("$gt" << sqrt(-2));
     GTMatchExpression gt(""_sd, gtOp["$gt"]);
-    ASSERT(!gt.matchesSingleElement(match.firstElement()));
-    ASSERT(!gt.matchesSingleElement(operand.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&gt, match.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&gt, operand.firstElement()));
 
     BSONObj lteOp = BSON("$lte" << sqrt(-2));
     LTEMatchExpression lte(""_sd, lteOp["$lte"]);
-    ASSERT(!lte.matchesSingleElement(match.firstElement()));
-    ASSERT(lte.matchesSingleElement(operand.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&lte, match.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&lte, operand.firstElement()));
 
     BSONObj ltOp = BSON("$lt" << sqrt(-2));
     LTMatchExpression lt(""_sd, ltOp["$lt"]);
-    ASSERT(!lt.matchesSingleElement(match.firstElement()));
-    ASSERT(!lt.matchesSingleElement(operand.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&lt, match.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&lt, operand.firstElement()));
 }
 
 TEST(ComparisonMatchExpression, NaNComparisonDecimal) {
@@ -139,28 +139,28 @@ TEST(ComparisonMatchExpression, NaNComparisonDecimal) {
 
     BSONObj operand = BSON("a" << Decimal128::kPositiveNaN);
     EqualityMatchExpression eq(""_sd, operand["a"]);
-    ASSERT(!eq.matchesSingleElement(match.firstElement()));
-    ASSERT(eq.matchesSingleElement(operand.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&eq, match.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&eq, operand.firstElement()));
 
     BSONObj gteOp = BSON("$gte" << Decimal128::kPositiveNaN);
     GTEMatchExpression gte(""_sd, gteOp["$gte"]);
-    ASSERT(!gte.matchesSingleElement(match.firstElement()));
-    ASSERT(gte.matchesSingleElement(operand.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&gte, match.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&gte, operand.firstElement()));
 
     BSONObj gtOp = BSON("$gt" << Decimal128::kPositiveNaN);
     GTMatchExpression gt(""_sd, gtOp["$gt"]);
-    ASSERT(!gt.matchesSingleElement(match.firstElement()));
-    ASSERT(!gt.matchesSingleElement(operand.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&gt, match.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&gt, operand.firstElement()));
 
     BSONObj lteOp = BSON("$lte" << Decimal128::kPositiveNaN);
     LTEMatchExpression lte(""_sd, lteOp["$lte"]);
-    ASSERT(!lte.matchesSingleElement(match.firstElement()));
-    ASSERT(lte.matchesSingleElement(operand.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&lte, match.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&lte, operand.firstElement()));
 
     BSONObj ltOp = BSON("$lt" << Decimal128::kPositiveNaN);
     LTMatchExpression lt(""_sd, ltOp["$lt"]);
-    ASSERT(!lt.matchesSingleElement(match.firstElement()));
-    ASSERT(!lt.matchesSingleElement(operand.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&lt, match.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&lt, operand.firstElement()));
 }
 
 TEST(EqOp, MatchesElement) {
@@ -169,8 +169,8 @@ TEST(EqOp, MatchesElement) {
     BSONObj notMatch = BSON("a" << 6);
 
     EqualityMatchExpression eq(""_sd, operand["a"]);
-    ASSERT(eq.matchesSingleElement(match.firstElement()));
-    ASSERT(!eq.matchesSingleElement(notMatch.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&eq, match.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&eq, notMatch.firstElement()));
 
     ASSERT(eq.equivalent(&eq));
 }
@@ -257,9 +257,9 @@ TEST(EqOp, MatchesMinKey) {
     ASSERT(!exec::matcher::matchesBSON(&eq, maxKeyObj, nullptr));
     ASSERT(!exec::matcher::matchesBSON(&eq, numObj, nullptr));
 
-    ASSERT(eq.matchesSingleElement(minKeyObj.firstElement()));
-    ASSERT(!eq.matchesSingleElement(maxKeyObj.firstElement()));
-    ASSERT(!eq.matchesSingleElement(numObj.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&eq, minKeyObj.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&eq, maxKeyObj.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&eq, numObj.firstElement()));
 }
 
 
@@ -274,9 +274,9 @@ TEST(EqOp, MatchesMaxKey) {
     ASSERT(exec::matcher::matchesBSON(&eq, maxKeyObj, nullptr));
     ASSERT(!exec::matcher::matchesBSON(&eq, numObj, nullptr));
 
-    ASSERT(!eq.matchesSingleElement(minKeyObj.firstElement()));
-    ASSERT(eq.matchesSingleElement(maxKeyObj.firstElement()));
-    ASSERT(!eq.matchesSingleElement(numObj.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&eq, minKeyObj.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&eq, maxKeyObj.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&eq, numObj.firstElement()));
 }
 
 TEST(EqOp, MatchesFullArray) {
@@ -343,10 +343,10 @@ TEST(LtOp, MatchesElement) {
     BSONObj notMatchWrongType = BSON("a"
                                      << "foo");
     LTMatchExpression lt(""_sd, operand["$lt"]);
-    ASSERT(lt.matchesSingleElement(match.firstElement()));
-    ASSERT(!lt.matchesSingleElement(notMatch.firstElement()));
-    ASSERT(!lt.matchesSingleElement(notMatchEqual.firstElement()));
-    ASSERT(!lt.matchesSingleElement(notMatchWrongType.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&lt, match.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&lt, notMatch.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&lt, notMatchEqual.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&lt, notMatchWrongType.firstElement()));
 }
 
 DEATH_TEST_REGEX(LtOp, InvalidEooOperand, "failure.*eoo") {
@@ -427,9 +427,9 @@ TEST(LtOp, MatchesMinKey) {
     ASSERT(!exec::matcher::matchesBSON(&lt, maxKeyObj, nullptr));
     ASSERT(!exec::matcher::matchesBSON(&lt, numObj, nullptr));
 
-    ASSERT(!lt.matchesSingleElement(minKeyObj.firstElement()));
-    ASSERT(!lt.matchesSingleElement(maxKeyObj.firstElement()));
-    ASSERT(!lt.matchesSingleElement(numObj.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&lt, minKeyObj.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&lt, maxKeyObj.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&lt, numObj.firstElement()));
 }
 
 TEST(LtOp, MatchesMaxKey) {
@@ -443,9 +443,9 @@ TEST(LtOp, MatchesMaxKey) {
     ASSERT(!exec::matcher::matchesBSON(&lt, maxKeyObj, nullptr));
     ASSERT(exec::matcher::matchesBSON(&lt, numObj, nullptr));
 
-    ASSERT(lt.matchesSingleElement(minKeyObj.firstElement()));
-    ASSERT(!lt.matchesSingleElement(maxKeyObj.firstElement()));
-    ASSERT(lt.matchesSingleElement(numObj.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&lt, minKeyObj.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&lt, maxKeyObj.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&lt, numObj.firstElement()));
 }
 
 TEST(LtOp, ElemMatchKey) {
@@ -470,10 +470,10 @@ TEST(LteOp, MatchesElement) {
     BSONObj notMatchWrongType = BSON("a"
                                      << "foo");
     LTEMatchExpression lte(""_sd, operand["$lte"]);
-    ASSERT(lte.matchesSingleElement(match.firstElement()));
-    ASSERT(lte.matchesSingleElement(equalMatch.firstElement()));
-    ASSERT(!lte.matchesSingleElement(notMatch.firstElement()));
-    ASSERT(!lte.matchesSingleElement(notMatchWrongType.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&lte, match.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&lte, equalMatch.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&lte, notMatch.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&lte, notMatchWrongType.firstElement()));
 }
 
 DEATH_TEST_REGEX(LteOp, InvalidEooOperand, "failure.*eoo") {
@@ -547,9 +547,9 @@ TEST(LteOp, MatchesMinKey) {
     ASSERT(!exec::matcher::matchesBSON(&lte, maxKeyObj, nullptr));
     ASSERT(!exec::matcher::matchesBSON(&lte, numObj, nullptr));
 
-    ASSERT(lte.matchesSingleElement(minKeyObj.firstElement()));
-    ASSERT(!lte.matchesSingleElement(maxKeyObj.firstElement()));
-    ASSERT(!lte.matchesSingleElement(numObj.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&lte, minKeyObj.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&lte, maxKeyObj.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&lte, numObj.firstElement()));
 }
 
 TEST(LteOp, MatchesMaxKey) {
@@ -563,9 +563,9 @@ TEST(LteOp, MatchesMaxKey) {
     ASSERT(exec::matcher::matchesBSON(&lte, maxKeyObj, nullptr));
     ASSERT(exec::matcher::matchesBSON(&lte, numObj, nullptr));
 
-    ASSERT(lte.matchesSingleElement(minKeyObj.firstElement()));
-    ASSERT(lte.matchesSingleElement(maxKeyObj.firstElement()));
-    ASSERT(lte.matchesSingleElement(numObj.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&lte, minKeyObj.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&lte, maxKeyObj.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&lte, numObj.firstElement()));
 }
 
 
@@ -656,9 +656,9 @@ TEST(GtOp, MatchesMinKey) {
     ASSERT(exec::matcher::matchesBSON(&gt, maxKeyObj, nullptr));
     ASSERT(exec::matcher::matchesBSON(&gt, numObj, nullptr));
 
-    ASSERT(!gt.matchesSingleElement(minKeyObj.firstElement()));
-    ASSERT(gt.matchesSingleElement(maxKeyObj.firstElement()));
-    ASSERT(gt.matchesSingleElement(numObj.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&gt, minKeyObj.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&gt, maxKeyObj.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&gt, numObj.firstElement()));
 }
 
 TEST(GtOp, MatchesMaxKey) {
@@ -672,9 +672,9 @@ TEST(GtOp, MatchesMaxKey) {
     ASSERT(!exec::matcher::matchesBSON(&gt, maxKeyObj, nullptr));
     ASSERT(!exec::matcher::matchesBSON(&gt, numObj, nullptr));
 
-    ASSERT(!gt.matchesSingleElement(minKeyObj.firstElement()));
-    ASSERT(!gt.matchesSingleElement(maxKeyObj.firstElement()));
-    ASSERT(!gt.matchesSingleElement(numObj.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&gt, minKeyObj.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&gt, maxKeyObj.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&gt, numObj.firstElement()));
 }
 
 TEST(GtOp, ElemMatchKey) {
@@ -699,10 +699,10 @@ TEST(GteOp, MatchesElement) {
     BSONObj notMatchWrongType = BSON("a"
                                      << "foo");
     GTEMatchExpression gte(""_sd, operand["$gte"]);
-    ASSERT(gte.matchesSingleElement(match.firstElement()));
-    ASSERT(gte.matchesSingleElement(equalMatch.firstElement()));
-    ASSERT(!gte.matchesSingleElement(notMatch.firstElement()));
-    ASSERT(!gte.matchesSingleElement(notMatchWrongType.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&gte, match.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&gte, equalMatch.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&gte, notMatch.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&gte, notMatchWrongType.firstElement()));
 }
 
 DEATH_TEST_REGEX(GteOp, InvalidEooOperand, "failure.*eoo") {
@@ -777,9 +777,9 @@ TEST(GteOp, MatchesMinKey) {
     ASSERT(exec::matcher::matchesBSON(&gte, maxKeyObj, nullptr));
     ASSERT(exec::matcher::matchesBSON(&gte, numObj, nullptr));
 
-    ASSERT(gte.matchesSingleElement(minKeyObj.firstElement()));
-    ASSERT(gte.matchesSingleElement(maxKeyObj.firstElement()));
-    ASSERT(gte.matchesSingleElement(numObj.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&gte, minKeyObj.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&gte, maxKeyObj.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&gte, numObj.firstElement()));
 }
 
 TEST(GteOp, MatchesMaxKey) {
@@ -793,9 +793,9 @@ TEST(GteOp, MatchesMaxKey) {
     ASSERT(exec::matcher::matchesBSON(&gte, maxKeyObj, nullptr));
     ASSERT(!exec::matcher::matchesBSON(&gte, numObj, nullptr));
 
-    ASSERT(!gte.matchesSingleElement(minKeyObj.firstElement()));
-    ASSERT(gte.matchesSingleElement(maxKeyObj.firstElement()));
-    ASSERT(!gte.matchesSingleElement(numObj.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&gte, minKeyObj.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&gte, maxKeyObj.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&gte, numObj.firstElement()));
 }
 
 TEST(GteOp, ElemMatchKey) {
@@ -818,8 +818,8 @@ TEST(RegexMatchExpression, MatchesElementExact) {
     BSONObj notMatch = BSON("a"
                             << "c");
     RegexMatchExpression regex(""_sd, "b", "");
-    ASSERT(regex.matchesSingleElement(match.firstElement()));
-    ASSERT(!regex.matchesSingleElement(notMatch.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
 
 TEST(RegexMatchExpression, TooLargePattern) {
@@ -834,8 +834,8 @@ TEST(RegexMatchExpression, MatchesElementSimplePrefix) {
     BSONObj notMatch = BSON("x"
                             << "adz");
     RegexMatchExpression regex(""_sd, "^ab", "");
-    ASSERT(regex.matchesSingleElement(match.firstElement()));
-    ASSERT(!regex.matchesSingleElement(notMatch.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesElementCaseSensitive) {
@@ -844,8 +844,8 @@ TEST(RegexMatchExpression, MatchesElementCaseSensitive) {
     BSONObj notMatch = BSON("x"
                             << "ABC");
     RegexMatchExpression regex(""_sd, "abc", "");
-    ASSERT(regex.matchesSingleElement(match.firstElement()));
-    ASSERT(!regex.matchesSingleElement(notMatch.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesElementCaseInsensitive) {
@@ -856,9 +856,9 @@ TEST(RegexMatchExpression, MatchesElementCaseInsensitive) {
     BSONObj notMatch = BSON("x"
                             << "abz");
     RegexMatchExpression regex(""_sd, "abc", "i");
-    ASSERT(regex.matchesSingleElement(match.firstElement()));
-    ASSERT(regex.matchesSingleElement(matchUppercase.firstElement()));
-    ASSERT(!regex.matchesSingleElement(notMatch.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&regex, matchUppercase.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesElementMultilineOff) {
@@ -867,8 +867,8 @@ TEST(RegexMatchExpression, MatchesElementMultilineOff) {
     BSONObj notMatch = BSON("x"
                             << "\naz");
     RegexMatchExpression regex(""_sd, "^a", "");
-    ASSERT(regex.matchesSingleElement(match.firstElement()));
-    ASSERT(!regex.matchesSingleElement(notMatch.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesElementMultilineOn) {
@@ -879,9 +879,9 @@ TEST(RegexMatchExpression, MatchesElementMultilineOn) {
     BSONObj notMatch = BSON("x"
                             << "\n\n");
     RegexMatchExpression regex(""_sd, "^a", "m");
-    ASSERT(regex.matchesSingleElement(match.firstElement()));
-    ASSERT(regex.matchesSingleElement(matchMultiline.firstElement()));
-    ASSERT(!regex.matchesSingleElement(notMatch.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&regex, matchMultiline.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesElementExtendedOff) {
@@ -890,8 +890,8 @@ TEST(RegexMatchExpression, MatchesElementExtendedOff) {
     BSONObj notMatch = BSON("x"
                             << "ab");
     RegexMatchExpression regex(""_sd, "a b", "");
-    ASSERT(regex.matchesSingleElement(match.firstElement()));
-    ASSERT(!regex.matchesSingleElement(notMatch.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesElementExtendedOn) {
@@ -900,8 +900,8 @@ TEST(RegexMatchExpression, MatchesElementExtendedOn) {
     BSONObj notMatch = BSON("x"
                             << "a b");
     RegexMatchExpression regex(""_sd, "a b", "x");
-    ASSERT(regex.matchesSingleElement(match.firstElement()));
-    ASSERT(!regex.matchesSingleElement(notMatch.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesElementDotAllOff) {
@@ -910,8 +910,8 @@ TEST(RegexMatchExpression, MatchesElementDotAllOff) {
     BSONObj notMatch = BSON("x"
                             << "a\nb");
     RegexMatchExpression regex(""_sd, "a.b", "");
-    ASSERT(regex.matchesSingleElement(match.firstElement()));
-    ASSERT(!regex.matchesSingleElement(notMatch.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesElementDotAllOn) {
@@ -922,16 +922,16 @@ TEST(RegexMatchExpression, MatchesElementDotAllOn) {
     BSONObj notMatch = BSON("x"
                             << "ab");
     RegexMatchExpression regex(""_sd, "a.b", "s");
-    ASSERT(regex.matchesSingleElement(match.firstElement()));
-    ASSERT(regex.matchesSingleElement(matchDotAll.firstElement()));
-    ASSERT(!regex.matchesSingleElement(notMatch.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&regex, matchDotAll.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesElementMultipleFlags) {
     BSONObj matchMultilineDotAll = BSON("x"
                                         << "\na\nb");
     RegexMatchExpression regex(""_sd, "^a.b", "ms");
-    ASSERT(regex.matchesSingleElement(matchMultilineDotAll.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&regex, matchMultilineDotAll.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesElementRegexType) {
@@ -939,32 +939,32 @@ TEST(RegexMatchExpression, MatchesElementRegexType) {
     BSONObj notMatchPattern = BSONObjBuilder().appendRegex("x", "r", "i").obj();
     BSONObj notMatchFlags = BSONObjBuilder().appendRegex("x", "yz", "s").obj();
     RegexMatchExpression regex(""_sd, "yz", "i");
-    ASSERT(regex.matchesSingleElement(match.firstElement()));
-    ASSERT(!regex.matchesSingleElement(notMatchPattern.firstElement()));
-    ASSERT(!regex.matchesSingleElement(notMatchFlags.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatchPattern.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatchFlags.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesElementSymbolType) {
     BSONObj match = BSONObjBuilder().appendSymbol("x", "yz").obj();
     BSONObj notMatch = BSONObjBuilder().appendSymbol("x", "gg").obj();
     RegexMatchExpression regex(""_sd, "yz", "");
-    ASSERT(regex.matchesSingleElement(match.firstElement()));
-    ASSERT(!regex.matchesSingleElement(notMatch.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&regex, match.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatch.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesElementWrongType) {
     BSONObj notMatchInt = BSON("x" << 1);
     BSONObj notMatchBool = BSON("x" << true);
     RegexMatchExpression regex(""_sd, "1", "");
-    ASSERT(!regex.matchesSingleElement(notMatchInt.firstElement()));
-    ASSERT(!regex.matchesSingleElement(notMatchBool.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatchInt.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&regex, notMatchBool.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesElementUtf8) {
     BSONObj multiByteCharacter = BSON("x"
                                       << "\xc2\xa5");
     RegexMatchExpression regex(""_sd, "^.$", "");
-    ASSERT(regex.matchesSingleElement(multiByteCharacter.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&regex, multiByteCharacter.firstElement()));
 }
 
 TEST(RegexMatchExpression, MatchesScalar) {
@@ -1141,11 +1141,11 @@ TEST(ModMatchExpression, MatchesElement) {
     BSONObj notMatch = BSON("a" << 6);
     BSONObj negativeNotMatch = BSON("a" << -2);
     ModMatchExpression mod(""_sd, 3, 1);
-    ASSERT(mod.matchesSingleElement(match.firstElement()));
-    ASSERT(mod.matchesSingleElement(largerMatch.firstElement()));
-    ASSERT(mod.matchesSingleElement(longLongMatch.firstElement()));
-    ASSERT(!mod.matchesSingleElement(notMatch.firstElement()));
-    ASSERT(!mod.matchesSingleElement(negativeNotMatch.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&mod, match.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&mod, largerMatch.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&mod, longLongMatch.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&mod, notMatch.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&mod, negativeNotMatch.firstElement()));
 }
 
 TEST(ModMatchExpression, ZeroDivisor) {
@@ -1200,17 +1200,17 @@ TEST(ExistsMatchExpression, MatchesElement) {
     BSONObj existsNull = BSON("a" << BSONNULL);
     BSONObj doesntExist = BSONObj();
     ExistsMatchExpression exists(""_sd);
-    ASSERT(exists.matchesSingleElement(existsInt.firstElement()));
-    ASSERT(exists.matchesSingleElement(existsNull.firstElement()));
-    ASSERT(!exists.matchesSingleElement(doesntExist.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&exists, existsInt.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&exists, existsNull.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&exists, doesntExist.firstElement()));
 }
 
 TEST(ExistsMatchExpression, MatchesElementExistsTrueValue) {
     BSONObj exists = BSON("a" << 5);
     BSONObj missing = BSONObj();
     ExistsMatchExpression existsTrueValue(""_sd);
-    ASSERT(existsTrueValue.matchesSingleElement(exists.firstElement()));
-    ASSERT(!existsTrueValue.matchesSingleElement(missing.firstElement()));
+    ASSERT(exec::matcher::matchesSingleElement(&existsTrueValue, exists.firstElement()));
+    ASSERT(!exec::matcher::matchesSingleElement(&existsTrueValue, missing.firstElement()));
 }
 
 TEST(ExistsMatchExpression, MatchesScalar) {
@@ -1254,15 +1254,15 @@ TEST(InMatchExpression, MatchesElementSingle) {
     InMatchExpression in(""_sd);
     std::vector<BSONElement> equalities{operand.firstElement()};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
-    ASSERT(in.matchesSingleElement(match["a"]));
-    ASSERT(!in.matchesSingleElement(notMatch["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&in, match["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&in, notMatch["a"]));
 }
 
 TEST(InMatchExpression, MatchesEmpty) {
     InMatchExpression in("a"_sd);
 
     BSONObj notMatch = BSON("a" << 2);
-    ASSERT(!in.matchesSingleElement(notMatch["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&in, notMatch["a"]));
     ASSERT(!exec::matcher::matchesBSON(&in, BSON("a" << 1), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&in, BSONObj(), nullptr));
 }
@@ -1278,10 +1278,10 @@ TEST(InMatchExpression, MatchesElementMultiple) {
                                << "r");
     BSONObj matchThird = BSON("a" << true);
     BSONObj notMatch = BSON("a" << false);
-    ASSERT(in.matchesSingleElement(matchFirst["a"]));
-    ASSERT(in.matchesSingleElement(matchSecond["a"]));
-    ASSERT(in.matchesSingleElement(matchThird["a"]));
-    ASSERT(!in.matchesSingleElement(notMatch["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&in, matchFirst["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&in, matchSecond["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&in, matchThird["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&in, notMatch["a"]));
 }
 
 
@@ -1461,7 +1461,7 @@ TEST(InMatchExpression, StringMatchingWithNullCollatorUsesBinaryComparison) {
     InMatchExpression in(""_sd);
     std::vector<BSONElement> equalities{operand.firstElement()};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
-    ASSERT(!in.matchesSingleElement(notMatch["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&in, notMatch["a"]));
 }
 
 TEST(InMatchExpression, StringMatchingRespectsCollation) {
@@ -1473,7 +1473,7 @@ TEST(InMatchExpression, StringMatchingRespectsCollation) {
     in.setCollator(&collator);
     std::vector<BSONElement> equalities{operand.firstElement()};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
-    ASSERT(in.matchesSingleElement(match["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&in, match["a"]));
 }
 
 TEST(InMatchExpression, ChangingCollationAfterAddingEqualitiesPreservesEqualities) {
@@ -1565,74 +1565,74 @@ TEST(BitTestMatchExpression, DoesNotMatchOther) {
     ASSERT_EQ((size_t)0, ballc.numBitPositions());
     ASSERT_EQ((size_t)0, banys.numBitPositions());
     ASSERT_EQ((size_t)0, banyc.numBitPositions());
-    ASSERT(!balls.matchesSingleElement(notMatch1["a"]));
-    ASSERT(!balls.matchesSingleElement(notMatch2["a"]));
-    ASSERT(!balls.matchesSingleElement(notMatch3["a"]));
-    ASSERT(!balls.matchesSingleElement(notMatch4["a"]));
-    ASSERT(!balls.matchesSingleElement(notMatch5["a"]));
-    ASSERT(!balls.matchesSingleElement(notMatch6["a"]));
-    ASSERT(!balls.matchesSingleElement(notMatch7["a"]));
-    ASSERT(!balls.matchesSingleElement(notMatch8["a"]));
-    ASSERT(!balls.matchesSingleElement(notMatch9["a"]));
-    ASSERT(!balls.matchesSingleElement(notMatch10["a"]));
-    ASSERT(!balls.matchesSingleElement(notMatch11["a"]));
-    ASSERT(!balls.matchesSingleElement(notMatch12["a"]));
-    ASSERT(!balls.matchesSingleElement(notMatch13["a"]));
-    ASSERT(!balls.matchesSingleElement(notMatch14["a"]));
-    ASSERT(!balls.matchesSingleElement(notMatch15["a"]));
-    ASSERT(!balls.matchesSingleElement(notMatch16["a"]));
-    ASSERT(!balls.matchesSingleElement(notMatch17["a"]));
-    ASSERT(!ballc.matchesSingleElement(notMatch1["a"]));
-    ASSERT(!ballc.matchesSingleElement(notMatch2["a"]));
-    ASSERT(!ballc.matchesSingleElement(notMatch3["a"]));
-    ASSERT(!ballc.matchesSingleElement(notMatch4["a"]));
-    ASSERT(!ballc.matchesSingleElement(notMatch5["a"]));
-    ASSERT(!ballc.matchesSingleElement(notMatch6["a"]));
-    ASSERT(!ballc.matchesSingleElement(notMatch7["a"]));
-    ASSERT(!ballc.matchesSingleElement(notMatch8["a"]));
-    ASSERT(!ballc.matchesSingleElement(notMatch9["a"]));
-    ASSERT(!ballc.matchesSingleElement(notMatch10["a"]));
-    ASSERT(!ballc.matchesSingleElement(notMatch11["a"]));
-    ASSERT(!ballc.matchesSingleElement(notMatch12["a"]));
-    ASSERT(!ballc.matchesSingleElement(notMatch13["a"]));
-    ASSERT(!ballc.matchesSingleElement(notMatch14["a"]));
-    ASSERT(!ballc.matchesSingleElement(notMatch15["a"]));
-    ASSERT(!ballc.matchesSingleElement(notMatch16["a"]));
-    ASSERT(!ballc.matchesSingleElement(notMatch17["a"]));
-    ASSERT(!banys.matchesSingleElement(notMatch1["a"]));
-    ASSERT(!banys.matchesSingleElement(notMatch2["a"]));
-    ASSERT(!banys.matchesSingleElement(notMatch3["a"]));
-    ASSERT(!banys.matchesSingleElement(notMatch4["a"]));
-    ASSERT(!banys.matchesSingleElement(notMatch5["a"]));
-    ASSERT(!banys.matchesSingleElement(notMatch6["a"]));
-    ASSERT(!banys.matchesSingleElement(notMatch7["a"]));
-    ASSERT(!banys.matchesSingleElement(notMatch8["a"]));
-    ASSERT(!banys.matchesSingleElement(notMatch9["a"]));
-    ASSERT(!banys.matchesSingleElement(notMatch10["a"]));
-    ASSERT(!banys.matchesSingleElement(notMatch11["a"]));
-    ASSERT(!banys.matchesSingleElement(notMatch12["a"]));
-    ASSERT(!banys.matchesSingleElement(notMatch13["a"]));
-    ASSERT(!banys.matchesSingleElement(notMatch14["a"]));
-    ASSERT(!banys.matchesSingleElement(notMatch15["a"]));
-    ASSERT(!banys.matchesSingleElement(notMatch16["a"]));
-    ASSERT(!banys.matchesSingleElement(notMatch17["a"]));
-    ASSERT(!banyc.matchesSingleElement(notMatch1["a"]));
-    ASSERT(!banyc.matchesSingleElement(notMatch2["a"]));
-    ASSERT(!banyc.matchesSingleElement(notMatch3["a"]));
-    ASSERT(!banyc.matchesSingleElement(notMatch4["a"]));
-    ASSERT(!banyc.matchesSingleElement(notMatch5["a"]));
-    ASSERT(!banyc.matchesSingleElement(notMatch6["a"]));
-    ASSERT(!banyc.matchesSingleElement(notMatch7["a"]));
-    ASSERT(!banyc.matchesSingleElement(notMatch8["a"]));
-    ASSERT(!banyc.matchesSingleElement(notMatch9["a"]));
-    ASSERT(!banyc.matchesSingleElement(notMatch10["a"]));
-    ASSERT(!banyc.matchesSingleElement(notMatch11["a"]));
-    ASSERT(!banyc.matchesSingleElement(notMatch12["a"]));
-    ASSERT(!banyc.matchesSingleElement(notMatch13["a"]));
-    ASSERT(!banyc.matchesSingleElement(notMatch14["a"]));
-    ASSERT(!banyc.matchesSingleElement(notMatch15["a"]));
-    ASSERT(!banyc.matchesSingleElement(notMatch16["a"]));
-    ASSERT(!banyc.matchesSingleElement(notMatch17["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, notMatch1["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, notMatch2["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, notMatch3["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, notMatch4["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, notMatch5["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, notMatch6["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, notMatch7["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, notMatch8["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, notMatch9["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, notMatch10["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, notMatch11["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, notMatch12["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, notMatch13["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, notMatch14["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, notMatch15["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, notMatch16["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, notMatch17["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, notMatch1["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, notMatch2["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, notMatch3["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, notMatch4["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, notMatch5["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, notMatch6["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, notMatch7["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, notMatch8["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, notMatch9["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, notMatch10["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, notMatch11["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, notMatch12["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, notMatch13["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, notMatch14["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, notMatch15["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, notMatch16["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, notMatch17["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banys, notMatch1["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banys, notMatch2["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banys, notMatch3["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banys, notMatch4["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banys, notMatch5["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banys, notMatch6["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banys, notMatch7["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banys, notMatch8["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banys, notMatch9["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banys, notMatch10["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banys, notMatch11["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banys, notMatch12["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banys, notMatch13["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banys, notMatch14["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banys, notMatch15["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banys, notMatch16["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banys, notMatch17["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, notMatch1["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, notMatch2["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, notMatch3["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, notMatch4["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, notMatch5["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, notMatch6["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, notMatch7["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, notMatch8["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, notMatch9["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, notMatch10["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, notMatch11["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, notMatch12["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, notMatch13["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, notMatch14["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, notMatch15["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, notMatch16["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, notMatch17["a"]));
 }
 
 TEST(BitTestMatchExpression, MatchBinaryWithLongBitMask) {
@@ -1646,10 +1646,10 @@ TEST(BitTestMatchExpression, MatchBinaryWithLongBitMask) {
     BitsAnyClearMatchExpression banyc("a"_sd, bitMask);
 
     std::vector<uint32_t> bitPositions = balls.getBitPositions();
-    ASSERT(balls.matchesSingleElement(match["a"]));
-    ASSERT(!ballc.matchesSingleElement(match["a"]));
-    ASSERT(banys.matchesSingleElement(match["a"]));
-    ASSERT(!banyc.matchesSingleElement(match["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, match["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, match["a"]));
 }
 
 TEST(BitTestMatchExpression, MatchLongWithBinaryBitMask) {
@@ -1663,10 +1663,10 @@ TEST(BitTestMatchExpression, MatchLongWithBinaryBitMask) {
     BitsAnySetMatchExpression banys("a"_sd, bitMaskSet, 4);
     BitsAnyClearMatchExpression banyc("a"_sd, bitMaskClear, 9);
 
-    ASSERT(balls.matchesSingleElement(match["a"]));
-    ASSERT(ballc.matchesSingleElement(match["a"]));
-    ASSERT(banys.matchesSingleElement(match["a"]));
-    ASSERT(banyc.matchesSingleElement(match["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match["a"]));
 }
 
 TEST(BitTestMatchExpression, MatchesEmpty) {
@@ -1686,22 +1686,22 @@ TEST(BitTestMatchExpression, MatchesEmpty) {
     ASSERT_EQ((size_t)0, ballc.numBitPositions());
     ASSERT_EQ((size_t)0, banys.numBitPositions());
     ASSERT_EQ((size_t)0, banyc.numBitPositions());
-    ASSERT(balls.matchesSingleElement(match1["a"]));
-    ASSERT(balls.matchesSingleElement(match2["a"]));
-    ASSERT(balls.matchesSingleElement(match3["a"]));
-    ASSERT(balls.matchesSingleElement(match4["a"]));
-    ASSERT(ballc.matchesSingleElement(match1["a"]));
-    ASSERT(ballc.matchesSingleElement(match2["a"]));
-    ASSERT(ballc.matchesSingleElement(match3["a"]));
-    ASSERT(ballc.matchesSingleElement(match4["a"]));
-    ASSERT(!banys.matchesSingleElement(match1["a"]));
-    ASSERT(!banys.matchesSingleElement(match2["a"]));
-    ASSERT(!banys.matchesSingleElement(match3["a"]));
-    ASSERT(!banys.matchesSingleElement(match4["a"]));
-    ASSERT(!banyc.matchesSingleElement(match1["a"]));
-    ASSERT(!banyc.matchesSingleElement(match2["a"]));
-    ASSERT(!banyc.matchesSingleElement(match3["a"]));
-    ASSERT(!banyc.matchesSingleElement(match4["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match4["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match4["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banys, match1["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banys, match2["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banys, match3["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banys, match4["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, match1["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, match2["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, match3["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&banyc, match4["a"]));
 }
 
 TEST(BitTestMatchExpression, MatchesInteger) {
@@ -1723,18 +1723,18 @@ TEST(BitTestMatchExpression, MatchesInteger) {
     ASSERT_EQ((size_t)3, ballc.numBitPositions());
     ASSERT_EQ((size_t)4, banys.numBitPositions());
     ASSERT_EQ((size_t)3, banyc.numBitPositions());
-    ASSERT(balls.matchesSingleElement(match1["a"]));
-    ASSERT(balls.matchesSingleElement(match2["a"]));
-    ASSERT(balls.matchesSingleElement(match3["a"]));
-    ASSERT(ballc.matchesSingleElement(match1["a"]));
-    ASSERT(ballc.matchesSingleElement(match2["a"]));
-    ASSERT(ballc.matchesSingleElement(match3["a"]));
-    ASSERT(banys.matchesSingleElement(match1["a"]));
-    ASSERT(banys.matchesSingleElement(match2["a"]));
-    ASSERT(banys.matchesSingleElement(match3["a"]));
-    ASSERT(banyc.matchesSingleElement(match1["a"]));
-    ASSERT(banyc.matchesSingleElement(match2["a"]));
-    ASSERT(banyc.matchesSingleElement(match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match3["a"]));
 }
 
 TEST(BitTestMatchExpression, MatchesNegativeInteger) {
@@ -1756,18 +1756,18 @@ TEST(BitTestMatchExpression, MatchesNegativeInteger) {
     ASSERT_EQ((size_t)4, ballc.numBitPositions());
     ASSERT_EQ((size_t)5, banys.numBitPositions());
     ASSERT_EQ((size_t)4, banyc.numBitPositions());
-    ASSERT(balls.matchesSingleElement(match1["a"]));
-    ASSERT(balls.matchesSingleElement(match2["a"]));
-    ASSERT(balls.matchesSingleElement(match3["a"]));
-    ASSERT(ballc.matchesSingleElement(match1["a"]));
-    ASSERT(ballc.matchesSingleElement(match2["a"]));
-    ASSERT(ballc.matchesSingleElement(match3["a"]));
-    ASSERT(banys.matchesSingleElement(match1["a"]));
-    ASSERT(banys.matchesSingleElement(match2["a"]));
-    ASSERT(banys.matchesSingleElement(match3["a"]));
-    ASSERT(banyc.matchesSingleElement(match1["a"]));
-    ASSERT(banyc.matchesSingleElement(match2["a"]));
-    ASSERT(banyc.matchesSingleElement(match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match3["a"]));
 }
 
 TEST(BitTestMatchExpression, MatchesIntegerWithBitMask) {
@@ -1783,18 +1783,18 @@ TEST(BitTestMatchExpression, MatchesIntegerWithBitMask) {
     BitsAnySetMatchExpression banys("a"_sd, bitMaskSet);
     BitsAnyClearMatchExpression banyc("a"_sd, bitMaskClear);
 
-    ASSERT(balls.matchesSingleElement(match1["a"]));
-    ASSERT(balls.matchesSingleElement(match2["a"]));
-    ASSERT(balls.matchesSingleElement(match3["a"]));
-    ASSERT(ballc.matchesSingleElement(match1["a"]));
-    ASSERT(ballc.matchesSingleElement(match2["a"]));
-    ASSERT(ballc.matchesSingleElement(match3["a"]));
-    ASSERT(banys.matchesSingleElement(match1["a"]));
-    ASSERT(banys.matchesSingleElement(match2["a"]));
-    ASSERT(banys.matchesSingleElement(match3["a"]));
-    ASSERT(banyc.matchesSingleElement(match1["a"]));
-    ASSERT(banyc.matchesSingleElement(match2["a"]));
-    ASSERT(banyc.matchesSingleElement(match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match3["a"]));
 }
 
 TEST(BitTestMatchExpression, MatchesNegativeIntegerWithBitMask) {
@@ -1810,18 +1810,18 @@ TEST(BitTestMatchExpression, MatchesNegativeIntegerWithBitMask) {
     BitsAnySetMatchExpression banys("a"_sd, bitMaskSet);
     BitsAnyClearMatchExpression banyc("a"_sd, bitMaskClear);
 
-    ASSERT(balls.matchesSingleElement(match1["a"]));
-    ASSERT(balls.matchesSingleElement(match2["a"]));
-    ASSERT(balls.matchesSingleElement(match3["a"]));
-    ASSERT(ballc.matchesSingleElement(match1["a"]));
-    ASSERT(ballc.matchesSingleElement(match2["a"]));
-    ASSERT(ballc.matchesSingleElement(match3["a"]));
-    ASSERT(banys.matchesSingleElement(match1["a"]));
-    ASSERT(banys.matchesSingleElement(match2["a"]));
-    ASSERT(banys.matchesSingleElement(match3["a"]));
-    ASSERT(banyc.matchesSingleElement(match1["a"]));
-    ASSERT(banyc.matchesSingleElement(match2["a"]));
-    ASSERT(banyc.matchesSingleElement(match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match3["a"]));
 }
 
 TEST(BitTestMatchExpression, DoesNotMatchInteger) {
@@ -1843,18 +1843,18 @@ TEST(BitTestMatchExpression, DoesNotMatchInteger) {
     ASSERT_EQ((size_t)3, ballc.numBitPositions());
     ASSERT_EQ((size_t)5, banys.numBitPositions());
     ASSERT_EQ((size_t)3, banyc.numBitPositions());
-    ASSERT(!balls.matchesSingleElement(match1["a"]));
-    ASSERT(!balls.matchesSingleElement(match2["a"]));
-    ASSERT(!balls.matchesSingleElement(match3["a"]));
-    ASSERT(!ballc.matchesSingleElement(match1["a"]));
-    ASSERT(!ballc.matchesSingleElement(match2["a"]));
-    ASSERT(!ballc.matchesSingleElement(match3["a"]));
-    ASSERT(banys.matchesSingleElement(match1["a"]));
-    ASSERT(banys.matchesSingleElement(match2["a"]));
-    ASSERT(banys.matchesSingleElement(match3["a"]));
-    ASSERT(banyc.matchesSingleElement(match1["a"]));
-    ASSERT(banyc.matchesSingleElement(match2["a"]));
-    ASSERT(banyc.matchesSingleElement(match3["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, match1["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, match2["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, match3["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, match1["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, match2["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match3["a"]));
 }
 
 TEST(BitTestMatchExpression, DoesNotMatchIntegerWithBitMask) {
@@ -1870,18 +1870,18 @@ TEST(BitTestMatchExpression, DoesNotMatchIntegerWithBitMask) {
     BitsAnySetMatchExpression banys("a"_sd, bitMaskSet);
     BitsAnyClearMatchExpression banyc("a"_sd, bitMaskClear);
 
-    ASSERT(!balls.matchesSingleElement(match1["a"]));
-    ASSERT(!balls.matchesSingleElement(match2["a"]));
-    ASSERT(!balls.matchesSingleElement(match3["a"]));
-    ASSERT(!ballc.matchesSingleElement(match1["a"]));
-    ASSERT(!ballc.matchesSingleElement(match2["a"]));
-    ASSERT(!ballc.matchesSingleElement(match3["a"]));
-    ASSERT(banys.matchesSingleElement(match1["a"]));
-    ASSERT(banys.matchesSingleElement(match2["a"]));
-    ASSERT(banys.matchesSingleElement(match3["a"]));
-    ASSERT(banyc.matchesSingleElement(match1["a"]));
-    ASSERT(banyc.matchesSingleElement(match2["a"]));
-    ASSERT(banyc.matchesSingleElement(match3["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, match1["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, match2["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, match3["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, match1["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, match2["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match3["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match3["a"]));
 }
 
 TEST(BitTestMatchExpression, MatchesBinary1) {
@@ -1904,14 +1904,14 @@ TEST(BitTestMatchExpression, MatchesBinary1) {
     ASSERT_EQ((size_t)3, ballc.numBitPositions());
     ASSERT_EQ((size_t)4, banys.numBitPositions());
     ASSERT_EQ((size_t)3, banyc.numBitPositions());
-    ASSERT(balls.matchesSingleElement(match1["a"]));
-    ASSERT(balls.matchesSingleElement(match2["a"]));
-    ASSERT(ballc.matchesSingleElement(match1["a"]));
-    ASSERT(ballc.matchesSingleElement(match2["a"]));
-    ASSERT(banys.matchesSingleElement(match1["a"]));
-    ASSERT(banys.matchesSingleElement(match2["a"]));
-    ASSERT(banyc.matchesSingleElement(match1["a"]));
-    ASSERT(banyc.matchesSingleElement(match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match2["a"]));
 }
 
 TEST(BitTestMatchExpression, MatchesBinary2) {
@@ -1934,14 +1934,14 @@ TEST(BitTestMatchExpression, MatchesBinary2) {
     ASSERT_EQ((size_t)3, ballc.numBitPositions());
     ASSERT_EQ((size_t)4, banys.numBitPositions());
     ASSERT_EQ((size_t)3, banyc.numBitPositions());
-    ASSERT(balls.matchesSingleElement(match1["a"]));
-    ASSERT(balls.matchesSingleElement(match2["a"]));
-    ASSERT(ballc.matchesSingleElement(match1["a"]));
-    ASSERT(ballc.matchesSingleElement(match2["a"]));
-    ASSERT(banys.matchesSingleElement(match1["a"]));
-    ASSERT(banys.matchesSingleElement(match2["a"]));
-    ASSERT(banyc.matchesSingleElement(match1["a"]));
-    ASSERT(banyc.matchesSingleElement(match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match2["a"]));
 }
 
 TEST(BitTestMatchExpression, MatchesBinaryWithBitMask) {
@@ -1958,14 +1958,14 @@ TEST(BitTestMatchExpression, MatchesBinaryWithBitMask) {
     BitsAnySetMatchExpression banys("a"_sd, bas, 21);
     BitsAnyClearMatchExpression banyc("a"_sd, bac, 21);
 
-    ASSERT(balls.matchesSingleElement(match1["a"]));
-    ASSERT(balls.matchesSingleElement(match2["a"]));
-    ASSERT(ballc.matchesSingleElement(match1["a"]));
-    ASSERT(ballc.matchesSingleElement(match2["a"]));
-    ASSERT(banys.matchesSingleElement(match1["a"]));
-    ASSERT(banys.matchesSingleElement(match2["a"]));
-    ASSERT(banyc.matchesSingleElement(match1["a"]));
-    ASSERT(banyc.matchesSingleElement(match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&balls, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&ballc, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match2["a"]));
 }
 
 TEST(BitTestMatchExpression, DoesNotMatchBinary1) {
@@ -1988,14 +1988,14 @@ TEST(BitTestMatchExpression, DoesNotMatchBinary1) {
     ASSERT_EQ((size_t)3, ballc.numBitPositions());
     ASSERT_EQ((size_t)5, banys.numBitPositions());
     ASSERT_EQ((size_t)3, banyc.numBitPositions());
-    ASSERT(!balls.matchesSingleElement(match1["a"]));
-    ASSERT(!balls.matchesSingleElement(match2["a"]));
-    ASSERT(!ballc.matchesSingleElement(match1["a"]));
-    ASSERT(!ballc.matchesSingleElement(match2["a"]));
-    ASSERT(banys.matchesSingleElement(match1["a"]));
-    ASSERT(banys.matchesSingleElement(match2["a"]));
-    ASSERT(banyc.matchesSingleElement(match1["a"]));
-    ASSERT(banyc.matchesSingleElement(match2["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, match1["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, match2["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, match1["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match2["a"]));
 }
 
 TEST(BitTestMatchExpression, DoesNotMatchBinary2) {
@@ -2018,14 +2018,14 @@ TEST(BitTestMatchExpression, DoesNotMatchBinary2) {
     ASSERT_EQ((size_t)3, ballc.numBitPositions());
     ASSERT_EQ((size_t)5, banys.numBitPositions());
     ASSERT_EQ((size_t)3, banyc.numBitPositions());
-    ASSERT(!balls.matchesSingleElement(match1["a"]));
-    ASSERT(!balls.matchesSingleElement(match2["a"]));
-    ASSERT(!ballc.matchesSingleElement(match1["a"]));
-    ASSERT(!ballc.matchesSingleElement(match2["a"]));
-    ASSERT(banys.matchesSingleElement(match1["a"]));
-    ASSERT(banys.matchesSingleElement(match2["a"]));
-    ASSERT(banyc.matchesSingleElement(match1["a"]));
-    ASSERT(banyc.matchesSingleElement(match2["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, match1["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, match2["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, match1["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match2["a"]));
 }
 
 TEST(BitTestMatchExpression, DoesNotMatchBinaryWithBitMask) {
@@ -2041,14 +2041,14 @@ TEST(BitTestMatchExpression, DoesNotMatchBinaryWithBitMask) {
     BitsAllClearMatchExpression ballc("a"_sd, bac, 22);
     BitsAnySetMatchExpression banys("a"_sd, bas, 22);
     BitsAnyClearMatchExpression banyc("a"_sd, bac, 22);
-    ASSERT(!balls.matchesSingleElement(match1["a"]));
-    ASSERT(!balls.matchesSingleElement(match2["a"]));
-    ASSERT(!ballc.matchesSingleElement(match1["a"]));
-    ASSERT(!ballc.matchesSingleElement(match2["a"]));
-    ASSERT(banys.matchesSingleElement(match1["a"]));
-    ASSERT(banys.matchesSingleElement(match2["a"]));
-    ASSERT(banyc.matchesSingleElement(match1["a"]));
-    ASSERT(banyc.matchesSingleElement(match2["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, match1["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&balls, match2["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, match1["a"]));
+    ASSERT(!exec::matcher::matchesSingleElement(&ballc, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banys, match2["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match1["a"]));
+    ASSERT(exec::matcher::matchesSingleElement(&banyc, match2["a"]));
 }
 
 TEST(LeafMatchExpressionTest, Equal1) {

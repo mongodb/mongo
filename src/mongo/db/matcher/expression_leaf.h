@@ -44,7 +44,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -55,12 +54,10 @@
 #include "mongo/db/matcher/expression_path.h"
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/in_list_data.h"
-#include "mongo/db/matcher/match_details.h"
 #include "mongo/db/matcher/path.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/util/make_data_structure.h"
-#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/pcre.h"
 
@@ -311,8 +308,6 @@ public:
                               const CollatorInterface* collator = nullptr);
 
     ~ComparisonMatchExpression() override = default;
-
-    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 };
 
 class EqualityMatchExpression final : public ComparisonMatchExpression {
@@ -585,8 +580,6 @@ public:
         return e;
     }
 
-    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
-
     void debugString(StringBuilder& debug, int indentationLevel) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
@@ -604,6 +597,10 @@ public:
     }
     const std::string& getFlags() const {
         return _flags;
+    }
+
+    const pcre::Regex* getRegex() const {
+        return _re.get();
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
@@ -668,8 +665,6 @@ public:
         }
         return m;
     }
-
-    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     void debugString(StringBuilder& debug, int indentationLevel) const override;
 
@@ -738,8 +733,6 @@ public:
         return e;
     }
 
-    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
-
     void debugString(StringBuilder& debug, int indentationLevel) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
@@ -777,8 +770,6 @@ public:
                                std::shared_ptr<InListData> equalities);
 
     std::unique_ptr<MatchExpression> clone() const final;
-
-    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     void debugString(StringBuilder& debug, int indentationLevel) const override;
 
@@ -980,8 +971,6 @@ public:
                                     clonable_ptr<ErrorAnnotation> annotation);
     ~BitTestMatchExpression() override {}
 
-    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
-
     void debugString(StringBuilder& debug, int indentationLevel) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
@@ -1026,26 +1015,6 @@ private:
             return expression;
         };
     }
-
-    /**
-     * Performs bit test using bit positions on 'eValue' and returns whether or not the bit test
-     * passes.
-     */
-    bool performBitTest(long long eValue) const;
-
-    /**
-     * Performs bit test using bit positions on 'eBinary' with length (in bytes) 'eBinaryLen' and
-     * returns whether or not the bit test passes.
-     */
-    bool performBitTest(const char* eBinary, uint32_t eBinaryLen) const;
-
-    /**
-     * Helper function for performBitTest(...).
-     *
-     * needFurtherBitTests() determines if the result of a bit-test ('isBitSet') is enough
-     * information to skip the rest of the bit tests.
-     **/
-    bool needFurtherBitTests(bool isBitSet) const;
 
     // Vector of bit positions to test, with bit position 0 being the least significant bit.
     // Used to perform bit tests against BinData.

@@ -131,11 +131,11 @@ TEST(InternalSchemaUniqueItemsMatchExpression, AlwaysUsesBinaryComparisonRegardl
 TEST(InternalSchemaUniqueItemsMatchExpression, FindsFirstDuplicateValue) {
     InternalSchemaUniqueItemsMatchExpression uniqueItems(""_sd);
     auto inputArray = fromjson("[1, 2, 2, 1]");
-    auto result = uniqueItems.findFirstDuplicateValue(inputArray);
+    auto result = exec::matcher::findFirstDuplicateValue(&uniqueItems, inputArray);
     ASSERT_TRUE(result);
     ASSERT_EQUALS(result.Int(), 2);
-    ASSERT_FALSE(uniqueItems.findFirstDuplicateValue(fromjson("[1, 2]")));
-    ASSERT_FALSE(uniqueItems.findFirstDuplicateValue(fromjson("[]")));
+    ASSERT_FALSE(exec::matcher::findFirstDuplicateValue(&uniqueItems, fromjson("[1, 2]")));
+    ASSERT_FALSE(exec::matcher::findFirstDuplicateValue(&uniqueItems, fromjson("[]")));
 }
 
 TEST(InternalSchemaUniqueItemsMatchExpression, EquivalentFunctionTest) {

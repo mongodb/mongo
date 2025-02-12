@@ -64,9 +64,9 @@ TEST(InternalSchemaMaxPropertiesMatchExpression, MatchesSingleElementTest) {
     BSONObj match = BSON("a" << BSON("a" << 5 << "b" << 10));
     BSONObj notMatch1 = BSON("a" << 1);
     BSONObj notMatch2 = BSON("a" << BSON("a" << 5 << "b" << 10 << "c" << 25));
-    ASSERT_TRUE(maxProperties.matchesSingleElement(match.firstElement()));
-    ASSERT_FALSE(maxProperties.matchesSingleElement(notMatch1.firstElement()));
-    ASSERT_FALSE(maxProperties.matchesSingleElement(notMatch2.firstElement()));
+    ASSERT_TRUE(exec::matcher::matchesSingleElement(&maxProperties, match.firstElement()));
+    ASSERT_FALSE(exec::matcher::matchesSingleElement(&maxProperties, notMatch1.firstElement()));
+    ASSERT_FALSE(exec::matcher::matchesSingleElement(&maxProperties, notMatch2.firstElement()));
 }
 
 TEST(InternalSchemaMaxPropertiesMatchExpression, MaxPropertiesZeroAllowsEmptyObjects) {

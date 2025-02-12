@@ -43,7 +43,6 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_path.h"
 #include "mongo/db/matcher/expression_visitor.h"
-#include "mongo/db/matcher/match_details.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
 
@@ -57,8 +56,6 @@ public:
     InternalSchemaObjectMatchExpression(boost::optional<StringData> path,
                                         std::unique_ptr<MatchExpression> expr,
                                         clonable_ptr<ErrorAnnotation> annotation = nullptr);
-
-    bool matchesSingleElement(const BSONElement& elem, MatchDetails* details = nullptr) const final;
 
     std::unique_ptr<MatchExpression> clone() const final;
 

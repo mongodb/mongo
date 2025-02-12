@@ -1106,7 +1106,8 @@ public:
             appendErrorReason(normalReason, "");
             auto attributeValueAsArray = BSONArray(attributeValue.embeddedObject());
             appendConsideredValue(attributeValueAsArray);
-            auto duplicateValue = expr->findFirstDuplicateValue(attributeValueAsArray);
+            auto duplicateValue =
+                exec::matcher::findFirstDuplicateValue(expr, attributeValueAsArray);
             tassert(9740321,
                     "Did not find duplicate value for 'InternalSchemaUniqueItemsMatchExpression' "
                     "failure",
@@ -1849,8 +1850,8 @@ private:
             appendOperatorName(*expr);
             appendSchemaAnnotations(*expr->getChild(0), _context->getCurrentObjBuilder());
             appendErrorReason(normalReason, invertedReason);
-            auto failingElement =
-                expr->findFirstMismatchInArray(attributeValue.embeddedObject(), nullptr);
+            auto failingElement = exec::matcher::findFirstMismatchInArray(
+                expr, attributeValue.embeddedObject(), nullptr);
             tassert(
                 9740331,
                 "Must have at least one mismatched array element when generating an error for an "

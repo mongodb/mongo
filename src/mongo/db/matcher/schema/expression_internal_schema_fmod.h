@@ -42,7 +42,6 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_visitor.h"
-#include "mongo/db/matcher/match_details.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/platform/decimal128.h"
 
@@ -68,8 +67,6 @@ public:
         }
         return m;
     }
-
-    bool matchesSingleElement(const BSONElement& e, MatchDetails* details = nullptr) const final;
 
     void debugString(StringBuilder& debug, int indentationLevel) const final;
 

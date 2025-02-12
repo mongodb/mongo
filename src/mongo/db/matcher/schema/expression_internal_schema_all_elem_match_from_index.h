@@ -43,8 +43,6 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
-#include "mongo/db/matcher/match_details.h"
-#include "mongo/db/matcher/match_expression_util.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
 
@@ -66,27 +64,6 @@ public:
         clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     std::unique_ptr<MatchExpression> clone() const final;
-
-    bool matchesArray(const BSONObj& array, MatchDetails* details) const final {
-        return !findFirstMismatchInArray(array, details);
-    }
-
-    /**
-     * Finds the first element in the sub-array of array 'array' that the expression applies to that
-     * does not match the sub-expression. If such element does not exist, then returns empty (i.e.
-     * EOO) value.
-     */
-    BSONElement findFirstMismatchInArray(const BSONObj& array, MatchDetails* details) const {
-        auto iter = BSONObjIterator(array);
-        match_expression_util::advanceBy(_index, iter);
-        while (iter.more()) {
-            auto element = iter.next();
-            if (!_expression->matchesBSONElement(element, details)) {
-                return element;
-            }
-        }
-        return {};
-    }
 
     void debugString(StringBuilder& debug, int indentationLevel) const final;
 

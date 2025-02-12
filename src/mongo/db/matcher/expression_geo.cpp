@@ -383,68 +383,6 @@ GeoMatchExpression::GeoMatchExpression(boost::optional<StringData> path,
       _query(query),
       _canSkipValidation(false) {}
 
-bool GeoMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
-    return contains(_query->getGeometry(), _query->getPred(), _canSkipValidation, e, details);
-}
-
-bool GeoMatchExpression::contains(const GeometryContainer& queryGeom,
-                                  const GeoExpression::Predicate& queryPredicate,
-                                  bool skipValidation,
-                                  const BSONElement& e,
-                                  MatchDetails*) {
-    if (!e.isABSONObj())
-        return false;
-
-    GeometryContainer geometry;
-    if (!geometry.parseFromStorage(e, skipValidation).isOK())
-        return false;
-
-    // Never match big polygon
-    if (geometry.getNativeCRS() == STRICT_SPHERE)
-        return false;
-
-    // Project this geometry into the CRS of the larger geometry.
-
-    // In the case of index validation, we are projecting the geometry of the query
-    // into the CRS of the index to confirm that the index region convers/includes
-    // the region described by the predicate.
-
-    if (!geometry.supportsProject(queryGeom.getNativeCRS()))
-        return false;
-
-    return contains(queryGeom, queryPredicate, &geometry);
-}
-
-bool GeoMatchExpression::contains(const GeometryContainer& queryGeom,
-                                  const GeoExpression::Predicate& queryPredicate,
-                                  GeometryContainer* geometry) {
-    geometry->projectInto(queryGeom.getNativeCRS());
-    if (GeoExpression::WITHIN == queryPredicate) {
-        return queryGeom.contains(*geometry);
-    } else {
-        MONGO_verify(GeoExpression::INTERSECT == queryPredicate);
-        return queryGeom.intersects(*geometry);
-    }
-}
-
-bool GeoMatchExpression::matchesGeoContainer(const GeometryContainer& input) const {
-    // Never match big polygon
-    if (input.getNativeCRS() == STRICT_SPHERE)
-        return false;
-
-    // Project this geometry into the CRS of the larger geometry.
-
-    // In the case of index validation, we are projecting the geometry of the query
-    // into the CRS of the index to confirm that the index region convers/includes
-    // the region described by the predicate.
-
-    if (!input.supportsProject(_query->getGeometry().getNativeCRS()))
-        return false;
-
-    GeometryContainer geometry{input};
-    return contains(_query->getGeometry(), _query->getPred(), &geometry);
-}
-
 void GeoMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
 
@@ -500,10 +438,6 @@ GeoNearMatchExpression::GeoNearMatchExpression(boost::optional<StringData> path,
                                                const BSONObj& rawObj)
     : LeafMatchExpression(GEO_NEAR, path), _rawObj(rawObj), _query(query) {}
 
-bool GeoNearMatchExpression::matchesSingleElement(const BSONElement& e,
-                                                  MatchDetails* details) const {
-    return true;
-}
 
 void GeoNearMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);

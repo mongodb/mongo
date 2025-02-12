@@ -30,19 +30,14 @@
 #pragma once
 
 #include <array>
-#include <cstddef>
 #include <memory>
 #include <utility>
-#include <vector>
 
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_arity.h"
 #include "mongo/db/matcher/expression_visitor.h"
-#include "mongo/db/matcher/match_details.h"
-#include "mongo/db/matcher/matchable.h"
 
 namespace mongo {
 
@@ -79,12 +74,6 @@ public:
     MatchCategory getCategory() const final {
         return MatchCategory::kOther;
     }
-
-    /**
-     * If the input object matches 'condition', returns the result of matching it against
-     * 'thenBranch'. Otherwise, returns the result of matching it against 'elseBranch'.
-     */
-    bool matchesSingleElement(const BSONElement& elem, MatchDetails* details = nullptr) const final;
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);

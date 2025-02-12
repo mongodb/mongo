@@ -43,8 +43,6 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_visitor.h"
-#include "mongo/db/matcher/match_details.h"
-#include "mongo/db/matcher/matchable.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
 
@@ -63,10 +61,6 @@ public:
      * The name of this MatchExpression.
      */
     virtual StringData name() const = 0;
-
-    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final {
-        return _value;
-    }
 
     void debugString(StringBuilder& debug, int indentationLevel = 0) const final {
         _debugAddSpace(debug, indentationLevel);

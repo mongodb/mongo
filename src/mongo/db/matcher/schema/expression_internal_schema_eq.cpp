@@ -32,7 +32,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
@@ -53,11 +52,6 @@ InternalSchemaEqMatchExpression::InternalSchemaEqMatchExpression(
                           std::move(annotation)),
       _rhsElem(rhs) {
     invariant(_rhsElem);
-}
-
-bool InternalSchemaEqMatchExpression::matchesSingleElement(const BSONElement& elem,
-                                                           MatchDetails* details) const {
-    return _eltCmp.evaluate(_rhsElem == elem);
 }
 
 void InternalSchemaEqMatchExpression::debugString(StringBuilder& debug,

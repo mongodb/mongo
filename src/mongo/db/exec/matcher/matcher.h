@@ -251,6 +251,172 @@ private:
     bool _result;
 };
 
+
+class MatchesSingleElementEvaluator final : public MatchExpressionConstVisitor {
+
+public:
+    MatchesSingleElementEvaluator(const BSONElement& e, MatchDetails* details)
+        : _elem(e), _details(details) {}
+
+    bool getResult() {
+        return _result;
+    }
+
+    void visit(const AlwaysFalseMatchExpression* expr) final {
+        _result = false;
+    }
+
+    void visit(const AlwaysTrueMatchExpression* expr) final {
+        _result = true;
+    }
+
+    void visit(const AndMatchExpression* expr) final {
+        for (auto&& child : expr->getChildren()) {
+            child->acceptVisitor(this);
+            if (!_result) {
+                return;
+            }
+        }
+        _result = true;
+    }
+
+    void visit(const BitsAllClearMatchExpression* expr) final;
+
+    void visit(const BitsAllSetMatchExpression* expr) final;
+
+    void visit(const BitsAnyClearMatchExpression* expr) final;
+
+    void visit(const BitsAnySetMatchExpression* expr) final;
+
+    void visit(const ElemMatchObjectMatchExpression* expr) final;
+
+    void visit(const ElemMatchValueMatchExpression* expr) final;
+
+    void visit(const EqualityMatchExpression* expr) final;
+
+    void visit(const ExistsMatchExpression* expr) final {
+        _result = !_elem.eoo();
+    }
+
+    void visit(const ExprMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(9713600);
+    }
+
+    void visit(const GTEMatchExpression* expr) final;
+
+    void visit(const GTMatchExpression* expr) final;
+
+    void visit(const GeoMatchExpression* expr) final;
+
+    void visit(const GeoNearMatchExpression* expr) final;
+
+    void visit(const InMatchExpression* expr) final;
+
+    void visit(const InternalBucketGeoWithinMatchExpression* expr) final;
+
+    void visit(const InternalExprEqMatchExpression* expr) final;
+
+    void visit(const InternalExprGTMatchExpression* expr) final;
+
+    void visit(const InternalExprGTEMatchExpression* expr) final;
+
+    void visit(const InternalExprLTMatchExpression* expr) final;
+
+    void visit(const InternalExprLTEMatchExpression* expr) final;
+
+    void visit(const InternalEqHashedKey* expr) final;
+
+    void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final;
+
+    void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final;
+
+    void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final;
+
+    void visit(const InternalSchemaBinDataFLE2EncryptedTypeExpression* expr) final;
+
+    void visit(const InternalSchemaBinDataSubTypeExpression* expr) final;
+
+    void visit(const InternalSchemaCondMatchExpression* expr) final;
+
+    void visit(const InternalSchemaEqMatchExpression* expr) final;
+
+    void visit(const InternalSchemaFmodMatchExpression* expr) final;
+
+    void visit(const InternalSchemaMatchArrayIndexMatchExpression* expr) final;
+
+    void visit(const InternalSchemaMaxItemsMatchExpression* expr) final;
+
+    void visit(const InternalSchemaMaxLengthMatchExpression* expr) final;
+
+    void visit(const InternalSchemaMaxPropertiesMatchExpression* expr) final;
+
+    void visit(const InternalSchemaMinItemsMatchExpression* expr) final;
+
+    void visit(const InternalSchemaMinLengthMatchExpression* expr) final;
+
+    void visit(const InternalSchemaMinPropertiesMatchExpression* expr) final;
+
+    void visit(const InternalSchemaObjectMatchExpression* expr) final;
+
+    void visit(const InternalSchemaRootDocEqMatchExpression* expr) final {
+        /**
+         * This expression should only be used to match full documents, not objects within an array
+         * in the case of $elemMatch.
+         */
+        MONGO_UNREACHABLE_TASSERT(9713602);
+    }
+
+    void visit(const InternalSchemaTypeExpression* expr) final;
+
+    void visit(const InternalSchemaUniqueItemsMatchExpression* expr) final;
+
+    void visit(const InternalSchemaXorMatchExpression* expr) final;
+
+    void visit(const LTEMatchExpression* expr) final;
+
+    void visit(const LTMatchExpression* expr) final;
+
+    void visit(const ModMatchExpression* expr) final;
+
+    void visit(const NorMatchExpression* expr) final {
+        for (auto&& child : expr->getChildren()) {
+            child->acceptVisitor(this);
+            if (_result) {
+                _result = false;
+                return;
+            }
+        }
+        _result = true;
+    }
+
+    void visit(const NotMatchExpression* expr) final;
+
+    void visit(const OrMatchExpression* expr) final {
+        MONGO_UNREACHABLE_TASSERT(5429901);
+    }
+
+    void visit(const RegexMatchExpression* expr) final;
+
+    void visit(const SizeMatchExpression* expr) final;
+
+    void visit(const TextMatchExpression* expr) final;
+
+    void visit(const TextNoOpMatchExpression* expr) final;
+
+    void visit(const TwoDPtInAnnulusExpression* expr) final;
+
+    void visit(const TypeMatchExpression* expr) final;
+
+    void visit(const WhereMatchExpression* expr) final;
+
+    void visit(const WhereNoOpMatchExpression* expr) final;
+
+private:
+    const BSONElement& _elem;
+    MatchDetails* _details;
+    bool _result;
+};
+
 //
 // Determine if a document satisfies the tree-predicate.
 //
@@ -284,9 +450,44 @@ inline bool matchesBSONElement(const MatchExpression* expr,
 }
 
 /**
+ * Determines if the element satisfies the expression tree-predicate.
+ * Not valid for all expressions (e.g. $where); in those cases, returns false.
+ */
+inline bool matchesSingleElement(const MatchExpression* expr,
+                                 const BSONElement& e,
+                                 MatchDetails* details = nullptr) {
+    MatchesSingleElementEvaluator visitor(e, details);
+    expr->acceptVisitor(&visitor);
+    return visitor.getResult();
+}
+
+/**
  * Evaluates the Expression stored in a ExprMatchExpression using the proper configuration.
  */
 Value evaluateExpression(const ExprMatchExpression* expr, const MatchableDocument* doc);
+
+
+/**
+ * Finds the first element in the sub-array of array 'array' that the
+ * InternalSchemaAllElemMatchFromIndexMatchExpression applies to that
+ * does not match the sub-expression. If such element does not exist, then returns empty (i.e.
+ * EOO) value.
+ */
+BSONElement findFirstMismatchInArray(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr,
+                                     const BSONObj& array,
+                                     MatchDetails* details);
+
+/**
+ * Finds the first duplicate element in the array 'array' that the
+ * InternalSchemaUniqueItemsMatchExpression applies to.
+ * If such element does not exist, then returns empty (i.e. EOO) value.
+ */
+BSONElement findFirstDuplicateValue(const InternalSchemaUniqueItemsMatchExpression* expr,
+                                    const BSONObj& array);
+
+
+/* Helper function to match InternalSchemaAllowedPropertiesMatchExpression */
+bool matchesBSONObj(const InternalSchemaAllowedPropertiesMatchExpression* expr, const BSONObj& obj);
 
 }  // namespace exec::matcher
 }  // namespace mongo

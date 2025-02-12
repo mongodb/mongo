@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,24 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
-#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/matcher/matcher.h"
 
 namespace mongo {
-constexpr StringData InternalSchemaXorMatchExpression::kName;
 
-void InternalSchemaXorMatchExpression::debugString(StringBuilder& debug,
-                                                   int indentationLevel) const {
-    _debugAddSpace(debug, indentationLevel);
-    debug << kName;
-    _debugStringAttachTagInfo(&debug);
-    _debugList(debug, indentationLevel);
+namespace exec::matcher {
+
+void MatchesSingleElementEvaluator::visit(const TextMatchExpression* expr) {
+    // Text match expressions force the selection of the text index and always generate EXACT
+    // index bounds (which causes the MatchExpression node to be trimmed), so we don't currently
+    // implement any explicit text matching logic here. SERVER-17648 tracks the work to
+    // implement a real text matcher.
+    //
+    // TODO: simply returning 'true' here isn't quite correct. First, we should be overriding
+    // matches() instead of matchesSingleElement(), because the latter is only ever called if
+    // the matched document has an element with path "_fts". Second, there are scenarios where
+    // we will use the untrimmed expression tree for matching (for example, when deciding
+    // whether or not to retry an operation that throws WriteConflictException); in those cases,
+    // we won't be able to correctly determine whether or not the object matches the expression.
+    _result = true;
 }
 
-void InternalSchemaXorMatchExpression::serialize(BSONObjBuilder* out,
-                                                 const SerializationOptions& opts,
-                                                 bool includePath) const {
-    BSONArrayBuilder arrBob(out->subarrayStart(kName));
-    _listToBSON(&arrBob, opts, includePath);
+void MatchesSingleElementEvaluator::visit(const TextNoOpMatchExpression* expr) {
+    MONGO_UNREACHABLE_TASSERT(9713601);
 }
-}  //  namespace mongo
+
+}  // namespace exec::matcher
+}  // namespace mongo

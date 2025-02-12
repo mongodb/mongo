@@ -48,11 +48,11 @@ TEST(InternalSchemaFmodMatchExpression, MatchesElement) {
     BSONObj notMatch = BSON("a" << 6);
     BSONObj negativeNotMatch = BSON("a" << -2);
     InternalSchemaFmodMatchExpression fmod(""_sd, Decimal128(3), Decimal128(1));
-    ASSERT_TRUE(fmod.matchesSingleElement(match.firstElement()));
-    ASSERT_TRUE(fmod.matchesSingleElement(largerMatch.firstElement()));
-    ASSERT_TRUE(fmod.matchesSingleElement(longLongMatch.firstElement()));
-    ASSERT_FALSE(fmod.matchesSingleElement(notMatch.firstElement()));
-    ASSERT_FALSE(fmod.matchesSingleElement(negativeNotMatch.firstElement()));
+    ASSERT_TRUE(exec::matcher::matchesSingleElement(&fmod, match.firstElement()));
+    ASSERT_TRUE(exec::matcher::matchesSingleElement(&fmod, largerMatch.firstElement()));
+    ASSERT_TRUE(exec::matcher::matchesSingleElement(&fmod, longLongMatch.firstElement()));
+    ASSERT_FALSE(exec::matcher::matchesSingleElement(&fmod, notMatch.firstElement()));
+    ASSERT_FALSE(exec::matcher::matchesSingleElement(&fmod, negativeNotMatch.firstElement()));
 }
 
 TEST(InternalSchemaFmodMatchExpression, ZeroDivisor) {

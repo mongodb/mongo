@@ -32,7 +32,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
@@ -42,16 +41,6 @@
 #include "mongo/db/query/util/make_data_structure.h"
 
 namespace mongo {
-
-bool ArrayMatchingMatchExpression::matchesSingleElement(const BSONElement& elt,
-                                                        MatchDetails* details) const {
-    if (elt.type() != BSONType::Array) {
-        return false;
-    }
-
-    return matchesArray(elt.embeddedObject(), details);
-}
-
 
 bool ArrayMatchingMatchExpression::equivalent(const MatchExpression* other) const {
     if (matchType() != other->matchType())
@@ -81,23 +70,6 @@ ElemMatchObjectMatchExpression::ElemMatchObjectMatchExpression(
     clonable_ptr<ErrorAnnotation> annotation)
     : ArrayMatchingMatchExpression(ELEM_MATCH_OBJECT, path, std::move(annotation)),
       _sub(std::move(sub)) {}
-
-bool ElemMatchObjectMatchExpression::matchesArray(const BSONObj& anArray,
-                                                  MatchDetails* details) const {
-    BSONObjIterator i(anArray);
-    while (i.more()) {
-        BSONElement inner = i.next();
-        if (!inner.isABSONObj())
-            continue;
-        if (exec::matcher::matchesBSON(_sub.get(), inner.Obj(), nullptr)) {
-            if (details && details->needRecord()) {
-                details->setElemMatchKey(inner.fieldName());
-            }
-            return true;
-        }
-    }
-    return false;
-}
 
 void ElemMatchObjectMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
@@ -142,30 +114,6 @@ ElemMatchValueMatchExpression::ElemMatchValueMatchExpression(
 
 void ElemMatchValueMatchExpression::add(std::unique_ptr<MatchExpression> sub) {
     _subs.push_back(std::move(sub));
-}
-
-bool ElemMatchValueMatchExpression::matchesArray(const BSONObj& anArray,
-                                                 MatchDetails* details) const {
-    BSONObjIterator i(anArray);
-    while (i.more()) {
-        BSONElement inner = i.next();
-
-        if (_arrayElementMatchesAll(inner)) {
-            if (details && details->needRecord()) {
-                details->setElemMatchKey(inner.fieldName());
-            }
-            return true;
-        }
-    }
-    return false;
-}
-
-bool ElemMatchValueMatchExpression::_arrayElementMatchesAll(const BSONElement& e) const {
-    for (unsigned i = 0; i < _subs.size(); i++) {
-        if (!_subs[i]->matchesSingleElement(e))
-            return false;
-    }
-    return true;
 }
 
 void ElemMatchValueMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
@@ -214,12 +162,6 @@ SizeMatchExpression::SizeMatchExpression(boost::optional<StringData> path,
                                          int size,
                                          clonable_ptr<ErrorAnnotation> annotation)
     : ArrayMatchingMatchExpression(SIZE, path, std::move(annotation)), _size(size) {}
-
-bool SizeMatchExpression::matchesArray(const BSONObj& anArray, MatchDetails* details) const {
-    if (_size < 0)
-        return false;
-    return anArray.nFields() == _size;
-}
 
 void SizeMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
