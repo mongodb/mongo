@@ -9,6 +9,30 @@ REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
 sys.path.append(str(REPO_ROOT))
 
 
+def create_build_files_in_new_js_dirs():
+    base_dirs = ["src/mongo/db/modules/enterprise/jstests", "jstests"]
+    for base_dir in base_dirs:
+        for root, dirs, _ in os.walk(base_dir):
+            for dir in dirs:
+                full_dir = os.path.join(root, dir)
+                build_file_path = os.path.join(full_dir, "BUILD.bazel")
+                if not os.path.isfile(build_file_path):
+                    js_files = [f for f in os.listdir(full_dir) if f.endswith(".js")]
+                    if js_files:
+                        with open(build_file_path, "w", encoding="utf-8") as build_file:
+                            build_file.write("""load("@aspect_rules_js//js:defs.bzl", "js_library")
+
+js_library(
+    name = "all_javascript_files",
+    srcs = glob([
+        "*.js",
+    ]),
+    visibility = ["//visibility:public"],
+)
+""")
+                        print(f"Created BUILD.bazel in {full_dir}")
+
+
 def list_files_without_targets(bazel_bin: str):
     # rules_lint only checks files that are in targets, verify that all files in the source tree
     # are contained within targets.
@@ -60,6 +84,8 @@ def list_files_without_targets(bazel_bin: str):
             print(f"\t{file}")
         print("")
         print("Please add these to a js_library target in a BUILD.bazel file in their directory")
+        print("Run the following to attempt to fix the issue automatically:")
+        print("\tbazel run lint --fix")
         return False
 
     print("All javascript files have BUILD.bazel targets!")
@@ -71,12 +97,15 @@ def run_rules_lint(bazel_bin, args):
         print("eslint not supported on windows")
         sys.exit(1)
 
+    if "--fix" in args:
+        create_build_files_in_new_js_dirs()
+
     if not list_files_without_targets(bazel_bin):
         sys.exit(1)
 
     # Default to linting everything if no path was passed in
-    if len(args) == 0:
-        args = ["//..."]
+    if len([arg for arg in args if not arg.startswith("--")]) == 0:
+        args = ["//..."] + args
 
     fix = ""
     with tempfile.NamedTemporaryFile(delete=False) as buildevents:
@@ -96,23 +125,23 @@ def run_rules_lint(bazel_bin, args):
     )
 
     # This is a rudimentary flag parser.
-    if args[1] == "--fail-on-violation":
+    if "--fail-on-violation" in args:
         args.extend(["--@aspect_rules_lint//lint:fail_on_violation", "--keep_going"])
-        args.pop(1)
+        args.remove("--fail-on-violation")
 
     # Allow a `--fix` option on the command-line.
     # This happens to make output of the linter such as ruff's
     # [*] 1 fixable with the `--fix` option.
     # so that the naive thing of pasting that flag to lint.sh will do what the user expects.
-    if args[1] == "--fix":
+    if "--fix" in args:
         fix = "patch"
         args.extend(["--@aspect_rules_lint//lint:fix", "--output_groups=rules_lint_patch"])
-        args.pop(1)
+        args.remove("--fix")
 
     # the --dry-run flag must immediately follow the --fix flag
-    if args[1] == "--dry-run":
+    if "--dry-run" in args:
         fix = "print"
-        args.pop(1)
+        args.remove("--dry-run")
 
     # Actually run the lint itself
     subprocess.run([bazel_bin, "build"] + args, check=True)

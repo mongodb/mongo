@@ -96,7 +96,9 @@ def test_runner_interface(args, autocomplete_query, get_buildozer_output=get_bui
         generate_compiledb(args[0], persistent_compdb)
 
     if lint_target:
-        run_rules_lint(args[0], args[3:])
+        command_start_index = args.index("lint") + 1
+        run_rules_lint(args[0], args[command_start_index:])
+        return args[1:command_start_index]
 
     if skip_plus_interface and not autocomplete_query:
         return args[1:]
