@@ -632,7 +632,9 @@ public:
                           "stats"_attr = redact(stats),
                           "cmd"_attr = redact(cmdObj));
 
-            exception.addContext("Executor error during distinct command");
+            exception.addContext(str::stream()
+                                 << "Executor error during distinct command on namespace: "
+                                 << nss.toStringForErrorMsg());
             throw;
         }
 

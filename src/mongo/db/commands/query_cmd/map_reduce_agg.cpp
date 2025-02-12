@@ -225,7 +225,8 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                 "mapReduce on a view is not supported",
                 e.code() != ErrorCodes::CommandOnShardedViewNotSupportedOnMongod);
 
-        e.addContext("MapReduce internal error");
+        e.addContext(str::stream() << "Executor error during MapReduce command on namespace: "
+                                   << parsedMr.getNamespace().toStringForErrorMsg());
         throw;
     }
 }

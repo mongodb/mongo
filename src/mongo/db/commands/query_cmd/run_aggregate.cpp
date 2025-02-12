@@ -399,7 +399,9 @@ bool getFirstBatch(const AggExState& aggExState,
                           "stats"_attr = redact(stats),
                           "cmd"_attr = redact(*aggExState.getDeferredCmd()));
 
-            exception.addContext("PlanExecutor error during aggregation");
+            exception.addContext(str::stream()
+                                 << "Executor error during aggregate command on namespace: "
+                                 << aggExState.getOriginalNss().toStringForErrorMsg());
             throw;
         }
 

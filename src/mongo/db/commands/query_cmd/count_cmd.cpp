@@ -90,6 +90,10 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
@@ -100,6 +104,8 @@
 #include "mongo/util/future.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/uuid.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 namespace {
@@ -333,9 +339,24 @@ public:
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
                 curOp->setPlanSummary(lk, exec->getPlanExplainer().getPlanSummary());
             }
+            long long countResult = 0;
+            try {
+                countResult = exec->executeCount();
+            } catch (DBException& exception) {
+                auto&& explainer = exec->getPlanExplainer();
+                auto&& [stats, _] =
+                    explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+                LOGV2_WARNING(8712900,
+                              "Plan executor error during count command",
+                              "error"_attr = exception.toStatus(),
+                              "stats"_attr = redact(stats),
+                              "cmd"_attr = redact(request().toBSON()));
 
-            auto countResult = exec->executeCount();
-
+                exception.addContext(str::stream()
+                                     << "Executor error during count command on namespace: "
+                                     << _ns.toStringForErrorMsg());
+                throw;
+            }
             // Store metrics for current operation.
             recordCurOpMetrics(opCtx, curOp, collection, *exec);
 
