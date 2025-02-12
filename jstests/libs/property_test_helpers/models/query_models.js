@@ -68,13 +68,16 @@ const inMatchPredicate =
         .map(function([field, inVals]) {
             return {[field]: {$in: inVals}};
         });
-const matchLeafPredicate = fc.oneof(simpleMatchLeafPredicate, inMatchPredicate);
 
 // Arbitrary $match expression that may contain nested logical operations, or just leaves.
 // {$match: {a: {$eq: 5}}}, {$match: {$and: [{a: {$eq: 5}}, {b: {$eq: 6}}]}}
-// $or and $nor are only allowed if `allowOrs` is true.
+// $or, $nor and $in are only allowed if `allowOrs` is true.
 function getMatchArb(allowOrs) {
     const logicalOpArb = allowOrs ? fc.constantFrom('$and', '$or', '$nor') : fc.constant('$and');
+
+    // $in is a form of OR, and shouldn't be generated when `allowOrs`=false.
+    const matchLeafPredicate =
+        allowOrs ? fc.oneof(simpleMatchLeafPredicate, inMatchPredicate) : simpleMatchLeafPredicate;
     const predicateArb =
         fc.letrec(
               tie => ({
