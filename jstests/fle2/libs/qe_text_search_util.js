@@ -1,0 +1,101 @@
+
+class TextFieldBase {
+    constructor(lb, ub, caseSensitive, diacriticSensitive, maxContention) {
+        this._lb = NumberInt(lb);
+        this._ub = NumberInt(ub);
+        this._caseSensitive = caseSensitive;
+        this._diacriticSensitive = diacriticSensitive;
+        this._cm = NumberLong(maxContention);
+    }
+    createQueryTypeDescriptor() {
+        return {
+            "contention": this._cm,
+            "strMinQueryLength": this._lb,
+            "strMaxQueryLength": this._ub,
+            "caseSensitive": this._caseSensitive,
+            "diacriticSensitive": this._diacriticSensitive,
+        };
+    }
+}
+
+export class SuffixField extends TextFieldBase {
+    createQueryTypeDescriptor() {
+        return Object.assign({"queryType": "suffixPreview"}, super.createQueryTypeDescriptor());
+    }
+
+    // TODO: SERVER-100592 update with latest msize calculations
+    calculateExpectedTagCount(cplen) {
+        assert.gt(this._lb, 0);
+        assert.gte(this._ub, this._lb);
+        assert.gte(cplen, 0);
+        const beta = cplen == 0 ? 1 : cplen;
+        const cbclen = Math.ceil(beta / 16) * 16;
+        if (this._lb > cbclen) {
+            return 1;  // 1 is for just the exact match string
+        }
+        return (Math.min(this._ub, cbclen) - this._lb + 1) +
+            1;  // +1 includes tag for exact match string
+    }
+}
+
+export class PrefixField extends SuffixField {
+    createQueryTypeDescriptor() {
+        let spec = super.createQueryTypeDescriptor();
+        spec.queryType = "prefixPreview";
+        return spec;
+    }
+}
+
+export class SubstringField extends TextFieldBase {
+    constructor(mlen, lb, ub, caseSensitive, diacriticSensitive, maxContention) {
+        super(lb, ub, caseSensitive, diacriticSensitive, maxContention);
+        this._mlen = NumberInt(mlen);
+    }
+
+    createQueryTypeDescriptor() {
+        return Object.assign({"queryType": "substringPreview", "strMaxLength": this._mlen},
+                             super.createQueryTypeDescriptor());
+    }
+
+    // TODO: SERVER-100592 update with latest msize calculations
+    calculateExpectedTagCount(cplen) {
+        assert.gte(cplen, 0);
+        assert.gt(this._lb, 0);
+        assert.gte(this._ub, this._lb);
+        assert.gte(this._mlen, this._ub);
+
+        const beta = cplen == 0 ? 1 : cplen;
+        const cbclen = Math.ceil(beta / 16) * 16;
+        if (beta > this._mlen || this._lb > cbclen) {
+            return 1;  // 1 is for just the exact match string
+        }
+        const hi = Math.min(this._ub, cbclen);
+        const range = hi - this._lb + 1;
+        const hisum = (hi * (hi + 1)) / 2;              // sum of [1..hi]
+        const losum = (this._lb * (this._lb - 1)) / 2;  // sum of [1..lb)
+        const maxkgram1 = (this._mlen * range) - (hisum - losum) + range;
+        const maxkgram2 = (cbclen * range) - (hisum - losum) + range;
+        return Math.min(maxkgram1, maxkgram2) + 1;  // +1 includes tag for exact match string
+    }
+}
+
+export class SuffixAndPrefixField {
+    constructor(sfxLb, sfxUb, pfxLb, pfxUb, caseSensitive, diacriticSensitive, maxContention) {
+        this._suffixField =
+            new SuffixField(sfxLb, sfxUb, caseSensitive, diacriticSensitive, maxContention);
+        this._prefixField =
+            new PrefixField(pfxLb, pfxUb, caseSensitive, diacriticSensitive, maxContention);
+    }
+    createQueryTypeDescriptor() {
+        return [
+            this._suffixField.createQueryTypeDescriptor(),
+            this._prefixField.createQueryTypeDescriptor()
+        ];
+    }
+    calculateExpectedTagCount(cplen) {
+        // subtract 1 since the exact match string is doubly counted in the other call
+        // to calculateExpectedTagCount.
+        return this._suffixField.calculateExpectedTagCount(cplen) +
+            this._prefixField.calculateExpectedTagCount(cplen) - 1;
+    }
+}
