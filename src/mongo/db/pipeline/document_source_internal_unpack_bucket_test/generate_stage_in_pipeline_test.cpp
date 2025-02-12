@@ -40,7 +40,7 @@ struct RewritePipelineHelperArgs {
     const StringData timeField = "time"_sd;
     const boost::optional<StringData> metaField = boost::none;
     const boost::optional<std::int32_t> bucketMaxSpanSeconds = boost::none;
-    const mongo::OptionalBool timeseriesBucketsMayHaveMixedSchemaData = {boost::none};
+    const boost::optional<bool> timeseriesBucketsMayHaveMixedSchemaData = boost::none;
     const bool timeseriesBucketsAreFixed = {false};
 };
 
@@ -79,29 +79,86 @@ TEST_F(InternalUnpackBucketGenerateInPipelineTest, EnsureStageIsGeneratedInRetur
     }
 }
 
-TEST_F(InternalUnpackBucketGenerateInPipelineTest, ValidateFields) {
+TEST_F(InternalUnpackBucketGenerateInPipelineTest, ValidateFieldCombinations) {
+    const auto [alteredPipeline, firstStage] = rewritePipelineHelper({
+        .metaField = "foo"_sd,
+        .bucketMaxSpanSeconds = 42,
+        .timeseriesBucketsMayHaveMixedSchemaData = false,
+        .timeseriesBucketsAreFixed = true,
+    });
+    ASSERT_BSONOBJ_EQ(BSON(timeseries::kTimeFieldName
+                           << "time"_sd << timeseries::kMetaFieldName << "foo"_sd
+                           << DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData << true
+                           << DocumentSourceInternalUnpackBucket::kFixedBuckets << true
+                           << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds << 42),
+                      firstStage);
+}
+
+TEST_F(InternalUnpackBucketGenerateInPipelineTest, ValidateIndividualFields) {
     {
-        const auto [alteredPipeline, _] = rewritePipelineHelper();
-        // The first stage should be the generated $_internalUnpackBucket stage.
-        const auto& firstStage = *alteredPipeline.begin();
+        const auto [alteredPipeline, firstStage] = rewritePipelineHelper();
         ASSERT_BSONOBJ_EQ(
-            BSON(DocumentSourceInternalUnpackBucket::kStageNameInternal
-                 << BSON(DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData
-                         << false << DocumentSourceInternalUnpackBucket::kFixedBuckets << false)),
+            BSON(timeseries::kTimeFieldName
+                 << "time"_sd << DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData
+                 << false << DocumentSourceInternalUnpackBucket::kFixedBuckets << false),
             firstStage);
     }
 
     {
-        const auto [alteredPipeline, _] = rewritePipelineHelper({
-            .timeseriesBucketsMayHaveMixedSchemaData = false,
+        const auto [alteredPipeline, firstStage] = rewritePipelineHelper({
+            .timeField = "readingTimestamp"_sd,
+        });
+        ASSERT_BSONOBJ_EQ(BSON(timeseries::kTimeFieldName
+                               << "readingTimestamp"_sd
+                               << DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData
+                               << false << DocumentSourceInternalUnpackBucket::kFixedBuckets
+                               << false),
+                          firstStage);
+    }
+
+    {
+        const auto [alteredPipeline, firstStage] = rewritePipelineHelper({
             .timeseriesBucketsAreFixed = true,
         });
-        // The first stage should be the generated $_internalUnpackBucket stage.
-        const auto& firstStage = *alteredPipeline.begin();
         ASSERT_BSONOBJ_EQ(
-            BSON(DocumentSourceInternalUnpackBucket::kStageNameInternal
-                 << BSON(DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData
-                         << true << DocumentSourceInternalUnpackBucket::kFixedBuckets << true)),
+            BSON(timeseries::kTimeFieldName
+                 << "time"_sd << DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData
+                 << false << DocumentSourceInternalUnpackBucket::kFixedBuckets << true),
+            firstStage);
+    }
+
+    {
+        const auto [alteredPipeline, firstStage] = rewritePipelineHelper({
+            .timeseriesBucketsMayHaveMixedSchemaData = false,
+        });
+        ASSERT_BSONOBJ_EQ(
+            BSON(timeseries::kTimeFieldName
+                 << "time"_sd << DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData
+                 << true << DocumentSourceInternalUnpackBucket::kFixedBuckets << false),
+            firstStage);
+    }
+
+    {
+        const auto [alteredPipeline, firstStage] = rewritePipelineHelper({
+            .metaField = "foo"_sd,
+        });
+        ASSERT_BSONOBJ_EQ(BSON(timeseries::kTimeFieldName
+                               << "time"_sd << timeseries::kMetaFieldName << "foo"_sd
+                               << DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData
+                               << false << DocumentSourceInternalUnpackBucket::kFixedBuckets
+                               << false),
+                          firstStage);
+    }
+
+    {
+        const auto [alteredPipeline, firstStage] = rewritePipelineHelper({
+            .bucketMaxSpanSeconds = 43,
+        });
+        ASSERT_BSONOBJ_EQ(
+            BSON(timeseries::kTimeFieldName
+                 << "time"_sd << DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData
+                 << false << DocumentSourceInternalUnpackBucket::kFixedBuckets << false
+                 << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds << 43),
             firstStage);
     }
 }

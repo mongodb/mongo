@@ -1021,26 +1021,26 @@ std::vector<BSONObj> DocumentSourceInternalUnpackBucket::generateStageInPipeline
     const StringData timeField,
     const boost::optional<StringData>& metaField,
     const boost::optional<std::int32_t>& bucketMaxSpanSeconds,
-    const mongo::OptionalBool& timeseriesBucketsMayHaveMixedSchemaData,
+    const boost::optional<bool>& timeseriesBucketsMayHaveMixedSchemaData,
     const bool timeseriesBucketsAreFixed) {
     auto bob = BSONObjBuilder{};
 
-    auto assumeNoMixedSchemaData = [&]() {
-        if (timeseriesBucketsMayHaveMixedSchemaData.has_value())
-            return !timeseriesBucketsMayHaveMixedSchemaData.value_or(false);
-        return false;
-    }();
+    bob.append(timeseries::kTimeFieldName, timeField);
+
+    if (metaField) {
+        bob.append(timeseries::kMetaFieldName, *metaField);
+    }
+
+    const auto assumeNoMixedSchemaData = !timeseriesBucketsMayHaveMixedSchemaData.value_or(true);
     bob.append(DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData,
                assumeNoMixedSchemaData);
 
     // Derived from timeseriesBucketingParametersHaveChanged.
     bob.append(kFixedBuckets, timeseriesBucketsAreFixed);
 
-    // TODO(SERVER-100423): Handle timeField.
-
-    // TODO(SERVER-100424): Handle metaField.
-
-    // TODO(SERVER-100425): Handle bucketMaxSpanSeconds.
+    if (bucketMaxSpanSeconds) {
+        bob.append(kBucketMaxSpanSeconds, *bucketMaxSpanSeconds);
+    }
 
     // Build the stage and make it the first stage in the pipeline.
     auto pipelineWithStage = std::vector{BSON(kStageNameInternal << bob.obj())};
