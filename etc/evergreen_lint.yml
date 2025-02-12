@@ -157,6 +157,7 @@ rules:
             # TODO: remove this exception when SERVER-94572 is resolved
             "streams_kafka",
             "streams_kafka_gwproxy",
+            "streams_lambda",
             # TODO: remove these exceptions when SERVER-94573 is resolved
             "selinux_rhel9_enterprise",
             "selinux_rhel8_org",

@@ -386,6 +386,7 @@ const skips = new Set([
     "$changeStreamSplitLargeEvent",
     "$collStats",
     "$currentOp",
+    "$externalFunction",
     "$hoppingWindow",
     "$https",
     "$indexStats",
