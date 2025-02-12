@@ -101,8 +101,8 @@ public:
     }
 
 protected:
-    RolesLocks _lockRoles(OperationContext* opCtx, const boost::optional<TenantId>&) override {
-        return RolesLocks();
+    RolesSnapshot _snapshotRoles(OperationContext* opCtx) override {
+        return RolesSnapshot();
     }
 
 private:

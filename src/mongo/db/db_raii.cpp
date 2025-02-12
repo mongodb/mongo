@@ -98,7 +98,7 @@ bool supportsLockFreeRead(OperationContext* opCtx) {
     // Lock-free reads are not supported when performing a write.
     // Lock-free reads are not supported if a storage txn is already open w/o the lock-free reads
     // operation flag set.
-    return !storageGlobalParams.disableLockFreeReads && !opCtx->inMultiDocumentTransaction() &&
+    return !opCtx->inMultiDocumentTransaction() &&
         !shard_role_details::getLocker(opCtx)->isWriteLocked() &&
         !(shard_role_details::getRecoveryUnit(opCtx)->isActive() && !opCtx->isLockFreeReadsOp());
 }

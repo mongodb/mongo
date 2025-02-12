@@ -212,26 +212,13 @@ bool AuthzManagerExternalStateLocal::hasAnyPrivilegeDocuments(OperationContext* 
     return AuthorizationManager::get(opCtx->getService())->hasAnyPrivilegeDocuments(opCtx);
 }
 
-AuthzManagerExternalStateLocal::RolesLocks::RolesLocks(OperationContext* opCtx,
-                                                       const boost::optional<TenantId>& tenant) {
-    if (!storageGlobalParams.disableLockFreeReads) {
-        _readLockFree = std::make_unique<AutoReadLockFree>(opCtx);
-    } else {
-        _adminLock = std::make_unique<Lock::DBLock>(opCtx, DatabaseName::kAdmin, LockMode::MODE_IS);
-        _rolesLock = std::make_unique<Lock::CollectionLock>(
-            opCtx, getRolesCollection(tenant), LockMode::MODE_S);
-    }
+AuthzManagerExternalStateLocal::RolesSnapshot::RolesSnapshot(OperationContext* opCtx) {
+    _readLockFree = std::make_unique<AutoReadLockFree>(opCtx);
 }
 
-AuthzManagerExternalStateLocal::RolesLocks::~RolesLocks() {
-    _readLockFree.reset(nullptr);
-    _rolesLock.reset(nullptr);
-    _adminLock.reset(nullptr);
-}
-
-AuthzManagerExternalStateLocal::RolesLocks AuthzManagerExternalStateLocal::_lockRoles(
-    OperationContext* opCtx, const boost::optional<TenantId>& tenant) {
-    return AuthzManagerExternalStateLocal::RolesLocks(opCtx, tenant);
+AuthzManagerExternalStateLocal::RolesSnapshot AuthzManagerExternalStateLocal::_snapshotRoles(
+    OperationContext* opCtx) {
+    return AuthzManagerExternalStateLocal::RolesSnapshot(opCtx);
 }
 
 StatusWith<User> AuthzManagerExternalStateLocal::getUserObject(

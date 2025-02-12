@@ -135,9 +135,6 @@ struct StorageGlobalParams {
     // Controls whether we allow the OplogTruncateMarkers mechanism to delete oplog history on WT.
     bool allowOplogTruncation;
 
-    // Disables lock-free reads.
-    bool disableLockFreeReads = false;
-
     // Test-only option. Disables table logging.
     bool forceDisableTableLogging = false;
 };

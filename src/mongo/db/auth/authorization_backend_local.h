@@ -53,27 +53,21 @@ protected:
     /**
      * Ensures a consistent logically valid view of the data across users and roles collections.
      *
-     * If running with lock-free enabled, a storage snapshot is opened that subsequent reads will
+     * A lock-free read operation opens storage snapshot that subsequent reads will
      * all use for a consistent point-in-time data view.
      *
-     * Otherwise, a MODE_S lock is taken on the roles collection to ensure no role changes are made
-     * across reading first the users collection and then the roles collection. This ensures an
-     * 'atomic' view of the roles and users collection data.
-     *
-     * The locks, or lock-free consistent data view, prevent the possibility of having permissions
+     * The lock-free consistent data view, prevent the possibility of having permissions
      * available which are logically invalid. This is how reads/writes across two collections are
      * made 'atomic'.
      */
-    class RolesLocks {
+    class RolesSnapshot {
     public:
-        RolesLocks() = default;
-        RolesLocks(OperationContext*, const boost::optional<TenantId>&);
-        ~RolesLocks();
+        RolesSnapshot() = default;
+        RolesSnapshot(OperationContext*);
+        ~RolesSnapshot();
 
     private:
         std::unique_ptr<AutoReadLockFree> _readLockFree;
-        std::unique_ptr<Lock::DBLock> _adminLock;
-        std::unique_ptr<Lock::CollectionLock> _rolesLock;
     };
 
     /**
@@ -133,7 +127,7 @@ protected:
      *
      * virtual to allow Mock to not lock anything.
      */
-    virtual RolesLocks _lockRoles(OperationContext* opCtx, const boost::optional<TenantId>&);
+    virtual RolesSnapshot _snapshotRoles(OperationContext* opCtx);
 
     AtomicWord<bool> _hasAnyPrivilegeDocuments{false};
 };

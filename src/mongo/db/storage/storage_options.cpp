@@ -62,7 +62,6 @@ void StorageGlobalParams::reset() {
     groupCollections = false;
     oplogMinRetentionHours.store(0.0);
     allowOplogTruncation = true;
-    disableLockFreeReads = false;
     forceDisableTableLogging = false;
 }
 
