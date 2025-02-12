@@ -123,7 +123,7 @@ runTest(
         {_id: "z", [subField]: "y"},
     ],
     [
-        {$match: {$expr: {[subField]: "y"}}},
+        {$match: {$expr: {$eq: ["$fullDocument." + subField, "y"]}}},
     ],
     [
         {
@@ -179,8 +179,8 @@ runTest(
                 $expr: {
                     $not: {
                         $eq: [
-                            "$documentKey." +
-                                "{".repeat(1024),
+                            "$documentKey.abc', 'test': " +
+                                "{a: ".repeat(2048),
                             "x"
                         ]
                     }
