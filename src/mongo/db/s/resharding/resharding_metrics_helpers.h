@@ -32,15 +32,10 @@
 #include <string>
 #include <type_traits>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
-#include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
-#include "mongo/db/service_context.h"
-#include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

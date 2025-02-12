@@ -31,36 +31,15 @@
 
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/oid.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/cancelable_operation_context.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
-#include "mongo/db/repl/primary_only_service.h"
-#include "mongo/db/s/resharding/resharding_coordinator_observer.h"
-#include "mongo/db/s/resharding/resharding_coordinator_service_external_state.h"
-#include "mongo/db/s/resharding/resharding_metrics.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/async_rpc.h"
-#include "mongo/executor/scoped_task_executor.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/s/index_version.h"
-#include "mongo/s/resharding/common_types_gen.h"
-#include "mongo/util/cancellation.h"
-#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+
+class ReshardingMetrics;
+class ReshardingCoordinatorDocument;
 
 namespace resharding {
 

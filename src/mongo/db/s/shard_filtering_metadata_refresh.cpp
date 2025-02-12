@@ -44,6 +44,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"

@@ -38,8 +38,6 @@
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
-#include "mongo/db/s/resharding/resharding_donor_service.h"
-#include "mongo/db/s/resharding/resharding_recipient_service.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/uuid.h"
