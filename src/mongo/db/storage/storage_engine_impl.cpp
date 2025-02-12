@@ -57,7 +57,6 @@
 #include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_data.h"
-#include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
@@ -109,18 +108,10 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
     // has been initialized. This is needed because at the time of startup, when the operation
     // context gets created, the storage engine initialization has not yet begun and so it gets
     // assigned a noop recovery unit. See the StorageClientObserver class.
-    auto prevRecoveryUnit = shard_role_details::releaseRecoveryUnit(opCtx);
-    invariant(prevRecoveryUnit->isNoop());
+    invariant(shard_role_details::getRecoveryUnit(opCtx)->isNoop());
     shard_role_details::setRecoveryUnit(opCtx,
                                         std::unique_ptr<RecoveryUnit>(_engine->newRecoveryUnit()),
                                         WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-    // If we throw in this constructor, make sure to destroy the RecoveryUnit instance created above
-    // before '_engine' is destroyed.
-    ScopeGuard recoveryUnitResetGuard([&] {
-        shard_role_details::setRecoveryUnit(opCtx,
-                                            std::move(prevRecoveryUnit),
-                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-    });
 
     // If we are loading the catalog after an unclean shutdown, it's possible that there are
     // collections in the catalog that are unknown to the storage engine. We should attempt to
@@ -133,9 +124,6 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
     loadDurableCatalog(opCtx,
                        _options.lockFileCreatedByUncleanShutdown ? LastShutdownState::kUnclean
                                                                  : LastShutdownState::kClean);
-
-    // We can dismiss recoveryUnitResetGuard now.
-    recoveryUnitResetGuard.dismiss();
 }
 
 void StorageEngineImpl::loadDurableCatalog(OperationContext* opCtx,

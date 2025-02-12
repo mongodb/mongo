@@ -89,11 +89,6 @@ std::unique_ptr<RecoveryUnit> releaseRecoveryUnit(OperationContext* opCtx, Clien
     return opCtx->releaseRecoveryUnit_DO_NOT_USE(clientLock);
 }
 
-std::unique_ptr<RecoveryUnit> releaseRecoveryUnit(OperationContext* opCtx) {
-    ClientLock lk(opCtx->getClient());
-    return releaseRecoveryUnit(opCtx, lk);
-}
-
 std::unique_ptr<RecoveryUnit> releaseAndReplaceRecoveryUnit(OperationContext* opCtx,
                                                             ClientLock& clientLock) {
     return opCtx->releaseAndReplaceRecoveryUnit_DO_NOT_USE(clientLock);
