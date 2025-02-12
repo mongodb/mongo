@@ -307,25 +307,21 @@ BSONObj groupEachScore(
 /**
  * Calculate the final score by summing the score fields on each input document and adding it as a
  * new field to the document.
- * { "$addFields": { "score": { "$add": ["$name1_score", "$name2_score"] } } },
+ * { "$setMetadata": { "score": { "$add": ["$name1_score", "$name2_score"] } } },
  */
-BSONObj calculateFinalScore(
+boost::intrusive_ptr<DocumentSource> buildSetScoreStage(
+    const auto& expCtx,
     const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputs) {
-    // Generate a $add object with an array of all the fields containing a score for a given
-    // pipeline.
-    const auto& allInputs = [&] {
-        BSONObjBuilder addBob;
+    Expression::ExpressionVector allInputScores;
+    for (auto it = inputs.begin(); it != inputs.end(); it++) {
+        allInputScores.push_back(ExpressionFieldPath::createPathFromString(
+            expCtx.get(), it->first + "_score", expCtx->variablesParseState));
+    }
 
-        BSONArrayBuilder addArrBuilder(addBob.subarrayStart("$add"_sd));
-        for (auto it = inputs.begin(); it != inputs.end(); it++) {
-            StringBuilder sb;
-            sb << "$" << it->first << "_score";
-            addArrBuilder.append(sb.str());
-        }
-        addArrBuilder.done();
-        return addBob.obj();
-    };
-    return BSON("$addFields" << BSON("score" << allInputs()));
+    return DocumentSourceSetMetadata::create(
+        expCtx,
+        make_intrusive<ExpressionAdd>(expCtx.get(), std::move(allInputScores)),
+        DocumentMetadataFields::MetaType::kScore);
 }
 
 /**
@@ -362,7 +358,7 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipelineStage(
  * scoreFields/apply score nulls behavior, calculate the final score field to add to each document,
  * sorts the documents by score and id, and replaces the root with the final set of outputted
  * documents.
- * The $sort stage looks like this: { "$sort": { "score": -1, "_id": 1 } }
+ * The $sort stage looks like this: { "$sort": { "score": {$meta: "score"}, "_id": 1 } }
  * The $replaceRoot stage looks like this: { "$replaceRoot": { "newRoot": "$docs" } }
  */
 std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
@@ -370,10 +366,12 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto group =
         DocumentSourceGroup::createFromBson(groupEachScore(inputPipelines).firstElement(), expCtx);
-    auto addFields = DocumentSourceAddFields::createFromBson(
-        calculateFinalScore(inputPipelines).firstElement(), expCtx);
+    auto setScoreMeta = buildSetScoreStage(expCtx, inputPipelines);
 
-    const SortPattern sortingPattern{BSON("score" << -1 << "_id" << 1), expCtx};
+    const SortPattern sortingPattern{BSON("score" << BSON("$meta"
+                                                          << "score")
+                                                  << "_id" << 1),
+                                     expCtx};
     auto sort = DocumentSourceSort::create(expCtx, sortingPattern);
 
     auto restoreUserDocs =
@@ -382,7 +380,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
                                               expCtx.get(), "docs", expCtx->variablesParseState),
                                           "documents",
                                           SbeCompatibility::noRequirements);
-    return {group, addFields, sort, restoreUserDocs};
+    return {std::move(group), std::move(setScoreMeta), std::move(sort), std::move(restoreUserDocs)};
 }
 }  // namespace
 

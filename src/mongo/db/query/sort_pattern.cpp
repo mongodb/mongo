@@ -102,8 +102,10 @@ SortPattern::SortPattern(const BSONObj& obj,
         if (keyField.type() == BSONType::Object) {
             patternPart.expression = parseMetaExpression(keyField.Obj(), expCtx);
 
-            // If sorting by textScore, sort highest scores first. If sorting by randVal, order
-            // doesn't matter, so just always use descending.
+            // If sorting by any metadata, sort highest scores first. Note this is weird for
+            // geoNearDistance, but it makes sense for every other meta field. If sorting by
+            // randVal, order doesn't matter, so just always use descending.
+            // One day we can support a syntax to customize this order if we find the motivation.
             patternPart.isAscending = false;
 
             _sortPattern.push_back(std::move(patternPart));

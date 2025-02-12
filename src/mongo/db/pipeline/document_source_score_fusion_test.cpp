@@ -152,12 +152,16 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowed) {
         R"({
             "expectedStages": [
                 {
-                    $vectorSearch: {
-                        queryVector: [1.0, 2.0, 3.0],
-                        path: "plot_embedding",
-                        numCandidates: 300,
-                        index: "vector_index",
-                        limit: 10
+                    "$vectorSearch": {
+                        "queryVector": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "path": "plot_embedding",
+                        "numCandidates": 300,
+                        "index": "vector_index",
+                        "limit": 10
                     }
                 },
                 {
@@ -172,10 +176,10 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowed) {
                         "name1_score": {
                             "$multiply": [
                                 {
-                                    $meta: "score"
+                                    "$meta": "score"
                                 },
                                 {
-                                    "$const": 1.0
+                                    "$const": 1
                                 }
                             ]
                         }
@@ -200,7 +204,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowed) {
                     }
                 },
                 {
-                    "$addFields": {
+                    "$setMetadata": {
                         "score": {
                             "$add": [
                                 "$name1_score"
@@ -210,7 +214,9 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowed) {
                 },
                 {
                     "$sort": {
-                        "score": -1,
+                        "$computed0": {
+                            "$meta": "score"
+                        },
                         "_id": 1
                     }
                 },
@@ -498,7 +504,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowed) {
                     }
                 },
                 {
-                    "$addFields": {
+                    "$setMetadata": {
                         "score": {
                             "$add": [
                                 "$name1_score",
@@ -509,7 +515,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowed) {
                 },
                 {
                     "$sort": {
-                        "score": -1,
+                        "$computed0": {$meta: "score"},
                         "_id": 1
                     }
                 },
@@ -610,7 +616,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultipleStagesInPipelineAllowed) {
                     }
                 },
                 {
-                    "$addFields": {
+                    "$setMetadata": {
                         "score": {
                             "$add": [
                                 "$name1_score"
@@ -620,7 +626,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultipleStagesInPipelineAllowed) {
                 },
                 {
                     "$sort": {
-                        "score": -1,
+                        "$computed0": {$meta: "score"},
                         "_id": 1
                     }
                 },
@@ -853,7 +859,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArguments
                     }
                 },
                 {
-                    "$addFields": {
+                    "$setMetadata": {
                         "score": {
                             "$add": [
                                 "$name1_score",
@@ -865,7 +871,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArguments
                 },
                 {
                     "$sort": {
-                        "score": -1,
+                        "$computed0": {$meta: "score"},
                         "_id": 1
                     }
                 },
@@ -995,7 +1001,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckAnyTypeAllowedForScore) {
                     }
                 },
                 {
-                    "$addFields": {
+                    "$setMetadata": {
                         "score": {
                             "$add": [
                                 "$name1_score"
@@ -1005,7 +1011,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckAnyTypeAllowedForScore) {
                 },
                 {
                     "$sort": {
-                        "score": -1,
+                        "$computed0": {$meta: "score"},
                         "_id": 1
                     }
                 },
@@ -1238,7 +1244,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfWeightsArrayMixedIntsDecimals) {
                     }
                 },
                 {
-                    "$addFields": {
+                    "$setMetadata": {
                         "score": {
                             "$add": [
                                 "$name1_score",
@@ -1249,7 +1255,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfWeightsArrayMixedIntsDecimals) {
                 },
                 {
                     "$sort": {
-                        "score": -1,
+                        "$computed0": {$meta: "score"},
                         "_id": 1
                     }
                 },
@@ -1357,7 +1363,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckAnyTypeAllowedForScoreNulls) {
                     }
                 },
                 {
-                    "$addFields": {
+                    "$setMetadata": {
                         "score": {
                             "$add": [
                                 "$name1_score"
@@ -1367,7 +1373,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckAnyTypeAllowedForScoreNulls) {
                 },
                 {
                     "$sort": {
-                        "score": -1,
+                        "$computed0": {$meta: "score"},
                         "_id": 1
                     }
                 },
@@ -1738,7 +1744,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionwithAllowed) {
                     }
                 },
                 {
-                    "$addFields": {
+                    "$setMetadata": {
                         "score": {
                             "$add": [
                                 "$name1_score",
@@ -1749,7 +1755,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionwithAllowed) {
                 },
                 {
                     "$sort": {
-                        "score": -1,
+                        "$computed0": {$meta: "score"},
                         "_id": 1
                     }
                 },
@@ -2081,7 +2087,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfScoreWithGeoNearDistanceMetadataPip
                     }
                 },
                 {
-                    "$addFields": {
+                    "$setMetadata": {
                         "score": {
                             "$add": [
                                 "$name1_score"
@@ -2091,7 +2097,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfScoreWithGeoNearDistanceMetadataPip
                 },
                 {
                     "$sort": {
-                        "score": -1,
+                        "$computed0": {$meta: "score"},
                         "_id": 1
                     }
                 },
