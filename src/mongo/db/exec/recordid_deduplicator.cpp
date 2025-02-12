@@ -44,7 +44,9 @@ RecordIdDeduplicator::RecordIdDeduplicator(ExpressionContext* expCtx,
                                            size_t chunkSize,
                                            uint64_t universeSize)
     : _expCtx(expCtx),
-      _roaring(threshold, chunkSize, universeSize, [&]() { roaringMetric.increment(); }) {}
+      _roaring(threshold, chunkSize, universeSize, [&]() { roaringMetric.increment(); }),
+      _memoryTracker{expCtx->getAllowDiskUse() && !expCtx->getInRouter(),
+                     std::numeric_limits<long long>::max()} {}
 
 bool RecordIdDeduplicator::contains(const RecordId& recordId) const {
     return recordId.withFormat(
@@ -85,8 +87,13 @@ bool RecordIdDeduplicator::insert(const RecordId& recordId) {
     // The record was found neither in memory nor in disk. Insert it.
     recordId.withFormat([&](RecordId::Null _) { hasNullRecordId = true; },
                         [&](int64_t rid) { _roaring.addChecked(rid); },
-                        [&](const char* str, int size) { _hashset.insert(recordId); });
+                        [&](const char* str, int size) {
+                            _hashset.insert(recordId);
+                            _memoryTracker.add(recordId.memUsage() + 2 * sizeof(void*));
+                        });
 
+
+    // ToDo: SERVER-99279 Check memory and spill.
     return true;
 }
 
@@ -144,6 +151,8 @@ void RecordIdDeduplicator::spill(uint64_t maximumMemoryUsageBytes) {
 
         _roaring.clear();
     }
+
+    _memoryTracker.resetCurrent();
 
     if (_diskStorageLong) {
         currentSpilledDataStorageSize += _diskStorageLong->rs()->storageSize(

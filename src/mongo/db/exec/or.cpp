@@ -38,7 +38,6 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/filter.h"
-#include "mongo/db/stats/counters.h"
 
 namespace mongo {
 
@@ -56,9 +55,7 @@ OrStage::OrStage(ExpressionContext* expCtx,
       _filter(filter),
       _currentChild(0),
       _dedup(dedup),
-      _recordIdDeduplicator(expCtx),
-      _memoryTracker{expCtx->getAllowDiskUse() && !expCtx->getInRouter(),
-                     static_cast<int64_t>(internalOrStageMaxMemoryBytes.load())} {}
+      _recordIdDeduplicator(expCtx) {}
 
 void OrStage::addChild(std::unique_ptr<PlanStage> child) {
     _children.emplace_back(std::move(child));
@@ -89,19 +86,12 @@ PlanStage::StageState OrStage::doWork(WorkingSetID* out) {
         if (_dedup && member->hasRecordId()) {
             ++_specificStats.dupsTested;
 
-            auto sizeBefore = _recordIdDeduplicator.getApproximateSize();
-
             // ...and we've seen the RecordId before
             if (!_recordIdDeduplicator.insert(member->recordId)) {
                 // ...drop it.
                 ++_specificStats.dupsDropped;
                 _ws->free(id);
                 return PlanStage::NEED_TIME;
-            }
-
-            _memoryTracker.add(_recordIdDeduplicator.getApproximateSize() - sizeBefore);
-            if (!_memoryTracker.withinMemoryLimit()) {
-                spill(_memoryTracker.maxAllowedMemoryUsageBytes());
             }
         }
 
@@ -131,26 +121,6 @@ PlanStage::StageState OrStage::doWork(WorkingSetID* out) {
     // NEED_TIME, ERROR, NEED_YIELD, pass them up.
     return childStatus;
 }
-
-void OrStage::spill(uint64_t maximumMemoryUsageBytes) {
-    _recordIdDeduplicator.spill(maximumMemoryUsageBytes);
-
-    SpillingStats stats = _recordIdDeduplicator.getSpillingStats();
-    SpillingStats specificStats = _specificStats.spillingStats;
-
-    auto additionalSpilledBytes = stats.getSpilledBytes() - specificStats.getSpilledBytes();
-    int64_t additionalSpilledRecords =
-        stats.getSpilledRecords() - specificStats.getSpilledRecords();
-    int64_t additionalSpilledDataStorageSize =
-        stats.getSpilledDataStorageSize() - specificStats.getSpilledDataStorageSize();
-
-    orStageCounters.incrementPerSpilling(1 /*spills*/,
-                                         additionalSpilledBytes,
-                                         additionalSpilledRecords,
-                                         additionalSpilledDataStorageSize);
-    _specificStats.spillingStats = stats;
-}
-
 
 unique_ptr<PlanStageStats> OrStage::getStats() {
     _commonStats.isEOF = isEOF();

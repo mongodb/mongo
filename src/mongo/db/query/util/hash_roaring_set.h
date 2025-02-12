@@ -244,18 +244,7 @@ public:
         return Iterator{this, Iterator::EndTag{}};
     }
 
-    uint64_t getApproximateSize() const {
-        return sizeof(HashRoaringSet) + _bitmap.getApproximateSize() +
-            computeHashSetApproximateSize();
-    }
-
 private:
-    uint64_t computeHashSetApproximateSize() const {
-        // For every slot there is 1 byte no matter if it is occupied or not.
-        size_t slots = _hashTable.capacity();
-        return _hashTable.size() * sizeof(uint64_t) + slots;
-    }
-
     /**
      * Move 'chunkSize' elements from hash table to Roaring Bitmaps.
      */

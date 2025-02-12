@@ -137,13 +137,6 @@ void addSingleSpillingStats(PlanSummaryStats::SpillingStage stage,
             appendCallback("groupSpilledDataStorageSize",
                            static_cast<long long>(stats.getSpilledDataStorageSize()));
             return;
-        case PlanSummaryStats::SpillingStage::OR:
-            appendCallback("orSpills", static_cast<long long>(stats.getSpills()));
-            appendCallback("orSpilledBytes", static_cast<long long>(stats.getSpilledBytes()));
-            appendCallback("orSpilledRecords", static_cast<long long>(stats.getSpilledRecords()));
-            appendCallback("orSpilledDataStorageSize",
-                           static_cast<long long>(stats.getSpilledDataStorageSize()));
-            return;
         case PlanSummaryStats::SpillingStage::SET_WINDOW_FIELDS:
             appendCallback("setWindowFieldsSpills", static_cast<long long>(stats.getSpills()));
             appendCallback("setWindowFieldsSpilledBytes",

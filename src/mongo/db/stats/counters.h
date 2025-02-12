@@ -519,7 +519,7 @@ public:
 
     // The total number of spills from group stages.
     Counter64& groupSpills = *MetricBuilder<Counter64>{"query.group.spills"};
-    // The total number of bytes spilled from group stages. The spilled storage size after
+    // The total number of bytes spilled from group stages. The spilled stroage size after
     // compression might be different from the bytes spilled.
     Counter64& groupSpilledBytes = *MetricBuilder<Counter64>{"query.group.spilledBytes"};
     // The number of records spilled.
@@ -609,32 +609,6 @@ public:
         *MetricBuilder<Counter64>{"query.textOr.spilledDataStorageSize"};
 };
 extern TextOrCounters textOrCounters;
-
-/** Counters tracking orStage stats across all execution engines. */
-class OrStageCounters {
-public:
-    OrStageCounters() = default;
-    OrStageCounters(OrStageCounters&) = delete;
-    OrStageCounters& operator=(const OrStageCounters&) = delete;
-
-    void incrementPerSpilling(int64_t spills,
-                              int64_t spilledBytes,
-                              int64_t spilledRecords,
-                              int64_t spilledDataStorageSize) {
-        orStageSpills.incrementRelaxed(spills);
-        orStageSpilledBytes.incrementRelaxed(spilledBytes);
-        orStageSpilledRecords.incrementRelaxed(spilledRecords);
-        orStageSpilledDataStorageSize.incrementRelaxed(spilledDataStorageSize);
-    }
-
-    Counter64& orStageSpills = *MetricBuilder<Counter64>{"query.or.spills"};
-    // The spilled storage size after compression might be different from the bytes spilled.
-    Counter64& orStageSpilledBytes = *MetricBuilder<Counter64>{"query.or.spilledBytes"};
-    Counter64& orStageSpilledRecords = *MetricBuilder<Counter64>{"query.or.spilledRecords"};
-    Counter64& orStageSpilledDataStorageSize =
-        *MetricBuilder<Counter64>{"query.or.spilledDataStorageSize"};
-};
-extern OrStageCounters orStageCounters;
 
 /**
  * A common class which holds various counters related to Classic and SBE plan caches.

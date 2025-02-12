@@ -495,14 +495,6 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("dupsTested", static_cast<long long>(spec->dupsTested));
             bob->appendNumber("dupsDropped", static_cast<long long>(spec->dupsDropped));
-            bob->appendNumber("spills", static_cast<long long>(spec->spillingStats.getSpills()));
-            bob->appendNumber("spilledBytes",
-                              static_cast<long long>(spec->spillingStats.getSpilledBytes()));
-            bob->appendNumber("spilledRecords",
-                              static_cast<long long>(spec->spillingStats.getSpilledRecords()));
-            bob->appendNumber(
-                "spilledDataStorageSize",
-                static_cast<long long>(spec->spillingStats.getSpilledDataStorageSize()));
         }
     } else if (STAGE_LIMIT == stats.stageType) {
         LimitStats* spec = static_cast<LimitStats*>(stats.specific.get());
@@ -899,7 +891,7 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
                 const CachedPlanStats* cachedStats =
                     static_cast<const CachedPlanStats*>(cachedPlan->getSpecificStats());
                 statsOut->replanReason = cachedStats->replanReason;
-                // Nonnull replanReason indicates cached plan was less efficient than expected and
+                // Nonnull replanReason indicates cached plan was less effecient than expected and
                 // an alternative plan was chosen.
                 statsOut->replanReason ? statsOut->fromPlanCache = false
                                        : statsOut->fromPlanCache = true;
@@ -929,11 +921,6 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
             case STAGE_TEXT_OR: {
                 auto textOrStats = static_cast<const TextOrStats*>(stages[i]->getSpecificStats());
                 PlanSummaryStatsVisitor(*statsOut).visit(textOrStats);
-                break;
-            }
-            case STAGE_OR: {
-                auto stageStats = static_cast<const OrStats*>(stages[i]->getSpecificStats());
-                PlanSummaryStatsVisitor(*statsOut).visit(stageStats);
                 break;
             }
             default:

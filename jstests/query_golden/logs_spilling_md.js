@@ -9,7 +9,6 @@
 
 import {findMatchingLogLine} from "jstests/libs/log.js";
 import {code, linebreak, section, subSection} from "jstests/libs/pretty_md.js";
-import {checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
 
 function getServerParameter(knob) {
     return assert.commandWorked(db.adminCommand({getParameter: 1, [knob]: 1}))[knob];
@@ -145,29 +144,6 @@ outputPipelineAndSlowQueryLog(
     "graph lookup unwind sort");
 
 coll.drop();
-
-if (checkSbeCompletelyDisabled(db)) {
-    saveParameterToRestore("internalOrStageMaxMemoryBytes");
-    setServerParameter("internalOrStageMaxMemoryBytes", 1);
-
-    let docs = [];
-    for (var i = 0; i < 100; ++i) {
-        docs.push({_id: i, a: 1, b: 1});
-    }
-    assert.commandWorked(coll.insertMany(docs));
-    assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}, {c: 1}]));
-
-    const orStage = {$or: [{a: 1}, {b: 1}]};
-    const orPipeline = [{"$match": orStage}];
-    const orGroupPipeline = [{"$match": orStage}, {"$group": {"_id": null, "n": {"$sum": 1}}}];
-
-    section("Or stage");
-    outputPipelineAndSlowQueryLog(coll, orPipeline, "Or stage");
-    section("Or and Group");
-    outputPipelineAndSlowQueryLog(coll, orGroupPipeline, "Or and Group");
-
-    coll.drop();
-}
 
 // TODO SERVER-99887 - add $setWindowFields test
 

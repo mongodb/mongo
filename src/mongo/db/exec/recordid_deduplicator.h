@@ -47,8 +47,7 @@ class RecordIdDeduplicator {
 public:
     /**
      * See HashRoaringSet constructor for definitions of the 'threshold', 'chunkSize', and
-     * 'universeSize' parameters needed in the definition of HashRoaringSet and
-     * 'maximumMemoryUsageBytes' that defines the maximum memory the RecordIdDeduplicator can use.
+     * 'universeSize' parameters needed in the definition of HashRoaringSet.
      */
     RecordIdDeduplicator(ExpressionContext* expCtx,
                          size_t threshold,
@@ -81,14 +80,8 @@ public:
         return _stats;
     }
 
-    /**
-     * Spills to disk until the memory usage does not exceed maximumMemoryUsageBytes. If not value
-     * is provided for maximumMemoryUsageBytes then it spills everything.
-     */
-    void spill(uint64_t maximumMemoryUsageBytes = 0);
-
-    uint64_t getApproximateSize() {
-        return _hashset.size() + _roaring.getApproximateSize();
+    void forceSpill() {
+        spill(0);
     }
 
 private:
@@ -102,7 +95,9 @@ private:
 
     std::unique_ptr<TemporaryRecordStore> _diskStorageString;
     std::unique_ptr<TemporaryRecordStore> _diskStorageLong;
+    MemoryUsageTracker _memoryTracker;
 
+    void spill(uint64_t maximumMemoryUsageBytes);
     SpillingStats _stats;
 };
 }  // namespace mongo

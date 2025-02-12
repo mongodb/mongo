@@ -88,10 +88,6 @@ private:
 
     // Stats
     OrStats _specificStats;
-
-    MemoryUsageTracker _memoryTracker;
-
-    void spill(uint64_t maximumMemoryUsageBytes);
 };
 
 }  // namespace mongo

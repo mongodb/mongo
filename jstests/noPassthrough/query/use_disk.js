@@ -12,7 +12,6 @@ import {
     profilerHasSingleMatchingEntryOrThrow,
     profilerHasZeroMatchingEntriesOrThrow,
 } from "jstests/libs/profiler.js";
-import {checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const conn = MongoRunner.runMongod();
@@ -174,31 +173,6 @@ assert.gt(profileObj.graphLookupSpills, 0, tojson(profileObj));
 assert.gt(profileObj.graphLookupSpilledBytes, 0, tojson(profileObj));
 assert.gt(profileObj.graphLookupSpilledRecords, 0, tojson(profileObj));
 assert.gt(profileObj.graphLookupSpilledDataStorageSize, 0, tojson(profileObj));
-
-if (checkSbeCompletelyDisabled(testDB)) {
-    //
-    // Confirm that usedDisk is correctly detected for the $or stage.
-    //
-    coll.drop();
-    let docs = [];
-    for (var i = 0; i < 100; ++i) {
-        docs.push({a: i});
-    }
-    assert.commandWorked(coll.insertMany(docs));
-    assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}]));
-    assert.commandWorked(testDB.adminCommand({setParameter: 1, internalOrStageMaxMemoryBytes: 1}));
-
-    const orStage = {$or: [{a: 1}, {b: 1}]};
-    const pipeline = [{"$match": orStage}];
-
-    coll.aggregate(pipeline, {allowDiskUse: true});
-    profileObj = getLatestProfilerEntry(testDB);
-    assert.eq(profileObj.usedDisk, true, tojson(profileObj));
-    assert.gt(profileObj.orSpills, 0, tojson(profileObj));
-    assert.gt(profileObj.orSpilledBytes, 0, tojson(profileObj));
-    assert.gt(profileObj.orSpilledRecords, 0, tojson(profileObj));
-    assert.gt(profileObj.orSpilledDataStorageSize, 0, tojson(profileObj));
-}
 
 // TODO SERVER-99887 - add $setWindowFields test
 
