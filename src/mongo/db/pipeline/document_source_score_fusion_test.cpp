@@ -41,8 +41,18 @@
 namespace mongo {
 namespace {
 
+/**
+ * This test fixture will provide tests with an ExpressionContext (among other things like
+ * OperationContext, etc.) and configure the common feature flags that we need.
+ */
 class DocumentSourceScoreFusionTest : service_context_test::WithSetupTransportLayer,
-                                      public AggregationContextFixture {};
+                                      public AggregationContextFixture {
+private:
+    RAIIServerParameterControllerForTest scoreFusionFlag{"featureFlagSearchHybridScoringFull",
+                                                         true};
+    // Feature flag needed to use 'score' meta field
+    RAIIServerParameterControllerForTest rankFusionFlag{"featureFlagRankFusionFull", true};
+};
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNoInputsField) {
     auto spec = fromjson(R"({
@@ -120,8 +130,6 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfMissingPipeline) {
 }
 
 TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowed) {
-    // Feature flag needed to use 'score' meta field
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
     auto spec = fromjson(R"({
         $scoreFusion: {
             inputs: {
@@ -298,7 +306,6 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipeline) {
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipelineWithFirstPipelineValid) {
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $scoreFusion: {
             inputs: {
@@ -322,7 +329,6 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipelineWithFirstPipeline
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipelineWithSecondPipelineValid) {
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $scoreFusion: {
             inputs: {
@@ -363,8 +369,6 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfEmptyPipeline) {
 }
 
 TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowed) {
-    // Feature flag needed to use 'score' meta field
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
     auto expCtx = getExpCtx();
     expCtx->setResolvedNamespaces(
         StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
@@ -530,8 +534,6 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowed) {
 }
 
 TEST_F(DocumentSourceScoreFusionTest, CheckMultipleStagesInPipelineAllowed) {
-    // Feature flag needed to use 'score' meta field
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
     auto spec = fromjson(R"({
         $scoreFusion: {
             inputs: {
@@ -641,9 +643,6 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultipleStagesInPipelineAllowed) {
 }
 
 TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArgumentsAllowed) {
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
-    // Feature flag needed to use 'score' meta field
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
     auto expCtx = getExpCtx();
     expCtx->setResolvedNamespaces(
         StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
@@ -914,8 +913,6 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInputNormalizationNotString) {
 }
 
 TEST_F(DocumentSourceScoreFusionTest, CheckAnyTypeAllowedForScore) {
-    // Feature flag needed to use 'score' meta field
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
     auto spec = fromjson(R"({
         $scoreFusion: {
             inputs: {
@@ -1090,8 +1087,6 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfEmptyWeights) {
 }
 
 TEST_F(DocumentSourceScoreFusionTest, CheckIfWeightsArrayMixedIntsDecimals) {
-    // Feature flag needed to use 'score' meta field
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
     auto expCtx = getExpCtx();
     expCtx->setResolvedNamespaces(
         StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
@@ -1269,9 +1264,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfWeightsArrayMixedIntsDecimals) {
         asOneObj);
 }
 
-TEST_F(DocumentSourceScoreFusionTest, CheckAnyTypeAllowedForScoreNulls) {
-    // Feature flag needed to use 'score' meta field
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+TEST_F(DocumentSourceScoreFusionTest, ScoreNullsMustBeNumericOrNull) {
+
     auto spec = fromjson(R"({
         $scoreFusion: {
             inputs: {
@@ -1425,7 +1419,6 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorIfOptionalFieldsIncludedMoreThanOnce)
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfSearchMetaUsed) {
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $scoreFusion: {
             inputs: {
@@ -1458,7 +1451,6 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfSearchMetaUsed) {
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfSearchStoredSourceUsed) {
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $scoreFusion: {
             inputs: {
@@ -1492,7 +1484,6 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfSearchStoredSourceUsed) {
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $scoreFusion: {
             inputs: {
@@ -1525,9 +1516,6 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
 }
 
 TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionwithAllowed) {
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
-    // Feature flag needed to use 'score' meta field
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
     auto expCtx = getExpCtx();
     expCtx->setResolvedNamespaces(
         StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
@@ -1770,7 +1758,6 @@ TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionwithAllowed) {
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNestedUnionWithModifiesFields) {
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto expCtx = getExpCtx();
     expCtx->setResolvedNamespaces(
         StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
@@ -1823,7 +1810,6 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNestedUnionWithModifiesFields) {
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfIncludeProject) {
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $scoreFusion: {
             inputs: {
@@ -1849,7 +1835,6 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfIncludeProject) {
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameDuplicated) {
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $scoreFusion: {
             inputs: {
@@ -1884,7 +1869,6 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameDuplicated) {
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameStartsWithDollar) {
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $scoreFusion: {
             inputs: {
@@ -1916,7 +1900,6 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameStartsWithDollar) {
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameContainsDot) {
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto spec = fromjson(R"({
         $scoreFusion: {
             inputs: {
@@ -1985,9 +1968,6 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfGeoNearPipeline) {
 }
 
 TEST_F(DocumentSourceScoreFusionTest, CheckIfScoreWithGeoNearDistanceMetadataPipeline) {
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
-    // Feature flag needed to use 'score' meta field
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
     auto spec = fromjson(R"({
         $scoreFusion: {
             inputs: {
