@@ -334,10 +334,9 @@ buildvariants:
     display_name: "* Shared Library Enterprise RHEL 8 (all feature flags) Experimental"
     tags: ["suggested"]
     tasks:
-      # TODO(SERVER-90936): Remove this once streams_kafka* and streams_lambda tests can work with the "default" tag.
+      # TODO(SERVER-90936): Remove this once streams_kafka* tests can work with the "default" tag.
       - name: streams_kafka
       - name: streams_kafka_gwproxy
-      - name: streams_lambda
       - name: product_limits
         cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
 

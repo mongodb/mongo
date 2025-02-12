@@ -622,7 +622,6 @@ buildvariants:
       - name: streams_kafka
       - name: streams_kafka_gwproxy
       - name: streams_https
-      - name: streams_lambda
 
   - <<: *enterprise-amazon2023-arm64-toolchain-v5-template
     name: enterprise-amazon2023-arm64-fuzzers-toolchain-v5
