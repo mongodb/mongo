@@ -48,7 +48,6 @@
 #include "mongo/db/views/view.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"
-#include "mongo/util/inline_memory.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -400,8 +399,8 @@ struct TransactionResources {
     ////////////////////////////////////////////////////////////////////////////////////////
     // Per-collection resources
 
-    using AcquiredCollections = inline_memory::List<AcquiredCollection, 1>;
-    using AcquiredViews = inline_memory::List<AcquiredView, 1>;
+    using AcquiredCollections = std::list<AcquiredCollection>;
+    using AcquiredViews = std::list<AcquiredView>;
 
     // Set of all collections which are currently acquired
     AcquiredCollections acquiredCollections;
