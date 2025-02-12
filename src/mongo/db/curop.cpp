@@ -562,6 +562,21 @@ void CurOp::updateStorageMetricsOnRecoveryUnitStash(ClientLock&) {
     }
 }
 
+void CurOp::setMemoryTrackingStats(const int64_t inUseMemoryBytes,
+                                   const int64_t maxUsedMemoryBytes) {
+    tassert(9897000,
+            "featureFlagQueryMemoryTracking must be turned on before writing memory stats to CurOp",
+            feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+    _inUseMemoryBytes.fetchAndAdd(inUseMemoryBytes);
+
+    // We recompute the max here (the memory tracker that calls this method will already computing
+    // the max) in order to avoid writing to the atomic if the max does not change.
+    if (maxUsedMemoryBytes > _maxUsedMemoryBytes.load()) {
+        _maxUsedMemoryBytes.swap(maxUsedMemoryBytes);
+    }
+}
+
 void CurOp::setNS(WithLock, NamespaceString nss) {
     _nss = std::move(nss);
 }

@@ -42,6 +42,9 @@
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/transport/transport_layer_mock.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/death_test.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/tick_source_mock.h"
 
@@ -392,6 +395,43 @@ TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
 
     // Append should include only the basic fields when just initialized.
     ASSERT_EQ(static_cast<size_t>(bs.nFields()), basicFields.size());
+}
+
+TEST(CurOpTest, ShouldUpdateMemoryStats) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
+                                                               true);
+
+    ASSERT_EQ(0, curop->getInUseMemoryBytes());
+    ASSERT_EQ(0, curop->getMaxUsedMemoryBytes());
+
+    curop->setMemoryTrackingStats(10 /* inUseMemoryBytes */, 15 /* maxUsedMemoryBytes */);
+    ASSERT_EQ(10, curop->getInUseMemoryBytes());
+    ASSERT_EQ(15, curop->getMaxUsedMemoryBytes());
+
+    // The max memory usage is updated if the new max is greater than the current max.
+    curop->setMemoryTrackingStats(11 /*currentMemoryBytes*/, 20 /*maxUsedMemoryBytes*/);
+    ASSERT_EQ(21, curop->getInUseMemoryBytes());
+    ASSERT_EQ(20, curop->getMaxUsedMemoryBytes());
+
+    // The max memory usage is not updated if the new max is not greater than the current max.
+    curop->setMemoryTrackingStats(10 /*currentMemoryBytes*/, 15 /*maxUsedMemoryBytes*/);
+    ASSERT_EQ(31, curop->getInUseMemoryBytes());
+    ASSERT_EQ(20, curop->getMaxUsedMemoryBytes());
+}
+
+DEATH_TEST(CurOpTest, RequireFeatureFlagEnabledToUpdateMemoryStats, "tassert") {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
+                                                               false);
+
+    ASSERT_EQ(0, curop->getInUseMemoryBytes());
+    ASSERT_EQ(0, curop->getMaxUsedMemoryBytes());
+    curop->setMemoryTrackingStats(10 /* inUseMemoryBytes */, 15 /* maxUsedMemoryBytes */);
 }
 
 TEST(CurOpTest, ShouldNotReportFailpointMsgIfNotSet) {

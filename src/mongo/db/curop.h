@@ -1055,6 +1055,24 @@ public:
      */
     void updateStorageMetricsOnRecoveryUnitStash(ClientLock&);
 
+    /**
+     * Sets the current and max used memory for this CurOp instance.
+     *
+     * Callers do not need to hold the client lock because CurOp's memory tracking metrics are
+     * wrapped in atomics. The intent of this is to improve performance. The other mutators in CurOp
+     * must hold the client lock, but updates to memory usage may be frequent and cause contention
+     * on the client lock.
+     */
+    void setMemoryTrackingStats(const int64_t inUseMemoryBytes, const int64_t maxUsedMemoryBytes);
+
+    int64_t getInUseMemoryBytes() const {
+        return _inUseMemoryBytes.load();
+    }
+
+    int64_t getMaxUsedMemoryBytes() const {
+        return _maxUsedMemoryBytes.load();
+    }
+
     /*
      * Gets the message for FailPoints used.
      */
@@ -1326,6 +1344,13 @@ private:
 
     // The hash of the query's shape.
     boost::optional<query_shape::QueryShapeHash> _queryShapeHash{boost::none};
+
+    // These metrics are in CurOp instead of OpDebug because these memory tracking metrics need to
+    // be reported in $currentOp -- $currentOp only looks at CurOp. These memory tracking metrics
+    // are atomics because a non-atomic allows for a data race between acquiring the memory
+    // statistics from the operation context and curop::reportState.
+    AtomicWord<int64_t> _inUseMemoryBytes{0};
+    AtomicWord<int64_t> _maxUsedMemoryBytes{0};
 };
 
 }  // namespace mongo
