@@ -375,6 +375,10 @@ public:
                             "prefixPreview unless featureFlagQETextSearchPreview is enabled",
                             !hasQueryType(cmd.getEncryptedFields().get(),
                                           QueryTypeEnum::PrefixPreview));
+                    uassert(10075600,
+                            "Cannot create a collection with a strEncodeVersion set unless "
+                            "featureFlagQETextSearchPreview is enabled",
+                            !cmd.getEncryptedFields()->getStrEncodeVersion());
                 }
             }
 
