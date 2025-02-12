@@ -75,6 +75,61 @@ boost::optional<OID> initializeRequest(BucketCatalog& catalog,
 }
 }  // namespace
 
+ReopeningScope::ReopeningScope(BucketCatalog& catalog,
+                               Stripe& stripe,
+                               WithLock stripeLock,
+                               const BucketKey& key,
+                               const CandidateType& candidate)
+    : _stripe(&stripe), _key(key) {
+    if (auto* c = get_if<OID>(&candidate)) {
+        _oid = *c;
+    }
+    // Only one query-based reopening can exist for 'key'.
+    invariant(_oid.has_value() || !stripe.outstandingReopeningRequests.contains(_key));
+
+    auto it = stripe.outstandingReopeningRequests.find(_key);
+    if (it == stripe.outstandingReopeningRequests.end()) {
+        bool inserted = false;
+        // Track the memory usage for the bucket keys in this data structure because these buckets
+        // are not open yet which means they are not already being tracked.
+        std::tie(it, inserted) = stripe.outstandingReopeningRequests.try_emplace(
+            key,
+            tracking::make_inlined_vector<tracking::shared_ptr<ReopeningRequest>,
+                                          Stripe::kInlinedVectorSize>(
+                getTrackingContext(catalog.trackingContexts, TrackingScope::kReopeningRequests)));
+        invariant(inserted);
+    }
+    auto& list = it->second;
+
+    list.push_back(tracking::make_shared<ReopeningRequest>(
+        getTrackingContext(catalog.trackingContexts, TrackingScope::kReopeningRequests),
+        ExecutionStatsController{
+            internal::getOrInitializeExecutionStats(catalog, key.collectionUUID)},
+        _oid));
+}
+
+ReopeningScope::~ReopeningScope() {
+    stdx::lock_guard stripeLock{_stripe->mutex};
+    auto keyIt = _stripe->outstandingReopeningRequests.find(_key);
+    invariant(keyIt != _stripe->outstandingReopeningRequests.end());
+    auto& list = keyIt->second;
+
+    // Only one query-based reopening can exist for 'key'.
+    invariant(_oid.has_value() || list.size() == 1);
+    auto requestIt = std::find_if(
+        list.begin(), list.end(), [&](const std::shared_ptr<ReopeningRequest>& request) {
+            return request->oid == _oid;
+        });
+    invariant(requestIt != list.end());
+
+    // Notify any waiters and clean up state.
+    (*requestIt)->promise.emplaceValue();
+    list.erase(requestIt);
+    if (list.empty()) {
+        _stripe->outstandingReopeningRequests.erase(keyIt);
+    }
+}
+
 ReopeningContext::~ReopeningContext() {
     if (!_cleared) {
         clear();

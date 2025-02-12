@@ -221,13 +221,14 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(
  * Given a rehydrated 'bucket', passes ownership of that bucket to the catalog, marking the bucket
  * as open.
  */
-StatusWith<std::reference_wrapper<Bucket>> reopenBucket(BucketCatalog& catalog,
-                                                        Stripe& stripe,
-                                                        WithLock stripeLock,
-                                                        ExecutionStatsController& stats,
-                                                        const BucketKey& key,
-                                                        tracking::unique_ptr<Bucket>&& bucket,
-                                                        std::uint64_t targetEra);
+StatusWith<std::reference_wrapper<Bucket>> loadBucketIntoCatalog(
+    BucketCatalog& catalog,
+    Stripe& stripe,
+    WithLock stripeLock,
+    ExecutionStatsController& stats,
+    const BucketKey& key,
+    tracking::unique_ptr<Bucket>&& bucket,
+    std::uint64_t targetEra);
 
 /**
  * Given an already-selected 'bucket', inserts 'doc' to the bucket if possible. If not, and 'mode'
@@ -281,8 +282,11 @@ void archiveBucket(BucketCatalog& catalog,
  * Identifies a previously archived bucket that may be able to accommodate the measurement
  * represented by 'info', if one exists.
  */
-boost::optional<OID> findArchivedCandidate(
-    BucketCatalog& catalog, Stripe& stripe, WithLock stripeLock, InsertContext& info, Date_t time);
+boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
+                                           Stripe& stripe,
+                                           WithLock stripeLock,
+                                           const InsertContext& info,
+                                           const Date_t& time);
 
 /**
  * Calculates the bucket max size constrained by the cache size and the cardinality of active
@@ -306,6 +310,34 @@ InsertResult getReopeningContext(BucketCatalog& catalog,
                                  const Date_t& time,
                                  uint64_t storageCacheSizeBytes);
 
+/**
+ * Returns an archived bucket eligible for new insert with 'time'.
+ */
+boost::optional<OID> getArchiveReopeningCandidate(BucketCatalog& catalog,
+                                                  Stripe& stripe,
+                                                  WithLock stripeLock,
+                                                  const InsertContext& info,
+                                                  const Date_t& time);
+
+/**
+ * Returns an aggregation pipeline used to reopen a bucket with 'info' and 'time'.
+ */
+std::vector<BSONObj> getQueryReopeningCandidate(BucketCatalog& catalog,
+                                                Stripe& stripe,
+                                                WithLock stripeLock,
+                                                const InsertContext& info,
+                                                uint64_t storageCacheSizeBytes,
+                                                const Date_t& time);
+
+/**
+ * Returns a conflicting operation that needs to be waited for archive-based reopening (when
+ * 'archivedCandidate' is passed) or query-based reopening.
+ */
+boost::optional<InsertWaiter> checkForReopeningConflict(
+    Stripe& stripe,
+    WithLock stripeLock,
+    const BucketKey& bucketKey,
+    boost::optional<OID> archivedCandidate = boost::none);
 /**
  * Aborts 'batch', and if the corresponding bucket still exists, proceeds to abort any other
  * unprepared batches and remove the bucket from the catalog if there is no unprepared batch.

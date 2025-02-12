@@ -492,13 +492,13 @@ Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj
     auto& stripe = *_bucketCatalog->stripes[insertContext.stripeNumber];
     stdx::lock_guard stripeLock{stripe.mutex};
 
-    return internal::reopenBucket(*_bucketCatalog,
-                                  stripe,
-                                  stripeLock,
-                                  insertContext.stats,
-                                  insertContext.key,
-                                  std::move(bucket),
-                                  getCurrentEra(_bucketCatalog->bucketStateRegistry))
+    return internal::loadBucketIntoCatalog(*_bucketCatalog,
+                                           stripe,
+                                           stripeLock,
+                                           insertContext.stats,
+                                           insertContext.key,
+                                           std::move(bucket),
+                                           getCurrentEra(_bucketCatalog->bucketStateRegistry))
         .getStatus();
 }
 

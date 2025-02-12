@@ -415,6 +415,28 @@ StatusWith<tracking::unique_ptr<Bucket>> getReopenedBucket(
     bucket_catalog::InsertContext& insertContext);
 
 /**
+ * Reopens and loads a bucket eligible for inserts into the bucket catalog. Checks for conflicting
+ * operations with reopening. Returns:
+ *      - A pointer of the bucket if successfully reopened and loaded into the bucket catalog.
+ *      - A nullptr if no eligible bucket is reopened.
+ *      - An error if the reopened bucket cannot be used for new inserts.
+ * Called with a stripe lock. May release the lock for reopening. Returns holding the lock.
+ * Manages the lifetime of the reopening request in 'stripe'.
+ */
+StatusWith<Bucket*> potentiallyReopenBucket(
+    OperationContext* opCtx,
+    BucketCatalog& catalog,
+    Stripe& stripe,
+    WithLock stripeLock,
+    const Collection* bucketsColl,
+    const Date_t& time,
+    BucketStateRegistry::Era catalogEra,
+    bool allowQueryBasedReopening,
+    uint64_t storageCacheSizeBytes,
+    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+    bucket_catalog::InsertContext& insertContext);
+
+/**
  * Efficiently inserts a batch of time-series measurements. It handles the logic of finding a bucket
  * to insert measurements into, and the logic of finding a new bucket to insert into when a bucket
  * is rolled over for a time-related reason.

@@ -395,13 +395,13 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
         if (existingIt == stripe.openBucketsById.end()) {
             // No existing bucket matches this one, go ahead and try to reopen our rehydrated
             // bucket.
-            auto swBucket = internal::reopenBucket(catalog,
-                                                   stripe,
-                                                   stripeLock,
-                                                   insertContext.stats,
-                                                   insertContext.key,
-                                                   std::move(rehydratedBucket.getValue()),
-                                                   reopeningContext.catalogEra);
+            auto swBucket = internal::loadBucketIntoCatalog(catalog,
+                                                            stripe,
+                                                            stripeLock,
+                                                            insertContext.stats,
+                                                            insertContext.key,
+                                                            std::move(rehydratedBucket.getValue()),
+                                                            reopeningContext.catalogEra);
 
             if (swBucket.isOK()) {
                 // We reopened the bucket successfully. Now we'll use it directly as an optimization
@@ -820,6 +820,94 @@ StatusWith<tracking::unique_ptr<Bucket>> getReopenedBucket(
                                      bucketsColl->getDefaultCollator(),
                                      bucketDocumentValidator,
                                      insertContext);
+}
+
+StatusWith<Bucket*> potentiallyReopenBucket(
+    OperationContext* opCtx,
+    BucketCatalog& catalog,
+    Stripe& stripe,
+    stdx::unique_lock<stdx::mutex>& stripeLock,
+    const Collection* bucketsColl,
+    const Date_t& time,
+    BucketStateRegistry::Era catalogEra,
+    bool allowQueryBasedReopening,
+    uint64_t storageCacheSizeBytes,
+    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+    bucket_catalog::InsertContext& insertContext) {
+    // Get the information needed for reopening.
+    boost::optional<std::variant<OID, std::vector<BSONObj>>> reopeningCandidate;
+    boost::optional<InsertWaiter> reopeningConflict;
+    const auto& bucketKey = insertContext.key;
+    if (const auto& archivedCandidate = internal::getArchiveReopeningCandidate(
+            catalog, stripe, stripeLock, insertContext, time)) {
+        reopeningConflict =
+            internal::checkForReopeningConflict(stripe, stripeLock, bucketKey, archivedCandidate);
+        if (!reopeningConflict) {
+            reopeningCandidate = archivedCandidate.get();
+        }
+    } else if (allowQueryBasedReopening) {
+        reopeningConflict = internal::checkForReopeningConflict(stripe, stripeLock, bucketKey);
+        if (!reopeningConflict) {
+            reopeningCandidate = internal::getQueryReopeningCandidate(
+                catalog, stripe, stripeLock, insertContext, storageCacheSizeBytes, time);
+        }
+    }
+
+    if (reopeningConflict) {
+        // Need to wait for another operation to finish. This could be another reopening request or
+        // a previously prepared write batch for the same series (metaField value).
+
+        // Release the stripe lock to wait for the conflicting operation.
+        ScopedUnlock unlockGuard(stripeLock);
+
+        bucket_catalog::waitToInsert(&reopeningConflict.get());
+        return Status{ErrorCodes::WriteConflict, "waited to retry"};
+    }
+
+    if (!reopeningCandidate) {
+        // No suitable bucket can be found for reopening.
+        return nullptr;
+    }
+
+    ReopeningScope reopeningScope(catalog, stripe, stripeLock, bucketKey, reopeningCandidate.get());
+
+    tracking::unique_ptr<Bucket> reopenedBucket(
+        getTrackingContext(catalog.trackingContexts, TrackingScope::kReopeningRequests), nullptr);
+    {
+        // Reopening can take some time. Release the stripe lock first.
+        ScopedUnlock unlockGuard(stripeLock);
+
+        // Reopen the bucket and initialize its in-memory states.
+        auto swReopenedBucket = getReopenedBucket(opCtx,
+                                                  catalog,
+                                                  bucketsColl,
+                                                  reopeningCandidate.get(),
+                                                  catalogEra,
+                                                  compressAndWriteBucketFunc,
+                                                  insertContext);
+
+        if (!swReopenedBucket.isOK()) {
+            return swReopenedBucket.getStatus();
+        }
+        if (!swReopenedBucket.getValue()) {
+            return nullptr;
+        }
+        reopenedBucket = std::move(swReopenedBucket.getValue());
+        // Reacquire the stripe lock to load the bucket back into the catalog.
+    }
+
+    auto swBucket = internal::loadBucketIntoCatalog(catalog,
+                                                    stripe,
+                                                    stripeLock,
+                                                    insertContext.stats,
+                                                    bucketKey,
+                                                    std::move(reopenedBucket),
+                                                    catalogEra);
+    if (!swBucket.isOK()) {
+        return swBucket.getStatus();
+    }
+
+    return &swBucket.getValue().get();
 }
 
 std::vector<std::shared_ptr<WriteBatch>> insertBatch(

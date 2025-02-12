@@ -90,6 +90,30 @@ struct ReopeningRequest {
 };
 
 /**
+ * RAII type that manages the lifetime of a reopening request.
+ */
+class ReopeningScope {
+public:
+    // A reopening candidate can be an OID for archive-based reopening, or an aggregation pipeline
+    // for query-based reopening.
+    using CandidateType = std::variant<OID, std::vector<BSONObj>>;
+
+    ReopeningScope() = delete;
+    ~ReopeningScope();
+
+    ReopeningScope(BucketCatalog& catalog,
+                   Stripe& stripe,
+                   WithLock stripeLock,
+                   const BucketKey& key,
+                   const CandidateType& candidate);
+
+private:
+    Stripe* _stripe;
+    BucketKey _key;
+    boost::optional<OID> _oid;
+};
+
+/**
  * RAII type that tracks the state needed to coordinate the reopening of closed buckets between
  * reentrant 'tryInsert'/'insert' calls.
  *
