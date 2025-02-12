@@ -304,10 +304,9 @@ void updateWithNoChange(int line, const BSONObj& doc, const ColumnKeyGenerator& 
 }
 
 void basicTests(int line,
-                std::string json,
+                const BSONObj doc,
                 const StringMap<UnencodedCellValue_ForTest>& pathMap,
-                ProjPairVector expected) {
-    const BSONObj doc = fromjson(json);
+                const ProjPairVector& expected) {
     for (auto&& [keyGen, expectedPaths] : expected) {
         StringMap<UnencodedCellValue_ForTest> expected;
         // Create expected by retrieving flags and vals from expected paths
@@ -327,6 +326,14 @@ void basicTests(int line,
         updateFromEmptyTest(line, doc, expected, *keyGen);
         updateWithNoChange(line, doc, *keyGen);
     }
+}
+
+void basicTests(int line,
+                std::string json,
+                const StringMap<UnencodedCellValue_ForTest>& pathMap,
+                const ProjPairVector& expected) {
+    const BSONObj doc = fromjson(json);
+    basicTests(line, doc, pathMap, expected);
 }
 
 std::unique_ptr<ColumnKeyGenerator> makeKeyGen(BSONObj columnstoreProjection = BSONObj(),
@@ -599,26 +606,30 @@ TEST(ColKeyGen, DeepObjectTests) {
     // Can't use lambdas because they can't be recursive (especially mutually recursive), but I'd
     // still like to keep these local to this test
     struct funcs {
-        static void addObjToStr(std::string& str, int depthLeft) {
-            if (!depthLeft) {
-                str += '1';
-                return;
+        static BSONObj makeNestedObjects(int depth) {
+            BSONObjBuilder bob;
+            if (depth <= 1) {
+                bob.append("a", 1);
+                return bob.obj();
             }
-
-            str += "{a:";
-            addObjToStr(str, depthLeft - 1);
-            str += "}";
+            bob.append("a", makeNestedObjects(depth - 1));
+            return bob.obj();
         }
 
-        static void addArrToStr(std::string& str, int depthLeft) {
-            if (!depthLeft) {
-                str += '1';
-                return;
+        static BSONArray makeNestedArrays(int depth) {
+            BSONArrayBuilder arr;
+            if (depth <= 1) {
+                arr.append(1);
+                return arr.arr();
             }
+            arr.append(makeNestedArrays(depth - 1));
+            return arr.arr();
+        }
 
-            str += "[";
-            addArrToStr(str, depthLeft - 1);
-            str += "]";
+        static BSONObj makeNestedArraysInObject(int depth) {
+            BSONObjBuilder bob;
+            bob.appendArray("a", makeNestedArrays(depth));
+            return bob.obj();
         }
 
         static std::string dottedPath(int length) {
@@ -630,26 +641,25 @@ TEST(ColKeyGen, DeepObjectTests) {
             return out;
         }
 
-        static void addAlternatingObjToStr(std::string& str, int depthLeft) {
-            if (!depthLeft) {
-                str += '1';
-                return;
+        // Returns an alternating sequence of nested objects and arrays of the given depth. The
+        // outermost layer is always an object. For even depths, the innermost layer is an array
+        // and for odd depths, the innermost layer is an object.
+        static BSONObj makeAlternatingObjectsAndArrays(int depth) {
+            if (depth == 2) {
+                BSONObjBuilder bob;
+                bob.append("a", makeNestedArrays(1));
+                return bob.obj();
             }
 
-            str += "{a:";
-            addAlternatingArrToStr(str, depthLeft - 1);
-            str += "}";
-        }
-
-        static void addAlternatingArrToStr(std::string& str, int depthLeft) {
-            if (!depthLeft) {
-                str += '1';
-                return;
+            if (depth <= 1) {
+                return makeNestedObjects(1);
             }
 
-            str += "[";
-            addAlternatingObjToStr(str, depthLeft - 1);
-            str += "]";
+            BSONObjBuilder bob;
+            BSONArrayBuilder arr;
+            arr.append(makeAlternatingObjectsAndArrays(depth - 2));
+            bob.appendArray("a", arr.arr());
+            return bob.obj();
         }
 
         static std::string alternatingArrayInfo(int pathDepth) {
@@ -666,8 +676,7 @@ TEST(ColKeyGen, DeepObjectTests) {
     constexpr int kDepth = BSONDepth::kBSONDepthParameterCeiling;
 
     {  // Just object nesting
-        std::string obj;
-        funcs::addObjToStr(obj, kDepth);
+        BSONObj obj = funcs::makeNestedObjects(kDepth);
         StringMap<UnencodedCellValue_ForTest> expected;
         StringSet expectedPaths;
         for (int i = 1; i < kDepth; i++) {
@@ -680,10 +689,9 @@ TEST(ColKeyGen, DeepObjectTests) {
     }
 
     {  // Just array nesting
-        std::string arr;
-        funcs::addArrToStr(arr, kDepth);
+        BSONObj arr = funcs::makeNestedArraysInObject(kDepth);
         basicTests(__LINE__,
-                   "{a: " + arr + "}",
+                   arr,
                    {
                        {"a", {"1", std::string(kDepth, '['), kHasDoubleNestedArrays}},
                    },
@@ -697,8 +705,7 @@ TEST(ColKeyGen, DeepObjectTests) {
     static_assert(BSONDepth::kBSONDepthParameterCeiling % 2 == 0);  // See above if this fails.
 
     {  // Innermost array.
-        std::string obj;
-        funcs::addAlternatingObjToStr(obj, kDepth);
+        BSONObj obj = funcs::makeAlternatingObjectsAndArrays(kDepth);
         StringMap<UnencodedCellValue_ForTest> expected;
         StringSet expectedPaths;
         constexpr auto kPathLen = kDepth / 2;
@@ -713,8 +720,7 @@ TEST(ColKeyGen, DeepObjectTests) {
     }
 
     {  // Innermost object.
-        std::string obj;
-        funcs::addAlternatingObjToStr(obj, kDepth + 1);
+        BSONObj obj = funcs::makeAlternatingObjectsAndArrays(kDepth + 1);
         StringMap<UnencodedCellValue_ForTest> expected;
         StringSet expectedPaths;
         constexpr auto kPathLen = kDepth / 2 + 1;
