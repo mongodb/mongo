@@ -200,6 +200,14 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool isTimeseriesCollection() const override {
+        MONGO_UNREACHABLE;
+    }
+
+    bool isNewTimeseriesWithoutView() const override {
+        MONGO_UNREACHABLE;
+    }
+
     boost::optional<bool> getTimeseriesBucketsMayHaveMixedSchemaData() const override {
         MONGO_UNREACHABLE;
     }

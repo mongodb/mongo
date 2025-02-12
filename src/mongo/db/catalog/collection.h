@@ -371,6 +371,18 @@ public:
                                                  ChangeStreamPreAndPostImagesOptions val) = 0;
 
     /**
+     * Returns true if this is a time-series collection.
+     */
+    virtual bool isTimeseriesCollection() const = 0;
+
+    /**
+     * return true if this is a time-series collection with FCV 9.0 metadata format,
+     * the time-series collection has a unified namespace (no view nor bucket collection, only the
+     * main namespace)
+     */
+    virtual bool isNewTimeseriesWithoutView() const = 0;
+
+    /**
      * Returns true if this is a temporary collection.
      */
     virtual bool isTemporary() const = 0;

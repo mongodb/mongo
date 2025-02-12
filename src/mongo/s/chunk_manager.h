@@ -501,6 +501,15 @@ public:
         return _allowMigrations;
     }
 
+    bool isTimeseriesCollection() const {
+        return getTimeseriesFields().has_value();
+    }
+
+    // TODO (SERVER-100717): To be implemented
+    bool isNewTimeseriesWithoutView() const {
+        return false;
+    }
+
 private:
     friend class ChunkManager;
 

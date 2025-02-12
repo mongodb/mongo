@@ -297,6 +297,14 @@ public:
         return _coll->isTemporary();
     }
 
+    bool isTimeseriesCollection() const override {
+        return _coll->isTimeseriesCollection();
+    }
+
+    bool isNewTimeseriesWithoutView() const override {
+        return _coll->isNewTimeseriesWithoutView();
+    }
+
     boost::optional<bool> getTimeseriesBucketsMayHaveMixedSchemaData() const override {
         return _coll->getTimeseriesBucketsMayHaveMixedSchemaData();
     }

@@ -235,6 +235,10 @@ public:
     void setChangeStreamPreAndPostImages(OperationContext* opCtx,
                                          ChangeStreamPreAndPostImagesOptions val) final;
 
+    bool isTimeseriesCollection() const final;
+
+    bool isNewTimeseriesWithoutView() const final;
+
     bool isTemporary() const final;
 
     boost::optional<bool> getTimeseriesBucketsMayHaveMixedSchemaData() const final;

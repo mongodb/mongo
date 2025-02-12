@@ -847,6 +847,15 @@ bool CollectionImpl::updateWithDamagesSupported() const {
     return _shared->_recordStore->updateWithDamagesSupported();
 }
 
+bool CollectionImpl::isTimeseriesCollection() const {
+    return getTimeseriesOptions().has_value();
+}
+
+// TODO (SERVER-100717): To be implemented
+bool CollectionImpl::isNewTimeseriesWithoutView() const {
+    return false;
+}
+
 bool CollectionImpl::isTemporary() const {
     return _metadata->options.temp;
 }

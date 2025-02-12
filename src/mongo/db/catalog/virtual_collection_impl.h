@@ -263,6 +263,16 @@ public:
         return true;
     }
 
+    bool isTimeseriesCollection() const final {
+        unimplementedTasserted();
+        return false;
+    }
+
+    bool isNewTimeseriesWithoutView() const final {
+        unimplementedTasserted();
+        return false;
+    }
+
     boost::optional<bool> getTimeseriesBucketsMayHaveMixedSchemaData() const final {
         unimplementedTasserted();
         return boost::none;
