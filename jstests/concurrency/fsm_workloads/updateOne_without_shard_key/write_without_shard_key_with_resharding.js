@@ -16,7 +16,6 @@ import {
     $config as $baseConfig
 } from
     "jstests/concurrency/fsm_workloads/updateOne_without_shard_key/write_without_shard_key_base.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.startState = "init";
@@ -33,8 +32,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         this.shardKeys.push({[this.defaultShardKeyField]: 1});
         this.shardKeys.push({[customShardKeyFieldName]: 1});
         this.currentShardKeyIndex = 0;
-        this._allowSameKeyResharding =
-            FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'ReshardingImprovements');
+        this._allowSameKeyResharding = true;
     };
 
     $config.data.generateRandomDocument = function generateRandomDocument(tid, partition) {

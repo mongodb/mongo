@@ -1513,8 +1513,6 @@ TEST(QueryRequestTest, ConvertToAggregationWithAllowPartialResultsFails) {
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithRequestResumeTokenSucceeds) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
-                                                               true);
     FindCommandRequest findCommand(testns);
     findCommand.setRequestResumeToken(true);
     findCommand.setHint(BSON("$natural" << 1));
@@ -1522,17 +1520,6 @@ TEST(QueryRequestTest, ConvertToAggregationWithRequestResumeTokenSucceeds) {
     auto ar = query_request_conversion::asAggregateCommandRequest(findCommand);
 
     ASSERT(ar.getRequestResumeToken());
-}
-
-TEST(QueryRequestTest, ConvertToAggregationWithResumeAfterFails) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
-                                                               false);
-    FindCommandRequest findCommand(testns);
-    BSONObj resumeAfter = BSON("$recordId" << 1LL);
-    findCommand.setResumeAfter(resumeAfter);
-    ASSERT_THROWS_CODE(query_request_conversion::asAggregateCommandRequest(findCommand),
-                       DBException,
-                       ErrorCodes::InvalidPipelineOperator);
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithPipeline) {

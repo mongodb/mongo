@@ -779,8 +779,6 @@ TEST(AggregationRequestTest, ShouldIgnoreQueryOptions) {
 }
 
 TEST(AggregationRequestTest, ShouldRejectRequestResumeTokenIfNonBooleanType) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
-                                                               true);
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.collection");
     const BSONObj validRequest = fromjson(
         "{aggregate: 'collection',"
@@ -795,8 +793,6 @@ TEST(AggregationRequestTest, ShouldRejectRequestResumeTokenIfNonBooleanType) {
 }
 
 TEST(AggregationRequestTest, ShouldRejectRequestResumeTokenIfOplogNss) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
-                                                               true);
     const BSONObj validRequest = fromjson(
         "{aggregate: 'collection',"
         "pipeline: [],"

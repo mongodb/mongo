@@ -121,67 +121,66 @@ let expectedReshardingEvents = [
     },
 ];
 
-if (FeatureFlagUtil.isEnabled(st.s, "ReshardingImprovements")) {
-    expectedReshardingEvents = [
-        {ns: reshardingNs, collectionUUID: newUUID, operationType: "create"},
-        {
-            ns: reshardingNs,
-            collectionUUID: newUUID,
-            operationType: "shardCollection",
-            operationDescription: {shardKey: {a: 1}}
-        },
-        {
-            ns: reshardingNs,
-            collectionUUID: newUUID,
-            operationType: "insert",
-            fullDocument: {_id: 0, a: 0},
-            documentKey: {a: 0, _id: 0}
-        },
-        {
-            ns: reshardingNs,
-            collectionUUID: newUUID,
-            operationType: "insert",
-            fullDocument: {_id: 1, a: 1},
-            documentKey: {a: 1, _id: 1}
-        },
-        {
-            operationType: "endOfTransaction",
-        },
-        {
-            ns: reshardingNs,
-            collectionUUID: newUUID,
-            operationType: "startIndexBuild",
-            operationDescription: {indexes: [{v: 2, key: {a: 1}, name: "a_1"}]},
-        },
-        {
-            ns: reshardingNs,
-            collectionUUID: newUUID,
-            operationType: "createIndexes",
-            operationDescription: {indexes: [{v: 2, key: {a: 1}, name: "a_1"}]}
-        },
-        {
-            ns: origNs,
-            collectionUUID: oldUUID,
-            operationType: "reshardCollection",
-            operationDescription: {
-                reshardUUID: newUUID,
-                shardKey: {a: 1},
-                oldShardKey: {_id: 1},
-                unique: false,
-                numInitialChunks: NumberLong(1)
-            }
-        },
-        {
-            ns: origNs,
-            collectionUUID: newUUID,
-            operationType: "insert",
-            fullDocument: {_id: 2, a: 2},
-            documentKey: {a: 2, _id: 2}
-        },
-    ];
-    if (!FeatureFlagUtil.isEnabled(st.s, "EndOfTransactionChangeEvent"))
-        expectedReshardingEvents = expectedReshardingEvents.filter(
-            (event) => (event.operationType !== "endOfTransaction"));
+expectedReshardingEvents = [
+    {ns: reshardingNs, collectionUUID: newUUID, operationType: "create"},
+    {
+        ns: reshardingNs,
+        collectionUUID: newUUID,
+        operationType: "shardCollection",
+        operationDescription: {shardKey: {a: 1}}
+    },
+    {
+        ns: reshardingNs,
+        collectionUUID: newUUID,
+        operationType: "insert",
+        fullDocument: {_id: 0, a: 0},
+        documentKey: {a: 0, _id: 0}
+    },
+    {
+        ns: reshardingNs,
+        collectionUUID: newUUID,
+        operationType: "insert",
+        fullDocument: {_id: 1, a: 1},
+        documentKey: {a: 1, _id: 1}
+    },
+    {
+        operationType: "endOfTransaction",
+    },
+    {
+        ns: reshardingNs,
+        collectionUUID: newUUID,
+        operationType: "startIndexBuild",
+        operationDescription: {indexes: [{v: 2, key: {a: 1}, name: "a_1"}]},
+    },
+    {
+        ns: reshardingNs,
+        collectionUUID: newUUID,
+        operationType: "createIndexes",
+        operationDescription: {indexes: [{v: 2, key: {a: 1}, name: "a_1"}]}
+    },
+    {
+        ns: origNs,
+        collectionUUID: oldUUID,
+        operationType: "reshardCollection",
+        operationDescription: {
+            reshardUUID: newUUID,
+            shardKey: {a: 1},
+            oldShardKey: {_id: 1},
+            unique: false,
+            numInitialChunks: NumberLong(1)
+        }
+    },
+    {
+        ns: origNs,
+        collectionUUID: newUUID,
+        operationType: "insert",
+        fullDocument: {_id: 2, a: 2},
+        documentKey: {a: 2, _id: 2}
+    },
+];
+if (!FeatureFlagUtil.isEnabled(st.s, "EndOfTransactionChangeEvent")) {
+    expectedReshardingEvents =
+        expectedReshardingEvents.filter((event) => (event.operationType !== "endOfTransaction"));
 }
 
 // Helper to confirm the sequence of events observed in the change stream.

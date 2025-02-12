@@ -53,12 +53,6 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(
-                ErrorCodes::CommandNotSupported,
-                "Resharding improvements is not enabled, cannot perform unshardCollection command.",
-                resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-
             const auto& nss = ns();
             auto unshardCollectionRequest = cluster::unsplittable::makeUnshardCollectionRequest(
                 request().getDbName(),

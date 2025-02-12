@@ -719,13 +719,7 @@ void ReshardingCollectionCloner::_writeOnceWithNaturalOrder(
                      resumeToken = BSONObj();
                  }
 
-                 writeOneBatch(opCtx,
-                               txnNumber,
-                               batch,
-                               shardId,
-                               donorHost,
-                               *resumeToken,
-                               true /*useNaturalOrderCloner*/);
+                 writeOneBatch(opCtx, txnNumber, batch, shardId, donorHost, *resumeToken);
              })
         .get();
 }
@@ -817,8 +811,7 @@ bool ReshardingCollectionCloner::doOneBatch(OperationContext* opCtx,
                                             TxnNumber& txnNum,
                                             ShardId donorShard,
                                             HostAndPort donorHost,
-                                            BSONObj resumeToken,
-                                            bool useNaturalOrderCloner) {
+                                            BSONObj resumeToken) {
     pipeline.reattachToOperationContext(opCtx);
     ON_BLOCK_EXIT([&pipeline] { pipeline.detachFromOperationContext(); });
 
@@ -832,7 +825,7 @@ bool ReshardingCollectionCloner::doOneBatch(OperationContext* opCtx,
         return false;
     }
 
-    writeOneBatch(opCtx, txnNum, batch, donorShard, donorHost, resumeToken, useNaturalOrderCloner);
+    writeOneBatch(opCtx, txnNum, batch, donorShard, donorHost, resumeToken);
     return true;
 }
 
@@ -841,8 +834,7 @@ void ReshardingCollectionCloner::writeOneBatch(OperationContext* opCtx,
                                                std::vector<InsertStatement>& batch,
                                                ShardId donorShard,
                                                HostAndPort donorHost,
-                                               BSONObj resumeToken,
-                                               bool useNaturalOrderCloner) {
+                                               BSONObj resumeToken) {
     Timer batchInsertTimer;
     int bytesInserted = resharding::data_copy::withOneStaleConfigRetry(opCtx, [&] {
         // ReshardingOpObserver depends on the collection metadata being known when processing
@@ -851,27 +843,16 @@ void ReshardingCollectionCloner::writeOneBatch(OperationContext* opCtx,
         // information to be recovered.
         auto [_, sii] = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, _outputNss));
-        if (useNaturalOrderCloner) {
-            return resharding::data_copy::insertBatchTransactionally(opCtx,
-                                                                     _outputNss,
-                                                                     sii,
-                                                                     txnNum,
-                                                                     batch,
-                                                                     _reshardingUUID,
-                                                                     donorShard,
-                                                                     donorHost,
-                                                                     resumeToken,
-                                                                     _storeProgress);
-        } else {
-            ScopedSetShardRole scopedSetShardRole(
-                opCtx,
-                _outputNss,
-                ShardVersionFactory::make(ChunkVersion::IGNORED(),
-                                          sii ? boost::make_optional(sii->getCollectionIndexes())
-                                              : boost::none) /* shardVersion */,
-                boost::none /* databaseVersion */);
-            return resharding::data_copy::insertBatch(opCtx, _outputNss, batch);
-        }
+        return resharding::data_copy::insertBatchTransactionally(opCtx,
+                                                                 _outputNss,
+                                                                 sii,
+                                                                 txnNum,
+                                                                 batch,
+                                                                 _reshardingUUID,
+                                                                 donorShard,
+                                                                 donorHost,
+                                                                 resumeToken,
+                                                                 _storeProgress);
     });
 
     _metrics->onDocumentsProcessed(
@@ -890,18 +871,10 @@ SemiFuture<void> ReshardingCollectionCloner::run(
     };
 
     auto chainCtx = std::make_shared<ChainContext>();
-    auto reshardingImprovementsEnabled = resharding::gFeatureFlagReshardingImprovements.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
-    return resharding::WithAutomaticRetry([this,
-                                           chainCtx,
-                                           factory,
-                                           executor,
-                                           cleanupExecutor,
-                                           cancelToken,
-                                           reshardingImprovementsEnabled] {
-               reshardingCollectionClonerPauseBeforeAttempt.pauseWhileSet();
-               if (reshardingImprovementsEnabled) {
+    return resharding::WithAutomaticRetry(
+               [this, chainCtx, factory, executor, cleanupExecutor, cancelToken] {
+                   reshardingCollectionClonerPauseBeforeAttempt.pauseWhileSet();
                    auto opCtx = factory.makeOperationContext(&cc());
                    _runOnceWithNaturalOrder(opCtx.get(),
                                             MongoProcessInterface::create(opCtx.get()),
@@ -911,27 +884,7 @@ SemiFuture<void> ReshardingCollectionCloner::run(
                    // If we got here, we succeeded and there is no more to come.  Otherwise
                    // _runOnceWithNaturalOrder would uassert.
                    chainCtx->moreToCome = false;
-                   return;
-               }
-               if (!chainCtx->pipeline) {
-                   auto opCtx = factory.makeOperationContext(&cc());
-                   chainCtx->pipeline = _restartPipeline(opCtx.get(), executor);
-               }
-
-               auto opCtx = factory.makeOperationContext(&cc());
-               ScopeGuard guard([&] {
-                   chainCtx->pipeline->dispose(opCtx.get());
-                   chainCtx->pipeline.reset();
-               });
-               chainCtx->moreToCome = doOneBatch(opCtx.get(),
-                                                 *chainCtx->pipeline,
-                                                 chainCtx->batchTxnNumber,
-                                                 {} /* donorShard */,
-                                                 {} /* donorHost*/,
-                                                 {} /* resumeToken */,
-                                                 false /* useNaturalOrderCloner */);
-               guard.dismiss();
-           })
+               })
         .onTransientError([this](const Status& status) {
             LOGV2(5269300,
                   "Transient error while cloning sharded collection",

@@ -11,6 +11,7 @@
  *  assumes_stable_shard_list,
  * ]
  */
+
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {executeReshardCollection} from "jstests/concurrency/fsm_libs/reshard_collection_util.js";
@@ -18,7 +19,6 @@ import {
     $config as $baseConfig
 } from
     "jstests/concurrency/fsm_workloads/txns/internal_transactions/internal_transactions_sharded.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     const customShardKeyFieldName = "customShardKey";
@@ -63,8 +63,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         this.shardKeys.push({[this.defaultShardKeyField]: 1});
         this.shardKeys.push({[customShardKeyFieldName]: 1});
         this.currentShardKeyIndex = 0;
-        this._allowSameKeyResharding =
-            FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'ReshardingImprovements');
+        this._allowSameKeyResharding = true;
     };
 
     $config.states.reshardCollection = function reshardCollection(db, collName, connCache) {

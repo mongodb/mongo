@@ -453,13 +453,9 @@ BSONObj CollectionScan::getPostBatchResumeToken() const {
     if (_params.requestResumeToken) {
         BSONObjBuilder builder;
         _lastSeenId.serializeToken("$recordId", &builder);
-        if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            auto initialSyncId =
-                repl::ReplicationCoordinator::get(opCtx())->getInitialSyncId(opCtx());
-            if (initialSyncId) {
-                initialSyncId.value().appendToBuilder(&builder, "$initialSyncId");
-            }
+        auto initialSyncId = repl::ReplicationCoordinator::get(opCtx())->getInitialSyncId(opCtx());
+        if (initialSyncId) {
+            initialSyncId.value().appendToBuilder(&builder, "$initialSyncId");
         }
         return builder.obj();
     }

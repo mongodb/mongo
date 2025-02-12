@@ -1,15 +1,16 @@
-// Tests that change streams on a collection can be resumed during and after the given collection is
-// moved.
-
-// @tags: [
-//   featureFlagMoveCollection,
-//   featureFlagReshardingImprovements,
-//   # TODO (SERVER-87812) Remove multiversion_incompatible tag
-//   multiversion_incompatible,
-//   requires_fcv_80,
-//   requires_majority_read_concern,
-//   uses_atclustertime,
-// ]
+/**
+ * Tests that change streams on a collection can be resumed during and after the given collection
+ * is moved.
+ *
+ * @tags: [
+ *   featureFlagMoveCollection,
+ *   # TODO (SERVER-87812) Remove multiversion_incompatible tag
+ *   multiversion_incompatible,
+ *   requires_fcv_80,
+ *   requires_majority_read_concern,
+ *   uses_atclustertime,
+ * ]
+ */
 
 import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";

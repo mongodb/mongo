@@ -328,7 +328,6 @@ protected:
                           expectedCoordinatorDoc.getReshardingKey().toBSON()),
                       0);
         ASSERT(coordinatorDoc.getState() == expectedCoordinatorDoc.getState());
-        ASSERT(coordinatorDoc.getActive());
         if (expectedCoordinatorDoc.getCloneTimestamp()) {
             ASSERT(coordinatorDoc.getCloneTimestamp());
             ASSERT_EQUALS(coordinatorDoc.getCloneTimestamp().value(),

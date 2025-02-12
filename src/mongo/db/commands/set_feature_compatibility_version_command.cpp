@@ -733,7 +733,6 @@ private:
         // roles aren't mutually exclusive.
         if (role && role->has(ClusterRole::ConfigServer)) {
             // Config server role actions.
-            _dropReshardingCoordinatorUniqueIndex(opCtx, requestedVersion);
         }
 
         if (role && role->has(ClusterRole::ShardServer)) {
@@ -775,65 +774,6 @@ private:
         }
     }
 
-    void _createReshardingCoordinatorUniqueIndex(
-        OperationContext* opCtx,
-        const multiversion::FeatureCompatibilityVersion requestedVersion,
-        const multiversion::FeatureCompatibilityVersion originalVersion) {
-        // We're guaranteed that if the resharding metadata collection exists, it is empty;
-        // if it were not we would have already aborted with ManualInterventionRequired.
-        if (resharding::gFeatureFlagReshardingImprovements
-                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
-            LOGV2(7760407,
-                  "Downgrading to FCV wth resharding improvements parameter disabled, "
-                  "creating resharding coordinator unique index.");
-            AutoGetCollection autoColl(
-                opCtx, NamespaceString::kConfigReshardingOperationsNamespace, MODE_X);
-            const Collection* collection = autoColl.getCollection().get();
-            // This could only happen if we got a downgrade command before the service initialized;
-            // in that case the collection and index will be created on initialization.
-            if (!collection) {
-                LOGV2_DEBUG(7760408,
-                            2,
-                            "The reshardingOperations collection did not exist during downgrade");
-                return;
-            }
-            writeConflictRetry(
-                opCtx,
-                "createIndexOnConfigCollection",
-                NamespaceString::kConfigReshardingOperationsNamespace,
-                [&] {
-                    WriteUnitOfWork wunit(opCtx);
-                    CollectionWriter collWriter(opCtx, collection->uuid());
-                    try {
-                        IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
-                            opCtx,
-                            collWriter,
-                            {BSON("key" << BSON("active" << 1) << "name"
-                                        << "ReshardingCoordinatorActiveIndex"
-                                        << "v" << int(IndexDescriptor::kLatestIndexVersion)
-                                        << "unique" << true)},
-                            false /*fromMigrate*/);
-                    } catch (const DBException& e) {
-                        // The uassert should never happen, but it does not indicate corruption if
-                        // it does.
-                        uassert(ErrorCodes::ManualInterventionRequired,
-                                str::stream() << "Unable to create 'active' index on "
-                                                 "'config.reshardingOperations'.  Consider "
-                                                 "dropping 'config.reshardingOperations' and "
-                                                 "trying again.  Original exception "
-                                              << e.toString(),
-                                e.code() == ErrorCodes::IndexAlreadyExists);
-                        LOGV2_DEBUG(7760409,
-                                    2,
-                                    "The 'active' unique index on the reshardingOperations "
-                                    "collection already existed during downgrade");
-                        return;
-                    }
-                    wunit.commit();
-                });
-        }
-    }
-
     void _dropSessionsCollectionLocally(
         OperationContext* opCtx,
         const multiversion::FeatureCompatibilityVersion requestedVersion,
@@ -857,40 +797,6 @@ private:
                     true /* dropSystemCollections */,
                     boost::none,
                     false /* requireCollectionEmpty */);
-            }
-        }
-    }
-
-    void _dropReshardingCoordinatorUniqueIndex(
-        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        // There is no need to re-create this index on upgrade, as the index is no longer
-        // needed to ensure resharding operations are unique.
-        const auto fromVersion =
-            getTransitionFCVInfo(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion())
-                .from;
-        if (resharding::gFeatureFlagReshardingImprovements
-                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, fromVersion)) {
-            LOGV2(7760401,
-                  "Upgrading to FCV wth resharding improvements parameter enabled, "
-                  "dropping resharding coordinator unique index.");
-            try {
-                // The index name is included literally here to avoid creating a
-                // construction-order catastrophe with the static std::string
-                // kReshardingCoordinatorActiveIndexName
-                auto reply = dropIndexes(opCtx,
-                                         NamespaceString::kConfigReshardingOperationsNamespace,
-                                         boost::none,
-                                         "ReshardingCoordinatorActiveIndex");
-                LOGV2_DEBUG(
-                    7760402, 2, "Dropped resharding coordinator index", "reply"_attr = reply);
-            } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                LOGV2_DEBUG(
-                    7760403, 2, "Resharding coordinator collection did not exist during upgrade.");
-            } catch (ExceptionFor<ErrorCodes::IndexNotFound>&) {
-                LOGV2_DEBUG(7760404,
-                            2,
-                            "Resharding coordinator 'active' index did not exist during upgrade.");
             }
         }
     }
@@ -1272,7 +1178,6 @@ private:
             // run on a consistent version from start to finish. This will ensure that it will
             // be able to apply the oplog entries correctly.
             abortAllReshardCollection(opCtx);
-            _createReshardingCoordinatorUniqueIndex(opCtx, requestedVersion, originalVersion);
             _dropSessionsCollectionLocally(opCtx, requestedVersion, originalVersion);
         }
 

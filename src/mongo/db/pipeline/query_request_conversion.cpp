@@ -88,20 +88,6 @@ AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& find
                           << " not supported in aggregation.",
             findCommand.getStartAt().isEmpty());
 
-    // Some options are disallowed when resharding improvements are disabled.
-    if (!resharding::gFeatureFlagReshardingImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        uassert(ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommandRequest::kRequestResumeTokenFieldName
-                              << " not supported in aggregation.",
-                !findCommand.getRequestResumeToken());
-
-        uassert(ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommandRequest::kResumeAfterFieldName
-                              << " not supported in aggregation.",
-                findCommand.getResumeAfter().isEmpty());
-    }
-
     // Now that we've successfully validated this QR, begin building the aggregation command.
     tassert(ErrorCodes::BadValue,
             "Unsupported type UUID for namspace",
@@ -172,17 +158,14 @@ AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& find
     if (findCommand.getLet()) {
         result.setLet(findCommand.getLet()->getOwned());
     }
-    if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        result.setRequestResumeToken(findCommand.getRequestResumeToken());
+    result.setRequestResumeToken(findCommand.getRequestResumeToken());
 
-        if (!findCommand.getResumeAfter().isEmpty()) {
-            result.setResumeAfter(findCommand.getResumeAfter().getOwned());
-        }
+    if (!findCommand.getResumeAfter().isEmpty()) {
+        result.setResumeAfter(findCommand.getResumeAfter().getOwned());
+    }
 
-        if (!findCommand.getStartAt().isEmpty()) {
-            result.setStartAt(findCommand.getStartAt().getOwned());
-        }
+    if (!findCommand.getStartAt().isEmpty()) {
+        result.setStartAt(findCommand.getStartAt().getOwned());
     }
     result.setIncludeQueryStatsMetrics(findCommand.getIncludeQueryStatsMetrics());
 

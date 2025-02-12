@@ -1,7 +1,6 @@
 /*
  * Tests resharding and moveCollection behaviour on unsplittable collections.
  * @tags: [
- *   featureFlagReshardingImprovements,
  *   featureFlagMoveCollection,
  *   assumes_balancer_off,
  *   requires_fcv_80

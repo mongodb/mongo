@@ -162,28 +162,6 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                         !_doc.getRelaxed().has_value());
             }
 
-            if (!resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                uassert(
-                    ErrorCodes::InvalidOptions,
-                    "Resharding improvements is not enabled, reject shardDistribution parameter",
-                    !_doc.getShardDistribution().has_value());
-                uassert(
-                    ErrorCodes::InvalidOptions,
-                    "Resharding improvements is not enabled, reject forceRedistribution parameter",
-                    !_doc.getForceRedistribution().has_value());
-                uassert(ErrorCodes::InvalidOptions,
-                        "Resharding improvements is not enabled, reject reshardingUUID parameter",
-                        !_doc.getReshardingUUID().has_value());
-                uassert(ErrorCodes::InvalidOptions,
-                        "Resharding improvements is not enabled, reject feature flag "
-                        "moveCollection or unshardCollection",
-                        !resharding::gFeatureFlagMoveCollection.isEnabled(
-                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-                            !resharding::gFeatureFlagUnshardCollection.isEnabled(
-                                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-            }
-
             if (!resharding::gFeatureFlagMoveCollection.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
                 !resharding::gFeatureFlagUnshardCollection.isEnabled(

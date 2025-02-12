@@ -191,16 +191,8 @@ void buildStateDocumentApplyMetricsForUpdate(BSONObjBuilder& bob,
                                              const RecipientShardContext& recipientCtx,
                                              ReshardingMetrics* metrics,
                                              Date_t timestamp) {
-    if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        bob.append(
-            getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kIndexBuildTimeFieldName),
-            timestamp);
-    } else {
-        bob.append(
-            getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kDocumentCopyFieldName),
-            timestamp);
-    }
+    bob.append(getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kIndexBuildTimeFieldName),
+               timestamp);
     bob.append(
         getIntervalStartFieldName<DocT>(ReshardingRecipientMetrics::kOplogApplicationFieldName),
         timestamp);
@@ -253,12 +245,7 @@ void setMeticsAfterWrite(ReshardingMetrics* metrics,
             metrics->setStartFor(ReshardingMetrics::TimedPhase::kBuildingIndex, timestamp);
             return;
         case RecipientStateEnum::kApplying:
-            if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                metrics->setEndFor(ReshardingMetrics::TimedPhase::kBuildingIndex, timestamp);
-            } else {
-                metrics->setEndFor(ReshardingMetrics::TimedPhase::kCloning, timestamp);
-            }
+            metrics->setEndFor(ReshardingMetrics::TimedPhase::kBuildingIndex, timestamp);
             metrics->setStartFor(ReshardingMetrics::TimedPhase::kApplying, timestamp);
             return;
         case RecipientStateEnum::kStrictConsistency:
@@ -423,33 +410,29 @@ ReshardingRecipientService::RecipientStateMachine::_notifyCoordinatorAndAwaitDec
     return _retryingCancelableOpCtxFactory
         ->withAutomaticRetry([this, executor](const auto& factory) {
             auto opCtx = factory.makeOperationContext(&cc());
-            if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                {
-                    AutoGetCollection coll(opCtx.get(), _metadata.getTempReshardingNss(), MODE_IS);
-                    if (coll) {
-                        // If verification is enabled, this is expected to have been set upon
-                        // transitioning to the "applying" state after cloning completes and updated
-                        // as oplog entries are applied. So it should not be overwrriten with the
-                        // fast count.
-                        if (!_recipientCtx.getTotalNumDocuments()) {
-                            _recipientCtx.setTotalNumDocuments(coll->numRecords(opCtx.get()));
-                        }
-                        _recipientCtx.setTotalDocumentSize(coll->dataSize(opCtx.get()));
-                        if (coll->isClustered()) {
-                            // There is an implicit 'clustered' index on a clustered collection.
-                            // Increment the total index count similar to storage stats:
-                            // https://github.com/10gen/mongo/blob/29d8030f8aa7f3bc119081007fb09777daffc591/src/mongo/db/stats/storage_stats.cpp#L249C1-L251C22
-                            _recipientCtx.setNumOfIndexes(
-                                coll->getIndexCatalog()->numIndexesTotal() + 1);
-                        } else {
-                            _recipientCtx.setNumOfIndexes(
-                                coll->getIndexCatalog()->numIndexesTotal());
-                        }
+            {
+                AutoGetCollection coll(opCtx.get(), _metadata.getTempReshardingNss(), MODE_IS);
+                if (coll) {
+                    // If verification is enabled, this is expected to have been set upon
+                    // transitioning to the "applying" state after cloning completes and updated
+                    // as oplog entries are applied. So it should not be overwrriten with the
+                    // fast count.
+                    if (!_recipientCtx.getTotalNumDocuments()) {
+                        _recipientCtx.setTotalNumDocuments(coll->numRecords(opCtx.get()));
+                    }
+                    _recipientCtx.setTotalDocumentSize(coll->dataSize(opCtx.get()));
+                    if (coll->isClustered()) {
+                        // There is an implicit 'clustered' index on a clustered collection.
+                        // Increment the total index count similar to storage stats:
+                        // https://github.com/10gen/mongo/blob/29d8030f8aa7f3bc119081007fb09777daffc591/src/mongo/db/stats/storage_stats.cpp#L249C1-L251C22
+                        _recipientCtx.setNumOfIndexes(coll->getIndexCatalog()->numIndexesTotal() +
+                                                      1);
+                    } else {
+                        _recipientCtx.setNumOfIndexes(coll->getIndexCatalog()->numIndexesTotal());
                     }
                 }
-                _metrics->fillRecipientCtxOnCompletion(_recipientCtx);
             }
+            _metrics->fillRecipientCtxOnCompletion(_recipientCtx);
             return _updateCoordinator(opCtx.get(), executor, factory);
         })
         .onTransientError([](const Status& status) {
@@ -735,83 +718,50 @@ void ReshardingRecipientService::RecipientStateMachine::
         _externalState->ensureTempReshardingCollectionExistsWithIndexes(
             opCtx.get(), _metadata, *_cloneTimestamp);
 
-        if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            if (!_metadata.getProvenance() ||
-                _metadata.getProvenance() == ProvenanceEnum::kReshardCollection) {
-                _externalState->withShardVersionRetry(
-                    opCtx.get(),
-                    _metadata.getSourceNss(),
-                    "validating shard key index for reshardCollection"_sd,
-                    [&] {
-                        shardkeyutil::validateShardKeyIsNotEncrypted(
-                            opCtx.get(),
-                            _metadata.getSourceNss(),
-                            ShardKeyPattern(_metadata.getReshardingKey()));
-
-                        if (_metadata.getImplicitlyCreateIndex()) {
-                            // This behavior in this phase is only used to validate whether this
-                            // resharding should be permitted, we need to call
-                            // validateShardKeyIndexExistsOrCreateIfPossible again in the buildIndex
-                            // phase to make sure we have the indexSpecs even after restart.
-                            shardkeyutil::ValidationBehaviorsReshardingBulkIndex behaviors;
-                            behaviors.setOpCtxAndCloneTimestamp(opCtx.get(), *_cloneTimestamp);
-
-                            auto [collOptions, _] = _externalState->getCollectionOptions(
-                                opCtx.get(),
-                                _metadata.getSourceNss(),
-                                _metadata.getSourceUUID(),
-                                *_cloneTimestamp,
-                                "loading collection options to validate shard key index for resharding."_sd);
-
-                            CollectionOptions collectionOptions =
-                                uassertStatusOK(CollectionOptions::parse(
-                                    collOptions, CollectionOptions::parseForStorage));
-
-                            shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
-                                opCtx.get(),
-                                _metadata.getSourceNss(),
-                                ShardKeyPattern{_metadata.getReshardingKey()},
-                                CollationSpec::kSimpleSpec,
-                                false /* unique */,
-                                true /* enforceUniquenessCheck */,
-                                behaviors,
-                                collectionOptions.timeseries /* tsOpts */);
-                        } else {
-                            LOGV2(9197501,
-                                  "Skip checking for the shard key index since "
-                                  "'implicitlyCreateIndex' was set to false");
-                        }
-                    });
-            }
-        } else {
+        if (!_metadata.getProvenance() ||
+            _metadata.getProvenance() == ProvenanceEnum::kReshardCollection) {
             _externalState->withShardVersionRetry(
                 opCtx.get(),
-                _metadata.getTempReshardingNss(),
+                _metadata.getSourceNss(),
                 "validating shard key index for reshardCollection"_sd,
                 [&] {
                     shardkeyutil::validateShardKeyIsNotEncrypted(
                         opCtx.get(),
-                        _metadata.getTempReshardingNss(),
+                        _metadata.getSourceNss(),
                         ShardKeyPattern(_metadata.getReshardingKey()));
 
                     if (_metadata.getImplicitlyCreateIndex()) {
-                        // Only the resharding improvements code path above supports resharding
-                        // timeseries collections, so we do not pass in timeseries options here.
+                        // This behavior in this phase is only used to validate whether this
+                        // resharding should be permitted, we need to call
+                        // validateShardKeyIndexExistsOrCreateIfPossible again in the buildIndex
+                        // phase to make sure we have the indexSpecs even after restart.
+                        shardkeyutil::ValidationBehaviorsReshardingBulkIndex behaviors;
+                        behaviors.setOpCtxAndCloneTimestamp(opCtx.get(), *_cloneTimestamp);
+
+                        auto [collOptions, _] = _externalState->getCollectionOptions(
+                            opCtx.get(),
+                            _metadata.getSourceNss(),
+                            _metadata.getSourceUUID(),
+                            *_cloneTimestamp,
+                            "loading collection options to validate shard key index for resharding."_sd);
+
+                        CollectionOptions collectionOptions =
+                            uassertStatusOK(CollectionOptions::parse(
+                                collOptions, CollectionOptions::parseForStorage));
+
                         shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
                             opCtx.get(),
-                            _metadata.getTempReshardingNss(),
+                            _metadata.getSourceNss(),
                             ShardKeyPattern{_metadata.getReshardingKey()},
                             CollationSpec::kSimpleSpec,
                             false /* unique */,
                             true /* enforceUniquenessCheck */,
-                            shardkeyutil::ValidationBehaviorsShardCollection(
-                                opCtx.get(), ShardingState::get(opCtx.get())->shardId()),
-                            boost::none /* tsOpts */);
+                            behaviors,
+                            collectionOptions.timeseries /* tsOpts */);
                     } else {
-                        LOGV2(9197502,
-                              "Skip checking for the shard key index since 'implicitlyCreateIndex' "
-                              "was set to false");
+                        LOGV2(9197501,
+                              "Skip checking for the shard key index since "
+                              "'implicitlyCreateIndex' was set to false");
                     }
                 });
         }
@@ -983,12 +933,7 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToBuildin
     }();
 
     return std::move(cloningFuture).thenRunOn(**executor).then([this, &factory] {
-        if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            _transitionState(RecipientStateEnum::kBuildingIndex, factory);
-        } else {
-            _transitionToApplying(factory);
-        }
+        _transitionState(RecipientStateEnum::kBuildingIndex, factory);
     });
 }
 
@@ -1087,8 +1032,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                abortToken)
         .thenRunOn(**executor)
         .then([this, &factory](const ReplIndexBuildState::IndexCatalogStats& stats) {
-            if (resharding::gFeatureFlagReshardingVerification.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            {
                 auto opCtx = factory.makeOperationContext(&cc());
                 auto [sourceIdxSpecs, _] = _externalState->getCollectionIndexes(
                     opCtx.get(),
@@ -1269,11 +1213,7 @@ void ReshardingRecipientService::RecipientStateMachine::_cleanupReshardingCollec
             opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getReshardingUUID());
     }
 
-    if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        resharding::data_copy::deleteRecipientResumeData(opCtx.get(),
-                                                         _metadata.getReshardingUUID());
-    }
+    resharding::data_copy::deleteRecipientResumeData(opCtx.get(), _metadata.getReshardingUUID());
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionState(
