@@ -49,21 +49,22 @@ export class TimestampDataset {
     docs() {
         let timestamp_docs = [];
 
-        for (let i = 0; i < 100; i++) {
-            timestamp_docs.push({a: Timestamp(0, i)});
-            timestamp_docs.push({a: Timestamp(i, 0)});
+        // Do not generate Timestamp(0,0) as it triggers SERVER-100712
+        for (let i = 1; i < 101; i++) {
+            timestamp_docs.push({a: Timestamp(1, i)});
+            timestamp_docs.push({a: Timestamp(i, 1)});
         }
         return timestamp_docs;
     }
 
     predicates() {
         return [
-            {a: Timestamp(0, 50)},
-            {a: {$gt: Timestamp(0, 50)}},
-            {a: {$ne: Timestamp(0, 50)}},
-            {a: Timestamp(50, 0)},
-            {a: {$gt: Timestamp(50, 0)}},
-            {a: {$ne: Timestamp(50, 0)}},
+            {a: Timestamp(1, 50)},
+            {a: {$gt: Timestamp(1, 50)}},
+            {a: {$ne: Timestamp(1, 50)}},
+            {a: Timestamp(50, 1)},
+            {a: {$gt: Timestamp(50, 1)}},
+            {a: {$ne: Timestamp(50, 1)}},
         ];
     }
 }

@@ -17,11 +17,12 @@ export class MixedTypesDataset {
 
             // Date, timestamp
             let threeDigitYear = String(i).padStart(3, '0');
-            mixed_docs.push({a: ISODate(`2${threeDigitYear}-01-01T01:01:01.001`)}),
-                mixed_docs.push({a: Timestamp(i, i)}),
+            mixed_docs.push({a: ISODate(`2${threeDigitYear}-01-01T01:01:01.001`)});
+            // Avoid Timestamp(0,0)
+            mixed_docs.push({a: Timestamp(i + 1, i + 1)});
 
-                // Boolean
-                mixed_docs.push({a: i % 2 === 0});
+            // Boolean
+            mixed_docs.push({a: i % 2 === 0});
 
             // Object
             mixed_docs.push({a: {[i]: 1, a: i}});
