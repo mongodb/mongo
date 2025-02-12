@@ -11,22 +11,6 @@ variables:
   # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-  - &generic_linux_compile_params # Essential set of compile parameters used for Linux dev variants.
-    run_on:
-      - rhel8.8-xlarge
-    activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
-    tasks:
-      - name: compile_test_parallel_core_stream_TG
-      - name: compile_test_parallel_unittest_stream_TG
-      - name: compile_test_parallel_dbtest_stream_TG
-      - name: generate_buildid_to_debug_symbols_mapping
-
-  # THIS HAS COPIES IN
-  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
-  # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
-  # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
-  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &generic_linux_compile_expansions # The most commonly used compile expansions.
     scons_cache_scope: shared
     scons_cache_mode: all
@@ -868,11 +852,12 @@ buildvariants:
         distros:
           - rhel8.8-xlarge
 
-  - <<: *generic_linux_compile_params
-    name: &linux-debug-aubsan-compile-toolchain-v5 linux-debug-aubsan-compile-toolchain-v5
-    display_name: "Linux x86 Shared Library {A,UB}SAN Enterprise Compile (v5 toolchain)"
-    tags: ["forbid_tasks_tagged_with_experimental"]
-    activate: false
+  - name: &linux-debug-aubsan-compile-toolchain-v5 linux-debug-aubsan-compile-toolchain-v5
+    display_name: "! Linux x86 Shared Library {A,UB}SAN Enterprise Compile (v5 toolchain)"
+    tags: ["required", "forbid_tasks_tagged_with_experimental"]
+    run_on:
+      - rhel8.8-xlarge
+    cron: "0 0 * * *" # Run once a day
     stepback: false
     expansions:
       <<: *generic_linux_compile_expansions
@@ -898,6 +883,7 @@ buildvariants:
       - name: compile_test_parallel_core_stream_TG
       - name: compile_test_parallel_unittest_stream_TG
       - name: compile_test_parallel_dbtest_stream_TG
+      - name: generate_buildid_to_debug_symbols_mapping
       - name: compile_integration_and_test_parallel_stream_TG
       - name: compile_jstestshell_TG
       - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan
@@ -949,8 +935,37 @@ buildvariants:
         distros:
           - rhel8.8-medium
 
+  - name: rhel8-debug-aubsan-lite-all-feature-flags-required-toolchain-v5
+    display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags) (v5 toolchain)"
+    tags: ["required"]
+    cron: "0 0 * * *" # Run once a day
+    run_on:
+      - rhel8.8-large
+    depends_on:
+      - name: archive_dist_test
+        variant: &linux_debug_aubsan_compile_toolchain_v5_variant_name linux-debug-aubsan-compile-toolchain-v5
+      - name: archive_jstestshell
+        variant: *linux_debug_aubsan_compile_toolchain_v5_variant_name
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+    expansions:
+      <<: *aubsan-lite-required-expansions
+      # To force disable feature flags even on the all feature flags variant, please use this file:
+      # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
+      compile_variant: linux-debug-aubsan-compile-toolchain-v5
+      test_flags: >-
+        --runAllFeatureFlagTests
+        --excludeWithAnyTags=incompatible_aubsan
+    tasks:
+      - name: jsCore
+      - name: jsCore_txns
+      - name: jsCore_wildcard_indexes
+
   - name: rhel8-debug-aubsan-all-feature-flags-toolchain-v5
-    display_name: "Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags) (v5 toolchain)"
+    display_name: "Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (v5 toolchain)"
     tags: ["forbid_tasks_tagged_with_experimental"]
     run_on:
       - rhel8.8-large
