@@ -91,8 +91,8 @@ TEST(DocumentDiffCalculatorTest, SimpleInsert) {
 }
 
 TEST(DocumentDiffCalculatorTest, SimpleUpdate) {
-    auto preObj = fromjson("{a: {b: 1}, c: 1}}");
-    auto postObj = fromjson("{a: {b: 1}, c: 2}}");
+    auto preObj = fromjson("{a: {b: 1}, c: 1}");
+    auto postObj = fromjson("{a: {b: 1}, c: 2}");
     auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
     ASSERT(oplogDiff);
     ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{u: {c: 2}}"));
@@ -102,8 +102,8 @@ TEST(DocumentDiffCalculatorTest, SimpleUpdate) {
 }
 
 TEST(DocumentDiffCalculatorTest, SimpleDelete) {
-    auto preObj = fromjson("{a: {b: 1}, c: 1}}");
-    auto postObj = fromjson("{a: {b: 1}}}");
+    auto preObj = fromjson("{a: {b: 1}, c: 1}");
+    auto postObj = fromjson("{a: {b: 1}}");
     auto oplogDiff = doc_diff::computeOplogDiff(preObj, postObj, 0);
     ASSERT(oplogDiff);
     ASSERT_BSONOBJ_BINARY_EQ(*oplogDiff, fromjson("{d: {c: false}}"));
@@ -176,7 +176,7 @@ TEST(DocumentDiffCalculatorTest, ReplaceAllFieldsLargeDelta) {
     auto inlineDiff = doc_diff::computeInlineDiff(preObj, postObj);
     ASSERT(inlineDiff);
     assertBsonObjEqualUnordered(*inlineDiff,
-                                fromjson("{a: 'd', b: 'd', c: 'd', A: 'i', B: 'i', C: 'i'}}"));
+                                fromjson("{a: 'd', b: 'd', c: 'd', A: 'i', B: 'i', C: 'i'}"));
 }
 
 TEST(DocumentDiffCalculatorTest, InsertFrontFieldLargeDelta) {

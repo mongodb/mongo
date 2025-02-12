@@ -3930,49 +3930,49 @@ namespace moveFinalUnwindFromShardsToMerger {
 
 class OneUnwind : public Base {
     string inputPipeJson() {
-        return "[{$unwind: {path: '$a'}}]}";
+        return "[{$unwind: {path: '$a'}}]";
     }
     string shardPipeJson() {
-        return "[]}";
+        return "[]";
     }
     string mergePipeJson() {
-        return "[{$unwind: {path: '$a'}}]}";
+        return "[{$unwind: {path: '$a'}}]";
     }
 };
 
 class TwoUnwind : public Base {
     string inputPipeJson() {
-        return "[{$unwind: {path: '$a'}}, {$unwind: {path: '$b'}}]}";
+        return "[{$unwind: {path: '$a'}}, {$unwind: {path: '$b'}}]";
     }
     string shardPipeJson() {
-        return "[]}";
+        return "[]";
     }
     string mergePipeJson() {
-        return "[{$unwind: {path: '$a'}}, {$unwind: {path: '$b'}}]}";
+        return "[{$unwind: {path: '$a'}}, {$unwind: {path: '$b'}}]";
     }
 };
 
 class UnwindNotFinal : public Base {
     string inputPipeJson() {
-        return "[{$unwind: {path: '$a'}}, {$match: {a:1}}]}";
+        return "[{$unwind: {path: '$a'}}, {$match: {a:1}}]";
     }
     string shardPipeJson() {
-        return "[{$unwind: {path: '$a'}}, {$match: {a:{$eq:1}}}]}";
+        return "[{$unwind: {path: '$a'}}, {$match: {a:{$eq:1}}}]";
     }
     string mergePipeJson() {
-        return "[]}";
+        return "[]";
     }
 };
 
 class UnwindWithOther : public Base {
     string inputPipeJson() {
-        return "[{$match: {a:1}}, {$unwind: {path: '$a'}}]}";
+        return "[{$match: {a:1}}, {$unwind: {path: '$a'}}]";
     }
     string shardPipeJson() {
-        return "[{$match: {a:{$eq:1}}}]}";
+        return "[{$match: {a:{$eq:1}}}]";
     }
     string mergePipeJson() {
-        return "[{$unwind: {path: '$a'}}]}";
+        return "[{$unwind: {path: '$a'}}]";
     }
 };
 }  // namespace moveFinalUnwindFromShardsToMerger

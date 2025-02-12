@@ -575,8 +575,7 @@ TEST(FLECollectionOptions, Equality_AllowedTypes) {
                     "queries": {"queryType": "equality"}
                 }
             ]
-        }
-    }})"))
+        }})"))
                       .getStatus());
     }
 
@@ -627,8 +626,7 @@ TEST(FLECollectionOptions, Equality_DisAllowedTypes) {
                     "queries": {"queryType": "equality"}
                 }
             ]
-        }
-    }})")));
+        }})")));
     }
 
     for (const auto& type : typesDisallowedUnindexed) {
@@ -660,8 +658,7 @@ TEST(FLECollectionOptions, Range_AllowedTypes) {
                     "queries": {"queryType": "rangePreview", "sparsity" : 1, min : 1, max : 2}
                 }
             ]
-        }
-    }})"))
+        }})"))
                   .getStatus());
 
     ASSERT_OK(CollectionOptions::parse(fromjson(str::stream() << R"({
@@ -674,8 +671,7 @@ TEST(FLECollectionOptions, Range_AllowedTypes) {
                     "queries": {"queryType": "rangePreview", "sparsity" : 1, min : {$numberLong: "1"}, max : {$numberLong: "2"}}
                 }
             ]
-        }
-    }})"))
+        }})"))
                   .getStatus());
 
     for (const auto& type : std::vector<std::string>{"double", "decimal"}) {
@@ -689,8 +685,7 @@ TEST(FLECollectionOptions, Range_AllowedTypes) {
                     "queries": {"queryType": "rangePreview", "sparsity" : 1}
                 }
             ]
-        }
-    }})"))
+        }})"))
                       .getStatus());
     }
 
@@ -706,8 +701,7 @@ TEST(FLECollectionOptions, Range_AllowedTypes) {
                     "queries": {"queryType": "rangePreview", "sparsity" : 1, min: 0.000, max: 1.000, precision: 3}
                 }
             ]
-        }
-    }})"))
+        }})"))
                   .getStatus());
 
     ASSERT_OK(CollectionOptions::parse(fromjson(str::stream() << R"({
@@ -722,8 +716,7 @@ TEST(FLECollectionOptions, Range_AllowedTypes) {
                     "queries": {"queryType": "rangePreview", "sparsity" : 1, min: NumberDecimal("0.000"), max: NumberDecimal("1.000"), precision: 3}
                 }
             ]
-        }
-    }})"))
+        }})"))
                   .getStatus());
 
     // Validate date works
@@ -737,8 +730,7 @@ TEST(FLECollectionOptions, Range_AllowedTypes) {
                     "queries": {"queryType": "rangePreview", "sparsity" : 1, min : {"$date": {"$numberLong": "12344"}}, max : {"$date": {"$numberLong": "12345"}}}
                 }
             ]
-        }
-    }})"))
+        }})"))
                   .getStatus());
 }
 
@@ -776,8 +768,7 @@ TEST(FLECollectionOptions, Range_DisAllowedTypes) {
                     "queries": {"queryType": "rangePreview"}
                 }
             ]
-        }
-    }})")));
+        }})")));
     }
 }
 
@@ -795,7 +786,6 @@ TEST(FLECollectionOptions, Range_MissingFields) {
                     "queries": {"queryType": "rangePreview"}
                 }
             ]
-        }
     }})")));
 
     ASSERT_STATUS_CODE(6775203, CollectionOptions::parse(fromjson(R"({
@@ -808,7 +798,6 @@ TEST(FLECollectionOptions, Range_MissingFields) {
                     "queries": {"queryType": "rangePreview", sparsity: 1}
                 }
             ]
-        }
     }})")));
 
     ASSERT_STATUS_CODE(6775204, CollectionOptions::parse(fromjson(R"({
@@ -821,7 +810,6 @@ TEST(FLECollectionOptions, Range_MissingFields) {
                     "queries": {"queryType": "rangePreview", sparsity: 1, min : 1}
                 }
             ]
-        }
     }})")));
 }
 
@@ -839,8 +827,7 @@ TEST(FLECollectionOptions, Equality_ExtraFields) {
                     "queries": {"queryType": "equality", sparsity:1}
                 }
             ]
-        }
-    }})")));
+        }})")));
 
     ASSERT_STATUS_CODE(6775206, CollectionOptions::parse(fromjson(R"({
         encryptedFields: {
@@ -852,8 +839,7 @@ TEST(FLECollectionOptions, Equality_ExtraFields) {
                     "queries": {"queryType": "equality", min:1}
                 }
             ]
-        }
-    }})")));
+        }})")));
 
     ASSERT_STATUS_CODE(6775207, CollectionOptions::parse(fromjson(R"({
         encryptedFields: {
@@ -865,8 +851,7 @@ TEST(FLECollectionOptions, Equality_ExtraFields) {
                     "queries": {"queryType": "equality", max:1}
                 }
             ]
-        }
-    }})")));
+        }})")));
 }
 
 
@@ -1014,8 +999,7 @@ TEST(FLECollectionOptions, Range_BoundTypeMismatch) {
                     "queries": {"queryType": "rangePreview", "sparsity" : 1, min: {"$numberLong": "12344"}, max: {"$numberLong": "123440"}}
                 }
             ]
-        }
-    }})")));
+        }})")));
 
     ASSERT_STATUS_CODE(7018200, CollectionOptions::parse(fromjson(str::stream() << R"({
         encryptedFields: {
@@ -1027,8 +1011,7 @@ TEST(FLECollectionOptions, Range_BoundTypeMismatch) {
                     "queries": {"queryType": "rangePreview", "sparsity" : 1, min: 1, max: 2}
                 }
             ]
-        }
-    }})")));
+        }})")));
 
     ASSERT_STATUS_CODE(7018201, CollectionOptions::parse(fromjson(str::stream() << R"({
         encryptedFields: {
@@ -1040,8 +1023,7 @@ TEST(FLECollectionOptions, Range_BoundTypeMismatch) {
                     "queries": {"queryType": "rangePreview", "sparsity" : 1, min: {$numberLong: "1"}, max: 2}
                 }
             ]
-        }
-    }})")));
+        }})")));
     ASSERT_STATUS_CODE(7018201, CollectionOptions::parse(fromjson(str::stream() << R"({
         encryptedFields: {
             "fields": [
@@ -1052,8 +1034,7 @@ TEST(FLECollectionOptions, Range_BoundTypeMismatch) {
                     "queries": {"queryType": "rangePreview", "sparsity" : 1, min: 1, max: {"$numberLong": "123440"}}
                 }
             ]
-        }
-    }})")));
+        }})")));
 }
 
 }  // namespace mongo

@@ -1215,7 +1215,7 @@ TEST_F(IndexBoundsBuilderTest, IntersectTwoLt) {
 TEST_F(IndexBoundsBuilderTest, IntersectEqGte) {
     auto testIndex = buildSimpleIndexEntry();
     std::vector<BSONObj> toIntersect;
-    toIntersect.push_back(fromjson("{a: 1}}"));
+    toIntersect.push_back(fromjson("{a: 1}"));
     toIntersect.push_back(fromjson("{a: {$gte: 1}}"));
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
@@ -1294,7 +1294,7 @@ TEST_F(IndexBoundsBuilderTest, IntersectFullyContained) {
 TEST_F(IndexBoundsBuilderTest, EmptyIntersection) {
     auto testIndex = buildSimpleIndexEntry();
     std::vector<BSONObj> toIntersect;
-    toIntersect.push_back(fromjson("{a: 1}}"));
+    toIntersect.push_back(fromjson("{a: 1}"));
     toIntersect.push_back(fromjson("{a: {$gte: 2}}"));
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
@@ -1353,7 +1353,7 @@ TEST_F(IndexBoundsBuilderTest, IntersectWithNE) {
     auto testIndex = buildSimpleIndexEntry();
     std::vector<BSONObj> toIntersect;
     toIntersect.push_back(fromjson("{a: {$gt: 1}}"));
-    toIntersect.push_back(fromjson("{a: {$ne: 2}}}"));
+    toIntersect.push_back(fromjson("{a: {$ne: 2}}"));
     toIntersect.push_back(fromjson("{a: {$lte: 6}}"));
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
@@ -1371,7 +1371,7 @@ TEST_F(IndexBoundsBuilderTest, UnionizeWithNE) {
     auto testIndex = buildSimpleIndexEntry();
     std::vector<BSONObj> toUnionize;
     toUnionize.push_back(fromjson("{a: {$ne: 3}}"));
-    toUnionize.push_back(fromjson("{a: {$ne: 4}}}"));
+    toUnionize.push_back(fromjson("{a: {$ne: 4}}"));
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
     testTranslateAndUnion(toUnionize, &oil, &tightness);

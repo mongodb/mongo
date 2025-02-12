@@ -624,18 +624,18 @@ TEST(MatchExpressionParserSchemaTest, InternalTypeCanParseLongCode) {
 TEST(MatchExpressionParserSchemaTest, AllowedPropertiesFailsParsingIfAFieldIsMissing) {
     auto query = fromjson(
         "{$_internalSchemaAllowedProperties:"
-        "{namePlaceholder: 'i', patternProperties: [], otherwise: {i: 1}}}}");
+        "{namePlaceholder: 'i', patternProperties: [], otherwise: {i: 1}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::FailedToParse);
 
     query = fromjson(
         "{$_internalSchemaAllowedProperties:"
-        "{properties: [], patternProperties: [], otherwise: {i: 1}}}}");
+        "{properties: [], patternProperties: [], otherwise: {i: 1}}}");
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::FailedToParse);
 
     query = fromjson(
         "{$_internalSchemaAllowedProperties:"
-        "{properties: [], namePlaceholder: 'i', otherwise: {i: 1}}}}");
+        "{properties: [], namePlaceholder: 'i', otherwise: {i: 1}}}");
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::FailedToParse);
 
     query = fromjson(
@@ -647,39 +647,39 @@ TEST(MatchExpressionParserSchemaTest, AllowedPropertiesFailsParsingIfAFieldIsMis
 TEST(MatchExpressionParserSchemaTest, AllowedPropertiesFailsParsingIfNamePlaceholderNotAString) {
     auto query = fromjson(
         "{$_internalSchemaAllowedProperties:"
-        "{properties: [], namePlaceholder: 7, patternProperties: [], otherwise: {i: 1}}}}");
+        "{properties: [], namePlaceholder: 7, patternProperties: [], otherwise: {i: 1}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::TypeMismatch);
 
     query = fromjson(
         "{$_internalSchemaAllowedProperties:"
-        "{properties: [], namePlaceholder: /i/, patternProperties: [], otherwise: {i: 1}}}}");
+        "{properties: [], namePlaceholder: /i/, patternProperties: [], otherwise: {i: 1}}}");
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::TypeMismatch);
 }
 
 TEST(MatchExpressionParserSchemaTest, AllowedPropertiesFailsParsingIfNamePlaceholderNotValid) {
     auto query = fromjson(
         "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'Capital',"
-        "patternProperties: [], otherwise: {Capital: 1}}}}");
+        "patternProperties: [], otherwise: {Capital: 1}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::BadValue);
 
     query = fromjson(
         "{$_internalSchemaAllowedProperties:"
-        "{properties: [], namePlaceholder: '', patternProperties: [], otherwise: {'': 1}}}}");
+        "{properties: [], namePlaceholder: '', patternProperties: [], otherwise: {'': 1}}}");
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::BadValue);
 }
 
 TEST(MatchExpressionParserSchemaTest, AllowedPropertiesFailsParsingIfPropertiesNotAllStrings) {
     auto query = fromjson(
         "{$_internalSchemaAllowedProperties:"
-        "{properties: [7], namePlaceholder: 'i', patternProperties: [], otherwise: {i: 1}}}}");
+        "{properties: [7], namePlaceholder: 'i', patternProperties: [], otherwise: {i: 1}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::TypeMismatch);
 
     query = fromjson(
         "{$_internalSchemaAllowedProperties: {properties: ['x', {}], namePlaceholder: 'i',"
-        "patternProperties: [], otherwise: {i: 1}}}}");
+        "patternProperties: [], otherwise: {i: 1}}}");
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::TypeMismatch);
 }
 
@@ -687,13 +687,13 @@ TEST(MatchExpressionParserSchemaTest,
      AllowedPropertiesFailsParsingIfPatternPropertiesNotAllObjects) {
     auto query = fromjson(
         "{$_internalSchemaAllowedProperties:"
-        "{properties: [], namePlaceholder: 'i', patternProperties: ['blah'], otherwise: {i: 1}}}}");
+        "{properties: [], namePlaceholder: 'i', patternProperties: ['blah'], otherwise: {i: 1}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::TypeMismatch);
 
     query = fromjson(
         "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
-        "otherwise: {i: 1}, patternProperties: [{regex: /a/, expression: {i: 0}}, 'blah']}}}");
+        "otherwise: {i: 1}, patternProperties: [{regex: /a/, expression: {i: 0}}, 'blah']}}");
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::TypeMismatch);
 }
 
@@ -701,13 +701,13 @@ TEST(MatchExpressionParserSchemaTest,
      AllowedPropertiesFailsParsingIfPatternPropertiesHasUnknownFields) {
     auto query = fromjson(
         "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
-        "patternProperties: [{foo: 1, bar: 1}], otherwise: {i: 1}}}}");
+        "patternProperties: [{foo: 1, bar: 1}], otherwise: {i: 1}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::FailedToParse);
 
     query = fromjson(
         "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
-        "patternProperties: [{regex: /a/, blah: 0}], otherwise: {i: 1}}}}");
+        "patternProperties: [{regex: /a/, blah: 0}], otherwise: {i: 1}}}");
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::FailedToParse);
 }
 
@@ -715,18 +715,18 @@ TEST(MatchExpressionParserSchemaTest,
      AllowedPropertiesFailsParsingIfPatternPropertiesRegexMissingOrWrongType) {
     auto query = fromjson(
         "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
-        "otherwise: {i: 0}, patternProperties: [{expression: {i: 0}}]}}}");
+        "otherwise: {i: 0}, patternProperties: [{expression: {i: 0}}]}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::FailedToParse);
 
     query = fromjson(
         "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
-        "otherwise: {i: 0}, patternProperties: [{regex: 7, expression: {i: 0}}]}}}");
+        "otherwise: {i: 0}, patternProperties: [{regex: 7, expression: {i: 0}}]}}");
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::TypeMismatch);
 
     query = fromjson(
         "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
-        "otherwise: {i: 0}, patternProperties: [{regex: 'notARegex', expression: {i: 0}}]}}}");
+        "otherwise: {i: 0}, patternProperties: [{regex: 'notARegex', expression: {i: 0}}]}}");
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::TypeMismatch);
 }
 
@@ -734,13 +734,13 @@ TEST(MatchExpressionParserSchemaTest,
      AllowedPropertiesFailsParsingIfPatternPropertiesExpressionInvalid) {
     auto query = fromjson(
         "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
-        "otherwise: {i: 0}, patternProperties: [{regex: /a/}]}}}");
+        "otherwise: {i: 0}, patternProperties: [{regex: /a/}]}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::FailedToParse);
 
     query = fromjson(
         "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
-        "otherwise: {i: 0}, patternProperties: [{regex: /a/, expression: 'blah'}]}}}");
+        "otherwise: {i: 0}, patternProperties: [{regex: /a/, expression: 'blah'}]}}");
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::TypeMismatch);
 }
 
@@ -748,7 +748,7 @@ TEST(MatchExpressionParserSchemaTest,
      AllowedPropertiesFailsParsingIfPatternPropertiesRegexHasFlags) {
     auto query = fromjson(
         "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
-        "otherwise: {i: 0}, patternProperties: [{regex: /a/i, expression: {i: 0}}]}}}");
+        "otherwise: {i: 0}, patternProperties: [{regex: /a/i, expression: {i: 0}}]}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::BadValue);
 }
@@ -756,33 +756,33 @@ TEST(MatchExpressionParserSchemaTest,
 TEST(MatchExpressionParserSchemaTest, AllowedPropertiesFailsParsingIfMismatchingNamePlaceholders) {
     auto query = fromjson(
         "{$_internalSchemaAllowedProperties:"
-        "{properties: [], namePlaceholder: 'i', patternProperties: [], otherwise: {j: 1}}}}");
+        "{properties: [], namePlaceholder: 'i', patternProperties: [], otherwise: {j: 1}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::FailedToParse);
 
     query = fromjson(
         "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
-        "patternProperties: [{regex: /a/, expression: {w: 7}}], otherwise: {i: 'foo'}}}}");
+        "patternProperties: [{regex: /a/, expression: {w: 7}}], otherwise: {i: 'foo'}}}");
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::FailedToParse);
 }
 
 TEST(MatchExpressionParserSchemaTest, AllowedPropertiesFailsParsingIfOtherwiseIncorrectType) {
     auto query = fromjson(
         "{$_internalSchemaAllowedProperties:"
-        "{properties: [], namePlaceholder: 'i', patternProperties: [], otherwise: false}}}}");
+        "{properties: [], namePlaceholder: 'i', patternProperties: [], otherwise: false}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::TypeMismatch);
 
     query = fromjson(
         "{$_internalSchemaAllowedProperties:"
-        "{properties: [], namePlaceholder: 'i', patternProperties: [], otherwise: [{i: 7}]}}}}");
+        "{properties: [], namePlaceholder: 'i', patternProperties: [], otherwise: [{i: 7}]}}");
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::TypeMismatch);
 }
 
 TEST(MatchExpressionParserSchemaTest, AllowedPropertiesFailsParsingIfOtherwiseNotAValidExpression) {
     auto query = fromjson(
         "{$_internalSchemaAllowedProperties: {properties: [], namePlaceholder: 'i',"
-        "patternProperties: [], otherwise: {i: {$invalid: 1}}}}}}");
+        "patternProperties: [], otherwise: {i: {$invalid: 1}}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::BadValue);
 }
@@ -791,7 +791,7 @@ TEST(MatchExpressionParserSchemaTest, AllowedPropertiesParsesSuccessfully) {
     auto query = fromjson(
         "{$_internalSchemaAllowedProperties: {properties: ['phoneNumber', 'address'],"
         "namePlaceholder: 'i', otherwise: {i: {$gt: 10}},"
-        "patternProperties: [{regex: /[nN]umber/, expression: {i: {$type: 'number'}}}]}}}");
+        "patternProperties: [{regex: /[nN]umber/, expression: {i: {$type: 'number'}}}]}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto allowedProperties = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(allowedProperties.getStatus());
@@ -809,7 +809,7 @@ TEST(MatchExpressionParserSchemaTest, AllowedPropertiesParsesSuccessfully) {
 TEST(MatchExpressionParserSchemaTest, AllowedPropertiesAcceptsEmptyPropertiesAndPatternProperties) {
     auto query = fromjson(
         "{$_internalSchemaAllowedProperties:"
-        "{properties: [], namePlaceholder: 'i', patternProperties: [], otherwise: {i: 1}}}}");
+        "{properties: [], namePlaceholder: 'i', patternProperties: [], otherwise: {i: 1}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto allowedProperties = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(allowedProperties.getStatus());
@@ -820,7 +820,7 @@ TEST(MatchExpressionParserSchemaTest, AllowedPropertiesAcceptsEmptyPropertiesAnd
 TEST(MatchExpressionParserSchemaTest, AllowedPropertiesAcceptsEmptyOtherwiseExpression) {
     auto query = fromjson(
         "{$_internalSchemaAllowedProperties:"
-        "{properties: [], namePlaceholder: 'i', patternProperties: [], otherwise: {}}}}}");
+        "{properties: [], namePlaceholder: 'i', patternProperties: [], otherwise: {}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto allowedProperties = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(allowedProperties.getStatus());
