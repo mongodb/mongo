@@ -28,28 +28,16 @@
 
 global:
     cpp_namespace: "mongo"
-    cpp_includes: "mongo/rpc/metadata/audit_client_attrs.h"
+    cpp_includes: 
+        - "mongo/rpc/metadata/audit_user_attrs.h"
+        - "mongo/rpc/metadata/audit_client_attrs.h"
 
 imports:
      - "mongo/db/basic_types.idl"
-     - "mongo/rpc/metadata/audit_client_attrs.idl"
+     - "mongo/rpc/metadata/audit_attrs.idl"
      - "mongo/rpc/metadata/audit_metadata.idl"
 
 structs:
-    AuthenticationMetadata:
-        # Since we need to store this struct in collection,
-        # we need to redefine the ImpersonatedUserMetadata struct because
-        # it has fields prefixed with with '$' dollar sign that are not supported
-        # by our storage engine.
-        description: "A struct representing the impersonated users associated with a specific operation."
-        strict: false
-        fields:
-            user:
-                type: UserName
-                optional: true
-            roles:
-                type: array<RoleName>
-
     ForwardableOperationMetadataBase:
         description: "Used to store metadata of an operation context that can be safely passed among different threads."
         strict: false
@@ -58,9 +46,9 @@ structs:
                 type: object_owned
                 description: "The comment associated with the operation."
                 optional: true
-            impersonatedUserMetadata:
-                type: AuthenticationMetadata
-                description: "The impersonated users associated with the operation."
+            auditUserMetadata:
+                type: AuditUserAttrs
+                description: "Users and roles that should be audited for this op"
                 optional: true
             auditClientMetadata:
                 type: AuditClientAttrs

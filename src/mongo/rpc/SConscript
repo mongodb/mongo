@@ -17,6 +17,12 @@ if wiredtiger:
         LIBDEPS=[],
     )
 
+    env.CppUnitTest(
+        target="rpc_d_test",
+        source=[],
+        LIBDEPS=[],
+    )
+
 env.CppIntegrationTest(
     target="rpc_integration_test",
     source=[],

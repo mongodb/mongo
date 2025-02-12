@@ -90,22 +90,6 @@ extern std::function<void(ServiceContext*)> initializeSynchronizeJob;
 extern std::function<void()> shutdownSynchronizeJob;
 
 /**
- * Struct that temporarily stores client information when an audit hook
- * executes on a separate thread with a new Client. In those cases, ImpersonatedClientAttrs
- * can bundle all relevant client attributes necessary for auditing and be safely
- * passed into the new thread, where the new Client will be loaded with the userNames and
- * roleNames stored in ImpersonatedClientAttrs.
- */
-struct ImpersonatedClientAttrs {
-    UserName userName;
-    std::vector<RoleName> roleNames;
-
-    ImpersonatedClientAttrs() = default;
-
-    ImpersonatedClientAttrs(Client* client);
-};
-
-/**
  * Narrow API for the parts of mongo::Command used by the audit library.
  */
 class CommandInterface {

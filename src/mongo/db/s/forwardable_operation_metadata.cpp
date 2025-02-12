@@ -49,6 +49,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/metadata/audit_client_attrs.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
+#include "mongo/rpc/metadata/audit_user_attrs.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -63,14 +64,7 @@ ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opC
         setComment(optComment->wrap());
     }
 
-    if (const auto authMetadata = rpc::getImpersonatedUserMetadata(opCtx)) {
-        if (authMetadata->getUser()) {
-            AuthenticationMetadata metadata;
-            metadata.setUser(authMetadata->getUser().get());
-            metadata.setRoles(authMetadata->getRoles());
-            setImpersonatedUserMetadata(metadata);
-        }
-    }
+    setAuditUserMetadata(rpc::AuditUserAttrs::get(opCtx));
 
     if (auto auditClientAttrs = rpc::AuditClientAttrs::get(opCtx->getClient())) {
         setAuditClientMetadata(std::move(auditClientAttrs));
@@ -93,14 +87,8 @@ void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
         opCtx->setComment(comment.value());
     }
 
-    if (const auto& optAuthMetadata = getImpersonatedUserMetadata()) {
-        const auto& authMetadata = optAuthMetadata.value();
-        UserName username(authMetadata.getUser().value_or(UserName()));
-
-        if (!authMetadata.getRoles().empty()) {
-            AuthorizationSession::get(client)->setImpersonatedUserData(username,
-                                                                       authMetadata.getRoles());
-        }
+    if (const auto& optAuditUserMetadata = getAuditUserMetadata()) {
+        rpc::AuditUserAttrs::set(opCtx, optAuditUserMetadata.value());
     }
 
     if (const auto& optAuditClientMetadata = getAuditClientMetadata()) {

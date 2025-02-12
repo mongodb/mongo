@@ -215,6 +215,7 @@ mongo_cc_library(
         "//src/mongo/db/catalog:collection_catalog",
         "//src/mongo/db/s:forwardable_operation_metadata",
         "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/rpc:metadata_impersonated_user",
         "//src/mongo/util/concurrency:thread_pool",
     ] + select({
         "//bazel/config:enterprise_feature_audit_enabled": [

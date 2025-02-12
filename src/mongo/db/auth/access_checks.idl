@@ -35,11 +35,8 @@ enums:
         values:
             kCheckAuthorizedToListCollections : "check_authorized_to_list_collections"
             kCheckCursorSessionPrivilege : "check_cursor_session_privilege"
-            kClearImpersonatedUserData : "clear_impersonated_user_data"
             kGetAuthenticatedRoleNames : "get_authenticated_role_names"
             kGetAuthenticatedUserName : "get_authenticated_user_name"
-            kGetImpersonatedRoleNames : "get_impersonated_role_names"
-            kGetImpersonatedUserName : "get_impersonated_user_name"
             kGetAuthenticatedUser : "get_authenticated_user"
             kIsAuthenticated :  "is_authenticated"
             kIsAuthenticatedAsUserWithRole : "is_authenticated_as_user_with_role"

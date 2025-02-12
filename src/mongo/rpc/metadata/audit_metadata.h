@@ -55,30 +55,10 @@ namespace rpc {
 static constexpr auto kImpersonationMetadataSectionName = "$audit"_sd;
 
 /*
- * Gets the current impersonation data from the OpCtx (assumes readImpersonatedUserMetadata
- * has already been called)
- */
-boost::optional<AuditMetadata> getImpersonatedUserMetadata(OperationContext* opCtx);
-
-/*
  * Sets the provided audit metadata on the AuditClientAtrrs decorator or AuditUserAttrs decorator
  * respectively only if their data is present.
  */
-
 void setAuditMetadata(OperationContext* opCtx, const boost::optional<AuditMetadata>& data);
-
-/*
- * Helper function that sets the provided impersonated user metadata on the opCtx AuditUserAttrs
- * decorator only if there are actually impersonated users/roles.
- */
-void setImpersonatedUserMetadataHelper(OperationContext* opCtx,
-                                       const boost::optional<AuditMetadata>& data);
-/*
- * Helper function that sets the provided audit client metadata on the AuditClientAtrrs decorator
- * only if there is client metadata.
- */
-void setAuditClientMetadataHelper(OperationContext* opCtx,
-                                  const boost::optional<AuditMetadata>& data);
 
 /*
  * Get impersonation metadata off the opCtx

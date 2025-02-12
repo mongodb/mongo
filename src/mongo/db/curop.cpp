@@ -72,6 +72,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
+#include "mongo/rpc/metadata/audit_user_attrs.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/util/assert_util.h"
@@ -319,28 +320,17 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
                             ->now()
                             .toString());
 
-    auto authSession = AuthorizationSession::get(client);
-    // Depending on whether the authenticated user is the same user which ran the command,
-    // this might be "effectiveUsers" or "runBy".
-    const auto serializeAuthenticatedUsers = [&](StringData name) {
-        if (authSession->isAuthenticated()) {
-            BSONArrayBuilder users(infoBuilder->subarrayStart(name));
-            authSession->getAuthenticatedUserName()->serializeToBSON(&users);
-        }
-    };
-
-    auto maybeImpersonationData = rpc::getImpersonatedUserMetadata(clientOpCtx);
-    if (maybeImpersonationData) {
+    if (auto clientAuditUserAttrs = rpc::AuditUserAttrs::get(clientOpCtx)) {
         BSONArrayBuilder users(infoBuilder->subarrayStart("effectiveUsers"));
-
-        if (maybeImpersonationData->getUser()) {
-            maybeImpersonationData->getUser()->serializeToBSON(&users);
-        }
-
+        clientAuditUserAttrs->getUser().serializeToBSON(&users);
         users.doneFast();
-        serializeAuthenticatedUsers("runBy"_sd);
-    } else {
-        serializeAuthenticatedUsers("effectiveUsers"_sd);
+        if (clientAuditUserAttrs->getIsImpersonating()) {
+            auto authSession = AuthorizationSession::get(client);
+            if (authSession->isAuthenticated()) {
+                BSONArrayBuilder users(infoBuilder->subarrayStart("runBy"));
+                authSession->getAuthenticatedUserName()->serializeToBSON(&users);
+            }
+        }
     }
 
     infoBuilder->appendBool("isFromUserConnection", client->isFromUserConnection());

@@ -457,7 +457,6 @@ mongo_cc_library(
         "authorization_manager.cpp",
         "authorization_manager_factory.cpp",
         "authorization_router.cpp",
-        "authorization_session.cpp",
         "//src/mongo/util/concurrency:thread_pool.h",
     ],
     hdrs = [
@@ -567,11 +566,9 @@ mongo_cc_library(
 mongo_cc_library(
     name = "auth_umc",
     srcs = [
-        "impersonation_session.cpp",
         "user_management_commands_parser.cpp",
     ],
     hdrs = [
-        "impersonation_session.h",
         "user_management_commands_parser.h",
     ],
     deps = [

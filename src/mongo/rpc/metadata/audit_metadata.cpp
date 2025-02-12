@@ -53,53 +53,6 @@
 
 namespace mongo {
 namespace rpc {
-namespace {
-const auto auditUserAttrsDecoration =
-    OperationContext::declareDecoration<synchronized_value<boost::optional<AuditUserAttrs>>>();
-}  // namespace
-
-boost::optional<AuditUserAttrs> AuditUserAttrs::get(OperationContext* opCtx) {
-    if (opCtx) {
-        auto auditUserAttrsOptional = auditUserAttrsDecoration(opCtx).synchronize();
-        if (auditUserAttrsOptional->has_value()) {
-            return auditUserAttrsOptional->value();
-        }
-    }
-    return boost::none;
-}
-
-void AuditUserAttrs::set(OperationContext* opCtx, AuditUserAttrs auditUserAttrs) {
-    *auditUserAttrsDecoration(opCtx) = std::move(auditUserAttrs);
-}
-
-boost::optional<AuditMetadata> getImpersonatedUserMetadata(OperationContext* opCtx) {
-    if (!opCtx) {
-        return boost::none;
-    }
-    auto auditUserAttrs = AuditUserAttrs::get(opCtx);
-    if (!auditUserAttrs) {
-        return boost::none;
-    }
-    AuditMetadata metadata;
-    metadata.setUser(auditUserAttrs->userName);
-    metadata.setRoles(std::move(auditUserAttrs->roleNames));
-    return metadata;
-}
-
-void setImpersonatedUserMetadata(OperationContext* opCtx,
-                                 const boost::optional<AuditMetadata>& data) {
-    if (!data) {
-        // Reset AuditUserAttrs decoration to boost::none if data is absent.
-        auditUserAttrsDecoration(opCtx) = boost::none;
-        return;
-    }
-    auto userName = data->getUser();
-    auto roleNames = data->getRoles();
-    if (userName) {
-        AuditUserAttrs::set(opCtx, AuditUserAttrs(*userName, std::move(roleNames)));
-    }
-}
-
 void setAuditClientMetadata(OperationContext* opCtx, const boost::optional<AuditMetadata>& data) {
     // TODO SERVER-83990: remove
     if (!gFeatureFlagExposeClientIpInAuditLogs.isEnabledUseLastLTSFCVWhenUninitialized(
@@ -135,47 +88,30 @@ void setAuditClientMetadata(OperationContext* opCtx, const boost::optional<Audit
 }
 
 void setAuditMetadata(OperationContext* opCtx, const boost::optional<AuditMetadata>& data) {
-    setImpersonatedUserMetadata(opCtx, data);
     setAuditClientMetadata(opCtx, data);
+    if (data) {
+        if (auto& user = data->getUser()) {
+            rpc::AuditUserAttrs::set(opCtx, *user, data->getRoles(), true /* isImpersonating */);
+        }
+    }
 }
 
 boost::optional<AuditMetadata> getAuditAttrsToAuditMetadata(OperationContext* opCtx) {
     // If we have no opCtx, which does appear to happen, don't do anything.
-    if (!opCtx) {
-        return {};
+    auto auditUserAttrs = AuditUserAttrs::get(opCtx);
+    if (!auditUserAttrs) {
+        return boost::none;
     }
 
-    // Otherwise construct a metadata section from the list of authenticated users/roles
-    auto authSession = AuthorizationSession::get(opCtx->getClient());
-    auto userName = authSession->getImpersonatedUserName();
-    auto roleNames = authSession->getImpersonatedRoleNames();
-    if (!userName && !roleNames.more()) {
-        userName = authSession->getAuthenticatedUserName();
-        roleNames = authSession->getAuthenticatedRoleNames();
-    }
-
-    // Add user/role information if available
-    boost::optional<AuditMetadata> metadata;
-    if (userName || roleNames.more()) {
-        metadata = AuditMetadata();
-        if (userName) {
-            metadata->setUser(userName.value());
-        }
-        metadata->setRoles(roleNameIteratorToContainer<std::vector<RoleName>>(roleNames));
-    } else {
-        return metadata;
-    }
+    AuditMetadata metadata;
+    metadata.setUser(auditUserAttrs->getUser());
+    metadata.setRoles(auditUserAttrs->getRoles());
 
     // TODO SERVER-83990: remove
     if (gFeatureFlagExposeClientIpInAuditLogs.isEnabledUseLastLTSFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        auto clientAttrs = AuditClientAttrs::get(opCtx->getClient());
-        if (clientAttrs) {
-            auto clientMetadata = clientAttrs->generateClientMetadataObj();
-            if (!metadata) {
-                metadata = AuditMetadata();
-            }
-            metadata->setClientMetadata(std::move(clientMetadata));
+        if (auto clientAttrs = AuditClientAttrs::get(opCtx->getClient())) {
+            metadata.setClientMetadata(clientAttrs->generateClientMetadataObj());
         }
     }
 
@@ -191,10 +127,10 @@ void writeAuditMetadata(OperationContext* opCtx, BSONObjBuilder* out) {
 
 std::size_t estimateAuditMetadataSize(
     const boost::optional<UserName>& userName,
-    RoleNameIterator roleNames,
+    const std::vector<RoleName>& roleNames,
     const boost::optional<ImpersonatedClientMetadata>& clientMetadata = boost::none) {
     // If there are no users/roles being impersonated just exit
-    if (!userName && !roleNames.more()) {
+    if (!userName && roleNames.empty()) {
         return 0;
     }
 
@@ -209,13 +145,13 @@ std::size_t estimateAuditMetadataSize(
 
     // BSONArrayType + "impersonatedRoles" + NULL + BSONArray Length
     ret += 1 + AuditMetadata::kRolesFieldName.size() + 1 + 4;
-    for (std::size_t i = 0; roleNames.more(); roleNames.next(), ++i) {
+    for (std::size_t i = 0; i < roleNames.size(); i++) {
         // BSONType::Object + strlen(indexId) + NULL byte
         // to_string(i).size() will be log10(i) plus some rounding and fuzzing.
         // Increment prior to taking the log so that we never take log10(0) which is NAN.
         // This estimates one extra byte every time we reach (i % 10) == 9.
         ret += 1 + static_cast<std::size_t>(1.1 + log10(i + 1)) + 1;
-        ret += roleNames.get().getBSONObjSize();
+        ret += roleNames[i].getBSONObjSize();
     }
 
     // EOD terminator for impersonatedRoles array
@@ -250,30 +186,22 @@ std::size_t estimateAuditMetadataSize(
 }
 
 std::size_t estimateAuditMetadataSize(OperationContext* opCtx) {
-    if (!opCtx) {
+    auto auditUserAttrs = AuditUserAttrs::get(opCtx);
+    if (!auditUserAttrs) {
         return 0;
     }
 
-    // Otherwise construct a metadata section from the list of authenticated users/roles
-    auto authSession = AuthorizationSession::get(opCtx->getClient());
-    auto userName = authSession->getImpersonatedUserName();
-    auto roleNames = authSession->getImpersonatedRoleNames();
-    if (!userName && !roleNames.more()) {
-        userName = authSession->getAuthenticatedUserName();
-        roleNames = authSession->getAuthenticatedRoleNames();
-    }
-    auto clientAttrs = AuditClientAttrs::get(opCtx->getClient());
-    if (clientAttrs) {
-        const auto& clientMetadata = clientAttrs->generateClientMetadataObj();
-        return estimateAuditMetadataSize(userName, roleNames, clientMetadata);
+    if (auto clientAttrs = AuditClientAttrs::get(opCtx->getClient())) {
+        return estimateAuditMetadataSize(auditUserAttrs->getUser(),
+                                         auditUserAttrs->getRoles(),
+                                         clientAttrs->generateClientMetadataObj());
     }
 
-    return estimateAuditMetadataSize(userName, roleNames);
+    return estimateAuditMetadataSize(auditUserAttrs->getUser(), auditUserAttrs->getRoles());
 }
 
 std::size_t estimateAuditMetadataSize(const AuditMetadata& md) {
-    return estimateAuditMetadataSize(
-        md.getUser(), makeRoleNameIteratorForContainer(md.getRoles()), md.getClientMetadata());
+    return estimateAuditMetadataSize(md.getUser(), md.getRoles(), md.getClientMetadata());
 }
 
 }  // namespace rpc

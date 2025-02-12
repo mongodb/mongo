@@ -27,33 +27,24 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "audit_user_attrs_client_observer.h"
 
-#include <boost/optional.hpp>
-#include <vector>
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/client.h"
+#include "mongo/rpc/metadata/audit_user_attrs.h"
+#include "mongo/util/decorable.h"
 
-#include "mongo/db/auth/role_name.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/rpc/metadata/audit_attrs_gen.h"
-#include "mongo/rpc/metadata/audit_metadata_gen.h"
+namespace mongo::audit {
+namespace {
+ServiceContext::ConstructorActionRegisterer auditUserAttrsClientObserverRegisterer{
+    "AuditUserAttrsClientObserverRegisterer", [](ServiceContext* svcCtx) {
+        svcCtx->registerClientObserver(std::make_unique<AuditUserAttrsClientObserver>());
+    }};
 
-namespace mongo::rpc {
+}  // namespace
 
-class AuditClientAttrs : public rpc::AuditClientAttrsBase {
-public:
-    AuditClientAttrs(HostAndPort local, HostAndPort remote, std::vector<HostAndPort> proxies)
-        : AuditClientAttrsBase(std::move(local), std::move(remote), std::move(proxies)) {}
-    AuditClientAttrs(HostAndPort local, HostAndPort remote)
-        : AuditClientAttrs(std::move(local), std::move(remote), {}) {}
+void AuditUserAttrsClientObserver::onCreateOperationContext(OperationContext* opCtx) {
+    rpc::AuditUserAttrs::resetToAuthenticatedUser(opCtx);
+}
 
-    explicit AuditClientAttrs(const BSONObj& obj);
-
-    static boost::optional<AuditClientAttrs> get(Client* client);
-    static void set(Client* client, AuditClientAttrs clientAttrs);
-    static void reset(Client* client);
-
-    ImpersonatedClientMetadata generateClientMetadataObj();
-};
-
-}  // namespace mongo::rpc
+}  // namespace mongo::audit

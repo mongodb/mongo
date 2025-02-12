@@ -55,6 +55,7 @@
 #include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/rpc/metadata/audit_user_attrs.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
@@ -420,20 +421,17 @@ LegacyRuntimeConstants Variables::transitionalExtractRuntimeConstants() const {
 }
 
 void Variables::defineUserRoles(OperationContext* opCtx) {
-    auto* as = AuthorizationSession::get(opCtx->getClient());
-
-    auto roleNames =
-        as->isImpersonating() ? as->getImpersonatedRoleNames() : as->getAuthenticatedRoleNames();
-    // Marshall current effective user roles into an array of
-    // {_id: ..., db: ..., role: ...} objects for the $$USER_ROLES variable.
     BSONArrayBuilder builder;
-    for (; roleNames.more(); roleNames.next()) {
-        BSONObjBuilder bob(builder.subobjStart());
-
-        bob.append("_id"_sd, roleNames->getUnambiguousName());
-        bob.append("role"_sd, roleNames->getRole());
-        bob.append("db"_sd, roleNames->getDB());
-        bob.doneFast();
+    if (auto auditUserAttrs = rpc::AuditUserAttrs::get(opCtx)) {
+        // Marshall current effective user roles into an array of
+        // {_id: ..., db: ..., role: ...} objects for the $$USER_ROLES variable.
+        for (const auto& roleName : auditUserAttrs->getRoles()) {
+            BSONObjBuilder bob(builder.subobjStart());
+            bob.append("_id"_sd, roleName.getUnambiguousName());
+            bob.append("role"_sd, roleName.getRole());
+            bob.append("db"_sd, roleName.getDB());
+            bob.doneFast();
+        }
     }
 
     _definitions[kUserRolesId] = {Value(builder.arr()), true /* isConst */};

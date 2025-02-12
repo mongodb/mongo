@@ -62,7 +62,6 @@ protected:
 
     void setUpTestData() {
         auto client = opCtx()->getClient();
-        auto authSession = AuthorizationSession::get(client);
 
         auto local = HostAndPort(kLocalAddr);
         auto remote = HostAndPort(kRemoteAddr);
@@ -72,7 +71,7 @@ protected:
 
         AuditClientAttrs::set(
             client, AuditClientAttrs(std::move(local), std::move(remote), std::move(proxies)));
-        authSession->setImpersonatedUserData(userName, roleNames);
+        AuditUserAttrs::set(opCtx(), userName, roleNames, true /* isImpersonating */);
     }
 
 private:

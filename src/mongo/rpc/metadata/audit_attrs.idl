@@ -31,6 +31,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
+    - "mongo/db/auth/auth_types.idl"
     - "mongo/util/net/hostandport.idl"
 
 types:
@@ -42,7 +43,33 @@ types:
         deserializer: "mongo::rpc::AuditClientAttrs"
         # Deserializer uses getOwned.
         is_view: false
+
+    AuditUserAttrs:
+        description: "Container for per-operation user information for auditing."
+        cpp_type: rpc::AuditUserAttrs
+        bson_serialization_type: object
+        serializer: "mongo::rpc::AuditUserAttrs::toBSON"
+        deserializer: "mongo::rpc::AuditUserAttrs"
+        # No view members.
+        is_view: false
+
 structs:
+    AuditUserAttrsBase:
+        description: "Stores per-operation user information needed for auditing."
+        strict: false
+        fields:
+            user:
+                type: UserName
+                description: "The username to audit"
+                optional: false
+            roles:
+                type: array<RoleName>
+                description: "Roles to audit"
+                optional: false
+            isImpersonating:
+                type: bool
+                description: "Whether impersonation is active"
+
     AuditClientAttrsBase:
         description: "Stores per-operation client information needed for auditing."
         strict: false

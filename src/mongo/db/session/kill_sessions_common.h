@@ -50,6 +50,7 @@
 #include "mongo/db/session/kill_sessions_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/session_killer.h"
+#include "mongo/rpc/metadata/audit_user_attrs.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -77,24 +78,38 @@ class ScopedKillAllSessionsByPatternImpersonator {
 public:
     ScopedKillAllSessionsByPatternImpersonator(OperationContext* opCtx,
                                                const KillAllSessionsByPattern& pattern) {
-        AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
+        _opCtx = opCtx;
+        // If pattern doesn't contain both user and roles, make sure we don't swap on destruction
+        _active = pattern.getUsers() && pattern.getRoles();
+        if (!_active) {
+            return;
+        }
+        // Save current value of AuditUserAttrs for later restore
+        _attrs = rpc::AuditUserAttrs::get(opCtx);
+        // Set AuditUserAttrs to match the pattern passed in
+        auto [name, roles] = getKillAllSessionsByPatternImpersonateData(pattern);
+        if (name) {
+            rpc::AuditUserAttrs::set(opCtx, *name, roles, true /* isImpersonating */);
+        } else {
+            rpc::AuditUserAttrs::resetToAuthenticatedUser(opCtx);
+        }
+    }
 
-        if (pattern.getUsers() && pattern.getRoles()) {
-            boost::optional<UserName> name;
-            std::tie(name, _roles) = getKillAllSessionsByPatternImpersonateData(pattern);
-
-            if (name) {
-                _name = std::make_shared<UserName>(name.get());
+    ~ScopedKillAllSessionsByPatternImpersonator() {
+        // Ensure the impersonator is active and opCtx is still alive, and swap back.
+        if (_active && _opCtx->checkForInterruptNoAssert().isOK()) {
+            if (_attrs) {
+                rpc::AuditUserAttrs::set(_opCtx, *_attrs);
+            } else {
+                rpc::AuditUserAttrs::resetToAuthenticatedUser(_opCtx);
             }
-
-            _raii.emplace(authSession, &_name, &_roles);
         }
     }
 
 private:
-    std::shared_ptr<UserName> _name;
-    std::vector<RoleName> _roles;
-    boost::optional<AuthorizationSession::ScopedImpersonate> _raii;
+    OperationContext* _opCtx;
+    boost::optional<rpc::AuditUserAttrs> _attrs;
+    bool _active;
 };
 
 /**

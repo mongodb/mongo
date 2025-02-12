@@ -63,7 +63,6 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/impersonation_session.h"
 #include "mongo/db/auth/ldap_cumulative_operation_stats.h"
 #include "mongo/db/auth/ldap_operation_stats.h"
 #include "mongo/db/auth/resource_pattern.h"
@@ -141,6 +140,7 @@
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/rpc/metadata/audit_user_attrs.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/protocol.h"
@@ -670,7 +670,6 @@ private:
 
     boost::optional<RunCommandOpTimes> _runCommandOpTimes;
     boost::optional<ResourceConsumption::ScopedMetricsCollector> _scopedMetrics;
-    boost::optional<ImpersonationSessionGuard> _impersonationSessionGuard;
     boost::optional<auth::SecurityTokenAuthenticationGuard> _tokenAuthorizationSessionGuard;
     bool _refreshedDatabase = false;
     bool _refreshedCollection = false;
@@ -1647,12 +1646,13 @@ void ExecCommandDatabase::_initiateCommand() {
                          "Skipping command execution for help request"));
     }
 
-    _impersonationSessionGuard.emplace(opCtx);
-
-    // Restart contract tracking afer the impersonation guard checks for impersonate if using
-    // impersonation.
-    if (_impersonationSessionGuard->isActive()) {
-        authzSession->startContractTracking();
+    if (auto auditUserAttrs = rpc::AuditUserAttrs::get(opCtx);
+        auditUserAttrs && auditUserAttrs->getIsImpersonating()) {
+        uassert(ErrorCodes::Unauthorized,
+                "Unauthorized use of impersonation metadata.",
+                authzSession->isAuthorizedForPrivilege(
+                    Privilege(ResourcePattern::forClusterResource(authzSession->getUserTenantId()),
+                              ActionType::impersonate)));
     }
 
     _invocation->checkAuthorization(opCtx, _execContext.getRequest());

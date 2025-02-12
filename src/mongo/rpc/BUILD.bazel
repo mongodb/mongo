@@ -141,14 +141,17 @@ mongo_cc_library(
 mongo_cc_library(
     name = "metadata_impersonated_user",
     srcs = [
+        "//src/mongo/rpc/metadata:audit_attrs_gen",
         "//src/mongo/rpc/metadata:audit_client_attrs.cpp",
-        "//src/mongo/rpc/metadata:audit_client_attrs_gen",
         "//src/mongo/rpc/metadata:audit_metadata.cpp",
+        "//src/mongo/rpc/metadata:audit_user_attrs.cpp",
+        "//src/mongo/rpc/metadata:audit_user_attrs_client_observer.cpp",
     ],
     hdrs = [
         "//src/mongo/rpc/metadata:audit_client_attrs.h",
         "//src/mongo/rpc/metadata:audit_metadata.h",
         "//src/mongo/rpc/metadata:audit_user_attrs.h",
+        "//src/mongo/rpc/metadata:audit_user_attrs_client_observer.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -255,6 +258,25 @@ mongo_cc_unit_test(
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/idl:server_parameter_test_util",
         "//src/third_party/wiredtiger:wiredtiger_checksum",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "rpc_d_test",
+    srcs = [
+        "//src/mongo/rpc/metadata:audit_user_attrs_client_observer_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_first_group",
+    ],
+    deps = [
+        ":client_metadata",
+        ":metadata",
+        ":rpc",
+        "//src/mongo/client:clientdriver_minimal",
+        "//src/mongo/db:service_context_d",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/auth:authorization_session_test_fixture",
     ],
 )
 

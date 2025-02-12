@@ -53,6 +53,7 @@
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
+#include "mongo/rpc/metadata/audit_user_attrs.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"

@@ -79,6 +79,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata/audit_user_attrs.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/util/assert_util.h"
@@ -431,9 +432,6 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
 
     auto replState = invariant(_getIndexBuild(buildUUID));
 
-    // Since index builds occur in a separate thread, client attributes that are audited must be
-    // extracted from the client object and passed into the thread separately.
-    audit::ImpersonatedClientAttrs impersonatedClientAttrs(opCtx->getClient());
     ForwardableOperationMetadata forwardableOpMetadata(opCtx);
 
     // The thread pool task will be responsible for signalling the condition variable when the index
@@ -452,7 +450,6 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                           shardVersion = oss.getShardVersion(nss),
                           dbVersion = oss.getDbVersion(dbName),
                           resumeInfo,
-                          impersonatedClientAttrs = std::move(impersonatedClientAttrs),
                           forwardableOpMetadata =
                               std::move(forwardableOpMetadata)](auto status) mutable noexcept {
         ScopeGuard onScopeExitGuard([&] {
@@ -479,13 +476,6 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         // Forward the forwardable operation metadata from the external client to this thread's
         // client.
         forwardableOpMetadata.setOn(opCtx.get());
-
-        // Load the external client's attributes into this thread's client for auditing.
-        auto authSession = AuthorizationSession::get(opCtx->getClient());
-        if (authSession) {
-            authSession->setImpersonatedUserData(std::move(impersonatedClientAttrs.userName),
-                                                 std::move(impersonatedClientAttrs.roleNames));
-        }
 
         while (MONGO_unlikely(hangBeforeInitializingIndexBuild.shouldFail())) {
             sleepmillis(100);

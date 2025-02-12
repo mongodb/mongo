@@ -28,10 +28,11 @@ idl_generator(
 )
 
 idl_generator(
-    name = "audit_client_attrs_gen",
-    src = "audit_client_attrs.idl",
+    name = "audit_attrs_gen",
+    src = "audit_attrs.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:auth_types_gen",
         "//src/mongo/util/net:hostandport_gen",
     ],
 )

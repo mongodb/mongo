@@ -73,6 +73,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/rpc/metadata/audit_user_attrs.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -206,7 +207,7 @@ void AuthorizationSessionImpl::startRequest(OperationContext* opCtx) {
             _expirationTime.value() <= opCtx->getServiceContext()->getFastClockSource()->now()) {
             _expiredUserName = std::exchange(_authenticatedUser, boost::none).value()->getName();
             _expirationTime = boost::none;
-            clearImpersonatedUserData();
+            rpc::AuditUserAttrs::resetToAuthenticatedUser(opCtx);
             _updateInternalAuthorizationState();
         }
     }
@@ -310,8 +311,8 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
     _expiredUserName = boost::none;
     _loginTime = Date_t::now();
 
-    // If there are any users and roles in the impersonation data, clear it out.
-    clearImpersonatedUserData();
+    // Reset AuditUserAttrs so that it contains the newly authorized user's information.
+    rpc::AuditUserAttrs::resetToAuthenticatedUser(opCtx);
 
     _updateInternalAuthorizationState();
     return Status::OK();
@@ -351,7 +352,7 @@ void AuthorizationSessionImpl::logoutSecurityTokenUser() {
 
     // Explicitly skip auditing the logout event,
     // security tokens don't represent a permanent login.
-    clearImpersonatedUserData();
+    rpc::AuditUserAttrs::resetToAuthenticatedUser(_client);
     _updateInternalAuthorizationState();
     _loginTime = boost::none;
 }
@@ -378,8 +379,7 @@ void AuthorizationSessionImpl::logoutAllDatabases(StringData reason) {
 
     _loginTime = boost::none;
     _expirationTime = boost::none;
-
-    clearImpersonatedUserData();
+    rpc::AuditUserAttrs::resetToAuthenticatedUser(_client);
     _updateInternalAuthorizationState();
 }
 
@@ -893,27 +893,20 @@ bool AuthorizationSessionImpl::_isAuthorizedForPrivilege(const Privilege& privil
     });
 }
 
-void AuthorizationSessionImpl::setImpersonatedUserData(const UserName& username,
-                                                       const std::vector<RoleName>& roles) {
-    std::atomic_store(&_impersonatedUserName, std::make_shared<UserName>(username));
-    _impersonatedRoleNames = roles;
-}
-
 bool AuthorizationSessionImpl::isCoauthorizedWithClient(Client* opClient, WithLock opClientLock) {
     _contract.addAccessCheck(AccessCheckEnum::kIsCoauthorizedWithClient);
-    auto getUserName = [](AuthorizationSession* authSession) {
-        if (auto impersonatedUsername = authSession->getImpersonatedUserName()) {
-            return impersonatedUsername;
-        } else {
-            return authSession->getAuthenticatedUserName();
+
+    auto getUserName = [](Client* client) -> boost::optional<UserName> {
+        if (auto auditUserAttrs = rpc::AuditUserAttrs::get(client)) {
+            return auditUserAttrs->getUser();
         }
+        return boost::none;
     };
 
-    if (auto myname = getUserName(this)) {
-        return myname == getUserName(AuthorizationSession::get(opClient));
-    } else {
-        return false;
+    if (auto myName = getUserName(_client)) {
+        return myName == getUserName(opClient);
     }
+    return false;
 }
 
 bool AuthorizationSessionImpl::isCoauthorizedWith(const boost::optional<UserName>& userName) {
@@ -925,36 +918,10 @@ bool AuthorizationSessionImpl::isCoauthorizedWith(const boost::optional<UserName
     return getAuthenticatedUserName() == userName;
 }
 
-boost::optional<UserName> AuthorizationSessionImpl::getImpersonatedUserName() {
-    _contract.addAccessCheck(AccessCheckEnum::kGetImpersonatedUserName);
-
-    if (auto impersonatedUserName = std::atomic_load(&_impersonatedUserName)) {
-        return *impersonatedUserName;
-    }
-    return boost::none;
-}
-
-RoleNameIterator AuthorizationSessionImpl::getImpersonatedRoleNames() {
-    _contract.addAccessCheck(AccessCheckEnum::kGetImpersonatedRoleNames);
-
-    return makeRoleNameIterator(_impersonatedRoleNames.begin(), _impersonatedRoleNames.end());
-}
-
 bool AuthorizationSessionImpl::isUsingLocalhostBypass() {
     _contract.addAccessCheck(AccessCheckEnum::kIsUsingLocalhostBypass);
 
     return _getAuthorizationManager()->isAuthEnabled() && _externalState->shouldAllowLocalhost();
-}
-
-// Clear the vectors of impersonated usernames and roles.
-void AuthorizationSessionImpl::clearImpersonatedUserData() {
-    std::atomic_store(&_impersonatedUserName, {});
-    _impersonatedRoleNames.clear();
-}
-
-
-bool AuthorizationSessionImpl::isImpersonating() const {
-    return std::atomic_load(&_impersonatedUserName) != nullptr;
 }
 
 auto AuthorizationSessionImpl::checkCursorSessionPrivilege(
@@ -1031,8 +998,6 @@ void AuthorizationSessionImpl::verifyContract(const AuthorizationContract* contr
     // These checks are done by auditing
     tempContract.addAccessCheck(AccessCheckEnum::kGetAuthenticatedUserName);
     tempContract.addAccessCheck(AccessCheckEnum::kGetAuthenticatedRoleNames);
-    tempContract.addAccessCheck(AccessCheckEnum::kGetImpersonatedUserName);
-    tempContract.addAccessCheck(AccessCheckEnum::kGetImpersonatedRoleNames);
 
     // Since internal sessions are started by the server, the generated authorization contract is
     // missing the following user access checks, so we add them here to allow commands that spawn
@@ -1082,6 +1047,13 @@ void AuthorizationSessionImpl::_updateInternalAuthorizationState() {
             RoleName roleName = roles.next();
             _authenticatedRoleNames.push_back(RoleName(roleName.getRole(), roleName.getDB()));
         }
+    }
+
+    if (auto auditUserAttrs = rpc::AuditUserAttrs::get(_client);
+        !auditUserAttrs || !auditUserAttrs->getIsImpersonating()) {
+        // If we are not impersonating or AuditUserAttrs doesn't exist, reset AuditUserAttrs to the
+        // authenticated user.
+        rpc::AuditUserAttrs::resetToAuthenticatedUser(_client);
     }
 
     // Update cached cluster/any action types for non-tenant resources.

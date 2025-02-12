@@ -89,33 +89,6 @@ public:
     AuthorizationSession() = default;
 
     /**
-     * Provides a way to swap out impersonate data for the duration of the ScopedImpersonate's
-     * lifetime.
-     */
-    class ScopedImpersonate {
-    public:
-        ScopedImpersonate(AuthorizationSession* authSession,
-                          std::shared_ptr<UserName>* user,
-                          std::vector<RoleName>* roles)
-            : _authSession(*authSession), _user(*user), _roles(*roles) {
-            swap();
-        }
-
-        ~ScopedImpersonate() {
-            this->swap();
-        }
-
-    private:
-        void swap();
-
-        AuthorizationSession& _authSession;
-        std::shared_ptr<UserName>& _user;
-        std::vector<RoleName>& _roles;
-    };
-
-    friend class ScopedImpersonate;
-
-    /**
      * Gets the AuthorizationSession associated with the given "client", or nullptr.
      *
      * The "client" object continues to own the returned AuthorizationSession.
@@ -143,7 +116,7 @@ public:
     static void set(Client* client, std::unique_ptr<AuthorizationSession> session);
 
     // Takes ownership of the externalState.
-    virtual ~AuthorizationSession() = 0;
+    virtual ~AuthorizationSession() = default;
 
     // Should be called at the beginning of every new request.  This performs the checks
     // necessary to determine if localhost connections should be given full access.
@@ -285,20 +258,6 @@ public:
         return isAuthorizedForClusterActions({action}, tenantId);
     }
 
-    // Replaces the data for the user that a system user is impersonating with new data.
-    // The auditing system adds this user and their roles to each audit record in the log.
-    virtual void setImpersonatedUserData(const UserName& username,
-                                         const std::vector<RoleName>& roles) = 0;
-
-    // Gets the name of the user, if any, that the system user is impersonating.
-    virtual boost::optional<UserName> getImpersonatedUserName() = 0;
-
-    // Gets an iterator over the roles of all users that the system user is impersonating.
-    virtual RoleNameIterator getImpersonatedRoleNames() = 0;
-
-    // Clears the data for impersonated users.
-    virtual void clearImpersonatedUserData() = 0;
-
     // Returns true if the session and 'opClient's AuthorizationSession share an
     // authenticated user. If either object has impersonated users,
     // those users will be considered as 'authenticated' for the purpose of this check.
@@ -315,11 +274,6 @@ public:
     // Impersonated users are not considered as 'authenticated' for the purpose of this check.
     // This always returns true if auth is not enabled.
     virtual bool isCoauthorizedWith(const boost::optional<UserName>& userName) = 0;
-
-    // Tells whether impersonation is active or not.  This state is set when
-    // setImpersonatedUserData is called and cleared when clearImpersonatedUserData is
-    // called.
-    virtual bool isImpersonating() const = 0;
 
     // Returns a status encoding whether the current session in the specified `opCtx` has privilege
     // to access a cursor in the specified `cursorSessionId` parameter.  Returns `Status::OK()`,
@@ -342,9 +296,6 @@ public:
     // When the current authorization will expire.
     // boost::none indicates a non-expiring session.
     virtual const boost::optional<Date_t>& getExpiration() const = 0;
-
-protected:
-    virtual std::tuple<std::shared_ptr<UserName>*, std::vector<RoleName>*> _getImpersonations() = 0;
 };
 
 // Returns a status encoding whether the current session in the specified `opCtx` has privilege to

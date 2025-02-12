@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,31 +27,45 @@
  *    it in the license file.
  */
 
-#include "mongo/db/operation_context.h"
-#include "mongo/rpc/metadata/audit_metadata.h"
+#include "audit_user_attrs_client_observer.h"
 
-namespace mongo {
-class OperationContext;
+#include "mongo/db/auth/authorization_session_test_fixture.h"
+#include "mongo/db/auth/sasl_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/rpc/metadata/audit_user_attrs.h"
 
-/**
- * RAII class to optionally set an impersonated username list into the authorization session
- * for the duration of the life of this object.
- */
-class ImpersonationSessionGuard {
-    ImpersonationSessionGuard(const ImpersonationSessionGuard&) = delete;
-    ImpersonationSessionGuard& operator=(const ImpersonationSessionGuard&) = delete;
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-public:
-    ImpersonationSessionGuard(OperationContext* opCtx);
-    ~ImpersonationSessionGuard();
+namespace mongo::audit {
 
-    bool isActive() const {
-        return _active;
-    }
+namespace {
 
-private:
-    OperationContext* _opCtx;
-    bool _active{false};
+class AuditDecorationsTest : public AuthorizationSessionTestFixture {
+protected:
+    explicit AuditDecorationsTest(Options options = Options{})
+        : AuthorizationSessionTestFixture(std::move(options)) {}
 };
 
-}  // namespace mongo
+const UserName kUser1Test("user1"_sd, "test"_sd);
+const std::unique_ptr<UserRequest> kUser1TestRequest =
+    std::make_unique<UserRequestGeneral>(kUser1Test, boost::none);
+
+
+TEST_F(AuditDecorationsTest, basicAuditUserAttrsCheck) {
+    ASSERT_OK(createUser(kUser1Test, {}));
+
+    auto newClient = getService()->makeClient("client1");
+    ASSERT_OK(AuthorizationSession::get(newClient.get())
+                  ->addAndAuthorizeUser(_opCtx.get(), kUser1TestRequest->clone(), boost::none));
+
+    auto opCtx2 = newClient->makeOperationContext();
+    auto auditAttrs = rpc::AuditUserAttrs::get(opCtx2.get());
+
+    ASSERT(auditAttrs);
+    ASSERT_EQ(auditAttrs->getUser().getUser(), "user1");
+    ASSERT_EQ(auditAttrs->getRoles().size(), 0);
+}
+
+}  // namespace
+
+}  // namespace mongo::audit

@@ -2658,6 +2658,7 @@ mongo_cc_library(
         "//src/mongo/db/query/query_shape:query_shape_common",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/update:pattern_cmp",
+        "//src/mongo/rpc:metadata_impersonated_user",
         "//src/mongo/scripting",  # TODO(SERVER-93876): Remove.
         "//src/mongo/scripting:scripting_common",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:elapsed_tracker",

@@ -152,20 +152,9 @@ public:
     bool isAuthorizedForClusterActions(const ActionSet& actionSet,
                                        const boost::optional<TenantId>& tenantId) override;
 
-    void setImpersonatedUserData(const UserName& username,
-                                 const std::vector<RoleName>& roles) override;
-
-    boost::optional<UserName> getImpersonatedUserName() override;
-
-    RoleNameIterator getImpersonatedRoleNames() override;
-
-    void clearImpersonatedUserData() override;
-
     bool isCoauthorizedWithClient(Client* opClient, WithLock opClientLock) override;
 
     bool isCoauthorizedWith(const boost::optional<UserName>& userName) override;
-
-    bool isImpersonating() const override;
 
     Status checkCursorSessionPrivilege(OperationContext* opCtx,
                                        boost::optional<LogicalSessionId> cursorSessionId) override;
@@ -214,10 +203,6 @@ private:
     // lock on the admin database (to update out-of-date user privilege information).
     bool _isAuthorizedForPrivilege(const Privilege& privilege);
 
-    std::tuple<std::shared_ptr<UserName>*, std::vector<RoleName>*> _getImpersonations() override {
-        return std::make_tuple(&_impersonatedUserName, &_impersonatedRoleNames);
-    }
-
     // Generates a vector of default privileges that are granted to any user,
     // regardless of which roles that user does or does not possess.
     // If localhost exception is active, the permissions include the ability to create
@@ -227,10 +212,6 @@ private:
 
 private:
     std::unique_ptr<AuthzSessionExternalState> _externalState;
-
-    // These are used in the auditing system. They are not used for authz checks.
-    std::shared_ptr<UserName> _impersonatedUserName;
-    std::vector<RoleName> _impersonatedRoleNames;
 
     // A record of privilege checks and other authorization like function calls made on
     // AuthorizationSession. IDL Typed Commands can optionally define a contract declaring the set

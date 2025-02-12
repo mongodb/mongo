@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,25 +27,24 @@
  *    it in the license file.
  */
 
-#include <boost/optional.hpp>
-#include <string>
+#pragma once
+
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
 
-#include "mongo/base/shim.h"
-#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/role_name.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/operation_context.h"
 
-namespace mongo {
+namespace mongo::audit {
+class AuditUserAttrsClientObserver final : public ServiceContext::ClientObserver {
+public:
+    void onCreateClient(Client* client) final{};
+    void onDestroyClient(Client* client) final{};
 
-AuthorizationSession::~AuthorizationSession() = default;
+    void onCreateOperationContext(OperationContext* opCtx) final;
+    void onDestroyOperationContext(OperationContext* opCtx) final{};
+};
 
-void AuthorizationSession::ScopedImpersonate::swap() {
-    using std::swap;
-    auto impersonations = _authSession._getImpersonations();
-    auto originalUser = std::atomic_exchange(std::get<0>(impersonations), std::move(_user));
-    _user = std::move(originalUser);
-    swap(*std::get<1>(impersonations), _roles);
-}
-
-}  // namespace mongo
+}  // namespace mongo::audit

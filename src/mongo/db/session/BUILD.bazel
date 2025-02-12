@@ -112,6 +112,7 @@ mongo_cc_library(
         "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/auth:user",
         "//src/mongo/rpc:client_metadata",
+        "//src/mongo/rpc:metadata_impersonated_user",
         "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
     ],
 )
