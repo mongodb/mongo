@@ -14,7 +14,7 @@
  * stages.
  *
  * The $rankFusion feature flag is required to enable use of "score" and "searchScore".
- * @tags: [ featureFlagRankFusionBasic ]
+ * @tags: [ featureFlagRankFusionBasic, featureFlagRankFusionFull ]
  */
 
 import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";
