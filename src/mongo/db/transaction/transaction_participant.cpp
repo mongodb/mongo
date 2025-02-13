@@ -1638,6 +1638,18 @@ void TransactionParticipant::Participant::unstashTransactionResources(
                 o().txnState.isInRetryableWriteMode());
     }
 
+    if (cmdName == "abortTransaction" &&
+        (o().txnState.isAbortedWithoutPrepare() || o().txnState.isInProgress())) {
+        // Explicitly set lastOp so that the abort for an internal transaction waits for write
+        // concern in the service entry point. This is used by internal transactions (via the
+        // cleanup abort) to ensure that the speculative snapshot the transaction was operating on
+        // has been replicated to secondaries.
+        //
+        // Note that setLastOpToSystemLastOpTime() requires us to not be in a write unit of work,
+        // and so it must be set before we set the write unit of work later in this function.
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+    }
+
     // If this is not a multi-document transaction, there is nothing to unstash.
     if (o().txnState.isInRetryableWriteMode()) {
         invariant(!o().txnResourceStash);

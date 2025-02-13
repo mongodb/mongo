@@ -125,7 +125,7 @@ ExecutorFuture<void> TransactionWithRetries::_runBodyHandleErrors(int bodyAttemp
                 _internalTxn->primeForCleanup();
                 iassert(bodyStatus);
             } else if (nextStep == Transaction::ErrorHandlingStep::kRetryTransaction) {
-                return _bestEffortAbort().then([this, bodyStatus] {
+                return _bestEffortAbort().then([this, bodyStatus](AbortResult result) {
                     InternalTransactionMetrics::get(_internalTxn->getParentServiceContext())
                         ->incrementRetriedTransactions();
                     _internalTxn->primeForTransactionRetry();
@@ -190,12 +190,16 @@ ExecutorFuture<CommitResult> TransactionWithRetries::_runCommitWithRetries() {
         .on(_executor, _token);
 }
 
-ExecutorFuture<void> TransactionWithRetries::_bestEffortAbort() {
-    return _internalTxn->abort().thenRunOn(_executor).onError([this](Status abortStatus) {
-        LOGV2(5875900,
-              "Unable to abort internal transaction",
-              "reason"_attr = redact(abortStatus),
-              "txnInfo"_attr = _internalTxn->reportStateForLog());
+ExecutorFuture<AbortResult> TransactionWithRetries::_bestEffortAbort() {
+    return _internalTxn->abort().thenRunOn(_executor).then([this](AbortResult result) {
+        if (!result.cmdStatus.isOK() || !result.wcError.toStatus().isOK()) {
+            LOGV2(5875900,
+                  "Unable to abort internal transaction",
+                  "commandStatus"_attr = redact(result.cmdStatus),
+                  "writeConcernStatus"_attr = redact(result.wcError.toStatus()),
+                  "txnInfo"_attr = _internalTxn->reportStateForLog());
+        }
+        return result;
     });
 }
 
@@ -203,7 +207,7 @@ bool TransactionWithRetries::needsCleanup() {
     return _internalTxn->needsCleanup();
 }
 
-SemiFuture<void> TransactionWithRetries::cleanUp() {
+SemiFuture<AbortResult> TransactionWithRetries::cleanUp() {
     tassert(7567600, "Unnecessarily cleaning up transaction", _internalTxn->needsCleanup());
 
     return _bestEffortAbort()

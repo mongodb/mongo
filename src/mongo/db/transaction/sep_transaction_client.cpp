@@ -104,6 +104,7 @@ StatusWith<CommitResult> SyncTransactionWithRetries::runNoThrow(OperationContext
     repl::ReplClientInfo::forClient(opCtx->getClient())
         .setLastProxyWriteTimestampForward(_txn->getOperationTime().asTimestamp());
 
+    boost::optional<AbortResult> cleanupAbortResult;
     if (_txn->needsCleanup()) {
         // Schedule cleanup on an out of line executor so it runs even if the transaction was
         // cancelled. Attempt to wait for cleanup so it appears synchronous for most callers, but
@@ -111,16 +112,19 @@ StatusWith<CommitResult> SyncTransactionWithRetries::runNoThrow(OperationContext
         //
         // Also schedule after getting the transaction's operation time so the best effort abort
         // can't unnecessarily advance it.
-        ExecutorFuture<void>(_cleanupExecutor)
-            .then([txn = _txn, inlineExecutor = _inlineExecutor]() mutable {
-                Notification<void> mayReturnFromCleanup;
-                auto cleanUpFuture = txn->cleanUp().unsafeToInlineFuture().tapAll(
-                    [&](auto&&) { mayReturnFromCleanup.set(); });
-                runFutureInline(inlineExecutor.get(), mayReturnFromCleanup);
-                return cleanUpFuture;
-            })
-            .getNoThrow(opCtx)
-            .ignore();
+        auto abortResult = ExecutorFuture<void>(_cleanupExecutor)
+                               .then([txn = _txn, inlineExecutor = _inlineExecutor]() mutable {
+                                   Notification<void> mayReturnFromCleanup;
+                                   auto cleanUpFuture =
+                                       txn->cleanUp().unsafeToInlineFuture().tapAll(
+                                           [&](auto&&) { mayReturnFromCleanup.set(); });
+                                   runFutureInline(inlineExecutor.get(), mayReturnFromCleanup);
+                                   return cleanUpFuture;
+                               })
+                               .getNoThrow(opCtx);
+        if (abortResult.isOK()) {
+            cleanupAbortResult = abortResult.getValue();
+        }
     }
 
     auto unyieldStatus = _resourceYielder ? _resourceYielder->unyieldNoThrow(opCtx) : Status::OK();
@@ -134,7 +138,16 @@ StatusWith<CommitResult> SyncTransactionWithRetries::runNoThrow(OperationContext
             // presumably more meaningful error the caller was interrupted with.
             return interruptStatus;
         }
-        return txnResult;
+
+        // TODO SERVER-99035: Use a more general TxnResult struct instead of CommitResult.
+        //
+        // We include the write concern error from the cleanup abort to ensure that the client
+        // is informed of any replication issues with the speculative snapshot that the internal
+        // transaction operated on, even if the transaction has failed and the commit
+        // (which would normally provide a write concern error) did not occur.
+        return StatusWith(CommitResult{txnResult.getStatus(),
+                                       cleanupAbortResult ? cleanupAbortResult->wcError
+                                                          : WriteConcernErrorDetail()});
     } else if (!unyieldStatus.isOK()) {
         return unyieldStatus;
     }

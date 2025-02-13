@@ -204,12 +204,16 @@ SemiFuture<CommitResult> Transaction::commit() {
         .semi();
 }
 
-SemiFuture<void> Transaction::abort() {
+SemiFuture<AbortResult> Transaction::abort() {
     return _commitOrAbort(DatabaseName::kAdmin, AbortTransaction::kCommandName)
         .thenRunOn(_executor)
         .then([](BSONObj res) {
-            uassertStatusOK(getStatusFromCommandResult(res));
-            uassertStatusOK(getWriteConcernStatusFromCommandResult(res));
+            auto wcErrorHolder = getWriteConcernErrorDetailFromBSONObj(res);
+            WriteConcernErrorDetail wcError;
+            if (wcErrorHolder) {
+                wcErrorHolder->cloneTo(&wcError);
+            }
+            return AbortResult{getStatusFromCommandResult(res), wcError};
         })
         .semi();
 }
