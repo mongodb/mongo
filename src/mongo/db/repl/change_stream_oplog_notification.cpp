@@ -104,45 +104,6 @@ void notifyChangeStreamsOnShardCollection(OperationContext* opCtx,
     insertOplogEntry(opCtx, std::move(oplogEntry), "ShardCollectionWritesOplog");
 }
 
-void notifyChangeStreamsOnDatabaseAdded(OperationContext* opCtx,
-                                        const DatabasesAdded& databasesAddedNotification) {
-    const std::string operationName = [&] {
-        switch (databasesAddedNotification.getPhase()) {
-            case CommitPhaseEnum::kSuccessful:
-                return "createDatabase";
-            case CommitPhaseEnum::kAborted:
-                return "createDatabaseAbort";
-            case CommitPhaseEnum::kPrepare:
-                return "createDatabasePrepare";
-            default:
-                MONGO_UNREACHABLE;
-        }
-    }();
-
-    for (const auto& dbName : databasesAddedNotification.getNames()) {
-        repl::MutableOplogEntry oplogEntry;
-        const auto dbNameStr =
-            DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
-
-        oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
-        oplogEntry.setNss(NamespaceString(dbName));
-        oplogEntry.setTid(dbName.tenantId());
-        oplogEntry.setObject(BSON("msg" << BSON(operationName << dbNameStr)));
-        BSONObjBuilder o2Builder;
-        o2Builder.append(operationName, dbNameStr);
-        if (databasesAddedNotification.getPhase() == CommitPhaseEnum::kPrepare) {
-            o2Builder.append("primaryShard", *databasesAddedNotification.getPrimaryShard());
-        }
-
-        o2Builder.append("isImported", databasesAddedNotification.getAreImported());
-        oplogEntry.setObject2(o2Builder.obj());
-        oplogEntry.setOpTime(repl::OpTime());
-        oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
-
-        insertOplogEntry(opCtx, std::move(oplogEntry), "DbAddedToConfigCatalogWritesOplog");
-    }
-}
-
 void notifyChangeStreamsOnMovePrimary(OperationContext* opCtx,
                                       const DatabaseName& dbName,
                                       const ShardId& oldPrimary,

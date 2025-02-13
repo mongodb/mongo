@@ -1629,17 +1629,6 @@ void ShardingCatalogManager::_addShardInTransaction(
 
     const auto existingShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
-    // 1. Send out the "prepareCommit" notification
-    std::vector<DatabaseName> importedDbNames;
-    std::transform(databasesInNewShard.begin(),
-                   databasesInNewShard.end(),
-                   std::back_inserter(importedDbNames),
-                   [](const DatabaseName& dbName) { return dbName; });
-    DatabasesAdded notification(
-        std::move(importedDbNames), true /*addImported*/, CommitPhaseEnum::kPrepare);
-    notification.setPrimaryShard(ShardId(newShard.getName()));
-    uassertStatusOK(_notifyClusterOnNewDatabases(opCtx, notification, existingShardIds));
-
     const auto collCreationTime = [&]() {
         const auto currentTime = VectorClock::get(opCtx)->getTime();
         return currentTime.clusterTime().asTimestamp();
@@ -1648,7 +1637,7 @@ void ShardingCatalogManager::_addShardInTransaction(
         coll.setTimestamp(collCreationTime);
     }
 
-    // 2. Set up and run the commit statements
+    // Set up and run the commit statements
     // TODO SERVER-81582: generate batches of transactions to insert the database/placementHistory
     // and collection/placementHistory before adding the shard in config.shards.
     auto transactionChain = [opCtx, &newShard, &databasesInNewShard, &collectionsInNewShard](
@@ -1786,18 +1775,6 @@ void ShardingCatalogManager::_addShardInTransaction(
 
         txn_api::SyncTransactionWithRetries txn(opCtx, executor, nullptr, inlineExecutor);
         txn.run(opCtx, transactionChain);
-    }
-
-    // 3. Reuse the existing notification object to also broadcast the event of successful commit.
-    notification.setPhase(CommitPhaseEnum::kSuccessful);
-    notification.setPrimaryShard(boost::none);
-    const auto notificationOutcome =
-        _notifyClusterOnNewDatabases(opCtx, notification, existingShardIds);
-    if (!notificationOutcome.isOK()) {
-        LOGV2_WARNING(7175502,
-                      "Unable to send out notification of successful import of databases "
-                      "from added shard",
-                      "err"_attr = notificationOutcome);
     }
 }
 

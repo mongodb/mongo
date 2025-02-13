@@ -358,22 +358,6 @@ DatabaseType ShardingCatalogManager::commitCreateDatabase(OperationContext* opCt
         _localConfigShard,
         _localCatalogClient.get());
 
-    // The creation of a new database is described by the notification of multiple events, following
-    // a 2-phase protocol:
-    // - a "prepare" notification prior to the write into config.databases will ensure that
-    // change streams will start collecting events on the new database before the first user
-    // write on one of its future collection occurs
-    // - a "commitSuccessful" notification after completing the write into config.databases
-    // will allow change streams to stop collecting events on the namespace created from
-    // shards != primaryShard.
-    const auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-    {
-        DatabasesAdded prepareCommitEvent(
-            {dbName}, false /*areImported*/, CommitPhaseEnum::kPrepare);
-        prepareCommitEvent.setPrimaryShard(primaryShard);
-        uassertStatusOK(_notifyClusterOnNewDatabases(opCtx, prepareCommitEvent, allShards));
-    }
-
     DatabaseType db = [&]() {
         // Hold _kShardMembershipLock until the entire commit finishes to serialize with removeShard
         // in order to guarantee that the proposed dbPrimary shard continues to exist (and the
@@ -440,17 +424,6 @@ DatabaseType ShardingCatalogManager::commitCreateDatabase(OperationContext* opCt
 
         return db;
     }();
-
-    DatabasesAdded commitCompletedEvent(
-        {dbName}, false /*areImported*/, CommitPhaseEnum::kSuccessful);
-    const auto notificationOutcome =
-        _notifyClusterOnNewDatabases(opCtx, commitCompletedEvent, allShards);
-    if (!notificationOutcome.isOK()) {
-        LOGV2_WARNING(7175500,
-                      "Unable to send out notification of successful createDatabase",
-                      "db"_attr = db,
-                      "err"_attr = notificationOutcome);
-    }
 
     ShardingLogging::get(opCtx)->logChange(
         opCtx,

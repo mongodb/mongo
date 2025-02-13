@@ -1,4 +1,4 @@
- 
+
  # Copyright (C) 2022-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -38,38 +38,7 @@ imports:
     - "mongo/db/basic_types.idl"
     - "mongo/s/sharding_types.idl"
 
-enums:
-    CommitPhase:
-        description: "Specifies the phase of the event being generated
-                      (For Sharding DDL commits described through 2-phase notifications)."
-        type: string
-        values:
-            kPrepare: "prepare"
-            kSuccessful: "commitSuccessful"
-            kAborted: "commitAborted"
-
 structs:
-    
-    DatabasesAdded:
-        description: "Event describing the explicit/implicit addition of a set of databases
-                      to the config catalog"
-        strict: false
-        fields:
-            names:
-                description: "The name of the databases being added to the config catalog"
-                type: array<database_name>
-            primaryShard:
-                description: "The primary shard assigned to the added database;
-                              only expected to be populated when phase == prepare"
-                type: shard_id
-                optional: true
-            areImported:
-                description: "When true, the added databases come with pre-existing user collections 
-                              (e.g. the databases got added as part of addShard())"
-                type: bool
-            phase:
-                description: "The sub-phase of the event being notified."
-                type: CommitPhase
 
     CollectionResharded:
         description: "Event describing the details of a reshardCollection operation."
@@ -105,7 +74,7 @@ structs:
                 description: "The number of chunks the new collection should have after resharding."
                 optional: true
 
-                
+
 commands:
     _shardsvrNotifyShardingEvent:
         command_name: _shardsvrNotifyShardingEvent
@@ -123,6 +92,6 @@ commands:
                 validator: { callback: "notify_sharding_event::validateEventType" }
             details:
                 type: object_owned
-                description: "A descriptor of the sharding event 
+                description: "A descriptor of the sharding event
                              (to be serialized and interpreted based on the value of eventType)."
 

@@ -159,11 +159,6 @@ protected:
             ->initializeIfNeeded(operationContext(), /* term */ 1);
         WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
 
-        _skipShardingEventNotificationFP =
-            globalFailPointRegistry().find("shardingCatalogManagerSkipNotifyClusterOnNewDatabases");
-        _skipShardingEventNotificationFP->setMode(FailPoint::alwaysOn);
-
-        // Updating the cluster cardinality parameter and blocking ShardingDDLCoordinators require
         // the primary only services to have been set up.
         _skipUpdatingCardinalityParamFP =
             globalFailPointRegistry().find("skipUpdatingClusterCardinalityParameterAfterAddShard");
@@ -175,7 +170,6 @@ protected:
     }
 
     void tearDown() override {
-        _skipShardingEventNotificationFP->setMode(FailPoint::off);
         _skipUpdatingCardinalityParamFP->setMode(FailPoint::off);
         _skipBlockingDDLCoordinatorsDuringAddAndRemoveShardFP->setMode(FailPoint::off);
         WaitForMajorityService::get(getServiceContext()).shutDown();

@@ -35,6 +35,8 @@
 namespace mongo {
 namespace notify_sharding_event {
 
+// TODO SERVER-100729 Remove any reference to the deprecated kDatabasesAdded event type
+// once 9.0 becomes LTS.
 static constexpr char kDatabasesAdded[] = "databasesAdded";
 static constexpr char kCollectionResharded[] = "collectionResharded";
 

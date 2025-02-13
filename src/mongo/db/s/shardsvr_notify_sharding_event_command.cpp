@@ -89,10 +89,9 @@ public:
                     "_shardsvrNotifyShardingEvent can only run on shard servers",
                     serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
+            // TODO SERVER-100729 Remove the following if clause once 9.0 becomes LTS.
             if (request().getEventType() == notify_sharding_event::kDatabasesAdded) {
-                const auto event = DatabasesAdded::parse(
-                    IDLParserContext("_shardsvrNotifyShardingEvent"), request().getDetails());
-                notifyChangeStreamsOnDatabaseAdded(opCtx, event);
+                // Ignore the deprecated notification.
                 return;
             }
 

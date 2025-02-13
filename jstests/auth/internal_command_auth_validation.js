@@ -647,7 +647,8 @@ const internalCommandsMap = {
     },
     _shardsvrNotifyShardingEvent: {
         testname: "_shardsvrNotifyShardingEvent",
-        command: {_shardsvrNotifyShardingEvent: "test", eventType: "databasesAdded", details: {}},
+        command:
+            {_shardsvrNotifyShardingEvent: "test", eventType: "collectionResharded", details: {}},
     },
     _shardsvrRenameCollection: {
         testname: "_shardsvrRenameCollection",

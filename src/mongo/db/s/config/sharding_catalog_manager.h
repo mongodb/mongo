@@ -740,14 +740,6 @@ private:
                                              const BSONObj& key);
 
     /**
-     * Broadcasts a remote command to the requested list of recipient that contains the details on a
-     * new set of databases being added to the config catalog.
-     */
-    Status _notifyClusterOnNewDatabases(OperationContext* opCtx,
-                                        const DatabasesAdded& event,
-                                        const std::vector<ShardId>& recipients);
-
-    /**
      * Returns true if the zone with the given name has chunk ranges associated with it and the
      * shard with the given name is the only shard that it belongs to.
      */
