@@ -35,6 +35,7 @@
 
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/not_primary_error_tracker.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/collection_routing_info_targeter.h"
@@ -54,6 +55,10 @@ void write(OperationContext* opCtx,
            BatchWriteExecStats* stats,
            BatchedCommandResponse* response,
            boost::optional<OID> targetEpoch) {
+    uassert(ErrorCodes::InvalidOptions,
+            "rawData is not enabled",
+            !request.getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
+
     if (request.hasEncryptionInformation()) {
         FLEBatchResult result = processFLEBatch(opCtx, request, stats, response, targetEpoch);
         if (result == FLEBatchResult::kProcessed) {
@@ -66,7 +71,9 @@ void write(OperationContext* opCtx,
     NotPrimaryErrorTracker::Disabled scopeDisabledTracker(
         &NotPrimaryErrorTracker::get(opCtx->getClient()));
 
-    CollectionRoutingInfoTargeter targeter(opCtx, request.getNS(), targetEpoch);
+    CollectionRoutingInfoTargeter targeter(
+        opCtx, request.getNS(), targetEpoch, request.getRawData());
+
     if (nss) {
         *nss = targeter.getNS();
     }

@@ -1,6 +1,7 @@
 /**
  * Performs basic CRUD operations on a time-series buckets collection.
  * @tags: [
+ *   requires_timeseries,
  *   does_not_support_transactions,
  *   featureFlagRawDataCrudOperations,
  *   requires_non_retryable_writes,
@@ -144,20 +145,20 @@ crudTest(() => {
 
 // insert()
 crudTest(() => {
-    bucketsColl.insert(insertBucket);
+    coll.insert(insertBucket, {rawData: true});
     assert.eq(bucketsColl.findOne(), insertBucket);
 }, false);
 
 // insertOne()
 crudTest(() => {
-    bucketsColl.insertOne(insertBucket);
+    coll.insertOne(insertBucket, {rawData: true});
     assert.eq(bucketsColl.findOne(), insertBucket);
     assert.eq(bucketsColl.find().length(), 1);
 }, false);
 
 // insertMany()
 crudTest(() => {
-    bucketsColl.insertMany(testBuckets);
+    coll.insertMany(testBuckets, {rawData: true});
     assert.eq(bucketsColl.find().length(), 2);
 }, false);
 

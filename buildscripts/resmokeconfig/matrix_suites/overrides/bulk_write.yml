@@ -32,6 +32,8 @@
       - jstests/core/query/explain/explain_uuid.js
       # Checks for specific name in the command that was executed that we override.
       - jstests/core/query/explain/explain_includes_command.js
+      # Bulk writes do not support the rawData field yet. TODO (SERVER-97424): Remove this exclusion.
+      - jstests/core/timeseries/write/timeseries_buckets_crud_ops.js
 
 - name: single_op_txns_excluded_files
   value:

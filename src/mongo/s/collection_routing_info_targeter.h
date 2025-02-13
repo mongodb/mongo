@@ -85,10 +85,14 @@ public:
      * If 'expectedEpoch' is specified, the targeter will throws 'StaleEpoch' exception if the epoch
      * for 'nss' ever becomes different from 'expectedEpoch'. Otherwise, the targeter will continue
      * targeting even if the collection gets dropped and recreated.
+     *
+     * If 'rawData' is true, the targeter will target the namespace of the underlying raw data
+     * format, as if it were the one originally supplied to the targeter.
      */
     CollectionRoutingInfoTargeter(OperationContext* opCtx,
                                   const NamespaceString& nss,
-                                  boost::optional<OID> expectedEpoch = boost::none);
+                                  boost::optional<OID> expectedEpoch = boost::none,
+                                  bool rawData = false);
 
     /* Initializes the targeter with a custom CollectionRoutingInfo cri, in order to support
      * using a custom (synthetic) routing table */
@@ -261,6 +265,8 @@ private:
     // Set to the epoch of the namespace we are targeting. If we ever refresh the catalog cache
     // and find a new epoch, we immediately throw a StaleEpoch exception.
     boost::optional<OID> _targetEpoch;
+
+    bool _rawData = false;
 
     // The latest loaded routing cache entry
     CollectionRoutingInfo _cri;

@@ -266,6 +266,10 @@ DBCollection.prototype.insertOne = function(document, options) {
 
     // Use bulk operation API already in the shell
     var bulk = this.initializeOrderedBulkOp();
+
+    if (opts.rawData)
+        bulk.setRawData(opts.rawData);
+
     bulk.insert(document);
 
     try {
@@ -325,6 +329,9 @@ DBCollection.prototype.insertMany = function(documents, options) {
 
     // Use bulk operation API already in the shell
     var bulk = opts.ordered ? this.initializeOrderedBulkOp() : this.initializeUnorderedBulkOp();
+
+    if (opts.rawData)
+        bulk.setRawData(opts.rawData);
 
     // Add all operations to the bulk operation
     documents.forEach(function(doc) {

@@ -1123,6 +1123,11 @@ size_t getTunedMaxBatchSize(OperationContext* opCtx,
 WriteResult performInserts(OperationContext* opCtx,
                            const write_ops::InsertCommandRequest& wholeOp,
                            OperationSource source) {
+    auto actualNs = wholeOp.getNamespace();
+    if (wholeOp.getRawData()) {
+        actualNs = timeseries::isTimeseriesViewRequest(opCtx, wholeOp).second;
+    }
+
     // Insert performs its own retries, so we should only be within a WriteUnitOfWork when run in a
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -1130,14 +1135,14 @@ WriteResult performInserts(OperationContext* opCtx,
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
 
     auto& curOp = *CurOp::get(opCtx);
-    ON_BLOCK_EXIT([&] {
+    ON_BLOCK_EXIT([&, &actualNs = actualNs] {
         // Timeseries inserts already did as part of performTimeseriesWrites.
         if (source != OperationSource::kTimeseriesInsert) {
             // This is the only part of finishCurOp we need to do for inserts because they
             // reuse the top-level curOp. The rest is handled by the top-level entrypoint.
             curOp.done();
             Top::getDecoration(opCtx).record(opCtx,
-                                             wholeOp.getNamespace(),
+                                             actualNs,
                                              LogicalOp::opInsert,
                                              Top::LockType::WriteLocked,
                                              curOp.elapsedTimeExcludingPauses(),
@@ -1149,14 +1154,14 @@ WriteResult performInserts(OperationContext* opCtx,
     // Timeseries inserts already did as part of performTimeseriesWrites.
     if (source != OperationSource::kTimeseriesInsert) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curOp.setNS(lk, wholeOp.getNamespace());
+        curOp.setNS(lk, actualNs);
         curOp.setLogicalOp(lk, LogicalOp::opInsert);
         curOp.ensureStarted();
         // Initialize 'ninserted' for the operation if is not yet.
         curOp.debug().additiveMetrics.incrementNinserted(0);
     }
 
-    uassertStatusOK(userAllowedWriteNS(opCtx, wholeOp.getNamespace()));
+    uassertStatusOK(userAllowedWriteNS(opCtx, actualNs));
 
     const auto [disableDocumentValidation, fleCrudProcessed] = getDocumentValidationFlags(
         opCtx, wholeOp.getWriteCommandRequestBase(), wholeOp.getDbName().tenantId());
@@ -1227,7 +1232,7 @@ WriteResult performInserts(OperationContext* opCtx,
         }
 
         out.canContinue = insertBatchAndHandleErrors(opCtx,
-                                                     wholeOp.getNamespace(),
+                                                     actualNs,
                                                      wholeOp.getCollectionUUID(),
                                                      wholeOp.getOrdered(),
                                                      batch,
@@ -1255,7 +1260,7 @@ WriteResult performInserts(OperationContext* opCtx,
             } catch (const DBException& ex) {
                 out.canContinue = handleError(opCtx,
                                               ex,
-                                              wholeOp.getNamespace(),
+                                              actualNs,
                                               wholeOp.getOrdered(),
                                               false /* multiUpdate */,
                                               boost::none /* sampleId */,

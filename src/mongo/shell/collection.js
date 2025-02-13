@@ -306,6 +306,7 @@ DBCollection.prototype.insert = function(obj, options) {
     var flags = 0;
 
     var wc = undefined;
+    var rawData = undefined;
     if (options === undefined) {
         // do nothing
     } else if (typeof (options) == 'object') {
@@ -317,6 +318,9 @@ DBCollection.prototype.insert = function(obj, options) {
 
         if (options.writeConcern)
             wc = options.writeConcern;
+
+        if (options.rawData)
+            rawData = options.rawData;
     } else {
         flags = options;
     }
@@ -331,6 +335,8 @@ DBCollection.prototype.insert = function(obj, options) {
 
     // Bit 1 of option flag is continueOnError. Bit 0 (stop on error) is the default.
     var bulk = ordered ? this.initializeOrderedBulkOp() : this.initializeUnorderedBulkOp();
+    if (rawData)
+        bulk.setRawData(rawData);
     var isMultiInsert = Array.isArray(obj);
 
     if (isMultiInsert) {

@@ -714,12 +714,14 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
             _clientRequest.getWriteCommandRequestBase().getBypassDocumentValidation());
         wcb.setOrdered(_clientRequest.getWriteCommandRequestBase().getOrdered());
         wcb.setCollectionUUID(_clientRequest.getWriteCommandRequestBase().getCollectionUUID());
+        wcb.setRawData(_clientRequest.getWriteCommandRequestBase().getRawData());
 
         wcb.setEncryptionInformation(
             _clientRequest.getWriteCommandRequestBase().getEncryptionInformation());
 
         if (targeter.isTrackedTimeSeriesBucketsNamespace() &&
-            !_clientRequest.getNS().isTimeseriesBucketsCollection()) {
+            !_clientRequest.getNS().isTimeseriesBucketsCollection() &&
+            !_clientRequest.getRawData()) {
             wcb.setIsTimeseriesNamespace(true);
         }
 

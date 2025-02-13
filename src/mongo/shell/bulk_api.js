@@ -532,6 +532,7 @@ var _bulk_api_module = (function() {
         var maxNumberOfDocsInBatch = 1000;
         var idFieldOverhead = Object.bsonsize({_id: ObjectId()}) - Object.bsonsize({});
         var writeConcern = null;
+        var rawData = null;
         var letParams = null;
         var currentOp;
 
@@ -807,6 +808,10 @@ var _bulk_api_module = (function() {
             return findOperations;
         };
 
+        this.setRawData = function(userRawData) {
+            rawData = userRawData;
+        };
+
         this.setLetParams = function(userLet) {
             letParams = userLet;
         };
@@ -898,6 +903,10 @@ var _bulk_api_module = (function() {
             // If we have a write concern
             if (writeConcern) {
                 cmd.writeConcern = writeConcern;
+            }
+
+            if (rawData) {
+                cmd.rawData = rawData;
             }
 
             // If we have let parameters, add them to the command.
