@@ -80,9 +80,15 @@ public:
         return true;
     }
 
-    bool isFromLoadBalancer() const override {
+    bool isLoadBalancerPeer() const override {
         return false;
-    }
+    };
+
+    bool isConnectedToLoadBalancerPort() const override {
+        return false;
+    };
+
+    void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) override{};
 
     bool bindsToOperationState() const override {
         return false;

@@ -107,6 +107,12 @@ void GRPCSession::cancel(Status reason) {
     }
 }
 
+void GRPCSession::setisLoadBalancerPeer(bool helloHasLoadBalancedOption) {
+    tassert(ErrorCodes::OperationFailed,
+            "Unable to set loadBalancer option on GRPC connection",
+            !helloHasLoadBalancedOption);
+}
+
 boost::optional<Status> GRPCSession::terminationStatus() const {
     auto cancelled = _isCancelled();
     auto status = _terminationStatus.synchronize();

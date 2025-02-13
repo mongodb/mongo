@@ -20,18 +20,18 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
         }
     };
 
-    var doHello = (admin, {lbConnection, lbHello, expectServiceId}) => {
+    var doHello = (admin, {lbConnection, lbHello}) => {
         if (lbConnection)
             assert.commandWorked(admin.adminCommand(
-                {configureFailPoint: 'clientIsFromLoadBalancer', mode: 'alwaysOn'}));
+                {configureFailPoint: 'clientIsConnectedToLoadBalancerPort', mode: 'alwaysOn'}));
         try {
             var helloDoc = {};
             if (lbHello)
                 helloDoc['loadBalanced'] = true;
             return admin.runCommand("hello", helloDoc);
         } finally {
-            assert.commandWorked(
-                admin.adminCommand({configureFailPoint: 'clientIsFromLoadBalancer', mode: 'off'}));
+            assert.commandWorked(admin.adminCommand(
+                {configureFailPoint: 'clientIsConnectedToLoadBalancerPort', mode: 'off'}));
         }
     };
 
@@ -80,7 +80,6 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
      * This is an error that should result in a disconnection.
      */
     runInShardingTest((admin) => {
-        var res = doHello(admin, {lbConnection: true});
-        assert.commandFailedWithCode(res, ErrorCodes.LoadBalancerSupportMismatch);
+        assertNoServiceId(doHello(admin, {lbConnection: true}));
     });
 })();

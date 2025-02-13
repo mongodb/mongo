@@ -31,7 +31,7 @@ function setupShardedCollection(st, dbName, collName) {
 function openCursor(mongosHost, dbName, collName, countdownLatch, identifyingComment) {
     const newDBConn = new Mongo(mongosHost).getDB(dbName);
     assert.commandWorked(newDBConn.getSiblingDB("admin").adminCommand(
-        {configureFailPoint: "clientIsFromLoadBalancer", mode: "alwaysOn"}));
+        {configureFailPoint: "clientIsConnectedToLoadBalancerPort", mode: "alwaysOn"}));
     let cmdRes = newDBConn.runCommand({find: collName, comment: identifyingComment, batchSize: 1});
     assert.commandWorked(cmdRes);
     const cursorId = cmdRes.cursor.id;
@@ -94,5 +94,5 @@ assert.soon(() => {
 });
 
 assert.commandWorked(
-    admin.adminCommand({configureFailPoint: "clientIsFromLoadBalancer", mode: "off"}));
+    admin.adminCommand({configureFailPoint: "clientIsConnectedToLoadBalancerPort", mode: "off"}));
 st.stop();

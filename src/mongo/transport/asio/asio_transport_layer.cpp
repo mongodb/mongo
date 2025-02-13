@@ -1333,7 +1333,7 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
         try {
             std::shared_ptr<AsioSession> session(
                 new SyncAsioSession(this, std::move(peerSocket), true));
-            if (session->isFromLoadBalancer()) {
+            if (session->isConnectedToLoadBalancerPort()) {
                 session->parseProxyProtocolHeader(_acceptorReactor)
                     .getAsync([this, session = std::move(session)](Status s) {
                         if (s.isOK()) {

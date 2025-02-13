@@ -75,7 +75,7 @@ public:
     };
 
     FailPointEnableBlock simulateLoadBalancerConnection() const {
-        return FailPointEnableBlock("loadBalancerSupportClientIsFromLoadBalancer");
+        return FailPointEnableBlock("loadBalancerSupportClientIsFromLoadBalancerPort");
     }
 };
 
@@ -89,14 +89,7 @@ TEST_F(LoadBalancerSupportTest, HelloNormalClientGivesOption) {
 
 TEST_F(LoadBalancerSupportTest, HelloLoadBalancedClientNoOption) {
     auto simLB = simulateLoadBalancerConnection();
-    try {
-        doHello(false);
-        FAIL("Expected to throw");
-    } catch (const DBException& ex) {
-        ASSERT_THAT(ex.toStatus(),
-                    StatusIs(Eq(ErrorCodes::LoadBalancerSupportMismatch),
-                             ContainsRegex("load balancer.*but.*driver")));
-    }
+    ASSERT_THAT(doHello(false), Not(HasServiceId()));
 }
 
 TEST_F(LoadBalancerSupportTest, HelloLoadBalancedClientGivesOption) {

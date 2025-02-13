@@ -1016,14 +1016,14 @@ public:
             switch (port) {
                 case kRouterPort: {
                     ASSERT_TRUE(st.session()->isFromRouterPort());
-                    ASSERT_FALSE(st.session()->isFromLoadBalancer());
+                    ASSERT_FALSE(st.session()->isConnectedToLoadBalancerPort());
                     ASSERT_FALSE(st.session()->getProxiedDstEndpoint());
                     ASSERT_TRUE(client->isRouterClient());
                     break;
                 }
                 case kLoadBalancerPort: {
                     ASSERT_FALSE(st.session()->isFromRouterPort());
-                    ASSERT_TRUE(st.session()->isFromLoadBalancer());
+                    ASSERT_TRUE(st.session()->isConnectedToLoadBalancerPort());
                     ASSERT_FALSE(client->isRouterClient());
                     ASSERT_EQ(st.session()->getSourceRemoteEndpoint().host(), kSourceRemoteIP);
                     ASSERT_EQ(st.session()->getSourceRemoteEndpoint().port(), kSourceRemotePort);
@@ -1033,7 +1033,7 @@ public:
                 }
                 case kMainPort: {
                     ASSERT_FALSE(st.session()->isFromRouterPort());
-                    ASSERT_FALSE(st.session()->isFromLoadBalancer());
+                    ASSERT_FALSE(st.session()->isConnectedToLoadBalancerPort());
                     ASSERT_FALSE(st.session()->getProxiedDstEndpoint());
                     ASSERT_FALSE(client->isRouterClient());
                     break;

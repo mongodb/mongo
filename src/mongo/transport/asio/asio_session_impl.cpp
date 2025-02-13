@@ -30,12 +30,14 @@
 
 #include "mongo/transport/asio/asio_session_impl.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/config.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
+#include "mongo/transport/asio/asio_session_manager.h"
 #include "mongo/transport/asio/asio_utils.h"
 #include "mongo/transport/proxy_protocol_header_parser.h"
 #include "mongo/transport/session_util.h"
@@ -52,7 +54,7 @@ MONGO_FAIL_POINT_DEFINE(asioTransportLayerShortOpportunisticReadWrite);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerSessionPauseBeforeSetSocketOption);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerBlockBeforeOpportunisticRead);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerBlockBeforeAddSession);
-MONGO_FAIL_POINT_DEFINE(clientIsFromLoadBalancer);
+MONGO_FAIL_POINT_DEFINE(clientIsConnectedToLoadBalancerPort);
 
 namespace {
 
@@ -190,7 +192,7 @@ CommonAsioSession::CommonAsioSession(
     try {
         _local = HostAndPort(_localAddr.toString(true));
         if (tl->loadBalancerPort()) {
-            _isFromLoadBalancer = _local.port() == *tl->loadBalancerPort();
+            _isConnectedToLoadBalancerPort = _local.port() == *tl->loadBalancerPort();
         }
     } catch (...) {
         LOGV2_DEBUG(9079002,
@@ -225,8 +227,33 @@ CommonAsioSession::CommonAsioSession(
 #endif
 }
 
-bool CommonAsioSession::isFromLoadBalancer() const {
-    return MONGO_unlikely(clientIsFromLoadBalancer.shouldFail()) || _isFromLoadBalancer;
+bool CommonAsioSession::isConnectedToLoadBalancerPort() const {
+    return MONGO_unlikely(clientIsConnectedToLoadBalancerPort.shouldFail()) ||
+        _isConnectedToLoadBalancerPort;
+}
+
+bool CommonAsioSession::isLoadBalancerPeer() const {
+    return _isLoadBalancerPeer;
+}
+
+void CommonAsioSession::setisLoadBalancerPeer(bool helloHasLoadBalancedOption) {
+    tassert(ErrorCodes::BadValue,
+            "Client claimed to be from a loadBalancer, but is not on load balancer port",
+            isConnectedToLoadBalancerPort() || !helloHasLoadBalancedOption);
+
+    if (_isLoadBalancerPeer == helloHasLoadBalancedOption) {
+        return;
+    }
+    _isLoadBalancerPeer = helloHasLoadBalancedOption;
+
+    auto sessionManager = getSessionManager();
+    if (auto asioSessionManager = checked_pointer_cast<AsioSessionManager>(sessionManager)) {
+        if (helloHasLoadBalancedOption) {
+            asioSessionManager->incrementLBConnections();
+        } else {
+            asioSessionManager->decrementLBConnections();
+        }
+    }
 }
 
 void CommonAsioSession::end() {

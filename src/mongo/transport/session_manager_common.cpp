@@ -62,7 +62,7 @@ struct ClientSummary {
           remote(c->session()->remote()),
           sourceClient(c->session()->getSourceRemoteEndpoint()),
           id(c->session()->id()),
-          isLoadBalanced(c->session()->isFromLoadBalancer()) {}
+          isLoadBalanced(c->session()->isLoadBalancerPeer()) {}
 
     friend logv2::DynamicAttributes logAttrs(const ClientSummary& m) {
         logv2::DynamicAttributes attrs;

@@ -164,7 +164,17 @@ public:
     /**
      * Returns true if this session was connected through an L4 load balancer.
      */
-    virtual bool isFromLoadBalancer() const = 0;
+    virtual bool isLoadBalancerPeer() const = 0;
+
+    /**
+     * Returns true if the connection is on a load balancer port.
+     */
+    virtual bool isConnectedToLoadBalancerPort() const = 0;
+
+    /**
+     * Signal the session that the client declared being from a load balancer.
+     */
+    virtual void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) = 0;
 
     /**
      * Returns true if this session binds to the operation state, which implies open cursors and
@@ -245,6 +255,10 @@ public:
 
 protected:
     Session();
+
+    std::shared_ptr<SessionManager> getSessionManager() const {
+        return _sessionManager.lock();
+    }
 
 private:
     const Id _id;

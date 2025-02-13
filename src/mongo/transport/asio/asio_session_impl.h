@@ -133,10 +133,14 @@ public:
 
     bool isConnected() override;
 
-    bool isFromLoadBalancer() const override;
+    bool isConnectedToLoadBalancerPort() const override;
+
+    bool isLoadBalancerPeer() const override;
+
+    void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) override;
 
     bool bindsToOperationState() const override {
-        return isFromLoadBalancer();
+        return isLoadBalancerPeer();
     }
 
     bool isFromRouterPort() const override {
@@ -316,7 +320,16 @@ protected:
 
     AsioTransportLayer* const _tl;
     bool _isIngressSession;
-    bool _isFromLoadBalancer = false;
+
+    /**
+     * We have a distinction here. A load balancer port can accept connections that are
+     * either attempting to connect to a load balancer or as a normal targeted connection.
+     * The bools below describe if 1/ the connection is connecting to the load balancer port,
+     * and 2/ the connection is a load balancer type connection. We only find out if the
+     * connection is a LoadBalancerConnection if the hello command parses {loadBalancer: 1}.
+     */
+    bool _isConnectedToLoadBalancerPort = false;
+    bool _isLoadBalancerPeer = false;
     boost::optional<HostAndPort> _proxiedSrcEndpoint;
     boost::optional<HostAndPort> _proxiedDstEndpoint;
 
