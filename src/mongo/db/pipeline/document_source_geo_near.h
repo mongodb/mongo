@@ -107,7 +107,7 @@ public:
      * executing a pipeline, so this method should never be called.
      */
     GetNextResult doGetNext() final {
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(9911962);
     }
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;

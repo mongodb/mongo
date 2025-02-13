@@ -227,14 +227,14 @@ bool BigSimplePolygon::VirtualContainsPoint(const S2Point& p) const {
 }
 
 void BigSimplePolygon::Encode(Encoder* const encoder) const {
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(9911951);
 }
 
 bool BigSimplePolygon::Decode(Decoder* const decoder) {
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(9911952);
 }
 
 bool BigSimplePolygon::DecodeWithinScope(Decoder* const decoder) {
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(9911953);
 }
 }  // namespace mongo

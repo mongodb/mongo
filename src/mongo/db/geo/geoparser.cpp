@@ -782,8 +782,7 @@ Status GeoParser::parseGeometryCollection(const BSONObj& obj,
             out->multiPolygons.push_back(std::make_unique<MultiPolygonWithCRS>());
             status = parseMultiPolygon(geoObj, skipValidation, out->multiPolygons.back().get());
         } else {
-            // Should not reach here.
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(9911957);
         }
 
         // Check parsing result.

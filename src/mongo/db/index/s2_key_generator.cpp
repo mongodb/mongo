@@ -90,7 +90,7 @@ Status S2GetKeysForElement(const BSONElement& element,
     }
     geoContainer.projectInto(SPHERE);
 
-    invariant(geoContainer.hasS2Region());
+    tassert(9911905, "", geoContainer.hasS2Region());
 
     coverer.GetCovering(geoContainer.getS2Region(), out);
     return Status::OK();
@@ -416,7 +416,7 @@ void getS2Keys(SharedBufferFragmentBuilder& pooledBufferBuilder,
     bool haveGeoField = false;
 
     if (multikeyPaths) {
-        invariant(multikeyPaths->empty());
+        tassert(9911909, "", multikeyPaths->empty());
         multikeyPaths->resize(keyPattern.nFields());
     }
 
@@ -539,12 +539,12 @@ void getS2Keys(SharedBufferFragmentBuilder& pooledBufferBuilder,
 
             // We expect there to be the missing field element present in the keys if data is
             // missing.  So, this should be non-empty.
-            invariant(!updatedKeysToAdd.empty());
+            tassert(9911906, "", !updatedKeysToAdd.empty());
 
             if (multikeyPaths && lastPathComponentCausesIndexToBeMultikey) {
                 const size_t pathLengthOfThisField =
                     FieldRef{keyElem.fieldNameStringData()}.numParts();
-                invariant(pathLengthOfThisField > 0);
+                tassert(9911907, "", pathLengthOfThisField > 0);
                 (*multikeyPaths)[posInIdx].insert(pathLengthOfThisField - 1);
             }
 
@@ -565,7 +565,7 @@ void getS2Keys(SharedBufferFragmentBuilder& pooledBufferBuilder,
         }
     }
 
-    invariant(keys->empty());
+    tassert(9911908, "", keys->empty());
     auto keysSequence = keys->extract_sequence();
     for (auto& ks : keysToAdd) {
         if (id) {

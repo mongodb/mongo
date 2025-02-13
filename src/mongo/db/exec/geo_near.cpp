@@ -102,7 +102,7 @@ static double computeGeoNearDistance(const GeoNearParams& nearParams, WorkingSet
     //
 
     // Must have an object in order to get geometry out of it.
-    invariant(member->hasObj());
+    tassert(9911912, "", member->hasObj());
 
     CRS queryCRS = nearParams.nearQuery->centroid->crs;
 
@@ -148,7 +148,7 @@ static double computeGeoNearDistance(const GeoNearParams& nearParams, WorkingSet
         if (nearParams.nearQuery->unitsAreRadians) {
             // Hack for nearSphere
             // TODO: Remove nearSphere?
-            invariant(SPHERE == queryCRS);
+            tassert(9911927, "", SPHERE == queryCRS);
             member->metadata().setGeoNearDistance(minDistance / kRadiusOfEarthInMeters);
         } else {
             member->metadata().setGeoNearDistance(minDistance);
@@ -169,7 +169,7 @@ static R2Annulus geoNearDistanceBounds(const GeoNearExpression& query) {
         return R2Annulus(query.centroid->oldPoint, query.minDistance, query.maxDistance);
     }
 
-    invariant(SPHERE == queryCRS);
+    tassert(9911913, "", SPHERE == queryCRS);
 
     // TODO: Tighten this up a bit by making a CRS for "sphere with radians"
     double minDistance = query.minDistance;
@@ -218,8 +218,8 @@ static R2Annulus twoDDistanceBounds(const GeoNearParams& nearParams,
     } else {
         // Spherical queries have upper bounds set by the earth - no-op
         // TODO: Wrapping errors would creep in here if nearSphere wasn't defined to not wrap
-        invariant(SPHERE == queryCRS);
-        invariant(!nearParams.nearQuery->isWrappingQuery);
+        tassert(9911914, "", SPHERE == queryCRS);
+        tassert(9911915, "", !nearParams.nearQuery->isWrappingQuery);
     }
 
     return fullBounds;
@@ -279,13 +279,13 @@ void GeoNear2DStage::DensityEstimator::buildIndexScan(ExpressionContext* expCtx,
             builder.obj(), BoundInclusion::kIncludeBothStartAndEndKeys));
     }
 
-    invariant(oil.isValidFor(1));
+    tassert(9911916, "", oil.isValidFor(1));
 
     // Intersect the $near bounds we just generated into the bounds we have for anything else
     // in the scan (i.e. $within)
     IndexBoundsBuilder::intersectize(oil, &scanParams.bounds.fields[twoDFieldPosition]);
 
-    invariant(!_indexScan);
+    tassert(9911917, "", !_indexScan);
     _indexScan = new IndexScan(expCtx, *_collection, scanParams, workingSet, nullptr);
     _children->emplace_back(_indexScan);
 }
@@ -344,7 +344,7 @@ PlanStage::StageState GeoNear2DStage::DensityEstimator::work(ExpressionContext* 
             // Advance to the next level and search again.
             _currentLevel--;
             // Reset index scan for the next level.
-            invariant(_children->back().get() == _indexScan);
+            tassert(9911918, "", _children->back().get() == _indexScan);
             _indexScan = nullptr;
             _children->pop_back();
             return PlanStage::NEED_TIME;
@@ -401,7 +401,7 @@ PlanStage::StageState GeoNear2DStage::initialize(OperationContext* opCtx,
 
             _boundsIncrement = 3 * estimatedDistance;
         }
-        invariant(_boundsIncrement > 0.0);
+        tassert(9911919, "", _boundsIncrement > 0.0);
 
         // Clean up
         _densityEstimator.reset(nullptr);
@@ -464,7 +464,7 @@ static double min2DBoundsIncrement(const GeoNearExpression& query,
     if (FLAT == queryCRS)
         return minBoundsIncrement;
 
-    invariant(SPHERE == queryCRS);
+    tassert(9911920, "", SPHERE == queryCRS);
 
     // If this is a spherical query, units are in meters - this is just a heuristic
     return minBoundsIncrement * kMetersPerDegreeAtEquator;
@@ -560,7 +560,7 @@ std::unique_ptr<NearStage::CoveredInterval> GeoNear2DStage::nextInterval(Operati
                                         max(0.0, nextBounds.getInner() - epsilon),
                                         nextBounds.getOuter() + epsilon));
     } else {
-        invariant(SPHERE == queryCRS);
+        tassert(9911921, "", SPHERE == queryCRS);
         // TODO: As above, make this consistent with $within : $centerSphere
 
         // Our intervals aren't in the same CRS as our index, so we need to adjust them
@@ -777,13 +777,13 @@ void GeoNear2DSphereStage::DensityEstimator::buildIndexScan(ExpressionContext* e
 
     // The search area expands 4X each time.
     // Return the neighbors of closest vertex to this cell at the given level.
-    invariant(_currentLevel < centerId.level());
+    tassert(9911922, "", _currentLevel < centerId.level());
     centerId.AppendVertexNeighbors(_currentLevel, &neighbors);
 
     ExpressionMapping::S2CellIdsToIntervals(neighbors, _indexParams.indexVersion, coveredIntervals);
 
     // Index scan
-    invariant(!_indexScan);
+    tassert(9911923, "", !_indexScan);
     _indexScan = new IndexScan(expCtx, *_collection, scanParams, workingSet, nullptr);
     _children->emplace_back(_indexScan);
 }
@@ -842,7 +842,7 @@ PlanStage::StageState GeoNear2DSphereStage::DensityEstimator::work(ExpressionCon
             // Advance to the next level and search again.
             _currentLevel--;
             // Reset index scan for the next level.
-            invariant(_children->back().get() == _indexScan);
+            tassert(9911924, "", _children->back().get() == _indexScan);
             _indexScan = nullptr;
             _children->pop_back();
             return PlanStage::NEED_TIME;
@@ -887,7 +887,7 @@ PlanStage::StageState GeoNear2DSphereStage::initialize(OperationContext* opCtx,
         //
         // At the coarsest level, the search area is the whole earth.
         _boundsIncrement = 3 * estimatedDistance;
-        invariant(_boundsIncrement > 0.0);
+        tassert(9911925, "", _boundsIncrement > 0.0);
 
         // Clean up
         _densityEstimator.reset(nullptr);
@@ -917,7 +917,7 @@ std::unique_ptr<NearStage::CoveredInterval> GeoNear2DSphereStage::nextInterval(
             _boundsIncrement /= 2;
     }
 
-    invariant(_boundsIncrement > 0.0);
+    tassert(9911926, "", _boundsIncrement > 0.0);
 
     R2Annulus nextBounds(_currBounds.center(),
                          _currBounds.getOuter(),
@@ -947,7 +947,7 @@ std::unique_ptr<NearStage::CoveredInterval> GeoNear2DSphereStage::nextInterval(
     // Generate a covering that does not intersect with any previous coverings
     S2CellUnion coverUnion;
     coverUnion.InitSwap(&cover);
-    invariant(cover.empty());
+    tassert(9911910, "", cover.empty());
     S2CellUnion diffUnion;
     diffUnion.GetDifference(&coverUnion, &_scannedCells);
     for (const auto& cellId : diffUnion.cell_ids()) {

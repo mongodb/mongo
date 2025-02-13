@@ -277,20 +277,20 @@ public:
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
                                        const SerializationOptions& opts = {},
                                        bool includePath = true) const final {
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(9911958);
     }
 
     void debugString(StringBuilder& debug, int level = 0) const final {
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(9911959);
     }
 
     bool equivalent(const MatchExpression* other) const final {
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(9911960);
         return false;
     }
 
     std::unique_ptr<MatchExpression> clone() const final {
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(9911961);
         return nullptr;
     }
 

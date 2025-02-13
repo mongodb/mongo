@@ -161,7 +161,7 @@ void S2CellIdsToIntervalsUnsorted(const std::vector<S2CellId>& intervalSet,
             long long end = static_cast<long long>(interval.range_max().id());
             b.append("start", start);
             b.append("end", end);
-            invariant(start <= end);
+            tassert(9911950, "", start <= end);
             oilOut->intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
                 b.obj(), BoundInclusion::kIncludeBothStartAndEndKeys));
         } else {
@@ -192,7 +192,7 @@ void ExpressionMapping::S2CellIdsToIntervals(const std::vector<S2CellId>& interv
         LOGV2(6029801,
               "invalid OrderedIntervalList",
               "orderedIntervalList"_attr = redact(oilOut->toString(false)));
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(9911963);
     }
 }
 
@@ -241,7 +241,7 @@ void ExpressionMapping::S2CellIdsToIntervalsWithParents(const std::vector<S2Cell
         LOGV2(6029802,
               "invalid OrderedIntervalList",
               "orderedIntervalList"_attr = redact(oilOut->toString(false)));
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(9911964);
     }
 }
 
