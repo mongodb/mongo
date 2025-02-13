@@ -436,18 +436,4 @@ StatusWith<Bucket*> potentiallyReopenBucket(
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
     bucket_catalog::InsertContext& insertContext);
 
-/**
- * Efficiently inserts a batch of time-series measurements. It handles the logic of finding a bucket
- * to insert measurements into, and the logic of finding a new bucket to insert into when a bucket
- * is rolled over for a time-related reason.
- */
-std::vector<std::shared_ptr<WriteBatch>> insertBatch(
-    OperationContext* opCtx,
-    BucketCatalog& catalog,
-    const Collection* bucketsColl,
-    const StringDataComparator* comparator,
-    const std::vector<BSONObj>& batchOfMeasurements,
-    InsertContext& insertContext,
-    std::function<uint64_t(OperationContext*)> functionToGetStorageCacheBytes);
-
 }  // namespace mongo::timeseries::bucket_catalog

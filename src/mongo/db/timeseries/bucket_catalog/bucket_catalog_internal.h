@@ -241,7 +241,7 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     Stripe& stripe,
     WithLock stripeLock,
     const BSONObj& doc,
-    OperationId,
+    OperationId opId,
     AllowBucketCreation mode,
     InsertContext& insertContext,
     Bucket& existingBucket,
@@ -397,9 +397,11 @@ void resetBucketOIDCounter();
 Bucket& allocateBucket(BucketCatalog& catalog,
                        Stripe& stripe,
                        WithLock stripeLock,
-                       InsertContext& info,
+                       const BucketKey& key,
+                       const TimeseriesOptions& timeseriesOptions,
                        const Date_t& time,
-                       const StringDataComparator* comparator);
+                       const StringDataComparator* comparator,
+                       ExecutionStatsController& stats);
 
 /**
  * Close the existing, full bucket and open a new one for the same metadata.
@@ -412,25 +414,26 @@ Bucket& rollover(BucketCatalog& catalog,
                  Stripe& stripe,
                  WithLock stripeLock,
                  Bucket& bucket,
-                 InsertContext& info,
+                 const BucketKey& key,
+                 const TimeseriesOptions& timeseriesOptions,
                  RolloverAction action,
                  const Date_t& time,
                  const StringDataComparator* comparator,
                  Bucket* additionalBucket,
-                 boost::optional<RolloverAction> additionalAction);
+                 boost::optional<RolloverAction> additionalAction,
+                 ExecutionStatsController& stats);
 
 /**
  * Determines if 'bucket' needs to be rolled over to accommodate 'doc'. If so, determines whether
  * to archive or close 'bucket'.
  */
 std::pair<RolloverAction, RolloverReason> determineRolloverAction(
-    TrackingContexts&,
     const BSONObj& doc,
     InsertContext& info,
     Bucket& bucket,
     uint32_t numberOfActiveBuckets,
     Bucket::NewFieldNames& newFieldNamesToBeInserted,
-    Sizes& sizesToBeAdded,
+    const Sizes& sizesToBeAdded,
     AllowBucketCreation mode,
     const Date_t& time,
     uint64_t storageCacheSizeBytes,
@@ -446,7 +449,7 @@ RolloverReason determineRolloverReason(const BSONObj& doc,
                                        const TimeseriesOptions& timeseriesOptions,
                                        Bucket& bucket,
                                        uint32_t numberOfActiveBuckets,
-                                       Sizes& sizesToBeAdded,
+                                       const Sizes& sizesToBeAdded,
                                        const Date_t& time,
                                        uint64_t storageCacheSizeBytes,
                                        const StringDataComparator* comparator);
@@ -516,22 +519,20 @@ void closeArchivedBucket(BucketCatalog& catalog, const BucketId& bucketId);
 
 /**
  * Inserts measurements into the provided eligible bucket. On success of all measurements being
- * inserted into the provided bucket, returns std::monostate. Otherwise, returns the rollover reason
- * along with the index of the measurement 'currentPosition' where insertion stopped.
+ * inserted into the provided bucket, returns true. Otherwise, returns false.
+ * Also increments `currentPosition` to one past the index of the last measurement inserted.
  */
-std::variant<std::monostate, RolloverReason> insertBatchIntoEligibleBucket(
-    OperationContext* opCtx,
-    BucketCatalog& catalog,
-    const Collection* bucketsColl,
-    const StringDataComparator* comparator,
-    const std::vector<BSONObj>& batchOfMeasurements,
-    InsertContext& insertContext,
-    Bucket& bucketToInsertInto,
-    Stripe& stripe,
-    WithLock stripeLock,
-    size_t& currentPosition,
-    std::vector<std::shared_ptr<WriteBatch>>& writeBatches,
-    std::function<uint64_t(OperationContext*)> functionToGetStorageCacheBytes);
+bool stageInsertBatchIntoEligibleBucket(BucketCatalog& catalog,
+                                        const Collection* bucketsColl,
+                                        OperationId opId,
+                                        const StringDataComparator* comparator,
+                                        BatchedInsertContext& batch,
+                                        Stripe& stripe,
+                                        WithLock stripeLock,
+                                        uint64_t storageCacheSizeBytes,
+                                        Bucket& eligibleBucket,
+                                        size_t& currentPosition,
+                                        std::shared_ptr<WriteBatch>& writeBatch);
 
 /**
  * Given an already-selected 'bucket', inserts 'doc' to the bucket if possible. If not, we return
@@ -542,14 +543,14 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> tryToInsertIntoBucketW
     BucketCatalog& catalog,
     Stripe& stripe,
     WithLock stripeLock,
-    const BSONObj& doc,
+    const BatchedInsertTuple& batchedInsertTuple,
     OperationId opId,
-    AllowBucketCreation mode,
-    InsertContext& insertContext,
-    Bucket& bucketToInsertInto,
-    const Date_t& time,
+    const TimeseriesOptions& timeseriesOptions,
+    const StripeNumber& stripeNumber,
+    ExecutionStatsController& stats,
     uint64_t storageCacheSizeBytes,
-    const StringDataComparator* comparator);
+    const StringDataComparator* comparator,
+    Bucket& bucket);
 
 /**
  * Given a bucket 'bucket' and a measurement 'doc', updates the WriteBatch corresponding to the
@@ -559,14 +560,36 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> tryToInsertIntoBucketW
  */
 std::shared_ptr<WriteBatch> addMeasurementToBatchAndBucket(
     BucketCatalog& catalog,
-    const BSONObj& doc,
+    const BSONObj& measurement,
     OperationId opId,
-    InsertContext& insertContext,
-    Bucket& bucket,
+    const TimeseriesOptions& timeseriesOptions,
+    const StripeNumber& stripeNumber,
+    ExecutionStatsController& stats,
     const StringDataComparator* comparator,
     Bucket::NewFieldNames& newFieldNamesToBeInserted,
-    Sizes& sizesToBeAdded,
+    const Sizes& sizesToBeAdded,
     bool isNewlyOpenedBucket,
-    bool openedDueToMetadata);
+    bool openedDueToMetadata,
+    Bucket& bucket);
 
+
+/**
+ * Given a bucket 'bucket', a measurement 'doc', and the 'writeBatch', updates the 'writeBatch'
+ * corresponding to the inputted bucket as well as the bucket itself to reflect the addition of the
+ * measurement. This includes updating the batch/bucket estimated sizes and the bucket's schema.
+ * TODO(SERVER-100294) Remove the new prefix after deleting legacy timeseries write path code.
+ */
+void newAddMeasurementToBatchAndBucket(BucketCatalog& catalog,
+                                       const BSONObj& measurement,
+                                       OperationId opId,
+                                       const TimeseriesOptions& timeseriesOptions,
+                                       const StripeNumber& stripeNumber,
+                                       ExecutionStatsController& stats,
+                                       const StringDataComparator* comparator,
+                                       Bucket::NewFieldNames& newFieldNamesToBeInserted,
+                                       const Sizes& sizesToBeAdded,
+                                       bool isNewlyOpenedBucket,
+                                       bool openedDueToMetadata,
+                                       Bucket& bucket,
+                                       std::shared_ptr<WriteBatch>& writeBatch);
 }  // namespace mongo::timeseries::bucket_catalog::internal

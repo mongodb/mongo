@@ -59,6 +59,7 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
+#include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils_internal.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/stdx/thread.h"
@@ -520,17 +521,21 @@ void BucketCatalogTest::_testUseBucketSkipsConflictingBucket(
     Bucket& bucket1 = internal::allocateBucket(*_bucketCatalog,
                                                *_bucketCatalog->stripes[insertCtx.stripeNumber],
                                                WithLock::withoutLock(),
-                                               insertCtx,
+                                               insertCtx.key,
+                                               insertCtx.options,
                                                time,
-                                               nullptr);
+                                               nullptr,
+                                               insertCtx.stats);
     makeBucketConflict(*_bucketCatalog, bucket1);
 
     Bucket& bucket2 = internal::allocateBucket(*_bucketCatalog,
                                                *_bucketCatalog->stripes[insertCtx.stripeNumber],
                                                WithLock::withoutLock(),
-                                               insertCtx,
+                                               insertCtx.key,
+                                               insertCtx.options,
                                                time,
-                                               nullptr);
+                                               nullptr,
+                                               insertCtx.stats);
 
     ASSERT_EQ(&bucket2,
               internal::useBucket(*_bucketCatalog,
@@ -553,26 +558,32 @@ void BucketCatalogTest::_testUseAlternateBucketSkipsConflictingBucket(
     Bucket& bucket1 = internal::allocateBucket(*_bucketCatalog,
                                                *_bucketCatalog->stripes[insertCtx.stripeNumber],
                                                WithLock::withoutLock(),
-                                               insertCtx,
+                                               insertCtx.key,
+                                               insertCtx.options,
                                                time,
-                                               nullptr);
+                                               nullptr,
+                                               insertCtx.stats);
     makeBucketConflict(*_bucketCatalog, bucket1);
 
     Bucket& bucket2 = internal::allocateBucket(*_bucketCatalog,
                                                *_bucketCatalog->stripes[insertCtx.stripeNumber],
                                                WithLock::withoutLock(),
-                                               insertCtx,
+                                               insertCtx.key,
+                                               insertCtx.options,
                                                time,
-                                               nullptr);
+                                               nullptr,
+                                               insertCtx.stats);
     // Temporarily mark bucket2 rolled over so we can open another.
     bucket2.rolloverAction = RolloverAction::kArchive;
 
     Bucket& bucket3 = internal::allocateBucket(*_bucketCatalog,
                                                *_bucketCatalog->stripes[insertCtx.stripeNumber],
                                                WithLock::withoutLock(),
-                                               insertCtx,
+                                               insertCtx.key,
+                                               insertCtx.options,
                                                time,
-                                               nullptr);
+                                               nullptr,
+                                               insertCtx.stats);
     // Unmark bucket2 to ensure we have an open bucket to skip as well.
     bucket2.rolloverAction = RolloverAction::kNone;
     bucket3.rolloverAction = RolloverAction::kArchive;
@@ -2333,9 +2344,11 @@ TEST_F(BucketCatalogTest, FindOpenBucketReturnsBucket) {
     Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
                                               *_bucketCatalog->stripes[insertCtx.stripeNumber],
                                               WithLock::withoutLock(),
-                                              insertCtx,
+                                              insertCtx.key,
+                                              insertCtx.options,
                                               time,
-                                              nullptr);
+                                              nullptr,
+                                              insertCtx.stats);
 
     ASSERT_EQ(&bucket,
               internal::findOpenBucket(*_bucketCatalog,
@@ -2353,9 +2366,12 @@ TEST_F(BucketCatalogTest, CheckBucketInsertEligibilityWithBucketWithDirectWrite)
     Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
                                               *_bucketCatalog->stripes[insertCtx.stripeNumber],
                                               WithLock::withoutLock(),
-                                              insertCtx,
+                                              insertCtx.key,
+                                              insertCtx.options,
                                               time,
-                                              nullptr);
+                                              nullptr,
+                                              insertCtx.stats);
+    ;
 
     directWriteStart(_bucketCatalog->bucketStateRegistry, bucket.bucketId);
 
@@ -2376,9 +2392,12 @@ TEST_F(BucketCatalogTest, CheckBucketInsertEligibilityWithClearedBucket) {
     Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
                                               *_bucketCatalog->stripes[insertCtx.stripeNumber],
                                               WithLock::withoutLock(),
-                                              insertCtx,
+                                              insertCtx.key,
+                                              insertCtx.options,
                                               time,
-                                              nullptr);
+                                              nullptr,
+                                              insertCtx.stats);
+    ;
 
     clear(*_bucketCatalog, bucket.bucketId.collectionUUID);
 
@@ -2399,9 +2418,12 @@ TEST_F(BucketCatalogTest, CheckBucketInsertEligibilityWithFrozenBucket) {
     Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
                                               *_bucketCatalog->stripes[insertCtx.stripeNumber],
                                               WithLock::withoutLock(),
-                                              insertCtx,
+                                              insertCtx.key,
+                                              insertCtx.options,
                                               time,
-                                              nullptr);
+                                              nullptr,
+                                              insertCtx.stats);
+    ;
 
     freezeBucket(_bucketCatalog->bucketStateRegistry, bucket.bucketId);
 
@@ -2422,9 +2444,11 @@ TEST_F(BucketCatalogTest, CheckBucketInsertEligibilityWithRolledOverBucket) {
     Bucket& bucket = internal::allocateBucket(*_bucketCatalog,
                                               *_bucketCatalog->stripes[insertCtx.stripeNumber],
                                               WithLock::withoutLock(),
-                                              insertCtx,
+                                              insertCtx.key,
+                                              insertCtx.options,
                                               time,
-                                              nullptr);
+                                              nullptr,
+                                              insertCtx.stats);
     // Ineligible for inserts. Do not remove from 'openBucketsByKey'.
     bucket.rolloverAction = RolloverAction::kArchive;
     ASSERT(!internal::checkBucketInsertEligibility(*_bucketCatalog,
@@ -2468,145 +2492,146 @@ TEST_F(BucketCatalogTest, UseAlternateBucketSkipsFrozenBucket) {
 
 TEST_F(BucketCatalogTest, InsertBatchHelperFillsUpSingleBucket) {
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
-
     const auto& bucketsColl = autoColl.getCollection();
-    BSONObj measurement = BSON(_timeField << Date_t::now() << _metaField << 1);
-    auto swResult =
-        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), measurement);
-    ASSERT_OK(swResult);
-    auto& [insertContext, time] = swResult.getValue();
-
-    Bucket& bucketToInsertInto =
-        internal::allocateBucket(*_bucketCatalog,
-                                 *_bucketCatalog->stripes[insertContext.stripeNumber],
-                                 WithLock::withoutLock(),
-                                 insertContext,
-                                 time,
-                                 nullptr);
-    size_t currentPosition = 0;
-    std::vector<std::shared_ptr<WriteBatch>> writeBatches;
-    auto& stripe = *_bucketCatalog->stripes[insertContext.stripeNumber];
-    stdx::lock_guard stripeLock{stripe.mutex};
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
 
     std::vector<BSONObj> batchOfMeasurements;
-
     for (auto i = 0; i < gTimeseriesBucketMaxCount; i++) {
         batchOfMeasurements.emplace_back(BSON(_timeField << Date_t::now() << _metaField << "a"));
     }
+    auto batchedInsertContexts = write_ops::internal::buildBatchedInsertContexts(
+        *_bucketCatalog, _uuid1, timeseriesOptions, batchOfMeasurements);
 
-    auto mockGetStorageCacheSizeBytesFunc = [](OperationContext*) {
-        return kStorageCacheSizeBytes;
-    };
+    // All of the measurements will be in the same bucket/BatchedInsertContext because we have the
+    // same meta field.
+    ASSERT(batchedInsertContexts.isOK());
+    ASSERT_EQ(batchedInsertContexts.getValue().size(), 1);
+    auto batchedInsertContext = batchedInsertContexts.getValue().front();
+    ASSERT_EQ(batchedInsertContext.measurementsTimesAndIndices.size(), gTimeseriesBucketMaxCount);
 
-    auto insertionResult =
-        internal::insertBatchIntoEligibleBucket(_opCtx,
-                                                *_bucketCatalog,
-                                                bucketsColl.get(),
-                                                bucketsColl->getDefaultCollator(),
-                                                batchOfMeasurements,
-                                                insertContext,
-                                                bucketToInsertInto,
-                                                stripe,
-                                                stripeLock,
-                                                currentPosition,
-                                                writeBatches,
-                                                mockGetStorageCacheSizeBytesFunc);
-    auto successfulInsertion = std::get_if<std::monostate>(&insertionResult);
+    auto time = std::get<Date_t>(batchedInsertContext.measurementsTimesAndIndices[0]);
+    Bucket& bucketToInsertInto =
+        internal::allocateBucket(*_bucketCatalog,
+                                 *_bucketCatalog->stripes[batchedInsertContext.stripeNumber],
+                                 WithLock::withoutLock(),
+                                 batchedInsertContext.key,
+                                 batchedInsertContext.options,
+                                 time,
+                                 nullptr,
+                                 batchedInsertContext.stats);
+    size_t currentPosition = 0;
+    auto& stripe = *_bucketCatalog->stripes[batchedInsertContext.stripeNumber];
+    stdx::lock_guard stripeLock{stripe.mutex};
+    std::shared_ptr<WriteBatch> writeBatch;
+
+    auto successfulInsertion =
+        internal::stageInsertBatchIntoEligibleBucket(*_bucketCatalog,
+                                                     bucketsColl.get(),
+                                                     _opCtx->getOpID(),
+                                                     bucketsColl->getDefaultCollator(),
+                                                     batchedInsertContext,
+                                                     stripe,
+                                                     stripeLock,
+                                                     kStorageCacheSizeBytes,
+                                                     bucketToInsertInto,
+                                                     currentPosition,
+                                                     writeBatch);
     ASSERT(successfulInsertion);
-    ASSERT_EQ(writeBatches.size(), gTimeseriesBucketMaxCount);
     ASSERT_EQ(bucketToInsertInto.numMeasurements, gTimeseriesBucketMaxCount);
     ASSERT_EQ(currentPosition, gTimeseriesBucketMaxCount);
 }
 
 TEST_F(BucketCatalogTest, InsertBatchHelperHandlesRollover) {
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
-
     const auto& bucketsColl = autoColl.getCollection();
-    BSONObj measurement = BSON(_timeField << Date_t::now() << _metaField << 1);
-    auto swResult =
-        prepareInsert(*_bucketCatalog, _uuid1, _getTimeseriesOptions(_ns1), measurement);
-    ASSERT_OK(swResult);
-    auto& [insertContext, time] = swResult.getValue();
-
-    Bucket& bucketToInsertInto =
-        internal::allocateBucket(*_bucketCatalog,
-                                 *_bucketCatalog->stripes[insertContext.stripeNumber],
-                                 WithLock::withoutLock(),
-                                 insertContext,
-                                 time,
-                                 nullptr);
-
-    size_t currentPosition = 0;
-    std::vector<std::shared_ptr<WriteBatch>> writeBatches;
-    auto& stripe = *_bucketCatalog->stripes[insertContext.stripeNumber];
-    stdx::lock_guard stripeLock{stripe.mutex};
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
 
     std::vector<BSONObj> batchOfMeasurements;
-
     for (auto i = 0; i < 2 * gTimeseriesBucketMaxCount; i++) {
         batchOfMeasurements.emplace_back(BSON(_timeField << Date_t::now() << _metaField << "a"));
     }
+    auto batchedInsertContexts = write_ops::internal::buildBatchedInsertContexts(
+        *_bucketCatalog, _uuid1, timeseriesOptions, batchOfMeasurements);
+    ASSERT(batchedInsertContexts.isOK());
 
-    auto mockGetStorageCacheSizeBytesFunc = [](OperationContext*) {
-        return kStorageCacheSizeBytes;
-    };
+    // All of the measurements will be in the same bucket/BatchedInsertContext because we have the
+    // same meta field.
+    ASSERT_EQ(batchedInsertContexts.getValue().size(), 1);
+    auto batchedInsertContext = batchedInsertContexts.getValue().front();
+    ASSERT_EQ(batchedInsertContext.measurementsTimesAndIndices.size(),
+              2 * gTimeseriesBucketMaxCount);
 
-    auto insertionResult =
-        internal::insertBatchIntoEligibleBucket(_opCtx,
-                                                *_bucketCatalog,
-                                                bucketsColl.get(),
-                                                bucketsColl->getDefaultCollator(),
-                                                batchOfMeasurements,
-                                                insertContext,
-                                                bucketToInsertInto,
-                                                stripe,
-                                                stripeLock,
-                                                currentPosition,
-                                                writeBatches,
-                                                mockGetStorageCacheSizeBytesFunc);
-    auto rolloverReason = std::get_if<RolloverReason>(&insertionResult);
-    ASSERT(rolloverReason);
-    ASSERT(*rolloverReason == RolloverReason::kCount);
-    // We should have inserted the first half of the measurements.
+    auto time = std::get<Date_t>(batchedInsertContext.measurementsTimesAndIndices[0]);
+    Bucket& bucketToInsertInto =
+        internal::allocateBucket(*_bucketCatalog,
+                                 *_bucketCatalog->stripes[batchedInsertContext.stripeNumber],
+                                 WithLock::withoutLock(),
+                                 batchedInsertContext.key,
+                                 batchedInsertContext.options,
+                                 time,
+                                 nullptr,
+                                 batchedInsertContext.stats);
+
+    size_t currentPosition = 0;
+    auto& stripe = *_bucketCatalog->stripes[batchedInsertContext.stripeNumber];
+    stdx::lock_guard stripeLock{stripe.mutex};
+    std::shared_ptr<WriteBatch> writeBatch1;
+
+    auto currentBatch = batchedInsertContexts.getValue().front();
+    auto successfulInsertion =
+        internal::stageInsertBatchIntoEligibleBucket(*_bucketCatalog,
+                                                     bucketsColl.get(),
+                                                     _opCtx->getOpID(),
+                                                     bucketsColl->getDefaultCollator(),
+                                                     currentBatch,
+                                                     stripe,
+                                                     stripeLock,
+                                                     kStorageCacheSizeBytes,
+                                                     bucketToInsertInto,
+                                                     currentPosition,
+                                                     writeBatch1);
+    ASSERT(!successfulInsertion);
     ASSERT_EQ(currentPosition, gTimeseriesBucketMaxCount);
     ASSERT_EQ(bucketToInsertInto.numMeasurements, gTimeseriesBucketMaxCount);
 
     // Let's rollover our first bucket and finish inserting the batch with another call into the
     // helper.
-    auto currentMeasurementTime = batchOfMeasurements[currentPosition]
-                                      .getField(bucketsColl->getTimeseriesOptions()->getTimeField())
-                                      .Date();
+    auto currentMeasurementTime =
+        std::get<Date_t>(currentBatch.measurementsTimesAndIndices[currentPosition]);
     auto newBucketToInsertInto = &internal::rollover(*_bucketCatalog,
                                                      stripe,
                                                      stripeLock,
                                                      bucketToInsertInto,
-                                                     insertContext,
+                                                     batchedInsertContext.key,
+                                                     batchedInsertContext.options,
                                                      RolloverAction::kHardClose,
                                                      currentMeasurementTime,
                                                      bucketsColl->getDefaultCollator(),
                                                      nullptr,
-                                                     boost::none);
+                                                     boost::none,
+                                                     batchedInsertContext.stats);
 
-    insertionResult = internal::insertBatchIntoEligibleBucket(_opCtx,
-                                                              *_bucketCatalog,
-                                                              bucketsColl.get(),
-                                                              bucketsColl->getDefaultCollator(),
-                                                              batchOfMeasurements,
-                                                              insertContext,
-                                                              *newBucketToInsertInto,
-                                                              stripe,
-                                                              stripeLock,
-                                                              currentPosition,
-                                                              writeBatches,
-                                                              mockGetStorageCacheSizeBytesFunc);
+    std::shared_ptr<WriteBatch> writeBatch2;
+    successfulInsertion =
+        internal::stageInsertBatchIntoEligibleBucket(*_bucketCatalog,
+                                                     bucketsColl.get(),
+                                                     _opCtx->getOpID(),
+                                                     bucketsColl->getDefaultCollator(),
+                                                     currentBatch,
+                                                     stripe,
+                                                     stripeLock,
+                                                     kStorageCacheSizeBytes,
+                                                     *newBucketToInsertInto,
+                                                     currentPosition,
+                                                     writeBatch2);
 
-    auto successfulInsertion = std::get_if<std::monostate>(&insertionResult);
     ASSERT(successfulInsertion);
-    ASSERT_EQ(writeBatches.size(), 2 * gTimeseriesBucketMaxCount);
     ASSERT_EQ(newBucketToInsertInto->numMeasurements, gTimeseriesBucketMaxCount);
     ASSERT_EQ(currentPosition, 2 * gTimeseriesBucketMaxCount);
 }
 
+/*
+// TODO(SERVER-100208)
 TEST_F(BucketCatalogTest, InsertBatch) {
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
@@ -2664,6 +2689,7 @@ TEST_F(BucketCatalogTest, InsertBatch) {
                                [](OperationContext*) { return kStorageCacheSizeBytes; });
     ASSERT_EQ(writeBatches.size(), 11);
 }
+*/
 
 
 }  // namespace

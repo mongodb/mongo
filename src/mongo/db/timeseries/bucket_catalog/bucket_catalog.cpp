@@ -292,17 +292,17 @@ StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
                                    storageCacheSizeBytes);
     }
 
-    auto insertionResult = insertIntoBucket(catalog,
-                                            stripe,
-                                            stripeLock,
-                                            doc,
-                                            opId,
-                                            internal::AllowBucketCreation::kNo,
-                                            insertContext,
-                                            *bucket,
-                                            time,
-                                            storageCacheSizeBytes,
-                                            comparator);
+    auto insertionResult = internal::insertIntoBucket(catalog,
+                                                      stripe,
+                                                      stripeLock,
+                                                      doc,
+                                                      opId,
+                                                      internal::AllowBucketCreation::kNo,
+                                                      insertContext,
+                                                      *bucket,
+                                                      time,
+                                                      storageCacheSizeBytes,
+                                                      comparator);
     // If our insert was successful, return a SuccessfulInsertion with our
     // WriteBatch.
     if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
@@ -320,21 +320,21 @@ StatusWith<InsertResult> tryInsert(BucketCatalog& catalog,
     if ((*reason == RolloverReason::kTimeBackward || *reason == RolloverReason::kTimeForward)) {
         if (Bucket* alternate =
                 internal::useAlternateBucket(catalog, stripe, stripeLock, insertContext, time)) {
-            insertionResult = insertIntoBucket(catalog,
-                                               stripe,
-                                               stripeLock,
-                                               doc,
-                                               opId,
-                                               internal::AllowBucketCreation::kNo,
-                                               insertContext,
-                                               *alternate,
-                                               time,
-                                               storageCacheSizeBytes,
-                                               comparator,
-                                               bucket,
-                                               *reason == RolloverReason::kTimeBackward
-                                                   ? RolloverAction::kArchive
-                                                   : RolloverAction::kSoftClose);
+            insertionResult = internal::insertIntoBucket(catalog,
+                                                         stripe,
+                                                         stripeLock,
+                                                         doc,
+                                                         opId,
+                                                         internal::AllowBucketCreation::kNo,
+                                                         insertContext,
+                                                         *alternate,
+                                                         time,
+                                                         storageCacheSizeBytes,
+                                                         comparator,
+                                                         bucket,
+                                                         *reason == RolloverReason::kTimeBackward
+                                                             ? RolloverAction::kArchive
+                                                             : RolloverAction::kSoftClose);
             if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
                 return SuccessfulInsertion{std::move(*batch)};
             }
@@ -407,17 +407,18 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
                 // We reopened the bucket successfully. Now we'll use it directly as an optimization
                 // to bypass normal bucket selection.
                 Bucket& reopenedBucket = swBucket.getValue().get();
-                auto insertionResult = insertIntoBucket(catalog,
-                                                        stripe,
-                                                        stripeLock,
-                                                        doc,
-                                                        opId,
-                                                        internal::AllowBucketCreation::kYes,
-                                                        insertContext,
-                                                        reopenedBucket,
-                                                        time,
-                                                        storageCacheSizeBytes,
-                                                        comparator);
+                auto insertionResult =
+                    internal::insertIntoBucket(catalog,
+                                               stripe,
+                                               stripeLock,
+                                               doc,
+                                               opId,
+                                               internal::AllowBucketCreation::kYes,
+                                               insertContext,
+                                               reopenedBucket,
+                                               time,
+                                               storageCacheSizeBytes,
+                                               comparator);
                 auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
                 invariant(batch);
                 return SuccessfulInsertion{std::move(*batch)};
@@ -445,17 +446,17 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
                                comparator);
     invariant(bucket);
 
-    auto insertionResult = insertIntoBucket(catalog,
-                                            stripe,
-                                            stripeLock,
-                                            doc,
-                                            opId,
-                                            internal::AllowBucketCreation::kYes,
-                                            insertContext,
-                                            *bucket,
-                                            time,
-                                            storageCacheSizeBytes,
-                                            comparator);
+    auto insertionResult = internal::insertIntoBucket(catalog,
+                                                      stripe,
+                                                      stripeLock,
+                                                      doc,
+                                                      opId,
+                                                      internal::AllowBucketCreation::kYes,
+                                                      insertContext,
+                                                      *bucket,
+                                                      time,
+                                                      storageCacheSizeBytes,
+                                                      comparator);
     auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
     invariant(batch);
     return SuccessfulInsertion{std::move(*batch)};
@@ -480,17 +481,17 @@ StatusWith<InsertResult> insert(BucketCatalog& catalog,
                                comparator);
     invariant(bucket);
 
-    auto insertionResult = insertIntoBucket(catalog,
-                                            stripe,
-                                            stripeLock,
-                                            doc,
-                                            opId,
-                                            internal::AllowBucketCreation::kYes,
-                                            insertContext,
-                                            *bucket,
-                                            time,
-                                            storageCacheSizeBytes,
-                                            comparator);
+    auto insertionResult = internal::insertIntoBucket(catalog,
+                                                      stripe,
+                                                      stripeLock,
+                                                      doc,
+                                                      opId,
+                                                      internal::AllowBucketCreation::kYes,
+                                                      insertContext,
+                                                      *bucket,
+                                                      time,
+                                                      storageCacheSizeBytes,
+                                                      comparator);
 
     auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
     invariant(batch);
@@ -909,72 +910,5 @@ StatusWith<Bucket*> potentiallyReopenBucket(
 
     return &swBucket.getValue().get();
 }
-
-std::vector<std::shared_ptr<WriteBatch>> insertBatch(
-    OperationContext* opCtx,
-    BucketCatalog& catalog,
-    const Collection* bucketsColl,
-    const StringDataComparator* comparator,
-    const std::vector<BSONObj>& batchOfMeasurements,
-    InsertContext& insertContext,
-    std::function<uint64_t(OperationContext*)> functionToGetStorageCacheBytes) {
-
-    size_t currentPosition = 0;
-    std::vector<std::shared_ptr<WriteBatch>> writeBatches;
-    auto& stripe = *catalog.stripes[insertContext.stripeNumber];
-    stdx::unique_lock stripeLock{stripe.mutex};
-
-    // Let's acquire a bucket to insert into.
-    auto currentMeasurementTime = batchOfMeasurements[currentPosition]
-                                      .getField(bucketsColl->getTimeseriesOptions()->getTimeField())
-                                      .Date();
-    bucket_catalog::Bucket* bucket =
-        bucket_catalog::internal::useBucket(catalog,
-                                            stripe,
-                                            stripeLock,
-                                            insertContext,
-                                            bucket_catalog::internal::AllowBucketCreation::kYes,
-                                            currentMeasurementTime,
-                                            comparator);
-
-    while (currentPosition < batchOfMeasurements.size()) {
-        auto result = internal::insertBatchIntoEligibleBucket(opCtx,
-                                                              catalog,
-                                                              bucketsColl,
-                                                              comparator,
-                                                              batchOfMeasurements,
-                                                              insertContext,
-                                                              *bucket,
-                                                              stripe,
-                                                              stripeLock,
-                                                              currentPosition,
-                                                              writeBatches,
-                                                              functionToGetStorageCacheBytes);
-        if (std::get_if<std::monostate>(&result)) {
-            invariant(currentPosition == batchOfMeasurements.size());
-            // We've finished inserting all our measurements. On the next iteration we'll return
-            // the vector of writeBatches.
-        } else if (std::get_if<RolloverReason>(&result)) {
-            auto currentMeasurementTime =
-                batchOfMeasurements[currentPosition]
-                    .getField(bucketsColl->getTimeseriesOptions()->getTimeField())
-                    .Date();
-
-            // Let's roll over our bucket and allocate a new one.
-            bucket = &internal::rollover(catalog,
-                                         stripe,
-                                         stripeLock,
-                                         *bucket,
-                                         insertContext,
-                                         RolloverAction::kHardClose,
-                                         currentMeasurementTime,
-                                         comparator,
-                                         nullptr,
-                                         boost::none);
-        }
-    }
-    return writeBatches;
-}
-
 
 }  // namespace mongo::timeseries::bucket_catalog

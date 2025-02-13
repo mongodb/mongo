@@ -222,12 +222,4 @@ void deleteRequestCheckFunction(DeleteRequest* request, const TimeseriesOptions&
  * Function that performs checks on an update request being performed on a timeseries collection.
  */
 void updateRequestCheckFunction(UpdateRequest* request, const TimeseriesOptions& options);
-
-TimeseriesBatches insertBatchOfMeasurements(OperationContext* opCtx,
-                                            bucket_catalog::BucketCatalog& catalog,
-                                            const Collection* bucketsColl,
-                                            const StringDataComparator* comparator,
-                                            const std::vector<BSONObj>& measurements,
-                                            bucket_catalog::InsertContext& insertContext);
-
 }  // namespace mongo::timeseries

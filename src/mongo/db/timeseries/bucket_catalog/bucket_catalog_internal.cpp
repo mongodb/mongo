@@ -59,8 +59,10 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
+#include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/db/timeseries/bucket_catalog/reopening.h"
+#include "mongo/db/timeseries/bucket_catalog/rollover.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/bucket_compression_failure.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
@@ -345,7 +347,8 @@ Bucket* useBucket(BucketCatalog& catalog,
     if (it == stripe.openBucketsByKey.end()) {
         // No open bucket for this metadata.
         return mode == AllowBucketCreation::kYes
-            ? &allocateBucket(catalog, stripe, stripeLock, info, time, comparator)
+            ? &allocateBucket(
+                  catalog, stripe, stripeLock, info.key, info.options, time, comparator, info.stats)
             : nullptr;
     }
 
@@ -386,7 +389,8 @@ Bucket* useBucket(BucketCatalog& catalog,
     cleanupFn();
 
     return mode == AllowBucketCreation::kYes
-        ? &allocateBucket(catalog, stripe, stripeLock, info, time, comparator)
+        ? &allocateBucket(
+              catalog, stripe, stripeLock, info.key, info.options, time, comparator, info.stats)
         : nullptr;
 }
 
@@ -733,7 +737,7 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     Stripe& stripe,
     WithLock stripeLock,
     const BSONObj& doc,
-    OperationId opId,
+    const OperationId opId,
     AllowBucketCreation mode,
     InsertContext& insertContext,
     Bucket& existingBucket,
@@ -756,8 +760,7 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
                                        sizesToBeAdded);
     if (!isNewlyOpenedBucket) {
         auto [action, reason] =
-            determineRolloverAction(catalog.trackingContexts,
-                                    doc,
+            determineRolloverAction(doc,
                                     insertContext,
                                     existingBucket,
                                     catalog.globalExecutionStats.numActiveBuckets.loadRelaxed(),
@@ -777,12 +780,14 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
                                    stripe,
                                    stripeLock,
                                    existingBucket,
-                                   insertContext,
+                                   insertContext.key,
+                                   insertContext.options,
                                    action,
                                    time,
                                    comparator,
                                    excludedBucket,
-                                   excludedAction);
+                                   excludedAction,
+                                   insertContext.stats);
             isNewlyOpenedBucket = true;
             // Recalculate the fields and size change for the newly opened bucket we got from
             // rolling over our original one.
@@ -797,69 +802,74 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     return addMeasurementToBatchAndBucket(catalog,
                                           doc,
                                           opId,
-                                          insertContext,
-                                          bucketToUse.get(),
+                                          insertContext.options,
+                                          insertContext.stripeNumber,
+                                          insertContext.stats,
                                           comparator,
                                           newFieldNamesToBeInserted,
                                           sizesToBeAdded,
                                           isNewlyOpenedBucket,
-                                          openedDueToMetadata);
+                                          openedDueToMetadata,
+                                          bucketToUse.get());
 }
 
-std::variant<std::shared_ptr<WriteBatch>, RolloverReason> tryToInsertIntoBucketWithoutRollover(
-    BucketCatalog& catalog,
-    Stripe& stripe,
-    WithLock stripeLock,
-    const BSONObj& doc,
-    OperationId opId,
-    AllowBucketCreation mode,
-    InsertContext& insertContext,
-    Bucket& bucketToInsertInto,
-    const Date_t& time,
-    uint64_t storageCacheSizeBytes,
-    const StringDataComparator* comparator) {
+bool tryToInsertIntoBucketWithoutRollover(BucketCatalog& catalog,
+                                          Stripe& stripe,
+                                          WithLock stripeLock,
+                                          const BatchedInsertTuple& batchedInsertTuple,
+                                          const OperationId opId,
+                                          const TimeseriesOptions& timeseriesOptions,
+                                          const StripeNumber& stripeNumber,
+                                          ExecutionStatsController& stats,
+                                          uint64_t storageCacheSizeBytes,
+                                          const StringDataComparator* comparator,
+                                          Bucket& bucket,
+                                          std::shared_ptr<WriteBatch>& writeBatch) {
     Bucket::NewFieldNames newFieldNamesToBeInserted;
     Sizes sizesToBeAdded;
 
-    bool isNewlyOpenedBucket = (bucketToInsertInto.size == 0);
+    auto measurement = std::get<BSONObj>(batchedInsertTuple);
+    auto date = std::get<Date_t>(batchedInsertTuple);
+
+    bool isNewlyOpenedBucket = (bucket.size == 0);
     bool openedDueToMetadata = true;
     calculateBucketFieldsAndSizeChange(catalog.trackingContexts,
-                                       bucketToInsertInto,
-                                       doc,
-                                       insertContext.options.getMetaField(),
+                                       bucket,
+                                       measurement,
+                                       timeseriesOptions.getMetaField(),
                                        newFieldNamesToBeInserted,
                                        sizesToBeAdded);
 
     if (!isNewlyOpenedBucket) {
-        auto [action, reason] =
-            determineRolloverAction(catalog.trackingContexts,
-                                    doc,
-                                    insertContext,
-                                    bucketToInsertInto,
+        auto reason =
+            determineRolloverReason(measurement,
+                                    stats,
+                                    timeseriesOptions,
+                                    bucket,
                                     catalog.globalExecutionStats.numActiveBuckets.loadRelaxed(),
-                                    newFieldNamesToBeInserted,
                                     sizesToBeAdded,
-                                    mode,
-                                    time,
+                                    date,
                                     storageCacheSizeBytes,
                                     comparator);
-        if (action != RolloverAction::kNone) {
+        if (reason != RolloverReason::kNone) {
             // We would not be able to insert this measurement without rolling over the bucket.
-            // Return the reason for rolling over.
-            return reason;
+            return false;
         }
     }
-
-    return addMeasurementToBatchAndBucket(catalog,
-                                          doc,
-                                          opId,
-                                          insertContext,
-                                          bucketToInsertInto,
-                                          comparator,
-                                          newFieldNamesToBeInserted,
-                                          sizesToBeAdded,
-                                          isNewlyOpenedBucket,
-                                          openedDueToMetadata);
+    newAddMeasurementToBatchAndBucket(catalog,
+                                      measurement,
+                                      opId,
+                                      timeseriesOptions,
+                                      stripeNumber,
+                                      stats,
+                                      comparator,
+                                      newFieldNamesToBeInserted,
+                                      sizesToBeAdded,
+                                      isNewlyOpenedBucket,
+                                      openedDueToMetadata,
+                                      bucket,
+                                      writeBatch);
+    return true;
 }
 
 void waitToCommitBatch(BucketStateRegistry& registry,
@@ -1339,10 +1349,12 @@ void resetBucketOIDCounter() {
 Bucket& allocateBucket(BucketCatalog& catalog,
                        Stripe& stripe,
                        WithLock stripeLock,
-                       InsertContext& info,
+                       const BucketKey& key,
+                       const TimeseriesOptions& timeseriesOptions,
                        const Date_t& time,
-                       const StringDataComparator* comparator) {
-    expireIdleBuckets(catalog, stripe, stripeLock, info.key.collectionUUID, info.stats);
+                       const StringDataComparator* comparator,
+                       ExecutionStatsController& stats) {
+    expireIdleBuckets(catalog, stripe, stripeLock, key.collectionUUID, stats);
 
     // In rare cases duplicate bucket _id fields can be generated in the same stripe and fail to be
     // inserted. We will perform a limited number of retries to minimize the probability of
@@ -1354,16 +1366,16 @@ Bucket& allocateBucket(BucketCatalog& catalog,
     bool successfullyCreatedId = false;
     for (int retryAttempts = 0; !successfullyCreatedId && retryAttempts < maxRetries;
          ++retryAttempts) {
-        std::tie(oid, roundedTime) = generateBucketOID(time, info.options);
-        auto bucketId = BucketId{info.key.collectionUUID, oid, info.key.signature()};
+        std::tie(oid, roundedTime) = generateBucketOID(time, timeseriesOptions);
+        auto bucketId = BucketId{key.collectionUUID, oid, key.signature()};
         std::tie(it, successfullyCreatedId) = stripe.openBucketsById.try_emplace(
             bucketId,
             tracking::make_unique<Bucket>(
                 getTrackingContext(catalog.trackingContexts, TrackingScope::kOpenBucketsById),
                 catalog.trackingContexts,
                 bucketId,
-                info.key,
-                info.options.getTimeField(),
+                key,
+                timeseriesOptions.getTimeField(),
                 roundedTime,
                 catalog.bucketStateRegistry));
         if (successfullyCreatedId) {
@@ -1385,13 +1397,13 @@ Bucket& allocateBucket(BucketCatalog& catalog,
 
     Bucket* bucket = it->second.get();
     if constexpr (kDebugBuild) {
-        assertNoOpenUnclearedBucketsForKey(stripe, catalog.bucketStateRegistry, info.key);
+        assertNoOpenUnclearedBucketsForKey(stripe, catalog.bucketStateRegistry, key);
     }
-    stripe.openBucketsByKey[info.key].emplace(bucket);
+    stripe.openBucketsByKey[key].emplace(bucket);
 
-    info.stats.incNumActiveBuckets();
+    stats.incNumActiveBuckets();
     // Make sure we set the control.min time field to match the rounded _id timestamp.
-    auto controlDoc = buildControlMinTimestampDoc(info.options.getTimeField(), roundedTime);
+    auto controlDoc = buildControlMinTimestampDoc(timeseriesOptions.getTimeField(), roundedTime);
     bucket->minmax.update(controlDoc, /*metaField=*/boost::none, comparator);
     return *bucket;
 }
@@ -1400,29 +1412,31 @@ Bucket& rollover(BucketCatalog& catalog,
                  Stripe& stripe,
                  WithLock stripeLock,
                  Bucket& bucket,
-                 InsertContext& info,
+                 const BucketKey& key,
+                 const TimeseriesOptions& timeseriesOptions,
                  RolloverAction action,
                  const Date_t& time,
                  const StringDataComparator* comparator,
                  Bucket* additionalBucket,
-                 boost::optional<RolloverAction> additionalAction) {
+                 boost::optional<RolloverAction> additionalAction,
+                 ExecutionStatsController& stats) {
     doRollover(catalog, stripe, stripeLock, bucket, action);
     if (additionalBucket) {
         invariant(additionalAction.has_value());
         doRollover(catalog, stripe, stripeLock, *additionalBucket, additionalAction.value());
     }
 
-    return allocateBucket(catalog, stripe, stripeLock, info, time, comparator);
+    return allocateBucket(
+        catalog, stripe, stripeLock, key, timeseriesOptions, time, comparator, stats);
 }
 
 std::pair<RolloverAction, RolloverReason> determineRolloverAction(
-    TrackingContexts& trackingContexts,
-    const BSONObj& doc,
+    const BSONObj& measurement,
     InsertContext& info,
     Bucket& bucket,
     uint32_t numberOfActiveBuckets,
     Bucket::NewFieldNames& newFieldNamesToBeInserted,
-    Sizes& sizesToBeAdded,
+    const Sizes& sizesToBeAdded,
     AllowBucketCreation mode,
     const Date_t& time,
     uint64_t storageCacheSizeBytes,
@@ -1489,7 +1503,7 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
         }
     }
 
-    if (schemaIncompatible(bucket, doc, info.options.getMetaField(), comparator)) {
+    if (schemaIncompatible(bucket, measurement, info.options.getMetaField(), comparator)) {
         info.stats.incNumBucketsClosedDueToSchemaChange();
         return {RolloverAction::kHardClose, RolloverReason::kSchemaChange};
     }
@@ -1527,7 +1541,7 @@ RolloverReason determineRolloverReason(const BSONObj& doc,
                                        const TimeseriesOptions& timeseriesOptions,
                                        Bucket& bucket,
                                        uint32_t numberOfActiveBuckets,
-                                       Sizes& sizesToBeAdded,
+                                       const Sizes& sizesToBeAdded,
                                        const Date_t& time,
                                        uint64_t storageCacheSizeBytes,
                                        const StringDataComparator* comparator) {
@@ -1674,62 +1688,94 @@ void closeArchivedBucket(BucketCatalog& catalog, const BucketId& bucketId) {
     stopTrackingBucketState(catalog.bucketStateRegistry, bucketId);
 }
 
-std::variant<std::monostate, RolloverReason> insertBatchIntoEligibleBucket(
-    OperationContext* opCtx,
-    BucketCatalog& catalog,
-    const Collection* bucketsColl,
-    const StringDataComparator* comparator,
-    const std::vector<BSONObj>& batchOfMeasurements,
-    InsertContext& insertContext,
-    Bucket& bucketToInsertInto,
-    Stripe& stripe,
-    WithLock stripeLock,
-    size_t& currentPosition,
-    std::vector<std::shared_ptr<WriteBatch>>& writeBatches,
-    std::function<uint64_t(OperationContext*)> functionToGetStorageCacheBytes) {
-
-    while (currentPosition < batchOfMeasurements.size()) {
-        auto insertionResult = tryToInsertIntoBucketWithoutRollover(
-            catalog,
-            stripe,
-            stripeLock,
-            batchOfMeasurements[currentPosition],
-            opCtx->getOpID(),
-            bucket_catalog::internal::AllowBucketCreation::kNo,
-            insertContext,
-            bucketToInsertInto,
-            batchOfMeasurements[currentPosition]
-                .getField(bucketsColl->getTimeseriesOptions()->getTimeField())
-                .Date(),
-            functionToGetStorageCacheBytes(opCtx),
-            comparator);
-        if (auto* batch = std::get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
-            // Successfully inserted a measurement.
-            ++currentPosition;
-            writeBatches.emplace_back(*batch);
-            continue;
-        } else if (auto* rolloverReason = std::get_if<RolloverReason>(&insertionResult)) {
-            // Return the reason for rollover to the caller, which must rollover the bucket.
-            return *rolloverReason;
-        }
+bool stageInsertBatchIntoEligibleBucket(BucketCatalog& catalog,
+                                        const Collection* bucketsColl,
+                                        const OperationId opId,
+                                        const StringDataComparator* comparator,
+                                        BatchedInsertContext& batch,
+                                        Stripe& stripe,
+                                        WithLock stripeLock,
+                                        uint64_t storageCacheSizeBytes,
+                                        Bucket& eligibleBucket,
+                                        size_t& currentPosition,
+                                        std::shared_ptr<WriteBatch>& writeBatch) {
+    // getEligibleBucket guarantees that we will successfully insert at least one measurement
+    // (batch.measurementsTimesAndIndices[currentPosition]) into the provided bucket without rolling
+    // it over, which allows us to unconditionally initialize the writeBatch.
+    writeBatch = activeBatch(
+        catalog.trackingContexts, eligibleBucket, opId, batch.stripeNumber, batch.stats);
+    while (currentPosition < batch.measurementsTimesAndIndices.size()) {
+        if (!tryToInsertIntoBucketWithoutRollover(
+                catalog,
+                stripe,
+                stripeLock,
+                batch.measurementsTimesAndIndices[currentPosition],
+                opId,
+                batch.options,
+                batch.stripeNumber,
+                batch.stats,
+                storageCacheSizeBytes,
+                comparator,
+                eligibleBucket,
+                writeBatch))
+            return false;
+        ++currentPosition;
     }
-    return std::monostate{};
+    return true;
+}
+
+void newAddMeasurementToBatchAndBucket(BucketCatalog& catalog,
+                                       const BSONObj& measurement,
+                                       const OperationId opId,
+                                       const TimeseriesOptions& timeseriesOptions,
+                                       const StripeNumber& stripeNumber,
+                                       ExecutionStatsController& stats,
+                                       const StringDataComparator* comparator,
+                                       Bucket::NewFieldNames& newFieldNamesToBeInserted,
+                                       const Sizes& sizesToBeAdded,
+                                       bool isNewlyOpenedBucket,
+                                       bool openedDueToMetadata,
+                                       Bucket& bucket,
+                                       std::shared_ptr<WriteBatch>& writeBatch) {
+    writeBatch->measurements.push_back(measurement);
+    for (auto&& field : newFieldNamesToBeInserted) {
+        writeBatch->newFieldNamesToBeInserted[field] = field.hash();
+        bucket.uncommittedFieldNames.emplace(tracking::StringMapHashedKey{
+            getTrackingContext(catalog.trackingContexts, TrackingScope::kOpenBucketsById),
+            field.key(),
+            field.hash()});
+    }
+
+    bucket.numMeasurements++;
+    writeBatch->sizes.uncommittedMeasurementEstimate +=
+        sizesToBeAdded.uncommittedMeasurementEstimate;
+    bucket.size +=
+        sizesToBeAdded.uncommittedVerifiedSize + sizesToBeAdded.uncommittedMeasurementEstimate;
+    if (isNewlyOpenedBucket) {
+        if (openedDueToMetadata) {
+            writeBatch->openedDueToMetadata = true;
+        }
+        auto updateStatus =
+            bucket.schema.update(measurement, timeseriesOptions.getMetaField(), comparator);
+        invariant(updateStatus == Schema::UpdateStatus::Updated);
+    }
 }
 
 std::shared_ptr<WriteBatch> addMeasurementToBatchAndBucket(
     BucketCatalog& catalog,
-    const BSONObj& doc,
-    OperationId opId,
-    InsertContext& insertContext,
-    Bucket& bucket,
+    const BSONObj& measurement,
+    const OperationId opId,
+    const TimeseriesOptions& timeseriesOptions,
+    const StripeNumber& stripeNumber,
+    ExecutionStatsController& stats,
     const StringDataComparator* comparator,
     Bucket::NewFieldNames& newFieldNamesToBeInserted,
-    Sizes& sizesToBeAdded,
+    const Sizes& sizesToBeAdded,
     bool isNewlyOpenedBucket,
-    bool openedDueToMetadata) {
-    auto batch = activeBatch(
-        catalog.trackingContexts, bucket, opId, insertContext.stripeNumber, insertContext.stats);
-    batch->measurements.push_back(doc);
+    bool openedDueToMetadata,
+    Bucket& bucket) {
+    auto batch = activeBatch(catalog.trackingContexts, bucket, opId, stripeNumber, stats);
+    batch->measurements.push_back(measurement);
     for (auto&& field : newFieldNamesToBeInserted) {
         batch->newFieldNamesToBeInserted[field] = field.hash();
         bucket.uncommittedFieldNames.emplace(tracking::StringMapHashedKey{
@@ -1746,9 +1792,8 @@ std::shared_ptr<WriteBatch> addMeasurementToBatchAndBucket(
         if (openedDueToMetadata) {
             batch->openedDueToMetadata = true;
         }
-
         auto updateStatus =
-            bucket.schema.update(doc, insertContext.options.getMetaField(), comparator);
+            bucket.schema.update(measurement, timeseriesOptions.getMetaField(), comparator);
         invariant(updateStatus == Schema::UpdateStatus::Updated);
     }
 

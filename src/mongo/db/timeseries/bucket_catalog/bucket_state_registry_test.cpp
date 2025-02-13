@@ -96,8 +96,14 @@ public:
     }
 
     Bucket& createBucket(InsertContext& info, Date_t time) {
-        auto ptr = &internal::allocateBucket(
-            *this, *stripes[info.stripeNumber], withLock, info, time, nullptr);
+        auto ptr = &internal::allocateBucket(*this,
+                                             *stripes[info.stripeNumber],
+                                             withLock,
+                                             info.key,
+                                             info.options,
+                                             time,
+                                             nullptr,
+                                             info.stats);
         ASSERT_FALSE(hasBeenCleared(*ptr));
         return *ptr;
     }
