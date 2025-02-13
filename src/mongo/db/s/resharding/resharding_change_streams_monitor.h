@@ -52,7 +52,8 @@ namespace mongo {
 class ReshardingChangeStreamsMonitor
     : public std::enable_shared_from_this<ReshardingChangeStreamsMonitor> {
 public:
-    using BatchProcessedCallback = std::function<void(int documentDelta, BSONObj resumeToken)>;
+    using BatchProcessedCallback =
+        std::function<void(int documentsDelta, BSONObj resumeToken, bool completed)>;
 
     ReshardingChangeStreamsMonitor(NamespaceString monitorNamespace,
                                    Timestamp startAtOperationTime,
@@ -99,10 +100,10 @@ private:
     boost::optional<Timestamp> _startAt;
     boost::optional<BSONObj> _startAfter;
     const bool _isRecipient;
-    bool _recievedFinalEvent = false;
+    bool _receivedFinalEvent = false;
 
     // Records the change in documents as the events are observed.
-    int _documentDelta = 0;
+    int _documentsDelta = 0;
 
     // Records the number of events processed.
     int _numEventsProcessed = 0;
