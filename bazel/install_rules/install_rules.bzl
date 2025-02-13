@@ -166,7 +166,7 @@ def mongo_install_rule_impl(ctx):
         libs = [lib for lib in file_map["dynamic_libs"]] + [lib for lib in file_map["dynamic_libs_debug"]]
 
     unittest_bin = None
-    if len(bins) == 1 and file_map["binaries"][bins[0]].basename.endswith("_test"):
+    if len(bins) == 1 and ctx.attr.debug != "debug" and file_map["binaries"][bins[0]].basename.endswith("_test"):
         unittest_bin = file_map["binaries"][bins[0]]
 
     # create a dep file for passing all the files we intend to install
