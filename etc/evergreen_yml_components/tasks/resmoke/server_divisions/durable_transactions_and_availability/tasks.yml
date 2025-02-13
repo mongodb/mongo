@@ -2013,6 +2013,7 @@ tasks:
             --fuzzMongodConfigs=normal
             --fuzzRuntimeParams
             --excludeWithAnyTags=does_not_support_config_fuzzer
+            --setShellParameter='{defaultFindReplicaSetHostTimeoutMS: 30000}'
 
   - <<: *gen_task_template
     name: config_fuzzer_replica_sets_jscore_passthrough_gen

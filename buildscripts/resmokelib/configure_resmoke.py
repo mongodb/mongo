@@ -100,6 +100,7 @@ def _validate_options(parser, args):
     mongocryptd_set_param_errors = get_set_param_errors(
         config.get("mongocryptd_set_parameters") or []
     )
+    mongo_set_param_errors = get_set_param_errors(config.get("mongo_set_parameters") or [])
     error_msgs = {}
     if mongod_set_param_errors:
         error_msgs["mongodSetParameters"] = mongod_set_param_errors
@@ -107,6 +108,8 @@ def _validate_options(parser, args):
         error_msgs["mongosSetParameters"] = mongos_set_param_errors
     if mongocryptd_set_param_errors:
         error_msgs["mongocryptdSetParameters"] = mongocryptd_set_param_errors
+    if mongo_set_param_errors:
+        error_msgs["mongoSetParameters"] = mongo_set_param_errors
     if error_msgs:
         parser.error(str(error_msgs))
 
@@ -473,6 +476,7 @@ be invoked as either:
         )
 
     _config.MONGOCRYPTD_SET_PARAMETERS = _merge_set_params(config.pop("mongocryptd_set_parameters"))
+    _config.MONGO_SET_PARAMETERS = _merge_set_params(config.pop("mongo_set_parameters"))
 
     _config.MONGOT_EXECUTABLE = _expand_user(config.pop("mongot-localdev/mongot_executable"))
     mongot_set_parameters = config.pop("mongot_set_parameters")
