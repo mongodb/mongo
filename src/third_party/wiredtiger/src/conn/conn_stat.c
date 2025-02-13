@@ -74,6 +74,7 @@ __wt_conn_stat_init(WT_SESSION_IMPL *session)
     stats = conn->stats;
 
     __wti_cache_stats_update(session);
+    __wt_checkpoint_timer_stats(session);
     __wt_evict_stats_update(session);
     __wt_txn_stats_update(session);
 

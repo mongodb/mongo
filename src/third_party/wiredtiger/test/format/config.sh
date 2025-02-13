@@ -86,6 +86,8 @@ CONFIG configuration_list[] = {
 
 {"backup.live_restore", "configure backup live restore recovery", C_BOOL, 0, 0, 0}
 
+{"backup.live_restore_threads", "number of live restore worker threads", 0x0, 0, 12, 12}
+
 {"block_cache", "enable the block cache", C_BOOL, 10, 0, 0}
 
 {"block_cache.cache_on_checkpoint", "block cache: cache checkpoint writes", C_BOOL, 30, 0, 0}

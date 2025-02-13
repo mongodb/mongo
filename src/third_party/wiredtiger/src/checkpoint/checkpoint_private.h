@@ -56,6 +56,44 @@ struct __wti_ckpt_handle_stats {
     uint64_t skip_time;       /* skipped handles gather time */
 };
 
+/*
+ * WTI_CKPT_PROGRESS --
+ *     Checkpoint progress.
+ */
+struct __wti_ckpt_progress {
+    uint64_t msg_count;
+    uint64_t write_bytes;
+    uint64_t write_pages;
+};
+
+/*
+ * WTI_CKPT_THREAD --
+ *     Checkpoint server information.
+ */
+struct __wti_ckpt_thread {
+    WT_CONDVAR *cond;         /* wait mutex */
+    WT_SESSION_IMPL *session; /* session associated with thread */
+    wt_thread_t tid;          /* thread id */
+    bool tid_set;             /* thread set */
+#define WT_CKPT_LOGSIZE(conn) (__wt_atomic_loadi64(&(conn)->ckpt.server.logsize) != 0)
+    wt_shared wt_off_t logsize; /* thread log size period */
+    bool signalled;             /* thread signalled */
+    uint64_t usecs;             /* thread timer */
+};
+
+/*
+ * WTI_CKPT_TIMER --
+ *     Time-related statistics.
+ */
+struct __wti_ckpt_timer {
+    struct timespec timer_end;
+    struct timespec timer_start;
+    uint64_t max;
+    uint64_t min;
+    uint64_t recent;
+    uint64_t total;
+};
+
 /* DO NOT EDIT: automatically built by prototypes.py: BEGIN */
 
 /* DO NOT EDIT: automatically built by prototypes.py: END */

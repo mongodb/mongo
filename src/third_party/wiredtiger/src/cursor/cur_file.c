@@ -1191,14 +1191,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, c
      * This initialization is repeated when opening the underlying data handle, which is ugly, but
      * cleanup requires the initialization have happened even if not opening a checkpoint handle.
      */
-    ckpt_snapshot.ckpt_id = 0;
-    ckpt_snapshot.oldest_ts = WT_TS_NONE;
-    ckpt_snapshot.stable_ts = WT_TS_NONE;
-    ckpt_snapshot.snapshot_write_gen = 0;
-    ckpt_snapshot.snapshot_max = WT_TXN_MAX;
-    ckpt_snapshot.snapshot_min = WT_TXN_MAX;
-    ckpt_snapshot.snapshot_txns = NULL;
-    ckpt_snapshot.snapshot_count = 0;
+    __wt_checkpoint_snapshot_clear(&ckpt_snapshot);
 
     /* Get the handle and lock it while the cursor is using it. */
     if (LF_ISSET(WT_DHANDLE_EXCLUSIVE) && checkpoint_wait)
