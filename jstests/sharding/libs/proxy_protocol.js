@@ -32,7 +32,7 @@ export class ProxyProtocolServer {
      * @return {number} ingress port number
      */
     getIngressPort() {
-        return ingress_port;
+        return this.ingress_port;
     }
 
     /**
@@ -55,7 +55,7 @@ export class ProxyProtocolServer {
      * @return {number} egress port number
      */
     getEgressPort() {
-        return egress_port;
+        return this.egress_port;
     }
 
     /**
