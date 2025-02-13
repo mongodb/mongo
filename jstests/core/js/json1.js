@@ -609,12 +609,12 @@ assertToJson({
 assert.eq('{}', JSON.stringify(new Error(stringThatNeedsEscaping)));
 assertToJson({
     fn: () => tojson(new Error(stringThatNeedsEscaping)),
-    expectedStr: 'Error(\"ho\\\"la\")',
+    expectedStr: 'new Error(\"ho\\\"la\")',
     assertMsg: "O5"
 });
 assertToJson({
     fn: () => toEJSON(new Error(stringThatNeedsEscaping)),
-    expectedStr: 'Error(\"ho\\\"la\")',
+    expectedStr: 'new Error(\"ho\\\"la\")',
     assertMsg: "O6"
 });
 assertToJson({
@@ -622,4 +622,14 @@ assertToJson({
     expectedStr: '{"$error":"ho\\\"la"}',
     assertMsg: "O7",
     logFormat: "json"
+});
+assertToJson({
+    fn: () => tojson(new SyntaxError(stringThatNeedsEscaping)),
+    expectedStr: 'new SyntaxError(\"ho\\\"la\")',
+    assertMsg: "O8"
+});
+assertToJson({
+    fn: () => toEJSON(new SyntaxError(stringThatNeedsEscaping)),
+    expectedStr: 'new SyntaxError(\"ho\\\"la\")',
+    assertMsg: "O9"
 });

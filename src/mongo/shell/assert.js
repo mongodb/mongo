@@ -90,31 +90,24 @@ function _convertExceptionToReturnStatus(func, excMsg) {
     return safeFunc;
 }
 
-var AssertionError = class MongoAssertionError extends Error {
-    constructor(message, id, attr) {
+/**
+ * Declare a new 'Error' subclass that can carry additional data from our custom asserts in
+ * the 'extraAttr' property.
+ */
+var AssertionError = class extends Error {
+    name = "AssertionError";
+    constructor(message, attr) {
         super(message);
-        // Properties that are always present ('message' is managed by the parent class).
-        this._fixedProperties = {
-            t: {"$date": new Date().toISOString()},
-            s: "E",  // error
-            c: "js_test",
-            id,
-            ctx: TestData?.testName || "-"
-        };
-        // Property 'attr' can be empty.
-        this.attr = attr;
+        // Property 'extraAttr' can be empty.
+        this.extraAttr = attr;
     }
-    #serialize(fn, options) {
-        return fn.apply(this, [
-            {...this._fixedProperties, msg: this.message, ...(this.attr && {attr: this.attr})},
-            ...options
-        ]);
-    }
-    toString() {
-        return this.#serialize(JSON.stringify, []);
-    }
-    tojson() {
-        return this.#serialize(tojson, arguments);
+    tojson(indent, nolint, depth, sortKeys) {
+        const escapedMsg = JSON.stringify(this.message);
+        if (!this.extraAttr) {
+            return `new ${this.name}(${escapedMsg})`;
+        }
+        return `new ${this.name}(${escapedMsg},${
+            tojson(this.extraAttr, indent, nolint, depth + 1, sortKeys)})`;
     }
 };
 
@@ -143,8 +136,7 @@ assert = (function() {
                     ...(attr.res._mongo && {connection: attr.res._mongo})
                 };
             }
-            throw new AssertionError(
-                _buildAssertionMessage(msg, prefixOverride || prefix), 9928000, attr);
+            throw new AssertionError(_buildAssertionMessage(msg, prefixOverride || prefix), attr);
         }
         doassert(_buildAssertionMessage(msg, prefix), attr?.res);
     }

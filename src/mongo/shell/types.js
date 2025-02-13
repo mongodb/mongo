@@ -1,5 +1,8 @@
 // Date and time types
 if (typeof (Timestamp) != "undefined") {
+    /**
+     * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+     */
     Timestamp.prototype.tojson = function() {
         return this.toStringIncomparable();
     };
@@ -35,6 +38,9 @@ Date.timeFunc = function(theFunc, numTimes) {
     return (new Date()).getTime() - start.getTime();
 };
 
+/**
+ * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+ */
 Date.prototype.tojson = function() {
     try {
         // If this === Date.prototype or this is a Date instance created from
@@ -127,6 +133,9 @@ RegExp.escape = function(text) {
     return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
 };
 
+/**
+ * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+ */
 RegExp.prototype.tojson = RegExp.prototype.toString;
 
 // Array
@@ -171,6 +180,9 @@ Array.shuffle = function(arr) {
     return arr;
 };
 
+/**
+ * The return value is not always a valid JSON string. See 'tojson()' function comment for details.
+ */
 Array.tojson = function(a, indent, nolint, depth, sortKeys) {
     if (!Array.isArray(a)) {
         throw new Error("The first argument to Array.tojson must be an array");
@@ -220,10 +232,16 @@ Array.tojson = function(a, indent, nolint, depth, sortKeys) {
     return s;
 };
 
+/**
+ * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+ */
 Set.tojson = function(s, indent, nolint, depth) {
     return Array.tojson(Array.from(s), indent, nolint, depth);
 };
 
+/**
+ * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+ */
 Map.tojson = function(m, indent, nolint, depth) {
     return Array.tojson(Array.from(m.entries()), indent, nolint, depth);
 };
@@ -419,6 +437,9 @@ if (!NumberLong.prototype) {
     NumberLong.prototype = {};
 }
 
+/**
+ * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+ */
 NumberLong.prototype.tojson = function() {
     return this.toString();
 };
@@ -428,6 +449,9 @@ if (!NumberInt.prototype) {
     NumberInt.prototype = {};
 }
 
+/**
+ * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+ */
 NumberInt.prototype.tojson = function() {
     return this.toString();
 };
@@ -438,6 +462,9 @@ if (typeof NumberDecimal !== 'undefined') {
         NumberDecimal.prototype = {};
     }
 
+    /**
+     * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+     */
     NumberDecimal.prototype.tojson = function() {
         return this.toString();
     };
@@ -455,6 +482,9 @@ ObjectId.prototype.toString = function() {
     return "ObjectId(" + tojson(this.str) + ")";
 };
 
+/**
+ * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+ */
 ObjectId.prototype.tojson = function() {
     return this.toString();
 };
@@ -512,6 +542,9 @@ if (typeof (DBPointer) != "undefined") {
         return globalThis.db[this.ns].findOne({_id: this.id});
     };
 
+    /**
+     * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+     */
     DBPointer.prototype.tojson = function(indent) {
         return this.toString();
     };
@@ -541,6 +574,9 @@ if (typeof (DBRef) != "undefined") {
         return coll.findOne({_id: this.$id});
     };
 
+    /**
+     * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+     */
     DBRef.prototype.tojson = function(indent) {
         return this.toString();
     };
@@ -571,6 +607,9 @@ if (typeof (DBRef) != "undefined") {
 
 // BinData
 if (typeof (BinData) != "undefined") {
+    /**
+     * The return value is not a valid JSON string. See 'tojson()' function comment for details.
+     */
     BinData.prototype.tojson = function() {
         return this.toString();
     };
@@ -658,25 +697,17 @@ if (typeof (gc) == "undefined") {
 // Free Functions
 
 /**
- * Functions to serialize to JSON and EJSON.
- *
- * 'tojson()' and 'tojsononeline()' serialize to JSON. The purpose of these functions is to preserve
- * compatibility with 'eval()'. The output produced by tojson()/tojsononeline() can be used by
- * 'eval()' to deserialize the object (note: eval does not work with EJSON). Use in any non-logging
- * code.
- *
- * 'toEJSON()' is similar to 'tostrictjson()' (and both serialize to EJSON), but it works
- * on any type (not just BSON objects) and also fixes some of its limitations (ie, circular
- * dependencies). The purpose of this function is to to make sure log lines are parsable by
- * non-mongo-shell json parsing tools like Parsely. Use in any logging code.
+ * The return value is not always a valid JSON string. See 'tojson()' function comment for details.
  */
-
-// Note: use 'toEJSON()' instead if the output is used for assertions and/or logging.
 tojsononeline = function(x) {
     return tojson(x, " ", true);
 };
 
-// Note: use 'toEJSON()' instead if the output is used for assertions and/or logging.
+/**
+ * Serializes the given argument 'x' to a string that can be used to deserialize it with 'eval()'.
+ * The return value is not always a valid JSON string. Use 'toEJSON()' for valid JSON output and for
+ * printing values into the logs.
+ */
 tojson = function(x, indent, nolint, depth, sortKeys) {
     if (x === null)
         return "null";
@@ -721,6 +752,11 @@ tojson = function(x, indent, nolint, depth, sortKeys) {
 };
 tojson.MAX_DEPTH = 100;
 
+/**
+ * Serializes the given object argument 'x' to a string, which can be used to deserialize it with
+ * 'eval()'. The return value is not always a valid JSON string. Use 'toEJSON()' for valid JSON
+ * output and for printing values into the logs.
+ */
 tojsonObject = function(x, indent, nolint, depth, sortKeys) {
     if (typeof depth !== 'number') {
         depth = 0;
@@ -747,7 +783,7 @@ tojsonObject = function(x, indent, nolint, depth, sortKeys) {
     }
 
     if (x instanceof Error) {
-        return `Error(${JSON.stringify(x.message)})`;
+        return `new ${x.name}(${JSON.stringify(x.message)})`;
     }
 
     try {
@@ -802,16 +838,23 @@ tojsonObject = function(x, indent, nolint, depth, sortKeys) {
     return s + indent + "}";
 };
 
-// Converts a JavaScript value to an EJSON string when 'TestData.logFormat == "json"', otherwise
-// returns the same result as 'tojson()'.
-// Compared to standard EJSON, this function outputs a different format for Sets, Maps, and Errors.
-//  * Sets serialize as {"$set": [<value1>,...]}
-//  * Maps serialize as {"$map": [[<key1>, <value1>],...]}
-//  * Errors serialize as {"$error": "<error_message>"}
-//
-// Use this function in assertions and/or logging.
-// Note: Use 'tojson()' or 'tojsononeline()' instead if the output is used to rehydrate objects
-// using 'eval()'.
+/**
+ * Serializes the given argument 'x' to an EJSON string (which is also a valid JSON string) when
+ * 'TestData.logFormat' is set to "json", otherwise returns the same result as 'tojson()'. The
+ * results of 'toEJSON()' and 'tostrictjson()' should be equal for BSON objects and arrays. Unlike
+ * 'tostrictjson()', 'toEJSON()' also accepts non-object types, recognizes recursive objects, and
+ * provides more detailed serializations for commonly used JavaScript classes, which goes beyond
+ * MongoDB EJSON serialization format, for instance:
+ *  - Set instances serialize to {"$set": [<elem1>,...]}
+ *  - Map instances serialize to {"$map": [[<key1>, <value1>],...]}
+ *  - Errors instances serialize to {"$error": "<error_message>"}
+ *
+ * 'toEJSON()' must be used when serializing JavaScript values into JSON logs to adhere to the
+ * format requirements.
+ *
+ * Unlike 'tojson()', the result of 'eval(toEJSON(x))' will not always evaluate into an object
+ * equivalent to 'x' and may throw a syntax error.
+ */
 toEJSON = function(x, indent, nolint, depth, sortKeys) {
     if (typeof TestData !== "object" || TestData.logFormat !== "json")
         return tojson(x, indent, nolint, depth, sortKeys);
@@ -857,10 +900,16 @@ toEJSON = function(x, indent, nolint, depth, sortKeys) {
     return JSON.stringify(x, ensureEJSONAndStopOnRecursion());
 };
 
+/**
+ * The printed value is not always a valid JSON string. See 'tojson()' function comment for details.
+ */
 printjson = function(x) {
     print(tojson(x));
 };
 
+/**
+ * The printed value is not always a valid JSON string. See 'tojson()' function comment for details.
+ */
 printjsononeline = function(x) {
     print(tojsononeline(x));
 };

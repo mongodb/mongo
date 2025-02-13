@@ -767,46 +767,27 @@ tests.push(function assertCallsHangAnalyzer() {
 });
 
 tests.push(function serializeAssertionErrorWithoutAttributes() {
-    let mongoAE = new AssertionError("Lorem ipsum", 9928000);
-    // Remove the non-deterministic timestamp.
-    delete mongoAE._fixedProperties.t;
-    const expectedObj =
-        {s: "E", c: "js_test", id: 9928000, ctx: "shell_assertions", msg: "Lorem ipsum"};
-    assert.eq(JSON.stringify(expectedObj), mongoAE.toString());
-    assert.eq(tojson(expectedObj, "", true), mongoAE.tojson("", true));
+    let mongoAE = new AssertionError("Lorem ipsum");
+    assert.eq("AssertionError: Lorem ipsum", mongoAE.toString());
+    assert.eq(`new AssertionError("Lorem ipsum")`, mongoAE.tojson("", true));
+    assert.docEq(mongoAE, eval(mongoAE.tojson("", true)));
 });
 
 tests.push(function serializeAssertionErrorWithAttributes() {
-    let mongoAE = new AssertionError("Oops!", 9928000, {hello: "world"});
-    // Remove the non-deterministic timestamp.
-    delete mongoAE._fixedProperties.t;
-    const expectedObj = {
-        s: "E",
-        c: "js_test",
-        id: 9928000,
-        ctx: "shell_assertions",
-        msg: "Oops!",
-        attr: {hello: "world"}
-    };
-    assert.eq(JSON.stringify(expectedObj), mongoAE.toString());
-    assert.eq(tojson(expectedObj, "", true), mongoAE.tojson("", true));
+    let mongoAE = new AssertionError("Oops!", {hello: "world"});
+    assert.eq("AssertionError: Oops!", mongoAE.toString());
+    assert.eq(`new AssertionError("Oops!",{ "hello" : "world" })`, mongoAE.tojson("", true));
+    assert.docEq(mongoAE, eval(mongoAE.tojson("", true)));
 });
 
-function assertThrowsAssertionErrorWithJson(assertFailureTriggerFn, expectedJsonFields) {
+function assertThrowsAssertionErrorWithJson(assertFailureTriggerFn, {msg, attr}) {
     const oldLogFormat = TestData.logFormat;
     try {
         TestData.logFormat = "json";
         assertFailureTriggerFn();
     } catch (e) {
-        const {t, ...jsonWithoutTimestamp} =
-            assert.doesNotThrow(JSON.parse,
-                                [e.toString()],
-                                "could not parse assertion error string",
-                                {error: e.toString()});
-        assert.docEq(
-            {s: "E", c: "js_test", id: 9928000, ctx: "shell_assertions", ...expectedJsonFields},
-            jsonWithoutTimestamp,
-            "unexpected assertion error");
+        assert.eq(msg, e.message, "unexpected error message");
+        assert.eq(toEJSON(attr), toEJSON(e.extraAttr), "unexpected extra attributes");
     } finally {
         TestData.logFormat = oldLogFormat;
     }
@@ -942,7 +923,7 @@ tests.push(function assertTimeJsonFormat() {
             assert.time(f, "Oops!", timeoutMS, {runHangAnalyzer: false}, kAttr);
         } catch (e) {
             // Override the 'timeMS' to make the test deterministic.
-            e.attr.timeMS = sleepTimeMS;
+            e.extraAttr.timeMS = sleepTimeMS;
             throw e;
         }
     }, {msg: "assert.time() failed : Oops!", attr: {timeMS: sleepTimeMS, timeoutMS, ...kAttr}});
