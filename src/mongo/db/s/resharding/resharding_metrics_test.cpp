@@ -324,6 +324,7 @@ TEST_F(ReshardingMetricsTest, RestoresFinishedApplyingTimeFromRecipientStateDocu
 }
 
 TEST_F(ReshardingMetricsTest, RestoresOngoingBuildIndexTimeFromRecipientStateDocument) {
+    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
     doRestoreOngoingPhaseTest<ReshardingRecipientMetrics, ReshardingRecipientDocument>(
         [this] { return createRecipientDocument(RecipientStateEnum::kBuildingIndex, UUID::gen()); },
         [this](auto& doc, auto interval) { doc.setIndexBuildTime(std::move(interval)); },
@@ -331,6 +332,7 @@ TEST_F(ReshardingMetricsTest, RestoresOngoingBuildIndexTimeFromRecipientStateDoc
 }
 
 TEST_F(ReshardingMetricsTest, RestoresFinishedBuildIndexTimeFromRecipientStateDocument) {
+    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
     doRestoreCompletedPhaseTest<ReshardingRecipientMetrics, ReshardingRecipientDocument>(
         [this] { return createRecipientDocument(RecipientStateEnum::kApplying, UUID::gen()); },
         [this](auto& doc, auto interval) { doc.setIndexBuildTime(std::move(interval)); },
@@ -566,6 +568,7 @@ TEST_F(ReshardingMetricsTest, CurrentOpReportsCopyingTime) {
 }
 
 TEST_F(ReshardingMetricsTest, CurrentOpReportsBuildIndexTime) {
+    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
     runTimeReportTest<ReshardingMetrics>(
         "CurrentOpReportsBuildIndexTime",
         {Role::kRecipient},
@@ -761,6 +764,7 @@ TEST_F(ReshardingMetricsTest, OnStateTransitionInformsCumulativeMetrics) {
 }
 
 TEST_F(ReshardingMetricsTest, onSameKeyResharding) {
+    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
     auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kCoordinator);
 
     auto report = metrics->reportForCurrentOp();
@@ -772,6 +776,7 @@ TEST_F(ReshardingMetricsTest, onSameKeyResharding) {
 }
 
 TEST_F(ReshardingMetricsTest, onIndexBuild) {
+    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
     auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
 
     auto report = metrics->reportForCurrentOp();

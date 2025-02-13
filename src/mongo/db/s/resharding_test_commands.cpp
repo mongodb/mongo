@@ -86,9 +86,15 @@ public:
             // the thread from the thread pool. We set up the ThreadPoolTaskExecutor identically to
             // how the recipient's primary-only service is set up.
             ThreadPool::Options threadPoolOptions;
-            auto donorShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx).size();
-            threadPoolOptions.maxThreads =
-                1 + 2 * donorShards + resharding::gReshardingCollectionClonerWriteThreadCount;
+            if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                // With reshardingImprovements, we need a larger executor.
+                auto donorShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx).size();
+                threadPoolOptions.maxThreads =
+                    1 + 2 * donorShards + resharding::gReshardingCollectionClonerWriteThreadCount;
+            } else {
+                threadPoolOptions.maxThreads = 1;
+            }
             threadPoolOptions.threadNamePrefix = "TestReshardCloneCollection-";
             threadPoolOptions.poolName = "TestReshardCloneCollectionThreadPool";
             threadPoolOptions.onCreateThread = [opCtx](const std::string& threadName) {

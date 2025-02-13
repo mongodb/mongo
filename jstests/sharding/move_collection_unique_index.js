@@ -4,6 +4,7 @@
  * @tags: [
  *   featureFlagMoveCollection,
  *   featureFlagUnshardCollection,
+ *   featureFlagReshardingImprovements,
  *   requires_fcv_80,
  * ]
  */

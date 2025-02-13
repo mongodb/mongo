@@ -289,9 +289,14 @@ std::unique_ptr<ReshardingDataReplicationInterface> ReshardingDataReplication::m
 
     std::shared_ptr<executor::TaskExecutor> collectionClonerExecutor;
     if (!cloningDone) {
-        resharding::data_copy::ensureCollectionExists(
-            opCtx, NamespaceString::kRecipientReshardingResumeDataNamespace, CollectionOptions{});
-        collectionClonerExecutor = _makeCollectionClonerExecutor(donorShards.size());
+        if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            resharding::data_copy::ensureCollectionExists(
+                opCtx,
+                NamespaceString::kRecipientReshardingResumeDataNamespace,
+                CollectionOptions{});
+            collectionClonerExecutor = _makeCollectionClonerExecutor(donorShards.size());
+        }
         collectionCloner =
             _makeCollectionCloner(metrics, metadata, myShardId, cloneTimestamp, relaxed);
         txnCloners = _makeTxnCloners(metadata, donorShards);

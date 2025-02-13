@@ -9,11 +9,12 @@
  * @tags: [
  *   uses_atclustertime,
  *   requires_fcv_72,
+ *   featureFlagReshardingImprovements,
  * ]
  */
-
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {getUUIDFromConfigCollections, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
@@ -68,6 +69,12 @@ const sourceCollection = reshardingTest.createShardedCollection({
 const mongos = sourceCollection.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const configsvr = new Mongo(topology.configsvr.nodes[0]);
+
+if (!FeatureFlagUtil.isEnabled(mongos, "ReshardingImprovements")) {
+    jsTestLog("Skipping test since featureFlagReshardingImprovements is not enabled");
+    reshardingTest.teardown();
+    quit();
+}
 
 const pauseBeforeCloningFP =
     configureFailPoint(configsvr, "reshardingPauseCoordinatorBeforeCloning");

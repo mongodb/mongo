@@ -114,7 +114,9 @@ void ReshardingCumulativeMetrics::reportForServerStatus(BSONObjBuilder* bob) con
     }
 
     BSONObjBuilder root(bob->subobjStart(_rootSectionName));
-    if (_rootSectionName == kResharding) {
+    if (_rootSectionName == kResharding &&
+        resharding::gFeatureFlagReshardingImprovements.isEnabledUseLatestFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         root.append(_fieldNames->getForCountSameKeyStarted(), _countSameKeyStarted.load());
         root.append(_fieldNames->getForCountSameKeySucceeded(), _countSameKeySucceeded.load());
         root.append(_fieldNames->getForCountSameKeyFailed(), _countSameKeyFailed.load());

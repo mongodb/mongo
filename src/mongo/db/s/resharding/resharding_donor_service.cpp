@@ -376,7 +376,10 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_notifyCoordinat
 
     return resharding::WithAutomaticRetry([this, executor] {
                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-               _metrics->fillDonorCtxOnCompletion(_donorCtx);
+               if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                       serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                   _metrics->fillDonorCtxOnCompletion(_donorCtx);
+               }
                return _updateCoordinator(opCtx.get(), executor);
            })
         .onTransientError([](const Status& status) {

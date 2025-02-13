@@ -3,10 +3,12 @@
  *
  * @tags: [
  *  requires_fcv_72,
+ *  featureFlagReshardingImprovements
  * ]
  */
 
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ReshardCollectionCmdTest} from "jstests/sharding/libs/reshard_collection_util.js";
 
@@ -26,6 +28,11 @@ assert.commandWorked(coordinator.getDB("admin").adminCommand(
     {setParameter: 1, reshardingCriticalSectionTimeoutMillis: criticalSectionTimeoutMS}));
 
 const testCompoundShardKey = (mongos) => {
+    if (!FeatureFlagUtil.isEnabled(mongos, "ReshardingImprovements")) {
+        jsTestLog("Skipping test since featureFlagReshardingImprovements is not enabled.");
+        return;
+    }
+
     assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {num: 1, str: 1}}));
     let bulk = mongos.getDB(kDbName).getCollection(collName).initializeOrderedBulkOp();
     for (let x = 0; x < kNumInitialDocs; x++) {
@@ -108,6 +115,11 @@ const testCompoundShardKey = (mongos) => {
 };
 
 const testMoreShardsAndZones = (mongos) => {
+    if (!FeatureFlagUtil.isEnabled(mongos, "ReshardingImprovements")) {
+        jsTestLog("Skipping test since featureFlagReshardingImprovements is not enabled");
+        return;
+    }
+
     /**
      * This test is to ensure we have correct behavior when we have more shards and zones
      * The setup is following:

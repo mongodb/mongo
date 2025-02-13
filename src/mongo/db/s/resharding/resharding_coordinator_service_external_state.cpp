@@ -211,6 +211,11 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
         // If shardDistribution is specified with min/max, use ShardDistributionSplitPolicy.
         if (const auto& shardDistribution = coordinatorDoc.getShardDistribution()) {
             uassert(ErrorCodes::InvalidOptions,
+                    "Resharding improvements is not enabled, should not have "
+                    "shardDistribution in coordinatorDoc",
+                    resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+            uassert(ErrorCodes::InvalidOptions,
                     "ShardDistribution should not be empty if provided",
                     shardDistribution->size() > 0);
             const SplitPolicyParams splitParams{coordinatorDoc.getReshardingUUID(),

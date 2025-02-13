@@ -852,6 +852,7 @@ void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
                     configCollDoc.getAllowMigrations());
 
             // Insert the coordinator document to config.reshardingOperations.
+            invariant(coordinatorDoc.getActive());
             writeToCoordinatorStateNss(opCtx, metrics, coordinatorDoc, txnNumber);
 
             // Update the config.collections entry for the original collection to include

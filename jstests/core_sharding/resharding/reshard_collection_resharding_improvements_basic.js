@@ -5,13 +5,14 @@
  *
  * @tags: [
  *  requires_fcv_72,
+ *  featureFlagReshardingImprovements,
  *  # Stepdown test coverage is already provided by the resharding FSM suites.
  *  does_not_support_stepdowns,
  *  # This test performs explicit calls to shardCollection
  *  assumes_unsharded_collection,
  * ]
  */
-
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReshardCollectionCmdTest} from "jstests/sharding/libs/reshard_collection_util.js";
 import {getShardHosts, getShardNames} from "jstests/sharding/libs/sharding_util.js";
 
@@ -37,6 +38,11 @@ const reshardCmdTest = new ReshardCollectionCmdTest({
 });
 
 const testShardDistribution = (mongos) => {
+    if (!FeatureFlagUtil.isEnabled(mongos, "ReshardingImprovements")) {
+        jsTestLog("Skipping test since featureFlagReshardingImprovements is not enabled");
+        return;
+    }
+
     /**
      * Failure cases.
      */
@@ -152,6 +158,11 @@ const testShardDistribution = (mongos) => {
 };
 
 const testForceRedistribution = (mongos) => {
+    if (!FeatureFlagUtil.isEnabled(mongos, "ReshardingImprovements")) {
+        jsTestLog("Skipping test since featureFlagReshardingImprovements is not enabled");
+        return;
+    }
+
     jsTest.log(
         "When forceRedistribution is not set to true, same-key resharding should have no effect");
     reshardCmdTest.assertReshardCollOk(
@@ -254,6 +265,11 @@ const testForceRedistribution = (mongos) => {
 };
 
 const testReshardingWithIndex = (mongos) => {
+    if (!FeatureFlagUtil.isEnabled(mongos, "ReshardingImprovements")) {
+        jsTestLog("Skipping test since featureFlagReshardingImprovements is not enabled");
+        return;
+    }
+
     jsTest.log(
         "When there is no index on the new shard-key, we should create one during resharding.");
 

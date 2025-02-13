@@ -6,6 +6,7 @@
  *  uses_atclustertime,
  *  featureFlagRecoverableShardsvrReshardCollectionCoordinator,
  *  requires_fcv_80,
+ *  featureFlagReshardingImprovements,
  *  featureFlagMoveCollection,
  *  # TODO (SERVER-87812) Remove multiversion_incompatible tag
  *  multiversion_incompatible,

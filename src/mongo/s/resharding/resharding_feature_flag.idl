@@ -35,6 +35,13 @@ imports:
     - "mongo/db/basic_types.idl"
 
 feature_flags:
+    featureFlagReshardingImprovements:
+        description: "Feature flag for applying improvements on resharding to make it faster and
+        support same-key resharding."
+        cpp_varname: gFeatureFlagReshardingImprovements
+        default: true
+        version: 7.2
+        shouldBeFCVGated: true
     featureFlagMoveCollection:
         description: "Feature flag for implementing online move collection."
         cpp_varname: gFeatureFlagMoveCollection

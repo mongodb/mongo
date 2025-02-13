@@ -6,6 +6,7 @@
  *   requires_majority_read_concern,
  *   uses_atclustertime,
  *   requires_fcv_80,
+ *   featureFlagReshardingImprovements,
  *   featureFlagUnshardCollection,
  *   # TODO (SERVER-87812) Remove multiversion_incompatible tag
  *   multiversion_incompatible,

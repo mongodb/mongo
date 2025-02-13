@@ -6,8 +6,8 @@
  *   uses_atclustertime,
  * ]
  */
-
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
@@ -24,6 +24,12 @@ const st = new ShardingTest({
         }
     },
 });
+
+if (!FeatureFlagUtil.isEnabled(st.s, "ReshardingImprovements")) {
+    jsTestLog("Skipping test since featureFlagReshardingImprovements is not enabled");
+    st.stop();
+    quit();
+}
 
 const inputCollection = st.s.getCollection("reshardingDb.coll");
 // Padding sufficient to ensure that only one document can appear per batch.

@@ -105,9 +105,12 @@ void ReshardingRecipientService::RecipientStateMachineExternalState::
                                                       std::move(indexes),
                                                       std::move(idIndex),
                                                       std::move(collOptions)};
-    // The indexSpecs are cleared here so we don't create those indexes when creating temp
-    // collections. These indexes will be fetched and built during building-index stage.
-    collOptionsAndIndexes.indexSpecs = {};
+    if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        // The indexSpecs are cleared here so we don't create those indexes when creating temp
+        // collections. These indexes will be fetched and built during building-index stage.
+        collOptionsAndIndexes.indexSpecs = {};
+    }
     MigrationDestinationManager::cloneCollectionIndexesAndOptions(
         opCtx, metadata.getTempReshardingNss(), collOptionsAndIndexes);
 

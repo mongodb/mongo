@@ -4,6 +4,7 @@
  *
  * @tags: [
  *  requires_fcv_72,
+ *  featureFlagReshardingImprovements,
  *  multiversion_incompatible,
  *  assumes_balancer_off,
  * ]

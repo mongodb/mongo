@@ -15,6 +15,8 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 const testName = TestData.testName;
 
 const testFindCmd = function() {
@@ -78,6 +80,11 @@ const testFindCmd = function() {
 };
 
 const testAggregateCmd = function(addDummyStage) {
+    if (!FeatureFlagUtil.isEnabled(db, "ReshardingImprovements")) {
+        jsTestLog("Skipping test since featureFlagReshardingImprovements is not enabled.");
+        return;
+    }
+
     // Optimizations in the aggregation code mean there are significant differences between
     // an "empty" aggregate and one with stages that aren't merged into the initial find, so
     // we use a redact stage that we know (but the server doesn't) won't redact anything to

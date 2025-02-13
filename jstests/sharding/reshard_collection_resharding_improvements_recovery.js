@@ -7,14 +7,15 @@
  * This test restarts a replica set node, which requires persistence.
  * @tags: [
  *  requires_fcv_72,
+ *  featureFlagReshardingImprovements,
  *  requires_persistence,
  * # TODO (SERVER-89180) Remove multiversion_incompatible tag
  *  multiversion_incompatible,
  * ]
  */
-
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest({numDonors: 2, enableElections: true});
@@ -34,6 +35,12 @@ const topology = DiscoverTopology.findConnectedNodes(mongos);
 
 const recipientShardNames = reshardingTest.recipientShardNames;
 const recipient = new Mongo(topology.shards[recipientShardNames[0]].primary);
+
+if (!FeatureFlagUtil.isEnabled(mongos, "ReshardingImprovements")) {
+    jsTestLog("Skipping test since featureFlagReshardingImprovements is not enabled");
+    reshardingTest.teardown();
+    quit();
+}
 
 const reshardingPauseRecipientBeforeBuildingIndexFailpoint =
     configureFailPoint(recipient, "reshardingPauseRecipientBeforeBuildingIndex");

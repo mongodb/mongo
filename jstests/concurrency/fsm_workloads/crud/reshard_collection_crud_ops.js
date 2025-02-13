@@ -4,6 +4,8 @@
  * @tags: [requires_sharding]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 export const $config = (function() {
     const shardKeys = [
         {a: 1},
@@ -155,7 +157,8 @@ export const $config = (function() {
     function setup(db, collName, _cluster) {
         const coll = db.getCollection(collName);
         assert.commandWorked(coll.insert(createDocuments(kTotalWorkingDocuments)));
-        this._allowSameKeyResharding = true;
+        this._allowSameKeyResharding =
+            FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'ReshardingImprovements');
     }
 
     return {
