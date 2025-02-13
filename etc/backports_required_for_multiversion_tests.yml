@@ -378,6 +378,10 @@ last-continuous:
       ticket: SERVER-99277
     - test_file: jstests/replsets/rollback_with_coalesced_txn_table_updates_during_oplog_application_inserts.js
       ticket: SERVER-99185
+    - test_file: jstests/sharding/coll_mod_unsplittable_collection.js
+      ticket: SERVER-99618
+    - test_file: jstests/concurrency/fsm_workloads/ddl/collMod/collMod.js
+      ticket: SERVER-99618
   suites: null
 last-lts:
   all:
@@ -803,4 +807,8 @@ last-lts:
       ticket: SERVER-99277
     - test_file: jstests/replsets/rollback_with_coalesced_txn_table_updates_during_oplog_application_inserts.js
       ticket: SERVER-99185
+    - test_file: jstests/sharding/coll_mod_unsplittable_collection.js
+      ticket: SERVER-99618
+    - test_file: jstests/concurrency/fsm_workloads/ddl/collMod/collMod.js
+      ticket: SERVER-99618
   suites: null

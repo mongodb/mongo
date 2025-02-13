@@ -25,6 +25,10 @@ export const $config = (function() {
                 index: {keyPattern: {createdAt: 1}, expireAfterSeconds: newTTL}
             });
             assert.commandWorkedOrFailedWithCode(res, [ErrorCodes.ConflictingOperationInProgress]);
+            // Check that we are returning {ok: 1} rather than {ok: true}
+            if (res.ok) {
+                assert(res.ok === 1);
+            }
             // only assert if new expireAfterSeconds differs from old one
             if (res.ok === 1 && res.hasOwnProperty('expireAfterSeconds_new')) {
                 assert.eq(res.expireAfterSeconds_new, newTTL);
@@ -33,21 +37,29 @@ export const $config = (function() {
             // Attempt an invalid collMod which should always fail regardless of whether a WCE
             // occurred. This is meant to reproduce SERVER-56772.
             const encryptSchema = {$jsonSchema: {properties: {_id: {encrypt: {}}}}};
-            assert.commandFailedWithCode(
+            res = assert.commandFailedWithCode(
                 db.runCommand({
                     collMod: this.threadCollName,
                     validator: encryptSchema,
                     validationAction: "warn"
                 }),
                 [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.QueryFeatureNotAllowed]);
+            // Check that we are returning {ok: 1} rather than {ok: true}
+            if (res.ok) {
+                assert(res.ok === 1);
+            }
             if (FeatureFlagUtil.isPresentAndEnabled(db, "ErrorAndLogValidationAction")) {
-                assert.commandFailedWithCode(
+                res = assert.commandFailedWithCode(
                     db.runCommand({
                         collMod: this.threadCollName,
                         validator: encryptSchema,
                         validationAction: "errorAndLog"
                     }),
                     [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.QueryFeatureNotAllowed]);
+                // Check that we are returning {ok: 1} rather than {ok: true}
+                if (res.ok) {
+                    assert(res.ok === 1);
+                }
             }
         }
 

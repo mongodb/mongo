@@ -120,7 +120,10 @@ void _appendResponseCollModIndexChanges(
     }
 
     auto& firstShardResponse = shardResponses[0].swResponse.getValue().data;
-    result.appendElements(CommandHelpers::filterCommandReplyForPassthrough(firstShardResponse));
+    // Remove the {ok: true} field from the response and rely on the command to add the field so
+    // that the user receives {ok: 1} instead.
+    BSONObj filteredResponse = firstShardResponse.removeField("ok");
+    result.appendElements(CommandHelpers::filterCommandReplyForPassthrough(filteredResponse));
 }
 
 }  // namespace
