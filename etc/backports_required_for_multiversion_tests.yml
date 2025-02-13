@@ -805,6 +805,8 @@ last-lts:
       ticket: SERVER-95687
     - test_file: jstests/sharding/remove_shard_with_unsharded.js
       ticket: SERVER-89883
+    - test_file: jstests/core/dbstats.js
+      ticket: SERVER-98571
     - test_file: jstests/sharding/metadata_refresh_on_shard_removal.js
       ticket: SERVER-99277
     - test_file: jstests/core/txns/multi_statement_transaction_abort.js

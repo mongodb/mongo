@@ -688,8 +688,10 @@ public:
             const auto& cmd = request();
             const auto& dbname = cmd.getDbName();
 
-            uassert(
-                ErrorCodes::BadValue, "Scale factor must be greater than zero", cmd.getScale() > 0);
+            // Scale factors valid range (0...2^50] (up to a petabyte)
+            uassert(ErrorCodes::BadValue,
+                    "Scale factor must be greater than zero and less than or equal to 2^50",
+                    cmd.getScale() > 0 && cmd.getScale() <= (1ll << 50));
 
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid db name: " << dbname.toStringForErrorMsg(),
