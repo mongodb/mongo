@@ -482,6 +482,10 @@ public:
             // logic which estimates the size of update commands is correct.
             dassert(write_ops::verifySizeEstimate(request(), &unparsedRequest()));
 
+            uassert(ErrorCodes::InvalidOptions,
+                    "rawData is not enabled",
+                    !request().getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
+
             doTransactionValidationForWrites(opCtx, ns());
             write_ops::UpdateCommandReply updateReply;
             if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
@@ -593,6 +597,10 @@ public:
             // Start the query planning timer right after parsing. In explain, there's only ever
             // one sub-operation, so we won't create nested CurOps.
             CurOp::get(opCtx)->beginQueryPlanningTimer();
+
+            uassert(ErrorCodes::InvalidOptions,
+                    "rawData is not enabled",
+                    !request().getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
 
             uassert(ErrorCodes::InvalidLength,
                     "explained write batches must be of size 1",
@@ -713,6 +721,10 @@ public:
             // of deletes for batch writes is correct.
             dassert(write_ops::verifySizeEstimate(request(), &unparsedRequest()));
 
+            uassert(ErrorCodes::InvalidOptions,
+                    "rawData is not enabled",
+                    !request().getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
+
             doTransactionValidationForWrites(opCtx, ns());
             write_ops::DeleteCommandReply deleteReply;
             OperationSource source = OperationSource::kStandard;
@@ -757,6 +769,10 @@ public:
             // Start the query planning timer right after parsing. In explain, there's only ever
             // one sub-operation, so we won't create nested CurOps.
             CurOp::get(opCtx)->beginQueryPlanningTimer();
+
+            uassert(ErrorCodes::InvalidOptions,
+                    "rawData is not enabled",
+                    !request().getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
 
             uassert(ErrorCodes::InvalidLength,
                     "explained write batches must be of size 1",

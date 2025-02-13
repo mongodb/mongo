@@ -53,6 +53,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/resource_yielder.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
@@ -688,6 +689,10 @@ void ClusterWriteCmd::InvocationBase::run(OperationContext* opCtx,
                                           rpc::ReplyBuilderInterface* result) {
     preRunImplHook(opCtx);
 
+    uassert(ErrorCodes::InvalidOptions,
+            "rawData is not enabled",
+            !_batchedRequest.getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
+
     BSONObjBuilder bob = result->getBodyBuilder();
     bool ok = runImpl(opCtx, *_request, _batchedRequest, bob);
     if (!ok)
@@ -698,6 +703,10 @@ void ClusterWriteCmd::InvocationBase::explain(OperationContext* opCtx,
                                               ExplainOptions::Verbosity verbosity,
                                               rpc::ReplyBuilderInterface* result) {
     preExplainImplHook(opCtx);
+
+    uassert(ErrorCodes::InvalidOptions,
+            "rawData is not enabled",
+            !_batchedRequest.getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
 
     uassert(ErrorCodes::InvalidLength,
             "explained write batches must be of size 1",

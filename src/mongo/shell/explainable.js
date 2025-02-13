@@ -178,8 +178,14 @@ var Explainable = (function() {
             var query = parsed.query;
             var justOne = parsed.justOne;
             var collation = parsed.collation;
+            var rawData = parsed.rawData;
 
             var bulk = this._collection.initializeOrderedBulkOp();
+
+            if (rawData) {
+                bulk.setRawData(rawData);
+            }
+
             var removeOp = bulk.find(query);
 
             if (collation) {
@@ -206,8 +212,14 @@ var Explainable = (function() {
             var collation = parsed.collation;
             var arrayFilters = parsed.arrayFilters;
             var hint = parsed.hint;
+            var rawData = parsed.rawData;
 
             var bulk = this._collection.initializeOrderedBulkOp();
+
+            if (rawData) {
+                bulk.setRawData(rawData);
+            }
+
             var updateOp = bulk.find(query);
 
             if (hint) {
