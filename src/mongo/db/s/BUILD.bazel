@@ -1473,6 +1473,7 @@ mongo_cc_unit_test(
         "sharding_logging_test.cpp",
         "sharding_recovery_service_test.cpp",
         "sharding_test_helpers.h",
+        "shardsvr_resolve_view_command_test.cpp",
         "split_chunk_request_test.cpp",
         "split_vector_test.cpp",
         "start_chunk_clone_request_test.cpp",

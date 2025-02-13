@@ -55,7 +55,7 @@ structs:
                 optional: true
 
 commands:
-    shardsvrResolveView:
+    _shardsvrResolveView:
         command_name: _shardsvrResolveView
         cpp_name: ShardsvrResolveView
         description: "Mongos issues this command on the primary shard to resolve the view for search index commands,

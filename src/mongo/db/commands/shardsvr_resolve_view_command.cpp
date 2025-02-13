@@ -43,6 +43,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/shardsvr_resolve_view_command_gen.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -83,6 +84,14 @@ public:
             auto cmd = request();
             auto nss = cmd.getNss();
             auto catalog = CollectionCatalog::get(opCtx);
+
+            // In sharded clusters, it's possible that the router has stale information
+            // regarding where the primary shard is. Being that this shard holds the view
+            // catalog (necessary for resolving the view), we must check that the databaseVersion
+            // attached by the router is valid and establish a storage engine snapshot consistent
+            // with it.
+            AutoGetDbForReadMaybeLockFree lock(opCtx, cmd.getDbName());
+
             auto resolvedView = uassertStatusOK(
                 view_catalog_helpers::resolveView(opCtx, catalog, nss, boost::none));
             Response res;
