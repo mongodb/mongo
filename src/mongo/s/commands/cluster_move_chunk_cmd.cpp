@@ -201,7 +201,7 @@ public:
                 chunk.emplace(chunkManager.findIntersectingChunkWithSimpleCollation(minKey));
                 uassert(656452,
                         str::stream() << "no chunk found with the shard key bounds "
-                                      << ChunkRange(minKey, maxKey).toString(),
+                                      << "[" << minKey << "," << maxKey << ")",
                         chunk->getMin().woCompare(minKey) == 0 &&
                             chunk->getMax().woCompare(maxKey) == 0);
             }
