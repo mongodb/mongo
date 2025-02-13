@@ -354,11 +354,6 @@ executor:
         writePeriodicNoops: true
         coordinateCommitReturnImmediatelyAfterPersistingDecision: true
         skipDroppingHashedShardKeyIndex: true
-        # Increment the query yield period as a best effort to avoid getting a QueryPlanKilled error
-        # when a query and a moveCollection run concurrently (more info on SERVER-88275)
-        # TODO (SERVER-88275) Remove both parameters once this bug is being addressed
-        internalQueryExecYieldPeriodMS: 6000
-        internalQueryExecYieldIterations: 1000000
     num_rs_nodes_per_shard: 2
     num_shards: 2
     enable_balancer: true
