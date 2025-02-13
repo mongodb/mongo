@@ -254,14 +254,21 @@ void ReplicationCoordinatorMock::_setMyLastAppliedOpTimeAndWallTime(
     _myLastAppliedOpTime = opTimeAndWallTime.opTime;
     _myLastAppliedWallTime = opTimeAndWallTime.wallTime;
 
-    if (_updateCommittedSnapshot) {
-        _setCurrentCommittedSnapshotOpTime(lk, opTimeAndWallTime.opTime);
+    if (!_updateCommittedSnapshot) {
+        return;
+    }
 
-        if (auto storageEngine = _service->getStorageEngine()) {
-            if (auto snapshotManager = storageEngine->getSnapshotManager()) {
-                snapshotManager->setCommittedSnapshot(opTimeAndWallTime.opTime.getTimestamp());
-            }
+    if (auto storageEngine = _service->getStorageEngine()) {
+        // Use the "all durable" timestamp for the committed snapshot rather than the one provided.
+        // This ensures that we never set the committed snapshot to a timestamp that contains oplog
+        // holes.
+        auto allDurable = storageEngine->getAllDurableTimestamp();
+        _setCurrentCommittedSnapshotOpTime(lk, {allDurable, opTimeAndWallTime.opTime.getTerm()});
+        if (auto snapshotManager = storageEngine->getSnapshotManager()) {
+            snapshotManager->setCommittedSnapshot(allDurable);
         }
+    } else {
+        _setCurrentCommittedSnapshotOpTime(lk, opTimeAndWallTime.opTime);
     }
 }
 
