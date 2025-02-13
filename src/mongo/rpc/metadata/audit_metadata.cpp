@@ -60,8 +60,7 @@ void setAuditClientMetadata(OperationContext* opCtx, const boost::optional<Audit
         return;
     }
     // Do not set/reset client metadata if it was not sent from a mongos
-    if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) ||
-        opCtx->getClient()->isFromUserConnection()) {
+    if (!opCtx->getClient()->isFromUserConnection()) {
         return;
     }
 
@@ -69,8 +68,6 @@ void setAuditClientMetadata(OperationContext* opCtx, const boost::optional<Audit
     auto session = client->session();
 
     if (!data || !data->getClientMetadata()) {
-        // Reset AuditClientAttrs decoration to default value if data is absent.
-        AuditClientAttrs::reset(client);
         return;
     }
 
@@ -80,6 +77,12 @@ void setAuditClientMetadata(OperationContext* opCtx, const boost::optional<Audit
 
     std::vector<HostAndPort> intermediates;
     for (size_t i = 1; i < hosts.size(); ++i) {
+        // In rare occasions a node will send a request to itself (e.g.
+        // checkCatalogConsistencyAcrossShards), adding itself as an intermediate. We check if the
+        // host is the same to skip it.
+        if (MONGO_unlikely(hosts[i] == local)) {
+            continue;
+        }
         intermediates.push_back(hosts[i]);
     }
 
