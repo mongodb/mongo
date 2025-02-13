@@ -4,6 +4,7 @@
 # import python standard modules, because this module
 # should be used for finding such external modules or
 # missing dependencies.
+import platform
 import re
 import subprocess
 import sys
@@ -45,8 +46,11 @@ def verify_requirements(silent: bool = False, executable=sys.executable):
     verbose("Checking required python packages...")
 
     try:
+        extras = []
+        if platform.machine() in set(["s390x", "ppc64le"]) and ".el9" not in platform.release():
+            extras = ["--extras", "oldcrypt"]
         poetry_dry_run_proc = subprocess.run(
-            [executable, "-m", "poetry", "install", "--no-root", "--sync", "--dry-run"],
+            [executable, "-m", "poetry", "install", "--no-root", "--sync", "--dry-run", *extras],
             check=True,
             text=True,
             capture_output=True,

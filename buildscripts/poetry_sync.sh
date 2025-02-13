@@ -81,7 +81,7 @@ run "${py3}" -m pip install "${pip_opts[@]}" "poetry==${poetry_version}"
 
 run env \
     PYTHON_KEYRING_BACKEND="keyring.backends.null.Keyring" \
-    "${py3}" -m poetry install --no-root --sync
+
 
 # poetry will install cryptography in an isolated build environment
 # to conform to pep517, however this doesn't work for the old cryptography
@@ -89,10 +89,14 @@ run env \
 # Here we go behing poetry's back and install with pip
 if uname -a | grep -q 's390x\|ppc64le'; then
     if uname -a | grep -q 'rhel9'; then
+        "${py3}" -m poetry install --no-root --sync
         "${py3}" -m pip uninstall -y cryptography==36.0.2
         "${py3}" -m pip install cryptography==36.0.2
     else
+        "${py3}" -m poetry install --extras 'oldcrypt' --no-root --sync
         "${py3}" -m pip uninstall -y cryptography==2.3
         "${py3}" -m pip install cryptography==2.3
     fi
+else
+    "${py3}" -m poetry install --no-root --sync
 fi

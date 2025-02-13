@@ -153,3 +153,76 @@ buildvariants:
       - name: compile_test_parallel_unittest_stream_TG
         distros:
           - rhel83-zseries-large
+
+  - &enterprise-rhel-9-s390x-template
+    name: enterprise-rhel-9-s390x
+    display_name: Enterprise RHEL 9 s390x
+    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
+    run_on:
+      - rhel9-zseries-small
+    cron: "0 4 * * 0"
+    stepback: false
+    expansions: &enterprise-rhel-9-s390x-expansions-template
+      additional_package_targets: >-
+        archive-mongocryptd
+        archive-mongocryptd-debug
+      release_buid: true
+      test_flags: --excludeWithAnyTags=incompatible_with_s390x
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=rhel9
+        -j3
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --linker=gold
+      crypt_task_compile_flags: >-
+        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+        CCFLAGS="-fno-gnu-unique"
+      resmoke_jobs_max: 2
+      has_packages: true
+      packager_script: packager_enterprise.py
+      packager_arch: s390x
+      packager_distro: rhel9
+      push_path: linux
+      push_bucket: downloads.10gen.com
+      push_name: linux
+      push_arch: s390x-enterprise-rhel9
+      repo_edition: enterprise
+      multiversion_platform: rhel9
+      multiversion_architecture: s390x
+      multiversion_edition: enterprise
+      compile_variant: enterprise-rhel-9-s390x
+    tasks:
+      - name: small_compile_test_and_package_serial_no_unittests_TG
+        distros:
+          - rhel9-zseries-large
+      - name: .development_critical !.requires_large_host !.incompatible_s390x
+      - name: .development_critical .requires_large_host !.incompatible_s390x
+        distros:
+          - rhel9-zseries-large
+      - name: .release_critical !.requires_large_host !.incompatible_s390x
+      - name: .release_critical .requires_large_host !.incompatible_s390x
+        distros:
+          - rhel9-zseries-large
+
+  - <<: *enterprise-rhel-9-s390x-template
+    name: enterprise-rhel-9-s390x-dynamic
+    display_name: Enterprise RHEL 9 s390x Shared
+    tags: ["bazel_check"]
+    expansions:
+      <<: *enterprise-rhel-9-s390x-expansions-template
+      has_packages: false
+      compile_flags: >-
+        --link-model=dynamic
+        --ssl
+        MONGO_DISTMOD=rhel9
+        -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --linker=gold
+      compile_variant: enterprise-rhel-9-s390x-shared
+    tasks:
+      - name: compile_test_serial_TG
+        distros:
+          - rhel9-zseries-large
+      - name: compile_test_parallel_unittest_stream_TG
+        distros:
+          - rhel9-zseries-large

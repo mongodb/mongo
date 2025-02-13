@@ -36,7 +36,6 @@ if uname -a | grep -q 's390x\|ppc64le'; then
   else
     EXTRA_IBM_ARGS="cryptography==2.3 pyOpenSSL==19.0.0"
   fi
-
 fi
 poetry_dir="${workdir}/poetry_dir"
 mkdir -p $poetry_dir
@@ -127,7 +126,16 @@ count=0
 for i in {1..5}; do
   yes | $POETRY_VENV_PYTHON -m poetry cache clear . --all
   rm -rf $poetry_dir/*
-  $POETRY_VENV_PYTHON -m poetry install --no-root --sync && RET=0 && break || RET=$? && sleep 1
+  if uname -a | grep -q 's390x\|ppc64le'; then
+    if uname -a | grep -q 'rhel9'; then
+      $POETRY_VENV_PYTHON -m poetry install --no-root --sync && RET=0 && break || RET=$? && sleep 1
+    else
+      $POETRY_VENV_PYTHON -m poetry install --extras 'oldcrypt' --no-root --sync && RET=0 && break || RET=$? && sleep 1
+    fi
+  else
+    $POETRY_VENV_PYTHON -m poetry install --no-root --sync && RET=0 && break || RET=$? && sleep 1
+  fi
+
   echo "Python failed install required deps with poetry, retrying..."
   sleep $((count * count * 20))
   count=$((count + 1))
@@ -144,8 +152,13 @@ fi
 # Here we go behing poetry's back and install with pip
 if uname -a | grep -q 's390x\|ppc64le'; then
   for i in {1..5}; do
-    python -m pip uninstall -y cryptography==2.3 || true
-    python -m pip install cryptography==2.3 && RET=0 && break || RET=$? && sleep 1
+    if uname -a | grep -q 'rhel9'; then
+      python -m pip uninstall -y cryptography==36.0.2
+      python -m pip install cryptography==36.0.2
+    else
+      python -m pip uninstall -y cryptography==2.3 || true
+      python -m pip install cryptography==2.3 && RET=0 && break || RET=$? && sleep 1
+    fi
   done
   if [ $RET -ne 0 ]; then
     echo "cryptography install error for full venv"

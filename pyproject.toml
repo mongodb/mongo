@@ -4,6 +4,7 @@ version = "1.0.0"
 requires-python = ">=3.10,<4.0"
 description = "MongoDB python dependencies"
 authors = [ { name = "MongoDB" } ]
+package-mode = false
 readme = "README.md"
 # These packages are included as a TODO if we want to run resmoke with pex
 # Currently this does nothing
@@ -88,8 +89,11 @@ structlog = "^24.4.0"
 # These are the dependencies of ldaptor
 passlib = "^1.7.4"
 pyOpenSSL = [
-    { version = "19.0.0", markers = "platform_machine == 's390x' or platform_machine == 'ppc64le'" },  # Needed for pinned cryptography package - see SERVER-70845
-    { version = "22.0.0", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" },
+    # { version = "19.0.0", markers = "platform_machine == 's390x' or platform_machine == 'ppc64le'" },  # Needed for pinned cryptography package - see SERVER-70845
+    # { version = "22.0.0", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" },
+
+    { version = "19.0.0", markers = "extra == 'oldcrypt'" },     # Needed for oauthlib to use RSAAlgorithm # Version locked - see SERVER-36618
+    { version = "22.0.0", markers = "extra != 'oldcrypt'" },
 ]
 pyparsing = "^2.4.7"
 service_identity = "^18.1.0"
@@ -121,18 +125,22 @@ evergreen-lint = "^0.1.9"
 ruff = "^0.6.7"
 
 [tool.poetry.group.modules_poc.dependencies]
-codeowners = "^0.7.0"
-progressbar2 = "^4.4.2"
-textual = {extras = ["syntax"], version = "^1.0.0"}
-tree-sitter = "^0.24.0"
-tree-sitter-cpp = "^0.23.4"
+codeowners = { version = "^0.7.0", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
+progressbar2 = { version = "^4.4.2", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
+textual = {extras = ["syntax"], version = "^1.0.0", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
+tree-sitter = { version = "^0.24.0", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
+tree-sitter-cpp = { version = "^0.23.4", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
 
 [tool.poetry.group.platform.dependencies]
 pypiwin32 = { version = ">=223", markers = "sys_platform == 'win32'" }
 pywin32 = { version = ">=225", markers = "sys_platform == 'win32'" }
 cryptography = [
-    { version = "2.3", markers = "'el8' in platform_release and platform_machine == 's390x' or platform_machine == 'ppc64le'" },     # Needed for oauthlib to use RSAAlgorithm # Version locked - see SERVER-36618
-    { version = "36.0.2", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" },
+    # { version = "2.3", markers = "platform_machine == 's390x' or platform_machine == 'ppc64le'" },     # Needed for oauthlib to use RSAAlgorithm # Version locked - see SERVER-36618
+    # { version = "36.0.2", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" },
+
+    { version = "2.3", markers = "extra == 'oldcrypt'" },     # Needed for oauthlib to use RSAAlgorithm # Version locked - see SERVER-36618
+    { version = "36.0.2", markers = "extra != 'oldcrypt'" },
+
 ]
 mongo-ninja-python = [
     { version = "1.11.1.7", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" },
@@ -192,6 +200,7 @@ libdeps = [
     "cxxfilt",
     "pympler",
 ]
+oldcrypt = []
 
 # This entrypoint is included as a TODO if we want to run resmoke with pex
 # Currently this does nothing
