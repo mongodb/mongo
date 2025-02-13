@@ -97,9 +97,7 @@ public:
     };
 };
 
-MONGO_REGISTER_COMMAND(ShardsvrReshardingDonorStartChangeStreamsMonitorCommand)
-    .requiresFeatureFlag(&resharding::gFeatureFlagReshardingVerification)
-    .forShard();
+MONGO_REGISTER_COMMAND(ShardsvrReshardingDonorStartChangeStreamsMonitorCommand).forShard();
 
 }  // namespace
 }  // namespace mongo
