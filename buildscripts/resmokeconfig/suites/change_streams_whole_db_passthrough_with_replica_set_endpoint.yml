@@ -10,9 +10,6 @@ selector:
   roots:
     - jstests/change_streams/**/*.js
   exclude_files:
-    # TODO (SERVER-87633): Investigate why change_streams/shell_helper.js fails when run against
-    # a sharded cluster.
-    - jstests/change_streams/shell_helper.js
     # Only relevant for single-collection change streams.
     - jstests/change_streams/metadata_notifications.js
   exclude_with_any_tags:

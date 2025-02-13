@@ -9,10 +9,6 @@ test_kind: js_test
 selector:
   roots:
     - jstests/change_streams/**/*.js
-  exclude_files:
-    # TODO (SERVER-87633): Investigate why change_streams/shell_helper.js fails when run against
-    # a sharded cluster.
-    - jstests/change_streams/shell_helper.js
   exclude_with_any_tags:
     ##
     # The next tags correspond to the special errors thrown by the

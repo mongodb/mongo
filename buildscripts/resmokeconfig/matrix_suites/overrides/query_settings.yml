@@ -1,7 +1,7 @@
 - name: common_core_excludes
   value:
     exclude_files:
-      # TODO SERVER-96408: Distinct explain fails with 'database not found' on sharded clusters
+      # Distinct explain fails with 'database not found' on sharded clusters
       - jstests/core/query/distinct/distinct_semantics.js
       # SERVER-95208 Fix timeseries query failing in explain, but passing when running.
       - jstests/core/timeseries/query/timeseries_union_with.js

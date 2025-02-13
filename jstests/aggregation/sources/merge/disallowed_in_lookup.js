@@ -14,7 +14,7 @@ coll.drop();
 const from = db.merge_in_lookup_not_allowed_from;
 from.drop();
 
-// TODO SERVER-82045 remove creation of database once
+// TODO SERVER-86712 remove creation of database once
 // $lookup/$merge behavior will be equal in both standalone and sharded cluster
 if (FixtureHelpers.isMongos(db)) {
     // Create database
