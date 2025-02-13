@@ -70,23 +70,6 @@ buildvariants:
       - name: compile_bazel_windows_TG
       - name: compile_bazel_ninja_TG
 
-  - name: &windows-dev-compile-suggested windows-dev-compile-suggested
-    display_name: "* Windows Server 2022 Enterprise Dev Compile"
-    tags: ["suggested"]
-    run_on:
-      - windows-2022-xxlarge
-    expansions:
-      exe: ".exe"
-      ext: zip
-      content_type: application/zip
-      num_scons_link_jobs_available: 0.2
-      python: "/cygdrive/c/python/python310/python.exe"
-      scons_cache_scope: shared
-      compile_variant: *windows-dev-compile-suggested
-    tasks:
-      - name: scons_compile_smoke_test_TG
-      - name: ninja_compile_smoke_test_TG
-
   ### QO & QE Patch-Specific Build Variants ###
   - name: &windows-compile-query-patch-only windows-compile-query-patch-only
     display_name: "~ Windows Server 2022 Enterprise Compile Query Patch Only"

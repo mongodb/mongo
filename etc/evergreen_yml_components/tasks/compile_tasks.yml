@@ -1952,56 +1952,6 @@ tasks:
           filenames:
             - "src/mongo_crypt_shared_v1-${push_name}-${push_arch}*"
 
-  # Test a compilation without extra args from evergreen to simulate local dev compilation.
-  - name: scons_dev_compile_smoke_test
-    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    commands:
-      - func: "get version expansions"
-      - func: "apply version expansions"
-      - func: "f_expansions_write"
-      - func: "scons raw compile"
-        vars:
-          targets: >-
-            install-wiredtiger
-            compiledb
-          task_compile_flags: >-
-            --opt=off
-            --dbg=on
-      - func: "scons raw compile"
-        vars:
-          targets: >-
-            install-wiredtiger
-            compiledb
-          task_compile_flags: >-
-            --opt=on
-            --dbg=off
-
-  # Test a ninja compilation without extra args from evergreen to simulate local dev compilation.
-  - name: ninja_dev_compile_smoke_test
-    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    commands:
-      - func: "get version expansions"
-      - func: "apply version expansions"
-      - func: "f_expansions_write"
-      - func: "scons raw compile"
-        vars:
-          targets: >-
-            install-wiredtiger
-            compiledb
-          task_compile_flags: >-
-            --ninja build.ninja
-      - func: "f_expansions_write"
-      - func: "ninja compile"
-        vars:
-          ninja_file: "build.ninja"
-          targets: "compiledb"
-
 ################################################
 #                 Task Groups                  #
 ################################################
@@ -2302,16 +2252,6 @@ task_groups:
       - compile_dbtest
       - run_dbtest
       - archive_dbtest
-
-  - <<: *compile_task_group_template
-    name: scons_compile_smoke_test_TG
-    tasks:
-      - scons_dev_compile_smoke_test
-
-  - <<: *compile_task_group_template
-    name: ninja_compile_smoke_test_TG
-    tasks:
-      - ninja_dev_compile_smoke_test
 
   - name: crypt_build_debug_and_test
     setup_task:
