@@ -1,3 +1,5 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
 package(default_visibility = ["//visibility:public"])
 
 exports_files(
@@ -5,4 +7,29 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+mongo_cc_library(
+    name = "timeseries_rewrites",
+    srcs = [
+        "timeseries_rewrites.cpp",
+    ],
+    hdrs = [
+        "timeseries_rewrites.h",
+    ],
+    deps = [
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/timeseries:timeseries_options",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_query_timeseries_test",
+    srcs = [
+        "timeseries_rewrites_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":timeseries_rewrites",
+    ],
 )
