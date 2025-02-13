@@ -157,6 +157,12 @@ Future<std::shared_ptr<GRPCAsyncClientFactory::AsyncClientHandle>> GRPCAsyncClie
         }
     }
 
+    // In the case of no timeout, set a default timeout to ensure we don't queue streams
+    // indefinitely if they cannot connect.
+    if (timeout < Milliseconds(0)) {
+        timeout = kDefaultStreamEstablishmentTimeout;
+    }
+
     LOGV2_DEBUG(9936101,
                 kDiagnosticLogLevel,
                 "Requesting new gRPC stream",

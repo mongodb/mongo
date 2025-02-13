@@ -56,7 +56,7 @@ public:
                               Promise<::grpc::Status>&& rpcTerminationStatusPromise,
                               std::shared_ptr<MockCancellationState> rpcCancellationState,
                               BidirectionalPipe::End&& serverPipeEnd,
-                              MetadataView clientMetadata);
+                              MetadataContainer clientMetadata);
 
 private:
     friend class MockServerContext;
@@ -135,6 +135,7 @@ private:
     std::shared_ptr<MockCancellationState> _rpcCancellationState;
 
     BidirectionalPipe::End _pipe;
-    MetadataView _clientMetadata;
+    MetadataContainer _clientMetadata;
+    MetadataView _clientMetadataView;
 };
 }  // namespace mongo::transport::grpc

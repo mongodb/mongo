@@ -57,6 +57,10 @@ public:
         _stream->WritesDone(tag);
     }
 
+    void startCall(GRPCReactor::CompletionQueueEntry* tag) override {
+        _stream->StartCall(tag);
+    }
+
 private:
     std::unique_ptr<::grpc::ClientAsyncReaderWriter<ConstSharedBuffer, SharedBuffer>> _stream;
 };

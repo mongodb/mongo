@@ -33,6 +33,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/grpc/reactor.h"
+#include "mongo/util/future_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
@@ -112,6 +113,28 @@ void GRPCReactor::schedule(Task task) {
     // immediate deadline is a workaround for this documented by gRPC.
     _setAlarm(std::make_shared<::grpc::Alarm>(), kImmediateDeadline)
         .getAsync([task = _stats.wrapTask(std::move(task))](Status s) { task(s); });
+}
+
+ExecutorFuture<void> GRPCReactor::sleepFor(Milliseconds duration, const CancellationToken& token) {
+    auto when = now() + duration;
+
+    if (token.isCanceled()) {
+        return ExecutorFuture<void>(
+            shared_from_this(),
+            Status(ErrorCodes::CallbackCanceled, "Cancelled sleep in gRPC reactor"));
+    }
+
+    if (when <= now()) {
+        return ExecutorFuture<void>(shared_from_this());
+    }
+
+    // Schedule a task to signal the alarm when the deadline is reached. When the withCancellation
+    // future completes, the timer will be destructed, which will cancel the corresponding gRPC
+    // alarm.
+    auto timer = makeTimer();
+    return future_util::withCancellation(timer->waitUntil(when), token)
+        .thenRunOn(shared_from_this())
+        .onCompletion([t = std::move(timer)](const Status& s) { return s; });
 }
 
 void GRPCReactor::appendStats(BSONObjBuilder& bob) const {

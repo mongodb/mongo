@@ -93,6 +93,8 @@ public:
     friend class StubFactoryImpl;
     friend class EgressSession;
     friend class MockClientStream;
+    friend class Client;
+    friend class Channel;
 
     /**
      * The CompletionQueueEntry is the tag type we provide to gRPC functions. It contains a Promise
@@ -143,6 +145,9 @@ public:
     }
 
     void appendStats(BSONObjBuilder& bob) const override;
+
+    // sleepFor is implemented so that the gRPC reactor is compatible with the AsyncTry API.
+    ExecutorFuture<void> sleepFor(Milliseconds duration, const CancellationToken& token);
 
 private:
     ::grpc::CompletionQueue* _getCompletionQueue() {

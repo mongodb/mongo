@@ -67,7 +67,7 @@ public:
 private:
     Future<CallContext> _streamFactory(const HostAndPort& remote,
                                        const std::shared_ptr<GRPCReactor>& reactor,
-                                       Milliseconds timeout,
+                                       boost::optional<Date_t> deadline,
                                        const ConnectOptions& options,
                                        const CancellationToken& token) override;
 

@@ -81,11 +81,19 @@ public:
             return;
         }
         *statusGuard = std::move(status);
+
+        cancelSource.cancel();
+    }
+
+    SemiFuture<void> onCancel() {
+        return cancelSource.token().onCancel();
     }
 
 private:
     Date_t _deadline;
     synchronized_value<boost::optional<::grpc::Status>> _cancellationStatus;
+
+    CancellationSource cancelSource;
 };
 
 /**

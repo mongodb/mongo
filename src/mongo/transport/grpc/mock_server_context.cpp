@@ -36,7 +36,7 @@ void MockServerContext::addInitialMetadataEntry(const std::string& key, const st
 }
 
 const MetadataView& MockServerContext::getClientMetadata() const {
-    return _stream->_clientMetadata;
+    return _stream->_clientMetadataView;
 }
 
 Date_t MockServerContext::getDeadline() const {

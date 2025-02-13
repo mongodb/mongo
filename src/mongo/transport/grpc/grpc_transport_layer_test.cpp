@@ -575,6 +575,26 @@ TEST_F(GRPCTransportLayerTest, ConnectionError) {
         CommandServiceTestFixtures::makeTLOptions());
 }
 
+TEST_F(GRPCTransportLayerTest, CancelBadConnectAttempt) {
+    runWithTL(
+        makeNoopRPCHandler(),
+        [&](auto& tl) {
+            CancellationSource cancelSource;
+            auto fut =
+                tl.asyncConnectWithAuthToken(HostAndPort("localhost", 1235),
+                                             ConnectSSLMode::kGlobalSSLMode,
+                                             tl.getReactor(TransportLayer::WhichReactor::kEgress),
+                                             Milliseconds::max(),  // no timeout
+                                             nullptr,
+                                             cancelSource.token());
+            cancelSource.cancel();
+            auto status = fut.getNoThrow();
+            ASSERT_NOT_OK(status);
+            ASSERT_EQ(status.getStatus().code(), ErrorCodes::CallbackCanceled);
+        },
+        CommandServiceTestFixtures::makeTLOptions());
+}
+
 TEST_F(GRPCTransportLayerTest, SSLModeMismatch) {
     runWithTL(
         makeNoopRPCHandler(),
@@ -977,22 +997,24 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest, ClientUsesOldCertsUntilRotate) 
 }
 
 TEST_F(MockGRPCTransportLayerTest, ConnectionTimeout) {
-    FailPointEnableBlock fp("grpcHangOnStreamEstablishment");
+    runTestWithMockServer([this]() {
+        FailPointEnableBlock fp("grpcHangOnStreamEstablishment");
 
-    auto tl = getServiceContext()->getTransportLayerManager()->getTransportLayer(
-        transport::TransportProtocol::GRPC);
-    auto client =
-        AsyncDBClient::connect(kServerHostAndPort,
-                               transport::ConnectSSLMode::kGlobalSSLMode,
-                               getServiceContext(),
-                               tl,
-                               tl->getReactor(transport::TransportLayer::WhichReactor::kEgress),
-                               Milliseconds(500),
-                               nullptr);
+        auto tl = getServiceContext()->getTransportLayerManager()->getTransportLayer(
+            transport::TransportProtocol::GRPC);
+        auto client =
+            AsyncDBClient::connect(kServerHostAndPort,
+                                   transport::ConnectSSLMode::kGlobalSSLMode,
+                                   getServiceContext(),
+                                   tl,
+                                   tl->getReactor(transport::TransportLayer::WhichReactor::kEgress),
+                                   Milliseconds(500),
+                                   nullptr);
 
-    auto status = client.getNoThrow();
-    ASSERT_NOT_OK(status);
-    ASSERT_EQ(status.getStatus().code(), ErrorCodes::NetworkTimeout);
+        auto status = client.getNoThrow();
+        ASSERT_NOT_OK(status);
+        ASSERT_EQ(status.getStatus().code(), ErrorCodes::ExceededTimeLimit);
+    });
 }
 
 }  // namespace

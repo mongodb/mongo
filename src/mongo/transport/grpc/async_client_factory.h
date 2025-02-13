@@ -51,6 +51,7 @@ namespace mongo::transport::grpc {
 class GRPCAsyncClientFactory : public executor::AsyncClientFactory {
 public:
     static constexpr auto kDiagnosticLogLevel = 4;
+    static constexpr auto kDefaultStreamEstablishmentTimeout = Seconds(20);
 
     GRPCAsyncClientFactory();
 

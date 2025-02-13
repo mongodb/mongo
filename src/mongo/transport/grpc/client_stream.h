@@ -103,6 +103,14 @@ public:
      * Thread-safe with respect to read.
      */
     virtual void writesDone(GRPCReactor::CompletionQueueEntry* tag) = 0;
+
+    /**
+     * Start the call that was set up by the constructor, but only if the constructor was invoked
+     * through the "Prepare" API which doesn't actually start the call.
+     * It is illegal to start a write-type operation (eg. Write(), WriteLast(), WritesDone()) while
+     * the StartCall() operation has not finished (determined by the returning of tag).
+     */
+    virtual void startCall(GRPCReactor::CompletionQueueEntry* tag) = 0;
 };
 
 }  // namespace mongo::transport::grpc

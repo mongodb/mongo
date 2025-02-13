@@ -346,18 +346,28 @@ TEST_F(MockGRPCAsyncClientFactoryTest, ConnectionErrorAssociatedWithRemote) {
     ASSERT_EQ(result.target, target);
 }
 
-TEST_F(MockGRPCAsyncClientFactoryTest, CancelStreamEstablishment) {
-    boost::optional<FailPointEnableBlock> fpb("grpcHangOnStreamEstablishment");
+TEST_F(MockGRPCAsyncClientFactoryTest, ConnectionErrorAssociatedWithRemoteWithDeadline) {
+    FailPointEnableBlock fpb("grpcFailChannelEstablishment");
+
+    auto target = HostAndPort("localhost", 12345);
+    auto cb = executor::TaskExecutor::CallbackHandle();
+    executor::RemoteCommandRequest request(
+        target, DatabaseName::kAdmin, BSON("ping" << 1), nullptr, Milliseconds(100));
+    auto result = getNet().startCommand(cb, request).get();
+
+    ASSERT_EQ(ErrorCodes::HostUnreachable, result.status);
+    ASSERT_EQ(result.target, target);
+}
+
+TEST_F(MockGRPCAsyncClientFactoryTest, CancelChannelEstablishment) {
+    boost::optional<FailPointEnableBlock> fpb("grpcHangOnChannelEstablishment");
     auto cbh = executor::TaskExecutor::CallbackHandle();
     CancellationSource cancellationSource;
 
     auto pf = makePromiseFuture<executor::RemoteCommandResponse>();
 
-    executor::RemoteCommandRequest request(HostAndPort("localhost", 12345),
-                                           DatabaseName::kAdmin,
-                                           BSON("ping" << 1),
-                                           nullptr,
-                                           Minutes(1));
+    executor::RemoteCommandRequest request(
+        HostAndPort("localhost", 12345), DatabaseName::kAdmin, BSON("ping" << 1), nullptr);
     auto cmdThread = stdx::thread([&] {
         pf.promise.setFrom(
             getNet().startCommand(cbh, request, nullptr, cancellationSource.token()).getNoThrow());
@@ -380,30 +390,94 @@ TEST_F(MockGRPCAsyncClientFactoryTest, CancelStreamEstablishment) {
     ASSERT_EQ(0, counters.timedOut);
     ASSERT_EQ(0, counters.failed);
     ASSERT_EQ(0, counters.succeeded);
-    ASSERT_EQ(0, counters.failedRemotely);
+}
+
+TEST_F(MockGRPCAsyncClientFactoryTest, CancelStreamEstablishment) {
+    runTestWithMockServer([this]() {
+        boost::optional<FailPointEnableBlock> fpb("grpcHangOnStreamEstablishment");
+        auto cbh = executor::TaskExecutor::CallbackHandle();
+        CancellationSource cancellationSource;
+
+        auto pf = makePromiseFuture<executor::RemoteCommandResponse>();
+
+        executor::RemoteCommandRequest request(HostAndPort("localhost", 12345),
+                                               DatabaseName::kAdmin,
+                                               BSON("ping" << 1),
+                                               nullptr,
+                                               Minutes(1));
+        auto cmdThread = stdx::thread([&] {
+            pf.promise.setFrom(getNet()
+                                   .startCommand(cbh, request, nullptr, cancellationSource.token())
+                                   .getNoThrow());
+        });
+        ON_BLOCK_EXIT([&] { cmdThread.join(); });
+
+        fpb.get()->waitForTimesEntered(fpb->initialTimesEntered() + 1);
+        cancellationSource.cancel();
+        fpb.reset();
+
+        ASSERT_EQ(getNet().getCounters().sent, 0);
+
+        // Wait for op to complete, assert that it was canceled.
+        auto result = pf.future.get();
+        ASSERT_EQ(ErrorCodes::CallbackCanceled, result.status);
+        ASSERT(result.elapsed);
+
+        auto counters = getNet().getCounters();
+        ASSERT_EQ(1, counters.canceled);
+        ASSERT_EQ(0, counters.timedOut);
+        ASSERT_EQ(0, counters.failed);
+        ASSERT_EQ(0, counters.succeeded);
+        ASSERT_EQ(0, counters.failedRemotely);
+    });
+}
+
+TEST_F(MockGRPCAsyncClientFactoryTest, FailStreamEstablishment) {
+    runTestWithMockServer([this]() {
+        FailPointEnableBlock fpb("grpcFailStreamEstablishment");
+
+        auto cbh = executor::TaskExecutor::CallbackHandle();
+        executor::RemoteCommandRequest request(HostAndPort("localhost", 12345),
+                                               DatabaseName::kAdmin,
+                                               BSON("ping" << 1),
+                                               nullptr,
+                                               Milliseconds(100));
+        auto res = getNet().startCommand(cbh, request).get();
+        ASSERT_EQ(res.status, ErrorCodes::HostUnreachable);
+        ASSERT_EQ(getNet().getCounters().sent, 0);
+
+        auto counters = getNet().getCounters();
+        ASSERT_EQ(0, counters.canceled);
+        ASSERT_EQ(0, counters.timedOut);
+        ASSERT_EQ(1, counters.failed);
+        ASSERT_EQ(0, counters.succeeded);
+        ASSERT_EQ(0, counters.failedRemotely);
+    });
 }
 
 void MockGRPCAsyncClientFactoryTest::runStreamEstablishmentTimeoutTest(
     boost::optional<ErrorCodes::Error> customCode) {
-    FailPointEnableBlock fpb("grpcHangOnStreamEstablishment");
+    runTestWithMockServer([&, this]() {
+        FailPointEnableBlock fpb("grpcHangOnStreamEstablishment");
 
-    auto cbh = executor::TaskExecutor::CallbackHandle();
-    executor::RemoteCommandRequest request(HostAndPort("localhost", 12345),
-                                           DatabaseName::kAdmin,
-                                           BSON("ping" << 1),
-                                           nullptr,
-                                           Milliseconds(100));
-    request.timeoutCode = customCode;
-    auto res = getNet().startCommand(cbh, request).get();
-    ASSERT_EQ(res.status, customCode.value_or(ErrorCodes::NetworkTimeout));
-    ASSERT_EQ(getNet().getCounters().sent, 0);
+        auto cbh = executor::TaskExecutor::CallbackHandle();
+        executor::RemoteCommandRequest request(HostAndPort("localhost", 12345),
+                                               DatabaseName::kAdmin,
+                                               BSON("ping" << 1),
+                                               nullptr,
+                                               Milliseconds(100));
+        request.timeoutCode = customCode;
+        auto res = getNet().startCommand(cbh, request).get();
+        ASSERT_EQ(res.status, customCode.value_or(ErrorCodes::ExceededTimeLimit));
+        ASSERT_EQ(getNet().getCounters().sent, 0);
 
-    auto counters = getNet().getCounters();
-    ASSERT_EQ(0, counters.canceled);
-    ASSERT_EQ(1, counters.timedOut);
-    ASSERT_EQ(0, counters.failed);
-    ASSERT_EQ(0, counters.succeeded);
-    ASSERT_EQ(0, counters.failedRemotely);
+        auto counters = getNet().getCounters();
+        ASSERT_EQ(0, counters.canceled);
+        ASSERT_EQ(1, counters.timedOut);
+        ASSERT_EQ(0, counters.failed);
+        ASSERT_EQ(0, counters.succeeded);
+        ASSERT_EQ(0, counters.failedRemotely);
+    });
 }
 
 TEST_F(MockGRPCAsyncClientFactoryTest, TimeoutStreamEstablishment) {

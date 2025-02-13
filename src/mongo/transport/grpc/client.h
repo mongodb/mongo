@@ -132,7 +132,18 @@ private:
     enum class ClientState { kUninitialized, kStarted, kShutdown };
     class PendingStreamState : public enable_shared_from_this<PendingStreamState> {
     public:
-        explicit PendingStreamState(const CancellationToken& token) : _cancelSource(token) {}
+        explicit PendingStreamState(HostAndPort remote,
+                                    ConnectSSLMode sslMode,
+                                    std::shared_ptr<ConnectionMetrics> connectionMetrics,
+                                    const CancellationToken& token)
+            : _remote(std::move(remote)),
+              _sslMode(std::move(sslMode)),
+              _connectionMetrics(std::move(connectionMetrics)),
+              _cancelSource(token) {
+            if (_connectionMetrics) {
+                _connectionMetrics->onConnectionStarted();
+            }
+        }
 
         // The WithLock corresponds to the Client's mutex, not the PendingStreamState's.
         void registerWithClient(WithLock, Client& client);
@@ -162,8 +173,33 @@ private:
             }
         }
 
+        const HostAndPort& getRemote() {
+            return _remote;
+        }
+
+        void setDeadline(Date_t deadline) {
+            _deadline = deadline;
+        }
+
+        const boost::optional<Date_t>& getDeadline() {
+            return _deadline;
+        }
+
+        const ConnectSSLMode& getSSLMode() {
+            return _sslMode;
+        }
+
+        const std::shared_ptr<ConnectionMetrics>& getConnectionMetrics() {
+            return _connectionMetrics;
+        }
+
     private:
         std::list<std::shared_ptr<PendingStreamState>>::iterator _iter;
+
+        HostAndPort _remote;
+        boost::optional<Date_t> _deadline;
+        ConnectSSLMode _sslMode;
+        std::shared_ptr<ConnectionMetrics> _connectionMetrics;
 
         stdx::mutex _mutex;
         Status _cancellationReason = Status::OK();
@@ -172,10 +208,10 @@ private:
         std::shared_ptr<ReactorTimer> _timer;
     };
 
-    virtual Future<CallContext> _streamFactory(const HostAndPort&,
-                                               const std::shared_ptr<GRPCReactor>&,
-                                               Milliseconds,
-                                               const ConnectOptions&,
+    virtual Future<CallContext> _streamFactory(const HostAndPort& remote,
+                                               const std::shared_ptr<GRPCReactor>& reactor,
+                                               boost::optional<Date_t> deadline,
+                                               const ConnectOptions& connectOptions,
                                                const CancellationToken& token) = 0;
 
     /**
@@ -229,11 +265,11 @@ public:
 
 
 private:
-    Future<CallContext> _streamFactory(const HostAndPort&,
-                                       const std::shared_ptr<GRPCReactor>&,
-                                       Milliseconds,
-                                       const ConnectOptions&,
-                                       const CancellationToken&) override;
+    Future<CallContext> _streamFactory(const HostAndPort& remote,
+                                       const std::shared_ptr<GRPCReactor>& reactor,
+                                       boost::optional<Date_t> deadline,
+                                       const ConnectOptions& connectOptions,
+                                       const CancellationToken& token) override;
 
 
     std::unique_ptr<StubFactory> _stubFactory;

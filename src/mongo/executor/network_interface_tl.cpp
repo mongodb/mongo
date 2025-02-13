@@ -101,10 +101,6 @@ void appendMetadata(RemoteCommandRequest* request,
         request->metadata = bob.obj();
     }
 }
-
-bool isTimeout(const Status& s) {
-    return ErrorCodes::isExceededTimeLimitError(s) || ErrorCodes::isNetworkTimeoutError(s);
-}
 }  // namespace
 
 /**
@@ -123,7 +119,7 @@ public:
         if (status.isOK()) {
             // Increment the count of commands that received a valid response
             ++_data.succeeded;
-        } else if (isTimeout(status)) {
+        } else if (ErrorCodes::isExceededTimeLimitError(status)) {
             // Increment the count of commands that experienced a local timeout
             // Note that these commands do not count as "failed".
             ++_data.timedOut;
@@ -880,7 +876,7 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::CommandStateBase::send
 }
 
 Status NetworkInterfaceTL::CommandStateBase::handleClientAcquisitionError(Status status) {
-    if (!isTimeout(status)) {
+    if (!ErrorCodes::isExceededTimeLimitError(status)) {
         return status;
     }
 

@@ -415,6 +415,35 @@ TEST_F(GRPCClientTest, GRPCClientConnectAfterReactorShutdown) {
     CommandServiceTestFixtures::runWithServer(serverHandler, clientThreadBody);
 }
 
+TEST_F(GRPCClientTest, GRPCClientShutdownDuringBadConnection) {
+    auto waitUntilChannelCreation = [this](std::shared_ptr<GRPCClient> client) {
+        auto numChannels = getCurrChannelMetric(client);
+        auto retries = 0;
+
+        while (numChannels < 1 && retries++ < 5) {
+            numChannels = getCurrChannelMetric(client);
+            sleepmillis(retries * 5);
+        }
+    };
+
+    auto serverHandler = [&](std::shared_ptr<IngressSession>) {
+    };
+
+    auto clientThreadBody = [&](auto& server, auto&) {
+        auto client = makeClient();
+        client->start();
+        ASSERT_EQ(getCurrChannelMetric(client), 0);
+        auto res =
+            client->connect(HostAndPort("localhost", 12345), getReactor(), Milliseconds::max(), {});
+        waitUntilChannelCreation(client);
+        ASSERT_EQ(getCurrChannelMetric(client), 1);
+        client->shutdown();
+        ASSERT_THROWS_CODE(res.get(), DBException, ErrorCodes::ShutdownInProgress);
+    };
+
+    CommandServiceTestFixtures::runWithServer(serverHandler, clientThreadBody);
+}
+
 TEST_F(GRPCClientTest, GRPCClientAppendStatsFailedSession) {
     auto serverHandler = [&](std::shared_ptr<IngressSession>) {
     };

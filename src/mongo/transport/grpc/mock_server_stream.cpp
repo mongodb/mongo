@@ -41,14 +41,20 @@ MockServerStream::MockServerStream(HostAndPort remote,
                                    Promise<::grpc::Status>&& rpcTerminationStatusPromise,
                                    std::shared_ptr<MockCancellationState> rpcCancellationState,
                                    BidirectionalPipe::End&& serverPipeEnd,
-                                   MetadataView clientMetadata)
+                                   MetadataContainer clientMetadata)
     : _remote(std::move(remote)),
       _initialMetadata(std::move(initialMetadataPromise)),
       _rpcReturnStatus(std::move(rpcTerminationStatusPromise)),
       _finalStatusReturned(false),
       _rpcCancellationState(std::move(rpcCancellationState)),
       _pipe{std::move(serverPipeEnd)},
-      _clientMetadata{std::move(clientMetadata)} {}
+      _clientMetadata{std::move(clientMetadata)} {
+    // Hold onto the MetadataContainer, but also write out a view for use by the server context API.
+    for (auto& kvp : _clientMetadata) {
+        _clientMetadataView.insert({StringData{kvp.first.data(), kvp.first.length()},
+                                    StringData{kvp.second.data(), kvp.second.length()}});
+    }
+}
 
 boost::optional<SharedBuffer> MockServerStream::read() {
     invariant(!*_finalStatusReturned);

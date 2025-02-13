@@ -34,6 +34,9 @@
 
 namespace mongo::transport::grpc {
 
+MONGO_FAIL_POINT_DEFINE(grpcHangOnStreamEstablishment);
+MONGO_FAIL_POINT_DEFINE(grpcFailStreamEstablishment);
+
 MockClientStream::MockClientStream(HostAndPort remote,
                                    Future<MetadataContainer>&& initialMetadataFuture,
                                    Future<::grpc::Status>&& rpcReturnStatus,
@@ -106,6 +109,22 @@ void MockClientStream::finish(::grpc::Status* status, GRPCReactor::CompletionQue
 }
 
 void MockClientStream::writesDone(GRPCReactor::CompletionQueueEntry* tag) {
+    _reactor->_processCompletionQueueNotification(tag, true /* ok */);
+}
+
+void MockClientStream::startCall(GRPCReactor::CompletionQueueEntry* tag) {
+    if (MONGO_unlikely(grpcHangOnStreamEstablishment.shouldFail())) {
+        _rpcCancellationState->onCancel().thenRunOn(_reactor).getAsync(
+            [reactor = _reactor, tag](Status s) {
+                reactor->_processCompletionQueueNotification(tag, false /* ok */);
+            });
+
+        return;
+    } else if (MONGO_unlikely(grpcFailStreamEstablishment.shouldFail())) {
+        _cancel();
+        _reactor->_processCompletionQueueNotification(tag, false /* ok */);
+        return;
+    }
     _reactor->_processCompletionQueueNotification(tag, true /* ok */);
 }
 

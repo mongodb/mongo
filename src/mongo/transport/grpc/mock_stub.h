@@ -201,11 +201,6 @@ private:
     std::shared_ptr<MockClientStream> _makeStream(MockRPC::MethodName methodName,
                                                   MockClientContext* ctx,
                                                   const std::shared_ptr<GRPCReactor>& reactor) {
-        MetadataView clientMetadata;
-        for (auto& kvp : ctx->_metadata) {
-            clientMetadata.insert(kvp);
-        }
-
         BidirectionalPipe pipe;
         auto metadataPF = makePromiseFuture<MetadataContainer>();
         auto terminationStatusPF = makePromiseFuture<::grpc::Status>();
@@ -219,7 +214,7 @@ private:
                                                std::move(terminationStatusPF.promise),
                                                cancellationState,
                                                std::move(*pipe.left),
-                                               clientMetadata);
+                                               ctx->_metadata);
         rpc.serverCtx = std::make_unique<MockServerContext>(rpc.serverStream.get());
         auto clientStream =
             std::make_shared<MockClientStream>(_channel->getRemote(),

@@ -130,8 +130,9 @@ TEST_F(MockClientTest, ConnectTimeout) {
         FailPointEnableBlock fp("grpcHangOnStreamEstablishment");
         auto status =
             client.connect(defaultServerAddress(), getReactor(), Milliseconds(5), {}).getNoThrow();
+        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
         ASSERT_NOT_OK(status);
-        ASSERT_EQ(status.getStatus().code(), ErrorCodes::NetworkTimeout);
+        ASSERT_EQ(status.getStatus().code(), ErrorCodes::ExceededTimeLimit);
     };
 
     CommandServiceTestFixtures::runWithMockServers(

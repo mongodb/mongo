@@ -195,6 +195,18 @@ public:
         ServiceContextTest::tearDown();
     }
 
+    void runTestWithMockServer(std::function<void(void)> test) {
+        auto server = std::make_unique<MockServer>(std::move(_pipe.consumer));
+        unittest::threadAssertionMonitoredTest([&](unittest::ThreadAssertionMonitor& monitor) {
+            server->start(
+                monitor,
+                [&](auto session) { session->setTerminationStatus(Status::OK()); },
+                std::make_unique<WireVersionProvider>());
+            ON_BLOCK_EXIT([&] { server->shutdown(); });
+            ASSERT_DOES_NOT_THROW(test());
+        });
+    }
+
 private:
     MockRPCQueue::Pipe _pipe;
     unittest::MinimumLoggedSeverityGuard networkSeverityGuard{logv2::LogComponent::kNetwork,
