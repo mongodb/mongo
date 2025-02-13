@@ -58,7 +58,7 @@ export function ingressHandshakeMetricsTest(conn, options) {
 
     function getTotalTimeToFirstNonAuthCommandMillis() {
         let status = assert.commandWorked(conn.adminCommand({serverStatus: 1}));
-        printjson(status);
+        jsTest.log.info({status});
         return status.metrics.network.totalTimeToFirstNonAuthCommandMillis;
     }
 

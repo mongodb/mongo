@@ -18,7 +18,8 @@ function prepareTenantUser(userName, tenantId) {
     let assertResponse = (res) => {
         if (res.ok === 1) {
             assert.commandWorked(res);
-            print(`Create a user "${userName}" with the useTenant privilege successfully.`);
+            jsTest.log.info(
+                `Create a user "${userName}" with the useTenant privilege successfully.`);
         } else {
             // If 'username' already exists, then attempts to create a user with the same name
             // will fail with error code 51003.
@@ -36,7 +37,7 @@ function prepareTenantUser(userName, tenantId) {
     assert(adminDb.auth('root', 'pwd'));
 
     // Create a user for tenant for setting security token on connections.
-    print(`Create a tenant user "${userName}", tenant:  ${tenantId}`);
+    jsTest.log.info(`Create a tenant user "${userName}", tenant:  ${tenantId}`);
     const unsignedToken = _createTenantToken({tenant: tenantId});
     res = runCommandWithSecurityToken(unsignedToken, db.getSiblingDB('$external'), {
         createUser: userName,
@@ -49,14 +50,14 @@ function prepareTenantUser(userName, tenantId) {
 
 function createSecurityToken(userName, tenantId) {
     if (TestData.useSignedSecurityToken) {
-        print(`Create signed security token, user: ${userName}, tenant: ${tenantId}`);
+        jsTest.log.info(`Create signed security token, user: ${userName}, tenant: ${tenantId}`);
         const key = TestData.testOnlyValidatedTenancyScopeKey;
         assert.eq(
             typeof key, 'string', 'testOnlyValidatedTenancyScopeKey not configured in TestData');
         securityToken =
             _createSecurityToken({user: userName, db: '$external', tenant: tenantId}, key);
     } else {
-        print(`Create unsigned security token , tenant: ${tenantId}`);
+        jsTest.log.info(`Create unsigned security token , tenant: ${tenantId}`);
         securityToken = _createTenantToken({tenant: tenantId, expectPrefix: false});
     }
 }

@@ -16,7 +16,7 @@ MongoRunner.validateCollectionsCallback = function(port, options) {
     const validateCollectionsImpl = options.validateCollections || validateCollections;
 
     if (jsTest.options().skipCollectionAndIndexValidation) {
-        print("Skipping collection validation during mongod shutdown");
+        jsTest.log.info("Skipping collection validation during mongod shutdown");
         return;
     }
 
@@ -24,8 +24,9 @@ MongoRunner.validateCollectionsCallback = function(port, options) {
     try {
         conn = new Mongo("localhost:" + port, undefined, {gRPC: false});
     } catch (e) {
-        print("Skipping collection validation because we couldn't establish a connection to the" +
-              " server on port " + port);
+        jsTest.log.info(
+            "Skipping collection validation because we couldn't establish a connection to the" +
+            " server on port " + port);
         return;
     }
 
@@ -127,7 +128,7 @@ MongoRunner.validateCollectionsCallback = function(port, options) {
             .execute();
 
     if (!result.ok) {
-        print("Skipping collection validation: " + result.msg);
+        jsTest.log.info("Skipping collection validation: " + result.msg);
         return;
     }
 

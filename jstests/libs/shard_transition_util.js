@@ -37,7 +37,7 @@ export const ShardTransitionUtil = (function() {
         assert.soon(() => {
             const rangeDeletions = conn.getCollection("config.rangeDeletions").find().toArray();
             if (rangeDeletions.length) {
-                print("Waiting for range deletions to complete: " + tojsononeline(rangeDeletions));
+                jsTest.log.info("Waiting for range deletions to complete", {rangeDeletions});
                 sleep(100);
                 return false;
             }
@@ -52,7 +52,8 @@ export const ShardTransitionUtil = (function() {
                 return;
             } catch (e) {
                 if (e.code === ErrorCodes.ShardNotFound) {
-                    print("Ignoring error with transitioning shard, retrying: " + tojson(e));
+                    jsTest.log.info("Ignoring error with transitioning shard, retrying",
+                                    {error: e});
                     continue;
                 }
 

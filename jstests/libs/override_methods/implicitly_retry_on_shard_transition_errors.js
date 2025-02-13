@@ -134,8 +134,9 @@ function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs
             res = func.apply(conn, makeFuncArgs(cmdObj));
 
             if (shouldRetry(cmdObj, res)) {
-                print("Retrying on error from " + cmdName +
-                      " with transitioning shard. Attempt: " + attempt + ", res: " + tojson(res));
+                jsTest.log.info("Retrying on error from " + cmdName +
+                                    " with transitioning shard. Attempt: " + attempt,
+                                {res});
                 return kRetry;
             }
 

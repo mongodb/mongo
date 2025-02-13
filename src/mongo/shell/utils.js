@@ -564,6 +564,13 @@ jsTestLog = function(
         if (severityLevel > logLevel) {
             return;
         }
+
+        // Syntax sugar for 'jsTestLog({someObject}) = jsTestLog(null, {attr: someObject})'.
+        if (!attr && typeof msg === "object" && msg !== null) {
+            attr = msg;
+            msg = null;
+        }
+
         // New logging format, enabled through the --logFormat resmoke flag.
         let new_msg = {
             t: new Date(),
@@ -578,7 +585,7 @@ jsTestLog = function(
         if (id && typeof id === "number") {
             new_msg["id"] = id;
         }
-        print(JSON.stringify(new_msg));
+        print(toEJSON(new_msg));
         return;
     }
 
@@ -586,6 +593,11 @@ jsTestLog = function(
     if (typeof msg === "object") {
         msg = tojson(msg);
     }
+
+    if (attr) {
+        msg += " " + tojson(attr);
+    }
+
     assert.eq(typeof (msg), "string", "Received: " + msg);
     const msgs = ["----", ...msg.split("\n"), "----"].map(s => `[jsTest] ${s}`);
     print(`\n\n${msgs.join("\n")}\n\n`);
@@ -601,23 +613,23 @@ jsTest.adminUserRoles = ["root"];
 
 /**
  * @deprecated: This function should not be used for new tests. The new severity API's should be
- * used instead: jsTest.log.info("message", args).
+ * used instead: jsTest.log.info().
  */
 jsTest.log = jsTestLog;
 
-jsTest.log.info = function(msg, {id, attr}) {
+jsTest.log.info = function(msg, attr, id) {
     jsTestLog(msg, {id, attr, severity: "I"});
 };
 
-jsTest.log.debug = function(msg, {id, attr}) {
+jsTest.log.debug = function(msg, attr, id) {
     jsTestLog(msg, {id, attr, severity: "D"});
 };
 
-jsTest.log.warning = function(msg, {id, attr}) {
+jsTest.log.warning = function(msg, attr, id) {
     jsTestLog(msg, {id, attr, severity: "W"});
 };
 
-jsTest.log.error = function(msg, {id, attr}) {
+jsTest.log.error = function(msg, attr, id) {
     jsTestLog(msg, {id, attr, severity: "E"});
 };
 

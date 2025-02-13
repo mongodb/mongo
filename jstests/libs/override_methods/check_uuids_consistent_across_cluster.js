@@ -19,7 +19,7 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
         //     config primary should skip the checks.
         // 2) The sharding catalog is read from the config server via mongos, so tests that cause
         //    the config primary to be unreachable from mongos should skip the checks.
-        print(
+        jsTest.log.info(
             "Skipping checking consistency of the sharding catalog with shards' storage catalogs and catalog caches");
         return;
     }
@@ -30,10 +30,10 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
         // But since sharding catalog changes are not transactional, it's possible the shard's
         // catalog cache will be stale. A test or suite that induces stepdowns or otherwise makes it
         // likely that this "best-effort" will fail should skip checks for only the catalog caches.
-        print(
+        jsTest.log.info(
             "Checking consistency of the sharding catalog with shards' storage catalogs, but not with shards' catalog caches");
     } else {
-        print(
+        jsTest.log.info(
             "Checking consistency of the sharding catalog with shards' storage catalogs and catalog caches");
     }
 
@@ -99,8 +99,9 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
                 ])
                 .toArray();
 
-        print("Aggregated authoritative metadata on config server for all sharded collections: " +
-              tojson(authoritativeCollMetadataArr));
+        jsTest.log.info(
+            "Aggregated authoritative metadata on config server for all sharded collections",
+            {authoritativeCollMetadataArr});
 
         // The ShardingTest object maintains a connection to each shard in its _connections array,
         // where each connection is tagged with the shard's connection string in a 'host' field.
@@ -124,14 +125,16 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
                 // A connection the shard may not be cached in ShardingTest if the shard was added
                 // manually to the cluster by the test.
                 if (!(shardConnStringToConn.hasOwnProperty(shardConnString))) {
-                    print("Creating connection to manually added shard: " + shardConnString);
+                    jsTest.log.info("Creating connection to manually added shard: " +
+                                    shardConnString);
                     shardConnStringToConn[shardConnString] = new Mongo(shardConnString);
                 }
                 let shardConn = shardConnStringToConn[shardConnString];
 
-                print("Checking that the UUID for " + ns + " returned by listCollections on " +
-                      shardConn +
-                      " is consistent with the UUID in config.collections on the config server");
+                jsTest.log.info(
+                    "Checking that the UUID for " + ns + " returned by listCollections on " +
+                    shardConn +
+                    " is consistent with the UUID in config.collections on the config server");
 
                 const actualCollMetadata =
                     shardConn.getDB(dbName).getCollectionInfos({name: collName})[0];
@@ -143,7 +146,7 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
                               tojson(actualCollMetadata));
 
                 if (!jsTest.options().skipCheckingCatalogCacheConsistencyWithShardingCatalog) {
-                    print(
+                    jsTest.log.info(
                         "Checking that the UUID for " + ns + " in config.cache.collections on " +
                         shardConn +
                         " is consistent with the UUID in config.collections on the config server");
@@ -176,7 +179,7 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
         if (e.message.indexOf("Unauthorized") < 0) {
             throw e;
         }
-        print("ignoring exception " + tojson(e) +
-              " while checking UUID consistency across cluster");
+        jsTest.log.info("ignoring exception while checking UUID consistency across cluster",
+                        {error: e});
     }
 };

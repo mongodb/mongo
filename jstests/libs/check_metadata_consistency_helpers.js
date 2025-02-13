@@ -46,7 +46,7 @@ export var MetadataConsistencyChecker = (function() {
             if (!jsTest.options().skipCheckingIndexesConsistentAcrossCluster) {
                 checkOptions['checkIndexes'] = true;
             } else {
-                print("Skipping index consistency check across the cluster");
+                jsTest.log.info("Skipping index consistency check across the cluster");
             }
 
             const inconsistencies = adminDB.checkMetadataConsistency(checkOptions).toArray();

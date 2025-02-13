@@ -19,8 +19,7 @@ assert.eq(shardedClusterDocs.length,
           2,
           "Could not find information about the two sharded clusters set up by the fixture " +
               tojsononeline(shardedClusterDocs));
-print("Comparing responses from the following sharded clusters: " +
-      tojsononeline(shardedClusterDocs));
+jsTest.log.info("Comparing responses from the following sharded clusters", {shardedClusterDocs});
 const globalConn0 = new Mongo(shardedClusterDocs[0].connectionString);
 const globalConn1 = new Mongo(shardedClusterDocs[1].connectionString);
 assert(isShardedClusterReplicaSetEndpoint(globalConn0));

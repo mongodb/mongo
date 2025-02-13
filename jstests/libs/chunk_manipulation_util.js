@@ -58,9 +58,9 @@ export function moveChunkParallel(staticMongod,
         cmd._waitForDelete = true;
         cmd.forceJumbo = forceJumbo;
 
-        printjson(cmd);
+        jsTest.log.info({cmd});
         var result = admin.runCommand(cmd);
-        printjson(result);
+        jsTest.log.info({result});
         if (expectSuccess) {
             assert(result.ok);
         } else {

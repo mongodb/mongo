@@ -1215,7 +1215,8 @@ tests.push(function assertJsTestLogJsonFormat() {
         jsTestLog("test message legacy", extraArgs);
         assert.eq(1, print.console.length);
         const expectedLegacyResult =
-            ["----", "test message legacy", "----"].map(s => `[jsTest] ${s}`);
+            ["----", "test message legacy " + tojson(extraArgs.attr), "----"].map(
+                s => `[jsTest] ${s}`);
         assert.eq(`\n\n${expectedLegacyResult.join("\n")}\n\n`,
                   print.console,
                   "expected a different log format when legacy mode is on");
@@ -1228,7 +1229,7 @@ tests.push(function assertLogSeverities() {
     jsTestLogUtils.setup(() => {
         for (const [severity, logFnName] of Object.entries(severities)) {
             const printedJson = jsTestLogUtils.getCapturedJSONOutput(
-                () => jsTest.log[logFnName]("test message", extraArgs));
+                () => jsTest.log[logFnName]("test message", extraArgs.attr, extraArgs.id));
             const expectedJson = {
                 "s": severity,
                 "c": "js_test",
@@ -1243,8 +1244,8 @@ tests.push(function assertLogSeverities() {
         const testMsg = "info is default.";
         const printedLogInfo = jsTestLogUtils.getCapturedJSONOutput(
             () => jsTest.log(testMsg, {...extraArgs, nonUsefulProp: "some value"}));
-        const printedLogDefault =
-            jsTestLogUtils.getCapturedJSONOutput(() => jsTest.log.info(testMsg, extraArgs));
+        const printedLogDefault = jsTestLogUtils.getCapturedJSONOutput(
+            () => jsTest.log.info(testMsg, extraArgs.attr, extraArgs.id));
         assert.docEq(printedLogInfo, printedLogDefault, "Expected default log severity to be info");
     });
 });

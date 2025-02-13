@@ -82,8 +82,7 @@ function checkCanRun(dbName, commandName, commandObj) {
  */
 export function runCommandCompareResponsesBase(
     conn0, conn1, dbName, commandName, commandObj, func, makeFuncArgs) {
-    print("Comparing responses for command with dbName: " + dbName +
-          ", cmdObj: " + JSON.stringify(commandObj));
+    jsTest.log.info("Comparing responses for command with dbName: " + dbName, {commandObj});
     checkCanRun(dbName, commandName, commandObj);
 
     let resObj0, err0;

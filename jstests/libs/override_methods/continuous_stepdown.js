@@ -89,7 +89,7 @@ const StepdownThread = function() {
      *          the error.
      */
     function _continuousPrimaryStepdownFn(stopCounter, seedNode, options) {
-        print("*** Continuous stepdown thread running with seed node " + seedNode);
+        jsTest.log.info("*** Continuous stepdown thread running with seed node " + seedNode);
 
         try {
             // The config primary may unexpectedly step down during startup if under heavy
@@ -99,7 +99,7 @@ const StepdownThread = function() {
             let primary = replSet.getPrimary();
 
             while (stopCounter.getCount() > 0) {
-                print("*** Stepping down " + primary);
+                jsTest.log.info("*** Stepping down " + primary);
 
                 // The command may fail if the node is no longer primary or is in the process of
                 // stepping down.
@@ -119,10 +119,10 @@ const StepdownThread = function() {
                 }
             }
 
-            print("*** Continuous stepdown thread completed successfully");
+            jsTest.log.info("*** Continuous stepdown thread completed successfully");
             return {ok: 1};
         } catch (e) {
-            print("*** Continuous stepdown thread caught exception: " + tojson(e));
+            jsTest.log.info("*** Continuous stepdown thread caught exception", {error: e});
             return {ok: 0, error: e.toString(), stack: e.stack};
         }
     }

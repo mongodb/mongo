@@ -321,7 +321,7 @@ function validateListCatalogToListCollectionsConsistency(
         if (shouldAssert !== false) {
             doassert(message);
         }
-        print(message);
+        jsTest.log.info({message});
     }
     return equals;
 }
@@ -358,7 +358,7 @@ function validateListCatalogToListIndexesConsistency(listCatalog, listIndexes, s
         if (shouldAssert !== false) {
             doassert(message);
         }
-        print(message);
+        jsTest.log.info({message});
     }
     return equals;
 }
@@ -476,8 +476,8 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
     if (isMongos && ["admin", "config"].includes(db.getName()))
         return;
 
-    print("Running catalog operations consistency check for DB " + db.getName() +
-          (tenantId ? " of tenant " + tenantId : ""));
+    jsTest.log.info("Running catalog operations consistency check for DB " + db.getName() +
+                    (tenantId ? " of tenant " + tenantId : ""));
 
     let consistencyCheckAttempts = 0;
     assert.soon(() => {
@@ -536,7 +536,8 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
         if (collInfo.length === 0 && catalogInfo.length === 1 &&
             catalogInfo[0].name === "system.profile" &&
             FeatureFlagUtil.isEnabled(db, "ReplicaSetEndpoint")) {
-            print("Skipped consistency check: Stray system.profile on RSEndpoint (SERVER-97721)");
+            jsTest.log.info(
+                "Skipped consistency check: Stray system.profile on RSEndpoint (SERVER-97721)");
             return true;
         }
 
@@ -550,7 +551,8 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
                                     namespaceSet.has('system.buckets.' + c.name))
                         .map(c => c.name));
         if (nsWithUnexpectedBucketsSet.size > 0) {
-            print("Ignored namespaces with unexpected buckets: " + [...nsWithUnexpectedBucketsSet]);
+            jsTest.log.info("Ignored namespaces with unexpected buckets",
+                            {nsWithUnexpectedBucketsSet});
             collInfo = collInfo.filter(c => !nsWithUnexpectedBucketsSet.has(c.name));
             catalogInfo = catalogInfo.filter(c => !nsWithUnexpectedBucketsSet.has(c.name));
             if (collIndexes !== null) {
@@ -566,12 +568,12 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
         const shouldAssert = consistencyCheckAttempts++ > 20;
         if (!validateListCatalogToListCollectionsConsistency(
                 catalogInfo, collInfo, isDbReadOnly, shouldAssert)) {
-            print("$listCatalog/listCollections consistency check failed, retrying...");
+            jsTest.log.info("$listCatalog/listCollections consistency check failed, retrying...");
             return false;
         }
         if (collIndexes !== null &&
             !validateListCatalogToListIndexesConsistency(catalogInfo, collIndexes, shouldAssert)) {
-            print("$listCatalog/listIndexes consistency check failed, retrying...");
+            jsTest.log.info("$listCatalog/listIndexes consistency check failed, retrying...");
             return false;
         }
 

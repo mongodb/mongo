@@ -31,7 +31,7 @@ export class ShardingTest {
         var countDBsFound = 0;
         this.config.databases.find().forEach(function(db) {
             countDBsFound++;
-            printjson(db);
+            jsTest.log.info({db});
         });
         throw Error("couldn't find dbname: " + dbname +
                     " in config.databases. Total DBs: " + countDBsFound);
@@ -40,7 +40,7 @@ export class ShardingTest {
     getNonPrimaries(dbname) {
         var x = this.config.databases.findOne({_id: dbname});
         if (!x) {
-            this.config.databases.find().forEach(printjson);
+            this.config.databases.find().forEach(jsTest.log.info);
             throw Error("couldn't find dbname: " + dbname +
                         " total: " + this.config.databases.count());
         }
@@ -1771,7 +1771,7 @@ export class ShardingTest {
                 this["c" + i] = conn;
             }
 
-            printjson('Config servers: ' + this._configDB);
+            jsTest.log.info('Config servers', {configDB: this._configDB});
 
             this.printNodes();
 

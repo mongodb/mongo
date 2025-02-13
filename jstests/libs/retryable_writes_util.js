@@ -116,7 +116,7 @@ export var RetryableWritesUtil = (function() {
                 return true;
             } catch (e) {
                 if (RetryableWritesUtil.isRetryableCode(e.code)) {
-                    print(prefix + ", err: " + tojson(e));
+                    jsTest.log.info(prefix, {error: e});
                     return false;
                 }
                 throw e;

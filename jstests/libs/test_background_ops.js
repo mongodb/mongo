@@ -23,22 +23,22 @@ export var waitForLock = function(mongo, name) {
         let res = lockColl.update({_id: name, state: 0}, {$set: {ts: ts, state: 1}});
 
         if (new Date().getTime() - startTime > 20 * 1000) {
-            print("Waiting for...");
-            printjson(res);
-            printjson(lockColl.findOne());
-            printjson(ts);
+            jsTest.log.info("Waiting for...");
+            jsTest.log.info({res});
+            jsTest.log.info({lockColl: lockColl.findOne()});
+            jsTest.log.info({ts});
         }
 
         return res.nModified == 1;
     }, "could not acquire lock", 30 * 1000, 100);
 
-    print("Acquired lock " + tojson({_id: name, ts: ts}) +
-          " curr : " + tojson(lockColl.findOne({_id: name})));
+    jsTest.log.info("Acquired lock",
+                    {lock: {_id: name, ts: ts}, curr: lockColl.findOne({_id: name})});
 
     // Set the state back to 0
     var unlock = function() {
-        print("Releasing lock " + tojson({_id: name, ts: ts}) +
-              " curr : " + tojson(lockColl.findOne({_id: name})));
+        jsTest.log.info("Releasing lock",
+                        {lock: {_id: name, ts: ts}, curr: lockColl.findOne({_id: name})});
         lockColl.update({_id: name, ts: ts}, {$set: {state: 0}});
     };
 
@@ -267,9 +267,10 @@ export function moveOps(collName, options) {
         var toShard = shards[Random.randInt(shards.length)]._id;
 
         try {
-            printjson(admin.runCommand({moveChunk: collName, find: findKey, to: toShard}));
+            jsTest.log.info(
+                {res: admin.runCommand({moveChunk: collName, find: findKey, to: toShard})});
         } catch (e) {
-            printjson(e);
+            jsTest.log.info({error: e});
         }
 
         sleep(1000);
@@ -290,9 +291,9 @@ export function splitOps(collName, options) {
         var middleKey = Random.randShardKeyValue(shardKey);
 
         try {
-            printjson(admin.runCommand({split: collName, middle: middleKey}));
+            jsTest.log.info({res: admin.runCommand({split: collName, middle: middleKey})});
         } catch (e) {
-            printjson(e);
+            jsTest.log.info({error: e});
         }
 
         sleep(1000);

@@ -265,9 +265,9 @@ export function confirmAllExpectedFieldsPresent(expectedKey, resultingKey) {
             continue;
         }
         if (!expectedKey.hasOwnProperty(field)) {
-            print("Field present in actual object but missing from expected: " + field);
-            print("Expected " + tojson(expectedKey));
-            print("Actual " + tojson(resultingKey));
+            jsTest.log.info("Field present in actual object but missing from expected: " + field);
+            jsTest.log.info("Expected", {expectedKey});
+            jsTest.log.info("Actual", {resultingKey});
         }
         assert(expectedKey.hasOwnProperty(field), field);
 
@@ -825,7 +825,7 @@ export function exhaustCursorAndGetQueryStats(conn, coll, cmd, key, expectedDocs
         execCountPost, execCountPre + 1, "Didn't find query stats for namespace " + namespace);
 
     const queryStats = getSingleQueryStatsEntryForNs(conn, namespace);
-    print("Query Stats: " + tojson(queryStats));
+    jsTest.log.info("Query Stats", {queryStats});
 
     assertExpectedResults(queryStats,
                           key,

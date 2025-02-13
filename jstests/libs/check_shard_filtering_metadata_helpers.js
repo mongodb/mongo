@@ -6,7 +6,7 @@ export var CheckShardFilteringMetadataHelpers = (function() {
             // they believe they are not primary.
 
             const dbName = configDatabasesEntry._id;
-            print(`CheckShardFilteringMetadata: checking database '${dbName}' on node '${
+            jsTest.log.info(`CheckShardFilteringMetadata: checking database '${dbName}' on node '${
                 nodeConn.host}' of shard '${shardId}'`);
 
             const nodeMetadata =
@@ -47,7 +47,8 @@ export var CheckShardFilteringMetadataHelpers = (function() {
                     `Unexpected dbVersion lastMod for db '${dbName}' on node '${nodeConn.host}'`);
             }
 
-            print(`CheckShardFilteringMetadata: Database '${dbName}' on '${nodeConn.host}' OK`);
+            jsTest.log.info(
+                `CheckShardFilteringMetadata: Database '${dbName}' on '${nodeConn.host}' OK`);
         }
 
         function getPrimaryShardForDB(dbName) {
@@ -67,7 +68,7 @@ export var CheckShardFilteringMetadataHelpers = (function() {
 
         function checkShardedCollection(coll, nodeShardingState) {
             const ns = coll._id;
-            print(`CheckShardFilteringMetadata: checking collection '${ns} ' on node '${
+            jsTest.log.info(`CheckShardFilteringMetadata: checking collection '${ns} ' on node '${
                 nodeConn.host}' of shard '${shardId}'`);
 
             const configDB = mongosConn.getDB('config');
@@ -117,7 +118,7 @@ export var CheckShardFilteringMetadataHelpers = (function() {
                       expectedShardVersion.t,
                       `Unexpected shardVersion for ns '${ns}' on node '${nodeConn.host}'`);
 
-            print(`CheckShardFilteringMetadata: ns '${ns}' on '${nodeConn.host}' OK`);
+            jsTest.log.info(`CheckShardFilteringMetadata: ns '${ns}' on '${nodeConn.host}' OK`);
         }
 
         const configDB = mongosConn.getDB('config');
@@ -135,7 +136,7 @@ export var CheckShardFilteringMetadataHelpers = (function() {
             });
         }
 
-        print("CheckShardFilteringMetadata: finished");
+        jsTest.log.info("CheckShardFilteringMetadata: finished");
     }
 
     return {

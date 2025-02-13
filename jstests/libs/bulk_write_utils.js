@@ -524,7 +524,7 @@ export class BulkWriteMetricChecker {
     }
 
     checkMetrics(testcaseName, bulkWriteOps, normalCommands, expectedMetrics) {
-        print(`Testcase: ${testcaseName} (on a ${
+        jsTest.log.info(`Testcase: ${testcaseName} (on a ${
             this.isMongos ? "ShardingTest"
                           : "ReplSetTest"} with bulkWrite = ${this.bulkWrite}, errorsOnly = ${
             this.errorsOnly} and timeseries = ${this.timeseries}).`);
@@ -559,7 +559,7 @@ export class BulkWriteMetricChecker {
 
     checkMetricsWithRetries(
         testcaseName, bulkWriteOps, normalCommand, expectedMetrics, lsid, txnNumber) {
-        print(`Testcase: ${testcaseName} (on a ${
+        jsTest.log.info(`Testcase: ${testcaseName} (on a ${
             this.isMongos ? "ShardingTest"
                           : "ReplSetTest"} with bulkWrite = ${this.bulkWrite}, errorsOnly = ${
             this.errorsOnly} and timeseries = ${this.timeseries}).`);

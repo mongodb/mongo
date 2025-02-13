@@ -57,15 +57,15 @@ function runWithRetries(mongo, cmdObj, clientFunction, clientFunctionArguments) 
             return res;
         } else if (hasIndexBuildAbortedError(res)) {
             if (shouldRetryIndexCreateCmd(cmdObj)) {
-                print("-=-=-=- Retrying " + tojsononeline(cmdObj) +
-                      " after IndexBuildAborted error response: " + tojsononeline(res));
+                jsTest.log.info("-=-=-=- Retrying after IndexBuildAborted error response",
+                                {cmdObj, res});
                 continue;
             } else {
                 return res;
             }
         } else if (shouldRetryOnInterruptedError(res)) {
-            print("-=-=-=- Retrying " + tojsononeline(cmdObj) +
-                  " after receiving Interrupted Error code : " + tojsononeline(res));
+            jsTest.log.info("-=-=-=- Retrying after receiving Interrupted Error code",
+                            {cmdObj, res});
             continue;
         }
 

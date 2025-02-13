@@ -30,8 +30,9 @@ export var ClusterIndexConsistencyChecker = (function() {
                         // shard is no longer in the cluster. This error should be transient, so it
                         // can be retried on.
                         if (e.code === ErrorCodes.ShardNotFound) {
-                            print("Retrying $indexStats aggregation on ShardNotFound error: " +
-                                  tojson(e));
+                            jsTest.log.info(
+                                "Retrying $indexStats aggregation on ShardNotFound error",
+                                {error: e});
                             continue;
                         }
                         throw e;
@@ -47,13 +48,13 @@ export var ClusterIndexConsistencyChecker = (function() {
         for (const collDoc of collDocs) {
             const ns = collDoc._id;
             const getIndexDocsForNs = makeGetIndexDocsFunc(ns);
-            print(`Checking that the indexes for ${ns} are consistent across shards...`);
+            jsTest.log.info(`Checking that the indexes for ${ns} are consistent across shards...`);
 
             const indexDocs = requiresAuth ? authutil.asCluster(mongos, keyFile, getIndexDocsForNs)
                                            : getIndexDocsForNs();
 
             if (indexDocs.length == 0) {
-                print(`Found no indexes for ${ns}, skipping index consistency check`);
+                jsTest.log.info(`Found no indexes for ${ns}, skipping index consistency check`);
                 continue;
             }
 

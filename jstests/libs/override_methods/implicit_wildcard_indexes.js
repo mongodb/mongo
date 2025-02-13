@@ -131,9 +131,9 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, originalRunCommand, m
                     conn, makeRunCommandArgs({createIndexes: collName, indexes: [index]}));
 
                 if (wildRes.ok) {
-                    print("Created implicit wildcard index: ", tojsononeline(index));
+                    jsTest.log.info("Created implicit wildcard index", {index});
                 } else if (!wildRes.ok && !new Set(acceptableErrorCodes).has(wildRes.code)) {
-                    print("Unexpected error code: ", wildRes.code, wildRes.errmsg);
+                    jsTest.log.info("Unexpected error code: ", wildRes.code, wildRes.errmsg);
                 }
 
                 assert.commandWorkedOrFailedWithCode(wildRes, acceptableErrorCodes);
@@ -153,7 +153,7 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, originalRunCommand, m
             // We are trying to make a non-wildcard component of the index multikey.
             // Drop all the implicitly created indexes and try again, since we can't be
             // sure which index was problematic.
-            print("Trying to make a non-wildcard component of the index multikey!");
+            jsTest.log.info("Trying to make a non-wildcard component of the index multikey!");
 
             // We must successfully drop our hidden indexes, otherwise we cannot proceed with the
             // test. We're not sure which index was problematic (or if multiple indexes might be

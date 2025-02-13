@@ -39,7 +39,7 @@ export var _kill_sessions_api_module = (function() {
     Fixture.prototype.kill = function(db, command) {
         var result = this._clientToKillVia.getDB(db).runCommand(command);
         if (!result.ok) {
-            print(tojson(result));
+            jsTest.log.info({result});
         }
         assert(result.ok);
     };
@@ -47,7 +47,7 @@ export var _kill_sessions_api_module = (function() {
     Fixture.prototype.assertKillFailed = function(db, command) {
         var result = this._clientToKillVia.getDB(db).runCommand(command);
         if (result.ok) {
-            print(tojson(result), tojson(command));
+            jsTest.log.info({result, command});
         }
         assert(!result.ok);
     };
@@ -294,7 +294,7 @@ export var _kill_sessions_api_module = (function() {
             cursors[db.getMongo().host] = result.cursor.id;
         }
         if (!result.ok) {
-            print(tojson(result));
+            jsTest.log.info({result});
         }
         assert(result.ok);
 

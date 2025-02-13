@@ -39,7 +39,7 @@ function configureQueryAnalyzer({db, collName}) {
         result = db.adminCommand(
             {configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: kSamplesPerSecond});
     } catch (e) {
-        print(`Failed to configure query analyzer: ${tojsononeline({ns, e})}`);
+        jsTest.log.info("Failed to configure query analyzer", {ns, error: e});
         if (!isNetworkError(e)) {
             throw e;
         }
@@ -49,7 +49,7 @@ function configureQueryAnalyzer({db, collName}) {
             result.code === ErrorCodes.NamespaceNotFound ||
             result.code === ErrorCodes.CommandNotSupportedOnView ||
             result.code === ErrorCodes.IllegalOperation) {
-            print(`Failed to configure query analyzer: ${tojsononeline({ns, result})}`);
+            jsTest.log.info("Failed to configure query analyzer", {ns, result});
             return;
         }
         assert.commandWorked(result);

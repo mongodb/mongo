@@ -11,9 +11,10 @@ export var CheckOrphansAreDeletedHelpers = (function() {
                         docs = coll.find().toArray();
                         return docs.length === 0;
                     } catch (e) {
-                        print('An exception occurred while checking documents in ' +
-                              coll.getFullName() +
-                              '. Will retry again unless timed out: ' + tojson(e));
+                        jsTest.log.info('An exception occurred while checking documents in ' +
+                                            coll.getFullName() +
+                                            '. Will retry again unless timed out',
+                                        {error: e});
                     }
                 },
                 () => {
@@ -37,8 +38,8 @@ export var CheckOrphansAreDeletedHelpers = (function() {
             const dbName = tempNsArray.shift();
             const collName = tempNsArray.join('.');
 
-            print('Checking that orphan documents on shard ' + shardId +
-                  ' have been deleted from namespace ' + ns);
+            jsTest.log.info('Checking that orphan documents on shard ' + shardId +
+                            ' have been deleted from namespace ' + ns);
 
             let rangeDeletions = [];
             assert.soon(
@@ -56,9 +57,10 @@ export var CheckOrphansAreDeletedHelpers = (function() {
                                     {$match: {type: 'idleCursor'}}
                                 ])
                                 .toArray();
-                        print("Idle cursors on shard " + shardId + ": " + tojson(idleCursors));
+                        jsTest.log.info("Idle cursors on shard " + shardId, {idleCursors});
                     } catch (e) {
-                        print("Failed to get idle cursors on shard " + shardId + ": " + tojson(e));
+                        jsTest.log.info("Failed to get idle cursors on shard " + shardId,
+                                        {error: e});
                     }
 
                     return 'timed out waiting for rangeDeletions on ' + ns + ' to be empty @ ' +

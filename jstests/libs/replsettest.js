@@ -121,7 +121,7 @@ export class ReplSetTest {
         }
 
         print("ReplSetTest waitForIndicator " + ind + " on " + node);
-        printjson(states);
+        jsTest.log.info({states});
         print("ReplSetTest waitForIndicator from node " + node);
 
         var lastTime = null;
@@ -164,7 +164,7 @@ export class ReplSetTest {
                           ") :");
                 }
 
-                printjson(status);
+                jsTest.log.info({status});
                 lastTime = new Date().getTime();
                 printStatus = true;
             }
@@ -217,7 +217,7 @@ export class ReplSetTest {
         }
 
         print("ReplSetTest waitForIndicator final status:");
-        printjson(status);
+        jsTest.log.info({status});
     }
 
     /**
@@ -885,7 +885,7 @@ export class ReplSetTest {
         print("ReplSetTest Next port: " + nextPort);
 
         this.ports.push(nextPort);
-        printjson(this.ports);
+        jsTest.log.info({ports: this.ports});
 
         if (this._useBridge) {
             this._unbridgedPorts.push(this._allocatePortForBridge());
@@ -896,7 +896,7 @@ export class ReplSetTest {
             print("ReplSetTest Next router port: " + nextPort);
 
             this.routerPorts.push(nextPort);
-            printjson(this.routerPorts);
+            jsTest.log.info({routerPorts: this.routerPorts});
         }
 
         if (jsTestOptions().shellGRPC) {
@@ -904,11 +904,11 @@ export class ReplSetTest {
             print("ReplSetTest Next gRPC port: " + nextPort);
 
             this.grpcPorts.push(nextPort);
-            printjson(this.grpcPorts);
+            jsTest.log.info({grpcPorts: this.grpcPorts});
         }
 
         var nextId = this.nodes.length;
-        printjson(this.nodes);
+        jsTest.log.info({nodes: this.nodes});
 
         print("ReplSetTest nextId: " + nextId);
         return this.start(nextId, config);
@@ -2636,7 +2636,7 @@ export class ReplSetTest {
         }
 
         if (tojson(options) != tojson({}))
-            printjson(options);
+            jsTest.log.info({options});
 
         print("ReplSetTest " + (restart ? "(Re)" : "") + "Starting....");
 

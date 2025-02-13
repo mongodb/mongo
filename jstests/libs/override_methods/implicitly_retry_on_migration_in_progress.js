@@ -78,14 +78,15 @@ function runCommandWithMigrationRetries(conn, dbName, commandName, commandObj, f
             // Retry if the errors is in the `kErrorsToRetry` list.
             if (kErrorsToRetry.has(res.code)) {
                 jsTestLog("Retrying the " + commandName +
-                          " command due to concurrent migrations/range deletions (attempt " +
-                          attempt + "): " + tojson(res));
+                              " command due to concurrent migrations/range deletions (attempt " +
+                              attempt + ")",
+                          {error: res});
                 return kRetry;
             }
 
             if (attempt > 1) {
-                jsTestLog("Done retrying " + commandName +
-                          " got a non-retryable error: " + tojson(res));
+                jsTestLog("Done retrying " + commandName + " got a non-retryable error",
+                          {error: res});
             }
             return kNoRetry;
         },

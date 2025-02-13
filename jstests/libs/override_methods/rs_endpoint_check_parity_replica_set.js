@@ -19,7 +19,7 @@ assert.eq(replDocs.length,
           2,
           "Could not find information about the two replica sets set up by the fixture" +
               tojsononeline(replDocs));
-print("Comparing responses from the following replica sets: " + tojsononeline(replDocs));
+jsTest.log.info("Comparing responses from the following replica sets", {replDocs});
 const globalConn0 = new Mongo(replDocs[0].connectionString);
 const globalConn1 = new Mongo(replDocs[1].connectionString);
 assert(isShardedClusterReplicaSetEndpoint(globalConn0));

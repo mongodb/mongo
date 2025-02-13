@@ -284,13 +284,14 @@ const maxOpsInTransaction = 10;
 const kLogPrefix = "=-=-=-=";
 
 function logErrorFull(msg, cmdName, cmdObj, res) {
-    print(`${kLogPrefix} ${msg} :: ${cmdName}, CommandID: ${currentCommandID},` +
-          ` error: ${tojsononeline(res)}, command: ${tojsononeline(cmdObj)}`);
+    jsTest.log.info(`${kLogPrefix} ${msg} :: ${cmdName}, CommandID: ${currentCommandID}`,
+                    {error: res, command: cmdObj});
     assert.eq(nestingLevel, currentCommandID.length);
 }
 
 function logMsgFull(msgHeader, msgFooter) {
-    print(`${kLogPrefix} ${msgHeader} :: CommandID: ${currentCommandID}, msg: ${msgFooter}`);
+    jsTest.log.info(
+        `${kLogPrefix} ${msgHeader} :: CommandID: ${currentCommandID}, msg: ${msgFooter}`);
     assert.eq(nestingLevel, currentCommandID.length);
 }
 
@@ -1214,8 +1215,9 @@ if (configuredForNetworkRetry()) {
                     retVal = connectOriginal.apply(this, arguments);
                     return true;
                 } catch (e) {
-                    print(kLogPrefix + " Retrying connection to: " + url +
-                          ", attempts: " + connectionAttempts + ", failed with: " + tojson(e));
+                    jsTest.log.info(kLogPrefix + " Retrying connection to: " + url +
+                                        " failed, attempts: " + connectionAttempts,
+                                    {error: e});
                 }
             },
             "Failed connecting to url: " + tojson(url),
@@ -1244,7 +1246,7 @@ if (configuredForTxnOverride()) {
     };
 }
 
-print(`${kLogPrefix} network_error_and_txn_override.js :: configuredForNetworkRetry:${
+jsTest.log.info(`${kLogPrefix} network_error_and_txn_override.js :: configuredForNetworkRetry:${
     Boolean(configuredForNetworkRetry())}, configuredForTxnOverride:${
     Boolean(configuredForTxnOverride())}`);
 

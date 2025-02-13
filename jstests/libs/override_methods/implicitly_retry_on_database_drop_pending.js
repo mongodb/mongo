@@ -107,7 +107,7 @@ function runCommandWithRetries(conn, dbName, commandObj, func, makeFuncArgs) {
             }
 
             msg += " failed due to the " + dbName + " database being marked as drop-pending.";
-            print(msg);
+            jsTest.log.info(msg);
 
             if (TestData.skipDropDatabaseOnDatabaseDropPending && commandName === "dropDatabase") {
                 // We avoid retrying the "dropDatabase" command when another "dropDatabase"

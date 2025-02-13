@@ -17,7 +17,7 @@ export function runWithFailpoint(db, failpointName, failpointOpts, func) {
 export function getDiagnosticLogs({description, logFile}) {
     // The log file will not exist if the db was not started with 'useLogFiles' enabled.
     const log = cat(logFile);
-    print("Log file contents", log);
+    jsTest.log.info("Log file contents", {log});
 
     const logLines = log.split("\n");
     assert.gt(logLines.length, 0, `${description}: no log lines`);

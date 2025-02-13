@@ -215,7 +215,7 @@ class ConvertTest {
 
             assert.throws(function() {
                 const res = coll.aggregate(pipeline);
-                print("should have failed result:", tojson(res.toArray()));
+                jsTest.log.info("should have failed", {res: res.toArray()});
             }, [], "Conversion should have failed: _id = " + doc._id);
         });
 

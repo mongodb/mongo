@@ -3,7 +3,7 @@ export var GeoNearRandomTest = function(name, dbToUse) {
     this.db = (dbToUse || globalThis.db);
     this.t = this.db[name];
     this.reset();
-    print("Starting getNear test: " + name);
+    jsTest.log.info("Starting getNear test: " + name);
 };
 
 GeoNearRandomTest.prototype.reset = function reset() {
@@ -67,7 +67,7 @@ GeoNearRandomTest.prototype.testPt = function(pt, opts) {
     opts['sphere'] = opts['sphere'] || 0;
     opts['nToTest'] = opts['nToTest'] || this.nPts;  // be careful, test is O( N^2 )
 
-    print("testing point: " + tojson(pt) + " opts: " + tojson(opts));
+    jsTest.log.info("testing point", {pt, opts});
 
     let query = {loc: {}};
     query.loc[opts.sphere ? '$nearSphere' : '$near'] = pt;

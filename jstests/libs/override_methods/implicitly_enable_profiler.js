@@ -23,7 +23,7 @@ if (topology.type === Topology.kReplicaSet) {
     throw new Error("Can only enabling profiler on a replica set. Unrecognized topology format: " +
                     tojson(topology));
 }
-print("Implicitly enabling profiler on " + tojsononeline(hosts));
+jsTest.log.info("Implicitly enabling profiler", {hosts});
 
 function runCommandAfterEnablingProfiler(
     conn, dbName, commandName, commandObj, func, makeFuncArgs) {

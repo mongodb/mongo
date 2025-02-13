@@ -10,11 +10,11 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
  */
 ShardingTest.prototype.checkOrphansAreDeleted = function() {
     if (jsTest.options().skipCheckOrphans) {
-        print("Skipping orphan check across the cluster");
+        jsTest.log.info("Skipping orphan check across the cluster");
         return;
     }
 
-    print('Running check orphans against cluster with mongos: ' + this.s.host);
+    jsTest.log.info('Running check orphans against cluster with mongos: ' + this.s.host);
 
     let getConn = function(connStr) {
         try {

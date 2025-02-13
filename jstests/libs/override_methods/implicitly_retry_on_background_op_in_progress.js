@@ -70,7 +70,7 @@ function runCommandWithRetries(conn, dbName, commandName, commandObj, func, make
             // This handles the retry case when run against a standalone, replica set, or mongos
             // where both shards returned the same response.
             if (hasBackgroundOpInProgress(res)) {
-                print(message);
+                jsTest.log.info(message);
                 return kRetry;
             }
 
@@ -116,13 +116,14 @@ function runCommandWithRetries(conn, dbName, commandName, commandObj, func, make
             // At this point, all shards have resulted in allowlisted errors resulting in
             // retrying allowlisted commands. Fake a successful response.
             if (shardsWithBackgroundOps.length === 0) {
-                print("done retrying " + commandName +
-                      " command because all shards have responded with acceptable errors");
+                jsTest.log.info(
+                    "done retrying " + commandName +
+                    " command because all shards have responded with acceptable errors");
                 res.ok = 1;
                 return kNoRetry;
             }
 
-            print(message + " on shards: " + tojson(shardsWithBackgroundOps));
+            jsTest.log.info(message + " on shards", {shardsWithBackgroundOps});
             return kRetry;
         },
         () => "Timed out while retrying command '" + tojson(commandObj) +

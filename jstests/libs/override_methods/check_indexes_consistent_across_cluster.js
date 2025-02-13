@@ -12,11 +12,11 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {
     if (jsTest.options().skipCheckingIndexesConsistentAcrossCluster) {
-        print("Skipping index consistency check across the cluster");
+        jsTest.log.info("Skipping index consistency check across the cluster");
         return;
     }
 
-    print("Checking consistency of indexes across the cluster");
+    jsTest.log.info("Checking consistency of indexes across the cluster");
 
     const mongos = new Mongo(this.s.host);
     mongos.fullOptions = this.s.fullOptions || {};

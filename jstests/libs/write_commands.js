@@ -47,7 +47,7 @@ function runCommandTest(self, coll, conn, preSetup) {
         self.confirmFunc(res);
     } catch (e) {
         // Make sure that we print out the response.
-        printjson(res);
+        jsTest.log.info({res});
         throw e;
     }
 }

@@ -39,22 +39,23 @@ function runWithKilledSessionRetries(mongo, cmdObj, clientFunction, clientFuncti
             const res = clientFunction.apply(mongo, clientFunctionArguments);
 
             if (KilledSessionUtil.hasKilledSessionError(res)) {
-                print("-=-=-=- Retrying " + tojsononeline(cmdObj) +
-                      " after killed session error response: " + tojsononeline(res));
+                jsTest.log.info("-=-=-=- Retrying after killed session error response",
+                                {cmdObj, res});
                 continue;
             }
 
             if (KilledSessionUtil.hasKilledSessionWCError(res)) {
-                print("-=-=-=- Retrying " + tojsononeline(cmdObj) +
-                      " after killed session write concern error response: " + tojsononeline(res));
+                jsTest.log.info(
+                    "-=-=-=- Retrying after killed session write concern error response",
+                    {cmdObj, res});
                 continue;
             }
 
             return res;
         } catch (e) {
             if (KilledSessionUtil.hasKilledSessionError(e)) {
-                print("-=-=-=- Retrying " + tojsononeline(cmdObj) +
-                      " after thrown killed session error: " + tojsononeline(e));
+                jsTest.log.info("-=-=-=- Retrying after thrown killed session error",
+                                {cmdObj, error: e});
                 continue;
             }
             throw e;
