@@ -57,6 +57,11 @@
 
 namespace mongo {
 
+/**
+ * Sets the appropriate state to enable/disable diagnostic logging based on `newVal`.
+ */
+void setDiagnosticLoggingInAssertUtil(bool newVal);
+
 class AssertionCount {
 public:
     AssertionCount();

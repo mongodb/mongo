@@ -51,8 +51,18 @@
 #define XSTR(x) XSTR_INNER_(x)
 
 namespace mongo {
+
+// Used by `logScopedDebugInfo` below to determine if we should log anything.
+Atomic<bool> shouldLogScopedDebugInfoInAssertUtil{true};
+
+void setDiagnosticLoggingInAssertUtil(bool newVal) {
+    shouldLogScopedDebugInfoInAssertUtil.store(newVal);
+}
 namespace {
 void logScopedDebugInfo() {
+    if (!shouldLogScopedDebugInfoInAssertUtil.load()) {
+        return;
+    }
     auto diagStack = scopedDebugInfoStack().getAll();
     if (diagStack.empty())
         return;
