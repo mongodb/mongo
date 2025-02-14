@@ -508,7 +508,6 @@ private:
     Status _killStatus;
     mutable stdx::mutex _mutex;
     stdx::condition_variable _sleepCondition;
-    std::string _error;
     OperationContext* _opCtx;         // Op context for DbEval
     stdx::thread::id _opCtxThreadId;  // Id of the thread that owns '_opCtx'
     std::size_t _inOp;

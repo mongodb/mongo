@@ -130,6 +130,15 @@ const int kStackChunkSize = 8192;
 constexpr size_t kMaxErrorStringSize = logv2::constants::kDefaultMaxAttributeOutputSizeKB * 1024;
 
 /**
+ * Error messages or error message prefixes.
+ */
+namespace ErrorMessage {
+const StringData kUncaughtException = "uncaught exception";
+const StringData kOutOfMemory = "Out of memory";
+const StringData kUnknownError = "Unknown Failure from JSInterpreter";
+}  // namespace ErrorMessage
+
+/**
  * Runtime's can race on first creation (on some function statics), so we just
  * serialize the initial Runtime creation.
  */
@@ -138,6 +147,23 @@ bool gFirstRuntimeCreated = false;
 
 bool closeToMaxMemory() {
     return mongo::sm::get_total_bytes() > (kInterruptGCThreshold * mongo::sm::get_max_bytes());
+}
+
+/**
+ * Logs the given status as plain text.
+ */
+void logStatus(const Status& status) {
+    str::stream ss;
+    ss << redact(status.reason());
+    if (auto extraInfo = status.extraInfo<JSExceptionInfo>()) {
+        ss << " :\n" << extraInfo->stack;
+    }
+
+    LOGV2_INFO_OPTIONS(
+        20163,
+        logv2::LogOptions(logv2::LogTag::kPlainShell, logv2::LogTruncation::Disabled),
+        "{jsError}",
+        "jsError"_attr = std::string(ss));
 }
 }  // namespace
 
@@ -612,8 +638,6 @@ auto MozJSImplScope::_runSafely(ImplScopeFunction&& functionToRun) -> decltype(f
             reasonWithStack << extraInfo->originalError.reason() << " :\n" << extraInfo->stack;
             _status = extraInfo->originalError.withReason(reasonWithStack);
         }
-
-        _error = _status.reason();
 
         // Clear the status state
         auto status = std::move(_status);
@@ -1178,20 +1202,8 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
     // expected to report and clear the errors before returning.
     JS_ClearPendingException(_context);
 
-    if (auto extraInfo = _status.extraInfo<JSExceptionInfo>()) {
-        str::stream reasonWithStack;
-        reasonWithStack << _status.reason() << " :\n" << extraInfo->stack;
-        _error = reasonWithStack;
-    } else {
-        _error = _status.reason();
-    }
-
     if (reportError)
-        LOGV2_INFO_OPTIONS(
-            20163,
-            logv2::LogOptions(logv2::LogTag::kPlainShell, logv2::LogTruncation::Disabled),
-            "{jsError}",
-            "jsError"_attr = redact(_error));
+        logStatus(_status);
 
     // Clear the status state
     auto status = std::move(_status);
@@ -1208,7 +1220,7 @@ Status MozJSImplScope::_checkForPendingException() {
     JS::RootedValue excn(_context);
 
     if (!JS_GetPendingException(_context, &excn)) {
-        return Status(ErrorCodes::UnknownError, "Unknown Failure from JSInterpreter");
+        return Status(ErrorCodes::UnknownError, ErrorMessage::kUnknownError);
     }
 
     // It's possible that we have an uncaught exception for OOM, which is reported on the exception
@@ -1217,43 +1229,41 @@ Status MozJSImplScope::_checkForPendingException() {
     // string of the exception being provided.
     const auto isThrowingOOM = JS_IsThrowingOutOfMemoryException(_context, excn);
     if (isThrowingOOM) {
-        return Status(ErrorCodes::JSInterpreterFailure, "Out of memory");
+        return Status(ErrorCodes::JSInterpreterFailure, ErrorMessage::kOutOfMemory);
     }
 
     // The pending JS exception needs to be cleared before we call ValueWriter below to print the
-    // exception. ValueWriter::toStringData() may call back into the Interpret, which asserts that
-    // we don't have an exception pending in DEBUG builds.
+    // exception. ValueWriter::toString() may call back into the Interpret, which asserts that we
+    // don't have an exception pending in DEBUG builds.
     JS_ClearPendingException(_context);
 
     str::stream ss;
-    JSStringWrapper jsstr;
     if (excn.isObject()) {
         // Exceptions originating from C++ should not get the "uncaught exception: " prefix. These
         // exceptions thrown from mongo are represented as MongoStatusInfo, so we exclude
         // MongoStatusInfo from having the prefix.
         if (!getProto<MongoStatusInfo>().instanceOf(excn)) {
-            ss << "uncaught exception: ";
+            ss << ErrorMessage::kUncaughtException << ": ";
         }
-        ss << str::UTF8SafeTruncation(ValueWriter(_context, excn).toStringData(&jsstr),
-                                      kMaxErrorStringSize);
+        ss << str::UTF8SafeTruncation(ValueWriter(_context, excn).toString(), kMaxErrorStringSize);
         auto status = jsExceptionToStatus(_context, excn, ErrorCodes::JSInterpreterFailure, ss);
 
-        auto stackStr = ObjectWrapper(_context, excn).getString(InternedString::stack);
+        ObjectWrapper errorObj(_context, excn);
+        auto stackStr = errorObj.getString(InternedString::stack);
         if (stackStr.empty()) {
             // The JavaScript Error objects resulting from C++ exceptions may not always have a
             // non-empty "stack" property. We instead use the line and column numbers of where in
             // the JavaScript code the C++ function was called from.
-            auto fnameStr = ObjectWrapper(_context, excn).getString(InternedString::fileName);
-            auto lineNum = ObjectWrapper(_context, excn).getNumberInt(InternedString::lineNumber);
-            auto colNum = ObjectWrapper(_context, excn).getNumberInt(InternedString::columnNumber);
+            auto fnameStr = errorObj.getString(InternedString::fileName);
+            auto lineNum = errorObj.getNumberInt(InternedString::lineNumber);
+            auto colNum = errorObj.getNumberInt(InternedString::columnNumber);
             stackStr = str::stream() << "@" << fnameStr << ":" << lineNum << ":" << colNum << "\n";
         }
         return Status(JSExceptionInfo(std::move(stackStr), status), ss);
     }
 
-    ss << "uncaught exception: "
-       << str::UTF8SafeTruncation(ValueWriter(_context, excn).toStringData(&jsstr),
-                                  kMaxErrorStringSize);
+    ss << ErrorMessage::kUncaughtException << ": "
+       << str::UTF8SafeTruncation(ValueWriter(_context, excn).toString(), kMaxErrorStringSize);
     return Status(ErrorCodes::UnknownError, ss);
 }
 
