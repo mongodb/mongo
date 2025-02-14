@@ -143,7 +143,8 @@ def main(
 ) -> None:
     """
     Run the given smoke test suite via a series of `resmoke.py run` commands.
-    All arguments not interpreted by this script are passed through to resmoke.
+    All arguments not interpreted by this script are passed through to resmoke, preceded by
+    the --runAllFeatureFlagTests option, which this script always passes.
     Typical usage to run a "full" smoke test suite, including both C++ unit tests and jstests,
     involves a bazel or ninja command to run the C++ portion followed by a run of this script
     to execute the jstest portion.
@@ -151,7 +152,8 @@ def main(
 
     configure_logging(verbose)
 
-    passthrough_resmoke_args = ctx.args
+    default_resmoke_args = ["--runAllFeatureFlagTests"]
+    passthrough_resmoke_args = default_resmoke_args + ctx.args
     parser.set_run_options(shlex.join(passthrough_resmoke_args))
 
     suite_names_or_paths = None if suites_str is None else suites_str.split(",")

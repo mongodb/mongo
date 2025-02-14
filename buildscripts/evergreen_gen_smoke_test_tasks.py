@@ -19,10 +19,11 @@ from buildscripts.util.read_config import read_config_file
 RANDOM_STRING_LENGTH = 5
 
 
-def make_smoke_test_task(suite: str, tests: list[str], compile_variant: str) -> Task:
+def make_smoke_test_task(suite: str, tests: set[str], compile_variant: str) -> Task:
+    resmoke_args = ["--runAllFeatureFlagTests"] + list(tests)
     commands = [
         FunctionCall("do setup"),
-        FunctionCall("run tests", {"suite": suite, "resmoke_args": shlex.join(tests)}),
+        FunctionCall("run tests", {"suite": suite, "resmoke_args": shlex.join(resmoke_args)}),
     ]
     dependencies = {TaskDependency("archive_dist_test", compile_variant)}
     # random string so we do not define the same task name for multiple variants which causes issues
