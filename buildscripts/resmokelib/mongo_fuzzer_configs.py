@@ -19,7 +19,7 @@ def generate_normal_wt_parameters(rng, value):
     return ret
 
 
-def generate_special_eviction_configs(rng, ret, fuzzer_stress_mode, params):
+def generate_special_eviction_configs(rng, ret, params):
     """Returns the value assigned the WiredTiger eviction parameters based on the fields of the parameters in config_fuzzer_wt_limits.py for special parameters (parameters with different assignment behaviors)."""
     from buildscripts.resmokelib.config_fuzzer_wt_limits import min_trigger_bytes
 
@@ -65,15 +65,10 @@ def generate_special_eviction_configs(rng, ret, fuzzer_stress_mode, params):
     # choices.append(rng.randint(params["dbg_rollback_error"]["lower_bound"], params["dbg_rollback_error"]["upper_bound"]))
     # ret["dbg_rollback_error"] = rng.choice(choices)
 
-    ret["dbg_slow_checkpoint"] = (
-        "false"
-        if fuzzer_stress_mode != "stress"
-        else rng.choice(params["dbg_slow_checkpoint"]["choices"])
-    )
     return ret
 
 
-def generate_eviction_configs(rng, fuzzer_stress_mode):
+def generate_eviction_configs(rng):
     """Returns a string with random configurations for wiredTigerEngineConfigString parameter."""
     from buildscripts.resmokelib.config_fuzzer_wt_limits import config_fuzzer_params
 
@@ -82,7 +77,6 @@ def generate_eviction_configs(rng, fuzzer_stress_mode):
     ret = {}
     excluded_normal_params = [
         "dbg_rollback_error",
-        "dbg_slow_checkpoint",
         "eviction_dirty_target",
         "eviction_dirty_target_1",
         "eviction_dirty_target_2",
@@ -95,7 +89,7 @@ def generate_eviction_configs(rng, fuzzer_stress_mode):
         "updates_target_min",
     ]
 
-    ret = generate_special_eviction_configs(rng, ret, fuzzer_stress_mode, params)
+    ret = generate_special_eviction_configs(rng, ret, params)
     ret.update(
         {
             key: generate_normal_wt_parameters(rng, value)
@@ -105,15 +99,14 @@ def generate_eviction_configs(rng, fuzzer_stress_mode):
     )
 
     return (
-        "debug_mode=(eviction={0},realloc_exact={1},rollback_error={2}, slow_checkpoint={3}),"
-        "eviction_checkpoint_target={4},eviction_dirty_target={5},eviction_dirty_trigger={6},"
-        "eviction_target={7},eviction_trigger={8},eviction_updates_target={9},"
-        "eviction_updates_trigger={10},file_manager=(close_handle_minimum={11},"
-        "close_idle_time={12},close_scan_interval={13})".format(
+        "debug_mode=(eviction={0},realloc_exact={1},rollback_error={2}),"
+        "eviction_checkpoint_target={3},eviction_dirty_target={4},eviction_dirty_trigger={5},"
+        "eviction_target={6},eviction_trigger={7},eviction_updates_target={8},"
+        "eviction_updates_trigger={9},file_manager=(close_handle_minimum={10},"
+        "close_idle_time={11},close_scan_interval={12})".format(
             ret["dbg_eviction"],
             ret["dbg_realloc_exact"],
             ret["dbg_rollback_error"],
-            ret["dbg_slow_checkpoint"],
             ret["eviction_checkpoint_target"],
             ret["eviction_dirty_target"],
             ret["eviction_dirty_trigger"],
@@ -243,7 +236,7 @@ def generate_normal_mongo_parameters(rng, value):
     return ret
 
 
-def generate_special_mongod_parameters(rng, ret, fuzzer_stress_mode, params):
+def generate_special_mongod_parameters(rng, ret, params):
     """Returns the value assigned the mongod parameter based on the fields of the parameters in config_fuzzer_limits.py for special parameters (parameters with different assignment behaviors)."""
     ret["storageEngineConcurrencyAdjustmentAlgorithm"] = rng.choices(
         params["storageEngineConcurrencyAdjustmentAlgorithm"]["choices"], weights=[10, 1]
@@ -305,11 +298,6 @@ def generate_special_mongod_parameters(rng, ret, fuzzer_stress_mode, params):
         params["maxNumberOfTransactionOperationsInSingleOplogEntry"]["choices"]
     )
 
-    ret["wiredTigerStressConfig"] = (
-        False
-        if fuzzer_stress_mode != "stress"
-        else rng.choice(params["wiredTigerStressConfig"]["choices"])
-    )
     ret["disableLogicalSessionCacheRefresh"] = rng.choice(
         params["disableLogicalSessionCacheRefresh"]["choices"]
     )
@@ -359,7 +347,7 @@ def generate_flow_control_parameters(rng, ret, flow_control_params, params):
     return ret
 
 
-def generate_mongod_parameters(rng, fuzzer_stress_mode):
+def generate_mongod_parameters(rng):
     """Return a dictionary with values for each mongod parameter."""
     from buildscripts.resmokelib.config_fuzzer_limits import config_fuzzer_params
 
@@ -401,7 +389,6 @@ def generate_mongod_parameters(rng, fuzzer_stress_mode):
         "throughputProbingStepMultiple",
         "wiredTigerConcurrentReadTransactions",
         "wiredTigerConcurrentWriteTransactions",
-        "wiredTigerStressConfig",
         "failpoint.hangAfterPreCommittingCatalogUpdates",
         "failpoint.hangBeforePublishingCatalogUpdates",
     ]
@@ -418,7 +405,7 @@ def generate_mongod_parameters(rng, fuzzer_stress_mode):
         }
     )
 
-    ret = generate_special_mongod_parameters(rng, ret, fuzzer_stress_mode, params)
+    ret = generate_special_mongod_parameters(rng, ret, params)
     ret = generate_flow_control_parameters(rng, ret, flow_control_params, params)
     return ret
 
@@ -447,12 +434,12 @@ def generate_mongos_parameters(rng):
     return {key: generate_normal_mongo_parameters(rng, value) for key, value in params.items()}
 
 
-def fuzz_mongod_set_parameters(fuzzer_stress_mode, seed, user_provided_params):
+def fuzz_mongod_set_parameters(seed, user_provided_params):
     """Randomly generate mongod configurations and wiredTigerConnectionString."""
     rng = random.Random(seed)
 
     ret = {}
-    mongod_params = generate_mongod_parameters(rng, fuzzer_stress_mode)
+    mongod_params = generate_mongod_parameters(rng)
 
     for key, value in mongod_params.items():
         ret[key] = value
@@ -470,7 +457,7 @@ def fuzz_mongod_set_parameters(fuzzer_stress_mode, seed, user_provided_params):
     return (
         utils.dump_yaml(ret),
         generate_mongod_extra_configs(rng),
-        generate_eviction_configs(rng, fuzzer_stress_mode),
+        generate_eviction_configs(rng),
         generate_table_configs(rng),
         generate_table_configs(rng),
         generate_encryption_config(rng),

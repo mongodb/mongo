@@ -1857,11 +1857,9 @@ class RunPlugin(PluginInterface):
         mongodb_server_options.add_argument(
             "--fuzzMongodConfigs",
             dest="fuzz_mongod_configs",
-            help="Randomly chooses mongod parameters that were not specified. Use 'stress' to fuzz "
-            "all configs including stressful storage configurations that may significantly "
-            "slow down the server. Use 'normal' to only fuzz non-stressful configurations. ",
+            help="Randomly chooses mongod parameters that were not specified.",
             metavar="MODE",
-            choices=("normal", "stress"),
+            choices=("normal"),
         )
 
         mongodb_server_options.add_argument(

@@ -217,7 +217,6 @@ config_fuzzer_params = {
             "isUniform": True,
             "fuzz_at": ["startup"],
         },
-        "wiredTigerStressConfig": {"choices": [True, False], "fuzz_at": ["startup"]},
         "wiredTigerCursorCacheSize": {"min": -100, "max": 0, "fuzz_at": ["startup"]},
         "wiredTigerSessionCloseIdleTimeSecs": {"min": 0, "max": 300, "fuzz_at": ["startup"]},
         "wiredTigerConcurrentReadTransactions": {"min": 5, "max": 32, "fuzz_at": ["startup"]},

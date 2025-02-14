@@ -192,7 +192,7 @@ tasks:
             --runAllFeatureFlagTests
 
   - <<: *antithesis_task_template
-    name: antithesis_config_fuzzer_stress_concurrency_sharded_replication
+    name: antithesis_config_fuzzer_concurrency_sharded_replication
     tags:
       [
         "assigned_to_jira_team_devprod_correctness",
@@ -206,7 +206,7 @@ tasks:
         vars:
           suite: concurrency_sharded_replication
           resmoke_args: >-
-            --fuzzMongodConfigs=stress
+            --fuzzMongodConfigs=normal
             --fuzzMongosConfigs=normal
             --fuzzRuntimeParams
             --excludeWithAnyTags=does_not_support_config_fuzzer

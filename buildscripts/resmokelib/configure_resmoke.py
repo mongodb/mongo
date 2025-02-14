@@ -457,7 +457,7 @@ be invoked as either:
             _config.WT_INDEX_CONFIG,
             _config.CONFIG_FUZZER_ENCRYPTION_OPTS,
         ) = mongo_fuzzer_configs.fuzz_mongod_set_parameters(
-            _config.FUZZ_MONGOD_CONFIGS, _config.CONFIG_FUZZ_SEED, _config.MONGOD_SET_PARAMETERS
+            _config.CONFIG_FUZZ_SEED, _config.MONGOD_SET_PARAMETERS
         )
         _config.EXCLUDE_WITH_ANY_TAGS.extend(["uses_compact"])
 

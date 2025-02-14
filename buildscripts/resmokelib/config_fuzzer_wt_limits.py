@@ -47,7 +47,6 @@ config_fuzzer_params = {
     # eviction - Turns aggressive eviction on/off
     # realloc_exact - Finds more memory bugs by allocating the memory for the exact size asked
     # rollback_error - Forces WiredTiger to return a rollback error every Nth call
-    # slow_checkpoint - Adds internal delays in processing internal leaf pages during a checkpoint
     "wt": {
         # The following three parameters are for fuzzing file manager settings.
         "close_idle_time_secs": {"min": 1, "max": 100},
@@ -62,7 +61,6 @@ config_fuzzer_params = {
             "upper_bound": 1500,
             "choices": [0],
         },
-        "dbg_slow_checkpoint": {"choices": ["true", "false"]},
         # 1% of 1GB default cache size on Evergreen, 99% of 1GB default cache size on Evergreen
         "eviction_checkpoint_target": {"min": 10 * 1024 * 1024, "max": 990 * 1024 * 1024},
         # 50% of 1GB default cache size on Evergreen, 95% of 1GB default cache size on Evergreen
