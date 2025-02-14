@@ -345,6 +345,8 @@ buildvariants:
         cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_cbr_sampling_jscore_passthrough
         cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_cbr_sampling_aggregation_passthrough
+        cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_cbr_histogram_jscore_passthrough
         cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
 

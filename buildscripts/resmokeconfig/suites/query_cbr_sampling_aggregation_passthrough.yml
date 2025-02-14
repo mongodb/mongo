@@ -1,0 +1,28 @@
+# This is equivalent to the aggregation suite, but runs with CBR with sampling CE enabled.
+
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/aggregation/**/*.js
+  exclude_files:
+    - jstests/aggregation/extras/*.js
+    - jstests/aggregation/data/*.js
+
+    # TODO SERVER-92589: Fails in all feature flags variant because SBE explain not supported
+    - jstests/aggregation/optimization/use_query_sort.js
+
+  exclude_with_any_tags:
+    # Profiler entries will have different shape in CBR
+    - requires_profiling
+executor:
+  config:
+    shell_options:
+      eval: await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        planRankerMode: "samplingCE"
+        internalQuerySamplingBySequentialScan: true
