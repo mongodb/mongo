@@ -28,6 +28,7 @@ selector:
     - jstests/with_mongot/e2e/views/nested_view.js
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
+    - assumes_unsharded_collection
 
 executor:
   config:

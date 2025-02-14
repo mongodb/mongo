@@ -701,8 +701,15 @@ DepsTracker Pipeline::getDependenciesForContainer(
 
     OrderedPathSet generatedPaths;
     bool hasUnsupportedStage = false;
+
+    // knowAllFields / knowAllMeta means we have determined all the field / metadata dependencies of
+    // the pipeline, and further stages will not affect that result.
     bool knowAllFields = false;
     bool knowAllMeta = false;
+
+    // It's important to iterate through the stages left-to-right so that metadata validation is
+    // done correctly. A stage anywhere in the pipeline may setMetadataAvailable(), but
+    // references to that metadata are only valid downstream of the metadata-generating stage.
     for (auto&& source : container) {
         DepsTracker localDeps(deps.getAvailableMetadata());
         DepsTracker::State status = source->getDependencies(&localDeps);
@@ -717,7 +724,9 @@ DepsTracker Pipeline::getDependenciesForContainer(
         }
 
         // If we ever saw an unsupported stage, don't bother continuing to track field and metadata
-        // deps: we already have to assume the pipeline depends on everything.
+        // deps: we already have to assume the pipeline depends on everything. We should keep
+        // tracking available metadata (by setMetadataAvailable()) so that requests to read metadata
+        // (by setNeedsMetadata()) can be validated correctly.
         if (!hasUnsupportedStage && !knowAllFields) {
             for (const auto& field : localDeps.fields) {
                 // If a field was generated within the pipeline, we don't need to count it as a
@@ -748,6 +757,10 @@ DepsTracker Pipeline::getDependenciesForContainer(
             }
         }
 
+        // This stage may have generated more available metadata; add to set of all available
+        // metadata in the pipeline so we can correctly validate if downstream stages want to access
+        // the metadata.
+        deps.setMetadataAvailable(localDeps.getAvailableMetadata());
         if (!hasUnsupportedStage && !knowAllMeta) {
             deps.setNeedsMetadata(localDeps.metadataDeps());
             knowAllMeta = status & DepsTracker::State::EXHAUSTIVE_META;
@@ -757,11 +770,14 @@ DepsTracker Pipeline::getDependenciesForContainer(
     if (!knowAllFields)
         deps.needWholeDocument = true;  // don't know all fields we need
 
-    if (deps.getAvailableMetadata()[DocumentMetadataFields::kTextScore]) {
+    if (expCtx->getNeedsMerge() && !knowAllMeta) {
         // There is a text score available. If we are the first half of a split pipeline, then we
         // have to assume future stages might depend on the textScore (unless we've encountered a
         // stage that doesn't preserve metadata).
-        if (expCtx->getNeedsMerge() && !knowAllMeta) {
+
+        // TODO SERVER-100404: This would be more correct if we did the same for all meta fields
+        // like deps.setNeedsMetadata(deps.getAvailableMetadata()).
+        if (deps.getAvailableMetadata()[DocumentMetadataFields::kTextScore]) {
             deps.setNeedsMetadata(DocumentMetadataFields::kTextScore);
         }
     }

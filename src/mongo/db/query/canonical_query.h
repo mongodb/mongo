@@ -117,7 +117,8 @@ public:
 
     /**
      * Perform validation checks on the normalized 'root' which could not be checked before
-     * normalization - those should happen in parsed_find_command::isValid().
+     * normalization - those should happen in
+     * parsed_find_command::validateAndGetAvailableMetadata().
      */
     static Status isValidNormalized(const MatchExpression* root);
 

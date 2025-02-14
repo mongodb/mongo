@@ -28,21 +28,41 @@
  */
 
 #include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
+
 #include "mongo/base/error_codes.h"
+#include "mongo/db/pipeline/document_source_set_metadata.h"
+#include "mongo/db/pipeline/document_source_single_document_transformation.h"
+#include "mongo/db/pipeline/search/document_source_search.h"
+#include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/util/str.h"
 
-namespace mongo {
+namespace mongo::hybrid_scoring_util {
 
-template <typename T>
-Status requireNonEmpty(const std::vector<T>& inputs) {
-    if (inputs.empty()) {
-        return {ErrorCodes::BadValue,
-                "A hybrid scoring stage should be run with at least one pipeline."};
+bool isScoreStage(const boost::intrusive_ptr<DocumentSource>& stage) {
+    if (stage->getSourceName() != DocumentSourceSetMetadata::kStageName) {
+        return false;
     }
-    return Status::OK();
+    auto singleDocTransform = static_cast<DocumentSourceSingleDocumentTransformation*>(stage.get());
+    auto setMetadataTransform =
+        static_cast<SetMetadataTransformation*>(&singleDocTransform->getTransformer());
+    return setMetadataTransform->getMetaType() == DocumentMetadataFields::MetaType::kScore;
 }
 
-Status validateScoreFusionMinInputs(const std::vector<ScoreFusionInputsSpec>& inputs) {
-    return requireNonEmpty(inputs);
+// TODO SERVER-100754: A pipeline that begins with a $match stage that isTextQuery() should also
+// count.
+bool isScoredPipeline(const Pipeline& pipeline) {
+    // Note that we don't check for $rankFusion and $scoreFusion explicitly because it will be
+    // desugared by this point.
+    static const std::set<StringData> implicitlyScoredStages{DocumentSourceVectorSearch::kStageName,
+                                                             DocumentSourceSearch::kStageName};
+    auto sources = pipeline.getSources();
+    if (sources.empty()) {
+        return false;
+    }
+
+    auto firstStageName = sources.front()->getSourceName();
+    return implicitlyScoredStages.contains(firstStageName) ||
+        std::any_of(sources.begin(), sources.end(), isScoreStage);
 }
-}  // namespace mongo
+
+}  // namespace mongo::hybrid_scoring_util

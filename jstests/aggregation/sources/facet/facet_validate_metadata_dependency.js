@@ -6,7 +6,8 @@
  * jstests/with_mongot/e2e/metadata/meta_dependency_validation.js.
  *
  * TODO SERVER-99965 Fix this for $geoNear-related metadata on sharded collections.
- * @tags: [assumes_unsharded_collection]
+ * featureFlagRankFusionFull is required to enable use of "score".
+ * @tags: [assumes_unsharded_collection, featureFlagRankFusionFull]
  */
 
 import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";
@@ -28,7 +29,8 @@ const kUnavailableMetadataErrCode = 40218;
 const validatedMetaFields = [
     {fieldName: "textScore", debugName: "text score", validSortKey: true},
     {fieldName: "geoNearDistance", debugName: "$geoNear distance", validSortKey: true},
-    {fieldName: "geoNearPoint", debugName: "$geoNear point", validSortKey: false}
+    {fieldName: "geoNearPoint", debugName: "$geoNear point", validSortKey: false},
+    {fieldName: "score", debugName: "score", validSortKey: true}
 ];
 
 // Test that each of the meta fields throws an error if referenced under a $facet without a
@@ -71,6 +73,26 @@ validatedMetaFields.forEach(metaField => {
         {$match: {$text: {$search: "three"}}},
         {$project: {_id: 1}},
         {$facet: {pipe1: [{$sort: {a: {$meta: "textScore"}, _id: 1}}]}}
+    ];
+    res = coll.aggregate(pipeline).toArray();
+    assert.eq(res, [{pipe1: [{_id: 1}, {_id: 2}, {_id: 0}]}]);
+}
+
+// Test that {$meta: "score"} works within $facet when it is a $text query.
+{
+    let pipeline = [
+        {$match: {$text: {$search: "three"}}},
+        {$facet: {pipe1: [{$project: {score: {$meta: "score"}}}, {$sort: {_id: 1}}]}}
+    ];
+    let res = coll.aggregate(pipeline).toArray();
+    assert.eq(res, [
+        {pipe1: [{_id: 0, score: 0.6666666666666666}, {_id: 1, score: 0.75}, {_id: 2, score: 0.75}]}
+    ]);
+
+    pipeline = [
+        {$match: {$text: {$search: "three"}}},
+        {$project: {_id: 1}},
+        {$facet: {pipe1: [{$sort: {a: {$meta: "score"}, _id: 1}}]}}
     ];
     res = coll.aggregate(pipeline).toArray();
     assert.eq(res, [{pipe1: [{_id: 1}, {_id: 2}, {_id: 0}]}]);

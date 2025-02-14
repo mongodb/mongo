@@ -91,7 +91,7 @@ function runTest({
                           `scoreDetails had unexpected contents in document ${tojson(result)}`);
             }
         } else {
-            // TODO SERVER-99169 Throw an error instead of returning empty results.
+            // TODO SERVER-100678 Throw an error instead of returning empty results.
             assert(!result.hasOwnProperty("scoreDetails"),
                    `Did not request scoreDetails to be calculated, but was found on document ${
                        tojson(result)}`);
@@ -112,7 +112,7 @@ runTest({requestScoreDetails: false, forceProjectionOnMerger: true});
 // Request $searchScoreDetails and ensure that it is not directly accessible outside of $rankFusion.
 runTest({requestScoreDetails: true, requestSearchScoreDetails: true});
 runTest({requestScoreDetails: true, requestSearchScoreDetails: true, numInputPipelines: 2});
-// TODO SERVER-99169 Nested $search's scoreDetails probably should not be accessible outside of the
+// TODO SERVER-100678 Nested $search's scoreDetails probably should not be accessible outside of the
 // $rankFusion pipeline even when we don't request $rankFusion scoreDetails.
 
 // runTest({requestScoreDetails: false, requestSearchScoreDetails: true });
@@ -141,7 +141,7 @@ runTest({requestScoreDetails: true, requestSearchScoreDetails: true, numInputPip
             .toArray();
     assert.eq(results.length, 6);
 
-    // TODO SERVER-99169 Determine what should happen here (currently some documents have
+    // TODO SERVER-100678 Determine what should happen here (currently some documents have
     // scoreDetails and some don't).
 }
 
@@ -167,7 +167,7 @@ runTest({requestScoreDetails: true, requestSearchScoreDetails: true, numInputPip
     assert.eq(results.length, 4);
 
     for (let result of results) {
-        // TODO SERVER-99169 Throw an error instead of returning empty results.
+        // TODO SERVER-100678 Throw an error instead of returning empty results.
         assert(!result.hasOwnProperty("scoreDetails"),
                `Did not request scoreDetails to be calculated, but was found on document ${
                    tojson(result)}`);

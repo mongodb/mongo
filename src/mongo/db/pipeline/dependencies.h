@@ -126,7 +126,8 @@ struct DepsTracker {
      * Represents a state where only text score metadata is available.
      */
     static constexpr auto kOnlyTextScore =
-        QueryMetadataBitSet(1 << DocumentMetadataFields::MetaType::kTextScore);
+        QueryMetadataBitSet((1 << DocumentMetadataFields::MetaType::kTextScore) |
+                            (1 << DocumentMetadataFields::MetaType::kScore));
 
     /**
      * Represents a state where no metadata is available.
@@ -155,7 +156,7 @@ struct DepsTracker {
     /**
      * Helper function to determine whether the query has a dependency on the $text score metadata.
      *
-     * TODO SERVER-99169 Consider finding a better home for this helper.
+     * TODO SERVER-100676 Consider finding a better home for this helper.
      */
     static bool needsTextScoreMetadata(const QueryMetadataBitSet& metadataDeps);
 
@@ -192,12 +193,25 @@ struct DepsTracker {
             _availableMetadata);
     }
 
+    /**
+     * Marks that the given metadata type (or set of metadata types) will be generated and is
+     * available for the rest of the pipeline to access.
+     *
+     * _availableMetadata is typically initialized in the DepsTracker constructor with metadata
+     * fields populated by the first stage of the pipeline. This method is then needed to signal
+     * that a stage (like $score) anywhere else in the pipeline will generate metadata that's only
+     * available to the downstream stages. For example, this makes sure we reject the pipeline
+     * [{$project "score" meta field}, {$score}].
+     */
+    void setMetadataAvailable(DocumentMetadataFields::MetaType type);
+    void setMetadataAvailable(const QueryMetadataBitSet& metadata);
 
     /**
-     * Marks that the given metadata type (or set of metadata types) is required by this pipeline.
+     * Marks that the given metadata type (or set of metadata types) is required by this pipeline,
+     * because the pipeline wants to read that metadata type for some purpose.
      *
-     * If _validateMetadataRequests is set and the type is marked as one that should be validated,
-     * throws a UserException if the type has not been marked as available.
+     * If we are validating metadata requests and the type is marked as one that should be
+     * validated, throws a UserException if the type has not been marked as available.
      */
     void setNeedsMetadata(DocumentMetadataFields::MetaType type);
     void setNeedsMetadata(const QueryMetadataBitSet& metadata);

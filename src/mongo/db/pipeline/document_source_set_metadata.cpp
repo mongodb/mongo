@@ -72,6 +72,9 @@ Document SetMetadataTransformation::serializeTransformation(
 DepsTracker::State SetMetadataTransformation::addDependencies(DepsTracker* deps) const {
     expression::addDependencies(_metadataExpression.get(), deps);
 
+    // Mark that _metaType is available for downstream stages to access.
+    deps->setMetadataAvailable(_metaType);
+
     // This transformation only sets metadata and does not modify fields, so later stages could need
     // access to either fields or metadata.
     return DepsTracker::State::SEE_NEXT;

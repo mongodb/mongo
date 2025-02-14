@@ -105,11 +105,13 @@ BSONObj DepsTracker::toProjectionWithoutMetadata(
 }
 
 void DepsTracker::setNeedsMetadata(DocumentMetadataFields::MetaType type) {
-    // TODO SERVER-99169 Validate 'score' and 'scoreDetails' too.
+    // TODO SERVER-100678 Validate 'scoreDetails' too.
     static const std::set<DocumentMetadataFields::MetaType> kMetadataFieldsToBeValidated = {
         DocumentMetadataFields::MetaType::kTextScore,
         DocumentMetadataFields::MetaType::kGeoNearDist,
-        DocumentMetadataFields::MetaType::kGeoNearPoint};
+        DocumentMetadataFields::MetaType::kGeoNearPoint,
+        DocumentMetadataFields::MetaType::kScore,
+    };
 
     // Perform validation if necessary.
     if (!std::holds_alternative<NoMetadataValidation>(_availableMetadata) &&
@@ -126,6 +128,38 @@ void DepsTracker::setNeedsMetadata(const QueryMetadataBitSet& metadata) {
     for (size_t i = 1; i < DocumentMetadataFields::kNumFields; ++i) {
         if (metadata[i]) {
             setNeedsMetadata(static_cast<DocumentMetadataFields::MetaType>(i));
+        }
+    }
+}
+
+void DepsTracker::setMetadataAvailable(DocumentMetadataFields::MetaType type) {
+    if (std::holds_alternative<NoMetadataValidation>(_availableMetadata)) {
+        return;
+    }
+
+    auto& availableMetadataBitSet = std::get<QueryMetadataBitSet>(_availableMetadata);
+    availableMetadataBitSet[type] = true;
+
+    // Some meta types are alias'd to others (for example, "textScore" is also available via
+    // "score"), so we must mark those alias'd types as available too.
+    switch (type) {
+        case DocumentMetadataFields::MetaType::kTextScore:
+        case DocumentMetadataFields::MetaType::kSearchScore:
+        case DocumentMetadataFields::MetaType::kVectorSearchScore:
+            availableMetadataBitSet[DocumentMetadataFields::MetaType::kScore] = true;
+            break;
+        case DocumentMetadataFields::MetaType::kSearchScoreDetails:
+            availableMetadataBitSet[DocumentMetadataFields::MetaType::kScoreDetails] = true;
+            break;
+        default:
+            break;
+    }
+}
+
+void DepsTracker::setMetadataAvailable(const QueryMetadataBitSet& metadata) {
+    for (size_t i = 1; i < DocumentMetadataFields::kNumFields; ++i) {
+        if (metadata[i]) {
+            setMetadataAvailable(static_cast<DocumentMetadataFields::MetaType>(i));
         }
     }
 }

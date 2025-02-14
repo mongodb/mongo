@@ -159,7 +159,7 @@ Status setFilter(ParsedFindCommand* out,
                  std::unique_ptr<MatchExpression> filter,
                  const std::unique_ptr<FindCommandRequest>& findCommand) {
     // Verify the filter follows certain rules like there must be at most one text clause.
-    auto swMeta = parsed_find_command::isValid(filter.get(), *findCommand);
+    auto swMeta = parsed_find_command::validateAndGetAvailableMetadata(filter.get(), *findCommand);
     if (!swMeta.isOK()) {
         return swMeta.getStatus();
     }
@@ -230,8 +230,8 @@ StatusWith<std::unique_ptr<ParsedFindCommand>> ParsedFindCommand::withExistingFi
 }
 
 namespace parsed_find_command {
-StatusWith<QueryMetadataBitSet> isValid(const MatchExpression* root,
-                                        const FindCommandRequest& findCommand) {
+StatusWith<QueryMetadataBitSet> validateAndGetAvailableMetadata(
+    const MatchExpression* root, const FindCommandRequest& findCommand) {
     QueryMetadataBitSet availableMetadata{};
 
     // There can only be one TEXT.  If there is a TEXT, it cannot appear inside a NOR.
@@ -246,6 +246,7 @@ StatusWith<QueryMetadataBitSet> isValid(const MatchExpression* root,
             return Status(ErrorCodes::BadValue, "text expression not allowed in nor");
         }
         availableMetadata.set(DocumentMetadataFields::kTextScore);
+        availableMetadata.set(DocumentMetadataFields::kScore);
     }
 
     // There can only be one NEAR.  If there is a NEAR, it must be either the root or the root

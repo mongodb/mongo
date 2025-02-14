@@ -13,8 +13,10 @@
  * TODO SERVER-100443 Expand on this test by adding more complex pipeline shapes with at least 3
  * stages.
  *
+ * featureFlagRankFusionFull is required to enable use of "score".
+ * featureFlagHybridScoringFull is required to enable use of $score.
  * The $rankFusion feature flag is required to enable use of "score" and "searchScore".
- * @tags: [ featureFlagRankFusionBasic, featureFlagRankFusionFull ]
+ * @tags: [ featureFlagRankFusionBasic, featureFlagRankFusionFull, featureFlagHybridScoringFull ]
  */
 
 import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";
@@ -28,14 +30,38 @@ coll.drop();
 const isSharded = FixtureHelpers.isSharded(coll);
 
 assert.commandWorked(coll.insertMany([
-    {_id: 0, a: 3, textField: "three blind mice", geoField: [23, 51]},
-    {_id: 1, a: 2, textField: "the three stooges", geoField: [25, 49]},
-    {_id: 2, a: 3, textField: "we three kings", geoField: [30, 51]}
+    {
+        _id: 0,
+        a: 3,
+        textField: "three blind mice",
+        geoField: [23, 51],
+        vector: [0.006585975, -0.03453151, -0.0073834695, -0.032803606, -0.0032448056]
+    },
+    {
+        _id: 1,
+        a: 2,
+        textField: "the three stooges",
+        geoField: [25, 49],
+        vector: [0.015856847, -0.0032713888, 0.011949126, -0.0062968833, 0.0032148995]
+    },
+    {
+        _id: 2,
+        a: 3,
+        textField: "we three kings",
+        geoField: [30, 51],
+        vector: [0.0071708043, 0.0016248949, 0.014487816, -0.000010448943, 0.027673058]
+    }
 ]));
 assert.commandWorked(coll.createIndex({textField: "text"}));
 assert.commandWorked(coll.createIndex({geoField: "2d"}));
 assert.commandWorked(
     createSearchIndex(coll, {name: "search-index", definition: {mappings: {dynamic: true}}}));
+assert.commandWorked(createSearchIndex(coll, {
+    name: "vector-search-index",
+    type: "vectorSearch",
+    definition:
+        {fields: [{type: "vector", numDimensions: 5, path: "vector", similarity: "euclidean"}]}
+}));
 
 const kUnavailableMetadataErrCode = 40218;
 
@@ -45,13 +71,23 @@ const FirstStageOptions = Object.freeze({
     FTS_MATCH: {$match: {$text: {$search: "three"}}},
     NON_FTS_MATCH: {$match: {a: {$gt: 3}}},
     SEARCH: {$search: {index: "search-index", exists: {path: "textField"}}},
-    SORT: {$sort: {a: -1}}
+    VECTOR_SEARCH: {
+        $vectorSearch: {
+            queryVector: [-0.012674698, 0.013308106, -0.005494981, -0.008286549, -0.00289768],
+            path: "vector",
+            exact: true,
+            index: "vector-search-index",
+            limit: 10
+        }
+    },
+    SORT: {$sort: {a: -1}},
+    SCORE: {$score: {score: {$divide: [1, "$a"]}}}
 });
 
 // The set of metadata fields that can be referenced inside $meta, alongside information used to
 // dictate if the queries should succeed or not.
 // TODO SERVER-93521: Change "searchScore" and "vectorSearchScore" to be validated.
-// TODO SERVER-99169: Change "score" and "scoreDetails" to be validated.
+// TODO SERVER-100678: Change "scoreDetails" to be validated.
 const MetaFields = Object.freeze({
     TEXT_SCORE: {
         name: "textScore",
@@ -97,7 +133,8 @@ const MetaFields = Object.freeze({
         shouldBeValidated: true,
         debugName: "sortKey",
         validSortKey: false,
-        firstStageRequired: [FirstStageOptions.SORT, FirstStageOptions.GEO_NEAR]
+        firstStageRequired:
+            [FirstStageOptions.SORT, FirstStageOptions.GEO_NEAR, FirstStageOptions.SCORE]
     },
     SEARCH_SCORE_DETAIS: {
         name: "searchScoreDetails",
@@ -129,7 +166,18 @@ const MetaFields = Object.freeze({
         debugName: "$vectorSearch distance",
         validSortKey: true
     },
-    SCORE: {name: "score", shouldBeValidated: false, debugName: "score", validSortKey: true},
+    SCORE: {
+        name: "score",
+        shouldBeValidated: true,
+        debugName: "score",
+        validSortKey: true,
+        firstStageRequired: [
+            FirstStageOptions.FTS_MATCH,
+            FirstStageOptions.SEARCH,
+            FirstStageOptions.SCORE,
+            FirstStageOptions.VECTOR_SEARCH,
+        ]
+    },
     SCORE_DETAILS: {
         name: "scoreDetails",
         shouldBeValidated: false,
@@ -185,9 +233,17 @@ function shouldQuerySucceed(metaField, firstStage, metaReferencingStageName) {
         return true;
     }
 
-    // TODO SERVER-100394: We should make meta field validation take place when $search is the first
-    // stage, but for now it's skipped.
-    if (firstStage === FirstStageOptions.SEARCH) {
+    // TODO SERVER-100404: $meta: "score" should be allowed to access "searchScore" and
+    // "vectorSearchScore" on sharded collections.
+    if (isSharded && metaField === MetaFields.SCORE &&
+        (firstStage === FirstStageOptions.SEARCH ||
+         firstStage === FirstStageOptions.VECTOR_SEARCH)) {
+        return false;
+    }
+
+    // TODO SERVER-100394: We should make meta field validation take place when $search or
+    // $vectorSearch is the first stage, but for now it's skipped.
+    if (firstStage === FirstStageOptions.SEARCH || firstStage === FirstStageOptions.VECTOR_SEARCH) {
         // This is a very specific edge case that's inconsistent but actually is the proper
         // behavior. Even though validation is typically skipped on $search queries for now, a
         // sharded $search query will perform validation for references to "textScore". Once
@@ -223,3 +279,4 @@ fc.assert(fc.property(testCaseArb, ({firstStage, metaField, metaReferencingStage
 }), {seed: 5, numRuns: 500});
 
 dropSearchIndex(coll, {name: "search-index"});
+dropSearchIndex(coll, {name: "vector-search-index"});

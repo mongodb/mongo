@@ -36,11 +36,11 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_group.h"
+#include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_score_fusion.h"
 #include "mongo/db/pipeline/document_source_score_fusion_gen.h"
 #include "mongo/db/pipeline/document_source_set_metadata.h"
-#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -58,19 +58,6 @@ REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(scoreFusion,
                                            feature_flags::gFeatureFlagSearchHybridScoringFull);
 namespace {
 
-/**
- * Checks is this stage is a $score stage, where it has been desugared to $setMetadata with the meta
- * type MetaType::kScore.
- */
-bool isScoreStage(const boost::intrusive_ptr<DocumentSource>& stage) {
-    if (stage->getSourceName() != DocumentSourceSetMetadata::kStageName) {
-        return false;
-    }
-    auto singleDocTransform = static_cast<DocumentSourceSingleDocumentTransformation*>(stage.get());
-    auto setMetadataTransform =
-        static_cast<SetMetadataTransformation*>(&singleDocTransform->getTransformer());
-    return setMetadataTransform->getMetaType() == DocumentMetadataFields::MetaType::kScore;
-}
 
 /**
  * Validates the weights inputs. If weights are specified by the user, there must be exactly one
@@ -140,7 +127,7 @@ BSONObj findScorePath(const Pipeline& pipeline) {
     BSONObj scorePath;
     if (firstStageName == DocumentSourceVectorSearch::kStageName ||
         firstStageName == DocumentSourceSearch::kStageName ||
-        std::any_of(sources.begin(), sources.end(), isScoreStage)) {
+        std::any_of(sources.begin(), sources.end(), hybrid_scoring_util::isScoreStage)) {
         // The "score" metadata field works as an alias for all 3 metadata score fields:
         // searchScore, vectorSearchScore, score.
         scorePath = BSON("$meta"
@@ -247,11 +234,7 @@ static void scoreFusionPipelineValidator(const Pipeline& pipeline) {
             str::stream() << "$scoreFusion input pipeline cannot be empty. " << scorePipelineMsg,
             !sources.empty());
 
-    auto firstStageName = sources.front()->getSourceName();
-    auto isScoredPipeline = implicitlyScoredStages.contains(firstStageName) ||
-        std::any_of(sources.begin(), sources.end(), isScoreStage);
-    uassert(9402500, scorePipelineMsg, isScoredPipeline);
-
+    uassert(9402500, scorePipelineMsg, hybrid_scoring_util::isScoredPipeline(pipeline));
 
     std::for_each(sources.begin(), sources.end(), [](auto& stage) {
         if (stage->getSourceName() == DocumentSourceSearch::kStageName) {

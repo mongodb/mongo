@@ -40,7 +40,7 @@ structs:
         type: object_owned
         optional: true
   # The ScoreFusionSpec needs to be in a separate file because use of the 
-  # validateScoreFusionMinInputs callback will otherwise create a circular dependency.
+  # validation callback will otherwise create a circular dependency.
   ScoreFusionSpec:
     description: Specification for a $scoreFusion stage.
     strict: true

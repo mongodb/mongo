@@ -110,13 +110,13 @@ namespace parsed_find_command {
  * only be performed once the match expressions is normalized. To perform these checks one can call
  * 'CanonicalQuery::isValidNormalized()'.
  *
- * On success, returns a bitset indicating which types of metadata are *unavailable*. For example,
+ * On success, returns a bitset indicating which types of metadata are available. For example,
  * if 'root' does not contain a $text predicate, then the returned metadata bitset will indicate
- * that text score metadata is unavailable. This means that if subsequent $meta:"textScore"
+ * that text score metadata is not available. This means that if subsequent $meta:"textScore"
  * expressions are found during analysis of the query, we should raise in an error.
  */
-StatusWith<QueryMetadataBitSet> isValid(const MatchExpression* root,
-                                        const FindCommandRequest& findCommand);
+StatusWith<QueryMetadataBitSet> validateAndGetAvailableMetadata(
+    const MatchExpression* root, const FindCommandRequest& findCommand);
 
 /**
  * Parses each big component of the input 'findCommand.' Throws exceptions if failing to parse.

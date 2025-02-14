@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_group.h"
+#include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
@@ -372,26 +373,39 @@ auto setWindowFields(const auto& expCtx, const std::string& rankFieldName) {
 }
 
 /**
- * Builds and returns an $addFields stage like this one:
+ * Builds and returns an $addFields stage like this one.
  * {$addFields: {
  *      prefix_scoreDetails:
- *          {$ifNull: [{$meta: "scoreDetails"}, {value: score, details: []]}]}
+ *          {$ifNull: [{$meta: "scoreDetails"}, {value: {$meta: "score"}, details: []]}]}
  *      }
  *  }
+ *
+ * We only want to try to access "{$meta: score}" if it will be available; otherwise, the query will
+ * error saying you tried to access "score" when it was not available. If the pipeline doesn't
+ * produce a score, we generate:
+ * {$addFields: {
+ *      prefix_scoreDetails:
+ *          {$ifNull: [{$meta: "scoreDetails"}, {details: []]}]}
+ *      }
+ *  }
+ * TODO SERVER-100678 Only generate $meta: "scoreDetails" if the pipeline produces scoreDetails.
  */
 auto addScoreDetails(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                     const std::string& prefix) {
+                     const std::string& prefix,
+                     const bool inputGeneratesScore) {
     const std::string scoreDetails = fmt::format("{}_scoreDetails", prefix);
     BSONObjBuilder bob;
     {
         BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
+        auto defaultScoreDetails = inputGeneratesScore
+            ? BSON("value" << BSON("$meta"
+                                   << "score")
+                           << "details" << BSONArrayBuilder().arr())
+            : BSON("details" << BSONArrayBuilder().arr());
         addFieldsBob.append(scoreDetails,
-                            BSON("$ifNull" << BSON_ARRAY(
-                                     BSON("$meta"
-                                          << "scoreDetails")
-                                     << BSON("value" << BSON("$meta"
-                                                             << "score")
-                                                     << "details" << BSONArrayBuilder().arr()))));
+                            BSON("$ifNull" << BSON_ARRAY(BSON("$meta"
+                                                              << "scoreDetails")
+                                                         << defaultScoreDetails)));
     }
     const auto spec = bob.obj();
     return DocumentSourceAddFields::createFromBson(spec.firstElement(), expCtx);
@@ -450,6 +464,7 @@ auto buildFirstPipelineStages(const std::string& prefixOne,
                               const int rankConstant,
                               const double weight,
                               const bool includeScoreDetails,
+                              const bool inputGeneratesScore,
                               const boost::intrusive_ptr<ExpressionContext>& expCtx) {
 
     std::list<boost::intrusive_ptr<DocumentSource>> outputStages = {
@@ -458,7 +473,7 @@ auto buildFirstPipelineStages(const std::string& prefixOne,
         addScoreField(expCtx, prefixOne, rankConstant, weight),
     };
     if (includeScoreDetails) {
-        outputStages.push_back(addScoreDetails(expCtx, prefixOne));
+        outputStages.push_back(addScoreDetails(expCtx, prefixOne, inputGeneratesScore));
     }
     return outputStages;
 }
@@ -578,6 +593,7 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipeline(
     const double weight,
     std::unique_ptr<Pipeline, PipelineDeleter> oneInputPipeline,
     const bool includeScoreDetails,
+    const bool inputGeneratesScore,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
 
     makeSureSortKeyIsOutput(oneInputPipeline->getSources());
@@ -585,7 +601,7 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipeline(
     oneInputPipeline->pushBack(setWindowFields(expCtx, fmt::format("{}_rank", prefix)));
     oneInputPipeline->pushBack(addScoreField(expCtx, prefix, rankConstant, weight));
     if (includeScoreDetails) {
-        oneInputPipeline->pushBack(addScoreDetails(expCtx, prefix));
+        oneInputPipeline->pushBack(addScoreDetails(expCtx, prefix, inputGeneratesScore));
     }
     std::vector<BSONObj> bsonPipeline = oneInputPipeline->serializeToBson();
 
@@ -700,14 +716,24 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
         // If not, the default is one.
         double pipelineWeight = getPipelineWeight(weights, name);
 
+        // TODO SERVER-100404 Once $meta: "score" validation works for sharded queries, we can
+        // use hybrid_scoring_util::isScoredPipeline to toggle inputGeneratesScore.
+        const bool inputGeneratesScore = false;
+
         if (outputStages.empty()) {
             // First pipeline.
             makeSureSortKeyIsOutput(pipeline->getSources());
+
+
             while (!pipeline->getSources().empty()) {
                 outputStages.push_back(pipeline->popFront());
             }
-            auto firstPipelineStages = buildFirstPipelineStages(
-                name, rankConstant, pipelineWeight, includeScoreDetails, pExpCtx);
+            auto firstPipelineStages = buildFirstPipelineStages(name,
+                                                                rankConstant,
+                                                                pipelineWeight,
+                                                                includeScoreDetails,
+                                                                inputGeneratesScore,
+                                                                pExpCtx);
             for (const auto& stage : firstPipelineStages) {
                 outputStages.push_back(std::move(stage));
             }
@@ -717,6 +743,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
                                                          pipelineWeight,
                                                          std::move(pipeline),
                                                          includeScoreDetails,
+                                                         inputGeneratesScore,
                                                          pExpCtx);
             outputStages.push_back(unionWithStage);
         }

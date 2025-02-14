@@ -477,8 +477,9 @@ private:
             ? DepsTracker::kOnlyTextScore
             : DepsTracker::kNoMetadata;
 
-        // TODO SERVER-35424 Right now we don't validate geo near metadata here, so we mark it as
-        // available. We should implement better dependency tracking for $geoNear.
+
+        // TODO SERVER-35424 / SERVER-100404 Right now we don't validate geo near metadata here, so
+        // we mark it as available. We should implement better dependency tracking for $geoNear.
         availableMetadata |= DepsTracker::kAllGeoNearData;
         (void)_splitPipeline.mergePipeline->getDependencies(availableMetadata);
     }

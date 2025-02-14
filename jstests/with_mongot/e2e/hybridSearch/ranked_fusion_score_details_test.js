@@ -63,7 +63,7 @@ let testQuery = [
             scoreDetails: true,
         },
     },
-    {$addFields: {details: {$meta: "scoreDetails"}, score: {$meta: "score"}}},
+    {$addFields: {details: {$meta: "scoreDetails"}}},
     {$project: {plot_embedding: 0}}
 ];
 
@@ -126,7 +126,7 @@ testQuery = [
             scoreDetails: true,
         },
     },
-    {$project: {details: {$meta: "scoreDetails"}, score: {$meta: "score"}}}
+    {$project: {details: {$meta: "scoreDetails"}}}
 ];
 results = coll.aggregate(testQuery).toArray();
 
@@ -155,7 +155,8 @@ for (const foundDoc of results) {
     assertFieldPresent("rank", secondVectorDetails);
     assertFieldPresent("weight", secondVectorDetails);
     assert.eq(secondVectorDetails["weight"], 2.8);
-    assertFieldPresent("value", secondVectorDetails);  // Original 'score' AKA vectorSearchScore.
+    // TODO SERVER-100404: Re-enable "value" field.
+    // assertFieldPresent("value", secondVectorDetails);  // Original 'score' AKA vectorSearchScore.
     assertFieldPresent("details",
                        secondVectorDetails);  // Not checking description contents, just that its
                                               // present and not our placeholder value.
@@ -166,7 +167,8 @@ for (const foundDoc of results) {
     assert.eq(vectorDetails["inputPipelineName"], "vector");
     assertFieldPresent("details", vectorDetails);
     assert.eq(vectorDetails["details"], []);
-    assertFieldPresent("value", vectorDetails);  // Original 'score' AKA vectorSearchScore.
+    // TODO SERVER-100404: Re-enable "value" field.
+    // assertFieldPresent("value", vectorDetails);  // Original 'score' AKA vectorSearchScore.
     assertFieldPresent("rank", vectorDetails);
     assertFieldPresent("weight", vectorDetails);
     assert.eq(vectorDetails["weight"], 0.5);
@@ -192,7 +194,7 @@ testQuery = [
             scoreDetails: true,
         },
     },
-    {$addFields: {details: {$meta: "scoreDetails"}, score: {$meta: "score"}}},
+    {$addFields: {details: {$meta: "scoreDetails"}}},
     {$project: {plot_embedding: 0}}
 ];
 

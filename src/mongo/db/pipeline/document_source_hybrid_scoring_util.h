@@ -33,18 +33,20 @@
 #include "mongo/db/pipeline/document_source_rank_fusion_inputs_gen.h"
 #include "mongo/db/pipeline/document_source_score_fusion_inputs_gen.h"
 
-namespace mongo {
+namespace mongo::hybrid_scoring_util {
 
 /**
- * Generic function to check inputs is not empty.
+ * Checks if this stage is a $score stage, where it has been desugared to $setMetadata with the meta
+ * type MetaType::kScore.
  */
-template <typename T>
-Status requireNonEmpty(const std::vector<T>& inputs);
+bool isScoreStage(const boost::intrusive_ptr<DocumentSource>& stage);
 
 /**
- * Helper function to validate that there is at least one input pipeline for a hybrid scoring
- * $scoreFusion stage.
+ * Checks if this pipeline will generate score metadata.
+ *
+ * TODO SERVER-100394 This custom logic should be able to be replaced by using DepsTracker to
+ * walk the pipeline and see if "score" metadata is produced.
  */
-Status validateScoreFusionMinInputs(const std::vector<ScoreFusionInputsSpec>& inputs);
+bool isScoredPipeline(const Pipeline& pipeline);
 
-}  // namespace mongo
+}  // namespace mongo::hybrid_scoring_util

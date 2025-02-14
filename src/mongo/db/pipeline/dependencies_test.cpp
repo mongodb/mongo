@@ -57,8 +57,9 @@ TEST(DependenciesTest, CheckClassConstants) {
     ASSERT_TRUE(DepsTracker::kAllGeoNearData[DocumentMetadataFields::kGeoNearDist]);
     ASSERT_EQ(DepsTracker::kAllGeoNearData.count(), 2);
     ASSERT_TRUE(DepsTracker::kAllMetadata.all());
-    ASSERT_EQ(DepsTracker::kOnlyTextScore.count(), 1);
+    ASSERT_EQ(DepsTracker::kOnlyTextScore.count(), 2);
     ASSERT_TRUE(DepsTracker::kOnlyTextScore[DocumentMetadataFields::kTextScore]);
+    ASSERT_TRUE(DepsTracker::kOnlyTextScore[DocumentMetadataFields::kScore]);
 }
 
 TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfMetadataAvailableAndNeeded) {
@@ -71,6 +72,7 @@ TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfMetadataAvailableAndNeeded) {
 TEST(DependenciesNeedsMetadataTest, ShouldThrowIfTextMetadataUnavailableButNeeded) {
     DepsTracker deps(DepsTracker::kAllGeoNearData);
     ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kTextScore), AssertionException);
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kScore), AssertionException);
 }
 
 TEST(DependenciesNeedsMetadataTest, ShouldThrowIfGeoMetadataUnavailableButNeeded) {
@@ -111,6 +113,13 @@ TEST(DependenciesNeedsMetadataTest, ShouldThrowIfNoMetadataAvailableButNeeded) {
     ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kTextScore), AssertionException);
     ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint), AssertionException);
     ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearDist), AssertionException);
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kScore), AssertionException);
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldSucceedTextScoreWithScoreAlias) {
+    DepsTracker deps(DepsTracker::kOnlyTextScore);
+    deps.setNeedsMetadata(DocumentMetadataFields::kScore);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kScore));
 }
 
 // Only a handful of metadata fields will throw if you try to reference them when not available.
@@ -144,6 +153,68 @@ TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfNotTrackingAvailableMetadataA
     DepsTracker deps((DepsTracker::NoMetadataValidation()));
     ASSERT_FALSE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
     ASSERT_FALSE(deps.getNeedsAnyMetadata());
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfSetTextMetadataAvailableThenIsNeeded) {
+    DepsTracker deps(DepsTracker::kNoMetadata);
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+
+    // Set text score metadata available, even though no metadata was originally available.
+    deps.setMetadataAvailable(DocumentMetadataFields::kTextScore);
+
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+
+    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
+    ASSERT_TRUE(deps.getNeedsAnyMetadata());
+
+    deps.setNeedsMetadata(DocumentMetadataFields::kScore);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kScore));
+    ASSERT_TRUE(deps.getNeedsAnyMetadata());
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfSetGeoMetadataAvailableThenIsNeeded) {
+    DepsTracker deps(DepsTracker::kNoMetadata);
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+
+    // Set text score metadata available, even though no metadata was originally available.
+    deps.setMetadataAvailable(DepsTracker::kAllGeoNearData);
+
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+
+    deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearDist);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kGeoNearDist));
+    ASSERT_TRUE(deps.getNeedsAnyMetadata());
+
+    deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kGeoNearPoint));
+    ASSERT_TRUE(deps.getNeedsAnyMetadata());
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldThrowIfSetTextMetadataAvailableButGeoIsNeeded) {
+    DepsTracker deps(DepsTracker::kNoMetadata);
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+
+    // Set text score metadata available, even though no metadata was originally available.
+    deps.setMetadataAvailable(DocumentMetadataFields::kTextScore);
+
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearDist), AssertionException);
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint), AssertionException);
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldThrowIfSetGeoMetadataAvailableButTextScoreIsNeeded) {
+    DepsTracker deps(DepsTracker::kNoMetadata);
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+
+    // Set geo metadata available, even though no metadata was originally available.
+    deps.setMetadataAvailable(DepsTracker::kAllGeoNearData);
+
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kScore), AssertionException);
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kTextScore), AssertionException);
 }
 
 TEST(DependenciesToProjectionTest, ShouldIncludeAllFieldsAndExcludeIdIfNotSpecified) {
