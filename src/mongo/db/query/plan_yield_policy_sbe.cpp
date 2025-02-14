@@ -38,9 +38,7 @@ void PlanYieldPolicySBE::saveState(OperationContext* opCtx) {
     }
 }
 
-void PlanYieldPolicySBE::restoreState(OperationContext* opCtx,
-                                      const Yieldable*,
-                                      RestoreContext::RestoreType restoreType) {
+void PlanYieldPolicySBE::restoreState(OperationContext* opCtx, const Yieldable*) {
     for (auto&& root : _yieldingPlans) {
         root->restoreState(!_useExperimentalCommitTxnBehavior /* relinquish cursor */);
     }

@@ -75,9 +75,7 @@ public:
 private:
     void saveState(OperationContext* opCtx) override;
 
-    void restoreState(OperationContext* opCtx,
-                      const Yieldable* yieldable,
-                      RestoreContext::RestoreType restoreType) override;
+    void restoreState(OperationContext* opCtx, const Yieldable* yieldable) override;
 
     // TODO SERVER-59620: Remove this.
     bool useExperimentalCommitTxnBehavior() const override {

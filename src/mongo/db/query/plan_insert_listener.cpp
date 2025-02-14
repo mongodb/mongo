@@ -114,20 +114,16 @@ void waitForInserts(OperationContext* opCtx,
     ON_BLOCK_EXIT([curOp] { curOp->resumeTimer(); });
 
     notifier->prepareForWait(opCtx);
-    auto yieldResult = yieldPolicy->yieldOrInterrupt(
-        opCtx,
-        [opCtx, &notifier] {
-            const auto deadline = awaitDataState(opCtx).waitForInsertsDeadline;
-            notifier->waitUntil(opCtx, deadline);
-            if (MONGO_unlikely(planExecutorHangWhileYieldedInWaitForInserts.shouldFail())) {
-                LOGV2(4452903,
-                      "PlanExecutor - planExecutorHangWhileYieldedInWaitForInserts fail point "
-                      "enabled. "
-                      "Blocking until fail point is disabled");
-                planExecutorHangWhileYieldedInWaitForInserts.pauseWhileSet();
-            }
-        },
-        RestoreContext::RestoreType::kYield);
+    auto yieldResult = yieldPolicy->yieldOrInterrupt(opCtx, [opCtx, &notifier] {
+        const auto deadline = awaitDataState(opCtx).waitForInsertsDeadline;
+        notifier->waitUntil(opCtx, deadline);
+        if (MONGO_unlikely(planExecutorHangWhileYieldedInWaitForInserts.shouldFail())) {
+            LOGV2(4452903,
+                  "PlanExecutor - planExecutorHangWhileYieldedInWaitForInserts fail point enabled. "
+                  "Blocking until fail point is disabled");
+            planExecutorHangWhileYieldedInWaitForInserts.pauseWhileSet();
+        }
+    });
     notifier->doneWaiting(opCtx);
 
     uassertStatusOK(yieldResult);

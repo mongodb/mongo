@@ -60,8 +60,6 @@ int sgn(int i) {
 
 namespace mongo {
 
-MONGO_FAIL_POINT_DEFINE(throwDuringIndexScanRestore);
-
 // static
 const char* IndexScan::kStageType = "IXSCAN";
 
@@ -286,14 +284,8 @@ void IndexScan::doSaveStateRequiresIndex() {
 }
 
 void IndexScan::doRestoreStateRequiresIndex() {
-    if (_indexCursor) {
-        if (MONGO_unlikely(throwDuringIndexScanRestore.shouldFail())) {
-            throwTemporarilyUnavailableException(str::stream()
-                                                 << "Hit failpoint '"
-                                                 << throwDuringIndexScanRestore.getName() << "'.");
-        }
+    if (_indexCursor)
         _indexCursor->restore();
-    }
 }
 
 void IndexScan::doDetachFromOperationContext() {
