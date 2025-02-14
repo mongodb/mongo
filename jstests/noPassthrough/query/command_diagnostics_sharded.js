@@ -6,10 +6,12 @@
  */
 import {
     assertOnDiagnosticLogContents,
+    getDiagnosticLogs,
     queryPlannerAlwaysFails,
     runWithFailpoint
 } from "jstests/libs/query/command_diagnostic_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {setParameter} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const hasEnterpriseModule = getBuildInfo().modules.includes("enterprise");
 const dbName = "test";
@@ -45,10 +47,33 @@ function runTest({
         "locks: {}",
         "flowControl: {}",
     ]);
-
-    jsTestLog("Running test case:", tojson({description, command, expectedDiagnosticInfo, redact}));
-
     const {failpointName, failpointOpts, errorCode} = queryPlannerAlwaysFails;
+
+    // If the knob for diagnostic logging is disabled, ensure that we do not see any diagnostic
+    // logging.
+    setParameter(conn, "enableDiagnosticLogging", false);
+    jsTestLog("Running test case with knob disabled: ",
+              tojson({description, command, expectedDiagnosticInfo, redact}));
+    runWithFailpoint(db, failpointName, failpointOpts, () => {
+        // BulkWrites don't fail if sub-operations fail, but they would still generate the
+        // diagnostic log if the knob was enabled.
+        if (!command.bulkWrite) {
+            assert.commandFailedWithCode(db.runCommand(command), errorCode, description);
+        } else {
+            assert.commandWorked(db.adminCommand(command), description);
+        }
+    });
+
+    const commandDiagnostics =
+        getDiagnosticLogs({description: description, logFile: conn.fullOptions.logFile});
+    assert.eq(commandDiagnostics.length,
+              0,
+              `${description}: found an unexpected log line containing command diagnostics`);
+
+    // Now enable the knob and ensure that we do see the expected logs.
+    setParameter(conn, "enableDiagnosticLogging", true);
+    jsTestLog("Running test case with knob enabled:",
+              tojson({description, command, expectedDiagnosticInfo, redact}));
     runWithFailpoint(db, failpointName, failpointOpts, () => {
         // BulkWrites don't fail if sub-operations fail, but they still generate the diagnostic log.
         if (!command.bulkWrite) {

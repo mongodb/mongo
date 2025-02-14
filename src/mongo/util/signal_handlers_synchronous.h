@@ -39,6 +39,10 @@
 #include "mongo/util/dynamic_catch.h"
 
 namespace mongo {
+/**
+ * Sets the appropriate state to enable/disable diagnostic logging based on `newVal`.
+ */
+void setDiagnosticLoggingInSignalHandlers(bool newVal);
 
 /**
  * Restores the default signal handlers and ends the process.

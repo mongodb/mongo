@@ -5,10 +5,12 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {
     assertOnDiagnosticLogContents,
     failAllInserts,
+    getDiagnosticLogs,
     planExecutorAlwaysFails,
     queryPlannerAlwaysFails,
     runWithFailpoint
 } from "jstests/libs/query/command_diagnostic_utils.js";
+import {setParameter} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const hasEnterpriseModule = getBuildInfo().modules.includes("enterprise");
 
@@ -58,8 +60,28 @@ function runTest({
         assert.commandWorked(db.adminCommand({setParameter: 1, redactClientLogData: redact}));
     }
 
+    // If the knob for diagnostic logging is disabled, ensure that we do not see any diagnostic
+    // logging.
+    setParameter(conn, "enableDiagnosticLogging", false);
     runWithFailpoint(db, failpointName, failpointOpts, () => {
-        print("Running test case:", description);
+        jsTestLog("Running test case with knob disabled: ", description);
+        if (errorCode) {
+            assert.commandFailedWithCode(db.runCommand(command), errorCode, description);
+        } else {
+            assert.commandWorked(db.runCommand(command), description);
+        }
+    });
+
+    const commandDiagnostics =
+        getDiagnosticLogs({description: description, logFile: conn.fullOptions.logFile});
+    assert.eq(commandDiagnostics.length,
+              0,
+              `${description}: found an unexpected log line containing command diagnostics`);
+
+    // Now enable the knob and ensure that we do see the expected logs.
+    setParameter(conn, "enableDiagnosticLogging", true);
+    runWithFailpoint(db, failpointName, failpointOpts, () => {
+        jsTestLog("Running test case with knob enabled:", description);
         if (errorCode) {
             assert.commandFailedWithCode(db.runCommand(command), errorCode, description);
         } else {
@@ -420,7 +442,7 @@ runTest({
 
     const {cursor} = assert.commandWorked(db.runCommand({find: collName, batchSize: 0}));
     runWithFailpoint(db, failpointName, failpointOpts, () => {
-        print("Testing getMore");
+        jsTestLog("Testing getMore");
         assert.commandFailedWithCode(
             db.runCommand({getMore: cursor.id, collection: collName}), errorCode, description);
     });

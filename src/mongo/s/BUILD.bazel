@@ -861,6 +861,7 @@ mongo_cc_library(
         "//src/mongo/transport:message_compressor_options_server",
         "//src/mongo/transport:session_manager",
         "//src/mongo/transport:transport_layer_manager",
+        "//src/mongo/util:assert_util_params",
         "//src/mongo/util:clock_sources",
         "//src/mongo/util:fail_point",
         "//src/mongo/util/net:http_client_impl",

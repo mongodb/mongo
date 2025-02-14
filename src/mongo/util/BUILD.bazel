@@ -641,6 +641,25 @@ mongo_cc_library(
     ],
 )
 
+idl_generator(
+    name = "assert_util_parameters_gen",
+    src = "assert_util_parameters.idl",
+)
+
+mongo_cc_library(
+    name = "assert_util_params",
+    srcs = [
+        "assert_util_parameters.cpp",
+        ":assert_util_parameters_gen",
+    ],
+    hdrs = [
+        "assert_util_parameters.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
 mongo_cc_library(
     name = "signal_handlers",
     srcs = [

@@ -72,6 +72,9 @@
 
 namespace mongo {
 
+// Used by `dumpScopedDebugInfo` below to determine if we should log anything.
+Atomic<bool> shouldLogScopedDebugInfoInSignalHandlers{true};
+
 namespace {
 
 using namespace fmt::literals;
@@ -209,6 +212,9 @@ void printSignal(int signalNum) {
 }
 
 void dumpScopedDebugInfo(std::ostream& os) {
+    if (!shouldLogScopedDebugInfoInSignalHandlers.load()) {
+        return;
+    }
     auto diagStack = scopedDebugInfoStack().getAll();
     if (diagStack.empty())
         return;
@@ -347,6 +353,10 @@ void setupSignalTestingHandler() {
 #endif
 
 }  // namespace
+
+void setDiagnosticLoggingInSignalHandlers(bool newVal) {
+    shouldLogScopedDebugInfoInSignalHandlers.store(newVal);
+}
 
 void endProcessWithSignal(int signalNum) {
 #if defined(_WIN32)
