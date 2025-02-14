@@ -154,7 +154,7 @@ private:
 
     void updateStorageSizeStat();
 
-    MemoryUsageTracker::Impl _memTracker;
+    SimpleMemoryUsageTracker _memTracker;
 
     ExpressionContext* _expCtx;
     std::deque<MemoryUsageTokenWith<Document>> _memCache;

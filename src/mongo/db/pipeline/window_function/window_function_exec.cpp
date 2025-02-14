@@ -99,7 +99,7 @@ std::unique_ptr<WindowFunctionExec> translateDocumentWindow(
     boost::intrusive_ptr<window_function::Expression> expr,
     const boost::optional<SortPattern>& sortBy,
     const WindowBounds::DocumentBased& bounds,
-    MemoryUsageTracker::Impl* memTracker) {
+    SimpleMemoryUsageTracker* memTracker) {
     auto inputExpr = translateInputExpression(expr, sortBy);
 
     return visit(
@@ -121,7 +121,7 @@ std::unique_ptr<mongo::WindowFunctionExec> translateDerivative(
     window_function::ExpressionDerivative* expr,
     PartitionIterator* iter,
     const boost::optional<SortPattern>& sortBy,
-    MemoryUsageTracker::Impl* memTracker) {
+    SimpleMemoryUsageTracker* memTracker) {
     tassert(5490703,
             "$derivative requires a 1-field sortBy",
             sortBy && sortBy->size() == 1 && !sortBy->begin()->expression);
@@ -145,7 +145,7 @@ std::unique_ptr<mongo::WindowFunctionExec> translateMinMaxScalar(
     window_function::ExpressionMinMaxScalar* minMaxScalarExpr,
     PartitionIterator* iter,
     const boost::optional<SortPattern>& sortBy,
-    MemoryUsageTracker::Impl* memTracker) {
+    SimpleMemoryUsageTracker* memTracker) {
     WindowBounds bounds = minMaxScalarExpr->bounds();
     return visit(
         OverloadedVisitor{
@@ -218,7 +218,7 @@ std::unique_ptr<WindowFunctionExec> WindowFunctionExec::create(
     const boost::optional<SortPattern>& sortBy,
     MemoryUsageTracker* memTracker) {
 
-    MemoryUsageTracker::Impl& functionMemTracker = (*memTracker)[functionStmt.fieldName];
+    SimpleMemoryUsageTracker& functionMemTracker = (*memTracker)[functionStmt.fieldName];
     if (auto expr = dynamic_cast<window_function::ExpressionDerivative*>(functionStmt.expr.get())) {
         return translateDerivative(expr, iter, sortBy, &functionMemTracker);
     } else if (auto expr = dynamic_cast<window_function::ExpressionMinMaxScalar*>(

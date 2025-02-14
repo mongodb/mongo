@@ -43,7 +43,7 @@ public:
 
 
     MemoryUsageTracker _tracker;
-    MemoryUsageTracker::Impl _funcTracker;
+    SimpleMemoryUsageTracker _funcTracker;
 };
 
 TEST_F(MemoryUsageTrackerTest, SetFunctionUsageUpdatesGlobal) {

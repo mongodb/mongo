@@ -30,7 +30,7 @@
 #include <cstdint>
 
 namespace mongo {
-// TODO SERVER-98972 Replace this.
+// TODO SERVER-100671 Replace this.
 class OperationMemoryUsageTracker {
 public:
     OperationMemoryUsageTracker(int64_t currentMemoryBytes = 0, int64_t maxUsedMemoryBytes = 0)

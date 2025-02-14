@@ -61,7 +61,7 @@ public:
                                         boost::intrusive_ptr<Expression> input,
                                         std::unique_ptr<WindowFunctionState> function,
                                         WindowBounds::DocumentBased bounds,
-                                        MemoryUsageTracker::Impl* memTracker);
+                                        SimpleMemoryUsageTracker* memTracker);
 
 private:
     void update() final;

@@ -90,11 +90,11 @@ public:
     virtual void reset() = 0;
 
 protected:
-    WindowFunctionExec(PartitionAccessor iter, MemoryUsageTracker::Impl* memTracker)
+    WindowFunctionExec(PartitionAccessor iter, SimpleMemoryUsageTracker* memTracker)
         : _iter(iter), _memTracker(memTracker){};
 
     PartitionAccessor _iter;
-    MemoryUsageTracker::Impl* _memTracker;
+    SimpleMemoryUsageTracker* _memTracker;
 };
 
 /**
@@ -126,7 +126,7 @@ protected:
                                 PartitionAccessor::Policy policy,
                                 boost::intrusive_ptr<Expression> input,
                                 std::unique_ptr<WindowFunctionState> function,
-                                MemoryUsageTracker::Impl* memTracker)
+                                SimpleMemoryUsageTracker* memTracker)
         : WindowFunctionExec(PartitionAccessor(iter, policy), memTracker),
           _input(std::move(input)),
           _function(std::move(function)) {

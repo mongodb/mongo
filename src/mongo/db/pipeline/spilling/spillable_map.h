@@ -212,7 +212,7 @@ private:
 
     void updateStorageSizeStat();
 
-    mutable MemoryUsageTracker::Impl _memTracker;
+    mutable SimpleMemoryUsageTracker _memTracker;
     ExpressionContext* _expCtx;
 
     ValueFlatUnorderedMap<MemoryUsageTokenWith<Document>> _memMap =

@@ -68,7 +68,7 @@ public:
                                  boost::intrusive_ptr<Expression> time,
                                  WindowBounds bounds,
                                  boost::optional<TimeUnit> unit,
-                                 MemoryUsageTracker::Impl* memTracker)
+                                 SimpleMemoryUsageTracker* memTracker)
         : WindowFunctionExec(PartitionAccessor(iter, PartitionAccessor::Policy::kEndpoints),
                              memTracker),
           _position(std::move(position)),

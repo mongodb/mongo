@@ -46,7 +46,7 @@ public:
                                         boost::intrusive_ptr<ExpressionFieldPath> sortExpr,
                                         boost::intrusive_ptr<AccumulatorState> function,
                                         WindowBounds bounds,
-                                        MemoryUsageTracker::Impl* memTracker)
+                                        SimpleMemoryUsageTracker* memTracker)
         : WindowFunctionExec(PartitionAccessor(iter, PartitionAccessor::Policy::kRightEndpoint),
                              memTracker),
           _input(std::move(input)),

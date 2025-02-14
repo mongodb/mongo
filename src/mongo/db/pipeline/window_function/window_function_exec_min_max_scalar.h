@@ -45,7 +45,7 @@ public:
     WindowFunctionExecMinMaxScalarNonRemovable(PartitionIterator* iter,
                                                boost::intrusive_ptr<Expression> input,
                                                std::pair<Value, Value> sMinAndsMax,
-                                               MemoryUsageTracker::Impl* memTracker)
+                                               SimpleMemoryUsageTracker* memTracker)
         : WindowFunctionExec(PartitionAccessor(iter, PartitionAccessor::Policy::kEndpoints),
                              memTracker),
           _input(input),

@@ -35,7 +35,6 @@
 #include <algorithm>
 #include <boost/noncopyable.hpp>
 #include <cstddef>
-#include <memory>
 #include <string>
 #include <utility>
 
@@ -45,6 +44,62 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
+
+/**
+ * Memory usage tracker for use cases where we don't need per-function memory tracking.
+ */
+class SimpleMemoryUsageTracker {
+public:
+    SimpleMemoryUsageTracker(SimpleMemoryUsageTracker* base, int64_t maxAllowedMemoryUsageBytes)
+        : _base(base), _maxAllowedMemoryUsageBytes(maxAllowedMemoryUsageBytes) {}
+
+    SimpleMemoryUsageTracker(int64_t maxAllowedMemoryUsageBytes)
+        : SimpleMemoryUsageTracker(nullptr, maxAllowedMemoryUsageBytes) {}
+
+    void add(int64_t diff) {
+        _currentMemoryBytes += diff;
+        tassert(6128100,
+                str::stream() << "Underflow in memory tracking, attempting to add " << diff
+                              << " but only " << _currentMemoryBytes - diff << " available",
+                _currentMemoryBytes >= 0);
+        if (_currentMemoryBytes > _maxMemoryBytes) {
+            _maxMemoryBytes = _currentMemoryBytes;
+        }
+        if (_base) {
+            _base->add(diff);
+        }
+    }
+
+    void set(int64_t total) {
+        add(total - _currentMemoryBytes);
+    }
+
+    int64_t currentMemoryBytes() const {
+        return _currentMemoryBytes;
+    }
+
+    int64_t maxMemoryBytes() const {
+        return _maxMemoryBytes;
+    }
+
+    bool withinMemoryLimit() const {
+        return _currentMemoryBytes <= _maxAllowedMemoryUsageBytes;
+    }
+
+    int64_t maxAllowedMemoryUsageBytes() const {
+        return _maxAllowedMemoryUsageBytes;
+    }
+
+private:
+    SimpleMemoryUsageTracker* _base = nullptr;
+
+    // Maximum memory consumption thus far observed for this function.
+    int64_t _maxMemoryBytes = 0;
+    // Tracks the current memory footprint.
+    int64_t _currentMemoryBytes = 0;
+
+    int64_t _maxAllowedMemoryUsageBytes;
+};
 
 /**
  * This is a utility class for tracking memory usage across multiple arbitrary operators or
@@ -65,60 +120,6 @@ namespace mongo {
  */
 class MemoryUsageTracker {
 public:
-    /**
-     * The class that does the tracking. Instances should be created via
-     * MemoryUsageTracker::operator[].
-     */
-    class Impl {
-    public:
-        Impl(Impl* base, int64_t maxAllowedMemoryUsageBytes)
-            : _base(base), _maxAllowedMemoryUsageBytes(maxAllowedMemoryUsageBytes){};
-
-        void add(int64_t diff) {
-            _currentMemoryBytes += diff;
-            tassert(6128100,
-                    str::stream() << "Underflow in memory tracking, attempting to add " << diff
-                                  << " but only " << _currentMemoryBytes - diff << " available",
-                    _currentMemoryBytes >= 0);
-            if (_currentMemoryBytes > _maxMemoryBytes) {
-                _maxMemoryBytes = _currentMemoryBytes;
-            }
-            if (_base) {
-                _base->add(diff);
-            }
-        }
-
-        void set(int64_t total) {
-            add(total - _currentMemoryBytes);
-        }
-
-        int64_t currentMemoryBytes() const {
-            return _currentMemoryBytes;
-        }
-
-        int64_t maxMemoryBytes() const {
-            return _maxMemoryBytes;
-        }
-
-        bool withinMemoryLimit() const {
-            return _currentMemoryBytes <= _maxAllowedMemoryUsageBytes;
-        }
-
-        int64_t maxAllowedMemoryUsageBytes() const {
-            return _maxAllowedMemoryUsageBytes;
-        }
-
-    private:
-        Impl* _base = nullptr;
-
-        // Maximum memory consumption thus far observed for this function.
-        int64_t _maxMemoryBytes = 0;
-        // Tracks the current memory footprint.
-        int64_t _currentMemoryBytes = 0;
-
-        int64_t _maxAllowedMemoryUsageBytes;
-    };
-
     MemoryUsageTracker(bool allowDiskUse = false, int64_t maxMemoryUsageBytes = 0)
         : _allowDiskUse(allowDiskUse), _baseTracker(nullptr, maxMemoryUsageBytes) {}
 
@@ -151,7 +152,7 @@ public:
     /**
      * Non-const version, creates a new element if one doesn't exist and returns a reference to it.
      */
-    Impl& operator[](StringData name) {
+    SimpleMemoryUsageTracker& operator[](StringData name) {
         auto [it, _] = _functionMemoryTracker.try_emplace(
             _key(name), &_baseTracker, _baseTracker.maxAllowedMemoryUsageBytes());
         return it->second;
@@ -197,7 +198,7 @@ public:
     }
 
 private:
-    Impl& _impl() {
+    SimpleMemoryUsageTracker& _tracker() {
         return _baseTracker;
     }
 
@@ -207,53 +208,11 @@ private:
 
     bool _allowDiskUse;
     // Tracks current memory used.
-    Impl _baseTracker;
+    SimpleMemoryUsageTracker _baseTracker;
     // Tracks memory consumption per function using the output field name as a key.
-    stdx::unordered_map<std::string, Impl> _functionMemoryTracker;
+    stdx::unordered_map<std::string, SimpleMemoryUsageTracker> _functionMemoryTracker;
 };
 
-// Lightweight version of memory usage tracker for use cases where we don't need historical maximum
-// and per-function memory tracking.
-class SimpleMemoryUsageTracker {
-public:
-    SimpleMemoryUsageTracker(int64_t maxAllowedMemoryUsageBytes)
-        : _maxAllowedMemoryUsageBytes(maxAllowedMemoryUsageBytes){};
-
-    void set(int64_t value) {
-        _currentMemoryBytes = value;
-    }
-
-    void add(int64_t diff) {
-        _currentMemoryBytes += diff;
-        tassert(6128101,
-                str::stream() << "Underflow in memory tracking, attempting to add " << diff
-                              << " but only " << _currentMemoryBytes - diff << " available",
-                _currentMemoryBytes >= 0);
-    }
-
-    int64_t currentMemoryBytes() const {
-        return _currentMemoryBytes;
-    }
-
-    int64_t maxAllowedMemoryUsageBytes() const {
-        return _maxAllowedMemoryUsageBytes;
-    }
-
-    bool withinMemoryLimit() const {
-        return _currentMemoryBytes <= _maxAllowedMemoryUsageBytes;
-    }
-
-private:
-    int64_t _currentMemoryBytes = 0;
-    const int64_t _maxAllowedMemoryUsageBytes;
-};
-
-/**
- * An RAII utility class which can make it easy to account for some new allocation in a given
- * 'MemoryUsageTracker' for the entire lifetime of the object. This is meant to be a static
- * allocation that is released when it goes out of scope, for a dynamic instance use
- * `MemoryUsageHandle`
- */
 template <typename Tracker>
 class MemoryUsageTokenImpl : private boost::noncopyable {
 public:
@@ -309,7 +268,7 @@ protected:
     int64_t _curMemoryUsageBytes{0};
 };
 
-using MemoryUsageToken = MemoryUsageTokenImpl<MemoryUsageTracker::Impl>;
+using MemoryUsageToken = MemoryUsageTokenImpl<SimpleMemoryUsageTracker>;
 using SimpleMemoryUsageToken = MemoryUsageTokenImpl<SimpleMemoryUsageTracker>;
 
 /**
@@ -344,7 +303,7 @@ private:
 };
 
 template <typename T>
-using MemoryUsageTokenWith = MemoryUsageTokenWithImpl<MemoryUsageTracker::Impl, T>;
+using MemoryUsageTokenWith = MemoryUsageTokenWithImpl<SimpleMemoryUsageTracker, T>;
 
 template <typename T>
 using SimpleMemoryUsageTokenWith = MemoryUsageTokenWithImpl<SimpleMemoryUsageTracker, T>;
