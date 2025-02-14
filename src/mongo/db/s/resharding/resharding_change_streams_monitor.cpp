@@ -69,6 +69,7 @@ ReshardingChangeStreamsMonitor::ReshardingChangeStreamsMonitor(
       _isRecipient(isRecipient),
       _batchProcessedCallback(callback) {}
 
+
 void ReshardingChangeStreamsMonitor::startMonitoring(
     std::shared_ptr<executor::TaskExecutor> executor, CancelableOperationContextFactory factory) {
     if (_finalEventPromise) {
@@ -90,10 +91,11 @@ void ReshardingChangeStreamsMonitor::startMonitoring(
                             "The resharding change streams monitor failed",
                             "reason"_attr = status);
                 _finalEventPromise->setError(status);
-                return;
             }
 
-            _finalEventPromise->emplaceValue();
+            if (_recievedFinalEvent) {
+                _finalEventPromise->emplaceValue();
+            }
         })
         .getAsync([](auto) {});
 }
@@ -148,36 +150,29 @@ void ReshardingChangeStreamsMonitor::_consumeChangeStream(OperationContext* opCt
     auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
         &client, aggRequest, false /* secondaryOk */, false /* useExhaust*/));
 
-    while (!_receivedFinalEvent) {
-        if (cursor->more()) {
-            auto doc = cursor->next();
-            _processChangeEvent(doc);
+    while (cursor->more()) {
+        auto doc = cursor->next();
+        _processChangeEvent(doc);
 
-            if (_receivedFinalEvent ||
-                _numEventsProcessed %
-                        resharding::gReshardingVerificationChangeStreamsEventsBatchSize.load() ==
-                    0) {
-                const auto resumeToken = doc.getObjectField("_id");
+        if (_recievedFinalEvent ||
+            _numEventsProcessed %
+                    resharding::gReshardingVerificationChangeStreamsEventsBatchSize.load() ==
+                0) {
+            const auto resumeToken = doc.getObjectField("_id");
+            _batchProcessedCallback(_documentDelta, resumeToken);
+            _documentDelta = 0;
 
-                // Create an alternative client so the callback can create its own opCtx to do
-                // writes without impacting the opCtx used to open the change streams cursor above.
-                auto newClient =
-                    opCtx->getServiceContext()->getService()->makeClient("AlternativeClient");
-                AlternativeClientRegion acr(newClient);
-                _batchProcessedCallback(_documentsDelta, resumeToken, _receivedFinalEvent);
-                _documentsDelta = 0;
-
-                if (MONGO_unlikely(
-                        failReshardingChangeStreamsMonitorAfterProcessingBatch.shouldFail())) {
-                    uasserted(ErrorCodes::InternalError, "Failing for failpoint");
-                }
+            if (MONGO_unlikely(
+                    failReshardingChangeStreamsMonitorAfterProcessingBatch.shouldFail())) {
+                uasserted(ErrorCodes::InternalError, "Failing for failpoint");
             }
 
-            hangReshardingChangeStreamsMonitorBeforeRecievingNextBatch.pauseWhileSet();
-        } else {
-            // TODO (SERVER-100668): Investigate if the sleep can be avoided.
-            opCtx->sleepFor(Milliseconds(1));
+            if (_recievedFinalEvent) {
+                return;
+            }
         }
+
+        hangReshardingChangeStreamsMonitorBeforeRecievingNextBatch.pauseWhileSet();
     }
 }
 
@@ -186,15 +181,15 @@ void ReshardingChangeStreamsMonitor::_processChangeEvent(const BSONObj changeEve
         changeEvent.getStringField(DocumentSourceChangeStream::kOperationTypeField);
 
     if (eventOpType == DocumentSourceChangeStream::kInsertOpType) {
-        _documentsDelta += 1;
+        _documentDelta += 1;
     } else if (eventOpType == DocumentSourceChangeStream::kDeleteOpType) {
-        _documentsDelta -= 1;
+        _documentDelta -= 1;
     } else if (eventOpType == DocumentSourceChangeStream::kReshardDoneCatchUpOpType &&
                _isRecipient) {
-        _receivedFinalEvent = true;
+        _recievedFinalEvent = true;
     } else if (eventOpType == DocumentSourceChangeStream::kReshardBlockingWritesOpType &&
                !_isRecipient) {
-        _receivedFinalEvent = true;
+        _recievedFinalEvent = true;
     } else {
         LOGV2(9981902,
               "Unrecognized event while processing change stream event for resharding validation",
