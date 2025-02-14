@@ -246,6 +246,13 @@ tasks:
       - func: "run tests"
 
   - <<: *task_template
+    name: streams_kafka_benchmark
+    tags: ["assigned_to_jira_team_streams", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
     name: streams_https
     tags: ["assigned_to_jira_team_streams", "default"]
     commands:

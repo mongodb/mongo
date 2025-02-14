@@ -403,7 +403,6 @@ buildvariants:
 
   - name: enterprise-amazon2-streams
     display_name: "Amazon Linux 2 enterprise build with streams"
-    tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - amazon2-latest-small
@@ -445,6 +444,7 @@ buildvariants:
       - name: streams
       - name: streams_kafka
       - name: streams_kafka_gwproxy
+      - name: streams_kafka_benchmark
       - name: streams_https
       - name: streams_lambda
 

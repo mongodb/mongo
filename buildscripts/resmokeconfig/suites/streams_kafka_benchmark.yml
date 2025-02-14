@@ -1,0 +1,16 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - src/mongo/db/modules/*/jstests/streams_kafka/benchmark/simple_kafka_benchmark.js
+
+executor:
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      bind_ip_all: ""
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagStreams: true
+        diagnosticDataCollectionEnabled: false
+    num_nodes: 1
