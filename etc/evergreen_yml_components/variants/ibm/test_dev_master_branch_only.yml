@@ -37,6 +37,8 @@ buildvariants:
         BAZEL_FLAGS=--jobs=4
       integration_test_compile_flags: >-
         BAZEL_FLAGS=--jobs=4
+      compile_all_but_not_unittests_flags: >-
+        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
         -Wl,--no-gnu-unique"
@@ -96,6 +98,8 @@ buildvariants:
         BAZEL_FLAGS=--jobs=4
       integration_test_compile_flags: >-
         BAZEL_FLAGS=--jobs=4
+      compile_all_but_not_unittests_flags: >-
+        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
         CCFLAGS="-fno-gnu-unique"

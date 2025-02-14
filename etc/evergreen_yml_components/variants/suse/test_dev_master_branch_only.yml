@@ -38,6 +38,8 @@ buildvariants:
         BAZEL_FLAGS=--jobs=4
       integration_test_compile_flags: >-
         BAZEL_FLAGS=--jobs=4
+      compile_all_but_not_unittests_flags: >-
+        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
       test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_ldap_pool,resource_intensive
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"

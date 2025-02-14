@@ -132,6 +132,8 @@ buildvariants:
         BAZEL_FLAGS=--jobs=4
       integration_test_compile_flags: >-
         BAZEL_FLAGS=--jobs=4
+      compile_all_but_not_unittests_flags: >-
+        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
       test_flags: --excludeWithAnyTags=requires_external_data_source
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
@@ -182,6 +184,8 @@ buildvariants:
         BAZEL_FLAGS=--jobs=4
       integration_test_compile_flags: >-
         BAZEL_FLAGS=--jobs=4
+      compile_all_but_not_unittests_flags: >-
+        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
       test_flags: --excludeWithAnyTags=requires_external_data_source
       crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
       resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
@@ -233,6 +237,8 @@ buildvariants:
         BAZEL_FLAGS=--jobs=4
       integration_test_compile_flags: >-
         BAZEL_FLAGS=--jobs=4
+      compile_all_but_not_unittests_flags: >-
+        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
       test_flags: --excludeWithAnyTags=requires_external_data_source,requires_updated_oscrypto
       crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
       resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
@@ -290,6 +296,8 @@ buildvariants:
         BAZEL_FLAGS=--jobs=4
       integration_test_compile_flags: >-
         BAZEL_FLAGS=--jobs=4
+      compile_all_but_not_unittests_flags: >-
+        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
       test_flags: --excludeWithAnyTags=requires_external_data_source
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
@@ -359,6 +367,8 @@ buildvariants:
         BAZEL_FLAGS=--jobs=4
       integration_test_compile_flags: >-
         BAZEL_FLAGS=--jobs=4
+      compile_all_but_not_unittests_flags: >-
+        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
       test_flags: --excludeWithAnyTags=requires_external_data_source
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
@@ -416,6 +426,8 @@ buildvariants:
         BAZEL_FLAGS=--jobs=4
       integration_test_compile_flags: >-
         BAZEL_FLAGS=--jobs=4
+      compile_all_but_not_unittests_flags: >-
+        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
       test_flags: --excludeWithAnyTags=requires_external_data_source,requires_updated_oscrypto
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"

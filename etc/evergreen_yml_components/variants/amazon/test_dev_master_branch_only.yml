@@ -493,6 +493,8 @@ buildvariants:
         BAZEL_FLAGS=--jobs=4
       integration_test_compile_flags: >-
         BAZEL_FLAGS=--jobs=4
+      compile_all_but_not_unittests_flags: >-
+        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
       crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
       test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source
       multiversion_platform: amazon2023
@@ -543,6 +545,8 @@ buildvariants:
         BAZEL_FLAGS=--jobs=4
       integration_test_compile_flags: >-
         BAZEL_FLAGS=--jobs=4
+      compile_all_but_not_unittests_flags: >-
+        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
       crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
       test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source
       multiversion_platform: amazon2023
@@ -587,6 +591,8 @@ buildvariants:
         BAZEL_FLAGS=--jobs=4
       integration_test_compile_flags: >-
         BAZEL_FLAGS=--jobs=4
+      compile_all_but_not_unittests_flags: >-
+        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
       has_packages: true
       packager_arch: x86_64
       packager_distro: amazon2
@@ -660,6 +666,8 @@ buildvariants:
         BAZEL_FLAGS=--jobs=4
       integration_test_compile_flags: >-
         BAZEL_FLAGS=--jobs=4
+      compile_all_but_not_unittests_flags: >-
+        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
         CCFLAGS="-fno-gnu-unique"
@@ -709,6 +717,8 @@ buildvariants:
         --link-model=static
       integration_test_compile_flags: >-
         BAZEL_FLAGS=--jobs=4
+      compile_all_but_not_unittests_flags: >-
+        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
       unittest_library_compile_flags: >-
         --link-model=dynamic
       unittest_compile_flags: >-
@@ -830,6 +840,8 @@ buildvariants:
         --link-model=static
       integration_test_compile_flags: >-
         BAZEL_FLAGS=--jobs=4
+      compile_all_but_not_unittests_flags: >-
+        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
       unittest_library_compile_flags: >-
         --link-model=dynamic
       unittest_compile_flags: >-
