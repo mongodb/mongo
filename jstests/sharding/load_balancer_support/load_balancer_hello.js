@@ -3,6 +3,11 @@
  * that have arrived through a load balancer affirm that they are
  * compatible with the way mongos handles load-balanced clients.
  * See `src/mongo/s/load_balancing_support.h`.
+ *
+ * @tags: [
+ *    requires_fcv_81,
+ * ]
+ *
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

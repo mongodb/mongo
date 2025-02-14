@@ -3,6 +3,7 @@
  * @tags: [
  *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
  *    embedded_router_incompatible,
+ *    requires_fcv_81
  * ]
  */
 import {Thread} from "jstests/libs/parallelTester.js";
@@ -32,6 +33,8 @@ function openCursor(mongosHost, dbName, collName, countdownLatch, identifyingCom
     const newDBConn = new Mongo(mongosHost).getDB(dbName);
     assert.commandWorked(newDBConn.getSiblingDB("admin").adminCommand(
         {configureFailPoint: "clientIsConnectedToLoadBalancerPort", mode: "alwaysOn"}));
+    assert.commandWorked(newDBConn.getSiblingDB("admin").adminCommand(
+        {configureFailPoint: "clientIsLoadBalancedPeer", mode: "alwaysOn"}));
     let cmdRes = newDBConn.runCommand({find: collName, comment: identifyingComment, batchSize: 1});
     assert.commandWorked(cmdRes);
     const cursorId = cmdRes.cursor.id;
@@ -95,4 +98,6 @@ assert.soon(() => {
 
 assert.commandWorked(
     admin.adminCommand({configureFailPoint: "clientIsConnectedToLoadBalancerPort", mode: "off"}));
+assert.commandWorked(
+    admin.adminCommand({configureFailPoint: "clientIsLoadBalancedPeer", mode: "off"}));
 st.stop();

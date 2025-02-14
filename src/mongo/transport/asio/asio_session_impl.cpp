@@ -55,6 +55,7 @@ MONGO_FAIL_POINT_DEFINE(asioTransportLayerSessionPauseBeforeSetSocketOption);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerBlockBeforeOpportunisticRead);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerBlockBeforeAddSession);
 MONGO_FAIL_POINT_DEFINE(clientIsConnectedToLoadBalancerPort);
+MONGO_FAIL_POINT_DEFINE(clientIsLoadBalancedPeer);
 
 namespace {
 
@@ -233,7 +234,7 @@ bool CommonAsioSession::isConnectedToLoadBalancerPort() const {
 }
 
 bool CommonAsioSession::isLoadBalancerPeer() const {
-    return _isLoadBalancerPeer;
+    return MONGO_unlikely(clientIsLoadBalancedPeer.shouldFail()) || _isLoadBalancerPeer;
 }
 
 void CommonAsioSession::setisLoadBalancerPeer(bool helloHasLoadBalancedOption) {
