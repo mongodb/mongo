@@ -217,9 +217,7 @@ bool isSargableLeaf(const MatchExpression* node) {
         case MatchExpression::MOD:
         case MatchExpression::REGEX:
         case MatchExpression::TYPE_OPERATOR:
-        case MatchExpression::GEO:
         case MatchExpression::INTERNAL_BUCKET_GEO_WITHIN:
-        case MatchExpression::INTERNAL_EQ_HASHED_KEY:
             return true;
         default:
             return false;
@@ -901,7 +899,8 @@ CEResult CardinalityEstimator::estimate(const ElemMatchValueMatchExpression* nod
     // Sampling and histogram handle this case higher up.
     tassert(9808601,
             "direct estimation of $elemMatch is currently only supported for heuristicCE",
-            _rankerMode == QueryPlanRankerModeEnum::kHeuristicCE);
+            _rankerMode == QueryPlanRankerModeEnum::kHeuristicCE ||
+                _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE);
 
     size_t selOffset = _conjSels.size();
 

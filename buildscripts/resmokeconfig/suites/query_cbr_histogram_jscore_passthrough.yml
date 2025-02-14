@@ -1,0 +1,94 @@
+# This is equivalent to the core suite, but runs with CBR with histogram CE enabled.
+test_kind: js_test
+selector:
+  roots:
+    - jstests/core/**/*.js
+    - jstests/core_standalone/**/*.js
+  exclude_files:
+    # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests in the
+    # 'core' suite. Instead we run them against a 1-node replica set in the 'core_txns' suite.
+    - jstests/core/txns/**/*.js
+    # Queryable encryption is not supported on standalone.
+    - jstests/core/query/queryable_encryption/**/*.js
+    # Query settings are not supported on standalone.
+    - jstests/core/query/query_settings/**/*.js
+    # CBR does not currently add plans to the plan cache. These tests examine the plan cache.
+    - jstests/core/query/plan_cache/*.js
+    - jstests/core/query/explain/explain_plan_cache.js
+    - jstests/core/query/partial_index_logical.js
+    - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_ixscan.js
+    - jstests/core/index/index_filter_commands.js
+    - jstests/core/index/index_filter_commands_invalidate_plan_cache_entries.js
+    # Tests that assert on op counters
+    - jstests/core/diagnostics/operation_latency_histogram.js
+    - jstests/core/query/top/top.js
+    # CBR picks a different plan which results in different results due to SERVER-23229
+    - jstests/core/query/project/projection_dotted_paths.js
+    # Asserts on output of allPlansExecution. CBR picks a single plan so there is no multiplanning.
+    - jstests/core/query/explain/explain_winning_plan.js
+    # Asserts on state of system collections. This passthrough creates statistics system collection.
+    - jstests/core/views/views_drop.js
+    # Override functions fail when view catalog is deliberately corrupted.
+    - jstests/core/views/invalid_system_views.js
+    - jstests/core/views/views_all_commands.js
+    - jstests/core/catalog/agg_internal_list_collections_stage.js
+    - jstests/core/catalog/agg_list_cluster_catalog_with_match.js
+    # This test runs many queries. This passthrough runs analyze for each indexed field on every query,
+    # causing a > 1 hour runtime. Exclude this test to keep the suite runtime reasonable.
+    - jstests/core/timeseries/query/timeseries_group_aggregations.js
+
+    # TODO SERVER-100451: $elemMatch estimation using histograms
+    - jstests/core/query/boolean_expression_simplification.js
+    # TODO SERVER-100665: Inversion of non exact index bounds
+    - jstests/core/query/nin/nin2.js
+    - jstests/core/query/regex/regex5.js
+    - jstests/core/query/sort/sort_dotted_paths.js
+    - jstests/core/query/sort/sort_dotted_paths_collation.js
+    - jstests/core/index/wildcard/wildcard_and_with_not.js
+    - jstests/core/query/and/and3.js
+    - jstests/core/query/not/not2.js
+    - jstests/core/query/type/type_operator_on_missing_values.js
+
+    # TODO SERVER-100610: Test directly or indirectly asserts on specific plan chosen
+    - jstests/core/query/sort/sort_array.js
+    - jstests/core/query/sort/sortg.js
+    - jstests/core/index/index_check2.js
+
+    # TODO SERVER-92589: Fails in all feature flags variant because SBE explain not supported
+    - jstests/core/query/index_deduplication.js
+    - jstests/core/query/explain/explain_all_plans_execution_stats.js
+    - jstests/core/query/explain/explain_multi_plan.js
+
+    # TODO SERVER-100417: Count commands not costed correctly
+    - jstests/core/query/explain/explain_multi_plan_count.js
+
+    # TODO SERVER-100739: Empty array breaks histogramCE
+    - jstests/core/query/nan.js
+
+    # TODO SERVER-100144: Parallel fetch nodes
+    - jstests/core/query/elemmatch/elemmatch_or_pushdown.js
+    - jstests/core/query/index_correctness_pbt.js
+    - jstests/core/query/run_all_plans_pbt.js
+
+  exclude_with_any_tags:
+    # Profiler entries will have different shape in CBR
+    - requires_profiling
+    # This passthrough affects opcounters
+    - inspects_command_opcounters
+    # This passthrough executes writes transparently to the test. If fsyncLock() is run, the testcase will hang.
+    - requires_fsync
+executor:
+  config:
+    shell_options:
+      crashOnInvalidBSONError: ""
+      objcheck: ""
+      eval: |
+        await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+        await import("jstests/libs/override_methods/implicit_histograms.js");
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        # Automatic mode will fallback when a predicate can't be estimated via histogram
+        planRankerMode: "automaticCE"

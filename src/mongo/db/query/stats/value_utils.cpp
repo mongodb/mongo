@@ -453,6 +453,18 @@ value::TypeTags deserialize(const std::string& name) {
         return value::TypeTags::Array;
     } else if ("Null" == name) {
         return value::TypeTags::Null;
+    } else if ("bsonUndefined" == name) {
+        return value::TypeTags::bsonUndefined;
+    } else if ("bsonJavascript" == name) {
+        return value::TypeTags::bsonJavascript;
+    } else if ("bsonBinData" == name) {
+        return value::TypeTags::bsonBinData;
+    } else if ("bsonRegex" == name) {
+        return value::TypeTags::bsonRegex;
+    } else if ("MinKey" == name) {
+        return value::TypeTags::MinKey;
+    } else if ("MaxKey" == name) {
+        return value::TypeTags::MaxKey;
     } else if ("Nothing" == name) {
         return value::TypeTags::Nothing;
     }
