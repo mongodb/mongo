@@ -76,6 +76,7 @@ selector:
     # on shutdown.
     - jstests/core_sharding/resharding/resharding_perform_verification.js
 
+    - jstests/core/query/update/update_bit_examples.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
