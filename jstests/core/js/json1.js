@@ -306,8 +306,8 @@ assertToJson({
 
 // Map type
 x = new Map();
-assertToJson({fn: () => tojson(x, "", false), expectedStr: '[ ]', assertMsg: "I1"});
-assertToJson({fn: () => toEJSON(x, "", false), expectedStr: '[ ]', assertMsg: "I2"});
+assertToJson({fn: () => tojson(x, "", false), expectedStr: 'new Map([ ])', assertMsg: "I1"});
+assertToJson({fn: () => toEJSON(x, "", false), expectedStr: 'new Map([ ])', assertMsg: "I2"});
 assertToJson(
     {fn: () => toEJSON(x), expectedStr: '{"$map":[]}', assertMsg: "I3", logFormat: "json"});
 
@@ -316,7 +316,7 @@ x.set("one", 1);
 x.set(2, "two");
 assertToJson({
     fn: () => tojson(x, "", false),
-    expectedStr: `[
+    expectedStr: `new Map([
 	[
 		"one",
 		1
@@ -325,12 +325,12 @@ assertToJson({
 		2,
 		"two"
 	]
-]`,
+])`,
     assertMsg: "J1"
 });
 assertToJson({
     fn: () => toEJSON(x, "", false),
-    expectedStr: `[
+    expectedStr: `new Map([
 	[
 		"one",
 		1
@@ -339,7 +339,7 @@ assertToJson({
 		2,
 		"two"
 	]
-]`,
+])`,
     assertMsg: "J2"
 });
 assertToJson({
@@ -354,7 +354,7 @@ x.set("one", 1);
 x.set(2, {y: [3, 4]});
 assertToJson({
     fn: () => tojson(x, "", false),
-    expectedStr: `[
+    expectedStr: `new Map([
 	[
 		"one",
 		1
@@ -368,12 +368,12 @@ assertToJson({
 			]
 		}
 	]
-]`,
+])`,
     assertMsg: "K1"
 });
 assertToJson({
     fn: () => tojson(x, "", false),
-    expectedStr: `[
+    expectedStr: `new Map([
 	[
 		"one",
 		1
@@ -387,19 +387,19 @@ assertToJson({
 			]
 		}
 	]
-]`,
+])`,
     assertMsg: "K2",
     logFormat: "json"
 });
 assertToJson({
     fn: () => tojson(x),
-    expectedStr: '[ [ "one", 1 ], [ 2, { "y" : [ 3, 4 ] } ] ]',
+    expectedStr: 'new Map([ [ "one", 1 ], [ 2, { "y" : [ 3, 4 ] } ] ])',
     assertMsg: "K3",
     logFormat: "json"
 });
 assertToJson({
     fn: () => toEJSON(x, "", false),
-    expectedStr: `[
+    expectedStr: `new Map([
 	[
 		"one",
 		1
@@ -413,7 +413,7 @@ assertToJson({
 			]
 		}
 	]
-]`,
+])`,
     assertMsg: "K4"
 });
 assertToJson({
@@ -425,6 +425,7 @@ assertToJson({
 
 assert.eq(x, x);
 assert.neq(x, new Map());
+assert.docEq(x, eval('(' + tojson(x) + ')'));
 
 y = new Map();
 y.set("one", 1);
@@ -433,9 +434,10 @@ assert.eq(x, y);
 
 // Set type
 x = new Set([{"x": [1, 2, []], "z": "ok", "y": [[]]}, {"foo": "bar"}]);
+assert.docEq(x, eval('(' + tojson(x) + ')'));
 assertToJson({
     fn: () => tojson(x, "", false),
-    expectedStr: `[
+    expectedStr: `new Set([
 	{
 		"x" : [
 			1,
@@ -450,12 +452,12 @@ assertToJson({
 	{
 		"foo" : "bar"
 	}
-]`,
+])`,
     assertMsg: "L1"
 });
 assertToJson({
     fn: () => toEJSON(x, "", false),
-    expectedStr: `[
+    expectedStr: `new Set([
 	{
 		"x" : [
 			1,
@@ -470,7 +472,7 @@ assertToJson({
 	{
 		"foo" : "bar"
 	}
-]`,
+])`,
     assertMsg: "L2"
 });
 assertToJson({
@@ -482,6 +484,7 @@ assertToJson({
 
 // Array type
 x = new Array({"x": [1, 2, []], "z": "ok", "y": [[]]}, {"foo": "bar"});
+assert.docEq(x, eval('(' + tojson(x) + ')'));
 assertToJson({
     fn: () => tojson(x, "", false),
     expectedStr: `[
@@ -552,6 +555,7 @@ x = {
     "data_regex": /^acme/i,
     "data_oid": ObjectId("579a70d9e249393f153b5bc1"),
     "data_ref": DBRef("test", "579a70d9e249393f153b5bc1"),
+    "data_pointer": DBPointer("test", ObjectId("579a70d9e249393f153b5bc1")),
     "data_undefined": undefined,
     "data_minkey": MinKey,
     "data_maxkey": MaxKey,
@@ -563,11 +567,11 @@ x = {
 
 assert.eq(
     JSON.stringify(x),
-    '{"data_binary":{"$binary":"VG8gYmUgb3Igbm90IHRvIGJlLi4uIFRoYXQgaXMgdGhlIHF1ZXN0aW9uLg==","$type":"00"},"data_timestamp":{"$timestamp":{"t":987654321,"i":0}},"data_regex":{"$regex":"^acme","$options":"i"},"data_oid":{"$oid":"579a70d9e249393f153b5bc1"},"data_ref":{"$ref":"test","$id":"579a70d9e249393f153b5bc1"},"data_minkey":{"$minKey":1},"data_maxkey":{"$maxKey":1},"data_numberlong":{"$numberLong":"12345"},"data_numberint":5,"data_numberdecimal":{"$numberDecimal":"3.14000000000000"},"data_date":"1970-01-01T23:59:59.999Z"}');
+    '{"data_binary":{"$binary":"VG8gYmUgb3Igbm90IHRvIGJlLi4uIFRoYXQgaXMgdGhlIHF1ZXN0aW9uLg==","$type":"00"},"data_timestamp":{"$timestamp":{"t":987654321,"i":0}},"data_regex":{"$regex":"^acme","$options":"i"},"data_oid":{"$oid":"579a70d9e249393f153b5bc1"},"data_ref":{"$ref":"test","$id":"579a70d9e249393f153b5bc1"},"data_pointer":{"ns":"test","id":{"$oid":"579a70d9e249393f153b5bc1"}},"data_minkey":{"$minKey":1},"data_maxkey":{"$maxKey":1},"data_numberlong":{"$numberLong":"12345"},"data_numberint":5,"data_numberdecimal":{"$numberDecimal":"3.14000000000000"},"data_date":"1970-01-01T23:59:59.999Z"}');
 assertToJson({
     fn: () => toEJSON(x),
     expectedStr:
-        '{"data_binary":{"$binary":"VG8gYmUgb3Igbm90IHRvIGJlLi4uIFRoYXQgaXMgdGhlIHF1ZXN0aW9uLg==","$type":"00"},"data_timestamp":{"$timestamp":{"t":987654321,"i":0}},"data_regex":{"$regex":"^acme","$options":"i"},"data_oid":{"$oid":"579a70d9e249393f153b5bc1"},"data_ref":{"$ref":"test","$id":"579a70d9e249393f153b5bc1"},"data_minkey":{"$minKey":1},"data_maxkey":{"$maxKey":1},"data_numberlong":{"$numberLong":"12345"},"data_numberint":5,"data_numberdecimal":{"$numberDecimal":"3.14000000000000"},"data_date":{"$date":"1970-01-01T23:59:59.999+00:00"}}',
+        '{"data_binary":{"$binary":"VG8gYmUgb3Igbm90IHRvIGJlLi4uIFRoYXQgaXMgdGhlIHF1ZXN0aW9uLg==","$type":"00"},"data_timestamp":{"$timestamp":{"t":987654321,"i":0}},"data_regex":{"$regex":"^acme","$options":"i"},"data_oid":{"$oid":"579a70d9e249393f153b5bc1"},"data_ref":{"$ref":"test","$id":"579a70d9e249393f153b5bc1"},"data_pointer":{"ns":"test","id":{"$oid":"579a70d9e249393f153b5bc1"}},"data_minkey":{"$minKey":1},"data_maxkey":{"$maxKey":1},"data_numberlong":{"$numberLong":"12345"},"data_numberint":5,"data_numberdecimal":{"$numberDecimal":"3.14000000000000"},"data_date":{"$date":"1970-01-01T23:59:59.999+00:00"}}',
     assertMsg: "N1",
     logFormat: "json"
 });
@@ -585,6 +589,7 @@ x = {};
 x.array = new Array(1, "two", [3, false]);
 x.set = new Set([1, "two", true]);
 x.map = new Map([["one", 1], [2, {y: [3, 4]}]]);
+assert.docEq(x, eval('(' + tojson(x) + ')'));
 assertToJson({
     fn: () => toEJSON(x),
     expectedStr:

@@ -236,14 +236,14 @@ Array.tojson = function(a, indent, nolint, depth, sortKeys) {
  * The return value is not a valid JSON string. See 'tojson()' function comment for details.
  */
 Set.tojson = function(s, indent, nolint, depth) {
-    return Array.tojson(Array.from(s), indent, nolint, depth);
+    return `new Set(${Array.tojson(Array.from(s), indent, nolint, depth)})`;
 };
 
 /**
  * The return value is not a valid JSON string. See 'tojson()' function comment for details.
  */
 Map.tojson = function(m, indent, nolint, depth) {
-    return Array.tojson(Array.from(m.entries()), indent, nolint, depth);
+    return `new Map(${Array.tojson(Array.from(m.entries()), indent, nolint, depth)})`;
 };
 
 Array.fetchRefs = function(arr, coll) {
