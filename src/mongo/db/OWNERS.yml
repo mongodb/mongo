@@ -178,6 +178,9 @@ filters:
   - "curop*":
     approvers:
       - 10gen/query-integration-observability
+  - "op_debug*":
+    approvers:
+      - 10gen/query-integration-observability
   - "update_index_data*":
     approvers:
       - 10gen/query-execution-write-exec

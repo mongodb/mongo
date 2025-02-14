@@ -993,6 +993,7 @@ mongo_cc_library(
         "curop.cpp",
         "curop_diagnostic_printer.cpp",
         "error_labels.h",
+        "op_debug.cpp",
         ":drop_database_gen",
         ":drop_gen",
         ":list_collections_gen",
@@ -1003,7 +1004,9 @@ mongo_cc_library(
         "coll_mod_reply_validation.h",
         "commands.h",
         "curop.h",
+        "curop_bson_helpers.h",
         "curop_diagnostic_printer.h",
+        "op_debug.h",
     ],
     deps = [
         ":api_parameters",  # TODO(SERVER-93876): Remove.

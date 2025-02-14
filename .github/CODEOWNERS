@@ -1243,6 +1243,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/aggregated_index_usage_tracker* @10gen/query-execution-index-access-stats @svc-auto-approve-bot
 /src/mongo/db/**/collection_index_usage_tracker* @10gen/query-execution-index-access-stats @svc-auto-approve-bot
 /src/mongo/db/**/curop* @10gen/query-integration-observability @svc-auto-approve-bot
+/src/mongo/db/**/op_debug* @10gen/query-integration-observability @svc-auto-approve-bot
 /src/mongo/db/**/update_index_data* @10gen/query-execution-write-exec @svc-auto-approve-bot
 /src/mongo/db/**/create* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/**/drop*idl @10gen/server-catalog-and-routing @svc-auto-approve-bot
