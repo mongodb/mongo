@@ -702,6 +702,7 @@ buildvariants:
         --ocsp-stapling=off
         -j$(grep -c ^processor /proc/cpuinfo)
         --link-model=dynamic
+        --disable-streams
       compile_variant: *enterprise-rhel8-debug-aubsan-search-grpc
       build_mongot: true
     tasks:

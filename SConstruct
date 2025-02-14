@@ -678,6 +678,13 @@ add_option(
     help="If set, will include the enterprise streams module in a release build.",
 )
 
+add_option(
+    "disable-streams",
+    default=False,
+    action="store_true",
+    help="If set, will exclude the enterprise streams module in a non-streams build.",
+)
+
 link_model_choices = ["auto", "object", "static", "dynamic", "dynamic-strict", "dynamic-sdk"]
 add_option(
     "link-model",
@@ -6136,7 +6143,7 @@ def shouldBuildStreams(thisEnv):
         # when streams-release-build is set.
         return get_option("streams-release-build") and isSupportedStreamsPlatform(thisEnv)
     else:
-        return isSupportedStreamsPlatform(thisEnv)
+        return not get_option("disable-streams") and isSupportedStreamsPlatform(thisEnv)
 
 
 env.AddMethod(shouldBuildStreams, "ShouldBuildStreams")

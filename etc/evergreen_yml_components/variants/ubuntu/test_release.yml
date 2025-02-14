@@ -20,6 +20,7 @@ buildvariants:
         --allocator=tcmalloc-gperf
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --disable-streams
       unittest_compile_flags: >-
         BAZEL_FLAGS=--jobs=4
       integration_test_compile_flags: >-

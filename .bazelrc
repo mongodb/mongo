@@ -84,6 +84,7 @@ common --flag_alias=detect_odr_violations=//bazel/config:detect_odr_violations
 common --flag_alias=shared_archive=//bazel/config:shared_archive
 common --flag_alias=skip_archive=//bazel/config:skip_archive
 common --flag_alias=streams_release_build=//bazel/config:streams_release_build
+common --flag_alias=disable_streams=//bazel/config:disable_streams
 common --flag_alias=release=//bazel/config:release
 common --flag_alias=build_enterprise=//bazel/config:build_enterprise
 common --flag_alias=visibility_support=//bazel/config:visibility_support

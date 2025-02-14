@@ -14,6 +14,7 @@ load(
     "debug_symbols",
     "detect_odr_violations",
     "developer_dir",
+    "disable_streams",
     "disable_warnings_as_errors",
     "dwarf_version",
     "fsan",
@@ -1898,6 +1899,22 @@ selects.config_setting_group(
 )
 
 # --------------------------------------
+# streams non release options
+# --------------------------------------
+
+disable_streams(
+    name = "disable_streams",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "streams_enabled",
+    flag_values = {
+        "//bazel/config:disable_streams": "False",
+    },
+)
+
+# --------------------------------------
 # stream_release_build
 # --------------------------------------
 
@@ -1946,6 +1963,7 @@ selects.config_setting_group(
         ":release_disabled",
         ":platform_for_streaming_build",
         ":ssl_enabled_linux",
+        ":streams_enabled",
     ],
 )
 

@@ -1378,6 +1378,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         f'--shared_archive={env.GetOption("link-model") == "dynamic-sdk"}',
         f'--linker={env.GetOption("linker")}',
         f'--streams_release_build={env.GetOption("streams-release-build")}',
+        f'--disable_streams={env.GetOption("disable-streams")}',
         f'--release={env.GetOption("release") == "on"}',
         f'--build_enterprise={"MONGO_ENTERPRISE_VERSION" in env}',
         f'--visibility_support={env.GetOption("visibility-support")}',

@@ -423,6 +423,19 @@ streams_release_build = rule(
 )
 
 # =========
+# disable-streams
+# =========
+disable_streams_provider = provider(
+    doc = """If set, will exclude the enterprise streams module in a non-release build.""",
+    fields = ["enabled"],
+)
+
+disable_streams = rule(
+    implementation = lambda ctx: disable_streams_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
 # visibility-support
 # =========
 
