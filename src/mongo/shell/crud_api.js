@@ -519,6 +519,10 @@ DBCollection.prototype.replaceOne = function(filter, replacement, options) {
         op.hint(opts.hint);
     }
 
+    if (opts.rawData) {
+        bulk.setRawData(opts.rawData);
+    }
+
     op.replaceOne(replacement);
 
     try {
@@ -610,6 +614,10 @@ DBCollection.prototype.updateOne = function(filter, update, options) {
 
     if (opts.arrayFilters) {
         op.arrayFilters(opts.arrayFilters);
+    }
+
+    if (opts.rawData) {
+        bulk.setRawData(opts.rawData);
     }
 
     op.updateOne(update);
@@ -706,6 +714,10 @@ DBCollection.prototype.updateMany = function(filter, update, options) {
 
     if (opts.arrayFilters) {
         op.arrayFilters(opts.arrayFilters);
+    }
+
+    if (opts.rawData) {
+        bulk.setRawData(opts.rawData);
     }
 
     op.update(update);

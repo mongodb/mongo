@@ -562,6 +562,10 @@ DBCollection.prototype.update = function(query, updateSpec, upsert, multi) {
         updateOp.arrayFilters(arrayFilters);
     }
 
+    if (rawData) {
+        bulk.setRawData(rawData);
+    }
+
     if (multi) {
         updateOp.update(updateSpec);
     } else {

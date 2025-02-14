@@ -1614,6 +1614,9 @@ WriteResult performUpdates(OperationContext* opCtx,
                            const write_ops::UpdateCommandRequest& wholeOp,
                            OperationSource source) {
     auto ns = wholeOp.getNamespace();
+    if (wholeOp.getRawData()) {
+        ns = timeseries::isTimeseriesViewRequest(opCtx, wholeOp).second;
+    }
     NamespaceString originalNs;
     if (source == OperationSource::kTimeseriesUpdate) {
         originalNs = ns;
