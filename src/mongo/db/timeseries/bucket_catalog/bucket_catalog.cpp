@@ -911,4 +911,22 @@ StatusWith<Bucket*> potentiallyReopenBucket(
     return &swBucket.getValue().get();
 }
 
+Bucket& getEligibleBucket(OperationContext* opCtx,
+                          BucketCatalog& catalog,
+                          Stripe& stripe,
+                          WithLock stripeLock,
+                          const Collection* bucketsColl,
+                          const BSONObj& measurement,
+                          const BucketKey& bucketKey,
+                          const Date_t& measurementTimestamp,
+                          const TimeseriesOptions& options,
+                          const StringDataComparator* comparator,
+                          BucketStateRegistry::Era era,
+                          uint64_t storageCacheSizeBytes,
+                          const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+                          ExecutionStatsController& stats) {
+    return internal::allocateBucket(
+        catalog, stripe, stripeLock, bucketKey, options, measurementTimestamp, comparator, stats);
+}
+
 }  // namespace mongo::timeseries::bucket_catalog

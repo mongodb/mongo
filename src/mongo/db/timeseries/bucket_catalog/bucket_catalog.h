@@ -436,4 +436,29 @@ StatusWith<Bucket*> potentiallyReopenBucket(
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
     bucket_catalog::InsertContext& insertContext);
 
+/**
+ * Returns a bucket where 'measurement' can be inserted. Attempts to get the bucket with the steps:
+ *  1. Finds an open bucket from 'stripe'.
+ *  2. Reopens a bucket from 'bucketsColl'.
+ *  3. Allocates a new bucket.
+ * May release the stripeLock in the middle but will reacquire it for such cases.
+ * Side effects:
+ *  - Performs rollover on open buckets of 'stripe'.
+ *  - Compresses uncompressed reopened bucket documents.
+ */
+Bucket& getEligibleBucket(OperationContext* opCtx,
+                          BucketCatalog& catalog,
+                          Stripe& stripe,
+                          WithLock stripeLock,
+                          const Collection* bucketsColl,
+                          const BSONObj& measurement,
+                          const BucketKey& bucketKey,
+                          const Date_t& measurementTimestamp,
+                          const TimeseriesOptions& options,
+                          const StringDataComparator* comparator,
+                          BucketStateRegistry::Era era,
+                          uint64_t storageCacheSizeBytes,
+                          const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+                          ExecutionStatsController& stats);
+
 }  // namespace mongo::timeseries::bucket_catalog
