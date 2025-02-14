@@ -49,8 +49,8 @@ export class ShardingTest {
     }
 
     printNodes() {
-        print("ShardingTest " + this._testName + " :\n" +
-              tojson({config: this._configDB, shards: this._connections, mongos: this._mongos}));
+        jsTest.log.info("ShardingTest " + this._testName,
+                        {config: this._configDB, shards: this._connections, mongos: this._mongos});
     }
 
     getConnNames() {
@@ -230,8 +230,8 @@ export class ShardingTest {
 
         let startTime = new Date();  // Measure the execution time of shutting down shards.
         this.stopAllShards(opts);
-        print("ShardingTest stopped all shards, took " + (new Date() - startTime) + "ms for " +
-              this._connections.length + " shards.");
+        jsTest.log.info("ShardingTest stopped all shards, took " + (new Date() - startTime) +
+                        "ms for " + this._connections.length + " shards.");
 
         if (!this.isConfigShardMode) {
             this.stopAllConfigServers(opts);
@@ -239,25 +239,25 @@ export class ShardingTest {
 
         var timeMillis = new Date().getTime() - this._startTime.getTime();
 
-        print('*** ShardingTest ' + this._testName + " completed successfully in " +
-              (timeMillis / 1000) + " seconds ***");
+        jsTest.log.info('*** ShardingTest ' + this._testName + " completed successfully in " +
+                        (timeMillis / 1000) + " seconds ***");
     }
 
     stopOnFail() {
         try {
             this.stopAllMongos();
         } catch (e) {
-            print("Did not successfully stop all mongos.");
+            jsTest.log.info("Did not successfully stop all mongos.");
         }
         try {
             this.stopAllShards();
         } catch (e) {
-            print("Did not successfully stop all shards.");
+            jsTest.log.info("Did not successfully stop all shards.");
         }
         try {
             this.stopAllConfigServers();
         } catch (e) {
-            print("Did not successfully stop all config servers.");
+            jsTest.log.info("Did not successfully stop all config servers.");
         }
     }
 
@@ -343,7 +343,7 @@ export class ShardingTest {
                 msg += tojsononeline(z.details);
             }
 
-            print("ShardingTest " + msg);
+            jsTest.log.info("ShardingTest " + msg);
         });
     }
 
@@ -387,7 +387,7 @@ export class ShardingTest {
     }
 
     printChunks(ns) {
-        print("ShardingTest " + this.getChunksString(ns));
+        jsTest.log.info("ShardingTest " + this.getChunksString(ns));
     }
 
     printShardingStatus(verbose) {
@@ -415,7 +415,7 @@ export class ShardingTest {
 
         out += this.getChunksString(ns);
 
-        print("ShardingTest " + out);
+        jsTest.log.info("ShardingTest " + out);
     }
 
     /**
@@ -474,7 +474,7 @@ export class ShardingTest {
                 max = c[s];
         }
 
-        print("ShardingTest input: " + tojson(c) + " min: " + min + " max: " + max);
+        jsTest.log.info("ShardingTest input", {chunkCounts: c, min, max});
         return max - min;
     }
 
@@ -1455,7 +1455,7 @@ export class ShardingTest {
 
                 const rs = new ReplSetTest(replSetTestOpts);
 
-                print("ShardingTest starting replica set for shard: " + setName);
+                jsTest.log.info("ShardingTest starting replica set for shard: " + setName);
 
                 // Start up the replica set but don't wait for it to complete. This allows the
                 // startup of each shard to proceed in parallel.
@@ -1474,7 +1474,8 @@ export class ShardingTest {
             // Wait for each shard replica set to finish starting up.
             //
             for (let i = 0; i < numShards; i++) {
-                print("Waiting for shard " + this._rs[i].setName + " to finish starting up.");
+                jsTest.log.info("Waiting for shard " + this._rs[i].setName +
+                                " to finish starting up.");
                 if (isConfigShardMode && i == 0) {
                     continue;
                 }
@@ -1484,15 +1485,16 @@ export class ShardingTest {
             //
             // Wait for the config server to finish starting up.
             //
-            print("Waiting for the config server to finish starting up.");
+            jsTest.log.info("Waiting for the config server to finish starting up.");
             this.configRS.startSetAwait();
             var config = this.configRS.getReplSetConfig();
             config.configsvr = true;
             config.settings = config.settings || {};
 
-            print("ShardingTest startup for all nodes took " + (new Date() - startTime) +
-                  "ms with " + this.configRS.nodeList().length + " config server nodes and " +
-                  totalNumShardNodes(this) + " total shard nodes.");
+            jsTest.log.info("ShardingTest startup for all nodes took " + (new Date() - startTime) +
+                            "ms with " + this.configRS.nodeList().length +
+                            " config server nodes and " + totalNumShardNodes(this) +
+                            " total shard nodes.");
 
             if (setDefaultTransactionLockTimeout) {
                 // Clean up TestData.setParameters to avoid affecting other tests.
@@ -1685,9 +1687,10 @@ export class ShardingTest {
                 });
             }
 
-            print("ShardingTest startup and initiation for all nodes took " +
-                  (new Date() - startTime) + "ms with " + this.configRS.nodeList().length +
-                  " config server nodes and " + totalNumShardNodes(this) + " total shard nodes.");
+            jsTest.log.info("ShardingTest startup and initiation for all nodes took " +
+                            (new Date() - startTime) + "ms with " +
+                            this.configRS.nodeList().length + " config server nodes and " +
+                            totalNumShardNodes(this) + " total shard nodes.");
 
             // If 'otherParams.mongosOptions.binVersion' is an array value, then we'll end up
             // constructing a version iterator.
@@ -1780,7 +1783,7 @@ export class ShardingTest {
             // Start and connect to the MongoS servers if needed; create connections to the embedded
             // router ports if not.
             if (isEmbeddedRouterMode) {
-                print("Connecting to embedded routers...");
+                jsTest.log.info("Connecting to embedded routers...");
 
                 let allShardNodes = this._rs
                                         .map(r => r.test.nodes.map((_, index) => ({
@@ -1821,7 +1824,8 @@ export class ShardingTest {
                 let routerNodes = shuffledNodes.slice(0, numMongos);
                 let i = 0;
 
-                print("Chose the following nodes to act as embedded routers: " + routerNodes);
+                jsTest.log.info("Chose the following nodes to act as embedded routers: " +
+                                routerNodes);
                 for (const nodeInfo of routerNodes) {
                     const node = nodeInfo.rs.nodes[nodeInfo.index];
                     const conn =
@@ -1835,8 +1839,9 @@ export class ShardingTest {
                     conn.commandLine = node.commandLine;
                     this._mongos.push(conn);
                     this["s" + i++] = conn;
-                    print("Connected to embedded router - this.s" + i + " == mongod with pid " +
-                          node.pid + " listening on routerPort " + node.routerPort);
+                    jsTest.log.info("Connected to embedded router - this.s" + i +
+                                    " == mongod with pid " + node.pid +
+                                    " listening on routerPort " + node.routerPort);
                 }
                 if (i > 0) {
                     this.s = this._mongos[0];
@@ -1922,8 +1927,8 @@ export class ShardingTest {
                             name = "config";
 
                             if (!useAutoBootstrapProcedure) {
-                                print("ShardingTest " + testName +
-                                      " transitioning to config shard");
+                                jsTest.log.info("ShardingTest " + testName +
+                                                " transitioning to config shard");
 
                                 function transitionFromDedicatedConfigServer() {
                                     return assert.commandWorked(
@@ -1945,7 +1950,8 @@ export class ShardingTest {
 
                             z.shardName = name;
                         } else {
-                            print("ShardingTest " + testName + " going to add shard : " + n);
+                            jsTest.log.info("ShardingTest " + testName +
+                                            " going to add shard : " + n);
 
                             let addShardCmd = {addShard: n};
                             if (alwaysUseTestNameForShardName) {
@@ -1960,7 +1966,7 @@ export class ShardingTest {
                 }
             } catch (e) {
                 // Clean up the running procceses on failure
-                print("Failed to add shards, stopping cluster.");
+                jsTest.log.info("Failed to add shards, stopping cluster.");
                 this.stop();
                 throw e;
             }
@@ -2067,7 +2073,7 @@ export class ShardingTest {
 
 // Stub for a hook to check that the cluster-wide metadata is consistent.
 ShardingTest.prototype.checkMetadataConsistency = function() {
-    print("Unhooked checkMetadataConsistency function");
+    jsTest.log.info("Unhooked checkMetadataConsistency function");
 };
 
 // Stub for a hook to check that collection UUIDs are consistent across shards and the config
@@ -2078,15 +2084,15 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {};
 ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {};
 
 ShardingTest.prototype.checkOrphansAreDeleted = function() {
-    print("Unhooked function");
+    jsTest.log.info("Unhooked function");
 };
 
 ShardingTest.prototype.checkRoutingTableConsistency = function() {
-    print("Unhooked checkRoutingTableConsistency function");
+    jsTest.log.info("Unhooked checkRoutingTableConsistency function");
 };
 
 ShardingTest.prototype.checkShardFilteringMetadata = function() {
-    print("Unhooked checkShardFilteringMetadata function");
+    jsTest.log.info("Unhooked checkShardFilteringMetadata function");
 };
 
 /**
@@ -2232,7 +2238,7 @@ function replicaSetsToTerminate(st, shardRS) {
                 liveNodes.push(node);
             } catch (err) {
                 // Ignore since the node is not live
-                print("ShardingTest replicaSetsToTerminate ignoring: " + node.host);
+                jsTest.log.info("ShardingTest replicaSetsToTerminate ignoring: " + node.host);
                 return;
             }
 
