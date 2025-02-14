@@ -994,6 +994,7 @@ void CommonMongodProcessInterface::writeRecordsToRecordStore(
 std::unique_ptr<TemporaryRecordStore> CommonMongodProcessInterface::createTemporaryRecordStore(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, KeyFormat keyFormat) const {
     assertIgnorePrepareConflictsBehavior(expCtx);
+    Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
     return expCtx->getOperationContext()
         ->getServiceContext()
         ->getStorageEngine()
