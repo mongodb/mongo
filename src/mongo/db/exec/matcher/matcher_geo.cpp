@@ -138,7 +138,8 @@ void MatchesSingleElementEvaluator::visit(const GeoNearMatchExpression* expr) {
 }
 
 void MatchesSingleElementEvaluator::visit(const InternalBucketGeoWithinMatchExpression* expr) {
-    _result = false;
+    // This expression should only be used to match full documents
+    MONGO_UNREACHABLE_TASSERT(10071003);
 }
 
 namespace {

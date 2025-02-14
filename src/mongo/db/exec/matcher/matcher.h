@@ -451,7 +451,7 @@ inline bool matchesBSONElement(const MatchExpression* expr,
 
 /**
  * Determines if the element satisfies the expression tree-predicate.
- * Not valid for all expressions (e.g. $where); in those cases, returns false.
+ * Not valid for all expressions (e.g. $where); in those cases, we fail with tassert
  */
 inline bool matchesSingleElement(const MatchExpression* expr,
                                  const BSONElement& e,

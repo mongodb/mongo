@@ -44,11 +44,12 @@ void MatchExpressionEvaluator::visit(const WhereNoOpMatchExpression* expr) {
 }
 
 void MatchesSingleElementEvaluator::visit(const WhereMatchExpression* expr) {
-    _result = false;
+    // This expression should only be used to match full documents
+    MONGO_UNREACHABLE_TASSERT(10071000);
 }
 
 void MatchesSingleElementEvaluator::visit(const WhereNoOpMatchExpression* expr) {
-    _result = false;
+    MONGO_UNREACHABLE_TASSERT(10071001);
 }
 
 }  // namespace exec::matcher
