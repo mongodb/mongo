@@ -243,7 +243,7 @@ void handleWouldChangeOwningShardErrorNonTransaction(OperationContext* opCtx,
     uassertStatusOK(swCommitResult.getValue().cmdStatus);
     const auto& wcError = swCommitResult.getValue().wcError;
     if (!wcError.toStatus().isOK()) {
-        appendWriteConcernErrorDetailToCmdResponse(shardId, wcError, *result);
+        appendWriteConcernErrorDetailToCommandResponse(shardId, wcError, *result);
     }
 }
 
@@ -918,7 +918,7 @@ void FindAndModifyCmd::_constructResult(OperationContext* opCtx,
 
     // First append the properly constructed writeConcernError. It will then be skipped in
     // appendElementsUnique.
-    if (auto wcErrorElem = response["writeConcernError"]) {
+    if (auto wcErrorElem = response[kWriteConcernErrorFieldName]) {
         appendWriteConcernErrorToCmdResponse(shardId, wcErrorElem, *result);
     }
 
@@ -1139,7 +1139,7 @@ void FindAndModifyCmd::_handleWouldChangeOwningShardErrorRetryableWriteLegacy(
         uassertStatusOK(getStatusFromCommandResult(result->asTempObj()));
         auto commitResponse = documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(opCtx);
 
-        if (auto wcErrorElem = commitResponse["writeConcernError"]) {
+        if (auto wcErrorElem = commitResponse[kWriteConcernErrorFieldName]) {
             appendWriteConcernErrorToCmdResponse(shardId, wcErrorElem, *result);
         }
 

@@ -837,6 +837,11 @@ error_codes:
       name: StreamProcessorExternalFunctionConnectionError,
       categories: [StreamProcessorUserError, StreamProcessorRetryableError],
     }
+  - {
+      code: 441,
+      name: ErrorWithWriteConcernError,
+      extra: ErrorWithWriteConcernErrorInfo,
+    }
 
   # Error codes 4000-8999 are reserved.
 

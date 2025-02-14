@@ -94,13 +94,6 @@ struct RawResponsesResult {
 };
 
 /**
- * This function appends the provided WriteConcernErrorDetail to the sharded response.
- */
-void appendWriteConcernErrorDetailToCmdResponse(const ShardId& shardId,
-                                                WriteConcernErrorDetail wcError,
-                                                BSONObjBuilder& responseBuilder);
-
-/**
  * This function appends the provided writeConcernError BSONElement to the sharded response.
  */
 void appendWriteConcernErrorToCmdResponse(const ShardId& shardID,

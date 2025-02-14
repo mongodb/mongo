@@ -201,8 +201,10 @@ mongo_cc_library(
     srcs = [
         "get_status_from_command_result.cpp",
         "write_concern_error_detail.cpp",
-        "write_concern_error_detail.h",
         "write_concern_error_gen",
+    ],
+    hdrs = [
+        "write_concern_error_detail.h",
     ],
     deps = [
         "//src/mongo/bson/util:bson_extract",

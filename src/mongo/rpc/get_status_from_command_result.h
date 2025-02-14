@@ -29,9 +29,37 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/error_extra_info.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/rpc/write_concern_error_detail.h"
+
 namespace mongo {
 class BSONObj;
 class Status;
+
+class ErrorWithWriteConcernErrorInfo final : public ErrorExtraInfo {
+public:
+    static constexpr auto code = ErrorCodes::ErrorWithWriteConcernError;
+    ErrorWithWriteConcernErrorInfo(Status mainError, WriteConcernErrorDetail statusWithWCError);
+
+    void serialize(BSONObjBuilder* bob) const override;
+    static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
+
+    const Status& getMainStatus() const;
+    const WriteConcernErrorDetail& getWriteConcernErrorDetail() const;
+
+private:
+    const Status _mainError;
+    const WriteConcernErrorDetail _wcError;
+};
+
+Status getStatusWithWCErrorDetailFromCommandResult(const BSONObj& result);
+
+Status getStatusWithWCErrorDetailFromCommandResult(const BSONObj& result,
+                                                   const ShardId& shardId,
+                                                   BSONObjBuilder& bob);
 
 /**
  * Converts "result" into a Status object.  The input is expected to be the object returned
@@ -76,5 +104,9 @@ Status getFirstWriteErrorStatusFromBulkWriteResult(const BSONObj& cmdResponse);
  * Extracts any type of error from a write command response.
  */
 Status getStatusFromWriteCommandReply(const BSONObj& cmdResponse);
+
+void appendWriteConcernErrorDetailToCommandResponse(const ShardId& shardId,
+                                                    WriteConcernErrorDetail wcError,
+                                                    BSONObjBuilder& responseBuilder);
 
 }  // namespace mongo

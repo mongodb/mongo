@@ -147,21 +147,11 @@ ShardsvrReshardCollection makeUnshardCollectionRequest(
 }
 }  // namespace cluster::unsplittable
 
-void appendWriteConcernErrorDetailToCmdResponse(const ShardId& shardId,
-                                                WriteConcernErrorDetail wcError,
-                                                BSONObjBuilder& responseBuilder) {
-    auto status = wcError.toStatus();
-    wcError.setStatus(
-        status.withReason(str::stream() << status.reason() << " at " << shardId.toString()));
-
-    responseBuilder.append("writeConcernError", wcError.toBSON());
-}
-
 void appendWriteConcernErrorToCmdResponse(const ShardId& shardId,
                                           const BSONElement& wcErrorElem,
                                           BSONObjBuilder& responseBuilder) {
-    WriteConcernErrorDetail wcError = getWriteConcernErrorDetail(wcErrorElem);
-    appendWriteConcernErrorDetailToCmdResponse(shardId, wcError, responseBuilder);
+    WriteConcernErrorDetail wcErrorDetail = getWriteConcernErrorDetail(wcErrorElem);
+    appendWriteConcernErrorDetailToCommandResponse(shardId, wcErrorDetail, responseBuilder);
 }
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTargeter(
@@ -700,8 +690,8 @@ RawResponsesResult appendRawResponses(
             continue;
         }
 
-        if (!firstWriteConcernErrorReceived && resObj["writeConcernError"]) {
-            firstWriteConcernErrorReceived.emplace(shardId, resObj["writeConcernError"]);
+        if (!firstWriteConcernErrorReceived && resObj[kWriteConcernErrorFieldName]) {
+            firstWriteConcernErrorReceived.emplace(shardId, resObj[kWriteConcernErrorFieldName]);
         }
 
         successResponsesReceived.emplace_back(shardId, resObj);

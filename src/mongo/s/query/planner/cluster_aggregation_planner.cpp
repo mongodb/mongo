@@ -145,7 +145,7 @@ Status appendCursorResponseToCommandResult(const ShardId& shardId,
                                            const BSONObj cursorResponse,
                                            BSONObjBuilder* result) {
     // If a write error was encountered, append it to the output buffer first.
-    if (auto wcErrorElem = cursorResponse["writeConcernError"]) {
+    if (auto wcErrorElem = cursorResponse[kWriteConcernErrorFieldName]) {
         appendWriteConcernErrorToCmdResponse(shardId, wcErrorElem, *result);
     }
 
@@ -1008,7 +1008,7 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
 
     // First append the properly constructed writeConcernError. It will then be skipped
     // in appendElementsUnique.
-    if (auto wcErrorElem = result["writeConcernError"]) {
+    if (auto wcErrorElem = result[kWriteConcernErrorFieldName]) {
         appendWriteConcernErrorToCmdResponse(shardId, wcErrorElem, *out);
     }
 

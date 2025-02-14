@@ -310,7 +310,7 @@ void CursorResponse::addToBSON(CursorResponse::ResponseType responseType,
     builder->append("ok", 1.0);
 
     if (_writeConcernError) {
-        builder->append("writeConcernError", *_writeConcernError);
+        builder->append(kWriteConcernErrorFieldName, *_writeConcernError);
     }
 }
 

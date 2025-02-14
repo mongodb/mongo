@@ -42,6 +42,8 @@
 
 namespace mongo {
 
+constexpr auto kWriteConcernErrorFieldName = "writeConcernError"_sd;
+
 /**
  * This class represents the layout and content of the error that occurs while trying
  * to satisfy the write concern after executing runCommand.

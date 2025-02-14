@@ -1240,7 +1240,7 @@ void RunCommandImpl::_epilogue() {
             _ok ? boost::none : boost::optional<ErrorCodes::Error>(status.code());
         boost::optional<ErrorCodes::Error> wcCode;
         auto response = body.asTempObj();
-        if (auto wcErrElement = response["writeConcernError"]; !wcErrElement.eoo()) {
+        if (auto wcErrElement = response[kWriteConcernErrorFieldName]; !wcErrElement.eoo()) {
             wcCode = ErrorCodes::Error(wcErrElement["code"].numberInt());
         }
         appendErrorLabelsAndTopologyVersion(opCtx,
@@ -1285,11 +1285,11 @@ void RunCommandAndWaitForWriteConcern::_waitForWriteConcern(BSONObjBuilder& bb) 
     if (auto scoped = failCommand.scopedIf([&](const BSONObj& obj) {
             return CommandHelpers::shouldActivateFailCommandFailPoint(
                        obj, invocation, opCtx->getClient()) &&
-                obj.hasField("writeConcernError");
+                obj.hasField(kWriteConcernErrorFieldName);
         });
         MONGO_unlikely(scoped.isActive())) {
         const BSONObj& data = scoped.getData();
-        bb.append(data["writeConcernError"]);
+        bb.append(data[kWriteConcernErrorFieldName]);
         if (data.hasField(kErrorLabelsFieldName) && data[kErrorLabelsFieldName].type() == Array) {
             // Propagate error labels specified in the failCommand failpoint to the
             // OperationContext decoration to override getErrorLabels() behaviors.
@@ -2082,8 +2082,8 @@ void ExecCommandDatabase::_handleFailure(Status status) {
     // Append the error labels for transient transaction errors.
     auto response = _extraFieldsBuilder.asTempObj();
     boost::optional<ErrorCodes::Error> wcCode;
-    if (response.hasField("writeConcernError")) {
-        wcCode = ErrorCodes::Error(response["writeConcernError"]["code"].numberInt());
+    if (response.hasField(kWriteConcernErrorFieldName)) {
+        wcCode = ErrorCodes::Error(response[kWriteConcernErrorFieldName]["code"].numberInt());
     }
     appendErrorLabelsAndTopologyVersion(opCtx,
                                         &_extraFieldsBuilder,

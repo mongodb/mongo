@@ -387,16 +387,33 @@ ResourcePattern CommandHelpers::resourcePatternForNamespace(const NamespaceStrin
     return ResourcePattern::forExactNamespace(ns);
 }
 
-bool CommandHelpers::appendCommandStatusNoThrow(BSONObjBuilder& result, const Status& status) {
+bool CommandHelpers::appendCommandStatusNoThrow(BSONObjBuilder& result,
+                                                const Status& originalStatus) {
+    auto status = originalStatus;
+    boost::optional<WriteConcernErrorDetail> writeConcernErrorDetail;
+    if (originalStatus.code() == ErrorCodes::ErrorWithWriteConcernError) {
+        auto errorWithWriteConcernError =
+            originalStatus.extraInfo<ErrorWithWriteConcernErrorInfo>();
+
+        status = errorWithWriteConcernError->getMainStatus();
+        writeConcernErrorDetail.emplace(errorWithWriteConcernError->getWriteConcernErrorDetail());
+    }
+
     appendSimpleCommandStatus(result, status.isOK(), status.reason());
     BSONObj tmp = result.asTempObj();
     if (!status.isOK() && !tmp.hasField("code")) {
         result.append("code", status.code());
         result.append("codeName", ErrorCodes::errorString(status.code()));
     }
+
     if (auto extraInfo = status.extraInfo()) {
         extraInfo->serialize(&result);
     }
+
+    if (writeConcernErrorDetail && !tmp.hasField(kWriteConcernErrorFieldName)) {
+        result.append(kWriteConcernErrorFieldName, writeConcernErrorDetail->toBSON());
+    }
+
     // If the command has errored, assert that it satisfies the IDL-defined requirements on a
     // command error reply.
     // Only validate error reply in test mode so that we don't expose users to errors if we
@@ -459,7 +476,7 @@ Status CommandHelpers::extractOrAppendOkAndGetStatus(BSONObjBuilder& reply) {
 void CommandHelpers::appendCommandWCStatus(BSONObjBuilder& result,
                                            const Status& awaitReplicationStatus,
                                            const WriteConcernResult& wcResult) {
-    if (!awaitReplicationStatus.isOK() && !result.hasField("writeConcernError")) {
+    if (!awaitReplicationStatus.isOK() && !result.hasField(kWriteConcernErrorFieldName)) {
         WriteConcernErrorDetail wcError;
         wcError.setStatus(awaitReplicationStatus);
         BSONObjBuilder errInfoBuilder;
@@ -468,7 +485,7 @@ void CommandHelpers::appendCommandWCStatus(BSONObjBuilder& result,
         }
         errInfoBuilder.append(kWriteConcernField, wcResult.wcUsed.toBSON());
         wcError.setErrInfo(errInfoBuilder.obj());
-        result.append("writeConcernError", wcError.toBSON());
+        result.append(kWriteConcernErrorFieldName, wcError.toBSON());
     }
 }
 

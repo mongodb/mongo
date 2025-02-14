@@ -36,6 +36,10 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/write_concern_error_detail.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -100,4 +104,93 @@ TEST(GetStatusFromCommandResult, BulkWriteResponseFails) {
     ASSERT_EQ(status.extraInfo<ErrorExtraInfoExample>()->data, 123);
 }
 
+TEST(GetStatusFromCommandResult, ErrorWithWriteConcernErrorInfo) {
+    auto commandResultWithWCE = R"({
+                "writeConcernError": {
+                    "code": {
+                        "$numberInt": "64"
+                    },
+                    "codeName": "WriteConcernTimeout",
+                    "errmsg": "waiting for replication timed out",
+                    "errInfo": {
+                        "wtimeout": true,
+                        "writeConcern": {
+                            "w": {
+                                "$numberInt": "3"
+                            },
+                            "wtimeout": {
+                                "$numberInt": "500"
+                            },
+                            "provenance": "clientSupplied"
+                        }
+                    }
+                },
+                "ok": {
+                    "$numberDouble": "0"
+                },
+                "errmsg": "Plan executor error during findAndModify :: caused by :: E11000 duplicate key error collection: test.user index: b_1 dup key: { b: 2.0 }",
+                "code": {
+                    "$numberInt": "11000"
+                },
+                "codeName": "DuplicateKey",
+                "keyPattern":{"b":{"$numberDouble":"1"}},"keyValue":{"b":{"$numberDouble":"2"}}
+            })";
+
+    auto status = getStatusWithWCErrorDetailFromCommandResult(fromjson(commandResultWithWCE));
+    ASSERT_EQ(status.code(), ErrorCodes::ErrorWithWriteConcernError);
+    ASSERT(!status.reason().empty());
+    ASSERT(status.extraInfo());
+    ASSERT(status.extraInfo<ErrorWithWriteConcernErrorInfo>());
+    ASSERT(status.extraInfo<ErrorWithWriteConcernErrorInfo>()
+               ->getWriteConcernErrorDetail()
+               .isErrInfoSet());
+    ASSERT_EQ(status.extraInfo<ErrorWithWriteConcernErrorInfo>()->getMainStatus().code(),
+              ErrorCodes::DuplicateKey);
+}
+
+TEST(GetStatusFromCommandResult, WCEDetailAppendToCmdResp) {
+    ShardId shardId("shard0");
+    BSONObjBuilder bob;
+    WriteConcernErrorDetail wce;
+    std::string errMsg;
+    auto wceObject = fromjson(R"(
+    {
+        "code": {
+            "$numberInt": "64"
+        },
+        "codeName": "WriteConcernTimeout",
+        "errmsg": "waiting for replication timed out",
+        "errInfo": {
+            "wtimeout": true,
+            "writeConcern": {
+                "w": {
+                    "$numberInt": "3"
+                },
+                "wtimeout": {
+                    "$numberInt": "500"
+                },
+                "provenance": "clientSupplied"
+            }
+        }
+    })");
+
+    wce.parseBSON(wceObject, &errMsg);
+    ASSERT(errMsg.empty());
+
+    appendWriteConcernErrorDetailToCommandResponse(shardId, wce, bob);
+    auto resp = bob.done();
+
+    WriteConcernErrorDetail newWCE;
+    newWCE.parseBSON(resp[kWriteConcernErrorFieldName].Obj(), &errMsg);
+    ASSERT(errMsg.empty());
+    ASSERT(newWCE.toStatus().reason().find(shardId.toString()) != std::string::npos);
+
+    // Test that WCE error is not appended twice.
+    bob.abandon();
+    bob.append(kWriteConcernErrorFieldName, wceObject);
+    appendWriteConcernErrorDetailToCommandResponse(shardId, wce, bob);
+    ASSERT_DOES_NOT_THROW(bob.done());
+}
+
+// namespace mongo
 }  // namespace mongo
