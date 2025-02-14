@@ -98,6 +98,7 @@
 #include "mongo/db/query/query_settings/query_settings_utils.h"
 #include "mongo/db/query/query_stats/agg_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/timeseries/timeseries_rewrites.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -109,6 +110,8 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/views/resolved_view.h"
@@ -1016,6 +1019,70 @@ StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> preparePipeline(
     return std::move(pipeline);
 }
 
+/**
+ * Rewrite the aggregate request's pipeline BSON for a timeseries query. The command object's
+ * pipeline will be replaced. Additionally, the index hint, if present, will be translated to an
+ * index on the bucket collection.
+ */
+void rewritePipelineBsonForTimeseriesCollection(const CollectionPtr& coll,
+                                                AggregateCommandRequest& aggRequest) {
+    const auto tsOpts = coll->getTimeseriesOptions();
+    tassert(10000200, "Timeseries options must be present for timeseries collection", tsOpts);
+    const auto timeField = tsOpts->getTimeField();
+    const auto metaField = tsOpts->getMetaField();
+    const auto maxSpanSeconds = tsOpts->getBucketMaxSpanSeconds().get_value_or(
+        mongo::timeseries::getMaxSpanSecondsFromGranularity(
+            tsOpts->getGranularity().get_value_or(BucketGranularityEnum::Seconds)));
+    const auto bucketsMayHaveMixedSchemaData = coll->getTimeseriesBucketsMayHaveMixedSchemaData();
+    // Assume parameters have changed unless otherwise specified.
+    const auto parametersChanged = coll->timeseriesBucketingParametersHaveChanged().value_or(true);
+    const auto bucketsAreFixed = timeseries::areTimeseriesBucketsFixed(*tsOpts, parametersChanged);
+    const auto newPipelineBson =
+        timeseries::rewritePipelineForTimeseriesCollection(aggRequest.getPipeline(),
+                                                           timeField,
+                                                           metaField,
+                                                           {maxSpanSeconds},
+                                                           bucketsMayHaveMixedSchemaData,
+                                                           bucketsAreFixed);
+    aggRequest.setPipeline(std::move(newPipelineBson));
+
+    // Translate the index hint if present.
+    if (aggRequest.getHint()) {
+        const auto converted = timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
+            *tsOpts, *aggRequest.getHint());
+        if (converted.isOK()) {
+            aggRequest.setHint(converted.getValue());
+        }
+    }
+}
+
+/**
+ * Rewrite the AggregateCommandRequest pipeline if the query is over a timeseries collection.
+ */
+void rewritePipelineIfTimeseries(const AggExState& aggExState,
+                                 const AggCatalogState& aggCatalogState) {
+    const auto handleTimeseriesWithoutView =
+        feature_flags::gFeatureFlagGenerateInternalUnpackBucketStageWithoutView
+            .isEnabledUseLatestFCVWhenUninitialized(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    if (handleTimeseriesWithoutView && aggCatalogState.lockAcquired()) {
+        if (const auto& coll = aggCatalogState.getPrimaryCollection();
+            coll && coll->isNewTimeseriesWithoutView()) {
+            sharding::router::CollectionRouter router(
+                aggExState.getOpCtx()->getServiceContext(), aggExState.getExecutionNss(), false);
+            router.route(aggExState.getOpCtx(),
+                         "rewrite pipeline BSON for timeseries collection"_sd,
+                         [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+                             // If this is not a sharded collection, perform the timeseries rewrite.
+                             if (aggExState.canReadUnderlyingCollectionLocally(cri)) {
+                                 rewritePipelineBsonForTimeseriesCollection(
+                                     coll, aggExState.getRequest());
+                             }
+                         });
+        }
+    }
+}
+
 Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result) {
     // Perform the validation checks on the request and its derivatives before proceeding.
     aggExState.performValidationChecks();
@@ -1057,6 +1124,8 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
             return runAggregateOnView(aggExState, std::move(aggCatalogState), result);
         }
     }
+
+    rewritePipelineIfTimeseries(aggExState, *aggCatalogState);
 
     boost::intrusive_ptr<ExpressionContext> expCtx = aggCatalogState->createExpressionContext();
 
