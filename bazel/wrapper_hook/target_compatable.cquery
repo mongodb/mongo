@@ -1,6 +1,0 @@
-def format(target):
-    if "IncompatiblePlatformProvider" in providers(target):
-        result = "False"
-    else:
-        result = "True"
-    return "%s %s" % (target.label, result)
