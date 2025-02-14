@@ -45,6 +45,7 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
         # Non-TSAN variants don't need this adjustment as they have a reasonable free memory margin
         {"task": r"fcv_upgrade_downgrade_sharded_collections_jscore_passthrough.*", "factor": 0.27},
         {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.125},
+        {"task": r"sharding_kill_stepdown_terminate_jscore_passthrough.*", "factor": 0.125},
     ],
     "enterprise-rhel8-debug-tsan-all-feature-flags": [
         # Lower the default resmoke_jobs_factor for TSAN to reduce memory pressure for this suite,
@@ -57,6 +58,7 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
         },
         {"task": r"fcv_upgrade_downgrade_replica_sets_jscore_passthrough.*", "factor": 0.27},
         {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.125},
+        {"task": r"sharding_kill_stepdown_terminate_jscore_passthrough.*", "factor": 0.125},
     ],
     "rhel8-debug-aubsan-classic-engine": [
         {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.25}
@@ -107,6 +109,11 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
     "windows-debug-suggested": [{"task": "noPassthrough", "factor": 0.5}],
     "windows": [{"task": "noPassthrough", "factor": 0.5}],
 }
+
+# Copy the task factor overrides for 'toolchain-v5'
+VARIANT_TASK_FACTOR_OVERRIDES["enterprise-rhel8-debug-tsan-all-feature-flags-toolchain-v5"] = (
+    VARIANT_TASK_FACTOR_OVERRIDES["enterprise-rhel8-debug-tsan-all-feature-flags"]
+)
 
 TASKS_FACTORS = [{"task": r"replica_sets.*", "factor": 0.5}, {"task": r"sharding.*", "factor": 0.5}]
 
