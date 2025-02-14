@@ -78,17 +78,17 @@ crudTest(() => {
 
 // remove()
 crudTest(() => {
-    assert.eq(bucketsColl.remove({"control.count": 2}).nRemoved, 1);
+    assert.eq(coll.remove({"control.count": 2}, {rawData: true}).nRemoved, 1);
 });
 
 // deleteOne()
 crudTest(() => {
-    assert.eq(bucketsColl.deleteOne({"control.count": 2}).deletedCount, 1);
+    assert.eq(coll.deleteOne({"control.count": 2}, {rawData: true}).deletedCount, 1);
 });
 
 // deleteMany()
 crudTest(() => {
-    assert.eq(bucketsColl.deleteMany({"control.version": 2}).deletedCount, 2);
+    assert.eq(coll.deleteMany({"control.version": 2}, {rawData: true}).deletedCount, 2);
 });
 
 // distinct()

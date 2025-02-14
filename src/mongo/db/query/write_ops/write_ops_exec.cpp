@@ -1937,6 +1937,9 @@ WriteResult performDeletes(OperationContext* opCtx,
                            const write_ops::DeleteCommandRequest& wholeOp,
                            OperationSource source) {
     auto ns = wholeOp.getNamespace();
+    if (wholeOp.getRawData()) {
+        ns = timeseries::isTimeseriesViewRequest(opCtx, wholeOp).second;
+    }
     if (source == OperationSource::kTimeseriesDelete) {
         if (!ns.isTimeseriesBucketsCollection()) {
             ns = ns.makeTimeseriesBucketsNamespace();

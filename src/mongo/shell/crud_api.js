@@ -383,6 +383,10 @@ DBCollection.prototype.deleteOne = function(filter, options) {
         removeOp.collation(opts.collation);
     }
 
+    if (opts.rawData) {
+        bulk.setRawData(opts.rawData);
+    }
+
     // Add the deleteOne operation.
     removeOp.removeOne();
 
@@ -438,6 +442,10 @@ DBCollection.prototype.deleteMany = function(filter, options) {
     // Add the collation, if there is one.
     if (opts.collation) {
         removeOp.collation(opts.collation);
+    }
+
+    if (opts.rawData) {
+        bulk.setRawData(opts.rawData);
     }
 
     // Add the deleteOne operation.

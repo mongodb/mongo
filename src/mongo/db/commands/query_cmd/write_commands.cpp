@@ -737,7 +737,7 @@ public:
 
             if (auto [isTimeseriesViewRequest, _] =
                     timeseries::isTimeseriesViewRequest(opCtx, request());
-                isTimeseriesViewRequest) {
+                isTimeseriesViewRequest && !request().getRawData()) {
                 source = OperationSource::kTimeseriesDelete;
             }
 
