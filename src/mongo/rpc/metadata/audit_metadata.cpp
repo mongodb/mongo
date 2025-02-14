@@ -101,20 +101,29 @@ void setAuditMetadata(OperationContext* opCtx, const boost::optional<AuditMetada
 
 boost::optional<AuditMetadata> getAuditAttrsToAuditMetadata(OperationContext* opCtx) {
     // If we have no opCtx, which does appear to happen, don't do anything.
-    auto auditUserAttrs = AuditUserAttrs::get(opCtx);
-    if (!auditUserAttrs) {
-        return boost::none;
+    if (!opCtx) {
+        return {};
     }
 
-    AuditMetadata metadata;
-    metadata.setUser(auditUserAttrs->getUser());
-    metadata.setRoles(auditUserAttrs->getRoles());
+    boost::optional<AuditMetadata> metadata;
+    auto auditUserAttrs = AuditUserAttrs::get(opCtx);
+
+    if (auditUserAttrs) {
+        metadata = AuditMetadata();
+        metadata->setUser(auditUserAttrs->getUser());
+        metadata->setRoles(auditUserAttrs->getRoles());
+    }
 
     // TODO SERVER-83990: remove
     if (gFeatureFlagExposeClientIpInAuditLogs.isEnabledUseLastLTSFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         if (auto clientAttrs = AuditClientAttrs::get(opCtx->getClient())) {
-            metadata.setClientMetadata(clientAttrs->generateClientMetadataObj());
+            if (!metadata) {
+                metadata = AuditMetadata();
+                // Roles is not an optional field so we initiate it with an empty vector.
+                metadata->setRoles({});
+            }
+            metadata->setClientMetadata(clientAttrs->generateClientMetadataObj());
         }
     }
 
