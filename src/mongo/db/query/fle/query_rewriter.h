@@ -139,11 +139,9 @@ public:
     QueryRewriter createSubpipelineRewriter(
         const NamespaceString& collectionNss,
         boost::intrusive_ptr<ExpressionContext> subpipelineExpCtx) {
-        // (Ignore FCV check): No FCV gating for this feature.
-        tassert(
-            9775501,
-            "createSubpipelineRewriter is not supported when feature flag is disabled",
-            feature_flags::gFeatureFlagLookupEncryptionSchemasFLE.isEnabledAndIgnoreFCVUnsafe());
+        tassert(9775501,
+                "createSubpipelineRewriter is not supported when feature flag is disabled",
+                feature_flags::gFeatureFlagLookupEncryptionSchemasFLE.isEnabled());
 
         tassert(9775506, "Invalid subpipeline expression context", subpipelineExpCtx);
         const auto iter = _escMap.find(collectionNss);

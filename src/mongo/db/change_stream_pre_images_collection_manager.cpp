@@ -76,7 +76,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
@@ -134,8 +133,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getDeleteExpiredPreImagesEx
 }
 
 bool useUnreplicatedTruncates() {
-    bool res = feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    bool res = feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions.isEnabled();
     return res;
 }
 }  // namespace

@@ -277,8 +277,7 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
 
         tassert(7816301,
                 "Pushing down $search into SBE but featureFlagSearchInSbe is disabled."_sd,
-                feature_flags::gFeatureFlagSearchInSbe.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+                feature_flags::gFeatureFlagSearchInSbe.isEnabled());
 
         // Build a SearchNode in order to retrieve the search info.
         auto searchNode = SearchNode::getSearchNode(query.cqPipeline().front().get());

@@ -131,8 +131,7 @@ void rewriteGraphLookUp(QueryRewriter* rewriter, DocumentSourceGraphLookUp* sour
 }
 
 void rewriteLookUp(QueryRewriter* rewriter, DocumentSourceLookUp* source) {
-    // (Ignore FCV check): No FCV gating for this feature.
-    if (!feature_flags::gFeatureFlagLookupEncryptionSchemasFLE.isEnabledAndIgnoreFCVUnsafe()) {
+    if (!feature_flags::gFeatureFlagLookupEncryptionSchemasFLE.isEnabled()) {
         return;
     }
     // When rewriting a lookup, we're only concerned with rewriting the pipeline of the lookup which
@@ -224,8 +223,7 @@ NamespaceString getAndValidateEscNsFromSchema(const EncryptionInformation& encry
 std::map<NamespaceString, NamespaceString> generateEncryptInfoEscMap(
     const DatabaseName& dbName, const EncryptionInformation& encryptInfo) {
     std::map<NamespaceString, NamespaceString> escMap;
-    // (Ignore FCV check): No FCV gating for this feature.
-    if (feature_flags::gFeatureFlagLookupEncryptionSchemasFLE.isEnabledAndIgnoreFCVUnsafe()) {
+    if (feature_flags::gFeatureFlagLookupEncryptionSchemasFLE.isEnabled()) {
         // Get the Esc collection namespace for every namespace in our encryption schema.
         for (const auto& elem : encryptInfo.getSchema()) {
             uassert(9775500,

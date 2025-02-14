@@ -118,7 +118,6 @@
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
@@ -1096,8 +1095,7 @@ bool shouldUseSbePlanCache(const QueryPlannerParams& params) {
 
     // SBE feature flag guards SBE plan cache use. Check this first to avoid doing potentially
     // expensive checks unnecessarily.
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (!feature_flags::gFeatureFlagSbeFull.isEnabled(fcvSnapshot)) {
+    if (!feature_flags::gFeatureFlagSbeFull.isEnabled()) {
         return false;
     }
 
@@ -1233,8 +1231,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
         // creating the planner.
         attachPipelineStages(collections, pipeline, needsMerge, canonicalQuery.get());
 
-        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabled(fcvSnapshot);
+        const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabled();
         return sbeFull || shouldUseRegularSbe(opCtx, *canonicalQuery, sbeFull);
     }();
 

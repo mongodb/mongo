@@ -333,9 +333,7 @@ void startFTDC(ServiceContext* serviceContext,
     config.enabled = ftdcStartupParams.enabled.load();
     config.maxFileSizeBytes = ftdcStartupParams.maxFileSizeMB.load() * 1024 * 1024;
 
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (feature_flags::gMultiServiceLogAndFTDCFormat.isEnabledUseLatestFCVWhenUninitialized(
-            fcvSnapshot) &&
+    if (feature_flags::gMultiServiceLogAndFTDCFormat.isEnabled() &&
         serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         // By embedding the router in MongoD, the FTDC machinery will produce diagnostic data for
         // router and shard services, requiring extra space for retention. If that is the case and

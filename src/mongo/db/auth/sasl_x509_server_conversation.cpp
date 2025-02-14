@@ -185,8 +185,7 @@ StatusWith<std::tuple<bool, std::string>> SaslX509ServerMechanism::stepImpl(
 
     uassert(ErrorCodes::BadValue,
             kX509AuthenticationDisabledMessage + ": Feature Flag is disabled.",
-            gFeatureFlagRearchitectUserAcquisition.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+            gFeatureFlagRearchitectUserAcquisition.isEnabled());
 
     // We want to set the _principalName here in case we need it for auditing purposes.
     ServerMechanismBase::_principalName = unpackName(inputData);

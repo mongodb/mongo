@@ -57,20 +57,6 @@ public:
         return _enabled;
     }
 
-    // TODO(SERVER-99874): Remove this stub
-    bool isEnabled(ServerGlobalParams::FCVSnapshot fcv) const {
-        return isEnabled();
-    }
-    bool isEnabledUseLastLTSFCVWhenUninitialized(ServerGlobalParams::FCVSnapshot fcv) const {
-        return isEnabled();
-    }
-    bool isEnabledUseLatestFCVWhenUninitialized(ServerGlobalParams::FCVSnapshot fcv) const {
-        return isEnabled();
-    }
-    bool isEnabledAndIgnoreFCVUnsafe() const {
-        return isEnabled();
-    }
-
 private:
     void set(bool enabled) {
         _enabled = enabled;

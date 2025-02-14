@@ -78,7 +78,6 @@
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -1052,8 +1051,7 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
 
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
     indexBuildOptions.applicationMode = applicationMode;
-    if (repl::feature_flags::gReduceMajorityWriteLatency.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (repl::feature_flags::gReduceMajorityWriteLatency.isEnabled()) {
         // When gReduceMajorityWriteLatency is enabled, the oplog can be written far ahead of oplog
         // application. In this case, top of oplog will include this applyIndexBuild oplog itself so
         // we will fall into deadlock if we wait the committedSnapshot to pass the top of oplog. So,

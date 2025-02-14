@@ -494,8 +494,7 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
     // arbiterOnly field for any member.
     invariant(!_replCoord->getMemberState().arbiter());
 
-    const auto useOplogWriter = feature_flags::gReduceMajorityWriteLatency.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    const auto useOplogWriter = feature_flags::gReduceMajorityWriteLatency.isEnabled();
 
     // The OplogWriter will take care of journaling when featureFlagReduceMajorityWriteLatency
     // is enabled.

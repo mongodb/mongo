@@ -103,8 +103,7 @@ public:
                 FixedFCVRegion fcvRegion(opCtx);
 
                 const bool shardAuthoritativeDbMetadataFeatureFlagEnabled =
-                    feature_flags::gShardAuthoritativeDbMetadata.isEnabled(
-                        (*fcvRegion).acquireFCVSnapshot());
+                    feature_flags::gShardAuthoritativeDbMetadata.isEnabled();
 
                 auto shardRegistry = Grid::get(opCtx)->shardRegistry();
                 // Ensure that the shard information is up-to-date as possible to catch the case

@@ -261,8 +261,7 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     invariant(storageEngine);
 
-    const auto useOplogWriter = feature_flags::gReduceMajorityWriteLatency.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    const auto useOplogWriter = feature_flags::gReduceMajorityWriteLatency.isEnabled();
     const auto applyBufferSize =
         useOplogWriter ? kOplogApplyBufferSize : kOplogApplyBufferSizeLegacy;
 

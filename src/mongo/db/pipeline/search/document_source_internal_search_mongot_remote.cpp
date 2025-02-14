@@ -248,8 +248,7 @@ bool DocumentSourceInternalSearchMongotRemote::shouldReturnEOF() {
     }
 
     if (pExpCtx->getExplain() &&
-        !feature_flags::gFeatureFlagSearchExplainExecutionStats.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        !feature_flags::gFeatureFlagSearchExplainExecutionStats.isEnabled()) {
         return true;
     }
 

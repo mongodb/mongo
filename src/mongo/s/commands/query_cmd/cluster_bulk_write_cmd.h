@@ -66,7 +66,6 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/rpc/op_msg.h"
@@ -157,8 +156,7 @@ public:
               _request{std::move(bulkRequest)} {
             uassert(ErrorCodes::CommandNotSupported,
                     "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
-                    gFeatureFlagBulkWriteCommand.isEnabled(
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+                    gFeatureFlagBulkWriteCommand.isEnabled());
 
             bulk_write_common::validateRequest(_request, /*isRouter=*/true);
         }

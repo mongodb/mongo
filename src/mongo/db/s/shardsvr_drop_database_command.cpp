@@ -108,8 +108,7 @@ public:
                 OperationShardingState::get(opCtx).getDbVersion(ns().dbName());
 
             const bool shardAuthoritativeDbMetadataFeatureFlagEnabled =
-                feature_flags::gShardAuthoritativeDbMetadata.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+                feature_flags::gShardAuthoritativeDbMetadata.isEnabled();
 
             DropDatabaseCoordinatorDocument coordinatorDoc;
             coordinatorDoc.setShardingDDLCoordinatorMetadata(

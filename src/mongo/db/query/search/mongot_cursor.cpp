@@ -276,9 +276,7 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     boost::optional<long long> batchSize = boost::none;
     // We should only use batchSize if the batchSize feature flag (featureFlagSearchBatchSizeTuning)
     // is enabled and we've already computed min/max bounds.
-    if (feature_flags::gFeatureFlagSearchBatchSizeTuning.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        bounds.has_value()) {
+    if (feature_flags::gFeatureFlagSearchBatchSizeTuning.isEnabled() && bounds.has_value()) {
         const auto storedSourceElem = query[kReturnStoredSourceArg];
         bool isStoredSource = !storedSourceElem.eoo() && storedSourceElem.Bool();
         batchSize = computeInitialBatchSize(expCtx, *bounds, userBatchSize, isStoredSource);

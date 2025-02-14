@@ -73,11 +73,9 @@ public:
               allowNamespaceNotFoundErrorsOnCrudOps(inputMode ==
                                                         OplogApplication::Mode::kInitialSync ||
                                                     OplogApplication::inRecovering(inputMode)),
-              skipWritesToOplog(
-                  (feature_flags::gReduceMajorityWriteLatency.isEnabled(
-                       serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-                   inputMode == OplogApplication::Mode::kSecondary) ||
-                  OplogApplication::inRecovering(inputMode)) {}
+              skipWritesToOplog((feature_flags::gReduceMajorityWriteLatency.isEnabled() &&
+                                 inputMode == OplogApplication::Mode::kSecondary) ||
+                                OplogApplication::inRecovering(inputMode)) {}
 
         Options(OplogApplication::Mode inputMode, bool skipWritesToOplog)
             : mode(inputMode),

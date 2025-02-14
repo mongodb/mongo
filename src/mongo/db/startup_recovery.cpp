@@ -87,7 +87,6 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/storage_options.h"
@@ -396,8 +395,7 @@ void clearTempFilesExceptForResumableBuilds(const std::vector<ResumeIndexInfo>& 
 }
 
 bool useUnreplicatedTruncatesForChangeStreamCollections() {
-    bool res = mongo::feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    bool res = mongo::feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions.isEnabled();
     return res;
 }
 

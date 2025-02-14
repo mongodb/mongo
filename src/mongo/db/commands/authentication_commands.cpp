@@ -332,8 +332,7 @@ AuthenticateReply authCommand(OperationContext* opCtx,
     auto mechanism = cmd.getMechanism();
 
     // TODO SERVER-78809: remove
-    if (!gFeatureFlagRearchitectUserAcquisition.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (!gFeatureFlagRearchitectUserAcquisition.isEnabled()) {
 
         auto userStr = user.value_or("").toString();
 

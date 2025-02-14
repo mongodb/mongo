@@ -1756,12 +1756,6 @@ public:
         return std::move(*this);
     }
 
-    // TODO(SERVER-99874): Remove this stub
-    template <typename T>
-    EntryBuilder requiresFeatureFlag(T* featureFlag) && {
-        return std::move(*this).requiresFeatureFlag(CheckableFeatureFlagRef(*featureFlag));
-    }
-
     /**
      * Set the plan into which the entry will be registered. Used for testing.
      * The default is the `globalCommandConstructionPlan()` singleton.

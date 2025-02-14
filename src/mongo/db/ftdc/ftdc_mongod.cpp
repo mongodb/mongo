@@ -236,9 +236,7 @@ void startMongoDFTDC(ServiceContext* serviceContext) {
         registerShardCollectors,
     };
 
-    // (Ignore FCV check): this feature flag is not FCV-gated.
-    const bool multiServiceFTDCSchema =
-        feature_flags::gMultiServiceLogAndFTDCFormat.isEnabledAndIgnoreFCVUnsafe();
+    const bool multiServiceFTDCSchema = feature_flags::gMultiServiceLogAndFTDCFormat.isEnabled();
 
     const UseMultiServiceSchema multiversionSchema{
         serviceContext->getService(ClusterRole::RouterServer) && multiServiceFTDCSchema};

@@ -51,8 +51,7 @@ namespace {
 constexpr size_t kMinOpsPerThread = 16;
 
 auto checkFeatureFlagReduceMajorityWriteLatencyFn = [] {
-    return feature_flags::gReduceMajorityWriteLatency.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    return feature_flags::gReduceMajorityWriteLatency.isEnabled();
 };
 
 auto& oplogWriterMetric = *MetricBuilder<OplogWriterStats>{"repl.write"}.setPredicate(

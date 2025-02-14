@@ -378,8 +378,7 @@ void _initializeGlobalShardingState(OperationContext* opCtx,
         }
     }();
 
-    // (Ignore FCV check): this feature flag is not FCV-gated.
-    auto catalogCache = feature_flags::gDualCatalogCache.isEnabledAndIgnoreFCVUnsafe()
+    auto catalogCache = feature_flags::gDualCatalogCache.isEnabled()
         ? std::make_unique<CatalogCache>(service,
                                          std::make_shared<ConfigServerCatalogCacheLoaderImpl>())
         : std::make_unique<CatalogCache>(service, shardRoleCatalogCacheLoader);
@@ -457,8 +456,7 @@ void _initializeGlobalShardingStateForConfigServer(OperationContext* opCtx) {
 
     _initializeGlobalShardingState(opCtx, configCS);
 
-    // (Ignore FCV check): this feature flag is not FCV-gated.
-    if (feature_flags::gDualCatalogCache.isEnabledAndIgnoreFCVUnsafe()) {
+    if (feature_flags::gDualCatalogCache.isEnabled()) {
         // With the feature flag enabled, there is a separate routing and filtering cache, so this
         // cache and the routing cache can be the same.
         RoutingInformationCache::setOverride(service, Grid::get(service)->catalogCache());

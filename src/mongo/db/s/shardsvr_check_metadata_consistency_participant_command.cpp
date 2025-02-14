@@ -157,9 +157,7 @@ public:
                                            std::make_move_iterator(indexInconsistencies.end()));
                 }
 
-                if (feature_flags::gShardAuthoritativeDbMetadata.isEnabled(
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-                    !nss.isConfigDB()) {
+                if (feature_flags::gShardAuthoritativeDbMetadata.isEnabled() && !nss.isConfigDB()) {
                     const auto dbInGlobalCatalog =
                         getDatabaseMetadataFromConfigServer(opCtx, nss.dbName());
 

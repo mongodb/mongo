@@ -346,8 +346,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegac
 
     // TODO SERVER-94874 Establish mongot cursor for $searchMeta queries too.
     if ((expCtx->getExplain() &&
-         !feature_flags::gFeatureFlagSearchExplainExecutionStats.isEnabled(
-             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) ||
+         !feature_flags::gFeatureFlagSearchExplainExecutionStats.isEnabled()) ||
         expCtx->getExplain() == ExplainOptions::Verbosity::kQueryPlanner ||
         !isSearchPipeline(origPipeline)) {
         // This path is for scenarios where we know we only need one cursor. For $search in

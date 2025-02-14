@@ -137,7 +137,6 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/db/storage/record_store.h"
@@ -2109,8 +2108,7 @@ bool PipelineD::isSearchPresentAndEligibleForSbe(const Pipeline* pipeline) {
     auto firstStageIsSearch = search_helpers::isSearchPipeline(pipeline) ||
         search_helpers::isSearchMetaPipeline(pipeline);
 
-    auto searchInSbeEnabled = feature_flags::gFeatureFlagSearchInSbe.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    auto searchInSbeEnabled = feature_flags::gFeatureFlagSearchInSbe.isEnabled();
     auto forceClassicEngine =
         expCtx->getQueryKnobConfiguration().getInternalQueryFrameworkControlForOp() ==
         QueryFrameworkControlEnum::kForceClassicEngine;

@@ -1235,8 +1235,7 @@ OpTime TopologyCoordinator::_getMemberOpTimeForRecencyCheck(const MemberData& me
     // For j: true case use min(lastDurable, lastApplied) because oplog entries being
     // durable no longer implies being applied, but we'd like to have numbered and
     // tagged write concerns support the read-your-write semantics.
-    if (feature_flags::gReduceMajorityWriteLatency.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (feature_flags::gReduceMajorityWriteLatency.isEnabled()) {
         memberOpTime = durablyWritten
             ? std::min(memberData.getLastDurableOpTime(), memberData.getLastAppliedOpTime())
             : memberData.getLastAppliedOpTime();
@@ -1978,8 +1977,7 @@ std::string TopologyCoordinator::_getReplSetStatusString() {
 void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatusArgs,
                                                 BSONObjBuilder* response,
                                                 Status* result) {
-    auto featureFlagMajorityWriteLatency = feature_flags::gReduceMajorityWriteLatency.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    auto featureFlagMajorityWriteLatency = feature_flags::gReduceMajorityWriteLatency.isEnabled();
     // output for each member
     std::vector<BSONObj> membersOut;
     const MemberState myState = getMemberState();

@@ -213,8 +213,7 @@ private:
 
         uassert(ErrorCodes::IllegalOperation,
                 "Compact command with extra options requires its feature flag to be enabled",
-                gFeatureFlagCompactOptions.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
+                gFeatureFlagCompactOptions.isEnabled() ||
                     (!params.getFreeSpaceTargetMB() && !params.getDryRun()));
     }
 };

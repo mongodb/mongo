@@ -201,8 +201,7 @@ DocumentSource::GetNextResult DocumentSourceVectorSearch::doGetNext() {
     }
 
     if (pExpCtx->getExplain() &&
-        !feature_flags::gFeatureFlagSearchExplainExecutionStats.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        !feature_flags::gFeatureFlagSearchExplainExecutionStats.isEnabled()) {
         return DocumentSource::GetNextResult::makeEOF();
     }
 

@@ -1692,8 +1692,7 @@ intrusive_ptr<Expression> ExpressionFieldPath::optimize() {
         return ExpressionConstant::create(getExpressionContext(), Value());
     }
 
-    const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled();
     if (sbeFullEnabled &&
         (_variable == Variables::kNowId || _variable == Variables::kClusterTimeId ||
          _variable == Variables::kUserRolesId)) {

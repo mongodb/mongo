@@ -1952,10 +1952,8 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     LOGV2_OPTIONS(9439300, {LogComponent::kSharding}, "Shutting down the filtering metadata cache");
     FilteringMetadataCache::get(opCtx)->shutDown();
 
-    // (Ignore FCV check): this feature flag is not FCV-gated.
     if (auto configServerRoutingInfoCache = RoutingInformationCache::get(serviceContext);
-        configServerRoutingInfoCache != nullptr &&
-        !feature_flags::gDualCatalogCache.isEnabledAndIgnoreFCVUnsafe()) {
+        configServerRoutingInfoCache != nullptr && !feature_flags::gDualCatalogCache.isEnabled()) {
         LOGV2_OPTIONS(
             8778000, {LogComponent::kSharding}, "Shutting down the RoutingInformationCache");
         configServerRoutingInfoCache->shutDownAndJoin();

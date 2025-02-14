@@ -769,9 +769,7 @@ int WiredTigerUtil::verifyTable(WiredTigerRecoveryUnit& ru,
 
     // Open a new session with custom error handlers.
     const char* sessionConfig = nullptr;
-    if (gFeatureFlagPrefetch.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        !connection->isEphemeral()) {
+    if (gFeatureFlagPrefetch.isEnabled() && !connection->isEphemeral()) {
         sessionConfig = "prefetch=(enabled=true)";
     }
     WiredTigerSession session(ru.getConnection(), &eventHandler, sessionConfig);
@@ -1268,8 +1266,7 @@ BSONObj WiredTigerUtil::getSanitizedStorageOptionsForSecondaryReplication(const 
 }
 
 Status WiredTigerUtil::canRunAutoCompact(bool isEphemeral) {
-    if (!gFeatureFlagAutoCompact.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (!gFeatureFlagAutoCompact.isEnabled()) {
         return Status(ErrorCodes::IllegalOperation,
                       "autoCompact() requires its feature flag to be enabled");
     }

@@ -4469,8 +4469,7 @@ boost::optional<Timestamp> ReplicationCoordinatorImpl::getRecoveryTimestamp() {
 }
 
 void ReplicationCoordinatorImpl::_enterDrainMode(WithLock) {
-    _oplogSyncState = feature_flags::gReduceMajorityWriteLatency.isEnabled(
-                          serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
+    _oplogSyncState = feature_flags::gReduceMajorityWriteLatency.isEnabled()
         ? OplogSyncState::WriterDraining
         : OplogSyncState::ApplierDraining;
     _externalState->stopProducer();

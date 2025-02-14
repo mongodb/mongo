@@ -128,9 +128,8 @@ public:
             }
         }
 
-        // (Ignore FCV check): this feature flag is not FCV-gated.
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
-            !feature_flags::gDualCatalogCache.isEnabledAndIgnoreFCVUnsafe()) {
+            !feature_flags::gDualCatalogCache.isEnabled()) {
             auto const routingInfoCache = RoutingInformationCache::get(opCtx);
 
             if (argumentElem.isNumber() || argumentElem.isBoolean()) {

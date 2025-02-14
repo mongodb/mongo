@@ -122,7 +122,7 @@ public:
 };
 
 MONGO_REGISTER_COMMAND(ClusterUnshardCollectionCmd)
-    .requiresFeatureFlag(&resharding::gFeatureFlagUnshardCollection)
+    .requiresFeatureFlag(resharding::gFeatureFlagUnshardCollection)
     .forRouter();
 
 }  // namespace

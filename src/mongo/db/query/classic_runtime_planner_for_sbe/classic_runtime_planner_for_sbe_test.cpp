@@ -104,9 +104,8 @@ protected:
             .pipeline = std::move(pipeline)});
         cq->setSbeCompatible(true);
 
-        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         // Whether or not to use the SBE plan cache depends on "featureFlagSbeFull".
-        const bool useSbePlanCache = feature_flags::gFeatureFlagSbeFull.isEnabled(fcvSnapshot);
+        const bool useSbePlanCache = feature_flags::gFeatureFlagSbeFull.isEnabled();
 
         auto params = std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForTest{});
         params->mainCollectionInfo.indexes = _indices;

@@ -496,8 +496,7 @@ bool findSbeCompatibleStagesForPushdown(
         isMainCollectionSharded = mainColl.isSharded_DEPRECATED();
     }
 
-    const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled();
     const SbeCompatibility minRequiredCompatibility = getMinRequiredSbeCompatibility(
         queryKnob.getInternalQueryFrameworkControlForOp(), sbeFullEnabled);
     const bool isTimeseriesCollection = cq->nss().isTimeseriesBucketsCollection();
@@ -541,15 +540,13 @@ bool findSbeCompatibleStagesForPushdown(
         // TODO (SERVER-77229): SBE execution of $search requires 'featureFlagSearchInSbe' to be
         // enabled.
         .search = meetsRequirements(SbeCompatibility::requiresSbeFull) &&
-            feature_flags::gFeatureFlagSearchInSbe.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()),
+            feature_flags::gFeatureFlagSearchInSbe.isEnabled(),
 
         .window = meetsRequirements(SbeCompatibility::requiresTrySbe),
 
         // TODO (SERVER-80243): Remove 'featureFlagTimeSeriesInSbe' check.
         .unpackBucket = meetsRequirements(SbeCompatibility::noRequirements) &&
-            feature_flags::gFeatureFlagTimeSeriesInSbe.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+            feature_flags::gFeatureFlagTimeSeriesInSbe.isEnabled() &&
             !queryKnob.getSbeDisableTimeSeriesForOp() &&
             cq->getExpCtx()->getSbePipelineCompatibility() == SbeCompatibility::noRequirements,
     };

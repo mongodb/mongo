@@ -49,7 +49,6 @@
 #include "mongo/db/pipeline/writer_util.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_options.h"
@@ -340,9 +339,7 @@ void DocumentSourceOut::initialize() {
 
     uassert(7406100,
             "$out to time-series collections is only supported on FCV greater than or equal to 7.1",
-            feature_flags::gFeatureFlagAggOutTimeseries.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
-                !_timeseries);
+            feature_flags::gFeatureFlagAggOutTimeseries.isEnabled() || !_timeseries);
 
     createTemporaryCollection();
     if (_originalIndexes.empty()) {
@@ -406,9 +403,7 @@ void DocumentSourceOut::finalize() {
     DocumentSourceWriteBlock writeBlock(pExpCtx->getOperationContext());
     uassert(7406101,
             "$out to time-series collections is only supported on FCV greater than or equal to 7.1",
-            feature_flags::gFeatureFlagAggOutTimeseries.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
-                !_timeseries);
+            feature_flags::gFeatureFlagAggOutTimeseries.isEnabled() || !_timeseries);
 
     // Rename the temporary collection to the namespace the user requested, and drop the target
     // collection if $out is writing to a collection that exists.

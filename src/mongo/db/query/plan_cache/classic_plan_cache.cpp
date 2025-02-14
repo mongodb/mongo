@@ -174,9 +174,7 @@ bool shouldCacheQuery(const CanonicalQuery& query) {
     // SBE plan cache is only on when featureFlagSbeFull is enabled, so in cases where the query
     // is SBE ineligble or the SBE plan cache is disabled, we do not cache at all.
     if (!findCommand.getHint().isEmpty()) {
-        if (!query.isSbeCompatible() ||
-            !feature_flags::gFeatureFlagSbeFull.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (!query.isSbeCompatible() || !feature_flags::gFeatureFlagSbeFull.isEnabled()) {
             return false;
         }
     }

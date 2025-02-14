@@ -282,8 +282,7 @@ public:
         applierSubBuilder.append("count", _applyBufferCounter.count.get());
         applierSubBuilder.append("sizeBytes", _applyBufferCounter.size.get());
         applierSubBuilder.append("maxSizeBytes", _applyBufferCounter.maxSize.get());
-        if (feature_flags::gReduceMajorityWriteLatency.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (feature_flags::gReduceMajorityWriteLatency.isEnabled()) {
             BSONObjBuilder builder;
             BSONObjBuilder writerSubBuilder;
             writerSubBuilder.append("count", _writeBufferCounter.count.get());

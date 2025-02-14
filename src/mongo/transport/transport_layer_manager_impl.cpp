@@ -143,8 +143,7 @@ void TransportLayerManagerImpl::appendStatsForFTDC(BSONObjBuilder& bob) const {
 
 bool shouldGRPCIngressBeEnabled() {
 #ifdef MONGO_CONFIG_GRPC
-    bool flag = feature_flags::gFeatureFlagGRPC.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    bool flag = feature_flags::gFeatureFlagGRPC.isEnabled();
 
     if (!flag) {
         return false;

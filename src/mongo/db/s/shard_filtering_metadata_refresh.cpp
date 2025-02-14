@@ -263,8 +263,7 @@ void FilteringMetadataCache::init(ServiceContext* serviceCtx,
     invariant(decoration->_loader == nullptr);
     decoration->_loader = loader;
 
-    // (Ignore FCV check): this feature flag is not FCV-gated.
-    if (feature_flags::gDualCatalogCache.isEnabledAndIgnoreFCVUnsafe()) {
+    if (feature_flags::gDualCatalogCache.isEnabled()) {
         decoration->_cache =
             std::make_unique<CatalogCache>(serviceCtx, loader, "FilteringMetadata"_sd);
     }

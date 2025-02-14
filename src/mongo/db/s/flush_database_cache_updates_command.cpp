@@ -213,8 +213,7 @@ public:
                     opCtx, dbName, boost::none));
 
                 // TODO (SERVER-97511): Remove the refresh of the routing information.
-                // (Ignore FCV check): this feature flag is not FCV-gated.
-                if (feature_flags::gDualCatalogCache.isEnabledAndIgnoreFCVUnsafe()) {
+                if (feature_flags::gDualCatalogCache.isEnabled()) {
                     const auto catalogCache = Grid::get(opCtx)->catalogCache();
                     catalogCache->onStaleDatabaseVersion(dbName, boost::none /* wantedVersion */);
                     (void)catalogCache->getDatabase(opCtx, dbName);

@@ -529,8 +529,7 @@ Status validate(OperationContext* opCtx,
         invariant(oldPrepareConflictBehavior == PrepareConflictBehavior::kEnforce);
     }
 
-    if (gFeatureFlagPrefetch.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+    if (gFeatureFlagPrefetch.isEnabled() &&
         !opCtx->getServiceContext()->getStorageEngine()->isEphemeral()) {
         shard_role_details::getRecoveryUnit(opCtx)->setPrefetching(true);
     }

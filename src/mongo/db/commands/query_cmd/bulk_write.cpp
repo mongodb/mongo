@@ -1281,8 +1281,7 @@ public:
             // creating this command invocation happens before any check that the node is a primary.
             uassert(ErrorCodes::CommandNotSupported,
                     "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
-                    gFeatureFlagBulkWriteCommand.isEnabledUseLastLTSFCVWhenUninitialized(
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+                    gFeatureFlagBulkWriteCommand.isEnabled());
 
             bulk_write_common::validateRequest(request(), /*isRouter=*/false);
 

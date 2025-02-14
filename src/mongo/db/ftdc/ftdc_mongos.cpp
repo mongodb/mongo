@@ -167,9 +167,8 @@ void startMongoSFTDC(ServiceContext* serviceContext) {
         }
     }
 
-    // (Ignore FCV check): This code is only executed in mongoS, and they're not FCV-gated anyway.
     const UseMultiServiceSchema multiServiceSchema{
-        feature_flags::gMultiServiceLogAndFTDCFormat.isEnabledAndIgnoreFCVUnsafe()};
+        feature_flags::gMultiServiceLogAndFTDCFormat.isEnabled()};
 
     startFTDC(serviceContext, directory, startMode, {registerRouterCollectors}, multiServiceSchema);
 }

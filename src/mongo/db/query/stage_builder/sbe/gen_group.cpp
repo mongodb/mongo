@@ -1315,10 +1315,8 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
                                       const PlanStageReqs& reqs,
                                       PlanStageSlots childOutputs,
                                       const GroupNode* groupNode) {
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled(fcvSnapshot);
-    const bool sbeBlockHashAggEnabled =
-        feature_flags::gFeatureFlagSbeBlockHashAgg.isEnabled(fcvSnapshot);
+    const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled();
+    const bool sbeBlockHashAggEnabled = feature_flags::gFeatureFlagSbeBlockHashAgg.isEnabled();
     const bool featureFlagsAllowBlockHashAgg = sbeFullEnabled || sbeBlockHashAggEnabled;
 
     boost::optional<sbe::value::SlotId> collatorSlot = _state.getCollatorSlot();

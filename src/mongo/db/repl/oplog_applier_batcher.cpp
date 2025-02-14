@@ -150,8 +150,7 @@ StatusWith<OplogApplierBatch> OplogApplierBatcher::getNextApplierBatch(
                   "oplogEntry"_attr = entry.toBSONForLogging());
         }
 
-        if (!feature_flags::gReduceMajorityWriteLatency.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (!feature_flags::gReduceMajorityWriteLatency.isEnabled()) {
             // Check for oplog version change.
             if (entry.getVersion() != OplogEntry::kOplogVersion) {
                 static constexpr char message[] = "Unexpected oplog version";
@@ -341,8 +340,7 @@ void OplogApplierBatcher::_run(StorageInterface* storageInterface) {
 
     while (true) {
         // When featureFlagReduceMajorityWriteLatency is enabled, OplogWriter takes care of this.
-        if (!feature_flags::gReduceMajorityWriteLatency.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (!feature_flags::gReduceMajorityWriteLatency.isEnabled()) {
             globalFailPointRegistry().find("rsSyncApplyStop")->pauseWhileSet();
             batchLimits.secondaryDelaySecsLatestTimestamp =
                 _calculateSecondaryDelaySecsLatestTimestamp();
@@ -371,11 +369,8 @@ void OplogApplierBatcher::_run(StorageInterface* storageInterface) {
 
             // When this feature flag is enabled, the oplogBatchDelayMillis is handled in
             // OplogWriter.
-            auto waitToFillBatch =
-                Milliseconds(feature_flags::gReduceMajorityWriteLatency.isEnabled(
-                                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
-                                 ? 0
-                                 : oplogBatchDelayMillis);
+            auto waitToFillBatch = Milliseconds(
+                feature_flags::gReduceMajorityWriteLatency.isEnabled() ? 0 : oplogBatchDelayMillis);
             ops = fassertNoTrace(31004,
                                  getNextApplierBatch(opCtx.get(), batchLimits, waitToFillBatch));
         } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {

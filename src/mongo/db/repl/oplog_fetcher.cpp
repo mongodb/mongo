@@ -166,8 +166,7 @@ StatusWith<OplogFetcher::DocumentsInfo> OplogFetcher::validateDocuments(
     info.networkDocumentBytes = 0;
     info.networkDocumentCount = 0;
     for (auto&& doc : documents) {
-        if (feature_flags::gReduceMajorityWriteLatency.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (feature_flags::gReduceMajorityWriteLatency.isEnabled()) {
             // Check for oplog version change.
             auto version = doc[OplogEntry::kVersionFieldName].numberLong();
             if (version != OplogEntry::kOplogVersion) {
