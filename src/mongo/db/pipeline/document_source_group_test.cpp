@@ -590,26 +590,33 @@ TEST_F(DocumentSourceGroupTest, MemoryTracking) {
     const MemoryUsageTracker& memTracker = groupProcessor->getMemoryTracker();
     ASSERT_EQUALS(memTracker.currentMemoryBytes(), 0);
 
-    // Tracked memory increases as rows are processed.
+    // Tracked memory increases as rows are processed. Different platforms have different amounts of
+    // memory here, so just show that the amount is increasing.
     ASSERT_TRUE(group->getNext().isPaused());
-    ASSERT_EQUALS(memTracker.currentMemoryBytes(), 192);
+    int64_t curBytes1 = memTracker.currentMemoryBytes();
+    ASSERT_GREATER_THAN(curBytes1, 0);
 
     ASSERT_TRUE(group->getNext().isPaused());
-    ASSERT_EQUALS(memTracker.currentMemoryBytes(), 280);
+    int64_t curBytes2 = memTracker.currentMemoryBytes();
+    ASSERT_GREATER_THAN(curBytes2, curBytes1);
 
     ASSERT_TRUE(group->getNext().isPaused());
-    ASSERT_EQUALS(memTracker.currentMemoryBytes(), 472);
+    int64_t curBytes3 = memTracker.currentMemoryBytes();
+    ASSERT_GREATER_THAN(curBytes3, curBytes2);
 
     std::vector<Document> outDocs;
     {
         auto result = group->getNext();
         ASSERT_TRUE(result.isAdvanced());
-        ASSERT_EQUALS(memTracker.currentMemoryBytes(), 560);
+        int64_t curBytes4 = memTracker.currentMemoryBytes();
+        ASSERT_GREATER_THAN(curBytes4, curBytes3);
         outDocs.push_back(result.releaseDocument());
 
+        // There are no more input documents, so memory usage stays the same here.
         result = group->getNext();
         ASSERT_TRUE(result.isAdvanced());
-        ASSERT_EQUALS(memTracker.currentMemoryBytes(), 560);
+        int64_t curBytes5 = memTracker.currentMemoryBytes();
+        ASSERT_EQUALS(curBytes4, curBytes5);
         outDocs.push_back(result.releaseDocument());
     }
 
