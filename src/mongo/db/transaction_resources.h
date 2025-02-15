@@ -259,7 +259,7 @@ inline const RecoveryUnit* getRecoveryUnit(const OperationContext* opCtx) {
  * ownership of the returned RecoveryUnit, and the OperationContext instance relinquishes
  * ownership. Sets the RecoveryUnit to NULL. Requires holding the client lock.
  */
-// TODO (SERVER-77213): Move implementation to .cpp file
+std::unique_ptr<RecoveryUnit> releaseRecoveryUnit(OperationContext* opCtx);
 std::unique_ptr<RecoveryUnit> releaseRecoveryUnit(OperationContext* opCtx, ClientLock& clientLock);
 
 /*
