@@ -189,6 +189,7 @@ var roles_all = {
     backup: 1,
     restore: 1,
     root: 1,
+    searchCoordinator: 1,
     __system: 1
 };
 

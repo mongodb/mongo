@@ -72,6 +72,7 @@ TEST(BuiltinRoles, BuiltinRolesOnlyOnAppropriateDatabases) {
     ASSERT(!auth::isBuiltinRole(RoleName("root", "test")));
     ASSERT(!auth::isBuiltinRole(RoleName("__system", "test")));
     ASSERT(!auth::isBuiltinRole(RoleName("MyRole", "test")));
+    ASSERT(!auth::isBuiltinRole(RoleName("searchCoordinator", "test")));
 
     ASSERT(auth::isBuiltinRole(RoleName("read", "admin")));
     ASSERT(auth::isBuiltinRole(RoleName("readWrite", "admin")));
@@ -88,6 +89,7 @@ TEST(BuiltinRoles, BuiltinRolesOnlyOnAppropriateDatabases) {
     ASSERT(auth::isBuiltinRole(RoleName("__system", "admin")));
     ASSERT(auth::isBuiltinRole(RoleName("directShardOperations", "admin")));
     ASSERT(!auth::isBuiltinRole(RoleName("MyRole", "admin")));
+    ASSERT(auth::isBuiltinRole(RoleName("searchCoordinator", "admin")));
 }
 
 TEST(BuiltinRoles, getBuiltinRolesForDB) {
