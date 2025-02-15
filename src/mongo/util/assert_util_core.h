@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/platform/compiler.h"
+#include "mongo/platform/source_location.h"
 #include "mongo/util/debug_util.h"
 
 /**
@@ -59,9 +60,22 @@
 
 namespace mongo {
 
+#ifdef MONGO_SOURCE_LOCATION_HAVE_STD
 MONGO_COMPILER_NORETURN void invariantFailed(const char* expr,
-                                             const char* file,
-                                             unsigned line) noexcept;
+                                             WrappedStdSourceLocation loc) noexcept;
+#endif
+
+MONGO_COMPILER_NORETURN void invariantFailed(const char* expr,
+                                             SyntheticSourceLocation loc) noexcept;
+
+#ifdef MONGO_SOURCE_LOCATION_HAVE_STD
+MONGO_COMPILER_NORETURN void invariantFailedWithMsg(const char* expr,
+                                                    const std::string& msg,
+                                                    WrappedStdSourceLocation loc) noexcept;
+#endif
+MONGO_COMPILER_NORETURN void invariantFailedWithMsg(const char* expr,
+                                                    const std::string& msg,
+                                                    SyntheticSourceLocation loc) noexcept;
 
 // This overload is our legacy invariant, which just takes a condition to test.
 //
@@ -70,22 +84,17 @@ MONGO_COMPILER_NORETURN void invariantFailed(const char* expr,
 //       Invariant failure !condition some/file.cpp 528
 //
 #define MONGO_invariant_1(Expression) \
-    ::mongo::invariantWithLocation((Expression), #Expression, __FILE__, __LINE__)
+    ::mongo::invariantWithLocation((Expression), #Expression, MONGO_SOURCE_LOCATION())
 
 template <typename T>
 inline void invariantWithLocation(const T& testOK,
                                   const char* expr,
-                                  const char* file,
-                                  unsigned line) {
+                                  SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!testOK)) {
-        ::mongo::invariantFailed(expr, file, line);
+        ::mongo::invariantFailed(expr, loc);
     }
 }
 
-MONGO_COMPILER_NORETURN void invariantFailedWithMsg(const char* expr,
-                                                    const std::string& msg,
-                                                    const char* file,
-                                                    unsigned line) noexcept;
 
 // This invariant overload accepts a condition and a message, to be logged if the condition is
 // false.
@@ -94,15 +103,19 @@ MONGO_COMPILER_NORETURN void invariantFailedWithMsg(const char* expr,
 //
 //       Invariant failure !condition "hello!" some/file.cpp 528
 //
-#define MONGO_invariant_2(Expression, contextExpr) \
-    ::mongo::invariantWithContextAndLocation(      \
-        (Expression), #Expression, [&] { return std::string{contextExpr}; }, __FILE__, __LINE__)
+#define MONGO_invariant_2(Expression, contextExpr)                                     \
+    ::mongo::invariantWithContextAndLocation((Expression),                             \
+                                             #Expression,                              \
+                                             [&] { return std::string{contextExpr}; }, \
+                                             MONGO_SOURCE_LOCATION())
 
 template <typename T, typename ContextExpr>
-inline void invariantWithContextAndLocation(
-    const T& testOK, const char* expr, ContextExpr&& contextExpr, const char* file, unsigned line) {
+inline void invariantWithContextAndLocation(const T& testOK,
+                                            const char* expr,
+                                            ContextExpr&& contextExpr,
+                                            SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!testOK)) {
-        ::mongo::invariantFailedWithMsg(expr, contextExpr(), file, line);
+        ::mongo::invariantFailedWithMsg(expr, contextExpr(), loc);
     }
 }
 

@@ -65,44 +65,44 @@ public:
           _dbmsg(std::make_unique<DbMessage>(_message.get())) {}
 
     auto getOpCtx() const {
-        invariant(_isOnClientThread());
+        dassert(_isOnClientThread());
         return _opCtx;
     }
 
     const Message& getMessage() const {
-        invariant(_isOnClientThread() && _message);
+        dassert(_isOnClientThread() && _message);
         return _message.get();
     }
 
     DbMessage& getDbMessage() const {
-        invariant(_isOnClientThread() && _dbmsg);
+        dassert(_isOnClientThread() && _dbmsg);
         return *_dbmsg.get();
     }
 
     void setRequest(OpMsgRequest request) {
-        invariant(_isOnClientThread() && !_request);
+        dassert(_isOnClientThread() && !_request);
         _request = std::move(request);
     }
     const OpMsgRequest& getRequest() const {
-        invariant(_isOnClientThread() && _request);
+        dassert(_isOnClientThread() && _request);
         return _request.get();
     }
 
     void setCommand(Command* command) {
-        invariant(_isOnClientThread() && !_command);
+        dassert(_isOnClientThread() && !_command);
         _command = command;
     }
     Command* getCommand() const {
-        invariant(_isOnClientThread());
+        dassert(_isOnClientThread());
         return _command;
     }
 
     void setReplyBuilder(std::unique_ptr<rpc::ReplyBuilderInterface> replyBuilder) {
-        invariant(_isOnClientThread() && !_replyBuilder);
+        dassert(_isOnClientThread() && !_replyBuilder);
         _replyBuilder = std::move(replyBuilder);
     }
     auto getReplyBuilder() const {
-        invariant(_isOnClientThread() && _replyBuilder);
+        dassert(_isOnClientThread() && _replyBuilder);
         return _replyBuilder.get();
     }
 

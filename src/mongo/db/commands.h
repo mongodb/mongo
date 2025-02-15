@@ -1806,6 +1806,6 @@ private:
     static auto MONGO_COMMAND_DUMMY_ID_(mongoRegisterCommand_dummy_, __LINE__) = \
         *::mongo::CommandConstructionPlan::EntryBuilder::make<__VA_ARGS__>()     \
              .expr(#__VA_ARGS__)                                                 \
-             .location(MONGO_SOURCE_LOCATION_NO_FUNC())
+             .location(MONGO_SOURCE_LOCATION())
 
 }  // namespace mongo
