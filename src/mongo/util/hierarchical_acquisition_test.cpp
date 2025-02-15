@@ -28,7 +28,6 @@
  */
 
 #include <fmt/format.h>
-#include <iterator>
 #include <string>
 
 #include "mongo/platform/source_location.h"
@@ -42,8 +41,9 @@ using namespace hierarchical_acquisition_detail;
 
 struct Context {
     friend std::string toString(Context context) {
-        return fmt::format(
-            R"({{"level": {}, "sourceLocation": "{}"}})", context.index, context.loc);
+        using namespace fmt::literals;
+        return R"({{"level": {}, "sourceLocation": "{}"}})"_format(context.index,
+                                                                   context.loc.toString());
     }
 
     friend std::ostream& operator<<(std::ostream& os, const Context& context) {
@@ -51,7 +51,7 @@ struct Context {
     }
 
     Level::IndexType index;
-    SourceLocation loc;
+    SourceLocationHolder loc;
 };
 
 #define MONGO_MAKE_CONTEXT(index)      \

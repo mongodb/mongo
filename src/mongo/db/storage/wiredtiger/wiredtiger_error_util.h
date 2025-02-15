@@ -98,14 +98,13 @@ inline void uassertWTOK(int ret, WT_SESSION* session) {
     uassertStatusOK(wtRCToStatus(ret, session));
 }
 
-#define MONGO_invariantWTOK_2(expression, session)                           \
-    do {                                                                     \
-        int _invariantWTOK_retCode = expression;                             \
-        if (MONGO_unlikely(_invariantWTOK_retCode != 0)) {                   \
-            invariantOKFailed(#expression,                                   \
-                              wtRCToStatus(_invariantWTOK_retCode, session), \
-                              MONGO_SOURCE_LOCATION());                      \
-        }                                                                    \
+#define MONGO_invariantWTOK_2(expression, session)                                               \
+    do {                                                                                         \
+        int _invariantWTOK_retCode = expression;                                                 \
+        if (MONGO_unlikely(_invariantWTOK_retCode != 0)) {                                       \
+            invariantOKFailed(                                                                   \
+                #expression, wtRCToStatus(_invariantWTOK_retCode, session), __FILE__, __LINE__); \
+        }                                                                                        \
     } while (false)
 
 #define MONGO_invariantWTOK_3(expression, session, contextExpr)                     \
@@ -115,7 +114,8 @@ inline void uassertWTOK(int ret, WT_SESSION* session) {
             invariantOKFailedWithMsg(#expression,                                   \
                                      wtRCToStatus(_invariantWTOK_retCode, session), \
                                      contextExpr,                                   \
-                                     MONGO_SOURCE_LOCATION());                      \
+                                     __FILE__,                                      \
+                                     __LINE__);                                     \
         }                                                                           \
     } while (false)
 

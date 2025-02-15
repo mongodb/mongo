@@ -27,33 +27,33 @@
  *    it in the license file.
  */
 
-#include <functional>
-#include <memory>
+#pragma once
 
-#include "mongo/util/assert_util.h"
-#include "mongo/util/boost_assert_shim.h"
+#include "mongo/platform/source_location.h"
 
-#if defined(BOOST_ENABLE_ASSERT_DEBUG_HANDLER) && !defined(NDEBUG)
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
-struct BoostAssertImpl {
-    BoostAssertImpl() {
-        BoostAssertFuncs::global().assertFunc =
-            [](char const* expr, char const* function, char const* file, long line) {
-                invariantFailed(expr, file, line);
-            };
+inline bool operator==(const SourceLocationHolder& lhs, const SourceLocationHolder& rhs) {
+    return lhs.line() == rhs.line()            //
+        && lhs.column() == rhs.column()        //
+        && lhs.file_name() == rhs.file_name()  //
+        && lhs.function_name() == rhs.function_name();
+}
 
-        BoostAssertFuncs::global().assertMsgFunc = [](char const* expr,
-                                                      char const* msg,
-                                                      char const* function,
-                                                      char const* file,
-                                                      long line) {
-            invariantFailedWithMsg(expr, msg, file, line);
-        };
-    }
-};
+inline bool operator!=(const SourceLocationHolder& lhs, const SourceLocationHolder& rhs) {
+    return !(lhs == rhs);
+}
 
-BoostAssertImpl installBoostAssertCallbacks;
+// Simple recursive constexpr string comparison to play nice with static_assert
+constexpr bool areEqual(const char* string1, const char* string2) {
+    return (string1 != nullptr)  //
+        && (string2 != nullptr)  //
+        && *string1 == *string2  //
+        && (*string1 == '\0' || areEqual(string1 + 1, string2 + 1));
+}
+
+inline constexpr SourceLocation makeHeaderSourceLocationForTest() {
+    return MONGO_SOURCE_LOCATION();
+}
 }  // namespace mongo
-
-#endif  // BOOST_ENABLE_ASSERT_DEBUG_HANDLER && !NDEBUG
