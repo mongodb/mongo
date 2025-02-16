@@ -2,8 +2,7 @@
  * Tests $audit field metadata propagation across different FCVs in a sharded cluster
  */
 
-// TODO SERVER-82756: uncomment.
-// import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
@@ -75,12 +74,11 @@ function testDollarAuditPropagation(st, fcv, isLoadBalanced = false, proxy_serve
     checkFCV(adminDB, fcv);
 
     // TODO SERVER-83990: remove.
-    // TODO SERVER-82756: uncomment since the FF will now be known once it is activated.
-    // if (fcv === latestFCV) {
-    //     assert(FeatureFlagUtil.isPresentAndEnabled(adminDB, "ExposeClientIpInAuditLogs"));
-    // } else {
-    //     assert(!FeatureFlagUtil.isPresentAndEnabled(adminDB, "ExposeClientIpInAuditLogs"));
-    // }
+    if (fcv === latestFCV) {
+        assert(FeatureFlagUtil.isPresentAndEnabled(adminDB, "ExposeClientIpInAuditLogs"));
+    } else {
+        assert(!FeatureFlagUtil.isPresentAndEnabled(adminDB, "ExposeClientIpInAuditLogs"));
+    }
 
     forceMetadataPropagation(testDB, profilerComment);
     verifyProfilerEntries(testDB, profilerComment, dollarAuditMetadata);
@@ -97,20 +95,14 @@ function testDollarAuditPropagation(st, fcv, isLoadBalanced = false, proxy_serve
             mongosOptions: {
                 binVersion: newVersion,
                 auditDestination: 'console',
-                // TODO SERVER-82756: remove once the feature flag is activated on the latestFCV.
-                setParameter: {featureFlagExposeClientIpInAuditLogs: true}
             },
             configOptions: {
                 binVersion: newVersion,
                 auditDestination: 'console',
-                // TODO SERVER-82756: remove once the feature flag is activated on the latestFCV.
-                setParameter: {featureFlagExposeClientIpInAuditLogs: true}
             },
             shardOptions: {
                 binVersion: newVersion,
                 auditDestination: 'console',
-                // TODO SERVER-82756: remove once the feature flag is activated on the latestFCV.
-                setParameter: {featureFlagExposeClientIpInAuditLogs: true}
             }
         }
     });
@@ -151,14 +143,10 @@ function testDollarAuditPropagation(st, fcv, isLoadBalanced = false, proxy_serve
             configOptions: {
                 binVersion: newVersion,
                 auditDestination: 'console',
-                // TODO SERVER-82756: remove once the feature flag is activated on the latestFCV.
-                setParameter: {featureFlagExposeClientIpInAuditLogs: true}
             },
             shardOptions: {
                 binVersion: newVersion,
                 auditDestination: 'console',
-                // TODO SERVER-82756: remove once the feature flag is activated on the latestFCV.
-                setParameter: {featureFlagExposeClientIpInAuditLogs: true}
             }
         }
     });
@@ -188,21 +176,14 @@ function testDollarAuditPropagation(st, fcv, isLoadBalanced = false, proxy_serve
                 auditDestination: 'console',
                 setParameter: {
                     "loadBalancerPort": egressPort,
-                    // TODO SERVER-82756: remove once the feature flag is activated on the
-                    // latestFCV.
-                    featureFlagExposeClientIpInAuditLogs: true
                 },
             },
             configOptions: {
                 binVersion: newVersion,
                 auditDestination: 'console',
-                // TODO SERVER-82756: remove once the feature flag is activated on the latestFCV.
-                setParameter: {featureFlagExposeClientIpInAuditLogs: true}
             },
             shardOptions: {
                 binVersion: newVersion,
-                // TODO SERVER-82756: remove once the feature flag is activated on the latestFCV.
-                setParameter: {featureFlagExposeClientIpInAuditLogs: true}
             }
         }
     });
