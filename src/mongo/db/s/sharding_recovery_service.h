@@ -169,6 +169,12 @@ private:
      */
     void recoverIndexesCatalog(OperationContext* opCtx);
 
+    /**
+     * Called from onConsistentDataAvailable to recover the in-memory metadata information from the
+     * on-disk shard-local catalog. Runs on startup and on rollback.
+     */
+    void _reloadShardingState(OperationContext* opCtx);
+
     void onStartup(OperationContext* opCtx) final {}
     void onSetCurrentConfig(OperationContext* opCtx) final {}
     void onShutdown() final {}

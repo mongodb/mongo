@@ -70,6 +70,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/shard_authoritative_catalog_gen.h"
+#include "mongo/db/s/shard_local_catalog_operations.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/write_concern.h"
@@ -81,7 +82,9 @@
 #include "mongo/rpc/unique_message.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_collection_gen.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -95,6 +98,8 @@
 namespace mongo {
 
 namespace {
+MONGO_FAIL_POINT_DEFINE(skipShardLocalCatalogRecovery);
+
 const StringData kShardingIndexCatalogEntriesFieldName = "indexes"_sd;
 const auto serviceDecorator = ServiceContext::declareDecoration<ShardingRecoveryService>();
 const auto kViewsPermittedDontSkipRSTL =
@@ -645,9 +650,36 @@ void ShardingRecoveryService::recoverStates(OperationContext* opCtx,
     }
 }
 
+void ShardingRecoveryService::_reloadShardingState(OperationContext* opCtx) {
+    Lock::GlobalWrite globalLock{opCtx};
+    LOGV2(9813601, "Recovering DatabaseShardingState from the shard-local catalog");
+
+    const auto allDatabases = DatabaseShardingState::getDatabaseNames(opCtx);
+    for (const auto& dbName : allDatabases) {
+        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
+        scopedDss->clearDbInfo(opCtx, true /* cancelOngoingRefresh */, true /* useDssForTesting */);
+    }
+
+    const auto dssMetadataCursor = shard_local_catalog_operations::readAllDatabaseMetadata(opCtx);
+    while (dssMetadataCursor->more()) {
+        const auto dbInfo =
+            DatabaseType::parse(IDLParserContext("DatabaseType"), dssMetadataCursor->next());
+        auto scopedDss =
+            DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbInfo.getDbName());
+        scopedDss->setDbInfo(opCtx, dbInfo, true /* useDssForTesting */);
+    }
+}
+
 void ShardingRecoveryService::onConsistentDataAvailable(OperationContext* opCtx,
                                                         bool isMajority,
                                                         bool isRollback) {
+
+    if (feature_flags::gShardAuthoritativeDbMetadata.isEnabled() &&
+        MONGO_likely(!skipShardLocalCatalogRecovery.shouldFail())) {
+        // Has to be called on rollback too. Takes the global lock.
+        _reloadShardingState(opCtx);
+    }
+
     // TODO (SERVER-91505): Determine if we should reload in-memory states on rollback.
     if (isRollback) {
         return;

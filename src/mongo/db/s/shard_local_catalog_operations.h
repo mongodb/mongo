@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/catalog/type_database_gen.h"
@@ -52,6 +53,14 @@ void insertDatabaseMetadata(OperationContext* opCtx, const DatabaseType& db);
  * `config.shard.databases`.
  */
 void removeDatabaseMetadata(OperationContext* opCtx, const DatabaseName& dbName);
+
+/**
+ * Read database metadata from all databases in the shard-local catalog.
+ *
+ * This function reads the database metadata from the replicated durable collection
+ * `config.shard.databases`.
+ */
+std::unique_ptr<DBClientCursor> readAllDatabaseMetadata(OperationContext* opCtx);
 
 }  // namespace shard_local_catalog_operations
 

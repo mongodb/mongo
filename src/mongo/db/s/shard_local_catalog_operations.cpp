@@ -32,6 +32,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/query/write_ops/delete.h"
 
@@ -122,6 +123,16 @@ void removeDatabaseMetadata(OperationContext* opCtx, const DatabaseName& dbName)
     deleteDatabaseMetadataEntry(opCtx, coll, dbName);
 
     wuow.commit();
+}
+
+std::unique_ptr<DBClientCursor> readAllDatabaseMetadata(OperationContext* opCtx) {
+    FindCommandRequest findOp(NamespaceString::kConfigShardDatabasesNamespace);
+    DBDirectClient client(opCtx);
+
+    auto cursor = client.find(std::move(findOp));
+    tassert(9813600, "Failed to retrieve cursor", cursor);
+
+    return cursor;
 }
 
 }  // namespace shard_local_catalog_operations
