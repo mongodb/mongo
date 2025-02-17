@@ -61,7 +61,7 @@ static constexpr size_t kWildcardMaxArrayIndexTraversalDepth = 8u;
  * IndexEntry for each of the query fields and add them into the provided vector.
  */
 void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
-                              const stdx::unordered_set<std::string>& fields,
+                              const std::set<std::string>& fields,
                               std::vector<IndexEntry>* out);
 
 /**
