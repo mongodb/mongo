@@ -839,8 +839,7 @@ tojsonObject = function(x, indent, nolint, depth, sortKeys) {
 };
 
 /**
- * Serializes the given argument 'x' to an EJSON string (which is also a valid JSON string) when
- * 'TestData.logFormat' is set to "json", otherwise returns the same result as 'tojson()'. The
+ * Serializes the given argument 'x' to an EJSON string (which is also a valid JSON string). The
  * results of 'toEJSON()' and 'tostrictjson()' should be equal for BSON objects and arrays. Unlike
  * 'tostrictjson()', 'toEJSON()' also accepts non-object types, recognizes recursive objects, and
  * provides more detailed serializations for commonly used JavaScript classes, which goes beyond
@@ -855,10 +854,7 @@ tojsonObject = function(x, indent, nolint, depth, sortKeys) {
  * Unlike 'tojson()', the result of 'eval(toEJSON(x))' will not always evaluate into an object
  * equivalent to 'x' and may throw a syntax error.
  */
-toEJSON = function(x, indent, nolint, depth, sortKeys) {
-    if (typeof TestData !== "object" || TestData.logFormat !== "json")
-        return tojson(x, indent, nolint, depth, sortKeys);
-
+toEJSON = function(x) {
     function ensureEJSONAndStopOnRecursion() {
         // Stack of ancestors (objects) of the current 'value'.
         // eg, For {"x": 1, "y": {"z": 2}} and value = 2,

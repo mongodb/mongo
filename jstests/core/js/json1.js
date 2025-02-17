@@ -56,23 +56,8 @@ assertToJson({
     assertMsg: "C3",
     logFormat: "json"
 });
-assertToJson({
-    fn: () => toEJSON(x, "", false),
-    expectedStr: `{
-	"x" : null,
-	"y" : true,
-	"z" : 123,
-	"w" : "foo",
-	"a" : undefined
-}`,
-    assertMsg: "C4"
-});
-assertToJson({
-    fn: () => toEJSON(x, "", false),
-    expectedStr: '{"x":null,"y":true,"z":123,"w":"foo"}',
-    assertMsg: "C5",
-    logFormat: "json"
-});
+assertToJson(
+    {fn: () => toEJSON(x), expectedStr: '{"x":null,"y":true,"z":123,"w":"foo"}', assertMsg: "C4"});
 
 x = {
     "x": [],
@@ -105,18 +90,7 @@ assertToJson({
     assertMsg: "D3",
     logFormat: "json"
 });
-assertToJson({
-    fn: () => toEJSON(x, "", false),
-    expectedStr: `{
-	"x" : [ ],
-	"y" : {
-		
-	}
-}`,
-    assertMsg: "D4"
-});
-assertToJson(
-    {fn: () => toEJSON(x), expectedStr: '{"x":[],"y":{}}', assertMsg: "D5", logFormat: "json"});
+assertToJson({fn: () => toEJSON(x), expectedStr: '{"x":[],"y":{}}', assertMsg: "D4"});
 
 // nested
 x = {
@@ -155,32 +129,8 @@ assertToJson({
 });
 assertToJson({
     fn: () => toEJSON(x),
-    expectedStr: `{
-	"x" : [
-		{
-			"x" : [
-				1,
-				2,
-				[ ]
-			],
-			"z" : "ok",
-			"y" : [
-				[ ]
-			]
-		},
-		{
-			"foo" : "bar"
-		}
-	],
-	"y" : null
-}`,
-    assertMsg: "E3"
-});
-assertToJson({
-    fn: () => toEJSON(x),
     expectedStr: '{"x":[{"x":[1,2,[]],"z":"ok","y":[[]]},{"foo":"bar"}],"y":null}',
-    assertMsg: "E4",
-    logFormat: "json"
+    assertMsg: "E3"
 });
 
 // special types
@@ -212,18 +162,9 @@ assertToJson({
     logFormat: "json"
 });
 assertToJson({
-    fn: () => toEJSON(x, "", false),
-    expectedStr: `{
-	"x" : ObjectId("4ad35a73d2e34eb4fc43579a"),
-	"z" : /xd?/gi
-}`,
-    assertMsg: "F4"
-});
-assertToJson({
     fn: () => toEJSON(x),
     expectedStr: '{"x":{"$oid":"4ad35a73d2e34eb4fc43579a"},"z":{"$regex":"xd?","$options":"gi"}}',
-    assertMsg: "F5",
-    logFormat: "json"
+    assertMsg: "F4"
 });
 
 // Timestamp type
@@ -251,19 +192,8 @@ assertToJson({
     assertMsg: "G3",
     logFormat: "json"
 });
-assertToJson({
-    fn: () => toEJSON(x, "", false),
-    expectedStr: `{
-	"x" : Timestamp(0, 0)
-}`,
-    assertMsg: "G4"
-});
-assertToJson({
-    fn: () => toEJSON(x),
-    expectedStr: '{"x":{"$timestamp":{"t":0,"i":0}}}',
-    assertMsg: "G5",
-    logFormat: "json"
-});
+assertToJson(
+    {fn: () => toEJSON(x), expectedStr: '{"x":{"$timestamp":{"t":0,"i":0}}}', assertMsg: "G4"});
 
 // Timestamp type, second
 x = {
@@ -290,26 +220,13 @@ assertToJson({
     assertMsg: "H3",
     logFormat: "json"
 });
-assertToJson({
-    fn: () => toEJSON(x, "", false),
-    expectedStr: `{
-	"x" : Timestamp(10, 2)
-}`,
-    assertMsg: "H4"
-});
-assertToJson({
-    fn: () => toEJSON(x),
-    expectedStr: '{"x":{"$timestamp":{"t":10,"i":2}}}',
-    assertMsg: "H5",
-    logFormat: "json"
-});
+assertToJson(
+    {fn: () => toEJSON(x), expectedStr: '{"x":{"$timestamp":{"t":10,"i":2}}}', assertMsg: "H4"});
 
 // Map type
 x = new Map();
 assertToJson({fn: () => tojson(x, "", false), expectedStr: 'new Map([ ])', assertMsg: "I1"});
-assertToJson({fn: () => toEJSON(x, "", false), expectedStr: 'new Map([ ])', assertMsg: "I2"});
-assertToJson(
-    {fn: () => toEJSON(x), expectedStr: '{"$map":[]}', assertMsg: "I3", logFormat: "json"});
+assertToJson({fn: () => toEJSON(x), expectedStr: '{"$map":[]}', assertMsg: "I2"});
 
 x = new Map();
 x.set("one", 1);
@@ -328,26 +245,8 @@ assertToJson({
 ])`,
     assertMsg: "J1"
 });
-assertToJson({
-    fn: () => toEJSON(x, "", false),
-    expectedStr: `new Map([
-	[
-		"one",
-		1
-	],
-	[
-		2,
-		"two"
-	]
-])`,
-    assertMsg: "J2"
-});
-assertToJson({
-    fn: () => toEJSON(x),
-    expectedStr: '{"$map":[["one",1],[2,"two"]]}',
-    assertMsg: "J3",
-    logFormat: "json"
-});
+assertToJson(
+    {fn: () => toEJSON(x), expectedStr: '{"$map":[["one",1],[2,"two"]]}', assertMsg: "J2"});
 
 x = new Map();
 x.set("one", 1);
@@ -397,31 +296,8 @@ assertToJson({
     assertMsg: "K3",
     logFormat: "json"
 });
-assertToJson({
-    fn: () => toEJSON(x, "", false),
-    expectedStr: `new Map([
-	[
-		"one",
-		1
-	],
-	[
-		2,
-		{
-			"y" : [
-				3,
-				4
-			]
-		}
-	]
-])`,
-    assertMsg: "K4"
-});
-assertToJson({
-    fn: () => toEJSON(x),
-    expectedStr: '{"$map":[["one",1],[2,{"y":[3,4]}]]}',
-    assertMsg: "K5",
-    logFormat: "json"
-});
+assertToJson(
+    {fn: () => toEJSON(x), expectedStr: '{"$map":[["one",1],[2,{"y":[3,4]}]]}', assertMsg: "K4"});
 
 assert.eq(x, x);
 assert.neq(x, new Map());
@@ -456,30 +332,9 @@ assertToJson({
     assertMsg: "L1"
 });
 assertToJson({
-    fn: () => toEJSON(x, "", false),
-    expectedStr: `new Set([
-	{
-		"x" : [
-			1,
-			2,
-			[ ]
-		],
-		"z" : "ok",
-		"y" : [
-			[ ]
-		]
-	},
-	{
-		"foo" : "bar"
-	}
-])`,
-    assertMsg: "L2"
-});
-assertToJson({
     fn: () => toEJSON(x),
     expectedStr: '{"$set":[{"x":[1,2,[]],"z":"ok","y":[[]]},{"foo":"bar"}]}',
-    assertMsg: "L3",
-    logFormat: "json"
+    assertMsg: "L2"
 });
 
 // Array type
@@ -506,30 +361,9 @@ assertToJson({
     assertMsg: "M1"
 });
 assertToJson({
-    fn: () => toEJSON(x, "", false),
-    expectedStr: `[
-	{
-		"x" : [
-			1,
-			2,
-			[ ]
-		],
-		"z" : "ok",
-		"y" : [
-			[ ]
-		]
-	},
-	{
-		"foo" : "bar"
-	}
-]`,
-    assertMsg: "M2"
-});
-assertToJson({
     fn: () => toEJSON(x),
     expectedStr: '[{"x":[1,2,[]],"z":"ok","y":[[]]},{"foo":"bar"}]',
-    assertMsg: "M3",
-    logFormat: "json"
+    assertMsg: "M2"
 });
 
 // tostrictjson produces proper output
@@ -572,18 +406,12 @@ assertToJson({
     fn: () => toEJSON(x),
     expectedStr:
         '{"data_binary":{"$binary":"VG8gYmUgb3Igbm90IHRvIGJlLi4uIFRoYXQgaXMgdGhlIHF1ZXN0aW9uLg==","$type":"00"},"data_timestamp":{"$timestamp":{"t":987654321,"i":0}},"data_regex":{"$regex":"^acme","$options":"i"},"data_oid":{"$oid":"579a70d9e249393f153b5bc1"},"data_ref":{"$ref":"test","$id":"579a70d9e249393f153b5bc1"},"data_pointer":{"ns":"test","id":{"$oid":"579a70d9e249393f153b5bc1"}},"data_minkey":{"$minKey":1},"data_maxkey":{"$maxKey":1},"data_numberlong":{"$numberLong":"12345"},"data_numberint":5,"data_numberdecimal":{"$numberDecimal":"3.14000000000000"},"data_date":{"$date":"1970-01-01T23:59:59.999+00:00"}}',
-    assertMsg: "N1",
-    logFormat: "json"
+    assertMsg: "N1"
 });
 // Serialize recursive object
 x = {};
 x.self = x;
-assertToJson({
-    fn: () => toEJSON(x),
-    expectedStr: '{"self":"[recursive]"}',
-    assertMsg: "N2",
-    logFormat: "json"
-});
+assertToJson({fn: () => toEJSON(x), expectedStr: '{"self":"[recursive]"}', assertMsg: "N2"});
 // Serialize containers
 x = {};
 x.array = new Array(1, "two", [3, false]);
@@ -594,8 +422,7 @@ assertToJson({
     fn: () => toEJSON(x),
     expectedStr:
         '{"array":[1,"two",[3,false]],"set":{"$set":[1,"two",true]},"map":{"$map":[["one",1],[2,{"y":[3,4]}]]}}',
-    assertMsg: "N3",
-    logFormat: "json"
+    assertMsg: "N3"
 });
 
 // Serialize Error instances
@@ -605,36 +432,24 @@ assertToJson(
     {fn: () => tojson(stringThatNeedsEscaping), expectedStr: '\"ho\\\"la\"', assertMsg: "O1"});
 assertToJson(
     {fn: () => toEJSON(stringThatNeedsEscaping), expectedStr: '\"ho\\\"la\"', assertMsg: "O2"});
-assertToJson({
-    fn: () => toEJSON(stringThatNeedsEscaping),
-    expectedStr: '\"ho\\\"la\"',
-    assertMsg: "O3",
-    logFormat: "json"
-});
 assert.eq('{}', JSON.stringify(new Error(stringThatNeedsEscaping)));
 assertToJson({
     fn: () => tojson(new Error(stringThatNeedsEscaping)),
     expectedStr: 'new Error(\"ho\\\"la\")',
-    assertMsg: "O5"
-});
-assertToJson({
-    fn: () => toEJSON(new Error(stringThatNeedsEscaping)),
-    expectedStr: 'new Error(\"ho\\\"la\")',
-    assertMsg: "O6"
+    assertMsg: "O3"
 });
 assertToJson({
     fn: () => toEJSON(new Error(stringThatNeedsEscaping)),
     expectedStr: '{"$error":"ho\\\"la"}',
-    assertMsg: "O7",
-    logFormat: "json"
+    assertMsg: "O4"
 });
 assertToJson({
     fn: () => tojson(new SyntaxError(stringThatNeedsEscaping)),
     expectedStr: 'new SyntaxError(\"ho\\\"la\")',
-    assertMsg: "O8"
+    assertMsg: "O5"
 });
 assertToJson({
     fn: () => toEJSON(new SyntaxError(stringThatNeedsEscaping)),
-    expectedStr: 'new SyntaxError(\"ho\\\"la\")',
-    assertMsg: "O9"
+    expectedStr: '{"$error":"ho\\\"la"}',
+    assertMsg: "O6"
 });
