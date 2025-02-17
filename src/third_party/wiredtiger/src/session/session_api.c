@@ -1823,8 +1823,9 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 
     /* Permit the commit if the transaction failed, but was read-only. */
     if (F_ISSET(txn, WT_TXN_ERROR) && txn->mod_count != 0)
-        WT_ERR_MSG(session, EINVAL, "failed %s transaction requires rollback",
-          F_ISSET(txn, WT_TXN_PREPARE) ? "prepared " : "");
+        WT_ERR_MSG(session, EINVAL, "failed %s transaction requires rollback%s%s",
+          F_ISSET(txn, WT_TXN_PREPARE) ? "prepared " : "", txn->rollback_reason == NULL ? "" : ": ",
+          txn->rollback_reason == NULL ? "" : txn->rollback_reason);
 
 err:
     /*
@@ -2201,6 +2202,20 @@ err:
 }
 
 /*
+ * __session_get_rollback_reason --
+ *     WT_SESSION->get_rollback_reason method.
+ */
+static const char *
+__session_get_rollback_reason(WT_SESSION *wt_session)
+{
+    WT_SESSION_IMPL *session;
+
+    session = (WT_SESSION_IMPL *)wt_session;
+
+    return (session->txn->rollback_reason);
+}
+
+/*
  * __session_get_last_error --
  *     WT_SESSION->get_last_error method.
  */
@@ -2316,7 +2331,8 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         __session_begin_transaction, __session_commit_transaction, __session_prepare_transaction,
         __session_rollback_transaction, __session_query_timestamp, __session_timestamp_transaction,
         __session_timestamp_transaction_uint, __session_checkpoint, __session_reset_snapshot,
-        __session_transaction_pinned_range, __session_get_last_error, __wt_session_breakpoint},
+        __session_transaction_pinned_range, __session_get_last_error, __session_get_rollback_reason,
+        __wt_session_breakpoint},
       stds_min = {NULL, NULL, __session_close, __session_reconfigure_notsup, __wt_session_strerror,
         __session_open_cursor, __session_alter_readonly, __session_bind_configuration,
         __session_create_readonly, __wti_session_compact_readonly, __session_drop_readonly,
@@ -2327,7 +2343,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         __session_query_timestamp_notsup, __session_timestamp_transaction_notsup,
         __session_timestamp_transaction_uint_notsup, __session_checkpoint_readonly,
         __session_reset_snapshot_notsup, __session_transaction_pinned_range_notsup,
-        __session_get_last_error, __wt_session_breakpoint},
+        __session_get_last_error, __session_get_rollback_reason, __wt_session_breakpoint},
       stds_readonly = {NULL, NULL, __session_close, __session_reconfigure, __wt_session_strerror,
         __session_open_cursor, __session_alter_readonly, __session_bind_configuration,
         __session_create_readonly, __wti_session_compact_readonly, __session_drop_readonly,
@@ -2338,7 +2354,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         __session_query_timestamp, __session_timestamp_transaction,
         __session_timestamp_transaction_uint, __session_checkpoint_readonly,
         __session_reset_snapshot, __session_transaction_pinned_range, __session_get_last_error,
-        __wt_session_breakpoint};
+        __session_get_rollback_reason, __wt_session_breakpoint};
     WT_DECL_RET;
     WT_SESSION_IMPL *session, *session_ret;
     uint32_t i;

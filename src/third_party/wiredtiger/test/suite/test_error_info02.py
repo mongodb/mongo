@@ -35,6 +35,12 @@ from error_info_util import error_info_util
 class test_error_info02(error_info_util):
     uri = "table:test_error_info.wt"
 
+    def assert_error_equal(self, err_val, sub_level_err_val, err_msg_val):
+        err, sub_level_err, err_msg = self.session.get_last_error()
+        self.assertEqual(err, err_val)
+        self.assertEqual(sub_level_err, sub_level_err_val)
+        self.assertEqual(err_msg, err_msg_val)
+
     def test_wt_rollback_cache_overflow(self):
         """
         Try to insert a key value pair with an unreasonably low cache max wait time and
@@ -70,7 +76,7 @@ class test_error_info02(error_info_util):
 
         self.assert_error_equal(wiredtiger.WT_ROLLBACK, wiredtiger.WT_CACHE_OVERFLOW, "Cache capacity has overflown")
 
-        self.ignoreStdoutPatternIfExists("Cache capacity has overflown")
+        self.ignoreStdoutPatternIfExists("transaction rolled back because of cache overflow")
 
     def test_wt_rollback_write_conflict_update_list(self):
         """

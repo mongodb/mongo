@@ -825,6 +825,8 @@ __txn_release(WT_SESSION_IMPL *session)
     __wti_txn_clear_read_timestamp(session);
     txn->isolation = session->isolation;
 
+    txn->rollback_reason = NULL;
+
     /*
      * Ensure the transaction flags are cleared on exit
      *
@@ -2276,6 +2278,18 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
+ * __wt_txn_rollback_required --
+ *     Prepare to log a reason if the user attempts to use the transaction to do anything other than
+ *     rollback.
+ */
+int
+__wt_txn_rollback_required(WT_SESSION_IMPL *session, const char *reason)
+{
+    session->txn->rollback_reason = reason;
+    return (WT_ROLLBACK);
+}
+
+/*
  * __wt_txn_init --
  *     Initialize a session's transaction data.
  */
@@ -2673,6 +2687,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
 int
 __wt_txn_is_blocking(WT_SESSION_IMPL *session)
 {
+    WT_DECL_RET;
     WT_TXN *txn;
     WT_TXN_SHARED *txn_shared;
     uint64_t global_oldest;
@@ -2711,8 +2726,9 @@ __wt_txn_is_blocking(WT_SESSION_IMPL *session)
      */
     if (__wt_atomic_loadv64(&txn_shared->id) == global_oldest ||
       __wt_atomic_loadv64(&txn_shared->pinned_id) == global_oldest) {
+        ret = __wt_txn_rollback_required(session, WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION);
         WT_RET_SUB(
-          session, WT_ROLLBACK, WT_OLDEST_FOR_EVICTION, WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION);
+          session, ret, WT_OLDEST_FOR_EVICTION, "Transaction has the oldest pinned transaction ID");
     }
     return (0);
 }
@@ -2794,6 +2810,7 @@ __wt_verbose_dump_txn_one(
         ", read_timestamp: %s"
         ", checkpoint LSN: [%s]"
         ", full checkpoint: %s"
+        ", rollback reason: %s"
         ", flags: 0x%08" PRIx32 ", isolation: %s"
         ", last saved error code: %d"
         ", last saved sub-level error code: %d"
@@ -2806,8 +2823,9 @@ __wt_verbose_dump_txn_one(
         __wt_timestamp_to_string(txn->prepare_timestamp, ts_string[3]),
         __wt_timestamp_to_string(txn_shared->pinned_durable_timestamp, ts_string[4]),
         __wt_timestamp_to_string(txn_shared->read_timestamp, ts_string[5]), ckpt_lsn_str,
-        txn->full_ckpt ? "true" : "false", txn->flags, iso_tag, txn_err_info->err,
-        txn_err_info->sub_level_err, txn_err_info->err_msg));
+        txn->full_ckpt ? "true" : "false", txn->rollback_reason == NULL ? "" : txn->rollback_reason,
+        txn->flags, iso_tag, txn_err_info->err, txn_err_info->sub_level_err,
+        txn_err_info->err_msg));
 
     /*
      * Log a message and return an error if error code and an optional error string has been passed.

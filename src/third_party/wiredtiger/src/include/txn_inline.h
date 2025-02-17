@@ -1930,9 +1930,9 @@ __txn_modify_block(
         }
 
         WT_STAT_CONN_DSRC_INCR(session, txn_update_conflict);
-        ret = WT_ROLLBACK;
+        ret = __wt_txn_rollback_required(session, WT_TXN_ROLLBACK_REASON_CONFLICT);
         __wt_session_set_last_error(
-          session, ret, WT_WRITE_CONFLICT, WT_TXN_ROLLBACK_REASON_CONFLICT);
+          session, ret, WT_WRITE_CONFLICT, "Write conflict between concurrent operations");
     }
 
     /*
@@ -1994,7 +1994,7 @@ __wt_txn_modify_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE 
         txn_global = &S2C(session)->txn_global;
         if (txn_global->debug_rollback != 0 &&
           ++txn_global->debug_ops % txn_global->debug_rollback == 0)
-            WT_RET_SUB(session, WT_ROLLBACK, WT_NONE, "debug mode simulated conflict");
+            return (__wt_txn_rollback_required(session, "debug mode simulated conflict"));
     }
     return (0);
 }
