@@ -154,7 +154,17 @@ config_random(TABLE *table, bool table_only)
         if (F_ISSET(cp, C_BOOL))
             testutil_snprintf(buf, sizeof(buf), "%s=%s", cp->name,
               mmrand(&g.data_rnd, 1, 100) <= cp->min ? "on" : "off");
-        else
+        else if (F_ISSET(cp, C_POW2)) {
+            double max, min;
+            uint32_t vbits, val_p2;
+
+            max = log2((double)cp->maxrand);
+            testutil_assert(max < 32);
+            min = log2((double)cp->min);
+            vbits = mmrand(&g.data_rnd, (uint32_t)min, (uint32_t)max);
+            val_p2 = (uint32_t)(1 << vbits);
+            testutil_snprintf(buf, sizeof(buf), "%s=%" PRIu32, cp->name, val_p2);
+        } else
             testutil_snprintf(
               buf, sizeof(buf), "%s=%" PRIu32, cp->name, mmrand(&g.data_rnd, cp->min, cp->maxrand));
         config_single(table, buf, false);
@@ -1954,6 +1964,16 @@ config_single(TABLE *table, const char *s, bool explicit)
             if (v1 != 0 && v1 != 1)
                 testutil_die(EINVAL, "%s: %s: value of boolean not 0 or 1", progname, s);
         }
+
+        v->v = v1;
+        v->set = explicit;
+        return;
+    }
+
+    if (F_ISSET(cp, C_POW2)) {
+        v1 = atou32(s, equalp, '\0');
+        if (v1 != 0 && !__wt_ispo2(v1))
+            testutil_die(EINVAL, "%s: %s: value is not a power of 2", progname, s);
 
         v->v = v1;
         v->set = explicit;

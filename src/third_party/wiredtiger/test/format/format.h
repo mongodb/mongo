@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "math.h"
 #include "test_util.h"
 
 #ifdef HAVE_SETRLIMIT

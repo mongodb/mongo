@@ -295,8 +295,9 @@ configure_live_restore(char **p, size_t max)
 {
     if (GV(BACKUP) && GV(BACKUP_LIVE_RESTORE) && g.backup_verify)
         CONFIG_APPEND(*p,
-          ",live_restore=(enabled=true,path=\"./%s/BACKUP\",threads_max=%" PRIu32 ")", g.home,
-          GV(BACKUP_LIVE_RESTORE_THREADS));
+          ",live_restore=(enabled=true,path=\"./%s/BACKUP\",read_size=%" PRIu32
+          "K,threads_max=%" PRIu32 ")",
+          g.home, GV(BACKUP_LIVE_RESTORE_READ_SIZE), GV(BACKUP_LIVE_RESTORE_THREADS));
 }
 
 /*

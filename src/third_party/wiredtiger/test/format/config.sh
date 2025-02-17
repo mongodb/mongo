@@ -22,9 +22,10 @@ typedef struct {
 
 #define C_BOOL 0x001u        /* Boolean (true if roll of 1-to-100 is <= CONFIG->min) */
 #define C_IGNORE 0x002u      /* Not a simple randomization, configured specially */
-#define C_STRING 0x004u      /* String (rather than integral) */
-#define C_TABLE 0x008u       /* Value is per table, not global */
-#define C_TYPE_FIX 0x010u    /* Value is only relevant to FLCS */
+#define C_POW2 0x004u        /* Value must be power of 2 */
+#define C_STRING 0x008u      /* String (rather than integral) */
+#define C_TABLE 0x010u       /* Value is per table, not global */
+#define C_TYPE_FIX 0x020u    /* Value is only relevant to FLCS */
 #define C_TYPE_ROW 0x040u    /* Value is only relevant to RS */
 #define C_TYPE_VAR 0x080u    /* Value is only relevant to VLCS */
 #define C_ZERO_NOTSET 0x100u /* Ignore zero values */
@@ -85,6 +86,8 @@ CONFIG configuration_list[] = {
 {"backup.incr_granularity", "incremental backup block granularity (KB)", 0x0, 4, 16384, 16384}
 
 {"backup.live_restore", "configure backup live restore recovery", C_BOOL, 0, 0, 0}
+
+{"backup.live_restore_read_size", "live restore read size (KB power of 2)", C_POW2, 1, 16384, 16384}
 
 {"backup.live_restore_threads", "number of live restore worker threads", 0x0, 0, 12, 12}
 
