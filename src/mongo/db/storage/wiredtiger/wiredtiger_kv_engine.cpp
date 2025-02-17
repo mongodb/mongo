@@ -1340,6 +1340,7 @@ void WiredTigerKVEngine::endNonBlockingBackup() {
 
 StatusWith<std::deque<std::string>> WiredTigerKVEngine::extendBackupCursor() {
     uassert(51033, "Cannot extend backup cursor with in-memory mode.", !isEphemeral());
+    stdx::lock_guard<stdx::mutex> backupCursorLk(_wtBackup.wtBackupCursorMutex);
     stdx::unique_lock<stdx::mutex> backupDupCursorLk(_wtBackup.wtBackupDupCursorMutex);
     invariant(_wtBackup.cursor);
 
