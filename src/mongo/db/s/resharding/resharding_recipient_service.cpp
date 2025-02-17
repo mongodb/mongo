@@ -748,40 +748,33 @@ void ReshardingRecipientService::RecipientStateMachine::
                             opCtx.get(),
                             _metadata.getSourceNss(),
                             ShardKeyPattern(_metadata.getReshardingKey()));
+                        // This behavior in this phase is only used to validate whether this
+                        // resharding should be permitted, we need to call
+                        // validateShardKeyIndexExistsOrCreateIfPossible again in the buildIndex
+                        // phase to make sure we have the indexSpecs even after restart.
+                        shardkeyutil::ValidationBehaviorsReshardingBulkIndex behaviors;
+                        behaviors.setOpCtxAndCloneTimestamp(opCtx.get(), *_cloneTimestamp);
 
-                        if (_metadata.getImplicitlyCreateIndex()) {
-                            // This behavior in this phase is only used to validate whether this
-                            // resharding should be permitted, we need to call
-                            // validateShardKeyIndexExistsOrCreateIfPossible again in the buildIndex
-                            // phase to make sure we have the indexSpecs even after restart.
-                            shardkeyutil::ValidationBehaviorsReshardingBulkIndex behaviors;
-                            behaviors.setOpCtxAndCloneTimestamp(opCtx.get(), *_cloneTimestamp);
+                        auto [collOptions, _] = _externalState->getCollectionOptions(
+                            opCtx.get(),
+                            _metadata.getSourceNss(),
+                            _metadata.getSourceUUID(),
+                            *_cloneTimestamp,
+                            "loading collection options to validate shard key index for resharding."_sd);
 
-                            auto [collOptions, _] = _externalState->getCollectionOptions(
-                                opCtx.get(),
-                                _metadata.getSourceNss(),
-                                _metadata.getSourceUUID(),
-                                *_cloneTimestamp,
-                                "loading collection options to validate shard key index for resharding."_sd);
+                        CollectionOptions collectionOptions =
+                            uassertStatusOK(CollectionOptions::parse(
+                                collOptions, CollectionOptions::parseForStorage));
 
-                            CollectionOptions collectionOptions =
-                                uassertStatusOK(CollectionOptions::parse(
-                                    collOptions, CollectionOptions::parseForStorage));
-
-                            shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
-                                opCtx.get(),
-                                _metadata.getSourceNss(),
-                                ShardKeyPattern{_metadata.getReshardingKey()},
-                                CollationSpec::kSimpleSpec,
-                                false /* unique */,
-                                true /* enforceUniquenessCheck */,
-                                behaviors,
-                                collectionOptions.timeseries /* tsOpts */);
-                        } else {
-                            LOGV2(9197501,
-                                  "Skip checking for the shard key index since "
-                                  "'implicitlyCreateIndex' was set to false");
-                        }
+                        shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
+                            opCtx.get(),
+                            _metadata.getSourceNss(),
+                            ShardKeyPattern{_metadata.getReshardingKey()},
+                            CollationSpec::kSimpleSpec,
+                            false /* unique */,
+                            true /* enforceUniquenessCheck */,
+                            behaviors,
+                            collectionOptions.timeseries /* tsOpts */);
                     });
             }
         } else {
@@ -795,24 +788,18 @@ void ReshardingRecipientService::RecipientStateMachine::
                         _metadata.getTempReshardingNss(),
                         ShardKeyPattern(_metadata.getReshardingKey()));
 
-                    if (_metadata.getImplicitlyCreateIndex()) {
-                        // Only the resharding improvements code path above supports resharding
-                        // timeseries collections, so we do not pass in timeseries options here.
-                        shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
-                            opCtx.get(),
-                            _metadata.getTempReshardingNss(),
-                            ShardKeyPattern{_metadata.getReshardingKey()},
-                            CollationSpec::kSimpleSpec,
-                            false /* unique */,
-                            true /* enforceUniquenessCheck */,
-                            shardkeyutil::ValidationBehaviorsShardCollection(
-                                opCtx.get(), ShardingState::get(opCtx.get())->shardId()),
-                            boost::none /* tsOpts */);
-                    } else {
-                        LOGV2(9197502,
-                              "Skip checking for the shard key index since 'implicitlyCreateIndex' "
-                              "was set to false");
-                    }
+                    // Only the resharding improvements code path above supports resharding
+                    // timeseries collections, so we do not pass in timeseries options here.
+                    shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
+                        opCtx.get(),
+                        _metadata.getTempReshardingNss(),
+                        ShardKeyPattern{_metadata.getReshardingKey()},
+                        CollationSpec::kSimpleSpec,
+                        false /* unique */,
+                        true /* enforceUniquenessCheck */,
+                        shardkeyutil::ValidationBehaviorsShardCollection(
+                            opCtx.get(), ShardingState::get(opCtx.get())->shardId()),
+                        boost::none /* tsOpts */);
                 });
         }
 
@@ -1015,33 +1002,27 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                    shardkeyutil::ValidationBehaviorsReshardingBulkIndex behaviors;
                    behaviors.setOpCtxAndCloneTimestamp(opCtx.get(), *_cloneTimestamp);
 
-                   if (_metadata.getImplicitlyCreateIndex()) {
-                       if (!_metadata.getProvenance() ||
-                           _metadata.getProvenance() == ProvenanceEnum::kReshardCollection) {
-                           auto [collOptions, _] = _externalState->getCollectionOptions(
-                               opCtx.get(),
-                               _metadata.getSourceNss(),
-                               _metadata.getSourceUUID(),
-                               *_cloneTimestamp,
-                               "loading collection options to build shard key index for resharding."_sd);
-                           CollectionOptions collectionOptions =
-                               uassertStatusOK(CollectionOptions::parse(
-                                   collOptions, CollectionOptions::parseForStorage));
+                   if (!_metadata.getProvenance() ||
+                       _metadata.getProvenance() == ProvenanceEnum::kReshardCollection) {
+                       auto [collOptions, _] = _externalState->getCollectionOptions(
+                           opCtx.get(),
+                           _metadata.getSourceNss(),
+                           _metadata.getSourceUUID(),
+                           *_cloneTimestamp,
+                           "loading collection options to build shard key index for resharding."_sd);
+                       CollectionOptions collectionOptions =
+                           uassertStatusOK(CollectionOptions::parse(
+                               collOptions, CollectionOptions::parseForStorage));
 
-                           shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
-                               opCtx.get(),
-                               _metadata.getSourceNss(),
-                               ShardKeyPattern{_metadata.getReshardingKey()},
-                               CollationSpec::kSimpleSpec,
-                               false /* unique */,
-                               true /* enforceUniquenessCheck */,
-                               behaviors,
-                               collectionOptions.timeseries /* tsOpts */);
-                       }
-                   } else {
-                       LOGV2(9197503,
-                             "Skip checking for the shard key index since 'implicitlyCreateIndex' "
-                             "was set to false");
+                       shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
+                           opCtx.get(),
+                           _metadata.getSourceNss(),
+                           ShardKeyPattern{_metadata.getReshardingKey()},
+                           CollationSpec::kSimpleSpec,
+                           false /* unique */,
+                           true /* enforceUniquenessCheck */,
+                           behaviors,
+                           collectionOptions.timeseries /* tsOpts */);
                    }
 
                    // Get all indexSpecs need to build.

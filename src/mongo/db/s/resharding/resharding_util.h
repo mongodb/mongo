@@ -416,13 +416,6 @@ std::shared_ptr<ThreadPool> makeThreadPoolForMarkKilledExecutor(const std::strin
 boost::optional<Status> coordinatorAbortedError();
 
 /**
- * If 'implicitlyCreateIndex' is false, asserts that
- * featureFlagHashedShardKeyIndexOptionalUponShardingCollection is enabled and the shard key is
- * hashed.
- */
-void validateImplicitlyCreateIndex(bool implicitlyCreateIndex, const BSONObj& shardKey);
-
-/**
  * If 'performVerification' is true, asserts that featureFlagReshardingVerification is enabled.
  */
 void validatePerformVerification(boost::optional<bool> performVerification);

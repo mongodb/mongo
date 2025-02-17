@@ -100,8 +100,6 @@ public:
 
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
-            resharding::validateImplicitlyCreateIndex(request().getImplicitlyCreateIndex(),
-                                                      request().getKey());
             resharding::validatePerformVerification(request().getPerformVerification());
 
             {

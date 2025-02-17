@@ -199,8 +199,6 @@ public:
                 resharding::validateShardDistribution(
                     *shardDistribution, opCtx, ShardKeyPattern(request().getKey()));
             }
-            resharding::validateImplicitlyCreateIndex(request().getImplicitlyCreateIndex(),
-                                                      request().getKey());
             resharding::validatePerformVerification(request().getPerformVerification());
 
             // Returns boost::none if there isn't any work to be done by the resharding operation.

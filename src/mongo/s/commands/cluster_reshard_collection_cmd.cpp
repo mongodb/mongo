@@ -62,7 +62,6 @@
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
@@ -127,7 +126,6 @@ public:
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 reshardCollectionRequest.setProvenance(ProvenanceEnum::kReshardCollection);
             }
-            reshardCollectionRequest.setImplicitlyCreateIndex(request().getImplicitlyCreateIndex());
             reshardCollectionRequest.setPerformVerification(request().getPerformVerification());
 
             if (resharding::gfeatureFlagReshardingNumSamplesPerChunk.isEnabled(

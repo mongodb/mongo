@@ -138,12 +138,6 @@ feature_flags:
     default: true
     version: 8.0
     shouldBeFCVGated: true
-  featureFlagHashedShardKeyIndexOptionalUponShardingCollection:
-    description: "Feature flag to make shardCollection and reshardCollection not require a hashed
-                  shard key to have a supporting index."
-    cpp_varname: feature_flags::gFeatureFlagHashedShardKeyIndexOptionalUponShardingCollection
-    default: false
-    shouldBeFCVGated: true
   featureFlagCreateDatabaseDDLCoordinator:
     description: "Feature flag for enabling the sharding DDL coordinator for database creation."
     cpp_varname: feature_flags::gCreateDatabaseDDLCoordinator
@@ -177,7 +171,7 @@ feature_flags:
     shouldBeFCVGated: false
   # TODO (SERVER-100309): remove once 9.0 becomes last LTS.
   featureFlagSessionsCollectionCoordinatorOnConfigServer:
-    description: Feature flag for running the shard collection coordinator on the config server for 
+    description: Feature flag for running the shard collection coordinator on the config server for
                  config.system.sessions.
     cpp_varname: feature_flags::gSessionsCollectionCoordinatorOnConfigServer
     default: true

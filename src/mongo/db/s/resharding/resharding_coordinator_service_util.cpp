@@ -252,8 +252,6 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
             originalEntryReshardingFields.setStartTime(coordinatorDoc.getStartTime());
             originalEntryReshardingFields.setProvenance(
                 coordinatorDoc.getCommonReshardingMetadata().getProvenance());
-            originalEntryReshardingFields.setImplicitlyCreateIndex(
-                coordinatorDoc.getCommonReshardingMetadata().getImplicitlyCreateIndex());
             originalEntryReshardingFields.setPerformVerification(
                 coordinatorDoc.getCommonReshardingMetadata().getPerformVerification());
 
@@ -711,8 +709,6 @@ CollectionType createTempReshardingCollectionType(
     tempEntryReshardingFields.setStartTime(coordinatorDoc.getStartTime());
     tempEntryReshardingFields.setProvenance(
         coordinatorDoc.getCommonReshardingMetadata().getProvenance());
-    tempEntryReshardingFields.setImplicitlyCreateIndex(
-        coordinatorDoc.getCommonReshardingMetadata().getImplicitlyCreateIndex());
     tempEntryReshardingFields.setPerformVerification(
         coordinatorDoc.getCommonReshardingMetadata().getPerformVerification());
 

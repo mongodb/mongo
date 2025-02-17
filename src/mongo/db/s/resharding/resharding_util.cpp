@@ -76,7 +76,6 @@
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -525,26 +524,6 @@ boost::optional<Status> coordinatorAbortedError() {
                   "Recieved abort from the resharding coordinator"};
 }
 
-void validateImplicitlyCreateIndex(bool implicitlyCreateIndex, const BSONObj& shardKey) {
-    if (!implicitlyCreateIndex) {
-        uassert(
-            ErrorCodes::InvalidOptions,
-            str::stream()
-                << "Can only specify'" << CommonReshardingMetadata::kImplicitlyCreateIndexFieldName
-                << "' when featureFlagHashedShardKeyIndexOptionalUponShardingCollection is "
-                   "enabled",
-            feature_flags::gFeatureFlagHashedShardKeyIndexOptionalUponShardingCollection.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-
-        auto shardKeyPattern = ShardKeyPattern(shardKey);
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "Can only specify '"
-                              << CommonReshardingMetadata::kImplicitlyCreateIndexFieldName
-                              << "' false when resharding on a hashed shard key",
-                shardKeyPattern.isHashedPattern());
-    }
-}
-
 void validatePerformVerification(boost::optional<bool> performVerification) {
     if (performVerification.has_value()) {
         validatePerformVerification(*performVerification);
@@ -612,7 +591,6 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     coordinatorDoc.setForceRedistribution(request.getForceRedistribution());
     coordinatorDoc.setUnique(request.getUnique());
     coordinatorDoc.setCollation(request.getCollation());
-    coordinatorDoc.setImplicitlyCreateIndex(request.getImplicitlyCreateIndex());
 
     auto performVerification = request.getPerformVerification();
     if (!performVerification.has_value() &&
