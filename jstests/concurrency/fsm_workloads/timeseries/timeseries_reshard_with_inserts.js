@@ -12,8 +12,6 @@
  *   requires_persistence,
  *   # TODO (SERVER-91251): Run this with stepdowns on TSAN.
  *   tsan_incompatible,
- *   # TODO (SERVER-100312): Re-enable this test.
- *   __TEMPORARILY_DISABLED__,
  * ]
  */
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
