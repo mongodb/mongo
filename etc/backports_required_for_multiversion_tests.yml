@@ -380,6 +380,8 @@ last-continuous:
       ticket: SERVER-84081
     - test_file: jstests/replsets/rollback_with_coalesced_txn_table_updates_during_oplog_application_inserts.js
       ticket: SERVER-99185
+    - test_file: jstests/sharding/direct_shard_connection_auth.js
+      ticket: SERVER-100223
     - test_file: jstests/sharding/coll_mod_unsplittable_collection.js
       ticket: SERVER-99618
     - test_file: jstests/concurrency/fsm_workloads/ddl/collMod/collMod.js
@@ -813,6 +815,8 @@ last-lts:
       ticket: SERVER-84081
     - test_file: jstests/replsets/rollback_with_coalesced_txn_table_updates_during_oplog_application_inserts.js
       ticket: SERVER-99185
+    - test_file: jstests/sharding/direct_shard_connection_auth.js
+      ticket: SERVER-100223
     - test_file: jstests/sharding/coll_mod_unsplittable_collection.js
       ticket: SERVER-99618
     - test_file: jstests/concurrency/fsm_workloads/ddl/collMod/collMod.js
