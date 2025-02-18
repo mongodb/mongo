@@ -419,6 +419,10 @@ public:
             // path, we have already parsed the FindCommandRequest, so start timing here.
             CurOp::get(opCtx)->beginQueryPlanningTimer();
 
+            if (!_cmdRequest) {
+                _cmdRequest = _parseCmdObjectToFindCommandRequest(opCtx, _request);
+            }
+
             uassert(ErrorCodes::InvalidOptions,
                     "rawData is not enabled",
                     !_cmdRequest->getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
