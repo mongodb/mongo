@@ -39,6 +39,7 @@
 #include <sys/resource.h>
 #endif
 
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/startup_warnings_common.h"
@@ -389,6 +390,16 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
             6260401,
             {logv2::LogTag::kStartupWarnings},
             "Running with --restore. This should only be used when restoring from a backup");
+    }
+
+    if (!internalQueryForceClassicEngine.load()) {
+        LOGV2_WARNING_OPTIONS(
+            9473500,
+            {logv2::LogTag::kStartupWarnings},
+            "'internalQueryForceClassicEngine' is set to a non-default value. SBE "
+            "is no longer a supported engine in version 6.0, and should not be "
+            "used in production environments. Please set "
+            "'internalQueryForceClassicEngine' to 'true'");
     }
 }
 }  // namespace mongo
