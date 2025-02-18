@@ -69,8 +69,7 @@ function testAggregateQuerySettingsApplicationWithoutSecondaryCollections(collOr
     const qsutils = new QuerySettingsUtils(db, collOrViewName);
     const qstests = new QuerySettingsIndexHintsTests(qsutils);
 
-    // Set indexes on collection 'coll'.
-    setIndexes(coll, qstests.allIndexes);
+    setIndexes(coll, [qstests.indexA, qstests.indexB, qstests.indexAB]);
 
     // Ensure that query settings cluster parameter is empty.
     qsutils.assertQueryShapeConfiguration([]);
@@ -94,8 +93,8 @@ function testAggregateQuerySettingsApplicationWithLookupEquiJoin(
     const qstests = new QuerySettingsIndexHintsTests(qsutils);
 
     // Set indexes on both collections.
-    setIndexes(coll, qstests.allIndexes);
-    setIndexes(secondaryColl, qstests.allIndexes);
+    setIndexes(coll, [qstests.indexA, qstests.indexB, qstests.indexAB]);
+    setIndexes(secondaryColl, [qstests.indexA, qstests.indexB, qstests.indexAB]);
 
     // Ensure that query settings cluster parameter is empty.
     qsutils.assertQueryShapeConfiguration([]);
@@ -165,8 +164,8 @@ function testAggregateQuerySettingsApplicationWithMerge(collOrViewName, outputCo
     const qsutils = new QuerySettingsUtils(db, collOrViewName);
     const qstests = new QuerySettingsIndexHintsTests(qsutils);
 
-    // Set indexes on collection 'coll'.
-    setIndexes(coll, qstests.allIndexes);
+    // Set indexes on both collections.
+    setIndexes(coll, [qstests.indexA, qstests.indexB, qstests.indexAB]);
 
     // Ensure that query settings cluster parameter is empty.
     qsutils.assertQueryShapeConfiguration([]);
@@ -200,8 +199,8 @@ function testAggregateQuerySettingsApplicationWithLookupPipeline(collOrViewName,
     const qstests = new QuerySettingsIndexHintsTests(qsutils);
 
     // Set indexes on both collections.
-    setIndexes(coll, qstests.allIndexes);
-    setIndexes(secondaryColl, qstests.allIndexes);
+    setIndexes(coll, [qstests.indexA, qstests.indexB, qstests.indexAB]);
+    setIndexes(secondaryColl, [qstests.indexA, qstests.indexB, qstests.indexAB]);
 
     // Ensure that query settings cluster parameter is empty.
     qsutils.assertQueryShapeConfiguration([]);
@@ -249,8 +248,8 @@ function testAggregateQuerySettingsApplicationWithGraphLookup(collOrViewName,
     const qstests = new QuerySettingsIndexHintsTests(qsutils);
 
     // Set indexes on both collections.
-    setIndexes(coll, qstests.allIndexes);
-    setIndexes(secondaryColl, qstests.allIndexes);
+    setIndexes(coll, [qstests.indexA, qstests.indexB, qstests.indexAB]);
+    setIndexes(secondaryColl, [qstests.indexA, qstests.indexB, qstests.indexAB]);
 
     // Ensure that query settings cluster parameter is empty.
     qsutils.assertQueryShapeConfiguration([]);
@@ -289,8 +288,8 @@ function testAggregateQuerySettingsApplicationWithUnionWithPipeline(collOrViewNa
     const qstests = new QuerySettingsIndexHintsTests(qsutils);
 
     // Set indexes on both collections.
-    setIndexes(coll, qstests.allIndexes);
-    setIndexes(secondaryColl, qstests.allIndexes);
+    setIndexes(coll, [qstests.indexA, qstests.indexB, qstests.indexAB]);
+    setIndexes(secondaryColl, [qstests.indexA, qstests.indexB, qstests.indexAB]);
 
     // Ensure that query settings cluster parameter is empty.
     qsutils.assertQueryShapeConfiguration([]);

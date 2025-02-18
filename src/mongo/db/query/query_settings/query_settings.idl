@@ -74,11 +74,11 @@ structs:
     fields:
       ns:
         type: NamespaceSpec
-        stability: internal
+        stability: unstable
       allowedIndexes:
         non_const_getter: true
         type: array<IndexHint>
-        stability: internal
+        stability: unstable
 
   QuerySettings:
     description: >-
@@ -90,18 +90,18 @@ structs:
         non_const_getter: true
         type: IndexHintSpecs
         optional: true
-        stability: internal
+        stability: unstable
       queryFramework:
         type: QueryFramework
         optional: true
-        stability: internal
+        stability: unstable
       reject:
         type: optionalBool
-        stability: internal
+        stability: unstable
       comment:
         type: Comment
         optional: true
-        stability: internal
+        stability: unstable
 
   QueryShapeConfiguration:
     description: >-
