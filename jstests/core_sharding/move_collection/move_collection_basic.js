@@ -5,7 +5,6 @@
  * @tags: [
  *  requires_fcv_80,
  *  requires_collstats,
- *  featureFlagReshardingImprovements,
  *  featureFlagMoveCollection,
  *  assumes_balancer_off,
  *  # Stepdown test coverage is already provided by the resharding FSM suites.

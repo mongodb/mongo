@@ -7,7 +7,6 @@
  * @tags: [
  *  uses_atclustertime,
  *  requires_fcv_80,
- *  featureFlagReshardingImprovements,
  *  featureFlagUnshardCollection,
  *  multiversion_incompatible,
  * ]

@@ -115,9 +115,7 @@ public:
                     TxnNumber& txnNum,
                     ShardId donorShard,
                     HostAndPort donorHost,
-                    BSONObj resumeToken,
-                    // TODO(SERVER-67712): remove the useNaturalOrderCloner parameter.
-                    bool useNaturalOrderCloner);
+                    BSONObj resumeToken);
 
     /**
      * Inserts a single batch of documents and its resume information if provided.
@@ -127,9 +125,7 @@ public:
                        std::vector<InsertStatement>& batch,
                        ShardId donorShard,
                        HostAndPort donorHost,
-                       BSONObj resumeToken,
-                       // TODO(SERVER-67712): remove the useNaturalOrderCloner parameter.
-                       bool useNaturalOrderCloner);
+                       BSONObj resumeToken);
 
 private:
     std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(

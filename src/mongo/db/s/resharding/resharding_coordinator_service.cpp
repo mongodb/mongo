@@ -139,29 +139,10 @@ ExecutorFuture<void> ReshardingCoordinatorService::_rebuildService(
                auto opCtx = opCtxHolder.get();
                DBDirectClient client(opCtx);
                BSONObj result;
-               // We don't need a unique index on "active" any more since
-               // checkIfConflictsWithOtherInstances was implemented, and once we allow quiesced
-               // instances it breaks them, so don't create it.
-               //
-               // TODO(SERVER-67712): We create the collection only to make index creation during
-               // downgrade simpler, so we can remove all of this initialization when the flag is
-               // removed.
-               if (!resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                       serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                   client.runCommand(
-                       nss.dbName(),
-                       BSON("createIndexes"
-                            << nss.coll().toString() << "indexes"
-                            << BSON_ARRAY(BSON("key" << BSON("active" << 1) << "name"
-                                                     << kReshardingCoordinatorActiveIndexName
-                                                     << "unique" << true))),
-                       result);
-                   uassertStatusOK(getStatusFromCommandResult(result));
-               } else {
-                   client.runCommand(nss.dbName(), BSON("create" << nss.coll().toString()), result);
-                   const auto& status = getStatusFromCommandResult(result);
-                   if (status.code() != ErrorCodes::NamespaceExists)
-                       uassertStatusOK(status);
+               client.runCommand(nss.dbName(), BSON("create" << nss.coll().toString()), result);
+               const auto& status = getStatusFromCommandResult(result);
+               if (status.code() != ErrorCodes::NamespaceExists) {
+                   uassertStatusOK(status);
                }
            })
         .until([token](Status status) { return shouldStopAttemptingToCreateIndex(status, token); })

@@ -53,12 +53,6 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(
-                ErrorCodes::CommandNotSupported,
-                "Resharding improvements is not enabled, cannot perform moveCollection command.",
-                resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-
             const auto& nss = ns();
             auto moveCollectionRequest = cluster::unsplittable::makeMoveCollectionRequest(
                 request().getDbName(),

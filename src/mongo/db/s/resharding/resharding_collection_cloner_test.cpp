@@ -129,12 +129,10 @@ private:
 };
 
 struct TestOptions {
-    bool useNaturalOrderCloner;
     bool storeProgress;
 
     BSONObj toBSON() const {
         BSONObjBuilder bob;
-        bob.append("useNaturalOrderCloner", useNaturalOrderCloner);
         bob.append("storeProgress", storeProgress);
         return bob.obj();
     }
@@ -142,14 +140,8 @@ struct TestOptions {
 
 std::vector<TestOptions> makeAllTestOptions() {
     std::vector<TestOptions> testOptions;
-    for (bool useNaturalOrderCloner : {false, true}) {
-        for (bool storeProgress : {false, true}) {
-            if (!useNaturalOrderCloner && storeProgress) {
-                // This is an invalid combination.
-                continue;
-            }
-            testOptions.push_back({useNaturalOrderCloner, storeProgress});
-        }
+    for (bool storeProgress : {false, true}) {
+        testOptions.push_back({storeProgress});
     }
     return testOptions;
 }
@@ -217,20 +209,17 @@ protected:
 
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
             operationContext());
-        if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            uassertStatusOK(createCollection(
-                operationContext(),
-                NamespaceString::kRecipientReshardingResumeDataNamespace.dbName(),
-                BSON("create" << NamespaceString::kRecipientReshardingResumeDataNamespace.coll())));
-            uassertStatusOK(createCollection(
-                operationContext(),
-                NamespaceString::kSessionTransactionsTableNamespace.dbName(),
-                BSON("create" << NamespaceString::kSessionTransactionsTableNamespace.coll())));
-            DBDirectClient client(operationContext());
-            client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
-                                 {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
-        }
+        uassertStatusOK(createCollection(
+            operationContext(),
+            NamespaceString::kRecipientReshardingResumeDataNamespace.dbName(),
+            BSON("create" << NamespaceString::kRecipientReshardingResumeDataNamespace.coll())));
+        uassertStatusOK(createCollection(
+            operationContext(),
+            NamespaceString::kSessionTransactionsTableNamespace.dbName(),
+            BSON("create" << NamespaceString::kSessionTransactionsTableNamespace.coll())));
+        DBDirectClient client(operationContext());
+        client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
+                             {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
     }
 
     void tearDown() override {
@@ -288,40 +277,29 @@ protected:
         auto opCtxHolder = cc().makeOperationContext();
         auto opCtx = opCtxHolder.get();
 
-        if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))
-            opCtx->setLogicalSessionId(makeLogicalSessionId(opCtx));
+        opCtx->setLogicalSessionId(makeLogicalSessionId(opCtx));
 
         TxnNumber txnNum(0);
 
-        while (_cloner->doOneBatch(opCtx,
-                                   *_pipeline,
-                                   txnNum,
-                                   kMyShardName,
-                                   _myHostAndPort,
-                                   _resumeToken,
-                                   testOptions.useNaturalOrderCloner)) {
+        while (_cloner->doOneBatch(
+            opCtx, *_pipeline, txnNum, kMyShardName, _myHostAndPort, _resumeToken)) {
             AutoGetCollection tempColl{opCtx, _tempNss, MODE_IX};
             ASSERT_EQ(tempColl->numRecords(opCtx), _metrics->getDocumentsProcessedCount());
             ASSERT_EQ(tempColl->dataSize(opCtx), _metrics->getBytesWrittenCount());
 
             auto doc = getResumeDataDocument(opCtx);
-            if (testOptions.useNaturalOrderCloner) {
-                auto parsedDoc = ReshardingRecipientResumeData::parse(
-                    IDLParserContext("ReshardingCollectionClonerTest"), doc);
-                ASSERT_BSONOBJ_EQ(parsedDoc.getId().toBSON(), getSourceId().toBSON());
-                ASSERT_EQ(parsedDoc.getDonorHost(), _myHostAndPort);
-                ASSERT_BSONOBJ_EQ(*parsedDoc.getResumeToken(), _resumeToken);
+            auto parsedDoc = ReshardingRecipientResumeData::parse(
+                IDLParserContext("ReshardingCollectionClonerTest"), doc);
+            ASSERT_BSONOBJ_EQ(parsedDoc.getId().toBSON(), getSourceId().toBSON());
+            ASSERT_EQ(parsedDoc.getDonorHost(), _myHostAndPort);
+            ASSERT_BSONOBJ_EQ(*parsedDoc.getResumeToken(), _resumeToken);
 
-                if (testOptions.storeProgress) {
-                    ASSERT_EQ(tempColl->numRecords(opCtx), *parsedDoc.getDocumentsCopied());
-                    ASSERT_GT(tempColl->dataSize(opCtx), 0);
-                    ASSERT_EQ(tempColl->dataSize(opCtx), *parsedDoc.getBytesCopied());
-                } else {
-                    ASSERT(!parsedDoc.getDocumentsCopied());
-                }
+            if (testOptions.storeProgress) {
+                ASSERT_EQ(tempColl->numRecords(opCtx), *parsedDoc.getDocumentsCopied());
+                ASSERT_GT(tempColl->dataSize(opCtx), 0);
+                ASSERT_EQ(tempColl->dataSize(opCtx), *parsedDoc.getBytesCopied());
             } else {
-                ASSERT(doc.isEmpty());
+                ASSERT(!parsedDoc.getDocumentsCopied());
             }
         }
 

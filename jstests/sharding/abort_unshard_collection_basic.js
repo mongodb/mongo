@@ -3,7 +3,6 @@
  *
  * @tags: [
  *  requires_fcv_80,
- *  featureFlagReshardingImprovements,
  *  featureFlagUnshardCollection,
  *  multiversion_incompatible,
  *  assumes_balancer_off,

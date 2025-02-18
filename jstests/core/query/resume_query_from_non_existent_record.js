@@ -25,8 +25,6 @@
  * ]
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
 const collName = "resume_query_from_non_existent_record";
 const coll = db[collName];
 
@@ -134,10 +132,6 @@ const testFindCmd = function() {
 };
 
 const testAggregateCmd = function() {
-    if (!FeatureFlagUtil.isEnabled(db, "ReshardingImprovements")) {
-        jsTestLog("Skipping test since featureFlagReshardingImprovements is not enabled.");
-        return;
-    }
     coll.drop();
 
     const testData = [{_id: 0, a: 1}, {_id: 1, a: 2}, {_id: 2, a: 3}];

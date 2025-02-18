@@ -3,11 +3,9 @@
  *
  * @tags: [
  *  requires_fcv_72,
- *  featureFlagReshardingImprovements
  * ]
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2});
@@ -22,11 +20,6 @@ for (let x = 0; x < numInitialDocs; x++) {
     bulk.insert({oldKey: x, newKey: numInitialDocs - x});
 }
 assert.commandWorked(bulk.execute());
-
-if (!FeatureFlagUtil.isEnabled(mongos, "ReshardingImprovements")) {
-    jsTestLog("Skipping test since featureFlagReshardingImprovements is not enabled.");
-    quit();
-}
 
 jsTest.log("aggregate with $requestResumeToken should fail without hint: {$natural: 1}.");
 assert.commandFailedWithCode(

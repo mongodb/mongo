@@ -95,27 +95,6 @@ public:
             reshardCollectionRequest.setNumInitialChunks(request().getNumInitialChunks());
             reshardCollectionRequest.setCollectionUUID(request().getCollectionUUID());
 
-            if (!resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                uassert(
-                    ErrorCodes::InvalidOptions,
-                    "Resharding improvements is not enabled, reject shardDistribution parameter",
-                    !request().getShardDistribution().has_value());
-                uassert(
-                    ErrorCodes::InvalidOptions,
-                    "Resharding improvements is not enabled, reject forceRedistribution parameter",
-                    !request().getForceRedistribution().has_value());
-                uassert(ErrorCodes::InvalidOptions,
-                        "Resharding improvements is not enabled, reject reshardingUUID parameter",
-                        !request().getReshardingUUID().has_value());
-                uassert(ErrorCodes::InvalidOptions,
-                        "Resharding improvements is not enabled, reject feature flag "
-                        "moveCollection or unshardCollection",
-                        !resharding::gFeatureFlagMoveCollection.isEnabled(
-                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-                            !resharding::gFeatureFlagUnshardCollection.isEnabled(
-                                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-            }
             reshardCollectionRequest.setShardDistribution(request().getShardDistribution());
             reshardCollectionRequest.setForceRedistribution(request().getForceRedistribution());
             reshardCollectionRequest.setReshardingUUID(request().getReshardingUUID());

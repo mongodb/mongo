@@ -470,13 +470,10 @@ BSONObj PlanExecutorSBE::getPostBatchResumeToken() const {
                     tag == sbe::value::TypeTags::RecordId);
             BSONObjBuilder builder;
             sbe::value::getRecordIdView(val)->serializeToken("$recordId", &builder);
-            if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                auto initialSyncId =
-                    repl::ReplicationCoordinator::get(_opCtx)->getInitialSyncId(_opCtx);
-                if (initialSyncId) {
-                    initialSyncId.value().appendToBuilder(&builder, "$initialSyncId");
-                }
+            auto initialSyncId =
+                repl::ReplicationCoordinator::get(_opCtx)->getInitialSyncId(_opCtx);
+            if (initialSyncId) {
+                initialSyncId.value().appendToBuilder(&builder, "$initialSyncId");
             }
             return builder.obj();
         }

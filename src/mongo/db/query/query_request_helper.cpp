@@ -123,35 +123,25 @@ Status validateResumeInput(OperationContext* opCtx,
         : std::make_pair(mongo::BSONObj(startAt), FindCommandRequest::kStartAtFieldName);
 
     BSONType recordIdType = resumeInput["$recordId"].type();
-    if (mongo::resharding::gFeatureFlagReshardingImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        if (resumeInput.nFields() > 2 ||
-            (recordIdType != BSONType::NumberLong && recordIdType != BSONType::BinData &&
-             recordIdType != BSONType::jstNULL) ||
-            (resumeInput.nFields() == 2 &&
-             (resumeInput["$initialSyncId"].type() != BSONType::BinData ||
-              resumeInput["$initialSyncId"].binDataType() != BinDataType::newUUID))) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream()
-                              << "Malformed resume token: the '" << resumeInputName
-                              << "' object must contain '$recordId', of type NumberLong, BinData "
-                                 "or jstNULL and optional '$initialSyncId of type BinData.");
-        }
-        if (resumeInput.hasField("$initialSyncId")) {
-            auto initialSyncId = repl::ReplicationCoordinator::get(opCtx)->getInitialSyncId(opCtx);
-            auto requestInitialSyncId = uassertStatusOK(UUID::parse(resumeInput["$initialSyncId"]));
-            if (!initialSyncId || requestInitialSyncId != *initialSyncId) {
-                return Status(ErrorCodes::Error(8132701),
-                              "$initialSyncId mismatch, the query is no longer resumable.");
-            }
-        }
-    } else if (resumeInput.nFields() != 1 ||
-               (recordIdType != BSONType::NumberLong && recordIdType != BSONType::BinData &&
-                recordIdType != BSONType::jstNULL)) {
+    if (resumeInput.nFields() > 2 ||
+        (recordIdType != BSONType::NumberLong && recordIdType != BSONType::BinData &&
+         recordIdType != BSONType::jstNULL) ||
+        (resumeInput.nFields() == 2 &&
+         (resumeInput["$initialSyncId"].type() != BSONType::BinData ||
+          resumeInput["$initialSyncId"].binDataType() != BinDataType::newUUID))) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "Malformed resume token: the '" << resumeInputName
-                                    << "' object must contain exactly one field named '$recordId', "
-                                       "of type NumberLong, BinData or jstNULL.");
+                      str::stream()
+                          << "Malformed resume token: the '" << resumeInputName
+                          << "' object must contain '$recordId', of type NumberLong, BinData "
+                             "or jstNULL and optional '$initialSyncId of type BinData.");
+    }
+    if (resumeInput.hasField("$initialSyncId")) {
+        auto initialSyncId = repl::ReplicationCoordinator::get(opCtx)->getInitialSyncId(opCtx);
+        auto requestInitialSyncId = uassertStatusOK(UUID::parse(resumeInput["$initialSyncId"]));
+        if (!initialSyncId || requestInitialSyncId != *initialSyncId) {
+            return Status(ErrorCodes::Error(8132701),
+                          "$initialSyncId mismatch, the query is no longer resumable.");
+        }
     }
 
     // Clustered collections can only accept '$_resumeAfter' or '$_startAt' parameter of type

@@ -153,16 +153,6 @@ void validate(const AggregateCommandRequest& aggregate,
                           << nss.toStringForErrorMsg(),
             !aggregate.getRequestReshardingResumeToken().value_or(false) || nss.isOplog());
 
-    // We need to use isEnabledUseLastLTSFCVWhenUninitialized here because an aggregate
-    // command with $_requestResumeToken could be sent directly to an initial sync node with
-    // uninitialized FCV, and creating/parsing/validating this command invocation happens before
-    // any check that the node is a primary.
-    uassert(
-        90675,
-        "$_requestResumeToken is not supported without Resharding Improvements",
-        !aggregate.getRequestResumeToken().has_value() ||
-            resharding::gFeatureFlagReshardingImprovements.isEnabledUseLastLTSFCVWhenUninitialized(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
     bool hasRequestResumeToken = aggregate.getRequestResumeToken().value_or(false);
     uassert(ErrorCodes::FailedToParse,
             str::stream() << AggregateCommandRequest::kRequestResumeTokenFieldName

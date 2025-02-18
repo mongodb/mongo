@@ -3,16 +3,15 @@
  * then after failover the result is available to retries.
  *
  * @tags: [
- *   featureFlagReshardingImprovements,
  *   requires_fcv_72,
  *    # TODO (SERVER-97257): Re-enable this test or add an explanation why it is incompatible.
  *    embedded_router_incompatible,
  *   uses_atclustertime,
  * ]
  */
+
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {getUUIDFromConfigCollections, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
@@ -40,12 +39,6 @@ const sourceCollection = reshardingTest.createShardedCollection({
 const mongos = sourceCollection.getMongo();
 let topology = DiscoverTopology.findConnectedNodes(mongos);
 let configsvr = new Mongo(topology.configsvr.primary);
-
-if (!FeatureFlagUtil.isEnabled(mongos, "ReshardingImprovements")) {
-    jsTestLog("Skipping test since featureFlagReshardingImprovements is not enabled");
-    reshardingTest.teardown();
-    quit();
-}
 
 let pauseBeforeCloningFP = configureFailPoint(configsvr, "reshardingPauseCoordinatorBeforeCloning");
 

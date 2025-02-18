@@ -4,12 +4,11 @@
  *
  * @tags: [
  *  requires_fcv_72,
- *  featureFlagReshardingImprovements
  * ]
  */
+
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest({numDonors: 2, enableElections: true});
@@ -34,12 +33,6 @@ const topology = DiscoverTopology.findConnectedNodes(mongos);
 
 const recipientShardNames = reshardingTest.recipientShardNames;
 const recipient = new Mongo(topology.shards[recipientShardNames[0]].primary);
-
-if (!FeatureFlagUtil.isEnabled(mongos, "ReshardingImprovements")) {
-    jsTestLog("Skipping test since featureFlagReshardingImprovements is not enabled");
-    reshardingTest.teardown();
-    quit();
-}
 
 // Create an index on oldKey.
 assert.commandWorked(

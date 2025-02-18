@@ -61,12 +61,6 @@ const auto kTimedPhaseNamesMap = [] {
         {TimedPhase::kCriticalSection, "totalCriticalSectionTimeElapsedSecs"},
         {TimedPhase::kBuildingIndex, "totalIndexBuildTimeElapsedSecs"}};
 }();
-const auto kTimedPhaseNamesMapWithoutReshardingImprovements = [] {
-    return ReshardingMetrics::TimedPhaseNameMap{
-        {TimedPhase::kCloning, "totalCopyTimeElapsedSecs"},
-        {TimedPhase::kApplying, "totalApplyTimeElapsedSecs"},
-        {TimedPhase::kCriticalSection, "totalCriticalSectionTimeElapsedSecs"}};
-}();
 inline ReshardingMetrics::State getDefaultState(ReshardingMetrics::Role role) {
     using Role = ReshardingMetrics::Role;
     switch (role) {
@@ -255,28 +249,19 @@ StringData ReshardingMetrics::getStateString() const noexcept {
 
 BSONObj ReshardingMetrics::reportForCurrentOp() const noexcept {
     BSONObjBuilder builder;
-    if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        reportDurationsForAllPhases<Seconds>(
-            kTimedPhaseNamesMap, getClockSource(), &builder, Seconds{0});
-        switch (_role) {
-            case Role::kCoordinator:
-                builder.append(_reshardingFieldNames->getForIsSameKeyResharding(),
-                               _isSameKeyResharding.load());
-                break;
-            case Role::kRecipient:
-                builder.append(_reshardingFieldNames->getForIndexesToBuild(),
-                               _indexesToBuild.load());
-                builder.append(_reshardingFieldNames->getForIndexesBuilt(), _indexesBuilt.load());
-                break;
-            default:
-                break;
-        }
-    } else {
-        reportDurationsForAllPhases<Seconds>(kTimedPhaseNamesMapWithoutReshardingImprovements,
-                                             getClockSource(),
-                                             &builder,
-                                             Seconds{0});
+    reportDurationsForAllPhases<Seconds>(
+        kTimedPhaseNamesMap, getClockSource(), &builder, Seconds{0});
+    switch (_role) {
+        case Role::kCoordinator:
+            builder.append(_reshardingFieldNames->getForIsSameKeyResharding(),
+                           _isSameKeyResharding.load());
+            break;
+        case Role::kRecipient:
+            builder.append(_reshardingFieldNames->getForIndexesToBuild(), _indexesToBuild.load());
+            builder.append(_reshardingFieldNames->getForIndexesBuilt(), _indexesBuilt.load());
+            break;
+        default:
+            break;
     }
     if (_role == Role::kRecipient) {
         reportOplogApplicationCountMetrics(_reshardingFieldNames, &builder);
@@ -308,12 +293,9 @@ void ReshardingMetrics::restoreRecipientSpecificFields(
 
 void ReshardingMetrics::restoreCoordinatorSpecificFields(
     const ReshardingCoordinatorDocument& document) {
-    if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        auto isSameKeyResharding =
-            document.getForceRedistribution() && *document.getForceRedistribution();
-        setIsSameKeyResharding(isSameKeyResharding);
-    }
+    auto isSameKeyResharding =
+        document.getForceRedistribution() && *document.getForceRedistribution();
+    setIsSameKeyResharding(isSameKeyResharding);
     restorePhaseDurationFields(document);
 }
 
@@ -348,16 +330,8 @@ void ReshardingMetrics::restoreIndexBuildDurationFields(const ReshardingRecipien
 
 void ReshardingMetrics::reportOnCompletion(BSONObjBuilder* builder) {
     invariant(builder);
-    if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        reportDurationsForAllPhases<Seconds>(
-            kTimedPhaseNamesMap, getClockSource(), builder, Seconds{0});
-    } else {
-        reportDurationsForAllPhases<Seconds>(kTimedPhaseNamesMapWithoutReshardingImprovements,
-                                             getClockSource(),
-                                             builder,
-                                             Seconds{0});
-    }
+    reportDurationsForAllPhases<Seconds>(
+        kTimedPhaseNamesMap, getClockSource(), builder, Seconds{0});
     builder->appendElements(BSON("provenance" << Provenance_serializer(_provenance)));
 }
 

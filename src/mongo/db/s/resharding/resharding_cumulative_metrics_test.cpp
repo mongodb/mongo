@@ -594,7 +594,6 @@ TEST_F(ReshardingCumulativeMetricsTest,
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsRunCount) {
-    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
     using Role = ShardingDataTransformMetrics::Role;
     ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
@@ -621,7 +620,6 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsRunCount) {
 
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsSucceededCount) {
-    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
     using Role = ShardingDataTransformMetrics::Role;
     ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
     auto ignore = _cumulativeMetrics->registerInstanceMetrics(&coordinator);
@@ -647,7 +645,6 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsSucceededCount) {
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsFailedCount) {
-    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
     using Role = ShardingDataTransformMetrics::Role;
     ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
@@ -673,7 +670,6 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsFailedCount) {
 }
 
 TEST_F(ReshardingCumulativeMetricsTest, ReportContainsCanceledCount) {
-    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
     using Role = ShardingDataTransformMetrics::Role;
     ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
     auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
