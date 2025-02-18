@@ -109,7 +109,6 @@ mongo_cc_unit_test(
         "process_id_test.cpp",
         "random_test.cpp",
         "source_location_test.cpp",
-        "source_location_test.h",
         "stack_locator_test.cpp",
         "waitable_atomic_test.cpp",
         "//src/mongo/unittest:join_thread.h",

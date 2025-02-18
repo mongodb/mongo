@@ -27,149 +27,156 @@
  *    it in the license file.
  */
 
-
-#include <type_traits>
-
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/source_location_test.h"
 #include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-
 namespace mongo {
 namespace {
 
-constexpr SourceLocation makeLocalFunctionSourceLocationForTest() {
-    return MONGO_SOURCE_LOCATION();
-}
-
-const SourceLocationHolder kLocation = MONGO_SOURCE_LOCATION_NO_FUNC();
-
-struct StructWithDefaultInitContextMember {
-    const SourceLocationHolder location = MONGO_SOURCE_LOCATION_NO_FUNC();
-};
-
-#define CALL_MONGO_SOURCE_LOCATION() MONGO_SOURCE_LOCATION()
+namespace m = unittest::match;
 
 TEST(SourceLocation, CorrectLineNumber) {
-    using LineT = std::invoke_result_t<decltype(&SourceLocation::line), SourceLocation>;
-    ASSERT_EQ(MONGO_SOURCE_LOCATION().line(), static_cast<LineT>(__LINE__));
+    ASSERT_EQ(MONGO_SOURCE_LOCATION().line(), __LINE__);
 }
 
 TEST(SourceLocation, InlineVariable) {
-    SourceLocationHolder inlineLocation1 = MONGO_SOURCE_LOCATION();
-    SourceLocationHolder inlineLocation2 = MONGO_SOURCE_LOCATION();
-    SourceLocationHolder inlineLocation3 = MONGO_SOURCE_LOCATION();
+    SourceLocation a = MONGO_SOURCE_LOCATION();
+    SourceLocation b = MONGO_SOURCE_LOCATION();
+    SourceLocation c = MONGO_SOURCE_LOCATION();
+    ASSERT_EQ(b.line(), a.line() + 1);
+    ASSERT_EQ(c.line(), a.line() + 2);
+}
 
-    // Each location should have the same filename
-    ASSERT_EQ(inlineLocation1.file_name(), inlineLocation2.file_name());
-    ASSERT_EQ(inlineLocation1.file_name(), inlineLocation3.file_name());
-
-    // The line numbers for each location should increase monotonically when inline
-    ASSERT_LT(inlineLocation1.line(), inlineLocation2.line());
-    ASSERT_LT(inlineLocation2.line(), inlineLocation3.line());
-
-    LOGV2(22616, "{inlineLocation1}", "inlineLocation1"_attr = inlineLocation1);
-    LOGV2(22617, "{inlineLocation2}", "inlineLocation2"_attr = inlineLocation2);
-    LOGV2(22618, "{inlineLocation3}", "inlineLocation3"_attr = inlineLocation3);
+constexpr SourceLocation functionLocation() {
+    return MONGO_SOURCE_LOCATION();
 }
 
 TEST(SourceLocation, LocalFunction) {
-    SourceLocationHolder inlineLocation1 = MONGO_SOURCE_LOCATION();
-    SourceLocationHolder localFunctionLocation1 = makeLocalFunctionSourceLocationForTest();
-    SourceLocationHolder localFunctionLocation2 = makeLocalFunctionSourceLocationForTest();
-
-    // The inline location should have the same file name but a later line
-    ASSERT_EQ(inlineLocation1.file_name(), localFunctionLocation1.file_name());
-    ASSERT_GT(inlineLocation1.line(), localFunctionLocation1.line());
-
-    // The two local function locations should be identical
-    ASSERT_EQ(localFunctionLocation1, localFunctionLocation2);
-
-    LOGV2(22619, "{inlineLocation1}", "inlineLocation1"_attr = inlineLocation1);
-    LOGV2(
-        22620, "{localFunctionLocation1}", "localFunctionLocation1"_attr = localFunctionLocation1);
-    LOGV2(
-        22621, "{localFunctionLocation2}", "localFunctionLocation2"_attr = localFunctionLocation2);
+    auto f1 = functionLocation();
+    auto f2 = functionLocation();
+    ASSERT_EQ(f2.line(), f1.line());
 }
 
 TEST(SourceLocation, HeaderFunction) {
-    SourceLocationHolder inlineLocation1 = MONGO_SOURCE_LOCATION();
-    SourceLocationHolder headerLocation1 = makeHeaderSourceLocationForTest();
-    SourceLocationHolder headerLocation2 = makeHeaderSourceLocationForTest();
-
-    // The inline location should have a different file name
-    ASSERT_NE(inlineLocation1.file_name(), headerLocation1.file_name());
-
-    // The two header locations should be identical
-    ASSERT_EQ(headerLocation1, headerLocation2);
-
-    LOGV2(22622, "{inlineLocation1}", "inlineLocation1"_attr = inlineLocation1);
-    LOGV2(22623, "{headerLocation1}", "headerLocation1"_attr = headerLocation1);
-    LOGV2(22624, "{headerLocation2}", "headerLocation2"_attr = headerLocation2);
+    auto h1 = makeHeaderSourceLocation_forTest();
+    auto h2 = makeHeaderSourceLocation_forTest();
+    ASSERT_EQ(h1.file_name(), h2.file_name());
+    ASSERT_EQ(h1.line(), h2.line());
+    ASSERT_NE(h1.file_name(), MONGO_SOURCE_LOCATION().file_name());
 }
+
+constexpr auto gLoc = MONGO_SOURCE_LOCATION();
+constexpr auto gLocLine = __LINE__ - 1;
 
 TEST(SourceLocation, GlobalVariable) {
-    SourceLocationHolder inlineLocation1 = MONGO_SOURCE_LOCATION();
-
-    // The inline location should have the same file name but a later line
-    ASSERT_EQ(inlineLocation1.file_name(), kLocation.file_name());
-    ASSERT_GT(inlineLocation1.line(), kLocation.line());
-
-    LOGV2(22625, "{inlineLocation1}", "inlineLocation1"_attr = inlineLocation1);
-    LOGV2(22626, "{kLocation}", "kLocation"_attr = kLocation);
+    ASSERT_EQ(gLoc.file_name(), MONGO_SOURCE_LOCATION().file_name());
+    ASSERT_EQ(gLoc.line(), gLocLine);
 }
+
+/*
+ * The MSVC version we're dealing with right now is 14.31.31103 -
+ * "Visual Studio 2019 - 14.30". It gets current source location
+ * wrong in some ways. These tests confirm its incorrect behavior.
+ * This condition can be adjusted when we upgrade to a better MSVC.
+ * XCode has the same problem.
+ */
+#if defined(_MSC_VER) || defined(__APPLE__)
+constexpr bool wrongLocation = true;
+#else
+constexpr bool wrongLocation = false;
+#endif
 
 TEST(SourceLocation, DefaultStructMember) {
-    SourceLocationHolder inlineLocation1 = MONGO_SOURCE_LOCATION();
-    StructWithDefaultInitContextMember obj1;
-    StructWithDefaultInitContextMember obj2;
-
-    // The inline location should have the same file name but a later line
-    ASSERT_EQ(inlineLocation1.file_name(), obj1.location.file_name());
-    ASSERT_GT(inlineLocation1.line(), obj1.location.line());
-
-    // The two default ctor'd struct member locations should be identical
-    ASSERT_EQ(obj1.location, obj2.location);
-
-    LOGV2(22627, "{inlineLocation1}", "inlineLocation1"_attr = inlineLocation1);
-    LOGV2(22628, "{obj1_location}", "obj1_location"_attr = obj1.location);
-    LOGV2(22629, "{obj2_location}", "obj2_location"_attr = obj2.location);
+    struct Obj {
+        Obj() = default;
+        unsigned ctorLine = __LINE__ - 1;
+        SourceLocation loc = MONGO_SOURCE_LOCATION();
+        unsigned memberLine = __LINE__ - 1;
+    };
+    Obj o{};
+    // Some compilers incorrectly choose site of the data member definition.
+    ASSERT_EQ(o.loc.line(), wrongLocation ? o.memberLine : o.ctorLine);
 }
 
+int someFunctionSourceLine = __LINE__ + 1;
+SourceLocation someFunction(SourceLocation loc = MONGO_SOURCE_LOCATION()) {
+    return loc;
+}
+
+TEST(SourceLocation, FunctionReportsCaller) {
+    auto reported = someFunction().line();
+    auto callSiteLine = __LINE__ - 1;
+    // Some compilers incorrectly choose the function source line.
+    ASSERT_EQ(reported, wrongLocation ? someFunctionSourceLine : callSiteLine);
+}
+
+struct SomeClass {
+    static constexpr int ctorSiteLine = __LINE__ + 1;
+    explicit SomeClass(SourceLocation loc = MONGO_SOURCE_LOCATION()) : loc{loc} {}
+    SourceLocation loc;
+};
+
+TEST(SourceLocation, ConstructorReportsCaller) {
+    auto reported = SomeClass{}.loc.line();
+    auto callSiteLine = __LINE__ - 1;
+    // Some compilers incorrectly choose the ctor source line.
+    ASSERT_EQ(reported, wrongLocation ? SomeClass::ctorSiteLine : callSiteLine);
+}
+
+#define CALL_MONGO_SOURCE_LOCATION() MONGO_SOURCE_LOCATION()
+
 TEST(SourceLocation, Macro) {
-    SourceLocationHolder inlineLocation1 = MONGO_SOURCE_LOCATION();
-    SourceLocationHolder inlineLocation2 = CALL_MONGO_SOURCE_LOCATION();
-
-    // Each location should have the same filename
-    ASSERT_EQ(inlineLocation1.file_name(), inlineLocation2.file_name());
-
-    // The line numbers for each location should increase monotonically when inline
-    ASSERT_LT(inlineLocation1.line(), inlineLocation2.line());
-
-    LOGV2(22630, "{inlineLocation1}", "inlineLocation1"_attr = inlineLocation1);
-    LOGV2(22631, "{inlineLocation2}", "inlineLocation2"_attr = inlineLocation2);
+    auto a = MONGO_SOURCE_LOCATION();
+    auto b = CALL_MONGO_SOURCE_LOCATION();
+    ASSERT_EQ(b.line(), a.line() + 1);
 }
 
 TEST(SourceLocation, Constexpr) {
-    constexpr SourceLocationHolder inlineLocation1 = MONGO_SOURCE_LOCATION();
-    constexpr SourceLocationHolder inlineLocation2 = MONGO_SOURCE_LOCATION();
-    static_assert((inlineLocation1.line() + 1) == inlineLocation2.line());
-    static_assert(inlineLocation1.column() == inlineLocation2.column());
-    static_assert(areEqual(inlineLocation1.file_name(), inlineLocation2.file_name()));
-    static_assert(areEqual(inlineLocation1.function_name(), inlineLocation2.function_name()));
+    constexpr auto a = MONGO_SOURCE_LOCATION();
+    [[maybe_unused]] constexpr std::tuple allConstexprs{functionLocation(),
+                                                        makeHeaderSourceLocation_forTest(),
+                                                        a.file_name(),
+                                                        a.line(),
+                                                        a.column(),
+                                                        a.function_name()};
+}
 
-    constexpr auto localFunctionLocation = makeLocalFunctionSourceLocationForTest();
-    static_assert(inlineLocation1.line() > localFunctionLocation.line());
-    static_assert(areEqual(inlineLocation1.file_name(), localFunctionLocation.file_name()));
-    static_assert(
-        !areEqual(inlineLocation1.function_name(), localFunctionLocation.function_name()));
+TEST(SourceLocation, ToString) {
+    auto synth = [](auto&&... args) {
+        return SyntheticSourceLocation(args...);
+    };
+    ASSERT_THAT(toString(MONGO_SOURCE_LOCATION()),
+                m::ContainsRegex(R"re((\S+):(\d+):(\d+):(.*))re"));
+    ASSERT_EQ(toString(SourceLocation{}), "(unknown location)");
+    ASSERT_EQ(toString(synth("f.c", 0, "f", 34)), "(unknown location)");
+    ASSERT_EQ(toString(synth("f.c", 12, "f", 34)), "f.c:12:34:f");
+    ASSERT_EQ(toString(synth("f.c", 12, "f", 0)), "f.c:12:f");
+    ASSERT_EQ(toString(synth("f.c", 12, "", 34)), "f.c:12:34");
+    ASSERT_EQ(toString(synth("f.c", 12, "", 0)), "f.c:12");
+}
 
-    constexpr auto headerLocation = makeHeaderSourceLocationForTest();
-    static_assert(!areEqual(inlineLocation1.file_name(), headerLocation.file_name()));
-    static_assert(!areEqual(inlineLocation1.function_name(), headerLocation.function_name()));
+TEST(SourceLocation, Formatting) {
+    auto loc = MONGO_SOURCE_LOCATION();
+    auto s = toString(loc);
+    {
+        std::ostringstream oss;
+        oss << loc;
+        ASSERT_EQ(oss.str(), s);
+    }
+    ASSERT_EQ(fmt::format("{}", loc), s);
+}
+
+TEST(SourceLocation, Logging) {
+    auto loc = MONGO_SOURCE_LOCATION();
+    auto s = toString(loc);
+    startCapturingLogMessages();
+    LOGV2(9922300, "", "location"_attr = loc);
+    auto logs = getCapturedBSONFormatLogMessages();
+    ASSERT_EQ(logs.size(), 1);
+    ASSERT_STRING_CONTAINS(logs.front()["attr"]["location"].String(), s);
 }
 
 }  // namespace

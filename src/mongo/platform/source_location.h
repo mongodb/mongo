@@ -30,132 +30,176 @@
 #pragma once
 
 #include <cstdint>
+#include <fmt/format.h>
 #include <ostream>
 #include <string>
-#include <utility>
+#include <version>
 
-#if !defined(_MSC_VER) && !defined(__clang__)  // not windows or clang
-#include <experimental/source_location>
-#endif  // windows
+#include "mongo/platform/compiler.h"
 
-#include <fmt/format.h>
+#if __cpp_lib_source_location >= 201907L
+#include <source_location>
+#define MONGO_SOURCE_LOCATION_HAVE_STD
+#endif
 
 namespace mongo {
 
-/**
- * A SourceLocation is a constexpr type that captures a source location
- *
- * This class mimics the api signature of C++20 std::source_location
- *
- * It is intended to be constructed with MONGO_SOURCE_LOCATION() below.
- */
-class SourceLocation {
-public:
-    constexpr SourceLocation(uint_least32_t line,
-                             uint_least32_t column,
-                             const char* file_name,
-                             const char* function_name) noexcept
-        : _line(line), _column(column), _file_name(file_name), _function_name(function_name) {}
-
-    constexpr uint_least32_t line() const noexcept {
-        return _line;
+struct SourceLocationFormatter {
+    constexpr auto parse(auto&& ctx) const {
+        return ctx.begin();
     }
 
-    constexpr uint_least32_t column() const noexcept {
-        return _column;
+    /**
+     * Normally produces `{file}:{line}:{column}:{func}`.
+     * If `line==0`, produces `(unknown location)` instead.
+     * The column and function names are conditionally present.
+     * If `column==0`, then `:{column}` is omitted.
+     * If `func` is empty, then `:{func}` is omitted.
+     */
+    auto format(const auto& loc, auto& ctx) const {
+        auto out = ctx.out();
+        auto ln = loc.line();
+        if (!ln)
+            return fmt::format_to(std::move(out), "(unknown location)");
+        out = fmt::format_to(out, "{}:{}", loc.file_name(), ln);
+        if (auto c = loc.column())
+            out = fmt::format_to(std::move(out), ":{}", c);
+        if (auto f = loc.function_name(); f && *f)
+            out = fmt::format_to(std::move(out), ":{}", f);
+        return out;
     }
-
-    constexpr const char* file_name() const noexcept {
-        return _file_name;
-    }
-
-    constexpr const char* function_name() const noexcept {
-        return _function_name;
-    }
-
-private:
-    uint_least32_t _line;
-    uint_least32_t _column;  // column will be 0 if there isn't compiler support
-    const char* _file_name;
-    const char* _function_name;
 };
 
+#ifdef MONGO_SOURCE_LOCATION_HAVE_STD
 /**
- * SourceLocationHolder is intended for convenient io of SourceLocation
+ * Wraps and emulates the API of `std::source_location`.
+ * `std::source_location` is only designed for exposing compiler
+ * intrinsics, and users must use alternative types if they want more
+ * features than that.
  */
-class SourceLocationHolder {
+class WrappedStdSourceLocation {
 public:
-    constexpr SourceLocationHolder(SourceLocation&& loc) noexcept
-        : _loc(std::forward<SourceLocation>(loc)) {}
+    constexpr WrappedStdSourceLocation() noexcept = default;
 
-    constexpr uint_least32_t line() const noexcept {
-        return _loc.line();
-    }
-
-    constexpr uint_least32_t column() const noexcept {
-        return _loc.column();
-    }
+    explicit(false) constexpr WrappedStdSourceLocation(std::source_location loc) noexcept
+        : _loc{loc} {}
 
     constexpr const char* file_name() const noexcept {
         return _loc.file_name();
+    }
+
+    constexpr uint_least32_t line() const noexcept {
+        return _loc.line();
     }
 
     constexpr const char* function_name() const noexcept {
         return _loc.function_name();
     }
 
-    std::string toString() const {
-        using namespace fmt::literals;
-        return R"({{fileName:"{}", line:{}, functionName:"{}"}})"_format(
-            _loc.file_name(), _loc.line(), _loc.function_name());
+    constexpr uint_least32_t column() const noexcept {
+        return _loc.column();
     }
 
-    friend std::ostream& operator<<(std::ostream& out, const SourceLocationHolder& context) {
-        return out << context.toString();
+    friend std::string toString(WrappedStdSourceLocation loc) {
+        return fmt::format("{}", loc);
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, WrappedStdSourceLocation loc) {
+        return os << toString(loc);
     }
 
 private:
-    SourceLocation _loc;
+    std::source_location _loc;
 };
 
+}  // namespace mongo
+
+template <>
+struct fmt::formatter<mongo::WrappedStdSourceLocation> : mongo::SourceLocationFormatter {};
+
+namespace mongo {
+
+using SourceLocation = WrappedStdSourceLocation;
+
+/** Fast. Loads a single packed struct address. */
+#define MONGO_SOURCE_LOCATION() ::mongo::WrappedStdSourceLocation(std::source_location::current())
+
+#endif  // MONGO_SOURCE_LOCATION_HAVE_STD
+
 /**
- * MONGO_SOURCE_LOCATION() either:
- * - captures std::experimental::source_location::current()
- * - makes a best effort with various macros and local static constants
- *
- * Since __FUNCSIG__ and __PRETTY_FUNCTION__ aren't defined outside of functions, there is also
- * MONGO_SOURCE_LOCATION_NO_FUNC() for use with a default member initializatizer or constant
- * initialization.
+ * Emulates the API of `std::source_location`, but can be
+ * constructed from arguments.
+ * Used only where `WrappedStdSourceLocation` isn't available or won't work.
  */
-#if defined(_MSC_VER)  // windows
+class SyntheticSourceLocation {
+public:
+    constexpr SyntheticSourceLocation() noexcept = default;
 
-// MSVC does not have any of N4810 yet. (see
-// https://developercommunity.visualstudio.com/idea/354069/implement-c-library-fundamentals-ts-v2.html)
-#define MONGO_SOURCE_LOCATION() ::mongo::SourceLocation(__LINE__, 0ul, __FILE__, __func__)
-#define MONGO_SOURCE_LOCATION_NO_FUNC() ::mongo::SourceLocation(__LINE__, 0ul, __FILE__, "")
+    constexpr SyntheticSourceLocation(const char* file,
+                                      uint_least32_t line,
+                                      const char* function = "",
+                                      uint_least32_t column = 0) noexcept
+        : _file_name{file}, _function_name{function}, _line{line}, _column{column} {}
 
-#elif defined(__clang__)  // windows -> clang
+    constexpr const char* file_name() const noexcept {
+        return _file_name;
+    }
+    constexpr uint_least32_t line() const noexcept {
+        return _line;
+    }
+    constexpr const char* function_name() const noexcept {
+        return _function_name;
+    }
+    constexpr uint_least32_t column() const noexcept {
+        return _column;
+    }
 
-// Clang got __builtin_FILE et al as of 8.0.1 (see https://reviews.llvm.org/D37035)
-#define MONGO_SOURCE_LOCATION() ::mongo::SourceLocation(__LINE__, 0ul, __FILE__, __func__)
-#define MONGO_SOURCE_LOCATION_NO_FUNC() ::mongo::SourceLocation(__LINE__, 0ul, __FILE__, "")
+    friend std::string toString(SyntheticSourceLocation loc) {
+        return fmt::format("{}", loc);
+    }
 
-#elif defined(__GNUG__)  // clang -> gcc
+    friend std::ostream& operator<<(std::ostream& os, SyntheticSourceLocation loc) {
+        return os << toString(loc);
+    }
 
-constexpr auto toSourceLocation(std::experimental::source_location loc) {
-    // Note that std::experimental::source_location captures __func__, not __PRETTY_FUNC__
-    return SourceLocation(loc.line(), loc.column(), loc.file_name(), loc.function_name());
+private:
+    const char* _file_name = "";
+    const char* _function_name = "";
+    uint_least32_t _line = 0;
+    uint_least32_t _column = 0;
+};
+
+}  // namespace mongo
+
+template <>
+struct fmt::formatter<mongo::SyntheticSourceLocation> : mongo::SourceLocationFormatter {};
+
+namespace mongo {
+
+#ifndef MONGO_SOURCE_LOCATION_HAVE_STD
+
+using SourceLocation = SyntheticSourceLocation;
+
+/**
+ * If we don't have `std::source_location` (toolchain-v4's clang), we can still
+ * make a synthetic.
+ * Old clang is missing std::source_location but has all the builtins.
+ */
+constexpr SyntheticSourceLocation currentSyntheticSourceLocation(
+    const char* file = __builtin_FILE(),
+    int line = __builtin_LINE(),
+    const char* func = __builtin_FUNCTION(),
+    int col = __builtin_COLUMN()) {
+    return SyntheticSourceLocation(file, line, func, col);
 }
 
-#define MONGO_SOURCE_LOCATION() \
-    ::mongo::toSourceLocation(std::experimental::source_location::current())
-#define MONGO_SOURCE_LOCATION_NO_FUNC() \
-    ::mongo::toSourceLocation(std::experimental::source_location::current())
+#define MONGO_SOURCE_LOCATION() ::mongo::currentSyntheticSourceLocation()
 
-#else  // gcc -> ?
+#endif  // no std::source_location
 
-#error "Unknown compiler, cannot approximate std::source_location"
-
-#endif  // ?
+/** Provided only for use in the source_location_test. */
+constexpr SourceLocation makeHeaderSourceLocation_forTest() {
+    return MONGO_SOURCE_LOCATION();
+}
 
 }  // namespace mongo

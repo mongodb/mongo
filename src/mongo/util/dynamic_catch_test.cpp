@@ -137,7 +137,7 @@ TEST_F(DynamicCatchTest, Nesting) {
 }
 
 TEST_F(DynamicCatchTest, RealisticScenarios) {
-    auto trial = [&](SourceLocationHolder loc, auto&& f, std::string expected) {
+    auto trial = [&](SourceLocation loc, auto&& f, std::string expected) {
         try {
             f();
             invariant(false, "`f` didn't throw");
@@ -146,7 +146,7 @@ TEST_F(DynamicCatchTest, RealisticScenarios) {
             StreamDynCatch dc;
             installSomeHandlers(dc);
             dc.doCatch(os);
-            ASSERT_STRING_SEARCH_REGEX(os.str(), expected) << " loc: " << loc;
+            ASSERT_STRING_SEARCH_REGEX(os.str(), expected) << " location: " << loc;
         }
     };
 #define LOC MONGO_SOURCE_LOCATION()
