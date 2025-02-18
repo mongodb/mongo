@@ -1004,6 +1004,17 @@ void checkCommandArguments(OperationContext* opCtx,
 
         sharding_ddl_util::assertNamespaceLengthLimit(originalNss, request.getUnsplittable());
     }
+
+    // The moveCollection operation adds a special flag registerExistingCollectionInGlobalCatalog to
+    // teh ShardsvrCreateCollectionRequest.
+    // In this case, the createCollectionCoordinator only performs the registration and skips the
+    // creation of collection.
+    // This flag cannot be used together with dataShard, as it may cause the data to become
+    // orphaned.
+    uassert(ErrorCodes::InvalidOptions,
+            "dataShard and registerExistingCollectionInGlobalCatalog cannot be specified in the "
+            "same request",
+            !(request.getDataShard() && request.getRegisterExistingCollectionInGlobalCatalog()));
 }
 
 /**
@@ -1649,6 +1660,21 @@ void CreateCollectionCoordinator::_checkPreconditions() {
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 "Cannot run CreateCollectionCoordinator on a non data bearing config server",
                 amIAConfigShard);
+    }
+
+    if (_request.getDataShard() && _request.getDataShard() == ShardId::kConfigServerId) {
+        const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+        bool isConfigShardAvailable =
+            std::find(allShardIds.begin(), allShardIds.end(), ShardId::kConfigServerId) !=
+            allShardIds.end();
+        uassert(
+            ErrorCodes::ShardNotFound,
+            str::stream()
+                << ShardId::kConfigServerId.toString()
+                << " server can't be chosen as data shard because it is currently configured to "
+                << "only host cluster metadata. Please use transitionFromDedicatedConfigServer "
+                << "command if you also want to store application data in the config server.",
+            isConfigShardAvailable);
     }
 }
 

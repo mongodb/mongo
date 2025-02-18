@@ -71,6 +71,7 @@ namespace cluster {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(createUnshardedCollectionRandomizeDataShard);
+MONGO_FAIL_POINT_DEFINE(hangCreateUnshardedCollection);
 
 std::vector<AsyncRequestsSender::Request> buildUnshardedRequestsForAllShards(
     OperationContext* opCtx, std::vector<ShardId> shardIds, const BSONObj& cmdObj) {
@@ -163,6 +164,15 @@ CreateCollectionResponse createCollection(OperationContext* opCtx,
                                           ShardsvrCreateCollection request,
                                           bool againstFirstShard) {
     const auto& nss = request.getNamespace();
+
+    if (MONGO_unlikely(hangCreateUnshardedCollection.shouldFail()) && request.getUnsplittable() &&
+        request.getDataShard() && request.getIsFromCreateUnsplittableCollectionTestCommand()) {
+        LOGV2(9913801, "Hanging createCollection due to failpoint 'hangCreateUnshardedCollection'");
+        hangCreateUnshardedCollection.pauseWhileSet();
+        LOGV2(9913802,
+              "Hanging createCollection due to failpoint 'hangCreateUnshardedCollection' finished");
+    }
+
     const auto dbInfo = createDatabase(opCtx, nss.dbName());
 
     // The config.system.session collection can only exist as sharded and it's essential for the
@@ -213,6 +223,10 @@ CreateCollectionResponse createCollection(OperationContext* opCtx,
             // to be different than the current one, then createCollection will fail with
             // AlreadyInitialized error. However, this error can also occur for other reasons. So
             // let's run createCollection again without selecting a random dataShard.
+        } catch (const ExceptionFor<ErrorCodes::ShardNotFound>&) {
+            // It's possible that the dataShard no longer exists. For example, the config shard
+            // may have been migrated to a dedicated config server during the test.
+            // In this case, the original request will be used to create the collection.
         }
     }
     // Note that this check must run separately to manage the case a request already comes with

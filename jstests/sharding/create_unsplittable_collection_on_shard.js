@@ -54,4 +54,14 @@ jsTest.log(
                                  ErrorCodes.AlreadyInitialized);
 }
 
+jsTest.log("Testing that creating an unsplittable collection on a non-existing shard fails.");
+{
+    const kDataColl = 'unsplittable_collection_on_config_shard';
+
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).runCommand(
+            {createUnsplittableCollection: kDataColl, dataShard: "non-existing-shard-name"}),
+        ErrorCodes.ShardNotFound);
+}
+
 st.stop();

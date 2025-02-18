@@ -6,8 +6,7 @@ test_kind: js_test
 selector:
   roots:
     - jstests/aggregation/**/*.js
-    # TODO (SERVER-98123) re-introduce this test once the checkpoint is enabled.
-    # - jstests/libs/random_data_shard_suite_selftest.js
+    - jstests/libs/random_data_shard_suite_selftest.js
   exclude_files:
     - jstests/aggregation/extras/*.js
     - jstests/aggregation/data/*.js
@@ -132,8 +131,7 @@ executor:
         TestData:
           runningWithBalancer: true
           shardsAddedRemoved: true
-          # TODO (SERVER-98123) set this flag to true
-          implicitlyTrackUnshardedCollectionOnCreation: false
+          implicitlyTrackUnshardedCollectionOnCreation: true
       eval:
         await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
         await import("jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
@@ -158,6 +156,8 @@ executor:
     mongos_options:
       set_parameters:
         enableTestCommands: 1
+        failpoint.createUnshardedCollectionRandomizeDataShard:
+          mode: alwaysOn
     mongod_options:
       set_parameters:
         enableTestCommands: 1
@@ -173,5 +173,7 @@ executor:
         failpoint.movePrimaryFailIfNeedToCloneMovableCollections:
           data:
             comment: *movePrimaryComment
+          mode: alwaysOn
+        failpoint.createUnshardedCollectionRandomizeDataShard:
           mode: alwaysOn
     enable_balancer: true
