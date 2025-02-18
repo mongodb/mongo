@@ -180,9 +180,12 @@ testInvalidTimeseriesOptions(
 
 testCompatibleCreateOptions({expireAfterSeconds: NumberLong(100)});
 testCompatibleCreateOptions({storageEngine: {}}, false);
-testCompatibleCreateOptions({storageEngine: {[TestData.storageEngine]: {}}});
+if (TestData.storageEngine !== undefined)
+    testCompatibleCreateOptions({storageEngine: {[TestData.storageEngine]: {}}});
 testCompatibleCreateOptions({indexOptionDefaults: {}}, false);
-testCompatibleCreateOptions({indexOptionDefaults: {storageEngine: {[TestData.storageEngine]: {}}}});
+if (TestData.storageEngine !== undefined)
+    testCompatibleCreateOptions(
+        {indexOptionDefaults: {storageEngine: {[TestData.storageEngine]: {}}}});
 testCompatibleCreateOptions({collation: {locale: "ja"}});
 testCompatibleCreateOptions({writeConcern: {}}, false);
 testCompatibleCreateOptions({comment: ""}, false);

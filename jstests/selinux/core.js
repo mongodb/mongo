@@ -2,6 +2,27 @@
 import {getPython3Binary} from "jstests/libs/python.js";
 import {SelinuxBaseTest} from "jstests/selinux/lib/selinux_base_test.js";
 
+// Helper function to find all .js files recursively in a directory
+function findAllTests(dir, tests) {
+    const entries = ls(dir).sort();
+
+    for (let entry of entries) {
+        if (entry === "jstests/core/txns/" ||
+            entry === "jstests/core/query/queryable_encryption/" ||
+            entry === "jstests/core/query/query_settings/") {
+            // Skip exclude_files in buildscripts/resmokeconfig/suites/core.yml
+            continue;
+        }
+        if (entry.endsWith("/")) {
+            // Recursively gather tests in subdirectories
+            findAllTests(entry, tests);
+        } else if (entry.endsWith(".js")) {
+            // Add .js files to the list of tests
+            tests.push(entry);
+        }
+    }
+}
+
 export class TestDefinition extends SelinuxBaseTest {
     async run() {
         const python = getPython3Binary();
@@ -13,7 +34,8 @@ export class TestDefinition extends SelinuxBaseTest {
         for (let dir of dirs) {
             jsTest.log("Running tests in " + dir);
 
-            const all_tests = ls(dir).filter(d => d.endsWith(".js")).sort();
+            let all_tests = [];
+            findAllTests(dir, all_tests);
             assert(all_tests);
             assert(all_tests.length);
 
@@ -61,6 +83,6 @@ export class TestDefinition extends SelinuxBaseTest {
             }
         }
 
-        jsTest.log("code test suite ran successfully");
+        jsTest.log("core test suite ran successfully");
     }
 }

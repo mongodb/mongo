@@ -9,6 +9,8 @@
 //   # When the config fuzzer changes 'internalQueryFindCommandBatchSize' to a value < 3,
 //   # 'cursor.firstBatch' is too small for the limit.
 //   does_not_support_config_fuzzer,
+//   # TestData.setParameters is undefined when run from selinux/core.js
+//   no_selinux,
 // ]
 
 let t = db.jstests_sortk;
