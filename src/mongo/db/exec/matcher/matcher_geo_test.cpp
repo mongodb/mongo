@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,19 +29,15 @@
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/matcher/matcher.h"
+#include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/intrusive_counter.h"
-#include "mongo/util/time_support.h"
 
-namespace mongo {
+namespace mongo::evaluate_matcher_geo_test {
 
 class InternalBucketGeoWithinExpression : public mongo::unittest::Test {
 public:
@@ -274,4 +270,36 @@ TEST_F(InternalBucketGeoWithinExpression, BucketContainsNonPointTypeLegacy) {
 
     ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
 }
-}  // namespace mongo
+
+TEST(ExpressionGeoTest, Geo1) {
+    BSONObj query = fromjson("{loc:{$within:{$box:[{x: 4, y:4},[6,6]]}}}");
+
+    std::unique_ptr<GeoExpression> gq(new GeoExpression);
+    ASSERT_OK(gq->parseFrom(query["loc"].Obj()));
+
+    GeoMatchExpression ge("a"_sd, gq.release(), query);
+
+    ASSERT(!exec::matcher::matchesBSON(&ge, fromjson("{a: [3,4]}")));
+    ASSERT(exec::matcher::matchesBSON(&ge, fromjson("{a: [4,4]}")));
+    ASSERT(exec::matcher::matchesBSON(&ge, fromjson("{a: [5,5]}")));
+    ASSERT(exec::matcher::matchesBSON(&ge, fromjson("{a: [5,5.1]}")));
+    ASSERT(exec::matcher::matchesBSON(&ge, fromjson("{a: {x: 5, y:5.1}}")));
+}
+
+TEST(MatchExpressionParserGeo, WithinBox) {
+    BSONObj query = fromjson("{a:{$within:{$box:[{x: 4, y:4},[6,6]]}}}");
+
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(
+        query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::kAllowAllSpecialFeatures);
+    ASSERT_TRUE(result.isOK());
+
+    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: [3,4]}")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: [4,4]}")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: [5,5]}")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: [5,5.1]}")));
+    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: {x: 5, y:5.1}}")));
+}
+
+
+}  // namespace mongo::evaluate_matcher_geo_test

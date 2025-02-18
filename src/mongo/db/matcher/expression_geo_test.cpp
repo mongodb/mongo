@@ -35,27 +35,11 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/unittest/unittest.h"
 
 
 namespace mongo {
-
-TEST(ExpressionGeoTest, Geo1) {
-    BSONObj query = fromjson("{loc:{$within:{$box:[{x: 4, y:4},[6,6]]}}}");
-
-    std::unique_ptr<GeoExpression> gq(new GeoExpression);
-    ASSERT_OK(gq->parseFrom(query["loc"].Obj()));
-
-    GeoMatchExpression ge("a"_sd, gq.release(), query);
-
-    ASSERT(!exec::matcher::matchesBSON(&ge, fromjson("{a: [3,4]}")));
-    ASSERT(exec::matcher::matchesBSON(&ge, fromjson("{a: [4,4]}")));
-    ASSERT(exec::matcher::matchesBSON(&ge, fromjson("{a: [5,5]}")));
-    ASSERT(exec::matcher::matchesBSON(&ge, fromjson("{a: [5,5.1]}")));
-    ASSERT(exec::matcher::matchesBSON(&ge, fromjson("{a: {x: 5, y:5.1}}")));
-}
 
 TEST(ExpressionGeoTest, GeoNear1) {
     BSONObj query = fromjson(

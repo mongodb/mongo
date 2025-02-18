@@ -43,7 +43,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/matcher/expression_leaf.h"
@@ -58,8 +57,6 @@
 
 namespace mongo {
 namespace {
-
-const double kNaN = std::numeric_limits<double>::quiet_NaN();
 
 TEST(InternalExprEqMatchExpression, NodesWithDifferentCollationsAreNotEquivalent) {
     auto operand = BSON("a" << 5);
@@ -129,160 +126,6 @@ TEST(InternalExprEqMatchExpression, EquivalentNodesAreEquivalent) {
                                       operand.firstElement());
     eq2.setCollator(&collator2);
     ASSERT_TRUE(eq1.equivalent(&eq2));
-}
-
-TEST(InternalExprEqMatchExpression, CorrectlyMatchesScalarElements) {
-    BSONObj operand1 = BSON("a" << 5);
-
-    InternalExprEqMatchExpression eq1(operand1.firstElement().fieldNameStringData(),
-                                      operand1.firstElement());
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq1, BSON("a" << 5.0)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&eq1, BSON("a" << 6)));
-
-    BSONObj operand2 = BSON("a"
-                            << "str");
-    InternalExprEqMatchExpression eq2(operand2.firstElement().fieldNameStringData(),
-                                      operand2.firstElement());
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq2,
-                                           BSON("a"
-                                                << "str")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&eq2,
-                                            BSON("a"
-                                                 << "string")));
-}
-
-TEST(InternalExprEqMatchExpression, StringMatchingRespectsCollation) {
-    BSONObj operand = BSON("a"
-                           << "string");
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    InternalExprEqMatchExpression eq(operand.firstElement().fieldNameStringData(),
-                                     operand.firstElement());
-    eq.setCollator(&collator);
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq,
-                                           BSON("a"
-                                                << "string2")));
-}
-
-TEST(InternalExprEqMatchExpression, ComparisonRespectsNewCollationAfterCallingSetCollator) {
-    BSONObj operand = BSON("a"
-                           << "string1");
-
-    CollatorInterfaceMock collatorAlwaysEqual(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    CollatorInterfaceMock collatorCompareLower(CollatorInterfaceMock::MockType::kToLowerString);
-
-    InternalExprEqMatchExpression eq(operand.firstElement().fieldNameStringData(),
-                                     operand.firstElement());
-    eq.setCollator(&collatorAlwaysEqual);
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq,
-                                           BSON("a"
-                                                << "string2")));
-
-
-    eq.setCollator(&collatorCompareLower);
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq,
-                                           BSON("a"
-                                                << "string1")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq,
-                                           BSON("a"
-                                                << "STRING1")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&eq,
-                                            BSON("a"
-                                                 << "string2")));
-}
-
-TEST(InternalExprEqMatchExpression, CorrectlyMatchesArrayElement) {
-    BSONObj operand = BSON("a.b" << 5);
-
-    InternalExprEqMatchExpression eq(operand.firstElement().fieldNameStringData(),
-                                     operand.firstElement());
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON("b" << 5))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON("b" << 6))));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY("b" << 5))));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY("b" << BSON_ARRAY(5)))));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(5 << "b"))));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY("b" << 5 << 5))));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY("b" << 6))));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(BSON("b" << 6)))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("a" << 1)));
-}
-
-TEST(InternalSchemaEqMatchExpression, DoesNotTraverseThroughAnArrayWithANumericalPathComponent) {
-    BSONObj operand = BSON("" << 5);
-    InternalExprEqMatchExpression eq("a.0.b"_sd, operand.firstElement());
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON("0" << BSON("b" << 5)))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON("0" << BSON("b" << 6)))));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(BSON("b" << 7)))));
-}
-
-TEST(InternalExprEqMatchExpression, CorrectlyMatchesNullElement) {
-    BSONObj operand = BSON("a" << BSONNULL);
-
-    InternalExprEqMatchExpression eq(operand.firstElement().fieldNameStringData(),
-                                     operand.firstElement());
-    // Expression equality to null should match literal null, but not missing or undefined.
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSONNULL)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSONObj()));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("a" << BSONUndefined)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("a" << 4)));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(1 << 2))));
-}
-
-TEST(InternalExprEqMatchExpression, CorrectlyMatchesNaN) {
-    BSONObj operand = BSON("x" << kNaN);
-
-    InternalExprEqMatchExpression eq(operand.firstElement().fieldNameStringData(),
-                                     operand.firstElement());
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("x" << kNaN)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("x" << 0)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSONObj()));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("x" << BSON_ARRAY(1))));
-}
-
-TEST(InternalExprEqMatchExpression, DoesNotTraverseLeafArrays) {
-    BSONObj operand = BSON("a" << 5);
-
-    InternalExprEqMatchExpression eq(operand.firstElement().fieldNameStringData(),
-                                     operand.firstElement());
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << 5.0)));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY("foo"))));
-}
-
-TEST(InternalExprEqMatchExpression, CorrectlyMatchesSubfieldAlongDottedPath) {
-    BSONObj operand = BSON("x.y.z" << 5);
-
-    InternalExprEqMatchExpression eq(operand.firstElement().fieldNameStringData(),
-                                     operand.firstElement());
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("x" << BSON("y" << BSON("z" << 5)))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("x" << BSON("y" << BSON("z" << 4)))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("x" << BSON("y" << 5))));
-}
-
-TEST(InternalExprEqMatchExpression, AlwaysMatchesDocumentWithArrayAlongPath) {
-    BSONObj operand = BSON("x.y.z" << 5);
-
-    InternalExprEqMatchExpression eq(operand.firstElement().fieldNameStringData(),
-                                     operand.firstElement());
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("x" << BSON_ARRAY(6))));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("x" << BSON("y" << BSON_ARRAY(6)))));
-    ASSERT_TRUE(
-        exec::matcher::matchesBSON(&eq, BSON("x" << BSON_ARRAY(BSON("y" << BSON("z" << 6))))));
-    ASSERT_TRUE(
-        exec::matcher::matchesBSON(&eq, BSON("x" << BSON("y" << BSON_ARRAY(BSON("z" << 6))))));
-    ASSERT_TRUE(
-        exec::matcher::matchesBSON(&eq, BSON("x" << BSON("y" << BSON("z" << BSON_ARRAY(10))))));
-
-    ASSERT_FALSE(exec::matcher::matchesBSON(
-        &eq, BSON("x" << BSON("y" << BSON("z" << BSON("foo" << BSON_ARRAY(10)))))));
-}
-
-TEST(InternalExprEqMatchExpression, ConsidersFieldNameInObjectEquality) {
-    BSONObj operand = BSON("x" << BSON("a" << 1));
-
-    InternalExprEqMatchExpression eq(operand.firstElement().fieldNameStringData(),
-                                     operand.firstElement());
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("x" << BSON("a" << 1))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("x" << BSON("y" << 1))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("y" << BSON("a" << 1))));
 }
 
 TEST(InternalExprEqMatchExpression, SerializesCorrectly) {

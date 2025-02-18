@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/matcher/match_details.h"
+#include "mongo/db/exec/matcher/match_details.h"
 
 #include <sstream>
 

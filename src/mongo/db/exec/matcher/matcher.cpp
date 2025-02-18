@@ -151,7 +151,7 @@ bool matchesBSONObj(const InternalSchemaAllowedPropertiesMatchExpression* expr,
         for (auto&& constraint : expr->getPatternProperties()) {
             if (constraint.first.regex->matchView(property.fieldName())) {
                 checkOtherwise = false;
-                if (!constraint.second->matchesBSONElement(property)) {
+                if (!matchesBSONElement(constraint.second->getFilter(), property)) {
                     return false;
                 }
             }
@@ -163,7 +163,7 @@ bool matchesBSONObj(const InternalSchemaAllowedPropertiesMatchExpression* expr,
             checkOtherwise = false;
         }
 
-        if (checkOtherwise && !expr->getOtherwise()->matchesBSONElement(property)) {
+        if (checkOtherwise && !matchesBSONElement(expr->getOtherwise()->getFilter(), property)) {
             return false;
         }
     }

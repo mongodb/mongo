@@ -34,7 +34,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -45,21 +44,6 @@
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
-
-TEST(MatchExpressionParserGeo, WithinBox) {
-    BSONObj query = fromjson("{a:{$within:{$box:[{x: 4, y:4},[6,6]]}}}");
-
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(
-        query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::kAllowAllSpecialFeatures);
-    ASSERT_TRUE(result.isOK());
-
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: [3,4]}")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: [4,4]}")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: [5,5]}")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: [5,5.1]}")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: {x: 5, y:5.1}}")));
-}
 
 TEST(MatchExpressionParserGeoNear, ParseNear) {
     BSONObj query = fromjson(

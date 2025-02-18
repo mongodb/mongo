@@ -32,7 +32,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/util/assert_util.h"
 
@@ -45,13 +44,6 @@ Matcher::Matcher(const BSONObj& pattern,
     : _pattern(pattern) {
     _expression = uassertStatusOK(
         MatchExpressionParser::parse(pattern, expCtx, extensionsCallback, allowedFeatures));
-}
-
-bool Matcher::matches(const BSONObj& doc, MatchDetails* details) const {
-    if (!_expression)
-        return true;
-
-    return exec::matcher::matchesBSON(_expression.get(), doc, details);
 }
 
 }  // namespace mongo

@@ -47,7 +47,6 @@
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/json.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -59,30 +58,6 @@
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
-
-
-TEST(MatchExpressionParserTest, SimpleEQ1) {
-    BSONObj query = BSON("x" << 2);
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_TRUE(result.isOK());
-
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 2)));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 3)));
-}
-
-TEST(MatchExpressionParserTest, Multiple1) {
-    BSONObj query = BSON("x" << 5 << "y" << BSON("$gt" << 5 << "$lt" << 8));
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_TRUE(result.isOK());
-
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 5 << "y" << 7)));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 5 << "y" << 6)));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 6 << "y" << 7)));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 5 << "y" << 9)));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 5 << "y" << 4)));
-}
 
 TEST(MatchExpressionParserTest, MinDistanceWithoutNearFailsToParse) {
     BSONObj query = fromjson("{loc: {$minDistance: 10}}");
@@ -145,17 +120,6 @@ TEST(MatchExpressionParserTest, AlwaysFalseFailsToParseNonOneArguments) {
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
 }
 
-TEST(MatchExpressionParserTest, AlwaysFalseParsesIntegerArgument) {
-    auto query = BSON(AlwaysFalseMatchExpression::kName << 1);
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(expr.getStatus());
-
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: 1}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: 'blah'}")));
-}
-
 TEST(MatchExpressionParserTest, AlwaysTrueFailsToParseNonOneArguments) {
     auto queryIntArgument = BSON(AlwaysTrueMatchExpression::kName << 0);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -173,17 +137,6 @@ TEST(MatchExpressionParserTest, AlwaysTrueFailsToParseNonOneArguments) {
     auto queryFalseArgument = BSON(AlwaysTrueMatchExpression::kName << true);
     expr = MatchExpressionParser::parse(queryFalseArgument, expCtx);
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
-}
-
-TEST(MatchExpressionParserTest, AlwaysTrueParsesIntegerArgument) {
-    auto query = BSON(AlwaysTrueMatchExpression::kName << 1);
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(expr.getStatus());
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: 1}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: 'blah'}")));
 }
 
 TEST(MatchExpressionParserTest, TextFailsToParseWhenDisallowed) {
@@ -471,26 +424,6 @@ TEST(MatchExpressionParserTest, ExprFailsToParseWithinInternalSchemaObjectMatch)
             .getStatus());
 }
 
-TEST(MatchExpressionParserTest, InternalExprEqParsesCorrectly) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-
-    auto query = fromjson("{a: {$_internalExprEq: 'foo'}}");
-    auto statusWith = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(statusWith.getStatus());
-    ASSERT_TRUE(exec::matcher::matchesBSON(statusWith.getValue().get(), fromjson("{a: 'foo'}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(statusWith.getValue().get(), fromjson("{a: ['foo']}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(statusWith.getValue().get(), fromjson("{a: ['bar']}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(statusWith.getValue().get(), fromjson("{a: 'bar'}")));
-
-    query = fromjson("{'a.b': {$_internalExprEq: 5}}");
-    statusWith = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(statusWith.getStatus());
-    ASSERT_TRUE(exec::matcher::matchesBSON(statusWith.getValue().get(), fromjson("{a: {b: 5}}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(statusWith.getValue().get(), fromjson("{a: {b: [5]}}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(statusWith.getValue().get(), fromjson("{a: {b: [6]}}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(statusWith.getValue().get(), fromjson("{a: {b: 6}}")));
-}
-
 TEST(MatchExpressionParserTest, InternalExprEqComparisonToArrayDoesNotParse) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto query = fromjson("{'a.b': {$_internalExprEq: [5]}}");
@@ -516,43 +449,6 @@ TEST(MatchExpressionParserTest, SampleRateDesugarsToExprAndExpressionRandom) {
     BSONObj query = fromjson("{$sampleRate: 0.999999999999999999999}");
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
-}
-
-TEST(MatchExpressionParserTest, SampleRateMatchingBehaviorStats) {
-    // Test that the average number of sampled docs is within 10 standard deviations using the
-    // binomial distribution over k runs, 10 * sqrt(N * p * (1 - p) / k).
-    constexpr double p = 0.5;
-    constexpr int k = 1000;
-    constexpr int N = 3000;  // Simulated collection size.
-
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression expr = MatchExpressionParser::parse(BSON("$sampleRate" << p), expCtx);
-
-    // Average the number of docs sampled over k iterations.
-    int sum = 0;
-    for (int i = 0; i < k; i++) {
-        for (int j = 0; j < N; j++) {
-            if (exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << 1))) {
-                sum++;
-            }
-        }
-    }
-    const double avg = static_cast<double>(sum) / k;
-
-    const double mu = p * N;
-    const double err = 10.0 * std::sqrt(mu * (1 - p) / k);
-    ASSERT_TRUE(mu - err <= avg && mu + err >= avg);
-
-    // Test that $sampleRate args 0.0 and 1.0 return 0 and all hits, respectively.
-    expr = MatchExpressionParser::parse(BSON("$sampleRate" << 0.0), expCtx);
-    for (int j = 0; j < N; j++) {
-        ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << 1)));
-    }
-
-    expr = MatchExpressionParser::parse(BSON("$sampleRate" << 1.0), expCtx);
-    for (int j = 0; j < N; j++) {
-        ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << 1)));
-    }
 }
 
 TEST(MatchExpressionParserTest, SampleRateFailureCases) {
@@ -641,34 +537,6 @@ TEST(MatchExpressionParserTest, BitwiseOperators) {
     }
 }
 
-TEST(InternalBinDataSubTypeMatchExpressionTest, SubTypeParsesCorrectly) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataSubType" << BinDataType::bdtCustom));
-    auto statusWith = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(statusWith.getStatus());
-
-    uint8_t bytes[] = {0, 1, 2, 3, 4, 5};
-    BSONObj match = BSON("a" << BSONBinData(bytes, 5, BinDataType::bdtCustom));
-    BSONObj notMatch = BSON("a" << BSONBinData(bytes, 5, BinDataType::Function));
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(statusWith.getValue().get(), match));
-    ASSERT_FALSE(exec::matcher::matchesBSON(statusWith.getValue().get(), notMatch));
-}
-
-TEST(InternalBinDataSubTypeMatchExpressionTest, SubTypeWithFloatParsesCorrectly) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataSubType" << 5.0));
-    auto statusWith = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(statusWith.getStatus());
-
-    uint8_t bytes[] = {0, 1, 2, 3, 4, 5};
-    BSONObj match = BSON("a" << BSONBinData(bytes, 5, BinDataType::MD5Type));
-    BSONObj notMatch = BSON("a" << BSONBinData(bytes, 5, BinDataType::bdtCustom));
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(statusWith.getValue().get(), match));
-    ASSERT_FALSE(exec::matcher::matchesBSON(statusWith.getValue().get(), notMatch));
-}
-
 TEST(InternalBinDataSubTypeMatchExpressionTest, InvalidSubTypeDoesNotParse) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto query1 = BSON("a" << BSON("$_internalSchemaBinDataSubType"
@@ -689,89 +557,6 @@ TEST(InternalBinDataSubTypeMatchExpressionTest, InvalidNumericalSubTypeDoesNotPa
     auto statusWith2 = MatchExpressionParser::parse(query2, expCtx);
     ASSERT_NOT_OK(statusWith1.getStatus());
     ASSERT_NOT_OK(statusWith2.getStatus());
-}
-
-TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeMatchesSingleTypeAlias) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType"
-                                  << "string"));
-    auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
-
-    FleBlobHeader blob;
-    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
-    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
-
-    BSONObj matchingDoc = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
-                                                  sizeof(FleBlobHeader),
-                                                  BinDataType::Encrypt));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), matchingDoc));
-}
-
-TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeMatchesSingleType) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::String));
-    auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
-
-    FleBlobHeader blob;
-    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
-    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
-
-    BSONObj matchingDoc = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
-                                                  sizeof(FleBlobHeader),
-                                                  BinDataType::Encrypt));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), matchingDoc));
-}
-
-TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeMatchesOneOfTypesInArray) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType"
-                                  << BSON_ARRAY(BSONType::Date << BSONType::String)));
-    auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
-
-    FleBlobHeader blob;
-    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
-    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
-
-    BSONObj matchingDoc = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
-                                                  sizeof(FleBlobHeader),
-                                                  BinDataType::Encrypt));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), matchingDoc));
-}
-
-TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeDoesNotMatchSingleType) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::String));
-    auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
-
-    FleBlobHeader blob;
-    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
-    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::NumberInt;
-
-    BSONObj notMatchingDoc = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
-                                                     sizeof(FleBlobHeader),
-                                                     BinDataType::Encrypt));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.get(), notMatchingDoc));
-}
-
-TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeDoesNotMatchTypeArray) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType"
-                                  << BSON_ARRAY(BSONType::Date << BSONType::Bool)));
-    auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
-
-    FleBlobHeader blob;
-    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
-    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::NumberInt;
-
-    BSONObj notMatchingDoc = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
-                                                     sizeof(FleBlobHeader),
-                                                     BinDataType::Encrypt));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.get(), notMatchingDoc));
 }
 
 TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, InvalidArgumentDoesNotParse) {
@@ -812,65 +597,4 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, NonBsonTypeArgumentDoesNo
         ErrorCodes::BadValue);
 }
 
-TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, IntentToEncryptFleBlobDoesNotMatch) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::String));
-    auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
-
-    FleBlobHeader blob;
-    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kPlaceholder);
-    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
-    BSONObj notMatch = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
-                                               sizeof(FleBlobHeader),
-                                               BinDataType::Encrypt));
-
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.get(), notMatch));
-}
-
-TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, UnknownFleBlobTypeDoesNotMatch) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::String));
-    auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
-
-    FleBlobHeader blob;
-    blob.fleBlobSubtype = 6;
-    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
-    BSONObj notMatch = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
-                                               sizeof(FleBlobHeader),
-                                               BinDataType::Encrypt));
-    try {
-        exec::matcher::matchesBSON(expr.get(), notMatch);
-    } catch (...) {
-        ASSERT_EQ(exceptionToStatus().code(), 33118);
-    }
-}
-
-TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, EmptyFleBlobDoesNotMatch) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::String));
-    auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
-
-    BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Encrypt));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.get(), notMatch));
-}
-
-TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, NonEncryptBinDataSubTypeDoesNotMatch) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::String));
-    auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
-
-    BSONObj notMatch = BSON("a" << BSONBinData("\x69\xb7", 2, BinDataGeneral));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.get(), notMatch));
-}
-
-TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, NonBinDataValueDoesNotMatch) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::String));
-    auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
-
-    BSONObj notMatch = BSON("a" << BSONArray());
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.get(), notMatch));
-}
 }  // namespace mongo

@@ -35,7 +35,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/path.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
 

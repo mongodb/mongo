@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/matcher/match_details.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
@@ -39,6 +40,7 @@
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/expression_visitor.h"
+#include "mongo/db/matcher/matcher.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_eq.h"
@@ -433,6 +435,14 @@ inline bool matchesBSON(const MatchExpression* expr,
                         MatchDetails* details = nullptr) {
     BSONMatchableDocument mydoc(doc);
     return matches(expr, &mydoc, details);
+}
+
+inline bool matches(const Matcher* matcher, const BSONObj& doc, MatchDetails* details = nullptr) {
+    if (!matcher->getMatchExpression()) {
+        return true;
+    }
+
+    return matchesBSON(matcher->getMatchExpression(), doc, details);
 }
 
 /**

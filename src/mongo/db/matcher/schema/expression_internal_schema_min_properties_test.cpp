@@ -30,7 +30,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_properties.h"
 #include "mongo/unittest/death_test.h"
@@ -40,56 +39,6 @@
 namespace mongo {
 
 namespace {
-
-TEST(InternalSchemaMinPropertiesMatchExpression, RejectsObjectsWithTooFewElements) {
-    InternalSchemaMinPropertiesMatchExpression minProperties(2);
-
-    ASSERT_FALSE(exec::matcher::matchesBSON(&minProperties, BSONObj()));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&minProperties, BSON("b" << 21)));
-}
-
-
-TEST(InternalSchemaMinPropertiesMatchExpression, AcceptsObjectWithAtLeastMinElements) {
-    InternalSchemaMinPropertiesMatchExpression minProperties(2);
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(&minProperties, BSON("b" << 21 << "c" << BSONNULL)));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&minProperties, BSON("b" << 21 << "c" << 3)));
-    ASSERT_TRUE(
-        exec::matcher::matchesBSON(&minProperties, BSON("b" << 21 << "c" << 3 << "d" << 43)));
-}
-
-TEST(InternalSchemaMinPropertiesMatchExpression, MatchesSingleElementTest) {
-    InternalSchemaMinPropertiesMatchExpression minProperties(2);
-
-    // Only BSON elements that are embedded objects can match.
-    BSONObj match = BSON("a" << BSON("a" << 5 << "b" << 10));
-    BSONObj notMatch1 = BSON("a" << 1);
-    BSONObj notMatch2 = BSON("a" << BSON("b" << 10));
-
-    ASSERT_TRUE(exec::matcher::matchesSingleElement(&minProperties, match.firstElement()));
-    ASSERT_FALSE(exec::matcher::matchesSingleElement(&minProperties, notMatch1.firstElement()));
-    ASSERT_FALSE(exec::matcher::matchesSingleElement(&minProperties, notMatch2.firstElement()));
-}
-
-TEST(InternalSchemaMinPropertiesMatchExpression, MinPropertiesZeroAllowsEmptyObjects) {
-    InternalSchemaMinPropertiesMatchExpression minProperties(0);
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(&minProperties, BSONObj()));
-}
-
-TEST(InternalSchemaMinPropertiesMatchExpression, NestedObjectsAreNotUnwound) {
-    InternalSchemaMinPropertiesMatchExpression minProperties(2);
-
-    ASSERT_FALSE(
-        exec::matcher::matchesBSON(&minProperties, BSON("b" << BSON("c" << 2 << "d" << 3))));
-}
-
-TEST(InternalSchemaMinPropertiesMatchExpression, NestedArraysAreNotUnwound) {
-    InternalSchemaMinPropertiesMatchExpression minProperties(2);
-
-    ASSERT_FALSE(exec::matcher::matchesBSON(&minProperties,
-                                            BSON("a" << (BSON("b" << 2 << "c" << 3 << "d" << 4)))));
-}
 
 TEST(InternalSchemaMinPropertiesMatchExpression, EquivalentFunctionIsAccurate) {
     InternalSchemaMinPropertiesMatchExpression minProperties1(1);

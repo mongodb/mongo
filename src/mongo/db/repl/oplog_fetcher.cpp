@@ -51,6 +51,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_find_and_modify_image_lookup.h"
@@ -810,7 +811,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
                     }
 
                     for (const auto& obj : objToBeMatched) {
-                        if (m.matches(obj)) {
+                        if (exec::matcher::matches(&m, obj)) {
                             LOGV2(9918500,
                                   "stopReplProducerOnDocument matched a document.",
                                   "doc"_attr = doc,
@@ -883,7 +884,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
             auto opCtx = cc().makeOperationContext();
             auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(_nss).build();
             Matcher m(_config.queryFilter, expCtx);
-            if (!m.matches(*firstDocToApply))
+            if (!exec::matcher::matches(&m, *firstDocToApply))
                 firstDocToApply++;
         }
     }

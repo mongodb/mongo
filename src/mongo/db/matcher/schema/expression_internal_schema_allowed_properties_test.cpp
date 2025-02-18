@@ -31,7 +31,6 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -41,73 +40,6 @@
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
-
-TEST(InternalSchemaAllowedPropertiesMatchExpression, MatchesObjectsWithListedProperties) {
-    auto filter = fromjson(
-        "{$_internalSchemaAllowedProperties: {properties: ['a', 'b'],"
-        "namePlaceholder: 'i', patternProperties: [], otherwise: {i: 0}}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(filter, expCtx);
-    ASSERT_OK(expr.getStatus());
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{a: 1, b: 1}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{a: 1}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{b: 1}")));
-}
-
-TEST(InternalSchemaAllowedPropertiesMatchExpression, MatchesObjectsWithMatchingPatternProperties) {
-    auto filter = fromjson(R"(
-        {$_internalSchemaAllowedProperties: {
-            properties: [],
-            namePlaceholder: 'i',
-            patternProperties: [
-                {regex: /s$/, expression: {i: {$gt: 0}}},
-                {regex: /[nN]um/, expression: {i: {$type: 'number'}}}
-            ],
-            otherwise: {i: {$type: 'string'}}
-        }})");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(filter, expCtx);
-    ASSERT_OK(expr.getStatus());
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(),
-                                           fromjson("{puppies: 2, kittens: 3, phoneNum: 1234}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{puppies: 2}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{phoneNum: 1234}")));
-}
-
-TEST(InternalSchemaAllowedPropertiesMatchExpression,
-     PatternPropertiesStillEnforcedEvenIfFieldListedInProperties) {
-    auto filter = fromjson(
-        "{$_internalSchemaAllowedProperties: {properties: ['a'], namePlaceholder: 'a',"
-        "patternProperties: [{regex: /a/, expression: {a: {$gt: 5}}}], otherwise: {a: 0}}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(filter, expCtx);
-    ASSERT_OK(expr.getStatus());
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{a: 6}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{a: 5}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{a: 4}")));
-}
-
-TEST(InternalSchemaAllowedPropertiesMatchExpression, OtherwiseEnforcedWhenAppropriate) {
-    auto filter = fromjson(R"(
-        {$_internalSchemaAllowedProperties: {
-            properties: [],
-            namePlaceholder: 'i',
-            patternProperties: [
-                {regex: /s$/, expression: {i: {$gt: 0}}},
-                {regex: /[nN]um/, expression: {i: {$type: 'number'}}}
-            ],
-            otherwise: {i: {$type: 'string'}}
-        }})");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(filter, expCtx);
-    ASSERT_OK(expr.getStatus());
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{foo: 'bar'}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{foo: 7}")));
-}
 
 TEST(InternalSchemaAllowedPropertiesMatchExpression, EquivalentToClone) {
     auto filter = fromjson(

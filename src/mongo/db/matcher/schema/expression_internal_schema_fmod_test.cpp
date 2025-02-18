@@ -33,7 +33,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -41,68 +40,10 @@
 namespace mongo {
 namespace {
 
-TEST(InternalSchemaFmodMatchExpression, MatchesElement) {
-    BSONObj match = BSON("a" << 1);
-    BSONObj largerMatch = BSON("a" << 4.0);
-    BSONObj longLongMatch = BSON("a" << 68719476736LL);
-    BSONObj notMatch = BSON("a" << 6);
-    BSONObj negativeNotMatch = BSON("a" << -2);
-    InternalSchemaFmodMatchExpression fmod(""_sd, Decimal128(3), Decimal128(1));
-    ASSERT_TRUE(exec::matcher::matchesSingleElement(&fmod, match.firstElement()));
-    ASSERT_TRUE(exec::matcher::matchesSingleElement(&fmod, largerMatch.firstElement()));
-    ASSERT_TRUE(exec::matcher::matchesSingleElement(&fmod, longLongMatch.firstElement()));
-    ASSERT_FALSE(exec::matcher::matchesSingleElement(&fmod, notMatch.firstElement()));
-    ASSERT_FALSE(exec::matcher::matchesSingleElement(&fmod, negativeNotMatch.firstElement()));
-}
-
 TEST(InternalSchemaFmodMatchExpression, ZeroDivisor) {
     ASSERT_THROWS_CODE(InternalSchemaFmodMatchExpression(""_sd, Decimal128(0), Decimal128(1)),
                        AssertionException,
                        ErrorCodes::BadValue);
-}
-
-TEST(InternalSchemaFmodMatchExpression, MatchesScalar) {
-    InternalSchemaFmodMatchExpression fmod("a"_sd, Decimal128(5), Decimal128(2));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&fmod, BSON("a" << 7.0)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&fmod, BSON("a" << 4)));
-}
-
-TEST(InternalSchemaFmodMatchExpression, MatchesNonIntegralValue) {
-    InternalSchemaFmodMatchExpression fmod("a"_sd, Decimal128(10.5), Decimal128((4.5)));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&fmod, BSON("a" << 15.0)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&fmod, BSON("a" << 10.0)));
-}
-
-TEST(InternalSchemaFmodMatchExpression, MatchesArrayValue) {
-    InternalSchemaFmodMatchExpression fmod("a"_sd, Decimal128(5), Decimal128(2));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&fmod, BSON("a" << BSON_ARRAY(5 << 12LL))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&fmod, BSON("a" << BSON_ARRAY(6 << 8))));
-}
-
-TEST(InternalSchemaFmodMatchExpression, DoesNotMatchNull) {
-    InternalSchemaFmodMatchExpression fmod("a"_sd, Decimal128(5), Decimal128(2));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&fmod, BSONObj()));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&fmod, BSON("a" << BSONNULL)));
-}
-
-TEST(InternalSchemaFmodMatchExpression, NegativeRemainders) {
-    InternalSchemaFmodMatchExpression fmod("a"_sd, Decimal128(5), Decimal128(-2.4));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&fmod, BSON("a" << 7.6)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&fmod, BSON("a" << 12.4)));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&fmod, BSON("a" << Decimal128(-12.4))));
-}
-
-TEST(InternalSchemaFmodMatchExpression, ElemMatchKey) {
-    InternalSchemaFmodMatchExpression fmod("a"_sd, Decimal128(5), Decimal128(2));
-    MatchDetails details;
-    details.requestElemMatchKey();
-    ASSERT_FALSE(exec::matcher::matchesBSON(&fmod, BSON("a" << 4), &details));
-    ASSERT_FALSE(details.hasElemMatchKey());
-    ASSERT_TRUE(exec::matcher::matchesBSON(&fmod, BSON("a" << 2), &details));
-    ASSERT_FALSE(details.hasElemMatchKey());
-    ASSERT_TRUE(exec::matcher::matchesBSON(&fmod, BSON("a" << BSON_ARRAY(1 << 2 << 5)), &details));
-    ASSERT_TRUE(details.hasElemMatchKey());
-    ASSERT_EQUALS("1", details.elemMatchKey());
 }
 
 TEST(InternalSchemaFmodMatchExpression, Equality) {

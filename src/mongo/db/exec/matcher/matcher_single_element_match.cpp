@@ -503,7 +503,7 @@ BSONElement findFirstMismatchInArray(const InternalSchemaAllElemMatchFromIndexMa
     match_expression_util::advanceBy(expr->startIndex(), iter);
     while (iter.more()) {
         auto element = iter.next();
-        if (!expr->getExpression()->matchesBSONElement(element, details)) {
+        if (!matchesBSONElement(expr->getExpression()->getFilter(), element, details)) {
             return element;
         }
     }
@@ -537,7 +537,7 @@ void MatchesSingleElementEvaluator::visit(
             element = iterator.next();
         }
 
-        return expr->getExpression()->matchesBSONElement(element, details);
+        return matchesBSONElement(expr->getExpression()->getFilter(), element, details);
     };
     _result = arrayMatchesSingleElement(expr, _elem, _details, arrayMatchFunc);
 }

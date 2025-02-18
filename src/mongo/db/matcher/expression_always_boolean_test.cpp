@@ -30,7 +30,6 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -39,17 +38,6 @@ namespace mongo {
 
 namespace {
 
-TEST(AlwaysFalseMatchExpression, RejectsAllObjects) {
-    AlwaysFalseMatchExpression falseExpr;
-
-    ASSERT_FALSE(exec::matcher::matchesBSON(&falseExpr, BSON("a" << BSONObj())));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&falseExpr, BSON("a" << 1)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&falseExpr,
-                                            BSON("a"
-                                                 << "string")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&falseExpr, BSONObj()));
-}
-
 TEST(AlwaysFalseMatchExpression, EquivalentReturnsCorrectResults) {
     auto falseExpr = std::make_unique<AlwaysFalseMatchExpression>();
     ASSERT_TRUE(falseExpr->equivalent(falseExpr.get()));
@@ -57,17 +45,6 @@ TEST(AlwaysFalseMatchExpression, EquivalentReturnsCorrectResults) {
 
     AlwaysTrueMatchExpression trueExpr;
     ASSERT_FALSE(falseExpr->equivalent(&trueExpr));
-}
-
-TEST(AlwaysTrueMatchExpression, AcceptsAllObjects) {
-    AlwaysTrueMatchExpression trueExpr;
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(&trueExpr, BSON("a" << BSONObj())));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&trueExpr, BSON("a" << 1)));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&trueExpr,
-                                           BSON("a"
-                                                << "string")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&trueExpr, BSONObj()));
 }
 
 TEST(AlwaysTrueMatchExpression, EquivalentReturnsCorrectResults) {

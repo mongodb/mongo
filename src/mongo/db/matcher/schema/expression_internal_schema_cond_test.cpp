@@ -36,7 +36,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
@@ -68,75 +67,6 @@ std::unique_ptr<InternalSchemaCondMatchExpression> createCondMatchExpression(BSO
     auto cond = std::make_unique<InternalSchemaCondMatchExpression>(std::move(expressions));
 
     return cond;
-}
-
-TEST(InternalSchemaCondMatchExpressionTest, AcceptsObjectsThatMatch) {
-    auto conditionQuery = BSON("age" << BSON("$lt" << 18));
-    auto thenQuery = BSON("job"
-                          << "student");
-    auto elseQuery = BSON("job"
-                          << "engineer");
-    auto cond = createCondMatchExpression(conditionQuery, thenQuery, elseQuery);
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(cond.get(), fromjson("{age: 15, job: 'student'}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(cond.get(), fromjson("{age: 18, job: 'engineer'}")));
-    ASSERT_TRUE(
-        exec::matcher::matchesBSON(cond.get(), fromjson("{age: [10, 20, 30], job: 'student'}")));
-}
-
-TEST(InternalSchemaCondMatchExpressionTest, RejectsObjectsThatDontMatch) {
-    auto conditionQuery = BSON("age" << BSON("$lt" << 18));
-    auto thenQuery = BSON("job"
-                          << "student");
-    auto elseQuery = BSON("job"
-                          << "engineer");
-    auto cond = createCondMatchExpression(conditionQuery, thenQuery, elseQuery);
-
-    ASSERT_FALSE(exec::matcher::matchesBSON(cond.get(), fromjson("{age: 21, job: 'student'}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(cond.get(), fromjson("{age: 5, job: 'engineer'}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(cond.get(), fromjson("{age: 19}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(cond.get(), fromjson("{age: 'blah'}")));
-}
-
-TEST(InternalSchemaCondMatchExpressionTest, EmptyMatchAlwaysUsesThenBranch) {
-    auto conditionQuery = BSONObj();
-    auto thenQuery = BSON("value" << BSON("$gte" << 0));
-    auto elseQuery = BSON("value" << BSON("$lt" << 0));
-    auto cond = createCondMatchExpression(conditionQuery, thenQuery, elseQuery);
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(cond.get(), BSON("value" << 0)));
-    ASSERT_TRUE(exec::matcher::matchesBSON(cond.get(), BSON("value" << 2)));
-
-    BSONObj match = BSON("value" << 10);
-    ASSERT_TRUE(exec::matcher::matchesSingleElement(cond.get(), match.firstElement()));
-}
-
-TEST(InternalSchemaCondMatchExpressionTest, AppliesToSubobjectsViaObjectMatch) {
-    auto conditionQuery = fromjson("{team: {$in: ['server', 'engineering']}}");
-    auto thenQuery = BSON("subteam"
-                          << "query");
-    auto elseQuery = BSON("interests"
-                          << "query optimization");
-
-    InternalSchemaObjectMatchExpression objMatch(
-        "job"_sd, createCondMatchExpression(conditionQuery, thenQuery, elseQuery));
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(
-        &objMatch, fromjson("{name: 'anne', job: {team: 'engineering', subteam: 'query'}}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(
-        &objMatch, fromjson("{name: 'natalia', job: {team: 'server', subteam: 'query'}}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(
-        &objMatch,
-        fromjson("{name: 'nicholas', job: {interests: ['query optimization', 'c++']}}")));
-
-    ASSERT_FALSE(exec::matcher::matchesBSON(
-        &objMatch, fromjson("{name: 'dave', team: 'server', subteam: 'query'}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(
-        &objMatch, fromjson("{name: 'mateo', interests: ['perl', 'python']}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(
-        &objMatch, fromjson("{name: 'lucas', job: {team: 'competitor', subteam: 'query'}}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(
-        &objMatch, fromjson("{name: 'marcos', job: {team: 'server', subteam: 'repl'}}")));
 }
 
 TEST(InternalSchemaCondMatchExpressionTest, EquivalentReturnsCorrectResults) {

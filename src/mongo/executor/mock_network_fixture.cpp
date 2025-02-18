@@ -29,6 +29,7 @@
 
 
 #include "mongo/executor/mock_network_fixture.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -49,7 +50,7 @@ MockNetwork::Matcher::Matcher(const BSONObj& matcherQuery) {
     // Expression matcher doesn't have copy constructor, so wrap it in a shared_ptr for capture.
     auto m = std::make_shared<mongo::Matcher>(matcherQuery, std::move(expCtx));
     _matcherFunc = [=](const BSONObj& request) {
-        return m->matches(request);
+        return exec::matcher::matches(m.get(), request);
     };
 }
 

@@ -52,7 +52,6 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression_visitor.h"
-#include "mongo/db/matcher/match_details.h"
 #include "mongo/db/matcher/matchable.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/query/collation/collator_interface.h"

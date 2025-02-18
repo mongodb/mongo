@@ -38,7 +38,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_path.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/util/pcre.h"
@@ -99,10 +98,6 @@ bool ExpressionWithPlaceholder::equivalent(const ExpressionWithPlaceholder* othe
         return false;
     }
     return _placeholder == other->_placeholder && _filter->equivalent(other->_filter.get());
-}
-
-bool ExpressionWithPlaceholder::matchesBSONElement(BSONElement elem, MatchDetails* details) const {
-    return exec::matcher::matchesBSONElement(_filter.get(), elem, details);
 }
 
 // static

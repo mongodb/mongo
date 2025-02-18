@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/update/update_array_node.h"
 
 namespace mongo {
@@ -88,7 +89,7 @@ UpdateExecutor::ApplyResult UpdateArrayNode::apply(
             } else {
                 auto filter = _arrayFilters.find(update.first);
                 invariant(filter != _arrayFilters.end());
-                if (filter->second->matchesBSONElement(arrayElement)) {
+                if (exec::matcher::matchesBSONElement(filter->second->getFilter(), arrayElement)) {
                     matchingElements[i].push_back(update.second.get());
                 }
             }

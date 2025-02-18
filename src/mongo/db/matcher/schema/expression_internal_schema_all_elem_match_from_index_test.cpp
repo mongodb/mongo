@@ -35,7 +35,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -47,71 +46,6 @@
 namespace mongo {
 namespace {
 
-TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, MatchesEmptyQuery) {
-    auto query = fromjson("{a: {$_internalSchemaAllElemMatchFromIndex: [2, {}]}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(),
-                                           BSON("a" << BSON_ARRAY(1 << 2 << 3 << 4))));
-}
-
-TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, MatchesValidQueries) {
-    auto query = fromjson("{a: {$_internalSchemaAllElemMatchFromIndex: [2, {a: {$lt: 5}}]}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(),
-                                           BSON("a" << BSON_ARRAY(1 << 2 << 3 << 4))));
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(),
-                                           BSON("a" << BSON_ARRAY(1 << 2 << 3 << 4))));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(),
-                                           BSON("a" << BSON_ARRAY(10 << 2 << 3 << 4))));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(),
-                                           BSON("a" << BSON_ARRAY(10 << 20 << 3 << 4))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(),
-                                            BSON("a" << BSON_ARRAY(1 << 2 << 3 << 40))));
-}
-
-TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, RejectsNonArrayElements) {
-    auto query = fromjson("{a: {$_internalSchemaAllElemMatchFromIndex: [2, {a: {$lt: 5}}]}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(expr.getStatus());
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << BSON("a" << 1))));
-}
-
-TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, MatchesArraysWithLessElementsThanIndex) {
-    auto query = fromjson("{a: {$_internalSchemaAllElemMatchFromIndex: [2, {a: {$lt: 5}}]}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << BSON_ARRAY(1))));
-}
-
-TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, NestedArraysMatchSubexpression) {
-    auto query = fromjson("{a: {$_internalSchemaAllElemMatchFromIndex: [2, {a: {$lt: 5}}]}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(exec::matcher::matchesBSON(
-        expr.getValue().get(), BSON("a" << BSON_ARRAY(1 << 2 << BSON_ARRAY(3 << 4) << 4))));
-    ASSERT_TRUE(exec::matcher::matchesBSON(
-        expr.getValue().get(), BSON("a" << BSON_ARRAY(1 << 2 << BSON_ARRAY(6 << 4) << 4))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(
-        expr.getValue().get(), BSON("a" << BSON_ARRAY(1 << 2 << BSON_ARRAY(5 << 6) << 4))));
-}
-
-TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, MatchedQueriesWithDottedPaths) {
-    auto query = fromjson("{'a.b': {$_internalSchemaAllElemMatchFromIndex: [2, {a: {$lt: 5}}]}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(),
-                                           BSON("a" << BSON("b" << BSON_ARRAY(1 << 2 << 3 << 4)))));
-}
-
 TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, HasSingleChild) {
     auto query = fromjson("{'a.b': {$_internalSchemaAllElemMatchFromIndex: [2, {a: {$lt: 5}}]}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -120,23 +54,6 @@ TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, HasSingleChild) {
 
     ASSERT_EQ(objMatch.getValue()->numChildren(), 1U);
     ASSERT(objMatch.getValue()->getChild(0));
-}
-
-TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, FindsFirstMismatchInArray) {
-    auto query = fromjson("{a: {$_internalSchemaAllElemMatchFromIndex: [2, {a: {$lt: 5}}]}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(expr.getStatus());
-    auto elemMatchExpr = dynamic_cast<const InternalSchemaAllElemMatchFromIndexMatchExpression*>(
-        expr.getValue().get());
-    ASSERT(elemMatchExpr);
-    ASSERT_FALSE(exec::matcher::findFirstMismatchInArray(
-        elemMatchExpr, BSON("a" << BSON_ARRAY(1 << 2 << 3 << 4)), nullptr));
-    auto inputArray = BSON_ARRAY(1 << 2 << 3 << 3 << 6 << 7);
-    auto mismatchedElement =
-        exec::matcher::findFirstMismatchInArray(elemMatchExpr, inputArray, nullptr);
-    ASSERT_TRUE(mismatchedElement);
-    ASSERT_EQ(mismatchedElement.Int(), 6);
 }
 
 DEATH_TEST_REGEX(InternalSchemaAllElemMatchFromIndexMatchExpression,

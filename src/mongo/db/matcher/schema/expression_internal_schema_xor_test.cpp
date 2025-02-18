@@ -35,7 +35,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -47,82 +46,6 @@
 
 namespace mongo {
 namespace {
-
-
-TEST(InternalSchemaXorOp, MatchesNothingWhenHasNoClauses) {
-    InternalSchemaXorMatchExpression internalSchemaXorOp;
-    ASSERT_FALSE(exec::matcher::matchesBSON(&internalSchemaXorOp, BSONObj()));
-}
-
-TEST(InternalSchemaXorOp, MatchesSingleClause) {
-    BSONObj matchPredicate = fromjson("{$_internalSchemaXor: [{a: { $ne: 5 }}]}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(matchPredicate, expCtx);
-
-    ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << 4)));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << BSON_ARRAY(4 << 6))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << 5)));
-    ASSERT_FALSE(
-        exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << BSON_ARRAY(4 << 5))));
-}
-
-TEST(InternalSchemaXorOp, MatchesThreeClauses) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    BSONObj matchPredicate =
-        fromjson("{$_internalSchemaXor: [{a: { $gt: 10 }}, {a: { $lt: 0 }}, {b: 0}]}");
-
-    auto expr = MatchExpressionParser::parse(matchPredicate, expCtx);
-
-    ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << -1)));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << 11)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << 5)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("b" << 100)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("b" << 101)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), BSONObj()));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << 11 << "b" << 100)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << 11 << "b" << 0)));
-}
-
-TEST(InternalSchemaXorOp, MatchesSingleElement) {
-    BSONObj matchPredicate = fromjson("{$_internalSchemaXor: [{a: {$lt: 5 }}, {b: 10}]}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(matchPredicate, expCtx);
-
-    ASSERT_OK(expr.getStatus());
-    BSONObj match1 = BSON("a" << 4);
-    BSONObj match2 = BSON("b" << 10);
-    BSONObj noMatch1 = BSON("a" << 8);
-    BSONObj noMatch2 = BSON("c"
-                            << "x");
-
-    ASSERT_TRUE(exec::matcher::matchesSingleElement(expr.getValue().get(), match1.firstElement()));
-    ASSERT_TRUE(exec::matcher::matchesSingleElement(expr.getValue().get(), match2.firstElement()));
-    ASSERT_FALSE(
-        exec::matcher::matchesSingleElement(expr.getValue().get(), noMatch1.firstElement()));
-    ASSERT_FALSE(
-        exec::matcher::matchesSingleElement(expr.getValue().get(), noMatch2.firstElement()));
-}
-
-TEST(InternalSchemaXorOp, DoesNotUseElemMatchKey) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-
-    BSONObj matchPredicate = fromjson("{$_internalSchemaXor: [{a: 1}, {b: 2}]}");
-
-    auto expr = MatchExpressionParser::parse(matchPredicate, expCtx);
-    MatchDetails details;
-    details.requestElemMatchKey();
-    ASSERT_OK(expr.getStatus());
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), BSON("a" << 1), &details));
-    ASSERT_FALSE(details.hasElemMatchKey());
-    ASSERT_TRUE(exec::matcher::matchesBSON(
-        expr.getValue().get(), BSON("a" << BSON_ARRAY(1) << "b" << BSON_ARRAY(10)), &details));
-    ASSERT_FALSE(details.hasElemMatchKey());
-    ASSERT_FALSE(exec::matcher::matchesBSON(
-        expr.getValue().get(), BSON("a" << BSON_ARRAY(3) << "b" << BSON_ARRAY(4)), &details));
-    ASSERT_FALSE(details.hasElemMatchKey());
-}
 
 TEST(InternalSchemaXorOp, Equivalent) {
     BSONObj baseOperand1 = BSON("a" << 1);

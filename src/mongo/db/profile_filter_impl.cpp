@@ -39,6 +39,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -77,7 +78,7 @@ bool ProfileFilterImpl::matches(OperationContext* opCtx,
                                 const OpDebug& op,
                                 const CurOp& curop) const {
     try {
-        return _matcher.matches(_makeBSON({opCtx, op, curop}));
+        return exec::matcher::matches(&_matcher, _makeBSON({opCtx, op, curop}));
     } catch (const DBException& e) {
         LOGV2_DEBUG(4910202, 5, "Profile filter threw an exception", "exception"_attr = e);
         return false;

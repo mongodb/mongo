@@ -40,7 +40,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression_type.h"
@@ -54,111 +53,6 @@
 namespace mongo {
 
 namespace {
-
-TEST(MatchExpressionParserSchemaTest, MinItemsCorrectlyParsesIntegerArgument) {
-    BSONObj query = BSON("x" << BSON("$_internalSchemaMinItems" << 2));
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_TRUE(result.isOK());
-
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1))));
-    ASSERT(
-        exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2 << 3))));
-}
-
-TEST(MatchExpressionParserSchemaTest, MinItemsCorrectlyParsesLongArgument) {
-    BSONObj query = BSON("x" << BSON("$_internalSchemaMinItems" << 2LL));
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_TRUE(result.isOK());
-
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1))));
-    ASSERT(
-        exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2 << 3))));
-}
-
-TEST(MatchExpressionParserSchemaTest, MinItemsCorrectlyParsesDoubleArgumentAsInteger) {
-    BSONObj query = BSON("x" << BSON("$_internalSchemaMinItems" << 2.0));
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_TRUE(result.isOK());
-
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1))));
-    ASSERT(
-        exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2 << 3))));
-}
-
-TEST(MatchExpressionParserSchemaTest, MinItemsCorrectlyParsesDecimalArgumentAsInteger) {
-    BSONObj query = BSON("x" << BSON("$_internalSchemaMinItems" << Decimal128("2")));
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_TRUE(result.isOK());
-
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1))));
-    ASSERT(
-        exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2 << 3))));
-}
-
-TEST(MatchExpressionParserSchemaTest, MaxItemsCorrectlyParsesIntegerArgument) {
-    BSONObj query = BSON("x" << BSON("$_internalSchemaMaxItems" << 2));
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_TRUE(result.isOK());
-
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1))));
-    ASSERT(
-        !exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2 << 3))));
-}
-
-TEST(MatchExpressionParserSchemaTest, MaxItemsCorrectlyParsesLongArgument) {
-    BSONObj query = BSON("x" << BSON("$_internalSchemaMaxItems" << 2LL));
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_TRUE(result.isOK());
-
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1))));
-    ASSERT(
-        !exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2 << 3))));
-}
-
-
-TEST(MatchExpressionParserSchemaTest, MaxItemsCorrectlyParsesDoubleArgumentAsInteger) {
-    BSONObj query = BSON("x" << BSON("$_internalSchemaMaxItems" << 2.0));
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_TRUE(result.isOK());
-
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1))));
-    ASSERT(
-        !exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2 << 3))));
-}
-
-TEST(MatchExpressionParserSchemaTest, MaxItemsCorrectlyParsesDecimalArgumentAsInteger) {
-    BSONObj query = BSON("x" << BSON("$_internalSchemaMaxItems" << Decimal128("2")));
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_TRUE(result.isOK());
-
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << 1)));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2))));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1))));
-    ASSERT(
-        !exec::matcher::matchesBSON(result.getValue().get(), BSON("x" << BSON_ARRAY(1 << 2 << 3))));
-}
 
 TEST(MatchExpressionParserSchemaTest, UniqueItemsFailsToParseNonTrueArguments) {
     auto queryIntArgument = BSON("x" << BSON("$_internalSchemaUniqueItems" << 0));
@@ -180,24 +74,6 @@ TEST(MatchExpressionParserSchemaTest, UniqueItemsFailsToParseNonTrueArguments) {
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
 }
 
-TEST(MatchExpressionParserSchemaTest, UniqueItemsParsesTrueBooleanArgument) {
-    auto query = BSON("x" << BSON("$_internalSchemaUniqueItems" << true));
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(expr.getStatus());
-
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: 1}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: 'blah'}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: []}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: [0]}")));
-    ASSERT_TRUE(
-        exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: ['7', null, [], {}, 7]}")));
-    ASSERT_FALSE(
-        exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: ['dup', 'dup', 7]}")));
-    ASSERT_FALSE(
-        exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{x: [{x: 1}, {x: 1}]}")));
-}
-
 TEST(MatchExpressionParserSchemaTest, ObjectMatchOnlyAcceptsAnObjectArgument) {
     auto query = BSON("a" << BSON("$_internalSchemaObjectMatch" << 1));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -215,46 +91,6 @@ TEST(MatchExpressionParserSchemaTest, ObjectMatchOnlyAcceptsAnObjectArgument) {
     ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
 }
 
-TEST(MatchExpressionParserSchemaTest, ObjectMatchCorrectlyParsesObjects) {
-    auto query = fromjson(
-        "{a: {$_internalSchemaObjectMatch: {"
-        "    b: {$gte: 0}"
-        "    }}"
-        "}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_TRUE(result.isOK());
-
-    ASSERT_FALSE(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: 1}")));
-    ASSERT_FALSE(
-        exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: {b: 'string'}}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: {b: -1}}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: {b: 1}}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: [{b: 0}]}")));
-}
-
-TEST(MatchExpressionParserSchemaTest, ObjectMatchCorrectlyParsesNestedObjectMatch) {
-    auto query = fromjson(
-        "{a: {$_internalSchemaObjectMatch: {"
-        "    b: {$_internalSchemaObjectMatch: {"
-        "        $or: [{c: {$type: 'string'}}, {c: {$gt: 0}}]"
-        "    }}"
-        "}}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_TRUE(result.isOK());
-
-    ASSERT_FALSE(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: 1}")));
-    ASSERT_FALSE(
-        exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: {b: {c: {}}}}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: {b: {c: 0}}}")));
-    ASSERT_TRUE(
-        exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: {b: {c: 'string'}}}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: {b: {c: 1}}}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(
-        result.getValue().get(), fromjson("{a: [{b: 0}, {b: [{c: 0}, {c: 'string'}]}]}")));
-}
-
 TEST(MatchExpressionParserSchemaTest, ObjectMatchSubExprRejectsPathlessOperators) {
     auto query = fromjson(
         "{a: {$_internalSchemaObjectMatch: {"
@@ -263,77 +99,6 @@ TEST(MatchExpressionParserSchemaTest, ObjectMatchSubExprRejectsPathlessOperators
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
-}
-
-//
-// Tests for parsing the $_internalSchemaMinLength expression.
-//
-TEST(MatchExpressionParserSchemaTest, MinLengthCorrectlyParsesIntegerArgument) {
-    BSONObj query = BSON("x" << BSON("$_internalSchemaMinLength" << 2));
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(result.getStatus());
-
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x"
-                                            << "a")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "ab")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "abc")));
-}
-
-TEST(MatchExpressionParserSchemaTest, MinLengthCorrectlyParsesLongArgument) {
-    BSONObj query = BSON("x" << BSON("$_internalSchemaMinLength" << 2LL));
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(result.getStatus());
-
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x"
-                                            << "a")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "ab")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "abc")));
-}
-
-TEST(MatchExpressionParserSchemaTest, MinLengthCorrectlyParsesDoubleArgumentAsInteger) {
-    BSONObj query = BSON("x" << BSON("$_internalSchemaMinLength" << 2.0));
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(result.getStatus());
-
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x"
-                                            << "a")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "ab")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "abc")));
-}
-
-TEST(MatchExpressionParserSchemaTest, MinLengthCorrectlyParsesDecimalArgumentAsInteger) {
-    BSONObj query = BSON("x" << BSON("$_internalSchemaMinLength" << Decimal128("2")));
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(result.getStatus());
-
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x"
-                                            << "a")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "ab")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "abc")));
 }
 
 TEST(MatchExpressionParserSchemaTest, MinLengthFailsToParseNonIntegerArguments) {
@@ -359,77 +124,6 @@ TEST(MatchExpressionParserSchemaTest, MinLengthFailsToParseNonIntegerArguments) 
     auto queryArrArgument = BSON("x" << BSON("$_internalSchemaMinLength" << BSON_ARRAY(1)));
     expr = MatchExpressionParser::parse(queryArrArgument, expCtx);
     ASSERT_NOT_OK(expr.getStatus());
-}
-
-//
-// Tests for parsing the $_internalSchemaMaxLength expression.
-//
-TEST(MatchExpressionParserSchemaTest, MaxLengthCorrectlyParsesIntegerArgument) {
-    BSONObj query = BSON("x" << BSON("$_internalSchemaMaxLength" << 2));
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(result.getStatus());
-
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "a")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "ab")));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x"
-                                            << "abc")));
-}
-
-TEST(MatchExpressionParserSchemaTest, MaxLengthCorrectlyParsesLongArgument) {
-    BSONObj query = BSON("x" << BSON("$_internalSchemaMaxLength" << 2LL));
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(result.getStatus());
-
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "a")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "ab")));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x"
-                                            << "abc")));
-}
-
-TEST(MatchExpressionParserSchemaTest, MaxLengthCorrectlyParsesDoubleArgumentAsInteger) {
-    BSONObj query = BSON("x" << BSON("$_internalSchemaMaxLength" << 2.0));
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(result.getStatus());
-
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "a")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "ab")));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x"
-                                            << "abc")));
-}
-
-TEST(MatchExpressionParserSchemaTest, MaxLengthorrectlyParsesDecimalArgumentAsInteger) {
-    BSONObj query = BSON("x" << BSON("$_internalSchemaMaxLength" << Decimal128("2")));
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(result.getStatus());
-
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "a")));
-    ASSERT(exec::matcher::matchesBSON(result.getValue().get(),
-                                      BSON("x"
-                                           << "ab")));
-    ASSERT(!exec::matcher::matchesBSON(result.getValue().get(),
-                                       BSON("x"
-                                            << "abc")));
 }
 
 TEST(MatchExpressionParserSchemaTest, MaxLengthFailsToParseNonIntegerArguments) {
@@ -488,23 +182,6 @@ TEST(MatchExpressionParserSchemaTest, CondFailsToParseIfNotExactlyThreeArguments
         "{used: false}]}");
     ASSERT_EQ(ErrorCodes::FailedToParse,
               MatchExpressionParser::parse(queryFourArguments, expCtx).getStatus());
-}
-
-TEST(MatchExpressionParserSchemaTest, CondParsesThreeMatchExpresssions) {
-    auto query = fromjson(
-        "{$_internalSchemaCond: [{climate: 'rainy'}, {clothing: 'jacket'}, {clothing: 'shirt'}]}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(expr.getStatus());
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(
-        expr.getValue().get(), fromjson("{climate: 'rainy', clothing: ['jacket', 'umbrella']}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(
-        expr.getValue().get(), fromjson("{climate: 'sunny', clothing: ['shirt', 'shorts']}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(expr.getValue().get(),
-                                            fromjson("{climate: 'rainy', clothing: ['poncho']}")));
-    ASSERT_FALSE(
-        exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{clothing: ['jacket']}")));
 }
 
 TEST(MatchExpressionParserSchemaTest, MatchArrayIndexFailsToParseNonObjectArguments) {
@@ -570,22 +247,6 @@ TEST(MatchExpressionParserSchemaTest, MatchArrayIndexFailsToParseIfExpressionNot
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::BadValue);
 }
 
-TEST(MatchExpressionParserSchemaTest, MatchArrayIndexParsesSuccessfully) {
-    auto query = fromjson(
-        "{foo: {$_internalSchemaMatchArrayIndex:"
-        "{index: 0, namePlaceholder: 'i', expression: {i: {$lt: 0}}}}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto matchArrayIndex = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(matchArrayIndex.getStatus());
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(matchArrayIndex.getValue().get(),
-                                           fromjson("{foo: [-1, 0, 1]}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(matchArrayIndex.getValue().get(),
-                                            fromjson("{foo: [2, 'blah']}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(matchArrayIndex.getValue().get(),
-                                            fromjson("{foo: [{x: 'baz'}]}")));
-}
-
 TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, FailsToParseWithNegativeIndex) {
     BSONObj matchPredicate =
         fromjson("{a: {$_internalSchemaAllElemMatchFromIndex: [-2, {a: { $lt: 0 }}]}}");
@@ -614,18 +275,6 @@ TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, FailsToParseWithEmptyAr
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto expr = MatchExpressionParser::parse(matchPredicate, expCtx);
     ASSERT_EQ(expr.getStatus(), ErrorCodes::FailedToParse);
-}
-
-TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, ParsesCorreclyWithValidInput) {
-    auto query = fromjson("{a: {$_internalSchemaAllElemMatchFromIndex: [2, {a: { $lt: 4 }}]}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto expr = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(expr.getStatus());
-
-    ASSERT_TRUE(
-        exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{a: [5, 3, 3, 3, 3, 3]}")));
-    ASSERT_FALSE(
-        exec::matcher::matchesBSON(expr.getValue().get(), fromjson("{a: [3, 3, 3, 5, 3, 3]}")));
 }
 
 TEST(MatchExpressionParserSchemaTest, InternalTypeFailsToParseOnTypeMismatch) {
@@ -840,61 +489,6 @@ TEST(MatchExpressionParserSchemaTest, AllowedPropertiesFailsParsingIfOtherwiseNo
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::BadValue);
 }
 
-TEST(MatchExpressionParserSchemaTest, AllowedPropertiesParsesSuccessfully) {
-    auto query = fromjson(
-        "{$_internalSchemaAllowedProperties: {properties: ['phoneNumber', 'address'],"
-        "namePlaceholder: 'i', otherwise: {i: {$gt: 10}},"
-        "patternProperties: [{regex: /[nN]umber/, expression: {i: {$type: 'number'}}}]}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto allowedProperties = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(allowedProperties.getStatus());
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(allowedProperties.getValue().get(),
-                                           fromjson("{phoneNumber: 123, address: 'earth'}")));
-    ASSERT_TRUE(exec::matcher::matchesBSON(allowedProperties.getValue().get(),
-                                           fromjson("{phoneNumber: 3.14, workNumber: 456}")));
-
-    ASSERT_FALSE(exec::matcher::matchesBSON(allowedProperties.getValue().get(),
-                                            fromjson("{otherNumber: 'blah'}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(allowedProperties.getValue().get(),
-                                            fromjson("{phoneNumber: 'blah'}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(allowedProperties.getValue().get(),
-                                            fromjson("{other: 'blah'}")));
-}
-
-TEST(MatchExpressionParserSchemaTest, AllowedPropertiesAcceptsEmptyPropertiesAndPatternProperties) {
-    auto query = fromjson(
-        "{$_internalSchemaAllowedProperties:"
-        "{properties: [], namePlaceholder: 'i', patternProperties: [], otherwise: {i: 1}}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto allowedProperties = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(allowedProperties.getStatus());
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(allowedProperties.getValue().get(), BSONObj()));
-}
-
-TEST(MatchExpressionParserSchemaTest, AllowedPropertiesAcceptsEmptyOtherwiseExpression) {
-    auto query = fromjson(
-        "{$_internalSchemaAllowedProperties:"
-        "{properties: [], namePlaceholder: 'i', patternProperties: [], otherwise: {}}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto allowedProperties = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(allowedProperties.getStatus());
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(allowedProperties.getValue().get(), BSONObj()));
-}
-
-TEST(MatchExpressionParserSchemaTest, EqParsesSuccessfully) {
-    auto query = fromjson("{foo: {$_internalSchemaEq: 1}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto eqExpr = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(eqExpr.getStatus());
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(eqExpr.getValue().get(), fromjson("{foo: 1}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(eqExpr.getValue().get(), fromjson("{foo: [1]}")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(eqExpr.getValue().get(), fromjson("{not_foo: 1}")));
-}
-
 TEST(MatchExpressionParserSchemaTest, RootDocEqFailsToParseNonObjects) {
     auto query = fromjson("{$_internalSchemaRootDocEq: 1}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -919,15 +513,6 @@ TEST(MatchExpressionParserSchemaTest, RootDocEqMustApplyToTopLevelDocument) {
     query = fromjson("{a: {$elemMatch: {$_internalSchemaRootDocEq: 1}}}");
     rootDocEq = MatchExpressionParser::parse(query, expCtx);
     ASSERT_EQ(rootDocEq.getStatus(), ErrorCodes::FailedToParse);
-}
-
-TEST(MatchExpressionParserSchemaTest, RootDocEqParsesSuccessfully) {
-    auto query = fromjson("{$_internalSchemaRootDocEq: {}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto eqExpr = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(eqExpr.getStatus());
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(eqExpr.getValue().get(), fromjson("{}")));
 }
 
 }  // namespace
