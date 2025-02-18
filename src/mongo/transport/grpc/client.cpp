@@ -38,6 +38,7 @@
 #include <grpcpp/security/tls_certificate_verifier.h>
 #include <grpcpp/security/tls_credentials_options.h>
 #include <grpcpp/support/async_stream.h>
+#include <src/core/lib/security/security_connector/ssl_utils.h>
 
 #include <src/core/tsi/ssl_transport_security.h>
 #include <src/core/tsi/transport_security_interface.h>
@@ -713,20 +714,7 @@ private:
                     !sslGlobalParams.sslUseSystemCA);
                 caCert.emplace(ssl_util::readPEMFile(_options.tlsCAFile.get()).getValue());
             } else if (sslGlobalParams.sslUseSystemCA) {
-                // If sslUseSystemCA is specified, read the CA file path from the SSL_CERT_FILE env
-                // var.
-                StringData caPath;
-                if (char* env = getenv(kSSLCertFileEnvVar); env && *env) {
-                    caPath = env;
-                } else {
-                    uasserted(9985601,
-                              "tlsUseSystemCA enabled, but SSL_CERT_FILE has not been set in "
-                              "environment");
-                }
-                LOGV2(9985602,
-                      "tlsUseSystemCA enabled, using value from environment variable",
-                      "SSL_CERT_FILE"_attr = caPath);
-                caCert.emplace(ssl_util::readPEMFile(caPath).getValue());
+                caCert.emplace(grpc_core::DefaultSslRootStore::GetPemRootCerts());
             } else if (_options.tlsAllowInvalidCertificates) {
                 LOGV2_WARNING(9985603, "No tlsCAFile specified, and tlsUseSystemCA not specified");
             } else {
