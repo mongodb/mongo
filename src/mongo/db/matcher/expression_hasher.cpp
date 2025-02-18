@@ -119,9 +119,7 @@ public:
     MatchExpressionHashVisitor(H hashState, const MatchExpressionHashParams& hashParams)
         : _hashState(std::move(hashState)),
           _params(hashParams),
-          _hashValues(_params.hashValuesOrParams & HashValuesOrParams::kHashValues),
-          _hashParamIds(_params.hashValuesOrParams & HashValuesOrParams::kHashParamIds),
-          _hashTags(_params.hashValuesOrParams & HashValuesOrParams::kHashIndexTags) {}
+          _hashParamIds(_params.hashValuesOrParams & HashValuesOrParams::kHashParamIds) {}
 
     void visit(const BitsAllClearMatchExpression* expr) final {
         visitBitTest(expr);
@@ -155,14 +153,14 @@ public:
     void visit(const InMatchExpression* expr) final {
         // `equivalent()` function compares $in using values of type, path, hasNull, collator,
         // regexes, and equalities fields.
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         combine(expr->hasNull());
         hashCombineCollator(expr->getCollator());
 
         if (_hashParamIds && expr->getInputParamId()) {
             // There cannot be regexes when InMatchExpression is parameterized.
             combine(expr->getInputParamId().get());
-        } else if (_hashValues) {
+        } else {
             // Hash the size of equalities's list and up to a maximum of 'maxNumberOfHashedElements'
             // evenly chosen equalities.
             BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
@@ -188,25 +186,25 @@ public:
     }
 
     void visit(const ModMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
 
         if (_hashParamIds && expr->getDivisorInputParamId()) {
             // Either both parameter IDs are set, or neither are.
             combine(expr->getDivisorInputParamId().get(), expr->getRemainderInputParamId().get());
-        } else if (_hashValues) {
+        } else {
             // `equivalent()` function does not use DivisorInputParamId and RemainderInputParamId.
             combine(expr->getDivisor(), expr->getRemainder());
         }
     }
 
     void visit(const RegexMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
 
         if (_hashParamIds && expr->getSourceRegexInputParamId()) {
             // Either both parameter IDs are set, or neither are.
             combine(expr->getSourceRegexInputParamId().get(),
                     expr->getCompiledRegexInputParamId().get());
-        } else if (_hashValues) {
+        } else {
             // `equivalent()` function does not use SourceRegexInputParamId or
             // CompiledRegexInputParamId. `getString()` function returns value of regex field.
             combine(expr->getString());
@@ -216,11 +214,11 @@ public:
     }
 
     void visit(const SizeMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
 
         if (_hashParamIds && expr->getInputParamId()) {
             combine(expr->getInputParamId().get());
-        } else if (_hashValues) {
+        } else {
             // `equivalent()` function does not use InputParamId. `getData()` returns value of size
             // field.
             combine(expr->getData());
@@ -228,10 +226,10 @@ public:
     }
 
     void visit(const TypeMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         if (_hashParamIds && expr->getInputParamId()) {
             combine(expr->getInputParamId().get());
-        } else if (_hashValues) {
+        } else {
             // `equivalent()` function does not use InputParamId.
             combine(expr->typeSet());
         }
@@ -242,38 +240,38 @@ public:
     }
 
     void visit(const AlwaysFalseMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
     }
     void visit(const AlwaysTrueMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
     }
     void visit(const AndMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
     }
     void visit(const ElemMatchObjectMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
     }
     void visit(const ElemMatchValueMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
     }
     void visit(const ExistsMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
     }
     void visit(const ExprMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         hashCombineCollator(expr->getExpressionContext()->getCollator());
         combine(*expr->getExpression());
     }
     void visit(const GeoMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         combine(SimpleBSONObjComparator{}.hash(expr->_rawObj));
     }
     void visit(const GeoNearMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         combine(SimpleBSONObjComparator{}.hash(expr->_rawObj));
     }
     void visit(const InternalBucketGeoWithinMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         combine(SimpleBSONObjComparator{}.hash(expr->getGeoContainer().getGeoElement().Obj()),
                 expr->getField());
     }
@@ -293,11 +291,11 @@ public:
         visitComparison(expr);
     }
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         combine(expr->startIndex(), *expr->getExpression());
     }
     void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         combine(expr->getNamePlaceholder(), *expr->getOtherwise());
         for (const auto& prop : expr->getProperties()) {
             combine(prop);
@@ -307,80 +305,80 @@ public:
         }
     }
     void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
     }
     void visit(const InternalSchemaBinDataFLE2EncryptedTypeExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         combine(expr->typeSet());
     }
     void visit(const InternalSchemaBinDataSubTypeExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         combine(expr->getBinDataSubType());
     }
     void visit(const InternalSchemaCondMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
     }
     void visit(const InternalSchemaEqMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         combine(expr->getRhsElem());
     }
     void visit(const InternalSchemaFmodMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         combine(expr->getDivisor(), expr->getRemainder());
     }
     void visit(const InternalSchemaMatchArrayIndexMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         combine(expr->arrayIndex(), *expr->getExpression());
     }
     void visit(const InternalSchemaMaxItemsMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         combine(expr->getName(), expr->numItems());
     }
     void visit(const InternalSchemaMaxLengthMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         combine(expr->getName(), expr->strLen());
     }
     void visit(const InternalSchemaMaxPropertiesMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         combine(expr->numProperties(), expr->getName());
     }
     void visit(const InternalSchemaMinItemsMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         combine(expr->getName(), expr->numItems());
     }
     void visit(const InternalSchemaMinLengthMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         combine(expr->getName(), expr->strLen());
     }
     void visit(const InternalSchemaMinPropertiesMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         combine(expr->numProperties(), expr->getName());
     }
     void visit(const InternalSchemaObjectMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         combine(MatchExpressionHasher{}(expr->getChild(0)));
     }
     void visit(const InternalSchemaRootDocEqMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         combine(simpleHash(expr->getRhsObj()));
     }
     void visit(const InternalSchemaTypeExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
     }
     void visit(const InternalSchemaUniqueItemsMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
     }
     void visit(const InternalSchemaXorMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
     }
     void visit(const NorMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
     }
     void visit(const NotMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
     }
     void visit(const OrMatchExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
     }
     void visit(const TextMatchExpression* expr) final {
         visitText(expr);
@@ -389,7 +387,7 @@ public:
         visitText(expr);
     }
     void visit(const TwoDPtInAnnulusExpression* expr) final {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         auto annulus = expr->getAnnulus();
         combine(annulus.getInner(), annulus.getOuter(), annulus.center().x, annulus.center().y);
     }
@@ -405,12 +403,8 @@ public:
     }
 
 private:
-    void hashCombineCommonProperties(const MatchExpression* expr) {
+    void hashCombineTypeAndPath(const MatchExpression* expr) {
         combine(expr->matchType(), expr->path());
-
-        if (_hashTags && expr->getTag()) {
-            combine(*expr->getTag());
-        }
     }
 
     void hashCombineCollator(const CollatorInterface* ci) {
@@ -420,12 +414,12 @@ private:
     }
 
     void visitBitTest(const BitTestMatchExpression* expr) {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
 
         if (_hashParamIds && expr->getBitPositionsParamId()) {
             // Either both parameter IDs are set, or neither are.
             combine(expr->getBitPositionsParamId().get(), expr->getBitMaskParamId().get());
-        } else if (_hashValues) {
+        } else {
             // `equivalent()` function does not use the parameter IDs or BitMask.
             // `equivalent()` function compares sorted bitPositions.
             auto bitPositions = expr->getBitPositions();
@@ -435,11 +429,11 @@ private:
     }
 
     void visitComparison(const ComparisonMatchExpressionBase* expr) {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
 
         if (_hashParamIds && expr->getInputParamId()) {
             combine(expr->getInputParamId().get());
-        } else if (_hashValues) {
+        } else {
             // Please, keep BSONElementComparator consistent with
             // `ComparisonMatchExpressionBase::equivalent()`.
             const StringDataComparator* stringComparator = expr->getCollator();
@@ -452,15 +446,15 @@ private:
     }
 
     void visitText(const TextMatchExpressionBase* expr) {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         combine(expr->getFTSQuery());
     }
 
     void visitWhere(const WhereMatchExpressionBase* expr) {
-        hashCombineCommonProperties(expr);
+        hashCombineTypeAndPath(expr);
         if (_hashParamIds && expr->getInputParamId()) {
             combine(expr->getInputParamId().get());
-        } else if (_hashValues) {
+        } else {
             combine(expr->getCode());
         }
     }
@@ -473,9 +467,7 @@ private:
     H _hashState;
 
     const MatchExpressionHashParams& _params;
-    const bool _hashValues;
     const bool _hashParamIds;
-    const bool _hashTags;
 };
 
 /**

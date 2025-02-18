@@ -438,7 +438,7 @@ void CanonicalQuery::setCqPipeline(std::vector<boost::intrusive_ptr<DocumentSour
 }
 
 bool CanonicalQuery::shouldParameterizeSbe(MatchExpression* matchExpr) const {
-    if (_disablePlanCache || _isUncacheableSbe || !feature_flags::gFeatureFlagSbeFull.isEnabled() ||
+    if (_disablePlanCache || _isUncacheableSbe ||
         QueryPlannerCommon::hasNode(matchExpr, MatchExpression::TEXT)) {
         return false;
     }
