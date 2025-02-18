@@ -132,6 +132,16 @@ enum UserWriteBlockingLevel {
 };
 
 /**
+ * Deletes all documents in the given collection
+ */
+void deleteAllDocumentsInCollection(
+    OperationContext* opCtx,
+    RemoteCommandTargeter& targeter,
+    const NamespaceString& nss,
+    boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
+    std::shared_ptr<executor::TaskExecutor> executor);
+
+/**
  * Sets the user write blocking state on a given target
  *
  * @param opCtx: The operation context
@@ -153,16 +163,31 @@ void setUserWriteBlockingState(
     boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
     std::shared_ptr<executor::TaskExecutor> executor);
 
-std::vector<DatabaseName> getDBNamesListFromShard(OperationContext* opCtx,
-                                                  RemoteCommandTargeter& targeter,
-                                                  std::shared_ptr<executor::TaskExecutor> executor);
+/**
+ * Retrieves all the databaseName from the given replica set
+ */
+std::vector<DatabaseName> getDBNamesListFromReplicaSet(
+    OperationContext* opCtx,
+    RemoteCommandTargeter& targeter,
+    std::shared_ptr<executor::TaskExecutor> executor);
 
+/**
+ * Removes the replica set monitor of the given connection
+ */
 void removeReplicaSetMonitor(OperationContext* opCtx, const ConnectionString& connectionString);
 
-BSONObj greetShard(OperationContext* opCtx,
-                   RemoteCommandTargeter& targeter,
-                   std::shared_ptr<executor::TaskExecutor> executorForAddShard);
+/**
+ * Sends 'hello' to the given replica set, and gives back the answer
+ */
+BSONObj greetReplicaSet(OperationContext* opCtx,
+                        RemoteCommandTargeter& targeter,
+                        std::shared_ptr<executor::TaskExecutor> executorForAddShard);
 
+/**
+ * Validates that the specified endpoint can serve as a shard server. In particular, this
+ * this function checks that the shard can be contacted and that it is not already member of
+ * another sharded cluster.
+ */
 void validateHostAsShard(OperationContext* opCtx,
                          RemoteCommandTargeter& targeter,
                          const ConnectionString& connectionString,
@@ -192,6 +217,67 @@ std::unique_ptr<Fetcher> createFetcher(OperationContext* opCtx,
 std::string getRemoveShardMessage(const ShardDrainingStateEnum& status);
 
 /**
+ * Gets the cluster time keys on the given replica set and then saves them locally.
+ */
+void getClusterTimeKeysFromReplicaSet(OperationContext* opCtx,
+                                      RemoteCommandTargeter& targeter,
+                                      std::shared_ptr<executor::TaskExecutor> executor);
+
+/**
+ * Creates a valid name for the new shard
+ */
+std::string createShardName(OperationContext* opCtx,
+                            RemoteCommandTargeter& targeter,
+                            bool isConfigShard,
+                            const boost::optional<StringData>& proposedShardName,
+                            std::shared_ptr<executor::TaskExecutor> executor);
+/**
+ * Issues a command on the remote host to insert a shard identity document
+ */
+void createShardIdentity(
+    OperationContext* opCtx,
+    RemoteCommandTargeter& targeter,
+    const std::string& shardName,
+    boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
+    std::shared_ptr<executor::TaskExecutor> executor);
+
+/**
+ * Remove all existing cluster parameters set on the replica set.
+ */
+void removeAllClusterParametersFromReplicaSet(
+    OperationContext* opCtx,
+    RemoteCommandTargeter& targeter,
+    boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
+    std::shared_ptr<executor::TaskExecutor> executor);
+
+/**
+ * Remove all existing cluster parameters on the replica set and sets the ones stored on the config
+ * server.
+ */
+void setClusterParametersOnReplicaSet(
+    OperationContext* opCtx,
+    RemoteCommandTargeter& targeter,
+    const TenantIdMap<std::vector<BSONObj>>& allClusterParameters,
+    boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
+    std::shared_ptr<executor::TaskExecutor> executor);
+
+/**
+ * Gets the cluster parameters set on the shard and then saves them locally.
+ */
+TenantIdMap<std::vector<BSONObj>> getClusterParametersFromReplicaSet(
+    OperationContext* opCtx,
+    RemoteCommandTargeter& targeter,
+    std::shared_ptr<executor::TaskExecutor> executor);
+
+/**
+ * Given a vector of cluster parameters in disk format, sets them locally.
+ */
+void setClusterParametersLocally(OperationContext* opCtx,
+                                 const TenantIdMap<std::vector<BSONObj>>& parameters);
+
+TenantIdMap<std::vector<BSONObj>> getClusterParametersLocally(OperationContext* opCtx);
+
+/*
  * Runs a count with the given query against the localConfigShard. Returns the result of that count
  * and throws any error that occurs while running this command.
  */

@@ -50,10 +50,13 @@
 #include "mongo/db/catalog/drop_database.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/list_databases_for_all_tenants_gen.h"
+#include "mongo/db/commands/set_cluster_parameter_invocation.h"
 #include "mongo/db/commands/set_user_write_block_mode_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/keys_collection_util.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -68,8 +71,11 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/remove_shard_draining_progress_gen.h"
+#include "mongo/db/s/sharding_config_server_parameters_gen.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/topology_change_helpers.h"
 #include "mongo/db/server_parameter.h"
@@ -83,6 +89,7 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/idl/cluster_server_parameter_common.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata.h"
@@ -113,6 +120,11 @@ MONGO_FAIL_POINT_DEFINE(skipBlockingDDLCoordinatorsDuringAddAndRemoveShard);
 MONGO_FAIL_POINT_DEFINE(hangAfterDroppingDatabaseInTransitionToDedicatedConfigServer);
 
 const Seconds kRemoteCommandTimeout{60};
+
+const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
+                                                WriteConcernOptions::SyncMode::UNSET,
+                                                WriteConcernOptions::kNoTimeout};
+
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 constexpr StringData kAddOrRemoveShardInProgressRecoveryDocumentId =
     "addOrRemoveShardInProgressRecovery"_sd;
@@ -627,73 +639,67 @@ Shard::CommandResponse runCommandForAddShard(OperationContext* opCtx,
                                   std::move(writeConcernStatus));
 }
 
-void deleteUserWriteCriticalSections(
+void deleteAllDocumentsInCollection(
     OperationContext* opCtx,
     RemoteCommandTargeter& targeter,
+    const NamespaceString& nss,
     boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
     std::shared_ptr<executor::TaskExecutor> executor) {
-    // Delete all the config.user_writes_critical_sections documents from the new shard.
-    {
-        // We need to fetch manually rather than using Shard::runExhaustiveCursorCommand because
-        // ShardRemote uses the FixedTaskExecutor which checks that the host being targeted is a
-        // fully added shard already
-        auto fetcherStatus = Status::OK();
-        std::vector<BSONObj> userWriteCritSectionDocs;
-        auto fetcher = topology_change_helpers::createFetcher(
-            opCtx,
-            targeter,
-            NamespaceString::kUserWritesCriticalSectionsNamespace,
-            repl::ReadConcernLevel::kMajorityReadConcern,
-            [&](const std::vector<BSONObj>& docs) -> bool {
-                for (const BSONObj& doc : docs) {
-                    userWriteCritSectionDocs.emplace_back(doc.getOwned());
-                }
-                return true;
-            },
-            [&](const Status& status) { fetcherStatus = status; },
-            executor);
-        uassertStatusOK(fetcher->schedule());
-        uassertStatusOK(fetcher->join(opCtx));
-        uassertStatusOK(fetcherStatus);
-
-        const auto sendDelete = [&](std::vector<mongo::write_ops::DeleteOpEntry>&& deleteOps) {
-            if (deleteOps.empty()) {
-                return;
+    // We need to fetch manually rather than using Shard::runExhaustiveCursorCommand because
+    // ShardRemote uses the FixedTaskExecutor which checks that the host being targeted is a
+    // fully added shard already
+    auto fetcherStatus =
+        Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
+    std::vector<BSONObj> docsToDelete;
+    auto fetcher = topology_change_helpers::createFetcher(
+        opCtx,
+        targeter,
+        nss,
+        repl::ReadConcernLevel::kMajorityReadConcern,
+        [&](const std::vector<BSONObj>& docs) -> bool {
+            for (const BSONObj& doc : docs) {
+                docsToDelete.emplace_back(doc.getOwned());
             }
-            write_ops::DeleteCommandRequest deleteOp(
-                NamespaceString::kUserWritesCriticalSectionsNamespace);
-            deleteOp.setDeletes(deleteOps);
-            generic_argument_util::setMajorityWriteConcern(deleteOp);
-            if (osiGenerator) {
-                auto const osi = (*osiGenerator)(opCtx);
-                generic_argument_util::setOperationSessionInfo(deleteOp, osi);
-            }
+            return true;
+        },
+        [&](const Status& status) { fetcherStatus = status; },
+        executor);
+    uassertStatusOK(fetcher->schedule());
+    uassertStatusOK(fetcher->join(opCtx));
+    uassertStatusOK(fetcherStatus);
 
-            const auto commandResponse = runCommandForAddShard(
-                opCtx,
-                targeter,
-                NamespaceString::kUserWritesCriticalSectionsNamespace.dbName(),
-                deleteOp.toBSON(),
-                executor);
-            uassertStatusOK(getStatusFromWriteCommandReply(commandResponse.response));
-        };
-
-        std::vector<mongo::write_ops::DeleteOpEntry> deleteOps;
-        deleteOps.reserve(write_ops::kMaxWriteBatchSize);
-        for (auto& element : userWriteCritSectionDocs) {
-            write_ops::DeleteOpEntry entry;
-            entry.setQ(std::move(element));
-            entry.setMulti(false);
-            deleteOps.emplace_back(std::move(entry));
-
-            if (deleteOps.size() == write_ops::kMaxWriteBatchSize) {
-                sendDelete(std::move(deleteOps));
-                deleteOps = std::vector<mongo::write_ops::DeleteOpEntry>();
-                deleteOps.reserve(write_ops::kMaxWriteBatchSize);
-            }
+    const auto sendDelete = [&](std::vector<mongo::write_ops::DeleteOpEntry>&& deleteOps) {
+        if (deleteOps.empty()) {
+            return;
         }
-        sendDelete(std::move(deleteOps));
+        write_ops::DeleteCommandRequest deleteOp(nss);
+        deleteOp.setDeletes(deleteOps);
+        generic_argument_util::setMajorityWriteConcern(deleteOp);
+        if (osiGenerator) {
+            auto const osi = (*osiGenerator)(opCtx);
+            generic_argument_util::setOperationSessionInfo(deleteOp, osi);
+        }
+
+        const auto commandResponse =
+            runCommandForAddShard(opCtx, targeter, nss.dbName(), deleteOp.toBSON(), executor);
+        uassertStatusOK(getStatusFromWriteCommandReply(commandResponse.response));
+    };
+
+    std::vector<mongo::write_ops::DeleteOpEntry> deleteOps;
+    deleteOps.reserve(write_ops::kMaxWriteBatchSize);
+    for (auto& element : docsToDelete) {
+        write_ops::DeleteOpEntry entry;
+        entry.setQ(std::move(element));
+        entry.setMulti(false);
+        deleteOps.emplace_back(std::move(entry));
+
+        if (deleteOps.size() == write_ops::kMaxWriteBatchSize) {
+            sendDelete(std::move(deleteOps));
+            deleteOps = std::vector<mongo::write_ops::DeleteOpEntry>();
+            deleteOps.reserve(write_ops::kMaxWriteBatchSize);
+        }
     }
+    sendDelete(std::move(deleteOps));
 }
 
 void setUserWriteBlockingState(
@@ -704,7 +710,11 @@ void setUserWriteBlockingState(
     boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
     std::shared_ptr<executor::TaskExecutor> executor) {
 
-    deleteUserWriteCriticalSections(opCtx, targeter, osiGenerator, executor);
+    deleteAllDocumentsInCollection(opCtx,
+                                   targeter,
+                                   NamespaceString::kUserWritesCriticalSectionsNamespace,
+                                   osiGenerator,
+                                   executor);
 
     const auto makeShardsvrSetUserWriteBlockModeCommand =
         [block, &osiGenerator](OperationContext* opCtx,
@@ -743,7 +753,7 @@ void setUserWriteBlockingState(
     }
 }
 
-std::vector<DatabaseName> getDBNamesListFromShard(
+std::vector<DatabaseName> getDBNamesListFromReplicaSet(
     OperationContext* opCtx,
     RemoteCommandTargeter& targeter,
     std::shared_ptr<executor::TaskExecutor> executor) {
@@ -786,9 +796,9 @@ void removeReplicaSetMonitor(OperationContext* opCtx, const ConnectionString& co
     }
 }
 
-BSONObj greetShard(OperationContext* opCtx,
-                   RemoteCommandTargeter& targeter,
-                   std::shared_ptr<executor::TaskExecutor> executor) {
+BSONObj greetReplicaSet(OperationContext* opCtx,
+                        RemoteCommandTargeter& targeter,
+                        std::shared_ptr<executor::TaskExecutor> executor) {
 
     boost::optional<Shard::CommandResponse> commandResponse;
     try {
@@ -814,7 +824,7 @@ void validateHostAsShard(OperationContext* opCtx,
                          const ConnectionString& connectionString,
                          bool isConfigShard,
                          std::shared_ptr<executor::TaskExecutor> executor) {
-    auto resHello = greetShard(opCtx, targeter, executor);
+    auto resHello = greetReplicaSet(opCtx, targeter, executor);
 
     // Fail if the node being added is a mongos.
     const std::string msg = resHello.getStringField("msg").toString();
@@ -1032,6 +1042,247 @@ std::string getRemoveShardMessage(const ShardDrainingStateEnum& status) {
         default:
             MONGO_UNREACHABLE;
     }
+}
+
+void getClusterTimeKeysFromReplicaSet(OperationContext* opCtx,
+                                      RemoteCommandTargeter& targeter,
+                                      std::shared_ptr<executor::TaskExecutor> executor) {
+    auto fetchStatus =
+        Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
+    std::vector<ExternalKeysCollectionDocument> keyDocs;
+
+    auto expireAt = opCtx->getServiceContext()->getFastClockSource()->now() +
+        Seconds(gNewShardExistingClusterTimeKeysExpirationSecs.load());
+    auto fetcher = topology_change_helpers::createFetcher(
+        opCtx,
+        targeter,
+        NamespaceString::kKeysCollectionNamespace,
+        repl::ReadConcernLevel::kLocalReadConcern,
+        [&](const std::vector<BSONObj>& docs) -> bool {
+            for (const BSONObj& doc : docs) {
+                keyDocs.push_back(
+                    keys_collection_util::makeExternalClusterTimeKeyDoc(doc.getOwned(), expireAt));
+            }
+            return true;
+        },
+        [&](const Status& status) { fetchStatus = status; },
+        executor);
+
+    uassertStatusOK(fetcher->schedule());
+    uassertStatusOK(fetcher->join(opCtx));
+    uassertStatusOK(fetchStatus);
+
+    auto opTime = keys_collection_util::storeExternalClusterTimeKeyDocs(opCtx, std::move(keyDocs));
+    auto waitStatus = WaitForMajorityService::get(opCtx->getServiceContext())
+                          .waitUntilMajorityForWrite(opTime, opCtx->getCancellationToken())
+                          .getNoThrow();
+    uassertStatusOK(waitStatus);
+}
+
+std::string createShardName(OperationContext* opCtx,
+                            RemoteCommandTargeter& targeter,
+                            bool isConfigShard,
+                            const boost::optional<StringData>& proposedShardName,
+                            std::shared_ptr<executor::TaskExecutor> executor) {
+    std::string selectedName;
+
+    if (proposedShardName) {
+        selectedName = proposedShardName->toString();
+    } else {
+        auto greet = greetReplicaSet(opCtx, targeter, executor);
+        selectedName = greet["setName"].str();
+    }
+
+    if (!isConfigShard && selectedName == DatabaseName::kConfig.db(omitTenant)) {
+        uasserted(ErrorCodes::BadValue,
+                  "use of shard replica set with name 'config' is not allowed");
+    }
+
+    return selectedName;
+}
+
+void createShardIdentity(
+    OperationContext* opCtx,
+    RemoteCommandTargeter& targeter,
+    const std::string& shardName,
+    boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
+    std::shared_ptr<executor::TaskExecutor> executor) {
+    ShardsvrAddShard addShardCmd = add_shard_util::createAddShardCmd(opCtx, shardName);
+
+    if (osiGenerator) {
+        auto const osi = (*osiGenerator)(opCtx);
+        generic_argument_util::setOperationSessionInfo(addShardCmd, osi);
+    }
+
+    auto response = runCommandForAddShard(
+        opCtx, targeter, DatabaseName::kAdmin, addShardCmd.toBSON(), executor);
+    uassertStatusOK(response.commandStatus);
+}
+
+void removeAllClusterParametersFromReplicaSet(
+    OperationContext* opCtx,
+    RemoteCommandTargeter& targeter,
+    boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
+    std::shared_ptr<executor::TaskExecutor> executor) {
+    auto tenantsOnTarget =
+        uassertStatusOK(getTenantsWithConfigDbsOnShard(opCtx, targeter, executor));
+
+    // Remove possible leftovers config.clusterParameters documents from the new shard.
+    for (const auto& tenantId : tenantsOnTarget) {
+        const auto& nss = NamespaceString::makeClusterParametersNSS(tenantId);
+
+        topology_change_helpers::deleteAllDocumentsInCollection(
+            opCtx, targeter, nss, osiGenerator, executor);
+    }
+}
+
+void setClusterParametersOnReplicaSet(
+    OperationContext* opCtx,
+    RemoteCommandTargeter& targeter,
+    const TenantIdMap<std::vector<BSONObj>>& allClusterParameters,
+    boost::optional<std::function<OperationSessionInfo(OperationContext*)>> osiGenerator,
+    std::shared_ptr<executor::TaskExecutor> executor) {
+    // First, remove all existing parameters from the new shard.
+    topology_change_helpers::removeAllClusterParametersFromReplicaSet(
+        opCtx, targeter, osiGenerator, executor);
+
+    LOGV2(6360600, "Pushing cluster parameters into new shard");
+
+    for (const auto& [tenantId, clusterParameters] : allClusterParameters) {
+        const auto& dbName = DatabaseNameUtil::deserialize(
+            tenantId, DatabaseName::kAdmin.db(omitTenant), SerializationContext::stateDefault());
+        // Push cluster parameters into the newly added shard.
+        for (auto& parameter : clusterParameters) {
+            ShardsvrSetClusterParameter setClusterParamsCmd(
+                BSON(parameter["_id"].String() << parameter.filterFieldsUndotted(
+                         BSON("_id" << 1 << "clusterParameterTime" << 1), false)));
+            setClusterParamsCmd.setDbName(dbName);
+            setClusterParamsCmd.setClusterParameterTime(
+                parameter["clusterParameterTime"].timestamp());
+            generic_argument_util::setMajorityWriteConcern(setClusterParamsCmd);
+            if (osiGenerator) {
+                auto const osi = (*osiGenerator)(opCtx);
+                generic_argument_util::setOperationSessionInfo(setClusterParamsCmd, osi);
+            }
+
+            const auto cmdResponse = runCommandForAddShard(
+                opCtx, targeter, dbName, setClusterParamsCmd.toBSON(), executor);
+            uassertStatusOK(cmdResponse.commandStatus);
+        }
+    }
+}
+
+void setClusterParametersLocally(OperationContext* opCtx,
+                                 const TenantIdMap<std::vector<BSONObj>>& parameters) {
+    for (const auto& tenantIdWithParameters : parameters) {
+        auto& tenantId = tenantIdWithParameters.first;
+        auto& parameterSet = tenantIdWithParameters.second;
+        auth::ValidatedTenancyScopeGuard::runAsTenant(opCtx, tenantId, [&]() -> void {
+            DBDirectClient client(opCtx);
+            ClusterParameterDBClientService dbService(client);
+            const auto tenantId = [&]() -> boost::optional<TenantId> {
+                const auto vts = auth::ValidatedTenancyScope::get(opCtx);
+                invariant(!vts || vts->hasTenantId());
+
+                if (vts && vts->hasTenantId()) {
+                    return vts->tenantId();
+                }
+                return boost::none;
+            }();
+
+            for (const auto& parameter : parameterSet) {
+                SetClusterParameter setClusterParameterRequest(
+                    BSON(parameter["_id"].String() << parameter.filterFieldsUndotted(
+                             BSON("_id" << 1 << "clusterParameterTime" << 1), false)));
+                setClusterParameterRequest.setDbName(
+                    DatabaseNameUtil::deserialize(tenantId,
+                                                  DatabaseName::kAdmin.db(omitTenant),
+                                                  SerializationContext::stateDefault()));
+                std::unique_ptr<ServerParameterService> parameterService =
+                    std::make_unique<ClusterParameterService>();
+                SetClusterParameterInvocation invocation{std::move(parameterService), dbService};
+                invocation.invoke(opCtx,
+                                  setClusterParameterRequest,
+                                  parameter["clusterParameterTime"].timestamp(),
+                                  boost::none /* previousTime */,
+                                  kMajorityWriteConcern);
+            }
+        });
+    }
+}
+
+TenantIdMap<std::vector<BSONObj>> getClusterParametersFromReplicaSet(
+    OperationContext* opCtx,
+    RemoteCommandTargeter& targeter,
+    std::shared_ptr<executor::TaskExecutor> executor) {
+    LOGV2(6538600, "Pulling cluster parameters from new shard");
+
+    // We can safely query the cluster parameters because the replica set must have been started
+    // with --shardsvr in order to add it into the cluster, and in this mode no setClusterParameter
+    // can be called on the replica set directly.
+    auto tenantIds = uassertStatusOK(getTenantsWithConfigDbsOnShard(opCtx, targeter, executor));
+
+    std::map<boost::optional<TenantId>, std::pair<std::unique_ptr<Fetcher>, Status>> fetchers;
+    // If for some reason the callback never gets invoked, we will return this status in
+    // response.
+    TenantIdMap<std::vector<BSONObj>> allParameters;
+
+    for (const auto& tenantId : tenantIds) {
+        auto fetcher = topology_change_helpers::createFetcher(
+            opCtx,
+            targeter,
+            NamespaceString::makeClusterParametersNSS(tenantId),
+            repl::ReadConcernLevel::kMajorityReadConcern,
+            [&allParameters, tenantId](const std::vector<BSONObj>& docs) -> bool {
+                std::vector<BSONObj> parameters;
+                parameters.reserve(docs.size());
+                for (const BSONObj& doc : docs) {
+                    parameters.push_back(doc.getOwned());
+                }
+                allParameters.emplace(tenantId, std::move(parameters));
+                return true;
+            },
+            [&fetchers, tenantId](const Status& status) { fetchers.at(tenantId).second = status; },
+            executor);
+        const auto fetcherPtr = fetcher.get();
+
+        fetchers.emplace(
+            tenantId,
+            std::make_pair(std::move(fetcher),
+                           Status(ErrorCodes::InternalError,
+                                  "Internal error running cursor callback in command")));
+
+        uassertStatusOK(fetcherPtr->schedule());
+    }
+
+    for (auto& [tenantId, fetcherWithStatus] : fetchers) {
+        auto& [fetcher, status] = fetcherWithStatus;
+        uassertStatusOK(fetcher->join(opCtx));
+        uassertStatusOK(status);
+    }
+
+    return allParameters;
+}
+
+TenantIdMap<std::vector<BSONObj>> getClusterParametersLocally(OperationContext* opCtx) {
+    auto localConfigShard = ShardingCatalogManager::get(opCtx)->localConfigShard();
+    auto tenantIds =
+        uassertStatusOK(getTenantsWithConfigDbsOnShard(opCtx, *localConfigShard.get()));
+    TenantIdMap<std::vector<BSONObj>> configSvrClusterParameterDocs;
+    for (const auto& tenantId : tenantIds) {
+        auto findResponse = uassertStatusOK(localConfigShard->exhaustiveFindOnConfig(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kLocalReadConcern,
+            NamespaceString::makeClusterParametersNSS(tenantId),
+            BSONObj(),
+            BSONObj(),
+            boost::none));
+
+        configSvrClusterParameterDocs.emplace(tenantId, findResponse.docs);
+    }
+
+    return configSvrClusterParameterDocs;
 }
 
 long long runCountCommandOnConfig(OperationContext* opCtx,

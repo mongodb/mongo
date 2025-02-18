@@ -42,10 +42,14 @@ namespace mongo {
 
 /**
  * Get all tenants which have non-empty config databases (<tenantId>_config) existing on the given
- * shard. If executor is specified, the remote command will run using that executor. Otherwise, the
- * default executor will be used.
+ * shard.
  */
 StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
-    OperationContext* opCtx, Shard* shard, executor::TaskExecutor* executor = nullptr);
+    OperationContext* opCtx, Shard& shard);
+
+StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
+    OperationContext* opCtx,
+    RemoteCommandTargeter& targeter,
+    std::shared_ptr<executor::TaskExecutor> executor);
 
 }  // namespace mongo

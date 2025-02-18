@@ -62,46 +62,59 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     _enterPhase(AddShardCoordinatorPhaseEnum::kFinal);
                 }
             }))
+        .then(_buildPhaseHandler(Phase::kCheckShardPreconditions,
+                                 [this, &token, _ = shared_from_this(), executor]() {
+                                     auto opCtxHolder = cc().makeOperationContext();
+                                     auto* opCtx = opCtxHolder.get();
+
+                                     auto& targeter = _getTargeter(opCtx);
+
+                                     _runWithRetries(
+                                         [&]() {
+                                             topology_change_helpers::validateHostAsShard(
+                                                 opCtx,
+                                                 targeter,
+                                                 _doc.getConnectionString(),
+                                                 _doc.getIsConfigShard(),
+                                                 **executor);
+                                         },
+                                         executor,
+                                         token);
+
+                                     // TODO(SERVER-97997) Remove the check after promoting to
+                                     // sharded cluster is implemented correctly
+                                     if (!_isFirstShard(opCtx)) {
+                                         topology_change_helpers::setUserWriteBlockingState(
+                                             opCtx,
+                                             targeter,
+                                             topology_change_helpers::UserWriteBlockingLevel::All,
+                                             true, /* block writes */
+                                             _osiGenerator(),
+                                             **executor);
+
+                                         _checkExistingDataOnShard(opCtx, targeter, **executor);
+                                     }
+                                 }))
         .then(_buildPhaseHandler(
-            Phase::kCheckShardPreconditions,
-            [this, &token, _ = shared_from_this(), executor]() {
+            Phase::kPrepareNewShard,
+            [this, _ = shared_from_this()] { return !_doc.getIsConfigShard(); },
+            [this, _ = shared_from_this(), executor]() {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
 
                 auto& targeter = _getTargeter(opCtx);
 
-                auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-                shardRegistry->reload(opCtx);
-                const bool isFirstShard = shardRegistry->getNumShards(opCtx) == 0;
+                topology_change_helpers::getClusterTimeKeysFromReplicaSet(
+                    opCtx, targeter, **executor);
 
-                _runWithRetries(
-                    [&]() {
-                        topology_change_helpers::validateHostAsShard(opCtx,
-                                                                     targeter,
-                                                                     _doc.getConnectionString(),
-                                                                     _doc.getIsConfigShard(),
-                                                                     **executor);
-                    },
-                    executor,
-                    token);
+                std::string shardName = topology_change_helpers::createShardName(
+                    opCtx, targeter, _doc.getIsConfigShard(), _doc.getProposedName(), **executor);
 
-                // TODO(SERVER-97997) Remove the check after promoting to sharded cluster is
-                // implemented correctly
-                if (!isFirstShard) {
-                    topology_change_helpers::setUserWriteBlockingState(
-                        opCtx,
-                        targeter,
-                        topology_change_helpers::UserWriteBlockingLevel::All,
-                        true, /* block writes */
-                        boost::make_optional<
-                            std::function<OperationSessionInfo(OperationContext*)>>(
-                            [this](OperationContext* opCtx) -> OperationSessionInfo {
-                                return getNewSession(opCtx);
-                            }),
-                        **executor);
+                // TODO(SERVER-100897): Find out why this fails if we pass a session info
+                topology_change_helpers::createShardIdentity(
+                    opCtx, targeter, shardName, boost::none, **executor);
 
-                    _checkExistingDataOnShard(opCtx, targeter, **executor);
-                }
+                _standardizeClusterParameters(opCtx, _isFirstShard(opCtx), executor);
             }))
         .then(_buildPhaseHandler(Phase::kFinal,
                                  [this, _ = shared_from_this()]() {
@@ -133,10 +146,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 targeter,
                 topology_change_helpers::UserWriteBlockingLevel::All,
                 false, /* unblock writes */
-                boost::make_optional<std::function<OperationSessionInfo(OperationContext*)>>(
-                    [this](OperationContext* opCtx) -> OperationSessionInfo {
-                        return getNewSession(opCtx);
-                    }),
+                _osiGenerator(),
                 **executor);
 
             topology_change_helpers::removeReplicaSetMonitor(opCtx, _doc.getConnectionString());
@@ -172,7 +182,7 @@ void AddShardCoordinator::_checkExistingDataOnShard(
     RemoteCommandTargeter& targeter,
     std::shared_ptr<executor::TaskExecutor> executor) const {
     const auto dbNames =
-        topology_change_helpers::getDBNamesListFromShard(opCtx, targeter, executor);
+        topology_change_helpers::getDBNamesListFromReplicaSet(opCtx, targeter, executor);
 
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "can't add shard '" << _doc.getConnectionString().toString()
@@ -216,6 +226,46 @@ void AddShardCoordinator::_runWithRetries(std::function<void()>&& function,
         .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor, token)
         .get();
+}
+
+boost::optional<std::function<OperationSessionInfo(OperationContext*)>>
+AddShardCoordinator::_osiGenerator() {
+    return boost::make_optional<std::function<OperationSessionInfo(OperationContext*)>>(
+        [this](OperationContext* opCtx) -> OperationSessionInfo { return getNewSession(opCtx); });
+}
+
+void AddShardCoordinator::_standardizeClusterParameters(
+    OperationContext* opCtx,
+    bool isFirstShard,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    auto configSvrClusterParameterDocs =
+        topology_change_helpers::getClusterParametersLocally(opCtx);
+
+    // If this is the first shard being added, and no cluster parameters have been set, then this
+    // can be seen as a replica set to shard conversion - absorb all of this shard's cluster
+    // parameters. Otherwise, push our cluster parameters to the shard.
+    if (isFirstShard) {
+        bool clusterParameterDocsEmpty = std::all_of(
+            configSvrClusterParameterDocs.begin(),
+            configSvrClusterParameterDocs.end(),
+            [&](const std::pair<boost::optional<TenantId>, std::vector<BSONObj>>& tenantParams) {
+                return tenantParams.second.empty();
+            });
+        if (clusterParameterDocsEmpty) {
+            auto parameters = topology_change_helpers::getClusterParametersFromReplicaSet(
+                opCtx, _getTargeter(opCtx), **executor);
+            topology_change_helpers::setClusterParametersLocally(opCtx, parameters);
+            return;
+        }
+    }
+    topology_change_helpers::setClusterParametersOnReplicaSet(
+        opCtx, _getTargeter(opCtx), configSvrClusterParameterDocs, _osiGenerator(), **executor);
+}
+
+bool AddShardCoordinator::_isFirstShard(OperationContext* opCtx) {
+    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    shardRegistry->reload(opCtx);
+    return shardRegistry->getNumShards(opCtx) == 0;
 }
 
 }  // namespace mongo

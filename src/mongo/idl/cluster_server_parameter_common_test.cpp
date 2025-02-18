@@ -78,7 +78,7 @@ TEST_F(ClusterServerParameterCommonTest, GetTenants) {
         createCollection(opCtx.get(), CreateCommand(NamespaceString::kClusterParametersNamespace)));
 
     auto tenantIds =
-        uassertStatusOK(getTenantsWithConfigDbsOnShard(opCtx.get(), _shardLocal.get()));
+        uassertStatusOK(getTenantsWithConfigDbsOnShard(opCtx.get(), *_shardLocal.get()));
     ASSERT_EQ(tenantIds.size(), 1);
     ASSERT_EQ(*tenantIds.begin(), boost::none);
 
@@ -86,7 +86,7 @@ TEST_F(ClusterServerParameterCommonTest, GetTenants) {
     ASSERT_OK(createCollection(
         opCtx.get(), CreateCommand(NamespaceString::makeClusterParametersNSS(kTenantId))));
 
-    tenantIds = uassertStatusOK(getTenantsWithConfigDbsOnShard(opCtx.get(), _shardLocal.get()));
+    tenantIds = uassertStatusOK(getTenantsWithConfigDbsOnShard(opCtx.get(), *_shardLocal.get()));
     ASSERT_EQ(tenantIds.size(), 2);
     auto it = tenantIds.begin();
     ASSERT_EQ(*it, boost::none);

@@ -41,6 +41,7 @@ enums:
             kUnset: "unset"
             kCheckLocalPreconditions: "checkLocalPreconditions"
             kCheckShardPreconditions: "checkShardPreconditions"
+            kPrepareNewShard: "prepareNewShard"
             kFinal: "final"
 
 structs:

@@ -194,49 +194,6 @@ const Seconds kRemoteCommandTimeout{60};
 constexpr StringData kAddOrRemoveShardInProgressRecoveryDocumentId =
     "addOrRemoveShardInProgressRecovery"_sd;
 
-/**
- * Generates a unique name to be given to a newly added shard.
- */
-StatusWith<std::string> generateNewShardName(OperationContext* opCtx, Shard* configShard) {
-    BSONObjBuilder shardNameRegex;
-    shardNameRegex.appendRegex(ShardType::name(), "^shard");
-
-    auto findStatus =
-        configShard->exhaustiveFindOnConfig(opCtx,
-                                            kConfigReadSelector,
-                                            repl::ReadConcernLevel::kLocalReadConcern,
-                                            NamespaceString::kConfigsvrShardsNamespace,
-                                            shardNameRegex.obj(),
-                                            BSON(ShardType::name() << -1),
-                                            1);
-    if (!findStatus.isOK()) {
-        return findStatus.getStatus();
-    }
-
-    const auto& docs = findStatus.getValue().docs;
-
-    int count = 0;
-    if (!docs.empty()) {
-        const auto shardStatus = ShardType::fromBSON(docs.front());
-        if (!shardStatus.isOK()) {
-            return shardStatus.getStatus();
-        }
-
-        std::istringstream is(shardStatus.getValue().getName().substr(5));
-        is >> count;
-        count++;
-    }
-
-    // TODO: fix so that we can have more than 10000 automatically generated shard names
-    if (count < 9999) {
-        std::stringstream ss;
-        ss << "shard" << std::setfill('0') << std::setw(4) << count;
-        return ss.str();
-    }
-
-    return Status(ErrorCodes::OperationFailed, "unable to generate new shard name");
-}
-
 // If an add/removeShard recovery document is present on kServerConfigurationNamespace, unset the
 // addOrRemoveShardInProgress cluster parameter. Must be called under the _kAddRemoveShardLock lock.
 void resetDDLBlockingForTopologyChangeIfNeeded(OperationContext* opCtx) {
@@ -338,60 +295,6 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShar
     }
 }
 
-StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
-    OperationContext* opCtx,
-    std::shared_ptr<RemoteCommandTargeter> targeter,
-    const std::string* shardProposedName,
-    const ConnectionString& connectionString,
-    bool isConfigShard) {
-
-    try {
-        topology_change_helpers::validateHostAsShard(
-            opCtx, *targeter, connectionString, isConfigShard, _executorForAddShard);
-    } catch (DBException& ex) {
-        return ex.toStatus();
-    }
-
-    auto resHelloStatus = std::invoke([&]() -> StatusWith<BSONObj> {
-        try {
-            return topology_change_helpers::greetShard(opCtx, *targeter, _executorForAddShard);
-        } catch (DBException& ex) {
-            return ex.toStatus();
-        }
-    });
-    if (!resHelloStatus.isOK()) {
-        return resHelloStatus.getStatus();
-    }
-
-    auto resHello = std::move(resHelloStatus.getValue());
-    const std::string foundSetName = resHello["setName"].str();
-
-    std::string actualShardName;
-
-    if (shardProposedName) {
-        actualShardName = *shardProposedName;
-    } else if (!foundSetName.empty()) {
-        // Default it to the name of the replica set
-        actualShardName = foundSetName;
-    }
-
-    // Disallow adding shard replica set with name 'config'
-    if (!isConfigShard && actualShardName == DatabaseName::kConfig.db(omitTenant)) {
-        return {ErrorCodes::BadValue, "use of shard replica set with name 'config' is not allowed"};
-    }
-
-    // Retrieve the most up to date connection string that we know from the replica set monitor (if
-    // this is a replica set shard, otherwise it will be the same value as connectionString).
-    ConnectionString actualShardConnStr = targeter->connectionString();
-
-    ShardType shard;
-    shard.setName(actualShardName);
-    shard.setHost(actualShardConnStr.toString());
-    shard.setState(ShardType::ShardState::kShardAware);
-
-    return shard;
-}
-
 Status ShardingCatalogManager::_dropSessionsCollection(
     OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter) {
 
@@ -419,7 +322,7 @@ Status ShardingCatalogManager::_dropSessionsCollection(
 StatusWith<std::vector<DatabaseName>> ShardingCatalogManager::_getDBNamesListFromShard(
     OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter) {
     try {
-        return topology_change_helpers::getDBNamesListFromShard(
+        return topology_change_helpers::getDBNamesListFromReplicaSet(
             opCtx, *targeter, _executorForAddShard);
     } catch (DBException& ex) {
         return ex.toStatus();
@@ -710,12 +613,24 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         [&] { topology_change_helpers::removeReplicaSetMonitor(opCtx, shardConnectionString); });
 
     // Validate the specified connection string may serve as shard at all
-    auto shardStatus = _validateHostAsShard(
-        opCtx, targeter, shardProposedName, shardConnectionString, isConfigShard);
-    if (!shardStatus.isOK()) {
-        return shardStatus.getStatus();
+    try {
+        topology_change_helpers::validateHostAsShard(
+            opCtx, *targeter, shardConnectionString, isConfigShard, _executorForAddShard);
+    } catch (DBException& ex) {
+        return ex.toStatus();
     }
-    ShardType& shardType = shardStatus.getValue();
+
+    std::string shardName;
+    try {
+        shardName = topology_change_helpers::createShardName(
+            opCtx,
+            *targeter,
+            isConfigShard,
+            shardProposedName ? boost::optional<StringData>(*shardProposedName) : boost::none,
+            _executorForAddShard);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
 
     // TODO SERVER-80532: the sharding catalog might lose some databases.
     // Check that none of the existing shard candidate's dbs exist already
@@ -752,52 +667,25 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
         // If the shard is also the config server itself, there is no need to pull the keys since
         // the keys already exists in the local admin.system.keys collection.
-        auto pullKeysStatus = _pullClusterTimeKeys(opCtx, targeter);
-        if (!pullKeysStatus.isOK()) {
-            return pullKeysStatus;
+        try {
+            topology_change_helpers::getClusterTimeKeysFromReplicaSet(
+                opCtx, *targeter, _executorForAddShard);
+        } catch (const DBException& ex) {
+            return ex.toStatus();
         }
-    }
 
-    // If a name for a shard wasn't provided, generate one
-    if (shardType.getName().empty()) {
-        auto result = generateNewShardName(opCtx, _localConfigShard.get());
-        if (!result.isOK()) {
-            return result.getStatus();
-        }
-        shardType.setName(result.getValue());
-    }
-
-    // Helper function that runs a command on the to-be shard and returns the status
-    auto runCmdOnNewShard = [this, &opCtx, &targeter](const BSONObj& cmd) -> Status {
-        auto swCommandResponse =
-            _runCommandForAddShard(opCtx, targeter.get(), DatabaseName::kAdmin, cmd);
-        if (!swCommandResponse.isOK()) {
-            return swCommandResponse.getStatus();
-        }
-        // Grabs the underlying status from a StatusWith object by taking the first
-        // non-OK status, if there is one. This is needed due to the semantics of
-        // _runCommandForAddShard.
-        auto commandResponse = std::move(swCommandResponse.getValue());
-        BatchedCommandResponse batchResponse;
-        return Shard::CommandResponse::processBatchWriteResponse(commandResponse, &batchResponse);
-    };
-
-    if (!isConfigShard) {
-        ShardsvrAddShard addShardCmd =
-            add_shard_util::createAddShardCmd(opCtx, shardType.getName());
-
-        // Use the _addShard command to add the shard, which in turn inserts a shardIdentity
-        // document into the shard and triggers sharding state initialization.
-        auto addShardStatus = runCmdOnNewShard(addShardCmd.toBSON());
-        if (!addShardStatus.isOK()) {
-            return addShardStatus;
+        try {
+            topology_change_helpers::createShardIdentity(
+                opCtx, *targeter, shardName, boost::none, _executorForAddShard);
+        } catch (const DBException& ex) {
+            return ex.toStatus();
         }
 
         // Set the user-writes blocking state on the new shard.
         _setUserWriteBlockingStateOnNewShard(opCtx, targeter.get());
 
         // Determine the set of cluster parameters to be used.
-        _standardizeClusterParameters(opCtx, shard.get());
+        _standardizeClusterParameters(opCtx, *targeter);
     }
 
     {
@@ -869,6 +757,10 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         // Tick clusterTime to get a new topologyTime for this mutation of the topology.
         auto newTopologyTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);
 
+        ShardType shardType;
+        shardType.setName(shardName);
+        shardType.setHost(targeter->connectionString().toString());
+        shardType.setState(ShardType::ShardState::kShardAware);
         shardType.setTopologyTime(newTopologyTime.asTimestamp());
 
         LOGV2(21942,
@@ -1380,207 +1272,10 @@ void ShardingCatalogManager::_setUserWriteBlockingStateOnNewShard(OperationConte
         _executorForAddShard);
 }
 
-Status ShardingCatalogManager::_pullClusterTimeKeys(
-    OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter) {
-    Status fetchStatus =
-        Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
-    std::vector<ExternalKeysCollectionDocument> keyDocs;
-
-    auto expireAt = opCtx->getServiceContext()->getFastClockSource()->now() +
-        Seconds(gNewShardExistingClusterTimeKeysExpirationSecs.load());
-    auto fetcher = topology_change_helpers::createFetcher(
-        opCtx,
-        *targeter,
-        NamespaceString::kKeysCollectionNamespace,
-        repl::ReadConcernLevel::kLocalReadConcern,
-        [&](const std::vector<BSONObj>& docs) -> bool {
-            for (const BSONObj& doc : docs) {
-                keyDocs.push_back(
-                    keys_collection_util::makeExternalClusterTimeKeyDoc(doc.getOwned(), expireAt));
-            }
-            return true;
-        },
-        [&](const Status& status) { fetchStatus = status; },
-        _executorForAddShard);
-
-    auto scheduleStatus = fetcher->schedule();
-    if (!scheduleStatus.isOK()) {
-        return scheduleStatus;
-    }
-
-    auto joinStatus = fetcher->join(opCtx);
-    if (!joinStatus.isOK()) {
-        return joinStatus;
-    }
-
-    if (keyDocs.empty()) {
-        return fetchStatus;
-    }
-
-    auto opTime = keys_collection_util::storeExternalClusterTimeKeyDocs(opCtx, std::move(keyDocs));
-    auto waitStatus = WaitForMajorityService::get(opCtx->getServiceContext())
-                          .waitUntilMajorityForWrite(opTime, opCtx->getCancellationToken())
-                          .getNoThrow();
-    if (!waitStatus.isOK()) {
-        return waitStatus;
-    }
-
-    return fetchStatus;
-}
-
-void ShardingCatalogManager::_setClusterParametersLocally(OperationContext* opCtx,
-                                                          const std::vector<BSONObj>& parameters) {
-    DBDirectClient client(opCtx);
-    ClusterParameterDBClientService dbService(client);
-    const auto tenantId = [&]() -> boost::optional<TenantId> {
-        const auto vts = auth::ValidatedTenancyScope::get(opCtx);
-        invariant(!vts || vts->hasTenantId());
-
-        if (vts && vts->hasTenantId()) {
-            return vts->tenantId();
-        }
-        return boost::none;
-    }();
-
-    for (auto& parameter : parameters) {
-        SetClusterParameter setClusterParameterRequest(
-            BSON(parameter["_id"].String() << parameter.filterFieldsUndotted(
-                     BSON("_id" << 1 << "clusterParameterTime" << 1), false)));
-        setClusterParameterRequest.setDbName(DatabaseNameUtil::deserialize(
-            tenantId, DatabaseName::kAdmin.db(omitTenant), SerializationContext::stateDefault()));
-        std::unique_ptr<ServerParameterService> parameterService =
-            std::make_unique<ClusterParameterService>();
-        SetClusterParameterInvocation invocation{std::move(parameterService), dbService};
-        invocation.invoke(opCtx,
-                          setClusterParameterRequest,
-                          parameter["clusterParameterTime"].timestamp(),
-                          boost::none /* previousTime */,
-                          kMajorityWriteConcern);
-    }
-}
-
-void ShardingCatalogManager::_pullClusterParametersFromNewShard(OperationContext* opCtx,
-                                                                Shard* shard) {
-    const auto& targeter = shard->getTargeter();
-    LOGV2(6538600, "Pulling cluster parameters from new shard");
-
-    // We can safely query the cluster parameters because the replica set must have been started
-    // with --shardsvr in order to add it into the cluster, and in this mode no setClusterParameter
-    // can be called on the replica set directly.
-    auto tenantIds =
-        uassertStatusOK(getTenantsWithConfigDbsOnShard(opCtx, shard, _executorForAddShard.get()));
-
-    std::vector<std::unique_ptr<Fetcher>> fetchers;
-    fetchers.reserve(tenantIds.size());
-    // If for some reason the callback never gets invoked, we will return this status in
-    // response.
-    std::vector<Status> statuses(
-        tenantIds.size(),
-        Status(ErrorCodes::InternalError, "Internal error running cursor callback in command"));
-    std::vector<std::vector<BSONObj>> allParameters(tenantIds.size());
-
-    int i = 0;
-    for (const auto& tenantId : tenantIds) {
-        auto fetcher = topology_change_helpers::createFetcher(
-            opCtx,
-            *targeter,
-            NamespaceString::makeClusterParametersNSS(tenantId),
-            repl::ReadConcernLevel::kMajorityReadConcern,
-            [&allParameters, i](const std::vector<BSONObj>& docs) -> bool {
-                std::vector<BSONObj> parameters;
-                parameters.reserve(docs.size());
-                for (const BSONObj& doc : docs) {
-                    parameters.push_back(doc.getOwned());
-                }
-                allParameters[i] = parameters;
-                return true;
-            },
-            [&statuses, i](const Status& status) { statuses[i] = status; },
-            _executorForAddShard);
-        uassertStatusOK(fetcher->schedule());
-        fetchers.push_back(std::move(fetcher));
-        i++;
-    }
-
-    i = 0;
-    for (const auto& tenantId : tenantIds) {
-        uassertStatusOK(fetchers[i]->join(opCtx));
-        uassertStatusOK(statuses[i]);
-
-        auth::ValidatedTenancyScopeGuard::runAsTenant(opCtx, tenantId, [&]() -> void {
-            _setClusterParametersLocally(opCtx, allParameters[i]);
-        });
-        i++;
-    }
-}
-
-void ShardingCatalogManager::_removeAllClusterParametersFromShard(OperationContext* opCtx,
-                                                                  Shard* shard) {
-    const auto& targeter = shard->getTargeter();
-    auto tenantsOnTarget =
-        uassertStatusOK(getTenantsWithConfigDbsOnShard(opCtx, shard, _executorForAddShard.get()));
-
-    // Remove possible leftovers config.clusterParameters documents from the new shard.
-    for (const auto& tenantId : tenantsOnTarget) {
-        const auto& nss = NamespaceString::makeClusterParametersNSS(tenantId);
-        write_ops::DeleteCommandRequest deleteOp(nss);
-        write_ops::DeleteOpEntry query({}, true /*multi*/);
-        deleteOp.setDeletes({query});
-        generic_argument_util::setMajorityWriteConcern(deleteOp);
-
-        const auto swCommandResponse =
-            _runCommandForAddShard(opCtx, targeter.get(), nss.dbName(), deleteOp.toBSON());
-        uassertStatusOK(swCommandResponse.getStatus());
-        uassertStatusOK(getStatusFromWriteCommandReply(swCommandResponse.getValue().response));
-    }
-}
-
-void ShardingCatalogManager::_pushClusterParametersToNewShard(
-    OperationContext* opCtx,
-    Shard* shard,
-    const TenantIdMap<std::vector<BSONObj>>& allClusterParameters) {
-    // First, remove all existing parameters from the new shard.
-    _removeAllClusterParametersFromShard(opCtx, shard);
-
-    const auto& targeter = shard->getTargeter();
-    LOGV2(6360600, "Pushing cluster parameters into new shard");
-
-    for (const auto& [tenantId, clusterParameters] : allClusterParameters) {
-        const auto& dbName = DatabaseNameUtil::deserialize(
-            tenantId, DatabaseName::kAdmin.db(omitTenant), SerializationContext::stateDefault());
-        // Push cluster parameters into the newly added shard.
-        for (auto& parameter : clusterParameters) {
-            ShardsvrSetClusterParameter setClusterParamsCmd(
-                BSON(parameter["_id"].String() << parameter.filterFieldsUndotted(
-                         BSON("_id" << 1 << "clusterParameterTime" << 1), false)));
-            setClusterParamsCmd.setDbName(dbName);
-            setClusterParamsCmd.setClusterParameterTime(
-                parameter["clusterParameterTime"].timestamp());
-            generic_argument_util::setMajorityWriteConcern(setClusterParamsCmd);
-
-            const auto cmdResponse =
-                _runCommandForAddShard(opCtx, targeter.get(), dbName, setClusterParamsCmd.toBSON());
-            uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
-        }
-    }
-}
-
-void ShardingCatalogManager::_standardizeClusterParameters(OperationContext* opCtx, Shard* shard) {
-    auto tenantIds =
-        uassertStatusOK(getTenantsWithConfigDbsOnShard(opCtx, _localConfigShard.get()));
-    TenantIdMap<std::vector<BSONObj>> configSvrClusterParameterDocs;
-    for (const auto& tenantId : tenantIds) {
-        auto findResponse = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kLocalReadConcern,
-            NamespaceString::makeClusterParametersNSS(tenantId),
-            BSONObj(),
-            BSONObj(),
-            boost::none));
-
-        configSvrClusterParameterDocs.emplace(tenantId, findResponse.docs);
-    }
+void ShardingCatalogManager::_standardizeClusterParameters(OperationContext* opCtx,
+                                                           RemoteCommandTargeter& targeter) {
+    auto configSvrClusterParameterDocs =
+        topology_change_helpers::getClusterParametersLocally(opCtx);
 
     auto shardsDocs = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
         opCtx,
@@ -1602,11 +1297,14 @@ void ShardingCatalogManager::_standardizeClusterParameters(OperationContext* opC
                 return tenantParams.second.empty();
             });
         if (clusterParameterDocsEmpty) {
-            _pullClusterParametersFromNewShard(opCtx, shard);
+            auto parameters = topology_change_helpers::getClusterParametersFromReplicaSet(
+                opCtx, targeter, _executorForAddShard);
+            topology_change_helpers::setClusterParametersLocally(opCtx, parameters);
             return;
         }
     }
-    _pushClusterParametersToNewShard(opCtx, shard, configSvrClusterParameterDocs);
+    topology_change_helpers::setClusterParametersOnReplicaSet(
+        opCtx, targeter, configSvrClusterParameterDocs, boost::none, _executorForAddShard);
 }
 
 void ShardingCatalogManager::_addShardInTransaction(

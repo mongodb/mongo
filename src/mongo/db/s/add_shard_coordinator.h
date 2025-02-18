@@ -71,6 +71,14 @@ private:
                          std::shared_ptr<executor::ScopedTaskExecutor> executor,
                          const CancellationToken& token);
 
+    boost::optional<std::function<OperationSessionInfo(OperationContext*)>> _osiGenerator();
+
+    void _standardizeClusterParameters(OperationContext* opCt,
+                                       bool isFirstShard,
+                                       std::shared_ptr<executor::ScopedTaskExecutor> executor);
+
+    bool _isFirstShard(OperationContext* opCtx);
+
     // Set on successful completion of the coordinator.
     boost::optional<std::string> _result;
 

@@ -384,18 +384,49 @@ protected:
         while (n-- > 0) {
             onCommandForAddShard([&](const RemoteCommandRequest& request) {
                 ASSERT_EQ(request.target, target);
+                ASSERT_EQ(request.dbname, NamespaceString::kClusterParametersNamespace.dbName());
+                ASSERT_BSONOBJ_EQ(request.cmdObj,
+                                  BSON("find" << NamespaceString::kClusterParametersNamespace.coll()
+                                              << "maxTimeMS" << 60000 << "readConcern"
+                                              << BSON("level"
+                                                      << "majority")));
+
+                auto cursorRes = CursorResponse(
+                    NamespaceString::createNamespaceString_forTest(
+                        request.dbname, NamespaceString::kClusterParametersNamespace.coll()),
+                    0,
+                    {
+                        BSON("_id"
+                             << "doc1"),
+                        BSON("_id"
+                             << "doc2"),
+                    });
+                return cursorRes.toBSON(CursorResponse::ResponseType::InitialResponse);
+            });
+
+            onCommandForAddShard([&](const RemoteCommandRequest& request) {
+                ASSERT_EQ(request.target, target);
                 auto it = std::find(dbnamesOnTarget.begin(), dbnamesOnTarget.end(), request.dbname);
                 ASSERT(it != dbnamesOnTarget.end());
                 dbnamesOnTarget.erase(it);
-                ASSERT_BSONOBJ_EQ(
-                    request.cmdObj,
-                    BSON("delete" << NamespaceString::kClusterParametersNamespace.coll()
-                                  << "bypassDocumentValidation" << false << "ordered" << true
-                                  << "deletes" << BSON_ARRAY(BSON("q" << BSONObj() << "limit" << 0))
-                                  << "writeConcern"
-                                  << BSON("w"
-                                          << "majority"
-                                          << "wtimeout" << 60000)));
+
+                ASSERT_EQ(request.target, target);
+                ASSERT_EQ(request.dbname, NamespaceString::kClusterParametersNamespace.dbName());
+                ASSERT_BSONOBJ_EQ(request.cmdObj,
+                                  BSON("delete"
+                                       << NamespaceString::kClusterParametersNamespace.coll()
+                                       << "bypassDocumentValidation" << false << "ordered" << true
+                                       << "deletes"
+                                       << BSON_ARRAY(BSON("q" << BSON("_id"
+                                                                      << "doc1")
+                                                              << "limit" << 1)
+                                                     << BSON("q" << BSON("_id"
+                                                                         << "doc2")
+                                                                 << "limit" << 1))
+                                       << "writeConcern"
+                                       << BSON("w"
+                                               << "majority"
+                                               << "wtimeout" << 60000)));
                 ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
 
                 return BSON("ok" << 1);
@@ -806,482 +837,6 @@ TEST_F(AddShardTest, CreateShardIdentityUpsertForAddShard) {
     ASSERT_BSONOBJ_EQ(expectedBSON, actualBSON);
 }
 
-TEST_F(AddShardTest, StandaloneBasicSuccess) {
-    std::unique_ptr<RemoteCommandTargeterMock> targeter(
-        std::make_unique<RemoteCommandTargeterMock>());
-    HostAndPort shardTarget("StandaloneHost:12345");
-    targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
-    targeter->setFindHostReturnValue(shardTarget);
-
-    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
-
-
-    std::string expectedShardName = "StandaloneShard";
-
-    // The shard doc inserted into the config.shards collection on the config server.
-    ShardType expectedShard;
-    expectedShard.setName(expectedShardName);
-    expectedShard.setHost("StandaloneHost:12345");
-    expectedShard.setState(ShardType::ShardState::kShardAware);
-
-    DatabaseType discoveredDB1(DatabaseName::createDatabaseName_forTest(boost::none, "TestDB1"),
-                               ShardId("StandaloneShard"),
-                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
-    DatabaseType discoveredDB2(DatabaseName::createDatabaseName_forTest(boost::none, "TestDB2"),
-                               ShardId("StandaloneShard"),
-                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
-
-    auto expectWriteConcern = ShardingCatalogClient::kMajorityWriteConcern;
-
-    auto future = launchAsync([this, expectedShardName, expectWriteConcern] {
-        ThreadClient tc(getServiceContext()->getService());
-        auto opCtx = Client::getCurrent()->makeOperationContext();
-        opCtx->setWriteConcern(expectWriteConcern);
-        auto shardName =
-            assertGet(ShardingCatalogManager::get(opCtx.get())
-                          ->addShard(opCtx.get(),
-                                     &expectedShardName,
-                                     assertGet(ConnectionString::parse("StandaloneHost:12345")),
-                                     false));
-        ASSERT_EQUALS(expectedShardName, shardName);
-    });
-
-    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "maxWireVersion"
-                                        << WireVersion::LATEST_WIRE_VERSION);
-    expectHello(shardTarget, commandResponse);
-    expectHello(shardTarget, commandResponse);
-
-    // Get databases list from new shard
-    expectListDatabases(
-        shardTarget,
-        std::vector<BSONObj>{BSON("name"
-                                  << "local"
-                                  << "sizeOnDisk" << 1000),
-                             BSON("name" << discoveredDB1.getDbName().toString_forTest()
-                                         << "sizeOnDisk" << 2000),
-                             BSON("name" << discoveredDB2.getDbName().toString_forTest()
-                                         << "sizeOnDisk" << 5000)});
-
-    expectCollectionDrop(shardTarget, NamespaceString::kLogicalSessionsNamespace);
-
-    // The shard receives a find to pull all clusterTime keys from the new shard.
-    expectClusterTimeKeysPullRequest(shardTarget);
-
-    // The shard receives the _addShard command
-    expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
-
-    // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
-    expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
-
-    // The shard receives a find to pull all cluster parameters from the new shard into this shard.
-    expectClusterParametersPullRequest(shardTarget);
-
-    // The shard receives the setFeatureCompatibilityVersion command.
-    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1), expectWriteConcern);
-
-    // Wait for the addShard to complete before checking the config database
-    future.timed_get(kLongFutureTimeout);
-
-    // Ensure that the shard document was properly added to config.shards.
-    assertShardExists(expectedShard);
-
-    // Ensure that the databases detected from the shard were properly added to config.database.
-    assertDatabaseExists(discoveredDB1);
-    assertDatabaseExists(discoveredDB2);
-
-    assertChangeWasLogged(expectedShard);
-
-    checkLocalClusterParametersAfterPull();
-}
-
-TEST_F(AddShardTest, StandaloneBasicPushSuccess) {
-    std::unique_ptr<RemoteCommandTargeterMock> targeter(
-        std::make_unique<RemoteCommandTargeterMock>());
-    HostAndPort shardTarget("StandaloneHost:12345");
-    targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
-    targeter->setFindHostReturnValue(shardTarget);
-
-    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
-
-    // Add some cluster parameters to push to the new shard.
-    const TenantIdMap<std::vector<BSONObj>>& localClusterParameters = {
-        {boost::none,
-         {BSON("testIntClusterParameter" << BSON("intData" << 5)),
-          BSON("testStrClusterParameter" << BSON("strData"
-                                                 << "abc"))}}};
-    addLocalClusterParameters(localClusterParameters);
-
-    std::string expectedShardName = "StandaloneShard";
-
-    // The shard doc inserted into the config.shards collection on the config server.
-    ShardType expectedShard;
-    expectedShard.setName(expectedShardName);
-    expectedShard.setHost("StandaloneHost:12345");
-    expectedShard.setState(ShardType::ShardState::kShardAware);
-
-    DatabaseType discoveredDB1(DatabaseName::createDatabaseName_forTest(boost::none, "TestDB1"),
-                               ShardId("StandaloneShard"),
-                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
-    DatabaseType discoveredDB2(DatabaseName::createDatabaseName_forTest(boost::none, "TestDB2"),
-                               ShardId("StandaloneShard"),
-                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
-
-    auto expectWriteConcern = ShardingCatalogClient::kMajorityWriteConcern;
-
-    auto future = launchAsync([this, expectedShardName, expectWriteConcern] {
-        ThreadClient tc(getServiceContext()->getService());
-        auto opCtx = Client::getCurrent()->makeOperationContext();
-        opCtx->setWriteConcern(expectWriteConcern);
-        auto shardName =
-            assertGet(ShardingCatalogManager::get(opCtx.get())
-                          ->addShard(opCtx.get(),
-                                     &expectedShardName,
-                                     assertGet(ConnectionString::parse("StandaloneHost:12345")),
-                                     false));
-        ASSERT_EQUALS(expectedShardName, shardName);
-    });
-
-    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "maxWireVersion"
-                                        << WireVersion::LATEST_WIRE_VERSION);
-    expectHello(shardTarget, commandResponse);
-    expectHello(shardTarget, commandResponse);
-
-    // Get databases list from new shard
-    expectListDatabases(
-        shardTarget,
-        std::vector<BSONObj>{BSON("name"
-                                  << "local"
-                                  << "sizeOnDisk" << 1000),
-                             BSON("name" << discoveredDB1.getDbName().toString_forTest()
-                                         << "sizeOnDisk" << 2000),
-                             BSON("name" << discoveredDB2.getDbName().toString_forTest()
-                                         << "sizeOnDisk" << 5000)});
-
-    expectCollectionDrop(shardTarget, NamespaceString::kLogicalSessionsNamespace);
-
-    // The shard receives a find to pull all clusterTime keys from the new shard.
-    expectClusterTimeKeysPullRequest(shardTarget);
-
-    // The shard receives the _addShard command
-    expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
-
-    // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
-    expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
-
-    // The shard receives a remove to clear its cluster parameters, then inserts to push cluster
-    // parameters.
-    expectClusterParametersPushRequest(shardTarget, {boost::none}, localClusterParameters);
-
-    // The shard receives the setFeatureCompatibilityVersion command.
-    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1), expectWriteConcern);
-
-    // Wait for the addShard to complete before checking the config database
-    future.timed_get(kLongFutureTimeout);
-
-    // Ensure that the shard document was properly added to config.shards.
-    assertShardExists(expectedShard);
-
-    // Ensure that the databases detected from the shard were properly added to config.database.
-    assertDatabaseExists(discoveredDB1);
-    assertDatabaseExists(discoveredDB2);
-
-    assertChangeWasLogged(expectedShard);
-}
-
-TEST_F(AddMultitenancyShardTest, StandaloneMultitenantPullSuccess) {
-    std::unique_ptr<RemoteCommandTargeterMock> targeter(
-        std::make_unique<RemoteCommandTargeterMock>());
-    HostAndPort shardTarget("StandaloneHost:12345");
-    targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
-    targeter->setFindHostReturnValue(shardTarget);
-
-    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
-
-
-    std::string expectedShardName = "StandaloneShard";
-
-    // The shard doc inserted into the config.shards collection on the config server.
-    ShardType expectedShard;
-    expectedShard.setName(expectedShardName);
-    expectedShard.setHost("StandaloneHost:12345");
-    expectedShard.setState(ShardType::ShardState::kShardAware);
-
-    DatabaseType discoveredDB1(DatabaseName::createDatabaseName_forTest(boost::none, "TestDB1"),
-                               ShardId("StandaloneShard"),
-                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
-    DatabaseType discoveredDB2(DatabaseName::createDatabaseName_forTest(boost::none, "TestDB2"),
-                               ShardId("StandaloneShard"),
-                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
-
-    auto expectWriteConcern = ShardingCatalogClient::kMajorityWriteConcern;
-
-    auto future = launchAsync([this, expectedShardName, expectWriteConcern] {
-        ThreadClient tc(getServiceContext()->getService());
-        auto opCtx = Client::getCurrent()->makeOperationContext();
-        opCtx->setWriteConcern(expectWriteConcern);
-        auto shardName =
-            assertGet(ShardingCatalogManager::get(opCtx.get())
-                          ->addShard(opCtx.get(),
-                                     &expectedShardName,
-                                     assertGet(ConnectionString::parse("StandaloneHost:12345")),
-                                     false));
-        ASSERT_EQUALS(expectedShardName, shardName);
-    });
-
-    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "maxWireVersion"
-                                        << WireVersion::LATEST_WIRE_VERSION);
-    expectHello(shardTarget, commandResponse);
-    expectHello(shardTarget, commandResponse);
-
-    // Get databases list from new shard
-    expectListDatabases(
-        shardTarget,
-        std::vector<BSONObj>{BSON("name"
-                                  << "local"
-                                  << "sizeOnDisk" << 1000),
-                             BSON("name" << discoveredDB1.getDbName().toString_forTest()
-                                         << "sizeOnDisk" << 2000),
-                             BSON("name" << discoveredDB2.getDbName().toString_forTest()
-                                         << "sizeOnDisk" << 5000)});
-
-    expectCollectionDrop(shardTarget, NamespaceString::kLogicalSessionsNamespace);
-
-    // The shard receives a find to pull all clusterTime keys from the new shard.
-    expectClusterTimeKeysPullRequest(shardTarget);
-
-    // The shard receives the _addShard command
-    expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
-
-    // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
-    expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
-
-    std::vector<boost::optional<TenantId>> tenantsOnTarget = {
-        boost::none,
-        TenantId(OID("123456789012345678901234")),
-        TenantId(OID("123456789012345678901235"))};
-
-    // The shard receives a listDatabases to enumerate all tenants, then a find per tenant to pull
-    // all cluster parameters. We supply a set of tenants which will be returned when finding all
-    // tenants.
-    expectClusterParametersPullRequest(shardTarget, tenantsOnTarget);
-
-    // The shard receives the setFeatureCompatibilityVersion command.
-    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1), expectWriteConcern);
-
-    // Wait for the addShard to complete before checking the config database
-    future.timed_get(kLongFutureTimeout);
-
-    // Ensure that the shard document was properly added to config.shards.
-    assertShardExists(expectedShard);
-
-    // Ensure that the databases detected from the shard were properly added to config.database.
-    assertDatabaseExists(discoveredDB1);
-    assertDatabaseExists(discoveredDB2);
-
-    assertChangeWasLogged(expectedShard);
-
-    checkLocalClusterParametersAfterPull(tenantsOnTarget);
-}
-
-TEST_F(AddMultitenancyShardTest, StandaloneMultitenantPushSuccess) {
-    std::unique_ptr<RemoteCommandTargeterMock> targeter(
-        std::make_unique<RemoteCommandTargeterMock>());
-    HostAndPort shardTarget("StandaloneHost:12345");
-    targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
-    targeter->setFindHostReturnValue(shardTarget);
-
-    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
-
-    // Add cluster params for multiple tenants to push to the new shard.
-    const TenantIdMap<std::vector<BSONObj>>& localClusterParameters = {
-        {boost::none,
-         {BSON("testIntClusterParameter" << BSON("intData" << 5)),
-          BSON("testStrClusterParameter" << BSON("strData"
-                                                 << "abc"))}},
-        {TenantId(OID("123456789012345678901234")),
-         {BSON("testIntClusterParameter" << BSON("intData" << 8)),
-          BSON("testStrClusterParameter" << BSON("strData"
-                                                 << "def")),
-          BSON("testBoolClusterParameter" << BSON("boolData" << true))}},
-        {TenantId(OID("123456789012345678901235")),
-         {BSON("testIntClusterParameter" << BSON("intData" << 10))}}};
-    addLocalClusterParameters(localClusterParameters);
-
-    std::string expectedShardName = "StandaloneShard";
-
-    // The shard doc inserted into the config.shards collection on the config server.
-    ShardType expectedShard;
-    expectedShard.setName(expectedShardName);
-    expectedShard.setHost("StandaloneHost:12345");
-    expectedShard.setState(ShardType::ShardState::kShardAware);
-
-    DatabaseType discoveredDB1(DatabaseName::createDatabaseName_forTest(boost::none, "TestDB1"),
-                               ShardId("StandaloneShard"),
-                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
-    DatabaseType discoveredDB2(DatabaseName::createDatabaseName_forTest(boost::none, "TestDB2"),
-                               ShardId("StandaloneShard"),
-                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
-
-    auto expectWriteConcern = ShardingCatalogClient::kMajorityWriteConcern;
-
-    auto future = launchAsync([this, expectedShardName, expectWriteConcern] {
-        ThreadClient tc(getServiceContext()->getService());
-        auto opCtx = Client::getCurrent()->makeOperationContext();
-        opCtx->setWriteConcern(expectWriteConcern);
-        auto shardName =
-            assertGet(ShardingCatalogManager::get(opCtx.get())
-                          ->addShard(opCtx.get(),
-                                     &expectedShardName,
-                                     assertGet(ConnectionString::parse("StandaloneHost:12345")),
-                                     false));
-        ASSERT_EQUALS(expectedShardName, shardName);
-    });
-
-    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "maxWireVersion"
-                                        << WireVersion::LATEST_WIRE_VERSION);
-    expectHello(shardTarget, commandResponse);
-    expectHello(shardTarget, commandResponse);
-
-    // Get databases list from new shard
-    expectListDatabases(
-        shardTarget,
-        std::vector<BSONObj>{BSON("name"
-                                  << "local"
-                                  << "sizeOnDisk" << 1000),
-                             BSON("name" << discoveredDB1.getDbName().toString_forTest()
-                                         << "sizeOnDisk" << 2000),
-                             BSON("name" << discoveredDB2.getDbName().toString_forTest()
-                                         << "sizeOnDisk" << 5000)});
-
-    expectCollectionDrop(shardTarget, NamespaceString::kLogicalSessionsNamespace);
-
-    // The shard receives a find to pull all clusterTime keys from the new shard.
-    expectClusterTimeKeysPullRequest(shardTarget);
-
-    // The shard receives the _addShard command
-    expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
-
-    // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
-    expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
-
-    // The shard receives a listDatabases to enumerate all tenants, then a remove per tenant to
-    // clear its cluster parameters, then inserts to push all tenants' cluster parameters. We supply
-    // a set of tenants which will be returned when finding all tenants.
-    expectClusterParametersPushRequest(shardTarget,
-                                       {boost::none,
-                                        TenantId(OID("123456789012345678901234")),
-                                        TenantId(OID("123456789012345678901235"))},
-                                       localClusterParameters);
-
-    // The shard receives the setFeatureCompatibilityVersion command.
-    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1), expectWriteConcern);
-
-    // Wait for the addShard to complete before checking the config database
-    future.timed_get(kLongFutureTimeout);
-
-    // Ensure that the shard document was properly added to config.shards.
-    assertShardExists(expectedShard);
-
-    // Ensure that the databases detected from the shard were properly added to config.database.
-    assertDatabaseExists(discoveredDB1);
-    assertDatabaseExists(discoveredDB2);
-
-    assertChangeWasLogged(expectedShard);
-}
-
-TEST_F(AddShardTest, StandaloneGenerateName) {
-    std::unique_ptr<RemoteCommandTargeterMock> targeter(
-        std::make_unique<RemoteCommandTargeterMock>());
-    HostAndPort shardTarget("StandaloneHost:12345");
-    targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
-    targeter->setFindHostReturnValue(shardTarget);
-
-    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
-
-    ShardType existingShard;
-    existingShard.setName("shard0005");
-    existingShard.setHost("existingHost:12345");
-    existingShard.setState(ShardType::ShardState::kShardAware);
-
-    // Add a pre-existing shard so when generating a name for the new shard it will have to go
-    // higher than the existing one.
-    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
-                                                    NamespaceString::kConfigsvrShardsNamespace,
-                                                    existingShard.toBSON(),
-                                                    ShardingCatalogClient::kMajorityWriteConcern));
-    assertShardExists(existingShard);
-
-    std::string expectedShardName = "shard0006";
-
-    // The shard doc inserted into the config.shards collection on the config server.
-    ShardType expectedShard;
-    expectedShard.setName(expectedShardName);
-    expectedShard.setHost(shardTarget.toString());
-    expectedShard.setState(ShardType::ShardState::kShardAware);
-
-    DatabaseType discoveredDB1(DatabaseName::createDatabaseName_forTest(boost::none, "TestDB1"),
-                               ShardId(expectedShardName),
-                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
-    DatabaseType discoveredDB2(DatabaseName::createDatabaseName_forTest(boost::none, "TestDB2"),
-                               ShardId(expectedShardName),
-                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
-
-    auto future = launchAsync([this, &expectedShardName, &shardTarget] {
-        ThreadClient tc(getServiceContext()->getService());
-        auto opCtx = Client::getCurrent()->makeOperationContext();
-        auto shardName =
-            assertGet(ShardingCatalogManager::get(opCtx.get())
-                          ->addShard(opCtx.get(), nullptr, ConnectionString(shardTarget), false));
-        ASSERT_EQUALS(expectedShardName, shardName);
-    });
-
-    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "maxWireVersion"
-                                        << WireVersion::LATEST_WIRE_VERSION);
-    expectHello(shardTarget, commandResponse);
-    expectHello(shardTarget, commandResponse);
-
-    // Get databases list from new shard
-    expectListDatabases(
-        shardTarget,
-        std::vector<BSONObj>{BSON("name"
-                                  << "local"
-                                  << "sizeOnDisk" << 1000),
-                             BSON("name" << discoveredDB1.getDbName().toString_forTest()
-                                         << "sizeOnDisk" << 2000),
-                             BSON("name" << discoveredDB2.getDbName().toString_forTest()
-                                         << "sizeOnDisk" << 5000)});
-
-    expectCollectionDrop(shardTarget, NamespaceString::kLogicalSessionsNamespace);
-
-    // The shard receives a find to pull all clusterTime keys from the new shard.
-    expectClusterTimeKeysPullRequest(shardTarget);
-
-    // The shard receives the _addShard command
-    expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
-
-    // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
-    expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
-
-    // The shard receives a find to pull all cluster parameters.
-    expectClusterParametersPushRequest(shardTarget);
-
-    // The shard receives the setFeatureCompatibilityVersion command
-    expectSetFeatureCompatibilityVersion(
-        shardTarget, BSON("ok" << 1), operationContext()->getWriteConcern());
-
-    // Wait for the addShard to complete before checking the config database
-    future.timed_get(kLongFutureTimeout);
-
-    // Ensure that the shard document was properly added to config.shards.
-    assertShardExists(expectedShard);
-
-    // Ensure that the databases detected from the shard were properly added to config.database.
-    assertDatabaseExists(discoveredDB1);
-    assertDatabaseExists(discoveredDB2);
-
-    assertChangeWasLogged(expectedShard);
-}
-
 TEST_F(AddShardTest, AddSCCCConnectionStringAsShard) {
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
         std::make_unique<RemoteCommandTargeterMock>());
@@ -1561,7 +1116,6 @@ TEST_F(AddShardTest, AddShardWithNameConfigFails) {
                                         << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
     expectHello(shardTarget, commandResponse);
-    expectHello(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
 }
@@ -1608,7 +1162,6 @@ TEST_F(AddShardTest, ShardContainsExistingDatabase) {
                                         << "mySet"
                                         << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectHello(shardTarget, commandResponse);
     expectHello(shardTarget, commandResponse);
 
     expectListDatabases(shardTarget, {BSON("name" << existingDB.getDbName().toString_forTest())});

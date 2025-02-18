@@ -18,6 +18,37 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
+const clusterParameter1Value = {
+    intData: 42
+};
+const clusterParameter1Name = 'testIntClusterParameter';
+const clusterParameter1 = {
+    [clusterParameter1Name]: clusterParameter1Value
+};
+
+const clusterParameter2Value = {
+    strData: 'on'
+};
+const clusterParameter2Name = 'testStrClusterParameter';
+const clusterParameter2 = {
+    [clusterParameter2Name]: clusterParameter2Value
+};
+
+const clusterParameter3Value = {
+    boolData: true
+};
+const clusterParameter3_4Name = 'testBoolClusterParameter';
+const clusterParameter3 = {
+    [clusterParameter3_4Name]: clusterParameter3Value
+};
+
+const clusterParameter4Value = {
+    boolData: false
+};
+const clusterParameter4 = {
+    [clusterParameter3_4Name]: clusterParameter4Value
+};
+
 {
     const st = new ShardingTest({shards: 2, nodes: 1});
 
@@ -61,8 +92,12 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 {
     const st = new ShardingTest({shards: 0});
     const rs = new ReplSetTest({nodes: 1});
-    rs.startSet({shardsvr: ""});
+    rs.startSet();
     rs.initiate();
+
+    assert.commandWorked(rs.getPrimary().adminCommand({setClusterParameter: clusterParameter1}));
+
+    rs.restart(0, {shardsvr: ""});
 
     const foo = rs.getPrimary().getDB("foo");
     assert.commandWorked(foo.foo.insertOne({a: 1}));
@@ -76,15 +111,31 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     jsTest.log("First RS is never locked for write");
     assert.commandWorked(foo.foo.insertOne({b: 1}));
 
+    jsTest.log("Cluster parameters synchronized correctly");
+    const shardParametersConfigColl = rs.getPrimary().getCollection('config.clusterParameters');
+    const clusterParametersConfigColl =
+        st.configRS.getPrimary().getCollection('config.clusterParameters');
+    assert.eq(1, shardParametersConfigColl.countDocuments({_id: clusterParameter1Name}));
+    assert.eq(1, clusterParametersConfigColl.countDocuments({_id: clusterParameter1Name}));
+
     rs.stopSet();
     st.stop();
 }
 
 {
     const st = new ShardingTest({shards: 1});
+
+    assert.commandWorked(st.s.adminCommand({setClusterParameter: clusterParameter1}));
+    assert.commandWorked(st.s.adminCommand({setClusterParameter: clusterParameter3}));
+
     const rs = new ReplSetTest({nodes: 1});
-    rs.startSet({shardsvr: ""});
+    rs.startSet();
     rs.initiate();
+
+    assert.commandWorked(rs.getPrimary().adminCommand({setClusterParameter: clusterParameter2}));
+    assert.commandWorked(rs.getPrimary().adminCommand({setClusterParameter: clusterParameter4}));
+
+    rs.restart(0, {shardsvr: ""});
 
     assert.commandWorked(rs.getPrimary().getDB("foo").foo.insertOne({a: 1}));
 
@@ -99,10 +150,12 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     assert.commandWorked(rs.getPrimary().getDB("foo").dropDatabase({w: "majority"}));
 
     jsTest.log("Empty non-first RS can be added");
-    assert.commandFailedWithCode(
-        st.configRS.getPrimary().adminCommand(
-            {_configsvrAddShardCoordinator: rs.getURL(), "writeConcern": {"w": "majority"}}),
-        ErrorCodes.NotImplemented);
+    assert.commandFailedWithCode(st.configRS.getPrimary().adminCommand({
+        _configsvrAddShardCoordinator: rs.getURL(),
+        name: "hagymasbab",
+        "writeConcern": {"w": "majority"}
+    }),
+                                 ErrorCodes.NotImplemented);
 
     jsTest.log("Non-first RS is locked for write");
     try {
@@ -110,6 +163,31 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     } catch (error) {
         assert.commandFailedWithCode(error, ErrorCodes.UserWritesBlocked);
     }
+
+    jsTest.log("Shard identity must be valid");
+    const shardIdentityDoc =
+        rs.getPrimary().getDB("admin").system.version.findOne({_id: "shardIdentity"});
+    assert.neq(shardIdentityDoc, null);
+
+    jsTest.log("Shard identity must be valid");
+    assert.eq(shardIdentityDoc.shardName, "hagymasbab");
+
+    jsTest.log("Cluster parameters synchronized correctly");
+    const shardParametersConfigColl = rs.getPrimary().getCollection('config.clusterParameters');
+    const clusterParametersConfigColl =
+        st.configRS.getPrimary().getCollection('config.clusterParameters');
+    assert.eq(1, shardParametersConfigColl.countDocuments({_id: clusterParameter1Name}));
+    assert.eq(0, shardParametersConfigColl.countDocuments({_id: clusterParameter2Name}));
+    assert.eq(1, shardParametersConfigColl.countDocuments({_id: clusterParameter3_4Name}));
+
+    assert.eq(1, clusterParametersConfigColl.countDocuments({_id: clusterParameter1Name}));
+    assert.eq(0, clusterParametersConfigColl.countDocuments({_id: clusterParameter2Name}));
+    assert.eq(1, clusterParametersConfigColl.countDocuments({_id: clusterParameter3_4Name}));
+
+    assert.eq(shardParametersConfigColl.findOne({_id: clusterParameter3_4Name},
+                                                {_id: 0, clusterParameterTime: 0}),
+              clusterParametersConfigColl.findOne({_id: clusterParameter3_4Name},
+                                                  {_id: 0, clusterParameterTime: 0}));
 
     rs.stopSet();
     st.stop();

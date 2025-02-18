@@ -678,28 +678,6 @@ private:
     Status _initConfigCollections(OperationContext* opCtx);
 
     /**
-     * Validates that the specified endpoint can serve as a shard server. In particular, this
-     * this function checks that the shard can be contacted and that it is not already member of
-     * another sharded cluster.
-     *
-     * @param targeter For sending requests to the shard-to-be.
-     * @param shardProposedName Optional proposed name for the shard. Can be omitted in which case
-     *      a unique name for the shard will be generated from the shard's connection string. If it
-     *      is not omitted, the value cannot be the empty string.
-     *
-     * On success returns a partially initialized ShardType object corresponding to the requested
-     * shard. It will have the hostName field set and optionally the name, if the name could be
-     * generated from either the proposed name or the connection string set name. The returned
-     * shard's name should be checked and if empty, one should be generated using some uniform
-     * algorithm.
-     */
-    StatusWith<ShardType> _validateHostAsShard(OperationContext* opCtx,
-                                               std::shared_ptr<RemoteCommandTargeter> targeter,
-                                               const std::string* shardProposedName,
-                                               const ConnectionString& connectionString,
-                                               bool isConfigShard);
-
-    /**
      * Drops the sessions collection on the specified host.
      */
     Status _dropSessionsCollection(OperationContext* opCtx,
@@ -762,42 +740,11 @@ private:
                                               RemoteCommandTargeter* targeter);
 
     /**
-     * Gets the cluster time keys on the given shard and then saves them locally.
-     */
-    Status _pullClusterTimeKeys(OperationContext* opCtx,
-                                std::shared_ptr<RemoteCommandTargeter> targeter);
-
-    /**
-     * Given a vector of cluster parameters in disk format, sets them locally.
-     */
-    void _setClusterParametersLocally(OperationContext* opCtx,
-                                      const std::vector<BSONObj>& parameters);
-
-    /**
-     * Gets the cluster parameters set on the shard and then saves them locally.
-     */
-    void _pullClusterParametersFromNewShard(OperationContext* opCtx, Shard* shard);
-
-    /**
-     * Remove all existing cluster parameters set on the shard.
-     */
-    void _removeAllClusterParametersFromShard(OperationContext* opCtx, Shard* shard);
-
-    /**
-     * Remove all existing cluster parameters on the new added shard and sets the ones stored on the
-     * config server.
-     */
-    void _pushClusterParametersToNewShard(
-        OperationContext* opCtx,
-        Shard* shard,
-        const TenantIdMap<std::vector<BSONObj>>& allClusterParameters);
-
-    /**
      * Determines whether to absorb the cluster parameters on the newly added shard (if we're
      * converting from a replica set to a sharded cluster) or set the cluster parameters stored on
      * the config server in the newly added shard.
      */
-    void _standardizeClusterParameters(OperationContext* opCtx, Shard* shard);
+    void _standardizeClusterParameters(OperationContext* opCtx, RemoteCommandTargeter& targeter);
 
 
     /**
