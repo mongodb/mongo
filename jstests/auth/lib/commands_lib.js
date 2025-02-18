@@ -7954,6 +7954,18 @@ export const authCommandsLib = {
           testcases: testcases_transformationOnlyExpectFail, // Not allowed in user requests.
         },
         {
+          testname: "aggregate_$externalFunction",
+          command: {
+              aggregate: "foo",
+              pipeline: [{$externalFunction: {}}],
+              cursor: {},
+          },
+          // TODO SERVER-74961: Windows is not yet supported in stream processing.
+          skipTest: (_) => !TestData.setParameters.featureFlagStreams || _isWindows() || getBuildInfo().version < "8.1",
+          skipSharded: true,
+          testcases: testcases_transformationOnlyExpectFail, // Not allowed in user requests.
+        },
+        {
           testname: "aggregate_$fill",
           command: {
               aggregate: "foo",
