@@ -12,7 +12,6 @@
 import {
     uniformDistTransitions
 } from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
-import {EncryptedClient, isEnterpriseShell} from "jstests/fle2/libs/encrypted_client_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const testDbName = jsTestName() + "_DB";
@@ -20,12 +19,8 @@ const collPrefix = "coll_";
 const collCount = 12;
 
 export const $config = (function() {
-    function getRandomCollectionName() {
-        return collPrefix + Random.randInt(collCount);
-    }
-
     function getRandomCollection(db) {
-        return db.getSiblingDB(testDbName)[getRandomCollectionName()];
+        return db.getSiblingDB(testDbName)[collPrefix + Random.randInt(collCount)];
     }
 
     const states = {
@@ -68,15 +63,14 @@ export const $config = (function() {
         },
 
         createFLEUnsharded: function createFLEUnsharded(db, collName) {
-            if (!isEnterpriseShell()) {
+            if (TestData.runningWithBalancer) {
+                // Implicit FLE state collection creation is not supported when data is placed
+                // outside the db primary shard. See SERVER-89286 for more information.
                 return;
             }
 
-            const client = new EncryptedClient(db.getMongo(), testDbName);
-            const edb = client.getDB();
-            const ecoll = edb.getCollection(getRandomCollectionName());
-
-            jsTestLog("Executing state createFLEUnsharded: " + ecoll.getFullName());
+            const coll = getRandomCollection(db);
+            jsTestLog("Executing state createFLEUnsharded: " + coll.getFullName());
             const sampleEncryptedFields = {
                 "fields": [
                     {
@@ -94,20 +88,19 @@ export const $config = (function() {
                 ]
             };
 
-            try {
-                client.createEncryptionCollection(ecoll.getName(),
-                                                  {encryptedFields: sampleEncryptedFields});
-            } catch (error) {
-                assert.contains(
-                    error.code,
-                    [
-                        ErrorCodes.CommandNotSupportedOnView,
-                        // Concurrent creation on the same namespace.
-                        ErrorCodes.NamespaceExists
-                    ],
-                    'Failed to create unsharded FLE collection due to an unexpected error:' +
-                        tojson(error));
-            }
+            // The concurrent operations ran by this test can interfere with the
+            // assumptions made by the 'EncryptedClient.createEncryptionCollection()' helper.
+            // Therefore, create the Encrypted Data Collection (EDC) directly using the
+            // 'createCollection()' command, without the ESC/ECOC state collections.
+            const res = coll.getDB().createCollection(coll.getName(),
+                                                      {encryptedFields: sampleEncryptedFields});
+
+            const errorCodes = [
+                // Concurrent creation on the same namespace.
+                ErrorCodes.NamespaceExists
+            ];
+            assert.commandWorkedOrFailedWithCode(
+                res, errorCodes, "Failed to create unsharded FLE collection");
         },
 
         createTimeseriesUnsharded: function createTimeseriesUnsharded(db, collName) {
