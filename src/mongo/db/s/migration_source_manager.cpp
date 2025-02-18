@@ -233,8 +233,12 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
             AutoGetCollection autoColl(_opCtx, nss(), MODE_IS);
             const auto scopedCsr =
                 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss());
-            const auto [metadata, _] = checkCollectionIdentity(
-                _opCtx, nss(), _args.getEpoch(), _args.getCollectionTimestamp());
+            const auto [metadata, _] = checkCollectionIdentity(_opCtx,
+                                                               nss(),
+                                                               _args.getEpoch(),
+                                                               _args.getCollectionTimestamp(),
+                                                               *autoColl,
+                                                               *scopedCsr);
             return metadata;
         }();
 
