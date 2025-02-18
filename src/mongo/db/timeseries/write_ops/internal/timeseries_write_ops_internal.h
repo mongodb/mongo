@@ -36,6 +36,11 @@
 
 namespace mongo::timeseries::write_ops::internal {
 
+struct WriteStageErrorAndIndex {
+    Status error;
+    size_t index;
+};
+
 NamespaceString ns(const mongo::write_ops::InsertCommandRequest& request);
 
 /**
@@ -93,7 +98,8 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
 
 /**
  * Given a batch of user measurements for a collection that does not have a metaField value, returns
- * a BatchedInsertContext for all of the user measurements.
+ * a BatchedInsertContext for all of the user measurements. This is a special case - all time-series
+ * without a metafield value are grouped within the same batch.
  *
  * Passes through the inputted measurements twice, once to record the index of the measurement in
  * the original user batch for error reporting, and then again to sort the measurements based on
@@ -103,13 +109,14 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
  * variant, because we do not need to split up the measurements into different batches according to
  * their metaField value.
  */
-StatusWith<std::vector<bucket_catalog::BatchedInsertContext>> buildBatchedInsertContextsNoMetaField(
+std::vector<bucket_catalog::BatchedInsertContext> buildBatchedInsertContextsNoMetaField(
     const bucket_catalog::BucketCatalog& bucketCatalog,
     const UUID& collectionUUID,
     const TimeseriesOptions& timeseriesOptions,
     const std::vector<BSONObj>& userMeasurementsBatch,
     bucket_catalog::ExecutionStatsController& stats,
-    tracking::Context& trackingContext);
+    tracking::Context& trackingContext,
+    std::vector<WriteStageErrorAndIndex>& errorsAndIndices);
 
 
 /**
@@ -121,14 +128,14 @@ StatusWith<std::vector<bucket_catalog::BatchedInsertContext>> buildBatchedInsert
  * the original user batch for error reporting, and then again to sort the measurements based on
  * their time field.
  */
-StatusWith<std::vector<bucket_catalog::BatchedInsertContext>>
-buildBatchedInsertContextsWithMetaField(const bucket_catalog::BucketCatalog& bucketCatalog,
-                                        const UUID& collectionUUID,
-                                        const TimeseriesOptions& timeseriesOptions,
-                                        const std::vector<BSONObj>& userMeasurementsBatch,
-                                        StringData metaFieldName,
-                                        bucket_catalog::ExecutionStatsController& stats,
-                                        tracking::Context& trackingContext);
+std::vector<bucket_catalog::BatchedInsertContext> buildBatchedInsertContextsWithMetaField(
+    const bucket_catalog::BucketCatalog& bucketCatalog,
+    const UUID& collectionUUID,
+    const TimeseriesOptions& timeseriesOptions,
+    const std::vector<BSONObj>& userMeasurementsBatch,
+    bucket_catalog::ExecutionStatsController& stats,
+    tracking::Context& trackingContext,
+    std::vector<WriteStageErrorAndIndex>& errorsAndIndices);
 
 /**
  * Given a set of measurements, splits up the measurements into batches based on the metaField.
@@ -139,12 +146,14 @@ buildBatchedInsertContextsWithMetaField(const bucket_catalog::BucketCatalog& buc
  * If the time-series collection has no metaField value, then all of the measurements will be
  * batched into one BatchedInsertContext.
  *
- * If any of the inserted measurements are malformed (i.e. missing the proper time field), returns a
- * Status with an error code.
+ * Any inserted measurements that are malformed (i.e. missing the proper time field) will have their
+ * error Status and their index recorded in errorsAndIndices. Callers should check that no errors
+ * occured while processing measurements by checking that errorsAndIndices is empty.
  */
-StatusWith<std::vector<bucket_catalog::BatchedInsertContext>> buildBatchedInsertContexts(
+std::vector<bucket_catalog::BatchedInsertContext> buildBatchedInsertContexts(
     bucket_catalog::BucketCatalog& bucketCatalog,
     const UUID& collectionUUID,
     const TimeseriesOptions& timeseriesOptions,
-    const std::vector<BSONObj>& userMeasurementsBatch);
+    const std::vector<BSONObj>& userMeasurementsBatch,
+    std::vector<WriteStageErrorAndIndex>& errorsAndIndices);
 }  // namespace mongo::timeseries::write_ops::internal

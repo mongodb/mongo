@@ -2494,19 +2494,20 @@ TEST_F(BucketCatalogTest, InsertBatchHelperFillsUpSingleBucket) {
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
 
     std::vector<BSONObj> batchOfMeasurements;
     for (auto i = 0; i < gTimeseriesBucketMaxCount; i++) {
         batchOfMeasurements.emplace_back(BSON(_timeField << Date_t::now() << _metaField << "a"));
     }
     auto batchedInsertContexts = write_ops::internal::buildBatchedInsertContexts(
-        *_bucketCatalog, _uuid1, timeseriesOptions, batchOfMeasurements);
+        *_bucketCatalog, _uuid1, timeseriesOptions, batchOfMeasurements, errorsAndIndices);
 
     // All of the measurements will be in the same bucket/BatchedInsertContext because we have the
     // same meta field.
-    ASSERT(batchedInsertContexts.isOK());
-    ASSERT_EQ(batchedInsertContexts.getValue().size(), 1);
-    auto batchedInsertContext = batchedInsertContexts.getValue().front();
+    ASSERT(errorsAndIndices.empty());
+    ASSERT_EQ(batchedInsertContexts.size(), 1);
+    auto batchedInsertContext = batchedInsertContexts.front();
     ASSERT_EQ(batchedInsertContext.measurementsTimesAndIndices.size(), gTimeseriesBucketMaxCount);
 
     auto time = std::get<Date_t>(batchedInsertContext.measurementsTimesAndIndices[0]);
@@ -2545,19 +2546,20 @@ TEST_F(BucketCatalogTest, InsertBatchHelperHandlesRollover) {
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
     const auto& bucketsColl = autoColl.getCollection();
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
 
     std::vector<BSONObj> batchOfMeasurements;
     for (auto i = 0; i < 2 * gTimeseriesBucketMaxCount; i++) {
         batchOfMeasurements.emplace_back(BSON(_timeField << Date_t::now() << _metaField << "a"));
     }
     auto batchedInsertContexts = write_ops::internal::buildBatchedInsertContexts(
-        *_bucketCatalog, _uuid1, timeseriesOptions, batchOfMeasurements);
-    ASSERT(batchedInsertContexts.isOK());
+        *_bucketCatalog, _uuid1, timeseriesOptions, batchOfMeasurements, errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
 
     // All of the measurements will be in the same bucket/BatchedInsertContext because we have the
     // same meta field.
-    ASSERT_EQ(batchedInsertContexts.getValue().size(), 1);
-    auto batchedInsertContext = batchedInsertContexts.getValue().front();
+    ASSERT_EQ(batchedInsertContexts.size(), 1);
+    auto batchedInsertContext = batchedInsertContexts.front();
     ASSERT_EQ(batchedInsertContext.measurementsTimesAndIndices.size(),
               2 * gTimeseriesBucketMaxCount);
 
@@ -2577,7 +2579,7 @@ TEST_F(BucketCatalogTest, InsertBatchHelperHandlesRollover) {
     stdx::lock_guard stripeLock{stripe.mutex};
     std::shared_ptr<WriteBatch> writeBatch1;
 
-    auto currentBatch = batchedInsertContexts.getValue().front();
+    auto currentBatch = batchedInsertContexts.front();
     auto successfulInsertion =
         internal::stageInsertBatchIntoEligibleBucket(*_bucketCatalog,
                                                      bucketsColl.get(),

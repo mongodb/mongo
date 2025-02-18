@@ -984,13 +984,14 @@ size_t performOrderedTimeseriesWrites(OperationContext* opCtx,
     return request.getDocuments().size();
 }
 
-StatusWith<std::vector<bucket_catalog::BatchedInsertContext>> buildBatchedInsertContextsNoMetaField(
+std::vector<bucket_catalog::BatchedInsertContext> buildBatchedInsertContextsNoMetaField(
     const bucket_catalog::BucketCatalog& bucketCatalog,
     const UUID& collectionUUID,
     const TimeseriesOptions& timeseriesOptions,
     const std::vector<BSONObj>& userMeasurementsBatch,
     bucket_catalog::ExecutionStatsController& stats,
-    tracking::Context& trackingContext) {
+    tracking::Context& trackingContext,
+    std::vector<WriteStageErrorAndIndex>& errorsAndIndices) {
 
     std::vector<bucket_catalog::BatchedInsertTuple> batchedInsertTupleVector;
 
@@ -1000,7 +1001,8 @@ StatusWith<std::vector<bucket_catalog::BatchedInsertContext>> buildBatchedInsert
         auto swTime =
             bucket_catalog::extractTime(userMeasurementsBatch[i], timeseriesOptions.getTimeField());
         if (!swTime.isOK()) {
-            return swTime.getStatus();
+            errorsAndIndices.push_back(WriteStageErrorAndIndex{std::move(swTime.getStatus()), i});
+            continue;
         }
         batchedInsertTupleVector.emplace_back(userMeasurementsBatch[i], swTime.getValue(), i);
     }
@@ -1017,18 +1019,25 @@ StatusWith<std::vector<bucket_catalog::BatchedInsertContext>> buildBatchedInsert
             return std::get<Date_t>(lhs) < std::get<Date_t>(rhs);
         });
 
-    return {{bucket_catalog::BatchedInsertContext(
-        bucketKey, stripeNumber, timeseriesOptions, stats, batchedInsertTupleVector)}};
+    std::vector<bucket_catalog::BatchedInsertContext> batchedInsertContexts;
+
+    // Only create a BatchedInsertContext if at least one measurement got processed successfully.
+    if (!batchedInsertTupleVector.empty()) {
+        batchedInsertContexts.emplace_back(
+            bucketKey, stripeNumber, timeseriesOptions, stats, batchedInsertTupleVector);
+    };
+
+    return batchedInsertContexts;
 };
 
-StatusWith<std::vector<bucket_catalog::BatchedInsertContext>>
-buildBatchedInsertContextsWithMetaField(const bucket_catalog::BucketCatalog& bucketCatalog,
-                                        const UUID& collectionUUID,
-                                        const TimeseriesOptions& timeseriesOptions,
-                                        const std::vector<BSONObj>& userMeasurementsBatch,
-                                        StringData metaFieldName,
-                                        bucket_catalog::ExecutionStatsController& stats,
-                                        tracking::Context& trackingContext) {
+std::vector<bucket_catalog::BatchedInsertContext> buildBatchedInsertContextsWithMetaField(
+    const bucket_catalog::BucketCatalog& bucketCatalog,
+    const UUID& collectionUUID,
+    const TimeseriesOptions& timeseriesOptions,
+    const std::vector<BSONObj>& userMeasurementsBatch,
+    bucket_catalog::ExecutionStatsController& stats,
+    tracking::Context& trackingContext,
+    std::vector<WriteStageErrorAndIndex>& errorsAndIndices) {
     // Maps from the string representation of a distinct metaField value to a vector of
     // BatchedInsertTuples whose measurements have that same metaField value.
     stdx::unordered_map<std::string, std::vector<bucket_catalog::BatchedInsertTuple>>
@@ -1047,7 +1056,9 @@ buildBatchedInsertContextsWithMetaField(const bucket_catalog::BucketCatalog& buc
                                                timeseriesOptions.getTimeField(),
                                                timeseriesOptions.getMetaField().get());
         if (!swTimeAndMeta.isOK()) {
-            return swTimeAndMeta.getStatus();
+            errorsAndIndices.push_back(
+                WriteStageErrorAndIndex{std::move(swTimeAndMeta.getStatus()), i});
+            continue;
         }
         auto time = std::get<Date_t>(swTimeAndMeta.getValue());
         auto meta = std::get<BSONElement>(swTimeAndMeta.getValue());
@@ -1075,18 +1086,19 @@ buildBatchedInsertContextsWithMetaField(const bucket_catalog::BucketCatalog& buc
             collectionUUID, bucket_catalog::BucketMetadata{trackingContext, metadata, boost::none}};
         auto stripeNumber = bucket_catalog::internal::getStripeNumber(bucketCatalog, bucketKey);
 
-        batchedInsertContexts.emplace_back(bucket_catalog::BatchedInsertContext(
-            bucketKey, stripeNumber, timeseriesOptions, stats, batchedInsertTupleVector));
+        batchedInsertContexts.emplace_back(
+            bucketKey, stripeNumber, timeseriesOptions, stats, batchedInsertTupleVector);
     }
 
     return batchedInsertContexts;
 }
 
-StatusWith<std::vector<bucket_catalog::BatchedInsertContext>> buildBatchedInsertContexts(
+std::vector<bucket_catalog::BatchedInsertContext> buildBatchedInsertContexts(
     bucket_catalog::BucketCatalog& bucketCatalog,
     const UUID& collectionUUID,
     const TimeseriesOptions& timeseriesOptions,
-    const std::vector<BSONObj>& userMeasurementsBatch) {
+    const std::vector<BSONObj>& userMeasurementsBatch,
+    std::vector<WriteStageErrorAndIndex>& errorsAndIndices) {
 
     auto metaFieldName = timeseriesOptions.getMetaField();
     auto& trackingContext = bucket_catalog::getTrackingContext(
@@ -1094,26 +1106,20 @@ StatusWith<std::vector<bucket_catalog::BatchedInsertContext>> buildBatchedInsert
     auto stats =
         bucket_catalog::internal::getOrInitializeExecutionStats(bucketCatalog, collectionUUID);
 
-    auto swBatchedInsertContexts = (metaFieldName)
-        ? buildBatchedInsertContextsWithMetaField(bucketCatalog,
-                                                  collectionUUID,
-                                                  timeseriesOptions,
-                                                  userMeasurementsBatch,
-                                                  metaFieldName.get(),
-                                                  stats,
-                                                  trackingContext)
-        : buildBatchedInsertContextsNoMetaField(bucketCatalog,
-                                                collectionUUID,
-                                                timeseriesOptions,
-                                                userMeasurementsBatch,
-                                                stats,
-                                                trackingContext);
-
-    if (!swBatchedInsertContexts.isOK()) {
-        return swBatchedInsertContexts.getStatus();
-    }
-
-    return swBatchedInsertContexts.getValue();
+    return (metaFieldName) ? buildBatchedInsertContextsWithMetaField(bucketCatalog,
+                                                                     collectionUUID,
+                                                                     timeseriesOptions,
+                                                                     userMeasurementsBatch,
+                                                                     stats,
+                                                                     trackingContext,
+                                                                     errorsAndIndices)
+                           : buildBatchedInsertContextsNoMetaField(bucketCatalog,
+                                                                   collectionUUID,
+                                                                   timeseriesOptions,
+                                                                   userMeasurementsBatch,
+                                                                   stats,
+                                                                   trackingContext,
+                                                                   errorsAndIndices);
 }
 
 }  // namespace internal
