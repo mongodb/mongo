@@ -984,7 +984,8 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // _configsvrSetClusterParameter command after finishing the remove shard operation since
     // setting a cluster parameter requires taking this lock.
     Lock::ExclusiveLock clusterCardinalityParameterLock(opCtx, _kClusterCardinalityParameterLock);
-    Lock::ExclusiveLock shardMembershipLock(opCtx, _kShardMembershipLock);
+    Lock::ExclusiveLock shardMembershipLock =
+        ShardingCatalogManager::acquireShardMembershipLockForTopologyChange(opCtx);
 
     auto findShardResponse = uassertStatusOK(
         _localConfigShard->exhaustiveFindOnConfig(opCtx,
@@ -1191,30 +1192,12 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         clusterCardinalityParameterLock.lock();
         shardMembershipLock.lock();
 
-        // Find a controlShard to be updated.
-        auto controlShardQueryStatus = _localConfigShard->exhaustiveFindOnConfig(
+        topology_change_helpers::removeShard(
+            shardMembershipLock,
             opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kLocalReadConcern,
-            NamespaceString::kConfigsvrShardsNamespace,
-            BSON(ShardType::name.ne(shardName)),
-            {},
-            1);
-        auto controlShardResponse = uassertStatusOK(controlShardQueryStatus);
-        // Since it's not possible to remove the last shard, there should always be a control shard.
-        uassert(4740601,
-                "unable to find a controlShard to update during removeShard",
-                !controlShardResponse.docs.empty());
-        const auto controlShardStatus = ShardType::fromBSON(controlShardResponse.docs.front());
-        uassertStatusOKWithContext(controlShardStatus, "unable to parse control shard");
-        std::string controlShardName = controlShardStatus.getValue().getName();
-
-        // Tick clusterTime to get a new topologyTime for this mutation of the topology.
-        auto newTopologyTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);
-
-        // Remove the shard's document and update topologyTime within a transaction.
-        _removeShardInTransaction(
-            opCtx, shardName, controlShardName, newTopologyTime.asTimestamp());
+            _localConfigShard,
+            shardName,
+            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
 
         // Release the shard membership lock since the set cluster parameter operation below
         // require taking this lock.
@@ -1353,6 +1336,11 @@ void ShardingCatalogManager::appendShardDrainingStatus(OperationContext* opCtx,
 
 Lock::SharedLock ShardingCatalogManager::enterStableTopologyRegion(OperationContext* opCtx) {
     return Lock::SharedLock(opCtx, _kShardMembershipLock);
+}
+
+Lock::ExclusiveLock ShardingCatalogManager::acquireShardMembershipLockForTopologyChange(
+    OperationContext* opCtx) {
+    return Lock::ExclusiveLock(opCtx, _kShardMembershipLock);
 }
 
 void ShardingCatalogManager::appendConnectionStats(executor::ConnectionPoolStats* stats) {
@@ -1776,77 +1764,6 @@ void ShardingCatalogManager::_addShardInTransaction(
         txn_api::SyncTransactionWithRetries txn(opCtx, executor, nullptr, inlineExecutor);
         txn.run(opCtx, transactionChain);
     }
-}
-
-
-void ShardingCatalogManager::_removeShardInTransaction(OperationContext* opCtx,
-                                                       const std::string& removedShardName,
-                                                       const std::string& controlShardName,
-                                                       const Timestamp& newTopologyTime) {
-    auto removeShardFn = [removedShardName, controlShardName, newTopologyTime](
-                             const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-        write_ops::DeleteCommandRequest deleteOp(NamespaceString::kConfigsvrShardsNamespace);
-        deleteOp.setDeletes({[&]() {
-            write_ops::DeleteOpEntry entry;
-            entry.setMulti(false);
-            entry.setQ(BSON(ShardType::name() << removedShardName));
-            return entry;
-        }()});
-        return txnClient.runCRUDOp(deleteOp, {})
-            .thenRunOn(txnExec)
-            .then([&txnClient, removedShardName, controlShardName, newTopologyTime](
-                      auto deleteResponse) {
-                uassertStatusOK(deleteResponse.toStatus());
-
-                write_ops::UpdateCommandRequest updateOp(
-                    NamespaceString::kConfigsvrShardsNamespace);
-                updateOp.setUpdates({[&]() {
-                    write_ops::UpdateOpEntry entry;
-                    entry.setUpsert(false);
-                    entry.setMulti(false);
-                    entry.setQ(BSON(ShardType::name() << controlShardName));
-                    entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-                        BSON("$set" << BSON(ShardType::topologyTime() << newTopologyTime))));
-                    return entry;
-                }()});
-
-                return txnClient.runCRUDOp(updateOp, {});
-            })
-            .thenRunOn(txnExec)
-            .then([&txnClient, newTopologyTime](auto updateResponse) {
-                uassertStatusOK(updateResponse.toStatus());
-                // Log the topology time associated to this commit in a dedicated document (and
-                // delete information about a previous commit if present).
-                write_ops::UpdateCommandRequest upsertOp(
-                    NamespaceString::kConfigsvrShardRemovalLogNamespace);
-                upsertOp.setUpdates({[&]() {
-                    write_ops::UpdateOpEntry entry;
-                    entry.setUpsert(true);
-                    entry.setMulti(false);
-                    entry.setQ(BSON("_id" << ShardingCatalogClient::kLatestShardRemovalLogId));
-                    entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-                        BSON("$set" << BSON(RemoveShardEventType::kTimestampFieldName
-                                            << newTopologyTime))));
-                    return entry;
-                }()});
-
-                return txnClient.runCRUDOp(upsertOp, {});
-            })
-            .thenRunOn(txnExec)
-            .then([removedShardName](auto upsertResponse) {
-                uassertStatusOK(upsertResponse.toStatus());
-                LOGV2_DEBUG(
-                    6583701, 1, "Finished removing shard ", "shard"_attr = removedShardName);
-            })
-            .semi();
-    };
-
-    auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-    auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-
-    txn_api::SyncTransactionWithRetries txn(opCtx, executor, nullptr, inlineExecutor);
-
-    txn.run(opCtx, removeShardFn);
 }
 
 void ShardingCatalogManager::scheduleAsyncUnblockDDLCoordinators(OperationContext* opCtx) {

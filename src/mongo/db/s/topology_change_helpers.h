@@ -252,5 +252,17 @@ boost::optional<RemoveShardProgress> dropLocalCollectionsAndDatabases(
     const std::vector<DatabaseType>& trackedDBs,
     const std::string& shardName);
 
+/**
+ * This function commits a shard removal function and should only be called while holding the shard
+ * membership lock in exclusive mode. It will find a control shard and generate a new topology time
+ * and then commit the removal of the shard from config.shards and update of the topology time in a
+ * transaction.
+ */
+void removeShard(const Lock::ExclusiveLock&,
+                 OperationContext* opCtx,
+                 const std::shared_ptr<Shard> localConfigShard,
+                 const std::string& shardName,
+                 std::shared_ptr<executor::TaskExecutor> executor);
+
 }  // namespace topology_change_helpers
 }  // namespace mongo

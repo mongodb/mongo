@@ -42,6 +42,7 @@ enums:
             kUnset: "unset"
             kJoinMigrationsAndCheckRangeDeletions: "joinMigrationsAndCheckRangeDeletions"
             kStopDDLsAndCleanupData: "stopDDLsAndCleanupData"
+            kCommit: "commit"
 
 structs:
     RemoveShardCommitCoordinatorDocument:
@@ -54,6 +55,9 @@ structs:
             shardId:
                 type: shard_id
                 description: "The shard id to be removed."
+            replicaSetName:
+                type: string
+                description: "The replica set name of the shard to be removed."
             isTransitionToDedicated:
                 type: bool
                 description: >-

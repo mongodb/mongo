@@ -59,6 +59,10 @@ private:
         return RemoveShardCommitCoordinatorPhase_serializer(phase);
     }
 
+    bool _mustAlwaysMakeProgress() override {
+        return _doc.getPhase() >= Phase::kCommit;
+    }
+
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
@@ -80,6 +84,10 @@ private:
     // Ensures none of the local collections have data in them and drops them. This should only be
     // called during config transitions.
     void _dropLocalCollections(OperationContext* opCtx);
+
+    // Removes the shard and updates the topology time on a control shard.
+    void _commitRemoveShard(OperationContext* opCtx,
+                            std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
     // Set on successful completion of the coordinator.
     boost::optional<RemoveShardProgress> _result;

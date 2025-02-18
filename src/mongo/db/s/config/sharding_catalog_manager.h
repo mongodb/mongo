@@ -549,7 +549,14 @@ public:
      * Returns a scoped lock object, which holds the _kShardMembershipLock in shared mode. While
      * this lock is held no topology changes can occur.
      */
-    Lock::SharedLock enterStableTopologyRegion(OperationContext* opCtx);
+    [[nodiscard]] Lock::SharedLock enterStableTopologyRegion(OperationContext* opCtx);
+
+    /**
+     * Returns a scoped lock object, which holds the _kShardMembershipLock in exclusive mode. This
+     * should only be acquired by topology change operations.
+     */
+    [[nodiscard]] Lock::ExclusiveLock acquireShardMembershipLockForTopologyChange(
+        OperationContext* opCtx);
 
     /**
      * Updates the "hasTwoOrMoreShard" cluster cardinality parameter based on the number of shards
@@ -811,13 +818,6 @@ private:
                                 const ShardType& newShard,
                                 std::vector<DatabaseName>&& databasesInNewShard,
                                 std::vector<CollectionType>&& collectionsInNewShard);
-    /**
-     * Use the internal transaction API to remove a shard.
-     */
-    void _removeShardInTransaction(OperationContext* opCtx,
-                                   const std::string& removedShardName,
-                                   const std::string& controlShardName,
-                                   const Timestamp& newTopologyTime);
 
     /**
      * Execute the merge chunk updates using the internal transaction API.

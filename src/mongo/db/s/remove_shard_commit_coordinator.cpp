@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/s/remove_shard_commit_coordinator.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/s/remove_shard_exception.h"
 
 #include "mongo/db/s/topology_change_helpers.h"
@@ -57,6 +58,14 @@ ExecutorFuture<void> RemoveShardCommitCoordinator::_runImpl(
                                      if (_doc.getIsTransitionToDedicated()) {
                                          _dropLocalCollections(opCtx);
                                      }
+                                 }))
+        .then(_buildPhaseHandler(Phase::kCommit,
+                                 [this, executor = executor, anchor = shared_from_this()] {
+                                     const auto opCtxHolder = cc().makeOperationContext();
+                                     auto* opCtx = opCtxHolder.get();
+                                     getForwardableOpMetadata().setOn(opCtx);
+
+                                     _commitRemoveShard(opCtx, executor);
                                  }))
         .then([this, anchor = shared_from_this()] {
             const auto opCtxHolder = cc().makeOperationContext();
@@ -161,6 +170,29 @@ void RemoveShardCommitCoordinator::_dropLocalCollections(OperationContext* opCtx
             opCtx, trackedDbs, _doc.getShardId().toString())) {
         uasserted(RemoveShardDrainingInfo(*pendingCleanupState),
                   "All collections must be empty before removing the shard.");
+    }
+}
+
+void RemoveShardCommitCoordinator::_commitRemoveShard(
+    OperationContext* opCtx, std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    LOGV2(9782601, "Going to remove shard", "shardId"_attr = _doc.getShardId().toString());
+
+    Lock::ExclusiveLock shardMembershipLock =
+        ShardingCatalogManager::get(opCtx)->acquireShardMembershipLockForTopologyChange(opCtx);
+
+    topology_change_helpers::removeShard(shardMembershipLock,
+                                         opCtx,
+                                         ShardingCatalogManager::get(opCtx)->localConfigShard(),
+                                         _doc.getShardId().toString(),
+                                         **executor);
+
+    // The shard which was just removed must be reflected in the shard registry, before the
+    // replica set monitor is removed, otherwise the shard would be referencing a dropped RSM.
+    Grid::get(opCtx)->shardRegistry()->reload(opCtx);
+
+    if (!_doc.getIsTransitionToDedicated()) {
+        // Don't remove the config shard's RSM because it is used to target the config server.
+        ReplicaSetMonitor::remove(_doc.getReplicaSetName().toString());
     }
 }
 

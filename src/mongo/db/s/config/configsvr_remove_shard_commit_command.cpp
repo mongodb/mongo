@@ -71,25 +71,27 @@ public:
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-            const auto shardId = [&] {
+            const auto [shardId, replicaSetName] = [&] {
                 const auto shardIdOrUrl = request().getCommandParameter();
                 const auto shard = uassertStatusOK(
                     Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardIdOrUrl));
-                return shard->getId();
+                return std::make_pair(shard->getId(), shard->getConnString().getReplicaSetName());
             }();
 
-            auto removeShardCommitCoordinator = [&]() {
-                auto coordinatorDoc = RemoveShardCommitCoordinatorDocument();
-                coordinatorDoc.setShardId(shardId);
-                coordinatorDoc.setIsTransitionToDedicated(shardId == ShardId::kConfigServerId);
-                coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                    {{NamespaceString::kConfigsvrShardsNamespace,
-                      DDLCoordinatorTypeEnum::kRemoveShardCommit}});
-                auto service = ShardingDDLCoordinatorService::getService(opCtx);
-                auto coordinator = checked_pointer_cast<RemoveShardCommitCoordinator>(
-                    service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
-                return coordinator;
-            }();
+            auto removeShardCommitCoordinator =
+                [&, shardId = shardId, replicaSetName = replicaSetName]() {
+                    auto coordinatorDoc = RemoveShardCommitCoordinatorDocument();
+                    coordinatorDoc.setShardId(shardId);
+                    coordinatorDoc.setReplicaSetName(replicaSetName);
+                    coordinatorDoc.setIsTransitionToDedicated(shardId == ShardId::kConfigServerId);
+                    coordinatorDoc.setShardingDDLCoordinatorMetadata(
+                        {{NamespaceString::kConfigsvrShardsNamespace,
+                          DDLCoordinatorTypeEnum::kRemoveShardCommit}});
+                    auto service = ShardingDDLCoordinatorService::getService(opCtx);
+                    auto coordinator = checked_pointer_cast<RemoveShardCommitCoordinator>(
+                        service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+                    return coordinator;
+                }();
 
             const auto& drainingStatus = [&]() -> RemoveShardProgress {
                 try {

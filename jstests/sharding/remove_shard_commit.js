@@ -12,11 +12,23 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardTransitionUtil} from "jstests/libs/shard_transition_util.js";
+import {getShardNames} from "jstests/libs/sharded_cluster_fixture_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = 'test';
 const collName = 'foo';
 const ns = dbName + '.' + collName;
+
+function getTopologyTime(st) {
+    const shardDoc = st.s.getDB('config')
+                         .getCollection('shards')
+                         .find({})
+                         .sort({'topologyTime': -1})
+                         .limit(1)
+                         .toArray();
+    assert.eq(shardDoc.length, 1);
+    return shardDoc[0].topologyTime;
+}
 
 function moveAllChunksOffShard(st, shardName, otherShard) {
     let configDB = st.s.getDB("config");
@@ -84,12 +96,17 @@ if (isConfigShard) {
 
 // If we are in the config shard scenario, the range deletions are now cleaned up. If we are not
 // in the config shard scenario, we should ignore the range deletions.
-jsTest.log(
-    "Test that the coordinator will continue past all checks when no data is left on the shard");
+jsTest.log("Test that the coordinator will commit the shard removal and bump the topology time.");
+let initialTopologyTime = getTopologyTime(st);
+let shardName = st.shard0.shardName;
 assert.commandFailedWithCode(
     st.configRS.getPrimary().adminCommand(
         {_configsvrRemoveShardCommit: st.shard0.shardName, writeConcern: {w: "majority"}}),
     ErrorCodes.NotImplemented);
+
+let finalTopologyTime = getTopologyTime(st);
+assert(!getShardNames(st.s).includes(shardName));
+assert.gt(timestampCmp(finalTopologyTime, initialTopologyTime), 0);
 
 rangeDeletionFailpoint.off();
 st.stop();
