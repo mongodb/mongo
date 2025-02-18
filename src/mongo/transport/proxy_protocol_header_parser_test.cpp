@@ -47,7 +47,6 @@ namespace mongo::transport {
 namespace {
 
 using namespace unittest::match;
-using namespace fmt::literals;
 
 template <typename MSrc, typename MDst>
 class ProxiedEndpointsAre : public Matcher {
@@ -55,7 +54,7 @@ public:
     explicit ProxiedEndpointsAre(MSrc&& s, MDst&& d) : _src(std::move(s)), _dst(std::move(d)) {}
 
     std::string describe() const {
-        return "ProxiedEndpointsAre({}, {})"_format(_src.describe(), _dst.describe());
+        return fmt::format("ProxiedEndpointsAre({}, {})", _src.describe(), _dst.describe());
     }
 
     MatchResult match(const ProxiedEndpoints& e) const {
@@ -73,7 +72,7 @@ ParserResults parseAllPrefixes(StringData s) {
         StringData sub = s.substr(0, len);
         results = parseProxyProtocolHeader(sub);
         if (len < s.size()) {
-            ASSERT_FALSE(results) << "size={}, sub={}"_format(len, sub);
+            ASSERT_FALSE(results) << fmt::format("size={}, sub={}", len, sub);
         }
     }
     ASSERT_TRUE(results);
@@ -277,12 +276,12 @@ TEST(ProxyProtocolHeaderParser, WellFormedV1Headers) {
                                     Eq(SockAddr::create("0.0.1.44", 3000, AF_INET))));
 
     static constexpr StringData allFs = "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"_sd;
-    ASSERT_THAT(*parseStringExpectSuccess("PROXY TCP6 {} "
-                                          "{} 10000 30000\r\n"_format(allFs, allFs)),
-                ProxiedEndpointsAre(Eq(SockAddr::create(allFs, 10000, AF_INET6)),
-                                    Eq(SockAddr::create(allFs, 30000, AF_INET6))));
+    ASSERT_THAT(
+        *parseStringExpectSuccess(fmt::format("PROXY TCP6 {} {} 10000 30000\r\n", allFs, allFs)),
+        ProxiedEndpointsAre(Eq(SockAddr::create(allFs, 10000, AF_INET6)),
+                            Eq(SockAddr::create(allFs, 30000, AF_INET6))));
 
-    ASSERT_THAT(*parseStringExpectSuccess("PROXY TCP6 :: {} 1000 3000\r\n"_format(allFs)),
+    ASSERT_THAT(*parseStringExpectSuccess(fmt::format("PROXY TCP6 :: {} 1000 3000\r\n", allFs)),
                 ProxiedEndpointsAre(Eq(SockAddr::create("::", 1000, AF_INET6)),
                                     Eq(SockAddr::create(allFs, 3000, AF_INET6))));
 
@@ -297,7 +296,7 @@ TEST(ProxyProtocolHeaderParser, WellFormedV1Headers) {
     ASSERT_FALSE(parseStringExpectSuccess("PROXY UNKNOWN hot garbage\r\n"));
     // The longest possible V1 header
     ASSERT_FALSE(
-        parseStringExpectSuccess("PROXY UNKNOWN {} {} 65535 65535\r\n"_format(allFs, allFs)));
+        parseStringExpectSuccess(fmt::format("PROXY UNKNOWN {} {} 65535 65535\r\n", allFs, allFs)));
 }
 
 struct TestV2Header {
@@ -310,13 +309,14 @@ struct TestV2Header {
     std::string metadata;
 
     std::string toString() const {
-        return "{}{}{}{}{}{}{}"_format(header,
-                                       versionAndCommand,
-                                       addressFamilyAndProtocol,
-                                       length,
-                                       firstAddr,
-                                       secondAddr,
-                                       metadata);
+        return fmt::format("{}{}{}{}{}{}{}",
+                           header,
+                           versionAndCommand,
+                           addressFamilyAndProtocol,
+                           length,
+                           firstAddr,
+                           secondAddr,
+                           metadata);
     }
 };
 

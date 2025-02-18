@@ -42,10 +42,6 @@
 
 namespace mongo {
 
-namespace {
-using namespace fmt::literals;
-}  // namespace
-
 OAuthAuthorizationServerMetadata OAuthDiscoveryFactory::acquire(StringData issuer) {
     // RFC8414 declares that the well-known addresses defined by OpenID Connect are valid for
     // compliant clients for legacy purposes. Newer clients should use
@@ -59,7 +55,7 @@ OAuthAuthorizationServerMetadata OAuthDiscoveryFactory::acquire(StringData issue
         issuer.remove_suffix(1);
     }
 
-    auto openIDConfiguationEndpoint = "{}/.well-known/openid-configuration"_format(issuer);
+    auto openIDConfiguationEndpoint = fmt::format("{}/.well-known/openid-configuration", issuer);
 
     DataBuilder results = _client->get(openIDConfiguationEndpoint);
     StringData textResult =

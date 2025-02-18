@@ -57,12 +57,12 @@ public:
      */
     template <typename... ArgT>
     InputStream(ArgT&&... args) : InputT(std::forward<ArgT>(args)...) {
-        using namespace fmt::literals;
         InputT::open();
-        uassert(ErrorCodes::FileNotOpen,
-                "Named pipe still not open for read after exhausting retries. Error: {}"_format(
-                    getLastSystemErrorMessageFormatted("open"_sd, InputT::getAbsolutePath())),
-                InputT::isOpen());
+        uassert(
+            ErrorCodes::FileNotOpen,
+            fmt::format("Named pipe still not open for read after exhausting retries. Error: {}",
+                        getLastSystemErrorMessageFormatted("open"_sd, InputT::getAbsolutePath())),
+            InputT::isOpen());
     }
 
     /**

@@ -51,7 +51,6 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 using std::list;
-using namespace fmt::literals;
 
 class ListClusterCatalogPipelineBuilder {
 public:

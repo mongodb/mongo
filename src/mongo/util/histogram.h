@@ -178,11 +178,11 @@ void appendHistogram(BSONObjBuilder& bob, const Histogram<Ts...>& hist, const St
     BSONObjBuilder histBob(bob.subobjStart(histKey));
     long long totalCount = 0;
 
-    using namespace fmt::literals;
     for (auto&& [count, lower, upper] : hist) {
-        std::string bucketKey = "{}{}, {})"_format(lower ? "[" : "(",
-                                                   lower ? "{}"_format(*lower) : "-inf",
-                                                   upper ? "{}"_format(*upper) : "inf");
+        std::string bucketKey = fmt::format("{}{}, {})",
+                                            lower ? "[" : "(",
+                                            lower ? fmt::format("{}", *lower) : "-inf",
+                                            upper ? fmt::format("{}", *upper) : "inf");
 
         BSONObjBuilder(histBob.subobjStart(bucketKey))
             .append("count", static_cast<long long>(count));

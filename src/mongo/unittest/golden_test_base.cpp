@@ -67,8 +67,6 @@ namespace mongo::unittest {
 namespace fs = ::boost::filesystem;
 namespace po = ::boost::program_options;
 
-using namespace fmt::literals;
-
 std::string readFile(const fs::path& path) {
     uassert(6741506,
             str::stream() << "path '" << path.string() << "' must not be a directory",
@@ -171,7 +169,7 @@ std::string GoldenTestContextBase::toSnakeCase(const std::string& str) {
 std::string GoldenTestContextBase::sanitizeName(const std::string& str) {
     for (char c : str) {
         bool valid = c == '_' || c == '-' || ctype::isAlnum(c);
-        uassert(6741501, "Unsupported character '{}' in name '{}'"_format(c, str), valid);
+        uassert(6741501, fmt::format("Unsupported character '{}' in name '{}'", c, str), valid);
     }
 
     return toSnakeCase(str);
@@ -183,7 +181,9 @@ void GoldenTestContextBase::verifyOutput() {
     fs::path goldenDataPath = getGoldenDataPath();
     if (!fs::exists(goldenDataPath)) {
         failResultMismatch(
-            actualStr, boost::none, "Golden data file doesn't exist: {}"_format(goldenDataPath));
+            actualStr,
+            boost::none,
+            fmt::format("Golden data file doesn't exist: {}", fmt::streamed(goldenDataPath)));
     }
 
     std::string expectedStr = readFile(goldenDataPath);

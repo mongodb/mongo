@@ -70,7 +70,6 @@
 
 namespace mongo {
 namespace {
-using namespace fmt::literals;
 
 class ShardsvrMovePrimaryEnterCriticalSectionCommand final
     : public TypedCommand<ShardsvrMovePrimaryEnterCriticalSectionCommand> {
@@ -85,10 +84,10 @@ public:
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 
-            uassert(
-                ErrorCodes::InvalidOptions,
-                "{} expected to be called within a retryable write "_format(Request::kCommandName),
-                TransactionParticipant::get(opCtx));
+            uassert(ErrorCodes::InvalidOptions,
+                    fmt::format("{} expected to be called within a retryable write ",
+                                Request::kCommandName),
+                    TransactionParticipant::get(opCtx));
 
             {
                 // Using the original operation context, the two write operations to enter the

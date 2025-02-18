@@ -44,13 +44,11 @@
 namespace mongo::ctype {
 namespace {
 
-using namespace fmt::literals;
-
 TEST(Ctype, MatchesCxxStdlib) {
     for (size_t i = 0; i < 256; ++i) {
         char c = i;
         unsigned char uc = i;
-        const std::string msg = " i={:02x}"_format(i);
+        const std::string msg = fmt::format(" i={:02x}", i);
         ASSERT_EQ(isAlnum(c), (bool)std::isalnum(uc)) << msg;
         ASSERT_EQ(isAlpha(c), (bool)std::isalpha(uc)) << msg;
         ASSERT_EQ(isLower(c), (bool)std::islower(uc)) << msg;
@@ -72,7 +70,7 @@ TEST(Ctype, MatchesCStdlib) {
     for (size_t i = 0; i < 256; ++i) {
         char c = i;
         unsigned char uc = i;
-        const std::string msg = " i={:02x}"_format(i);
+        const std::string msg = fmt::format(" i={:02x}", i);
         ASSERT_EQ(isAlnum(c), (bool)isalnum(uc)) << msg;
         ASSERT_EQ(isAlpha(c), (bool)isalpha(uc)) << msg;
         ASSERT_EQ(isLower(c), (bool)islower(uc)) << msg;

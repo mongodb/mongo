@@ -90,8 +90,6 @@
 namespace mongo {
 namespace unittest {
 
-using namespace fmt::literals;
-
 class DeathTestSyscallException : public std::runtime_error {
 public:
     using std::runtime_error::runtime_error;
@@ -109,7 +107,7 @@ void logAndThrowWithErrnoAt(StringData expr, StringData file, unsigned line) {
                 "line"_attr = line);
     breakpoint();
     throw DeathTestSyscallException(
-        "{} failed: {} @{}:{}"_format(expr, errorMessage(ec), file, line));
+        fmt::format("{} failed: {} @{}:{}", expr, errorMessage(ec), file, line));
 }
 
 
@@ -222,10 +220,10 @@ void canonicalizeExe(std::string& arg0) {
 void stripOption(std::vector<std::string>& av, StringData opt) {
     for (size_t i = 0; i < av.size();) {
         StringData sd = av[i];
-        if (sd == "--{}"_format(opt)) {
+        if (sd == fmt::format("--{}", opt)) {
             if (i + 1 < av.size())
                 av.erase(av.begin() + i, av.begin() + i + 2);
-        } else if (sd.startsWith("--{}="_format(opt))) {
+        } else if (sd.startsWith(fmt::format("--{}=", opt))) {
             av.erase(av.begin() + i);
         } else {
             ++i;
@@ -293,9 +291,9 @@ void DeathTestBase::Subprocess::execChild(std::string tempPath) {
     stripOption(av, "filterFileName");
     stripOption(av, "tempPath");
     const TestInfo* info = UnitTest::getInstance()->currentTestInfo();
-    av.push_back("--suite={}"_format(info->suiteName()));
-    av.push_back("--filter=^{}$"_format(pcre_util::quoteMeta(info->testName())));
-    av.push_back("--tempPath={}"_format(tempPath));
+    av.push_back(fmt::format("--suite={}", info->suiteName()));
+    av.push_back(fmt::format("--filter=^{}$", pcre_util::quoteMeta(info->testName())));
+    av.push_back(fmt::format("--tempPath={}", tempPath));
     // The presence of this flag is how the test body in the child process knows it's in the
     // child process, and therefore to not exec again. Its value is ignored.
     av.push_back("--internalRunDeathTest=1");

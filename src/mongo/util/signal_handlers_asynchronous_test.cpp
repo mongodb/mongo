@@ -49,7 +49,6 @@
 
 namespace mongo {
 namespace {
-using namespace fmt::literals;
 
 constexpr auto kTestLogTag = "test"_sd;
 

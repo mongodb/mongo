@@ -81,7 +81,6 @@
 
 
 namespace mongo::auth {
-using namespace fmt::literals;
 
 using ResolvedRoleData = AuthorizationBackendInterface::ResolvedRoleData;
 using ResolveRoleOption = AuthorizationBackendInterface::ResolveRoleOption;
@@ -386,8 +385,8 @@ StatusWith<ResolvedRoleData> AuthorizationBackendLocal::resolveRoles(
                 for (const auto& privElem : elem.Obj()) {
                     if (privElem.type() != Object) {
                         return {ErrorCodes::UnsupportedFormat,
-                                "Expected privilege document as object, got {}"_format(
-                                    typeName(privElem.type()))};
+                                fmt::format("Expected privilege document as object, got {}",
+                                            typeName(privElem.type()))};
                     }
                     auto pp = auth::ParsedPrivilege::parse(idlctx, privElem.Obj());
                     Privilege::addPrivilegeToPrivilegeVector(

@@ -324,7 +324,7 @@ BSONObj BSONObj::_jsonStringGenerator(const Generator& g,
     }
 
     if (pretty)
-        fmt::format_to(buffer, "\n{:<{}}", "", (pretty - 1) * 4);
+        fmt::format_to(std::back_inserter(buffer), "\n{:<{}}", "", (pretty - 1) * 4);
     buffer.push_back(isArray ? ']' : '}');
     return truncation;
 }

@@ -38,12 +38,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
-namespace {
-
-using namespace fmt::literals;
-
-}  // namespace
-
 namespace create_database_util {
 
 void logCommitCreateDatabaseFailed(const DatabaseName& dbName, const std::string& reason) {
@@ -117,7 +111,7 @@ boost::optional<DatabaseType> findDatabaseExactMatch(
 BSONObj constructDbMatchFilterCaseInsensitive(StringData dbNameStr) {
     BSONObjBuilder filterBuilder;
     filterBuilder.appendRegex(
-        DatabaseType::kDbNameFieldName, "^{}$"_format(pcre_util::quoteMeta(dbNameStr)), "i");
+        DatabaseType::kDbNameFieldName, fmt::format("^{}$", pcre_util::quoteMeta(dbNameStr)), "i");
     return filterBuilder.obj();
 }
 

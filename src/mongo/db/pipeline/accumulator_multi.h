@@ -413,10 +413,9 @@ SortPattern getAccSortPattern(AccumulatorN* accN) {
 }
 
 inline SortPattern getAccSortPattern(const boost::intrusive_ptr<AccumulatorState>& accState) {
-    using namespace fmt::literals;
     auto accN = dynamic_cast<AccumulatorN*>(accState.get());
     tassert(8434700,
-            "Expected AccumulatorN but the accumulator is {}"_format(accState->getOpName()),
+            fmt::format("Expected AccumulatorN but the accumulator is {}", accState->getOpName()),
             accN);
     switch (accN->getAccumulatorType()) {
         case AccumulatorN::kTop:

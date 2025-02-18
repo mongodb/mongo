@@ -81,7 +81,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
-using namespace fmt::literals;
 using std::string;
 using std::unique_ptr;
 using std::vector;
@@ -666,12 +665,14 @@ UpdateResult PlanExecutorImpl::getUpdateResult() const {
             case StageType::STAGE_PROJECTION_DEFAULT:
             case StageType::STAGE_PROJECTION_COVERED:
             case StageType::STAGE_PROJECTION_SIMPLE: {
-                tassert(7314604,
-                        "Unexpected number of children: {}"_format(_root->getChildren().size()),
-                        _root->getChildren().size() == 1U);
+                tassert(
+                    7314604,
+                    fmt::format("Unexpected number of children: {}", _root->getChildren().size()),
+                    _root->getChildren().size() == 1U);
                 auto childStage = _root->child().get();
                 tassert(7314605,
-                        "Unexpected child stage type: {}"_format(childStage->stageType()),
+                        fmt::format("Unexpected child stage type: {}",
+                                    fmt::underlying(childStage->stageType())),
                         StageType::STAGE_UPDATE == childStage->stageType() ||
                             StageType::STAGE_TIMESERIES_MODIFY == childStage->stageType());
                 return childStage;
@@ -716,12 +717,14 @@ long long PlanExecutorImpl::getDeleteResult() const {
             case StageType::STAGE_PROJECTION_DEFAULT:
             case StageType::STAGE_PROJECTION_COVERED:
             case StageType::STAGE_PROJECTION_SIMPLE: {
-                tassert(7308302,
-                        "Unexpected number of children: {}"_format(_root->getChildren().size()),
-                        _root->getChildren().size() == 1U);
+                tassert(
+                    7308302,
+                    fmt::format("Unexpected number of children: {}", _root->getChildren().size()),
+                    _root->getChildren().size() == 1U);
                 auto childStage = _root->child().get();
                 tassert(7308303,
-                        "Unexpected child stage type: {}"_format(childStage->stageType()),
+                        fmt::format("Unexpected child stage type: {}",
+                                    fmt::underlying(childStage->stageType())),
                         StageType::STAGE_DELETE == childStage->stageType() ||
                             StageType::STAGE_TIMESERIES_MODIFY == childStage->stageType());
                 return childStage;

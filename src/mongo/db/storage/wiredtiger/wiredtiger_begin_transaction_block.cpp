@@ -83,7 +83,6 @@ bool allowUntimestampedWrites() {
 
 }  // namespace
 
-using namespace fmt::literals;
 using NoReadTimestamp = WiredTigerBeginTxnBlock::NoReadTimestamp;
 
 static inline int getConfigOffset(int ignore_prepare,

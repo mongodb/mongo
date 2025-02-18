@@ -147,8 +147,6 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeCommitOnShardingCatalog);
 
 namespace mongo {
 
-using namespace fmt::literals;
-
 namespace create_collection_util {
 std::unique_ptr<InitialSplitPolicy> createPolicy(
     OperationContext* opCtx,
@@ -283,8 +281,8 @@ bool isTimeseries(const boost::optional<CollectionAcquisition>& collection) {
 
 void assertTimeseriesOptionsConsistency(const Collection* coll) {
     tassert(9934501,
-            "Encountered invalid state for target collection '{}'. "_format(
-                coll->ns().toStringForErrorMsg()) +
+            fmt::format("Encountered invalid state for target collection '{}'. ",
+                        coll->ns().toStringForErrorMsg()) +
                 "The collection namespace is prefixed with 'system.buckets.' but does not have "
                 "associated time-series options. Please consider options to correct this, "
                 "including renaming the collection or dropping the collection after inspecting "
@@ -292,8 +290,8 @@ void assertTimeseriesOptionsConsistency(const Collection* coll) {
             !coll->ns().isTimeseriesBucketsCollection() ||
                 coll->getTimeseriesOptions().has_value());
     tassert(9934502,
-            "Encountered invalid state for target collection '{}'. "_format(
-                coll->ns().toStringForErrorMsg()) +
+            fmt::format("Encountered invalid state for target collection '{}'. ",
+                        coll->ns().toStringForErrorMsg()) +
                 "The collection namespace is not prefixed with 'system.buckets.' but has "
                 "associated time-series options. Please consider options to correct this, "
                 "including renaming the collection or dropping the collection after inspecting "
@@ -570,15 +568,17 @@ CollectionAcquisition acquireTargetCollection(OperationContext* opCtx,
     if (collOrView.isView()) {
         // Namespace exists in local catalog and is a view
         tassert(8119030,
-                "Found view definition on a prohibited bucket namesapce '{}'"_format(
-                    originalNss.toStringForErrorMsg()),
+                fmt::format("Found view definition on a prohibited bucket namesapce '{}'",
+                            originalNss.toStringForErrorMsg()),
                 !originalNss.isTimeseriesBucketsCollection());
 
         uassert(
             (isSharded(request) ? ErrorCodes::CommandNotSupportedOnView
                                 : ErrorCodes::NamespaceExists),
-            "Cannot {} collection '{}' because a view already exists with the same namespace"_format(
-                (isSharded(request) ? "shard" : "create"), originalNss.toStringForErrorMsg()),
+            fmt::format(
+                "Cannot {} collection '{}' because a view already exists with the same namespace",
+                (isSharded(request) ? "shard" : "create"),
+                originalNss.toStringForErrorMsg()),
             collOrView.getView().getViewDefinition().timeseries());
 
         return acquireCollectionMaybeLockFree(
@@ -685,7 +685,9 @@ void checkLocalCatalogCollectionOptions(OperationContext* opCtx,
 
         uassert(
             ErrorCodes::InvalidOptions,
-            "The `timeseries` options provided must match the ones of the existing collection. Requested {} but found {}"_format(
+            fmt::format(
+                "The `timeseries` options provided must match the ones of the existing collection. "
+                "Requested {} but found {}",
                 request.getTimeseries()->toBSON().toString(),
                 targetColl->getCollectionPtr()->getTimeseriesOptions()->toBSON().toString()),
             timeseries::optionsAreEqual(*request.getTimeseries(),
@@ -705,11 +707,13 @@ void checkShardingCatalogCollectionOptions(OperationContext* opCtx,
     tassert(
         8119040, "Found empty routing info when checking collection options", cm.hasRoutingTable());
 
-    uassert(
-        ErrorCodes::AlreadyInitialized,
-        "Collection '{}' already exists with a different 'unique' option. Requested '{}' but found '{}'"_format(
-            targetNss.toStringForErrorMsg(), request.getUnique().value_or(false), cm.isUnique()),
-        cm.isUnique() == request.getUnique().value_or(false));
+    uassert(ErrorCodes::AlreadyInitialized,
+            fmt::format("Collection '{}' already exists with a different 'unique' option. "
+                        "Requested '{}' but found '{}'",
+                        targetNss.toStringForErrorMsg(),
+                        request.getUnique().value_or(false),
+                        cm.isUnique()),
+            cm.isUnique() == request.getUnique().value_or(false));
 
     if (request.getDataShard()) {
 
@@ -718,15 +722,16 @@ void checkShardingCatalogCollectionOptions(OperationContext* opCtx,
 
         tassert(
             8119031,
-            "Collection '{}' is distributed across more than one shard even if is unsplittable"_format(
+            fmt::format(
+                "Collection '{}' is distributed across more than one shard even if is unsplittable",
                 targetNss.toStringForErrorMsg()),
             cm.getNShardsOwningChunks() == 1 || cm.isSharded());
 
-        uassert(
-            ErrorCodes::AlreadyInitialized,
-            "Incompatible 'dataShard' option. Collection '{}' is already sharded with data distributed on multiple shards"_format(
-                targetNss.toStringForErrorMsg()),
-            cm.getNShardsOwningChunks() == 1);
+        uassert(ErrorCodes::AlreadyInitialized,
+                fmt::format("Incompatible 'dataShard' option. Collection '{}' is already sharded "
+                            "with data distributed on multiple shards",
+                            targetNss.toStringForErrorMsg()),
+                cm.getNShardsOwningChunks() == 1);
 
         const auto& originalDataShard = [&] {
             std::set<ShardId> allShards;
@@ -734,13 +739,13 @@ void checkShardingCatalogCollectionOptions(OperationContext* opCtx,
             return *allShards.begin();
         }();
 
-        uassert(
-            ErrorCodes::AlreadyInitialized,
-            "Incompatible 'dataShard' option. Collection '{}' already exists on a different shard. Requested shard '{}' but found '{}'"_format(
-                targetNss.toStringForErrorMsg(),
-                request.getDataShard()->toString(),
-                originalDataShard.toString()),
-            originalDataShard == *request.getDataShard());
+        uassert(ErrorCodes::AlreadyInitialized,
+                fmt::format("Incompatible 'dataShard' option. Collection '{}' already exists on a "
+                            "different shard. Requested shard '{}' but found '{}'",
+                            targetNss.toStringForErrorMsg(),
+                            request.getDataShard()->toString(),
+                            originalDataShard.toString()),
+                originalDataShard == *request.getDataShard());
     }
 
     {
@@ -753,20 +758,20 @@ void checkShardingCatalogCollectionOptions(OperationContext* opCtx,
                                            request.getRegisterExistingCollectionInGlobalCatalog());
         const auto defaultCollator =
             cm.getDefaultCollator() ? cm.getDefaultCollator()->getSpec().toBSON() : BSONObj();
-        uassert(
-            ErrorCodes::AlreadyInitialized,
-            "Collection '{}' already exists with a different 'collator' option. Requested {} but found {}"_format(
-                targetNss.toStringForErrorMsg(),
-                requestedCollator.toString(),
-                defaultCollator.toString()),
-            SimpleBSONObjComparator::kInstance.evaluate(defaultCollator == requestedCollator));
+        uassert(ErrorCodes::AlreadyInitialized,
+                fmt::format("Collection '{}' already exists with a different 'collator' option. "
+                            "Requested {} but found {}",
+                            targetNss.toStringForErrorMsg(),
+                            requestedCollator.toString(),
+                            defaultCollator.toString()),
+                SimpleBSONObjComparator::kInstance.evaluate(defaultCollator == requestedCollator));
     }
 
     {
         // Check timeseries options
         uassert(ErrorCodes::AlreadyInitialized,
-                "Collection '{}' already exists and is not timeseries"_format(
-                    targetNss.toStringForErrorMsg()),
+                fmt::format("Collection '{}' already exists and is not timeseries",
+                            targetNss.toStringForErrorMsg()),
                 !request.getTimeseries() || cm.getTimeseriesFields());
 
         if (cm.getTimeseriesFields()) {
@@ -775,20 +780,20 @@ void checkShardingCatalogCollectionOptions(OperationContext* opCtx,
                 // they match
                 const auto& existingTimeseriesOptions =
                     cm.getTimeseriesFields()->getTimeseriesOptions();
-                uassert(
-                    ErrorCodes::AlreadyInitialized,
-                    "Collection '{}' already exists with a different timeseries options. Requested '{}' but found '{}'"_format(
-                        targetNss.toStringForErrorMsg(),
-                        request.getTimeseries()->toBSON().toString(),
-                        existingTimeseriesOptions.toBSON().toString()),
-                    timeseries::optionsAreEqual(*request.getTimeseries(),
-                                                existingTimeseriesOptions));
+                uassert(ErrorCodes::AlreadyInitialized,
+                        fmt::format("Collection '{}' already exists with a different timeseries "
+                                    "options. Requested '{}' but found '{}'",
+                                    targetNss.toStringForErrorMsg(),
+                                    request.getTimeseries()->toBSON().toString(),
+                                    existingTimeseriesOptions.toBSON().toString()),
+                        timeseries::optionsAreEqual(*request.getTimeseries(),
+                                                    existingTimeseriesOptions));
             } else {
                 // The collection exists and is timeseries but it was requested to create a normal
                 // collection
                 uassert(ErrorCodes::AlreadyInitialized,
-                        "Timeseries collection '{}' already exists"_format(
-                            targetNss.toStringForErrorMsg()),
+                        fmt::format("Timeseries collection '{}' already exists",
+                                    targetNss.toStringForErrorMsg()),
                         !isUnsplittable(request));
             }
         }
@@ -815,14 +820,14 @@ void checkShardingCatalogCollectionOptions(OperationContext* opCtx,
                 existingTimeseriesOptions, *request.getShardKey()));
         }();
 
-        uassert(
-            ErrorCodes::AlreadyInitialized,
-            "Collection '{}' already exists with a different shard key. Requested {} but found {}"_format(
-                targetNss.toStringForErrorMsg(),
-                requestKeyPattern.toString(),
-                cm.getShardKeyPattern().toBSON().toString()),
-            SimpleBSONObjComparator::kInstance.evaluate(requestKeyPattern ==
-                                                        cm.getShardKeyPattern().toBSON()));
+        uassert(ErrorCodes::AlreadyInitialized,
+                fmt::format("Collection '{}' already exists with a different shard key. Requested "
+                            "{} but found {}",
+                            targetNss.toStringForErrorMsg(),
+                            requestKeyPattern.toString(),
+                            cm.getShardKeyPattern().toBSON().toString()),
+                SimpleBSONObjComparator::kInstance.evaluate(requestKeyPattern ==
+                                                            cm.getShardKeyPattern().toBSON()));
     }
 }
 
@@ -934,10 +939,11 @@ boost::optional<CreateCollectionResponse> checkIfCollectionExistsWithSameOptions
             // can only be created on the primary.
             // Note that the dataShard is only used for testing and this error message is mainly
             // useful for debugging purpuses only.
-            uasserted(
-                ErrorCodes::AlreadyInitialized,
-                "Cannot specify a data shard for an implicitly created view on an existing timeseries collection."_format(
-                    targetNss.toStringForErrorMsg(), request.getDataShard()->toString()));
+            uasserted(ErrorCodes::AlreadyInitialized,
+                      fmt::format("Cannot specify a data shard for an implicitly created view on "
+                                  "an existing timeseries collection.",
+                                  targetNss.toStringForErrorMsg(),
+                                  request.getDataShard()->toString()));
         }
         // For a timeseries request, the bucket collection already exists and it's tracked but the
         // view is missing locally. We need to create it. Proceed with the coordinator.
@@ -1342,8 +1348,8 @@ void commit(OperationContext* opCtx,
 
     if (MONGO_unlikely(nss == NamespaceString::kLogicalSessionsNamespace)) {
         tassert(ErrorCodes::IllegalOperation,
-                "The '{}' collection must always be sharded"_format(
-                    NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg()),
+                fmt::format("The '{}' collection must always be sharded",
+                            NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg()),
                 isSharded(request));
     }
 

@@ -63,8 +63,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kConnectionPool
 
 
-using namespace fmt::literals;
-
 // One interesting implementation note herein concerns how setup() and
 // refresh() are invoked outside of the global lock, but setTimeout is not.
 // This implementation detail simplifies mocks, allowing them to return
@@ -159,12 +157,19 @@ void ConnectionPool::ControllerInterface::init(ConnectionPool* pool) {
 }
 
 std::string ConnectionPool::ConnectionControls::toString() const {
-    return "{{ maxPending: {}, target: {}, }}"_format(maxPendingConnections, targetConnections);
+    return fmt::format(
+        "{{ maxPending: {}, target: {}, }}", maxPendingConnections, targetConnections);
 }
 
 std::string ConnectionPool::HostState::toString() const {
-    return "{{ requests: {}, ready: {}, pending: {}, active: {}, leased: {}, isExpired: {} }}"_format(
-        requests, ready, pending, active, leased, health.isExpired);
+    return fmt::format(
+        "{{ requests: {}, ready: {}, pending: {}, active: {}, leased: {}, isExpired: {} }}",
+        requests,
+        ready,
+        pending,
+        active,
+        leased,
+        health.isExpired);
 }
 
 /**

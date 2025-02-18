@@ -153,12 +153,12 @@ struct JSONValueExtractor {
     void operator()(const char* name, const Duration<Period>& value) {
         // A suffix is automatically prepended
         dassert(!StringData(name).endsWith(value.mongoUnitSuffix()));
-        format_to(std::back_inserter(_buffer),
-                  FMT_COMPILE(R"({}"{}{}":{})"),
-                  _separator,
-                  name,
-                  value.mongoUnitSuffix(),
-                  value.count());
+        fmt::format_to(std::back_inserter(_buffer),
+                       FMT_COMPILE(R"({}"{}{}":{})"),
+                       _separator,
+                       name,
+                       value.mongoUnitSuffix(),
+                       value.count());
         _separator = ","_sd;
     }
 
@@ -177,20 +177,20 @@ struct JSONValueExtractor {
 
 private:
     void storeUnquoted(StringData name) {
-        format_to(std::back_inserter(_buffer), FMT_COMPILE(R"({}"{}":)"), _separator, name);
+        fmt::format_to(std::back_inserter(_buffer), FMT_COMPILE(R"({}"{}":)"), _separator, name);
         _separator = ","_sd;
     }
 
     template <typename T>
     void storeUnquotedValue(StringData name, const T& value) {
-        format_to(
+        fmt::format_to(
             std::back_inserter(_buffer), FMT_COMPILE(R"({}"{}":{})"), _separator, name, value);
         _separator = ","_sd;
     }
 
     template <typename T>
     void storeQuoted(StringData name, const T& value) {
-        format_to(std::back_inserter(_buffer), FMT_COMPILE(R"({}"{}":")"), _separator, name);
+        fmt::format_to(std::back_inserter(_buffer), FMT_COMPILE(R"({}"{}":")"), _separator, name);
         std::size_t before = _buffer.size();
         std::size_t wouldWrite = 0;
         std::size_t written = 0;

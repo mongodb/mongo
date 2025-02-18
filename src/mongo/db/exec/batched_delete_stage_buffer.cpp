@@ -39,7 +39,6 @@
 
 
 namespace mongo {
-using namespace fmt::literals;
 
 BatchedDeleteStageBuffer::BatchedDeleteStageBuffer(WorkingSet* ws) : _ws(ws) {}
 
@@ -48,10 +47,12 @@ void BatchedDeleteStageBuffer::append(WorkingSetID id) {
 }
 
 void BatchedDeleteStageBuffer::eraseUpToOffsetInclusive(size_t bufferOffset) {
-    tassert(6515701,
-            "Cannot erase offset '{}' - beyond the size of the BatchedDeleteStageBuffer {}"_format(
-                bufferOffset, _buffer.size()),
-            bufferOffset < _buffer.size());
+    tassert(
+        6515701,
+        fmt::format("Cannot erase offset '{}' - beyond the size of the BatchedDeleteStageBuffer {}",
+                    bufferOffset,
+                    _buffer.size()),
+        bufferOffset < _buffer.size());
     for (unsigned int i = 0; i <= bufferOffset; i++) {
         auto id = _buffer.at(i);
         _ws->free(id);
@@ -62,11 +63,11 @@ void BatchedDeleteStageBuffer::eraseUpToOffsetInclusive(size_t bufferOffset) {
 
 void BatchedDeleteStageBuffer::erase(const std::set<WorkingSetID>& idsToRemove) {
     for (auto& workingSetMemberId : idsToRemove) {
-        tassert(
-            6515702,
-            "Attempted to free member with WorkingSetId '{}', which does not exist in the BatchedDeleteStageBuffer"_format(
-                workingSetMemberId),
-            std::find(_buffer.begin(), _buffer.end(), workingSetMemberId) != _buffer.end());
+        tassert(6515702,
+                fmt::format("Attempted to free member with WorkingSetId '{}', which does not exist "
+                            "in the BatchedDeleteStageBuffer",
+                            workingSetMemberId),
+                std::find(_buffer.begin(), _buffer.end(), workingSetMemberId) != _buffer.end());
 
         _ws->free(workingSetMemberId);
     }

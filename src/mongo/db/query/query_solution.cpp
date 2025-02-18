@@ -235,7 +235,6 @@ std::pair<const QuerySolutionNode*, size_t> QuerySolutionNode::getFirstNodeByTyp
 }
 
 std::string QuerySolution::summaryString() const {
-    using namespace fmt::literals;
     tassert(5968205, "QuerySolutionNode cannot be null in this QuerySolution", _root);
 
     StringBuilder sb;

@@ -74,10 +74,9 @@ UUID retrieveReshardingUUID(OperationContext* opCtx, const NamespaceString& ns) 
     const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
     const auto collEntry = catalogClient->getCollection(opCtx, ns);
 
-    uassert(
-        ErrorCodes::NoSuchReshardCollection,
-        format(FMT_STRING("Could not find resharding metadata for {}"), ns.toStringForErrorMsg()),
-        collEntry.getReshardingFields());
+    uassert(ErrorCodes::NoSuchReshardCollection,
+            fmt::format("Could not find resharding metadata for {}", ns.toStringForErrorMsg()),
+            collEntry.getReshardingFields());
 
     return collEntry.getReshardingFields()->getReshardingUUID();
 }
@@ -94,10 +93,9 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-            uassert(
-                ErrorCodes::IllegalOperation,
-                format(FMT_STRING("{} can only be run on config servers"), definition()->getName()),
-                serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
+            uassert(ErrorCodes::IllegalOperation,
+                    fmt::format("{} can only be run on config servers", definition()->getName()),
+                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 

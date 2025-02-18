@@ -60,7 +60,7 @@ namespace {
 
 template <typename T>
 std::string formatHex(T&& x) {
-    return format(FMT_STRING("{:#x}"), x);
+    return fmt::format("{:#x}", x);
 }
 
 std::string formatPtr(const void* x) {
@@ -68,7 +68,7 @@ std::string formatPtr(const void* x) {
 }
 
 std::string formatThreadId(stdx::thread::id x) {
-    return format(FMT_STRING("{}"), x);
+    return fmt::format("{}", fmt::streamed(x));
 }
 
 

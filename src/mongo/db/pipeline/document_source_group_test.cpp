@@ -31,6 +31,8 @@
 #include <boost/move/utility_core.hpp>
 #include <cstdint>
 #include <deque>
+#include <fmt/format.h>
+#include <fmt/ranges.h>
 #include <functional>
 #include <list>
 #include <map>

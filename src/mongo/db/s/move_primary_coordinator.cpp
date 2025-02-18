@@ -93,7 +93,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
-using namespace fmt::literals;
 
 namespace {
 
@@ -211,15 +210,16 @@ ExecutorFuture<void> MovePrimaryCoordinator::_runImpl(
                     BSONObj() /* No sorting */,
                     1 /* Limit */));
 
-                uassert(ErrorCodes::ShardNotFound,
-                        "Requested primary shard {} does not exist"_format(toShardId.toString()),
-                        !findResponse.docs.empty());
+                uassert(
+                    ErrorCodes::ShardNotFound,
+                    fmt::format("Requested primary shard {} does not exist", toShardId.toString()),
+                    !findResponse.docs.empty());
 
                 return uassertStatusOK(ShardType::fromBSON(findResponse.docs.front()));
             }();
 
             uassert(ErrorCodes::ShardNotFound,
-                    "Requested primary shard {} is draining"_format(toShardId.toString()),
+                    fmt::format("Requested primary shard {} is draining", toShardId.toString()),
                     !toShardEntry.getDraining());
 
             return runMovePrimaryWorkflow(executor, token);
@@ -230,7 +230,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then(_buildPhaseHandler(
+        .then(_buildPhaseHandler(  //
             Phase::kClone,
             [this, anchor = shared_from_this()] {
                 const auto opCtxHolder = cc().makeOperationContext();
@@ -247,8 +247,10 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
 
                     uasserted(
                         7120202,
-                        "movePrimary operation on database {} failed cloning data to recipient {}"_format(
-                            _dbName.toStringForErrorMsg(), toShardId.toString()));
+                        fmt::format("movePrimary operation on database {} failed cloning data to "
+                                    "recipient {}",
+                                    _dbName.toStringForErrorMsg(),
+                                    toShardId.toString()));
                 }
 
                 LOGV2(7120201,
@@ -468,7 +470,7 @@ void MovePrimaryCoordinator::logChange(OperationContext* opCtx,
         details.append("error", status.toString());
     }
     ShardingLogging::get(opCtx)->logChange(
-        opCtx, "movePrimary.{}"_format(what), NamespaceString(_dbName), details.obj());
+        opCtx, fmt::format("movePrimary.{}", what), NamespaceString(_dbName), details.obj());
 }
 
 std::vector<NamespaceString> MovePrimaryCoordinator::getCollectionsToClone(
@@ -583,8 +585,9 @@ void MovePrimaryCoordinator::assertNoOrphanedDataOnRecipient(
 
     for (const auto& nss : collectionsToClone) {
         uassert(ErrorCodes::NamespaceExists,
-                "Found orphaned collection {} on recipient {}"_format(nss.toStringForErrorMsg(),
-                                                                      toShardId.toString()),
+                fmt::format("Found orphaned collection {} on recipient {}",
+                            nss.toStringForErrorMsg(),
+                            toShardId.toString()),
                 !std::binary_search(allCollections.cbegin(), allCollections.cend(), nss));
     };
 }
@@ -624,8 +627,9 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(Operat
 
         uassertStatusOKWithContext(
             Shard::CommandResponse::getEffectiveStatus(cloneResponse),
-            "movePrimary operation on database {} failed to clone data to recipient {}"_format(
-                _dbName.toStringForErrorMsg(), toShardId.toString()));
+            fmt::format("movePrimary operation on database {} failed to clone data to recipient {}",
+                        _dbName.toStringForErrorMsg(),
+                        toShardId.toString()));
 
         std::vector<NamespaceString> colls;
         for (const auto& bsonElem : cloneResponse.getValue().response["clonedColls"].Obj()) {
@@ -681,8 +685,8 @@ void MovePrimaryCoordinator::commitMetadataToConfig(
 
     uassertStatusOKWithContext(
         Shard::CommandResponse::getEffectiveStatus(commitResponse),
-        "movePrimary operation on database {} failed to commit metadata changes"_format(
-            _dbName.toStringForErrorMsg()));
+        fmt::format("movePrimary operation on database {} failed to commit metadata changes",
+                    _dbName.toStringForErrorMsg()));
 }
 
 DatabaseType MovePrimaryCoordinator::getPostCommitDatabaseMetadata(OperationContext* opCtx) const {
@@ -699,8 +703,8 @@ DatabaseType MovePrimaryCoordinator::getPostCommitDatabaseMetadata(OperationCont
 
     const auto databases = std::move(findResponse.docs);
     uassert(ErrorCodes::IncompatibleShardingMetadata,
-            "Tried to find version for database {}, but found no databases"_format(
-                _dbName.toStringForErrorMsg()),
+            fmt::format("Tried to find version for database {}, but found no databases",
+                        _dbName.toStringForErrorMsg()),
             !databases.empty());
 
     return DatabaseType::parse(IDLParserContext("DatabaseType"), databases.front());
@@ -862,8 +866,10 @@ void MovePrimaryCoordinator::enterCriticalSectionOnRecipient(OperationContext* o
 
     uassertStatusOKWithContext(
         Shard::CommandResponse::getEffectiveStatus(enterCriticalSectionResponse),
-        "movePrimary operation on database {} failed to block read/write operations on recipient {}"_format(
-            _dbName.toStringForErrorMsg(), toShardId.toString()));
+        fmt::format("movePrimary operation on database {} failed to block read/write operations on "
+                    "recipient {}",
+                    _dbName.toStringForErrorMsg(),
+                    toShardId.toString()));
 }
 
 void MovePrimaryCoordinator::exitCriticalSectionOnRecipient(OperationContext* opCtx) {
@@ -893,8 +899,10 @@ void MovePrimaryCoordinator::exitCriticalSectionOnRecipient(OperationContext* op
 
     uassertStatusOKWithContext(
         Shard::CommandResponse::getEffectiveStatus(exitCriticalSectionResponse),
-        "movePrimary operation on database {} failed to unblock read/write operations on recipient {}"_format(
-            _dbName.toStringForErrorMsg(), toShardId.toString()));
+        fmt::format("movePrimary operation on database {} failed to unblock read/write operations "
+                    "on recipient {}",
+                    _dbName.toStringForErrorMsg(),
+                    toShardId.toString()));
 }
 
 }  // namespace mongo

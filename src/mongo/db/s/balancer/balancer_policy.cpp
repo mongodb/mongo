@@ -71,7 +71,6 @@ MONGO_FAIL_POINT_DEFINE(balancerShouldReturnRandomMigrations);
 using std::numeric_limits;
 using std::string;
 using std::vector;
-using namespace fmt::literals;
 
 namespace {
 
@@ -928,7 +927,9 @@ std::string SplitInfo::toString() const {
         splitKeysBuilder << splitKey.toString() << ", ";
     }
 
-    return "Splitting chunk in {} [ {}, {} ), residing on {} at [ {} ] with version {} and collection placement version {}"_format(
+    return fmt::format(
+        "Splitting chunk in {} [ {}, {} ), residing on {} at [ {} ] with version {} and collection "
+        "placement version {}",
         toStringForLogging(nss),
         minKey.toString(),
         maxKey.toString(),
@@ -950,7 +951,8 @@ MergeInfo::MergeInfo(const ShardId& shardId,
       chunkRange(chunkRange) {}
 
 std::string MergeInfo::toString() const {
-    return "Merging chunk range {} in {} residing on {} with collection placement version {}"_format(
+    return fmt::format(
+        "Merging chunk range {} in {} residing on {} with collection placement version {}",
         chunkRange.toString(),
         NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()),
         shardId.toString(),
@@ -962,9 +964,9 @@ MergeAllChunksOnShardInfo::MergeAllChunksOnShardInfo(const ShardId& shardId,
     : shardId(shardId), nss(nss) {}
 
 std::string MergeAllChunksOnShardInfo::toString() const {
-    return "Merging all contiguous chunks residing on shard {} for collection {}"_format(
-        shardId.toString(),
-        NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
+    return fmt::format("Merging all contiguous chunks residing on shard {} for collection {}",
+                       shardId.toString(),
+                       NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
 }
 
 DataSizeInfo::DataSizeInfo(const ShardId& shardId,
@@ -997,13 +999,12 @@ NamespaceStringToShardDataSizeMap getStatsForBalancing(
     auto responsesFromShards = sharding_util::sendCommandToShards(
         opCtx, DatabaseName::kAdmin, reqObj, shardIds, executor, false /* throwOnError */);
 
-    using namespace fmt::literals;
     NamespaceStringToShardDataSizeMap namespaceToShardDataSize;
     for (auto&& response : responsesFromShards) {
         try {
             const auto& shardId = response.shardId;
-            auto errorContext =
-                "Failed to get stats for balancing from shard '{}'"_format(shardId.toString());
+            auto errorContext = fmt::format("Failed to get stats for balancing from shard '{}'",
+                                            shardId.toString());
             const auto responseValue =
                 uassertStatusOKWithContext(std::move(response.swResponse), errorContext);
 

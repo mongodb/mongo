@@ -454,7 +454,7 @@ public:
                     if (val.stringSerialize) {
                         val.stringSerialize(buffer);
                     } else if (val.toString) {
-                        fmt::format_to(buffer, "{}", val.toString());
+                        fmt::format_to(std::back_inserter(buffer), "{}", val.toString());
                     } else if (val.BSONSerialize) {
                         BSONObjBuilder objBuilder;
                         val.BSONSerialize(objBuilder);
@@ -471,13 +471,13 @@ public:
                     }
 
                 } else if constexpr (isDuration<std::decay_t<decltype(val)>>) {
-                    fmt::format_to(buffer, "{}", val.toString());
+                    fmt::format_to(std::back_inserter(buffer), "{}", val.toString());
                 } else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, BSONObj>) {
                     val.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, buffer);
                 } else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, BSONArray>) {
                     val.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true, buffer);
                 } else {
-                    fmt::format_to(buffer, "{}", val);
+                    fmt::format_to(std::back_inserter(buffer), "{}", val);
                 }
             };
 
@@ -565,37 +565,37 @@ public:
             auto append = [&buffer](StringData key, auto&& val) {
                 if constexpr (std::is_same_v<decltype(val), CustomAttributeValue&&>) {
                     if (val.stringSerialize) {
-                        fmt::format_to(buffer, "{}: ", key);
+                        fmt::format_to(std::back_inserter(buffer), "{}: ", key);
                         val.stringSerialize(buffer);
                     } else if (val.toString) {
-                        fmt::format_to(buffer, "{}: {}", key, val.toString());
+                        fmt::format_to(std::back_inserter(buffer), "{}: {}", key, val.toString());
                     } else if (val.BSONSerialize) {
                         BSONObjBuilder objBuilder;
                         val.BSONSerialize(objBuilder);
-                        fmt::format_to(buffer, "{}: ", key);
+                        fmt::format_to(std::back_inserter(buffer), "{}: ", key);
                         objBuilder.done().jsonStringBuffer(
                             JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, buffer);
                     } else if (val.BSONAppend) {
                         BSONObjBuilder objBuilder;
                         val.BSONAppend(objBuilder, ""_sd);
-                        fmt::format_to(buffer, "{}: ", key);
+                        fmt::format_to(std::back_inserter(buffer), "{}: ", key);
                         objBuilder.done().getField(""_sd).jsonStringBuffer(
                             JsonStringFormat::ExtendedRelaxedV2_0_0, false, false, 0, buffer);
                     } else {
-                        fmt::format_to(buffer, "{}: ", key);
+                        fmt::format_to(std::back_inserter(buffer), "{}: ", key);
                         val.toBSONArray().jsonStringBuffer(
                             JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true, buffer);
                     }
                 } else if constexpr (isDuration<std::decay_t<decltype(val)>>) {
-                    fmt::format_to(buffer, "{}: {}", key, val.toString());
+                    fmt::format_to(std::back_inserter(buffer), "{}: {}", key, val.toString());
                 } else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, BSONObj>) {
-                    fmt::format_to(buffer, "{}: ", key);
+                    fmt::format_to(std::back_inserter(buffer), "{}: ", key);
                     val.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, buffer);
                 } else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, BSONArray>) {
-                    fmt::format_to(buffer, "{}: ", key);
+                    fmt::format_to(std::back_inserter(buffer), "{}: ", key);
                     val.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true, buffer);
                 } else {
-                    fmt::format_to(buffer, "{}: {}", key, val);
+                    fmt::format_to(std::back_inserter(buffer), "{}: {}", key, val);
                 }
             };
 

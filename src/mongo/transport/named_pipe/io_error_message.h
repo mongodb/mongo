@@ -36,8 +36,8 @@
 
 namespace mongo {
 inline std::string getLastSystemErrorMessageFormatted(StringData op, const std::string& path) {
-    using namespace fmt::literals;
     std::error_code ec = lastSystemError();
-    return "Failed to {} {}: error code = {}, {}"_format(op, path, ec.value(), errorMessage(ec));
+    return fmt::format(
+        "Failed to {} {}: error code = {}, {}", op, path, ec.value(), errorMessage(ec));
 }
 }  // namespace mongo

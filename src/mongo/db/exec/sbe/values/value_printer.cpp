@@ -513,14 +513,14 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
 
             // If the BinData is a correctly sized newUUID, display it as such.
             if (type == newUUID && len == kNewUUIDLength) {
-                using namespace fmt::literals;
                 StringData sd(data, len);
                 // 4 Octets - 2 Octets - 2 Octets - 2 Octets - 6 Octets
-                stream << "UUID(\"{}-{}-{}-{}-{}\")"_format(hexblob::encodeLower(sd.substr(0, 4)),
-                                                            hexblob::encodeLower(sd.substr(4, 2)),
-                                                            hexblob::encodeLower(sd.substr(6, 2)),
-                                                            hexblob::encodeLower(sd.substr(8, 2)),
-                                                            hexblob::encodeLower(sd.substr(10, 6)));
+                stream << fmt::format("UUID(\"{}-{}-{}-{}-{}\")",
+                                      hexblob::encodeLower(sd.substr(0, 4)),
+                                      hexblob::encodeLower(sd.substr(4, 2)),
+                                      hexblob::encodeLower(sd.substr(6, 2)),
+                                      hexblob::encodeLower(sd.substr(8, 2)),
+                                      hexblob::encodeLower(sd.substr(10, 6)));
                 break;
             }
 

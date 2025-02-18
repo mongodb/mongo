@@ -101,7 +101,7 @@ public:
     }
 
     friend std::string toString(WrappedStdSourceLocation loc) {
-        return fmt::format("{}", loc);
+        return loc._toString();
     }
 
     friend std::ostream& operator<<(std::ostream& os, WrappedStdSourceLocation loc) {
@@ -109,6 +109,8 @@ public:
     }
 
 private:
+    std::string _toString() const;
+
     std::source_location _loc;
 };
 
@@ -118,6 +120,11 @@ template <>
 struct fmt::formatter<mongo::WrappedStdSourceLocation> : mongo::SourceLocationFormatter {};
 
 namespace mongo {
+
+/** Must appear after formatter specialization. */
+inline std::string WrappedStdSourceLocation::_toString() const {
+    return fmt::format("{}", *this);
+}
 
 using SourceLocation = WrappedStdSourceLocation;
 
@@ -155,7 +162,7 @@ public:
     }
 
     friend std::string toString(SyntheticSourceLocation loc) {
-        return fmt::format("{}", loc);
+        return loc._toString();
     }
 
     friend std::ostream& operator<<(std::ostream& os, SyntheticSourceLocation loc) {
@@ -163,6 +170,8 @@ public:
     }
 
 private:
+    std::string _toString() const;
+
     const char* _file_name = "";
     const char* _function_name = "";
     uint_least32_t _line = 0;
@@ -175,6 +184,11 @@ template <>
 struct fmt::formatter<mongo::SyntheticSourceLocation> : mongo::SourceLocationFormatter {};
 
 namespace mongo {
+
+/** Must appear after formatter specialization. */
+inline std::string SyntheticSourceLocation::_toString() const {
+    return fmt::format("{}", *this);
+}
 
 #ifndef MONGO_SOURCE_LOCATION_HAVE_STD
 

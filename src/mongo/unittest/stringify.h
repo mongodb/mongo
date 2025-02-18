@@ -64,7 +64,7 @@ std::string lastResortFormat(const std::type_info& ti, const void* p, size_t sz)
 
 template <typename T>
 std::string doFormat(const T& x) {
-    return format(FMT_STRING("{}"), x);
+    return fmt::format("{}", x);
 }
 
 template <typename T>
@@ -98,7 +98,7 @@ public:
     template <typename T>
     Joiner& operator()(const T& v) {
         // `stringify::` qualification necessary to disable ADL on `v`.
-        _out += format(FMT_STRING("{}{}"), _sep, stringify::invoke(v));
+        _out += fmt::format("{}{}", _sep, stringify::invoke(v));
         _sep = ", ";
         return *this;
     }
@@ -117,14 +117,14 @@ std::string doSequence(const T& seq) {
     Joiner joiner;
     for (const auto& e : seq)
         joiner(e);
-    return format(FMT_STRING("[{}]"), std::string{joiner});
+    return fmt::format("[{}]", std::string{joiner});
 }
 
 template <typename T, size_t... Is>
 std::string doTuple(const T& tup, std::index_sequence<Is...>) {
     Joiner joiner;
     (joiner(std::get<Is>(tup)), ...);
-    return format(FMT_STRING("({})"), std::string{joiner});
+    return fmt::format("({})", std::string{joiner});
 }
 
 template <typename T>

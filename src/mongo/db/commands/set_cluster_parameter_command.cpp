@@ -67,7 +67,6 @@
 
 namespace mongo {
 
-using namespace fmt::literals;
 namespace {
 const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
@@ -107,12 +106,14 @@ public:
                     request().getCommandParameter().nFields() > 0);
 
             uassert(ErrorCodes::InvalidOptions,
-                    "{} only supports setting exactly one parameter"_format(Request::kCommandName),
+                    fmt::format("{} only supports setting exactly one parameter",
+                                Request::kCommandName),
                     request().getCommandParameter().nFields() == 1);
 
             uassert(
                 ErrorCodes::NoSuchKey,
-                "Unknown server parameter: {}"_format(
+                fmt::format(
+                    "Unknown server parameter: {}",
                     query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName),
                 !request().getCommandParameter()
                      [query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName]);

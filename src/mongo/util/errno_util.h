@@ -109,7 +109,7 @@ inline std::error_code lastSystemError() {
  * Libc++ do not include it. So if the code is an unknown, it is replaced with the
  * message that libstdc++ would have given, which is the expanded format
  * expression:
- *     `"Unknown error {}"_format(ec.value())`
+ *     `fmt::format("Unknown error {}", ec.value())`
  */
 std::string errorMessage(std::error_code ec);
 

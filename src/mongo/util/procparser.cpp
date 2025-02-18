@@ -339,7 +339,7 @@ Status parseProcStatFile(StringData filename,
 
     auto status = parseProcStat(keys, swString.getValue(), getTicksPerSecond(), builder);
     if (!status.isOK()) {
-        status.addContext(format(FMT_STRING("Parsing {}"), filename));
+        status.addContext(fmt::format("Parsing {}", filename));
     }
     return status;
 }
@@ -413,7 +413,7 @@ Status parseProcMemInfoFile(StringData filename,
 
     auto status = parseProcMemInfo(keys, swString.getValue(), builder);
     if (!status.isOK()) {
-        status.addContext(format(FMT_STRING("Parsing {}"), filename));
+        status.addContext(fmt::format("Parsing {}", filename));
     }
     return status;
 }
@@ -892,7 +892,7 @@ Status parseProcVMStatFile(StringData filename,
 
     auto status = parseProcVMStat(keys, swString.getValue(), builder);
     if (!status.isOK()) {
-        status.addContext(format(FMT_STRING("Parsing {}"), filename));
+        status.addContext(fmt::format("Parsing {}", filename));
     }
     return status;
 }

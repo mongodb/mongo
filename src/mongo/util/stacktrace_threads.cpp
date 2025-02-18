@@ -207,7 +207,7 @@ public:
 
 private:
     std::string makeId() {
-        return format(FMT_STRING("{:03d}"), _serial++);
+        return fmt::format("{:03d}", _serial++);
     }
 
     size_t _hits = 0;

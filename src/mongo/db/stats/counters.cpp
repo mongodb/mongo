@@ -44,8 +44,6 @@
 
 namespace mongo {
 
-using namespace fmt::literals;
-
 void OpCounters::_reset() {
     _insert->store(0);
     _query->store(0);
@@ -274,7 +272,7 @@ void AuthCounter::MechanismCounterHandle::incClusterAuthenticateSuccessful() {
 auto AuthCounter::getMechanismCounter(StringData mechanism) -> MechanismCounterHandle {
     auto it = _mechanisms.find(mechanism.rawData());
     uassert(ErrorCodes::MechanismUnavailable,
-            "Received authentication for mechanism {} which is not enabled"_format(mechanism),
+            fmt::format("Received authentication for mechanism {} which is not enabled", mechanism),
             it != _mechanisms.end());
 
     auto& data = it->second;

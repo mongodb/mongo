@@ -44,7 +44,6 @@
 
 namespace mongo {
 namespace {
-using namespace fmt::literals;
 
 class ShardsvrCommitToShardLocalCatalogCommand final
     : public TypedCommand<ShardsvrCommitToShardLocalCatalogCommand> {
@@ -78,10 +77,10 @@ public:
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 
-            uassert(
-                ErrorCodes::InvalidOptions,
-                "{} expected to be called within a retryable write "_format(Request::kCommandName),
-                TransactionParticipant::get(opCtx));
+            uassert(ErrorCodes::InvalidOptions,
+                    fmt::format("{} expected to be called within a retryable write ",
+                                Request::kCommandName),
+                    TransactionParticipant::get(opCtx));
 
             {
                 // Using the original operation context, the write operations to update the

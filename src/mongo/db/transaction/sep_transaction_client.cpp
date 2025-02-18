@@ -42,9 +42,6 @@
 
 
 namespace mongo {
-using namespace fmt::literals;
-
-
 namespace txn_api {
 namespace {
 

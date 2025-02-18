@@ -39,7 +39,7 @@
 namespace mongo::unittest::stringify {
 
 std::string formatTypedObj(const std::type_info& ti, StringData s) {
-    return format(FMT_STRING("[{}={}]"), demangleName(ti), s);
+    return fmt::format("[{}={}]", demangleName(ti), s);
 }
 
 std::string lastResortFormat(const std::type_info& ti, const void* p, size_t sz) {

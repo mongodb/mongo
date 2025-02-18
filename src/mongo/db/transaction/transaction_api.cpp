@@ -88,12 +88,7 @@
 MONGO_FAIL_POINT_DEFINE(overrideTransactionApiMaxRetriesToThree);
 
 namespace mongo {
-using namespace fmt::literals;
-
-
 namespace txn_api {
-
-
 namespace details {
 
 void Transaction::TransactionState::transitionTo(StateFlag newState) {
@@ -235,7 +230,7 @@ SemiFuture<BSONObj> Transaction::_commitOrAbort(const DatabaseName& dbName, Stri
             return BSON("ok" << 1);
         }
         uassert(5875902,
-                "Internal transaction not in progress, state: {}"_format(_state.toString()),
+                fmt::format("Internal transaction not in progress, state: {}", _state.toString()),
                 _state.is(TransactionState::kStarted) ||
                     // Allows retrying commit.
                     (_state.isInCommit() && cmdName == CommitTransaction::kCommandName) ||

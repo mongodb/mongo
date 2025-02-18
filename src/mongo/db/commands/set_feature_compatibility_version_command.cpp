@@ -143,8 +143,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 
-using namespace fmt::literals;
-
 namespace mongo {
 namespace {
 
@@ -212,9 +210,11 @@ void abortAllReshardCollection(OperationContext* opCtx) {
 
         uasserted(
             ErrorCodes::ManualInterventionRequired,
-            "reshardCollection was not properly cleaned up after attempted abort for these ns: "
-            "[{}]. This is sign that the resharding operation was interrupted but not "
-            "aborted."_format(nsListStr));
+            fmt::format(
+                "reshardCollection was not properly cleaned up after attempted abort for these ns: "
+                "[{}]. This is sign that the resharding operation was interrupted but not "
+                "aborted.",
+                nsListStr));
     }
 }
 
@@ -361,9 +361,11 @@ public:
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
 
         auto isConfirmed = request.getConfirm().value_or(false);
-        const auto upgradeMsg =
-            "Once you have upgraded to {}, you will not be able to downgrade FCV and binary version without support assistance. Please re-run this command with 'confirm: true' to acknowledge this and continue with the FCV upgrade."_format(
-                multiversion::toString(requestedVersion));
+        const auto upgradeMsg = fmt::format(
+            "Once you have upgraded to {}, you will not be able to downgrade FCV and binary "
+            "version without support assistance. Please re-run this command with 'confirm: true' "
+            "to acknowledge this and continue with the FCV upgrade.",
+            multiversion::toString(requestedVersion));
         const auto downgradeMsg =
             "Once you have downgraded the FCV, if you choose to downgrade the binary version, "
             "it will require support assistance. Please re-run this command with 'confirm: "

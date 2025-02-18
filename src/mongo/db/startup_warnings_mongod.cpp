@@ -59,7 +59,6 @@
 namespace mongo {
 namespace {
 
-using namespace fmt::literals;
 
 #ifdef __linux__
 #if MONGO_CONFIG_TCMALLOC_GOOGLE
@@ -217,7 +216,7 @@ void checkMultipleNumaNodes() {
 }
 
 std::string thpParameterPath(StringData parameter) {
-    return "{}/{}"_format(ProcessInfo::kTranparentHugepageDirectory, parameter);
+    return fmt::format("{}/{}", ProcessInfo::kTranparentHugepageDirectory, parameter);
 }
 
 void logIncorrectAllocatorSettings(StringData path,

@@ -52,8 +52,6 @@
 
 namespace mongo {
 
-using namespace fmt::literals;
-
 namespace {
 
 class BaseProcTest : public unittest::Test {
@@ -1131,10 +1129,10 @@ TEST_F(FTDCProcNetstat, TestLocalSockstat) {
     LOGV2(4840200, "Parsed local /net/proc/sockstat file", "obj"_attr = obj);
 
     for (auto&& [category, nodes] : testKeys) {
-        ASSERT(obj[category].isABSONObj()) << ", category={}"_format(category);
+        ASSERT(obj[category].isABSONObj()) << fmt::format(", category={}", category);
         for (auto&& node : nodes) {
             ASSERT(obj[category][node].isNumber())
-                << ", category={}, node={}"_format(category, node);
+                << fmt::format(", category={}, node={}", category, node);
         }
     }
 }

@@ -101,14 +101,12 @@ static constexpr size_t kMaxUnixPathLength = 108;
 
 template <typename AddrUn = sockaddr_un>
 AddrUn parseSockAddrUn(StringData buffer) {
-    using namespace fmt::literals;
-
     AddrUn addr{};
     addr.sun_family = AF_UNIX;
 
     StringData path = buffer.substr(0, buffer.find('\0'));
     uassert(ErrorCodes::FailedToParse,
-            "Provided unix path longer than system supports: {}"_format(buffer),
+            fmt::format("Provided unix path longer than system supports: {}", buffer),
             path.size() < sizeof(AddrUn::sun_path));
     std::copy(path.begin(), path.end(), addr.sun_path);
     return addr;

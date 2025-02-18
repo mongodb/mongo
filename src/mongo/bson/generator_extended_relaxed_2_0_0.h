@@ -64,7 +64,7 @@ public:
     void writeDouble(fmt::memory_buffer& buffer, double val) const {
         if (val >= std::numeric_limits<double>::lowest() &&
             val <= std::numeric_limits<double>::max())
-            format_to(std::back_inserter(buffer), FMT_COMPILE(R"({})"), val);
+            fmt::format_to(std::back_inserter(buffer), FMT_COMPILE(R"({})"), val);
         else {
             ExtendedCanonicalV200Generator::writeDouble(buffer, val);
         }
@@ -78,9 +78,9 @@ public:
         // handles both the case where Date_t::millis is too large, and the case where
         // Date_t::millis is negative (before the epoch).
         if (val.isFormattable()) {
-            format_to(std::back_inserter(buffer),
-                      FMT_COMPILE(R"({{"$date":"{}"}})"),
-                      StringData{DateStringBuffer{}.iso8601(val, _localDate)});
+            fmt::format_to(std::back_inserter(buffer),
+                           FMT_COMPILE(R"({{"$date":"{}"}})"),
+                           StringData{DateStringBuffer{}.iso8601(val, _localDate)});
         } else {
             ExtendedCanonicalV200Generator::writeDate(buffer, val);
         }

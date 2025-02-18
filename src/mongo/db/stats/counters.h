@@ -762,7 +762,7 @@ extern OperatorCounters operatorCountersWindowAccumulatorExpressions;
 struct QueryCounters {
 private:
     static Counter64& _makeCounter(StringData name, ClusterRole role) {
-        return *MetricBuilder<Counter64>{format(FMT_STRING("query.{}"), name)}.setRole(role);
+        return *MetricBuilder<Counter64>{fmt::format("query.{}", name)}.setRole(role);
     }
 
     ClusterRole _role;

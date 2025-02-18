@@ -51,7 +51,7 @@ void TextFormatter::operator()(boost::log::record_view const& rec,
     using boost::log::extract;
 
     fmt::memory_buffer buffer;
-    fmt::format_to(buffer,
+    fmt::format_to(std::back_inserter(buffer),
                    "{} {:<2} {:<8} [{}] ",
                    StringData{DateStringBuffer{}.iso8601(
                        extract<Date_t>(attributes::timeStamp(), rec).get(),

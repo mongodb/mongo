@@ -41,15 +41,13 @@
 
 namespace {
 
-using namespace fmt::literals;
-
 template <typename Map>
 std::string dumpMap(const Map& m) {
     std::string r;
     r += "{";
     const char* comma = "";
     for (auto&& [k, v] : m) {
-        r += "{}{}:{}"_format(comma, k, v);
+        r += fmt::format("{}{}:{}", comma, k, v);
         comma = ", ";
     }
     r += "}";

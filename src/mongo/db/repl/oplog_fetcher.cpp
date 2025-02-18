@@ -990,8 +990,6 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
 
 Status OplogFetcher::_checkRemoteOplogStart(const OplogFetcher::Documents& documents,
                                             OpTime remoteLastOpApplied) {
-    using namespace fmt::literals;
-
     // Sometimes our remoteLastOpApplied may be stale; if we received a document with an
     // opTime later than remoteLastApplied, we can assume the remote is at least up to that
     // opTime.
@@ -1009,10 +1007,13 @@ Status OplogFetcher::_checkRemoteOplogStart(const OplogFetcher::Documents& docum
     // candidate is ahead of us) and sync source resolution. If the sync source is now behind us,
     // choose a new sync source to prevent going into rollback.
     if (remoteLastOpApplied < lastFetched) {
-        return Status(ErrorCodes::InvalidSyncSource,
-                      "Sync source's last applied OpTime {} is older than our last fetched OpTime "
-                      "{}. Choosing new sync source."_format(remoteLastOpApplied.toString(),
-                                                             lastFetched.toString()));
+        return Status(
+            ErrorCodes::InvalidSyncSource,
+            fmt::format(
+                "Sync source's last applied OpTime {} is older than our last fetched OpTime "
+                "{}. Choosing new sync source.",
+                remoteLastOpApplied.toString(),
+                lastFetched.toString()));
     }
 
     // If '_requireFresherSyncSource' is true, we must check that the sync source's
@@ -1026,10 +1027,12 @@ Status OplogFetcher::_checkRemoteOplogStart(const OplogFetcher::Documents& docum
     // OpTime to determine where to start our OplogFetcher.
     if (_config.requireFresherSyncSource == RequireFresherSyncSource::kRequireFresherSyncSource &&
         remoteLastOpApplied <= lastFetched) {
-        return Status(ErrorCodes::InvalidSyncSource,
-                      "Sync source must be ahead of me. My last fetched oplog optime: {}, latest "
-                      "oplog optime of sync source: {}"_format(lastFetched.toString(),
-                                                               remoteLastOpApplied.toString()));
+        return Status(
+            ErrorCodes::InvalidSyncSource,
+            fmt::format("Sync source must be ahead of me. My last fetched oplog optime: {}, latest "
+                        "oplog optime of sync source: {}",
+                        lastFetched.toString(),
+                        remoteLastOpApplied.toString()));
     }
 
     // At this point we know that our sync source has our minValid and is not behind us, so if our
@@ -1046,11 +1049,13 @@ Status OplogFetcher::_checkRemoteOplogStart(const OplogFetcher::Documents& docum
     auto opTimeResult = OpTime::parseFromOplogEntry(o);
 
     if (!opTimeResult.isOK()) {
-        return Status(ErrorCodes::InvalidBSON,
-                      "our last optime fetched: {}. failed to parse optime from first oplog in "
-                      "batch on source: {}: {}"_format(lastFetched.toString(),
-                                                       o.toString(),
-                                                       opTimeResult.getStatus().toString()));
+        return Status(
+            ErrorCodes::InvalidBSON,
+            fmt::format("our last optime fetched: {}. failed to parse optime from first oplog in "
+                        "batch on source: {}: {}",
+                        lastFetched.toString(),
+                        o.toString(),
+                        opTimeResult.getStatus().toString()));
     }
     auto opTime = opTimeResult.getValue();
     if (opTime != lastFetched) {
@@ -1080,38 +1085,41 @@ Status OplogFetcher::_checkTooStaleToSyncFromSource(const OpTime lastFetched,
         return Status(ErrorCodes::TooStaleToSyncFromSource, e.reason());
     }
 
-    using namespace fmt::literals;
-
     StatusWith<OpTime> remoteFirstOpTimeResult = OpTime::parseFromOplogEntry(remoteFirstOplogEntry);
     if (!remoteFirstOpTimeResult.isOK()) {
         return Status(
             ErrorCodes::InvalidBSON,
-            "failed to parse optime from first entry in source's oplog: {}: {}"_format(
-                remoteFirstOplogEntry.toString(), remoteFirstOpTimeResult.getStatus().toString()));
+            fmt::format("failed to parse optime from first entry in source's oplog: {}: {}",
+                        remoteFirstOplogEntry.toString(),
+                        remoteFirstOpTimeResult.getStatus().toString()));
     }
 
     auto remoteFirstOpTime = remoteFirstOpTimeResult.getValue();
     if (remoteFirstOpTime.isNull()) {
         return Status(ErrorCodes::InvalidBSON,
-                      "optime of first entry in source's oplog cannot be null: {}"_format(
-                          remoteFirstOplogEntry.toString()));
+                      fmt::format("optime of first entry in source's oplog cannot be null: {}",
+                                  remoteFirstOplogEntry.toString()));
     }
 
     // remoteFirstOpTime may come from a very old config, so we cannot compare their terms.
     if (lastFetched.getTimestamp() < remoteFirstOpTime.getTimestamp()) {
         // We are too stale to sync from our current sync source.
-        return Status(ErrorCodes::TooStaleToSyncFromSource,
-                      "we are too stale to sync from the sync source's oplog. our last fetched "
-                      "timestamp is earlier than the sync source's first timestamp. our last "
-                      "optime fetched: {}. sync source's first optime: {}"_format(
-                          lastFetched.toString(), remoteFirstOpTime.toString()));
+        return Status(
+            ErrorCodes::TooStaleToSyncFromSource,
+            fmt::format("we are too stale to sync from the sync source's oplog. our last fetched "
+                        "timestamp is earlier than the sync source's first timestamp. our last "
+                        "optime fetched: {}. sync source's first optime: {}",
+                        lastFetched.toString(),
+                        remoteFirstOpTime.toString()));
     }
 
     // If we are not too stale to sync from the source, we should go into rollback.
-    std::string message =
-        "the sync source's oplog and our oplog have diverged, going into rollback. our last optime "
-        "fetched: {}. optime of first document in batch: {}. sync source's first optime: {}"_format(
-            lastFetched.toString(), firstOpTimeInBatch.toString(), remoteFirstOpTime.toString());
+    std::string message = fmt::format(
+        "the sync source's oplog and our oplog have diverged, going into rollback. our last "
+        "optime fetched: {}. optime of first document in batch: {}. sync source's first optime: {}",
+        lastFetched.toString(),
+        firstOpTimeInBatch.toString(),
+        remoteFirstOpTime.toString());
     return Status(ErrorCodes::OplogStartMissing, message);
 }
 

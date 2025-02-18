@@ -31,6 +31,7 @@
 
 #include <fmt/format.h>
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/logv2/redaction.h"
 
@@ -46,30 +47,28 @@ struct ExpressionContextPrinter {
         auto out = fc.out();
 
         if (!expCtx) {
-            out = format_to(out, FMT_STRING("expCtx is null"));
+            out = fmt::format_to(out, "expCtx is null");
             return out;
         }
 
-        out = format_to(
-            out,
-            FMT_STRING("{{collator: {}, uuid: {}, needsMerge: {}, allowDiskUse: {}, "
-                       "isMapReduceCommand: {}, "
-                       "inLookup: {}, inUnionWith: {}, forcePlanCache: {}, sbeCompatibility: {}, "
-                       "sbeGroupCompatibility: {}, sbeWindowCompatibility: {}, "
-                       "sbePipelineCompatibility: {}, subPipelineDepth: {}}}"),
-            expCtx->getCollatorBSON().toString(),
-            expCtx->getUUID() ? redact(expCtx->getUUID()->toString()) : "none",
-            expCtx->getNeedsMerge(),
-            expCtx->getAllowDiskUse(),
-            expCtx->isMapReduceCommand(),
-            expCtx->getInLookup(),
-            expCtx->getInUnionWith(),
-            expCtx->getForcePlanCache(),
-            expCtx->getSbeCompatibility(),
-            expCtx->getSbeGroupCompatibility(),
-            expCtx->getSbeWindowCompatibility(),
-            expCtx->getSbePipelineCompatibility(),
-            expCtx->getSubPipelineDepth());
+        out = fmt::format_to(out, "{{");
+        auto field = [&, sep = ""_sd](StringData name, auto&& value) mutable {
+            out = fmt::format_to(out, "{}{}: {}", std::exchange(sep, ", "_sd), name, value);
+        };
+        field("collator", expCtx->getCollatorBSON().toString());
+        field("uuid", expCtx->getUUID() ? redact(expCtx->getUUID()->toString()) : "none");
+        field("needsMerge", expCtx->getNeedsMerge());
+        field("allowDiskUse", expCtx->getAllowDiskUse());
+        field("isMapReduceCommand", expCtx->isMapReduceCommand());
+        field("inLookup", expCtx->getInLookup());
+        field("inUnionWith", expCtx->getInUnionWith());
+        field("forcePlanCache", expCtx->getForcePlanCache());
+        field("sbeCompatibility", fmt::underlying(expCtx->getSbeCompatibility()));
+        field("sbeGroupCompatibility", fmt::underlying(expCtx->getSbeGroupCompatibility()));
+        field("sbeWindowCompatibility", fmt::underlying(expCtx->getSbeWindowCompatibility()));
+        field("sbePipelineCompatibility", fmt::underlying(expCtx->getSbePipelineCompatibility()));
+        field("subPipelineDepth", expCtx->getSubPipelineDepth());
+        out = fmt::format_to(out, "}}");
 
         return out;
     }
@@ -88,7 +87,7 @@ struct formatter<mongo::command_diagnostics::ExpressionContextPrinter> {
         return ctx.begin();
     }
 
-    auto format(const mongo::command_diagnostics::ExpressionContextPrinter& obj, auto& ctx) {
+    auto format(const mongo::command_diagnostics::ExpressionContextPrinter& obj, auto& ctx) const {
         return obj.format(ctx);
     }
 };

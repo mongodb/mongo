@@ -52,7 +52,7 @@ protected:
     }
 
     BSONObj _toBSON(const char* obj) const {
-        return fromjson(fmt::format(obj, _metaField));
+        return fromjson(fmt::format(fmt::runtime(obj), _metaField));
     }
 
     BSONObj _translateQuery(const char* query) const {
@@ -84,14 +84,14 @@ protected:
      * expected to be untranslated and still remain the metaField.
      */
     void _testTranslate(const char* obj, std::function<BSONObj(const BSONObj&)> translateFn) const {
-        ASSERT_BSONOBJ_EQ(
-            translateFn(fromjson(fmt::format(obj, _metaField, _metaField, _metaField))),
-            fromjson(fmt::format(obj, "meta", "meta", _metaField)));
+        ASSERT_BSONOBJ_EQ(translateFn(fromjson(
+                              fmt::format(fmt::runtime(obj), _metaField, _metaField, _metaField))),
+                          fromjson(fmt::format(fmt::runtime(obj), "meta", "meta", _metaField)));
 
-        ASSERT_THROWS_CODE(
-            translateFn(fromjson(fmt::format(obj, _metaField, "notMetaField", _metaField))),
-            AssertionException,
-            ErrorCodes::InvalidOptions);
+        ASSERT_THROWS_CODE(translateFn(fromjson(fmt::format(
+                               fmt::runtime(obj), _metaField, "notMetaField", _metaField))),
+                           AssertionException,
+                           ErrorCodes::InvalidOptions);
     }
 
     void _testTranslateQuery(const char* query) const {

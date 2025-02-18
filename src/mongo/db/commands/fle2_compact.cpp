@@ -81,8 +81,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
-using namespace fmt::literals;
-
 MONGO_FAIL_POINT_DEFINE(fleCompactOrCleanupFailBeforeECOCRead);
 MONGO_FAIL_POINT_DEFINE(fleCompactHangBeforeESCAnchorInsert);
 MONGO_FAIL_POINT_DEFINE(fleCleanupHangBeforeNullAnchorUpdate);
@@ -350,13 +348,13 @@ stdx::unordered_set<ECOCCompactionDocumentV2> getUniqueCompactionDocuments(
 
         for (auto& doc : docs) {
             auto ecocDoc = ECOCCompactionDocumentV2::parseAndDecrypt(doc, compactionToken.token);
-            uassert(
-                8574701,
-                "Compaction token for field '{}' is of type '{}', but ECOCDocument is of type '{}'"_format(
-                    compactionToken.fieldPathName,
-                    compactionToken.isRange() ? "range"_sd : "equality"_sd,
-                    ecocDoc.isRange() ? "range"_sd : "equality"_sd),
-                ecocDoc.isRange() == compactionToken.isRange());
+            uassert(8574701,
+                    fmt::format("Compaction token for field '{}' is of type '{}', but ECOCDocument "
+                                "is of type '{}'",
+                                compactionToken.fieldPathName,
+                                compactionToken.isRange() ? "range"_sd : "equality"_sd,
+                                ecocDoc.isRange() ? "range"_sd : "equality"_sd),
+                    ecocDoc.isRange() == compactionToken.isRange());
             if (compactionToken.isRange()) {
                 ecocDoc.anchorPaddingRootToken = compactionToken.anchorPaddingToken;
             }
@@ -709,9 +707,9 @@ void processFLECompactV2(OperationContext* opCtx,
     // Validate that we have an EncryptedFieldConfig for each range field.
     if (!rangeFields.empty()) {
         uassert(8574702,
-                "Command '{}' requires field '{}' when range fields are present"_format(
-                    CompactStructuredEncryptionData::kCommandName,
-                    CompactStructuredEncryptionData::kEncryptionInformationFieldName),
+                fmt::format("Command '{}' requires field '{}' when range fields are present",
+                            CompactStructuredEncryptionData::kCommandName,
+                            CompactStructuredEncryptionData::kEncryptionInformationFieldName),
                 request.getEncryptionInformation());
         auto efc = EncryptionInformationHelpers::getAndValidateSchema(
             request.getNamespace(), request.getEncryptionInformation().get());
@@ -720,18 +718,18 @@ void processFLECompactV2(OperationContext* opCtx,
             auto fieldConfig = std::find_if(efcFields.begin(), efcFields.end(), [&](const auto& f) {
                 return rfIt.first == f.getPath();
             });
-            uassert(
-                8574705,
-                "Missing range field '{}' in '{}'"_format(
-                    rfIt.first, CompactStructuredEncryptionData::kEncryptionInformationFieldName),
-                fieldConfig != efcFields.end());
+            uassert(8574705,
+                    fmt::format("Missing range field '{}' in '{}'",
+                                rfIt.first,
+                                CompactStructuredEncryptionData::kEncryptionInformationFieldName),
+                    fieldConfig != efcFields.end());
             rfIt.second.queryTypeConfig = getQueryType(*fieldConfig, QueryTypeEnum::Range);
 
-            uassert(
-                9107500,
-                "Missing bsonType for range field '{}' in '{}'"_format(
-                    rfIt.first, CompactStructuredEncryptionData::kEncryptionInformationFieldName),
-                fieldConfig->getBsonType().has_value());
+            uassert(9107500,
+                    fmt::format("Missing bsonType for range field '{}' in '{}'",
+                                rfIt.first,
+                                CompactStructuredEncryptionData::kEncryptionInformationFieldName),
+                    fieldConfig->getBsonType().has_value());
             rfIt.second.fieldType = typeFromName(fieldConfig->getBsonType().value());
         }
     }

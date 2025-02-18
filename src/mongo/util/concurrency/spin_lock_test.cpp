@@ -44,8 +44,6 @@
 namespace mongo {
 namespace {
 
-using namespace fmt::literals;
-
 class LockTester {
 public:
     LockTester(SpinLock* spin, int* counter) : _spin(spin), _counter(counter), _requests(0) {}

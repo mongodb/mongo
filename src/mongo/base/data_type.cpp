@@ -38,10 +38,13 @@ namespace mongo {
 
 namespace {
 auto makeOverflowStatus(StringData action, size_t sizeOfT, size_t length, size_t debug_offset) {
-    using namespace fmt::literals;
-    return Status(ErrorCodes::Overflow,
-                  "buffer size too small to {} ({}) bytes out of buffer[{}] at offset: {}"_format(
-                      action, sizeOfT, length, debug_offset));
+    return Status(
+        ErrorCodes::Overflow,
+        fmt::format("buffer size too small to {} ({}) bytes out of buffer[{}] at offset: {}",
+                    action,
+                    sizeOfT,
+                    length,
+                    debug_offset));
 }
 }  // namespace
 

@@ -56,7 +56,6 @@
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
-using namespace fmt::literals;
 namespace mongo {
 
 using std::string;
@@ -191,8 +190,10 @@ public:
             // internal use. The common pattern is to take the min/max boundaries from a chunk,
             // where the max represent a non-included boundary.
             uassert(ErrorCodes::InvalidOptions,
-                    "The range {} for the namespace {} is required to be owned by one shard"_format(
-                        rangeString(min, max), nss.toStringForErrorMsg()),
+                    fmt::format(
+                        "The range {} for the namespace {} is required to be owned by one shard",
+                        rangeString(min, max),
+                        nss.toStringForErrorMsg()),
                     !collection.getShardingDescription().isSharded() ||
                         collection.getShardingFilter()->isRangeEntirelyOwned(
                             min, max, false /*includeMaxBound*/));

@@ -62,14 +62,12 @@
 namespace mongo {
 namespace {
 
-using namespace fmt::literals;
-
 auto& gCursorStats = *new CursorStats{};
 }  // namespace
 
 Counter64& CursorStats::_makeStat(StringData name) {
     static constexpr auto prefix = "cursor"_sd;
-    return *MetricBuilder<Counter64>("{}.{}"_format(prefix, name))
+    return *MetricBuilder<Counter64>(fmt::format("{}.{}", prefix, name))
                 .setRole(ClusterRole::ShardServer);
 }
 

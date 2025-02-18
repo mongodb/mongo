@@ -102,8 +102,6 @@ int SSL_CTX_set_ciphersuites(SSL_CTX*, const char*) {
 }
 #endif
 
-using namespace fmt::literals;
-
 namespace mongo {
 
 using transport::SSLConnectionContext;
@@ -2714,15 +2712,16 @@ Status SSLManagerOpenSSL::_parseAndValidateCertificate(const std::string& keyFil
                                                        Date_t* serverCertificateExpirationDate) {
     UniqueBIO inBio(BIO_new(BIO_s_file()));
     if (!inBio) {
-        return Status(
-            ErrorCodes::InvalidSSLConfiguration,
-            "Failed to allocate BIO object. error: {}"_format(getSSLErrorMessage(ERR_get_error())));
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      fmt::format("Failed to allocate BIO object. error: {}",
+                                  getSSLErrorMessage(ERR_get_error())));
     }
 
     if (BIO_read_filename(inBio.get(), keyFile.c_str()) <= 0) {
         return Status(ErrorCodes::InvalidSSLConfiguration,
-                      "Cannot read key file '{}' when setting subject name. error: {}"_format(
-                          keyFile, getSSLErrorMessage(ERR_get_error())));
+                      fmt::format("Cannot read key file '{}' when setting subject name. error: {}",
+                                  keyFile,
+                                  getSSLErrorMessage(ERR_get_error())));
     }
 
     return _parseAndValidateCertificateFromBIO(std::move(inBio),
@@ -2750,8 +2749,8 @@ Status SSLManagerOpenSSL::_parseAndValidateCertificateFromMemory(
     if (!inBio) {
         CaptureSSLErrorInAttrs capture(errorAttrs);
         return Status(ErrorCodes::InvalidSSLConfiguration,
-                      "Failed to allocate BIO object from in-memory payload. error: {}"_format(
-                          getSSLErrorMessage(ERR_get_error())));
+                      fmt::format("Failed to allocate BIO object from in-memory payload. error: {}",
+                                  getSSLErrorMessage(ERR_get_error())));
     }
 
     return _parseAndValidateCertificateFromBIO(std::move(inBio),
@@ -2772,10 +2771,11 @@ Status SSLManagerOpenSSL::_parseAndValidateCertificateFromBIO(
     UniqueX509 x509(PEM_read_bio_X509(
         inBio.get(), nullptr, &SSLManagerOpenSSL::password_cb, static_cast<void*>(&keyPassword)));
     if (x509 == nullptr) {
-        return Status(
-            ErrorCodes::InvalidSSLConfiguration,
-            "Cannot retrieve certificate from keyfile '{}' when setting subject name. error: {}"_format(
-                fileNameForLogging, getSSLErrorMessage(ERR_get_error())));
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      fmt::format("Cannot retrieve certificate from keyfile '{}' when setting "
+                                  "subject name. error: {}",
+                                  fileNameForLogging,
+                                  getSSLErrorMessage(ERR_get_error())));
     }
 
     *subjectName = getCertificateSubjectX509Name(x509.get());
@@ -2812,10 +2812,11 @@ Status SSLManagerOpenSSL::_parseAndValidateCertificateFromBIO(
 
     auto now = Date_t::now();
     if ((notBeforeMillis > now) || (now > notAfterMillis)) {
-        return Status(
-            ErrorCodes::InvalidSSLConfiguration,
-            "The provided SSL certificate is expired or not yet valid. notBefore {}, notAfter {}"_format(
-                notBeforeMillis.toString(), notAfterMillis.toString()));
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      fmt::format("The provided SSL certificate is expired or not yet valid. "
+                                  "notBefore {}, notAfter {}",
+                                  notBeforeMillis.toString(),
+                                  notAfterMillis.toString()));
     }
 
     if (serverCertificateExpirationDate != nullptr) {

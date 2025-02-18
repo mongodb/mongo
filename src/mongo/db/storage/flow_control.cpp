@@ -276,13 +276,13 @@ int FlowControl::_calculateNewTicketsForLag(const std::vector<repl::MemberData>&
                                             std::uint64_t lagMillis,
                                             std::uint64_t thresholdLagMillis) {
     invariant(lagMillis >= thresholdLagMillis);
-    using namespace fmt::literals;
 
     const auto currSustainerAppliedTs = getMedianAppliedTimestamp(currMemberData);
     const auto prevSustainerAppliedTs = getMedianAppliedTimestamp(prevMemberData);
     invariant(prevSustainerAppliedTs <= currSustainerAppliedTs,
-              "PrevSustainer: {} CurrSustainer: {}"_format(prevSustainerAppliedTs.toString(),
-                                                           currSustainerAppliedTs.toString()));
+              fmt::format("PrevSustainer: {} CurrSustainer: {}",
+                          prevSustainerAppliedTs.toString(),
+                          currSustainerAppliedTs.toString()));
 
     const std::int64_t sustainerAppliedCount =
         _approximateOpsBetween(prevSustainerAppliedTs, currSustainerAppliedTs);

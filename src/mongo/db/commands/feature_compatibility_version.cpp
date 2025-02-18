@@ -93,8 +93,6 @@ using repl::UnreplicatedWritesBlock;
 using GenericFCV = multiversion::GenericFCV;
 using FCV = multiversion::FeatureCompatibilityVersion;
 
-using namespace fmt::literals;
-
 namespace {
 
 /**
@@ -305,11 +303,12 @@ void FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
     auto newVersion = setFCVRequest.getCommandParameter();
     auto isFromConfigServer = setFCVRequest.getFromConfigServer().value_or(false);
 
-    uassert(
-        5147403,
-        "cannot set featureCompatibilityVersion to '{}' while featureCompatibilityVersion is '{}'"_format(
-            multiversion::toString(newVersion), multiversion::toString(fromVersion)),
-        fcvTransitions.permitsTransition(fromVersion, newVersion, isFromConfigServer));
+    uassert(5147403,
+            fmt::format("cannot set featureCompatibilityVersion to '{}' while "
+                        "featureCompatibilityVersion is '{}'",
+                        multiversion::toString(newVersion),
+                        multiversion::toString(fromVersion)),
+            fcvTransitions.permitsTransition(fromVersion, newVersion, isFromConfigServer));
 
     auto fcvObj = findFeatureCompatibilityVersionDocument(opCtx);
     if (!fcvObj.isOK()) {

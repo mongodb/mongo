@@ -47,7 +47,6 @@
 namespace mongo {
 namespace {
 
-using namespace fmt::literals;
 
 static constexpr const char* kReason = "reason";
 static const std::string& kReasonString = *new std::string{kReason};
@@ -56,7 +55,7 @@ static const std::string& kReasonString = *new std::string{kReason};
 template <typename R>
 void checkReason(R&& r, std::string expected = kReasonString) {
     ASSERT_EQUALS(Status(ErrorCodes::MaxError, std::forward<R>(r)).reason(), expected)
-        << "type {}"_format(demangleName(typeid(decltype(r))));
+        << fmt::format("type {}", demangleName(typeid(decltype(r))));
 };
 
 struct CanString {

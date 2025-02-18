@@ -43,6 +43,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <fmt/compile.h>
 #include <fmt/format.h>
 #include <system_error>
 
@@ -61,7 +62,6 @@
 
 
 namespace mongo {
-using namespace fmt::literals;
 
 namespace {
 
@@ -133,7 +133,7 @@ void setOSThreadName(const std::string& threadName) {
     const char* truncName = threadName.c_str();
     if (threadName.size() > kMaxThreadNameLength) {
         StringData sd = threadName;
-        shortNameBuf = "{}.{}"_format(sd.substr(0, 7), sd.substr(sd.size() - 7));
+        shortNameBuf = fmt::format("{}.{}", sd.substr(0, 7), sd.substr(sd.size() - 7));
         truncName = shortNameBuf->c_str();
     }
 
@@ -229,7 +229,8 @@ private:
         if (isMainThread())
             return "main";
         static AtomicWord<uint64_t> next{1};
-        return "thread{}"_format(next.fetchAndAdd(1));
+        using namespace fmt::literals;
+        return fmt::format("thread{}"_cf, next.fetchAndAdd(1));
     }
 
     ThreadNameRef _h{_makeAnonymousThreadName()};

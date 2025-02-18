@@ -75,7 +75,6 @@ protected:
 
 namespace {
 
-using namespace fmt::literals;
 
 TEST_F(NamespaceStringTest, createNamespaceString_forTest) {
     TenantId tenantId(OID::gen());
@@ -377,7 +376,7 @@ TEST_F(NamespaceStringTest, NSSWithTenantId) {
         ASSERT_EQ(nss4.size(), 3);
         ASSERT_EQ(nss4.ns_forTest(), "foo");
         ASSERT_EQ(nss4.toString_forTest(), "foo");
-        ASSERT_EQ(nss4.toStringWithTenantId_forTest(), "{}_foo"_format(tenantId.toString()));
+        ASSERT_EQ(nss4.toStringWithTenantId_forTest(), fmt::format("{}_foo", tenantId.toString()));
         ASSERT_EQ(nss4.db_forTest(), "foo");
         ASSERT_EQ(nss4.coll(), "");
         ASSERT_EQ(nss4.dbName().toString_forTest(), "foo");
@@ -394,7 +393,7 @@ TEST_F(NamespaceStringTest, NSSWithTenantId) {
         ASSERT_EQ(multiNss.ns_forTest(), "config.system.change_collection");
         ASSERT_EQ(multiNss.toString_forTest(), "config.system.change_collection");
         ASSERT_EQ(multiNss.toStringWithTenantId_forTest(),
-                  "{}_config.system.change_collection"_format(tenantId.toString()));
+                  fmt::format("{}_config.system.change_collection", tenantId.toString()));
         ASSERT_EQ(multiNss.db_forTest(), "config");
         ASSERT_EQ(multiNss.coll(), "system.change_collection");
         ASSERT_EQ(multiNss.dbName().toString_forTest(), "config");
@@ -424,12 +423,12 @@ TEST_F(NamespaceStringTest, NSSWithTenantId) {
         ASSERT_EQ(*emptyWithTenant.tenantId(), tenantId);
         ASSERT_EQ(emptyWithTenant.toString_forTest(), "");
         ASSERT_EQ(emptyWithTenant.toStringWithTenantId_forTest(),
-                  "{}_"_format(tenantId.toString()));
+                  fmt::format("{}_", tenantId.toString()));
         ASSERT(emptyWithTenant.dbName().tenantId());
         ASSERT_EQ(emptyWithTenant.dbName().tenantId(), tenantId);
         ASSERT_EQ(emptyWithTenant.dbName().toString_forTest(), "");
         ASSERT_EQ(emptyWithTenant.dbName().toStringWithTenantId_forTest(),
-                  "{}_"_format(tenantId.toString()));
+                  fmt::format("{}_", tenantId.toString()));
     }
 
     {

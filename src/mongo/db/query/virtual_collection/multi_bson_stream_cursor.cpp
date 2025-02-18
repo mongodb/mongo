@@ -48,7 +48,6 @@
 #include "mongo/platform/compiler.h"
 
 namespace mongo {
-using namespace fmt::literals;
 
 /**
  * Expands '_buffer' by a multiple of two of its current size that is large enough to contain two
@@ -57,9 +56,9 @@ using namespace fmt::literals;
  */
 void MultiBsonStreamCursor::expandBuffer(int32_t bsonSize) {
     uassert(6968308,
-            "bsonSize {} > BSONObjMaxUserSize {}"_format(bsonSize, BSONObjMaxUserSize),
+            fmt::format("bsonSize {} > BSONObjMaxUserSize {}", bsonSize, BSONObjMaxUserSize),
             (bsonSize <= BSONObjMaxUserSize));
-    uassert(6968309, "bsonSize {} < 0"_format(bsonSize), (bsonSize >= 0));
+    uassert(6968309, fmt::format("bsonSize {} < 0", bsonSize), (bsonSize >= 0));
 
     int newSizeTarget = 2 * bsonSize;
     do {
@@ -98,8 +97,9 @@ boost::optional<Record> MultiBsonStreamCursor::nextFromCurrentStream() {
                 remBytes = kSizeSize - availBytes;
                 readBytes = _streamReader->readBytes(remBytes, (_buffer.get() + _bufEnd));
                 if (MONGO_unlikely(readBytes < remBytes)) {
-                    uasserted(6968303,
-                              "Truncated file: {}"_format(_vopts.dataSources[_streamIdx].url));
+                    uasserted(
+                        6968303,
+                        fmt::format("Truncated file: {}", _vopts.dataSources[_streamIdx].url));
                     return boost::none;
                 }
                 _bufEnd += readBytes;
@@ -113,8 +113,9 @@ boost::optional<Record> MultiBsonStreamCursor::nextFromCurrentStream() {
                 if (MONGO_likely(remBytes <= _bufSize - _bufEnd)) {  // 'remBytes' will fit
                     readBytes = _streamReader->readBytes(remBytes, (_buffer.get() + _bufEnd));
                     if (MONGO_unlikely(readBytes < remBytes)) {
-                        uasserted(6968304,
-                                  "Truncated file: {}"_format(_vopts.dataSources[_streamIdx].url));
+                        uasserted(
+                            6968304,
+                            fmt::format("Truncated file: {}", _vopts.dataSources[_streamIdx].url));
                         return boost::none;
                     }
                     _bufEnd += readBytes;
@@ -131,7 +132,8 @@ boost::optional<Record> MultiBsonStreamCursor::nextFromCurrentStream() {
                 return boost::none;
             }
             if (MONGO_unlikely(_bufEnd < kSizeSize)) {
-                uasserted(6968305, "Truncated file: {}"_format(_vopts.dataSources[_streamIdx].url));
+                uasserted(6968305,
+                          fmt::format("Truncated file: {}", _vopts.dataSources[_streamIdx].url));
                 return boost::none;
             }
             // Not used again: availBytes += _bufEnd;
@@ -142,7 +144,8 @@ boost::optional<Record> MultiBsonStreamCursor::nextFromCurrentStream() {
                     expandBuffer(bsonSize);
                     continue;
                 }
-                uasserted(6968306, "Truncated file: {}"_format(_vopts.dataSources[_streamIdx].url));
+                uasserted(6968306,
+                          fmt::format("Truncated file: {}", _vopts.dataSources[_streamIdx].url));
                 return boost::none;
             }
         }
@@ -153,8 +156,9 @@ boost::optional<Record> MultiBsonStreamCursor::nextFromCurrentStream() {
     // 'recordData.data' includes the size in the first four bytes.
     boost::optional<RecordData> recordData = RecordData{(_buffer.get() + _bufBegin), bsonSize};
     _bufBegin += bsonSize;
-    tassert(
-        6968307, "_bufBegin {} > _bufSize {}"_format(_bufBegin, _bufSize), (_bufBegin <= _bufSize));
+    tassert(6968307,
+            fmt::format("_bufBegin {} > _bufSize {}", _bufBegin, _bufSize),
+            (_bufBegin <= _bufSize));
 
     return {{RecordId{_nextRecordId++}, std::move(*recordData)}};
 }
@@ -167,8 +171,9 @@ boost::optional<Record> MultiBsonStreamCursor::nextFromCurrentStream() {
 std::unique_ptr<InputStream<NamedPipeInput>> MultiBsonStreamCursor::getInputStream(
     const std::string& url) {
     auto filePathPos = url.find(ExternalDataSourceMetadata::kUrlProtocolFile.toString());
-    tassert(
-        ErrorCodes::BadValue, "Invalid file url: {}"_format(url), filePathPos != std::string::npos);
+    tassert(ErrorCodes::BadValue,
+            fmt::format("Invalid file url: {}", url),
+            filePathPos != std::string::npos);
 
     auto filePathStr =
         url.substr(filePathPos + ExternalDataSourceMetadata::kUrlProtocolFile.size());

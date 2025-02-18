@@ -415,7 +415,6 @@ private:
  * the objects referenced in the "b" fields of the "backtrace" list.
  */
 StackTrace getStackTraceImpl(const Options& options) {
-    using namespace fmt::literals;
     std::string err;
     BSONObjBuilder bob;
 #if (MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_NONE)

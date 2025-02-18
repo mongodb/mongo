@@ -63,8 +63,6 @@ namespace mongo {
 
 namespace {
 
-using namespace fmt::literals;
-
 // Counter used to assign unique names to otherwise-unnamed thread pools.
 AtomicWord<int> nextUnnamedThreadPoolId{1};
 
@@ -81,10 +79,10 @@ std::string threadIdToString(stdx::thread::id id) {
  */
 ThreadPool::Options cleanUpOptions(ThreadPool::Options&& options) {
     if (options.poolName.empty()) {
-        options.poolName = "ThreadPool{}"_format(nextUnnamedThreadPoolId.fetchAndAdd(1));
+        options.poolName = fmt::format("ThreadPool{}", nextUnnamedThreadPoolId.fetchAndAdd(1));
     }
     if (options.threadNamePrefix.empty()) {
-        options.threadNamePrefix = "{}-"_format(options.poolName);
+        options.threadNamePrefix = fmt::format("{}-", options.poolName);
     }
     if (options.maxThreads < 1) {
         LOGV2_FATAL(28702,
@@ -335,7 +333,8 @@ void ThreadPool::Impl::_drainPendingTasks(stdx::unique_lock<stdx::mutex>& lk) {
     // may already have one associated with the thread.
     ++_numIdleThreads;
     _cleanUpThread = stdx::thread([&] {
-        const std::string threadName = "{}{}"_format(_options.threadNamePrefix, _nextThreadId++);
+        const std::string threadName =
+            fmt::format("{}{}", _options.threadNamePrefix, _nextThreadId++);
         setThreadName(threadName);
         if (_options.onCreateThread)
             _options.onCreateThread(threadName);
@@ -362,7 +361,7 @@ void ThreadPool::Impl::schedule(Task task) {
         case shutdownComplete: {
             auto status =
                 Status(ErrorCodes::ShutdownInProgress,
-                       "Shutdown of thread pool {} in progress"_format(_options.poolName));
+                       fmt::format("Shutdown of thread pool {} in progress", _options.poolName));
 
             lk.unlock();
             task(status);
@@ -578,7 +577,7 @@ void ThreadPool::Impl::_startWorkerThread_inlock() {
         return;
     }
     invariant(_threads.size() < _options.maxThreads);
-    std::string threadName = "{}{}"_format(_options.threadNamePrefix, _nextThreadId++);
+    std::string threadName = fmt::format("{}{}", _options.threadNamePrefix, _nextThreadId++);
     try {
         _threads.emplace_back([this, threadName] { _workerThreadBody(threadName); });
         ++_numIdleThreads;

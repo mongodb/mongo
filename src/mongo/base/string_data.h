@@ -418,13 +418,13 @@ constexpr StringData operator"" _sd(const char* c, std::size_t len) {
 
 namespace fmt {
 template <>
-class formatter<mongo::StringData> : formatter<std::string_view> {
+class formatter<mongo::StringData> : private formatter<std::string_view> {
     using Base = formatter<std::string_view>;
 
 public:
     using Base::parse;
-    template <typename FormatContext>
-    auto format(mongo::StringData s, FormatContext& fc) {
+
+    auto format(mongo::StringData s, auto& fc) const {
         return Base::format(std::string_view{s}, fc);
     }
 };

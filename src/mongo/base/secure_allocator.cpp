@@ -64,7 +64,7 @@ namespace {
 
 std::string fmtError(StringData prefix) {
     auto ec = lastSystemError();
-    return format(FMT_STRING("{}: {}"), prefix, errorMessage(ec));
+    return fmt::format("{}: {}", prefix, errorMessage(ec));
 }
 
 /**

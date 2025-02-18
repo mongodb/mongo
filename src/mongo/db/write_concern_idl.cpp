@@ -41,14 +41,15 @@
 namespace mongo {
 // Helpers for IDL parsing
 WriteConcernW deserializeWriteConcernW(BSONElement wEl) {
-    using namespace fmt::literals;
     if (wEl.isNumber()) {
         uassert(ErrorCodes::FailedToParse, "w cannot be NaN", !wEl.isNaN());
         auto wNum = wEl.safeNumberLong();
         if (wNum < 0 || wNum > static_cast<long long>(repl::ReplSetConfig::kMaxMembers)) {
-            uasserted(ErrorCodes::FailedToParse,
-                      "w has to be a non-negative number and not greater than {}; found: {}"_format(
-                          repl::ReplSetConfig::kMaxMembers, wNum));
+            uasserted(
+                ErrorCodes::FailedToParse,
+                fmt::format("w has to be a non-negative number and not greater than {}; found: {}",
+                            repl::ReplSetConfig::kMaxMembers,
+                            wNum));
         }
 
         return WriteConcernW{wNum};
@@ -60,11 +61,11 @@ WriteConcernW deserializeWriteConcernW(BSONElement wEl) {
 
         WTags tags;
         for (auto&& e : wTags) {
-            uassert(
-                ErrorCodes::FailedToParse,
-                "tags must be a single level document with only number values; found: {}"_format(
-                    e.toString()),
-                e.isNumber());
+            uassert(ErrorCodes::FailedToParse,
+                    fmt::format(
+                        "tags must be a single level document with only number values; found: {}",
+                        e.toString()),
+                    e.isNumber());
 
             tags.try_emplace(e.fieldName(), e.safeNumberInt());
         }
@@ -73,8 +74,9 @@ WriteConcernW deserializeWriteConcernW(BSONElement wEl) {
     } else if (wEl.eoo() || wEl.type() == BSONType::jstNULL || wEl.type() == BSONType::Undefined) {
         return WriteConcernW{};
     }
-    uasserted(ErrorCodes::FailedToParse,
-              "w has to be a number, string, or object; found: {}"_format(typeName(wEl.type())));
+    uasserted(
+        ErrorCodes::FailedToParse,
+        fmt::format("w has to be a number, string, or object; found: {}", typeName(wEl.type())));
 }
 
 void serializeWriteConcernW(const WriteConcernW& w, StringData fieldName, BSONObjBuilder* builder) {

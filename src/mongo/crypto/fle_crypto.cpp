@@ -133,7 +133,6 @@ extern "C" {
 static_assert(kDebugBuild == 1, "Only use in debug builds");
 #endif
 
-using namespace fmt::literals;
 
 namespace mongo {
 
@@ -362,10 +361,10 @@ void toEncryptedBinDataPretyped(StringData field,
     uassert(9784114, "Input buffer of encrypted data cannot be empty", cdr.length() > 0);
     auto dtAsNum = static_cast<uint8_t>(dt);
     auto firstByte = static_cast<uint8_t>(cdr.data()[0]);
-    uassert(
-        9588900,
-        "Expected buffer to begin with type tag {}, but began with {}"_format(dtAsNum, firstByte),
-        firstByte == dtAsNum);
+    uassert(9588900,
+            fmt::format(
+                "Expected buffer to begin with type tag {}, but began with {}", dtAsNum, firstByte),
+            firstByte == dtAsNum);
 
     builder->appendBinData(field, cdr.length(), BinDataType::Encrypt, cdr.data());
 }
@@ -2045,7 +2044,7 @@ StateCollectionTokensV2 StateCollectionTokensV2::Encrypted::decrypt(const ECOCTo
     if (expectLeaf) {
         auto leaf = cdrc.readAndAdvance<uint8_t>();
         uassert(ErrorCodes::BadValue,
-                "Invalid value for ESCTokensV2 leaf tag {}"_format(leaf),
+                fmt::format("Invalid value for ESCTokensV2 leaf tag {}", leaf),
                 (leaf == 0) || (leaf == 1));
 
         isLeaf = !!leaf;
@@ -2360,7 +2359,7 @@ BSONObj ESCCollectionAnchorPadding::generatePaddingDocument(
     toBinData(kId, block, &builder);
     toBinData(kValue, cipherText, &builder);
 #ifdef FLE2_DEBUG_STATE_COLLECTIONS
-    builder.append(kDebugId, "NULL DOC({})"_format(id));
+    builder.append(kDebugId, fmt::format("NULL DOC({})", id));
     builder.append(kDebugValuePosition, 0);
     builder.append(kDebugValueCount, 0);
 #endif
@@ -3417,8 +3416,9 @@ FLE2IndexedTextEncryptedValue::FLE2IndexedTextEncryptedValue(ConstDataRange toPa
     mc_FLE2IndexedEncryptedValueV2_parse(_value.get(), buf.get(), status);
     uassertStatusOK(status.toStatus());
     uassert(9784115,
-            "Expected buffer to begin with type tag {}, but began with {}"_format(kFLE2IEVTypeText,
-                                                                                  _value->type),
+            fmt::format("Expected buffer to begin with type tag {}, but began with {}",
+                        fmt::underlying(kFLE2IEVTypeText),
+                        fmt::underlying(_value->type)),
             _value->type == kFLE2IEVTypeText);
 }
 
@@ -4134,10 +4134,11 @@ std::vector<CompactionToken> CompactionHelpers::parseCompactionTokens(BSONObj co
                     std::move(fieldName), doc.getECOCToken(), doc.getAnchorPaddingToken()};
             }
 
-            uasserted(
-                6346801,
-                "Field '{}' of compaction tokens must be a BinData(General) or Object, got '{}'"_format(
-                    fieldName, typeName(token.type())));
+            uasserted(6346801,
+                      fmt::format("Field '{}' of compaction tokens must be a BinData(General) or "
+                                  "Object, got '{}'",
+                                  fieldName,
+                                  typeName(token.type())));
         });
     return parsed;
 }
@@ -4208,16 +4209,16 @@ bool hasQueryType(const EncryptedFieldConfig& config, QueryTypeEnum queryType) {
 
 QueryTypeConfig getQueryType(const EncryptedField& field, QueryTypeEnum queryType) {
     uassert(8574703,
-            "Field '{}' is missing a QueryTypeConfig"_format(field.getPath()),
+            fmt::format("Field '{}' is missing a QueryTypeConfig", field.getPath()),
             field.getQueries());
 
     return visit(OverloadedVisitor{
                      [&](QueryTypeConfig query) {
                          uassert(8574704,
-                                 "Field '{}' should be of type '{}', got '{}'"_format(
-                                     field.getPath(),
-                                     QueryType_serializer(queryType),
-                                     QueryType_serializer(query.getQueryType())),
+                                 fmt::format("Field '{}' should be of type '{}', got '{}'",
+                                             field.getPath(),
+                                             QueryType_serializer(queryType),
+                                             QueryType_serializer(query.getQueryType())),
                                  query.getQueryType() == queryType);
                          return query;
                      },
@@ -4227,9 +4228,11 @@ QueryTypeConfig getQueryType(const EncryptedField& field, QueryTypeEnum queryTyp
                                  return query;
                              }
                          }
-                         uasserted(8674705,
-                                   "Field '{}' should be of type '{}', but no configs match"_format(
-                                       field.getPath(), QueryType_serializer(queryType)));
+                         uasserted(
+                             8674705,
+                             fmt::format("Field '{}' should be of type '{}', but no configs match",
+                                         field.getPath(),
+                                         QueryType_serializer(queryType)));
                      }},
                  field.getQueries().get());
 }
@@ -4424,7 +4427,8 @@ std::uint64_t getEdgesLength(BSONType fieldType, StringData fieldPath, QueryType
                 ->size();
         }
         default:
-            uasserted(8674710, "Invalid queryTypeConfig.type '{}'"_format(typeName(fieldType)));
+            uasserted(8674710,
+                      fmt::format("Invalid queryTypeConfig.type '{}'", typeName(fieldType)));
     }
 
     MONGO_UNREACHABLE;

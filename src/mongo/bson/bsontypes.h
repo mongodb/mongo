@@ -113,6 +113,10 @@ enum BSONType {
     MaxKey = 127
 };
 
+inline auto format_as(BSONType t) {
+    return fmt::underlying(t);
+}
+
 /**
  * Maps from the set of type aliases accepted by the $type query operator to the corresponding BSON
  * types. Excludes "number", since this alias maps to a set of BSON types.
@@ -209,6 +213,10 @@ enum BinDataType {
     Vector = 9,    /* A denser format of an array of numbers representing a vector */
     bdtCustom = 128
 };
+
+inline auto format_as(BinDataType type) {
+    return fmt::underlying(type);
+}
 
 /**
  * Return the name of the BinData Type.

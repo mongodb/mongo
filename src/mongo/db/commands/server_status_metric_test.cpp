@@ -43,8 +43,6 @@
 namespace mongo {
 namespace {
 
-using namespace fmt::literals;
-
 bool falseNodesPredicate(const BSONElement& el) {
     return el.type() == Bool && !el.boolean();
 }
@@ -106,7 +104,7 @@ protected:
             switch (el.type()) {
                 case Object:
                     for (auto&& v : extractTreeNodes(el.Obj(), pred))
-                        nodes.push_back("{}.{}"_format(key, v));
+                        nodes.push_back(fmt::format("{}.{}", key, v));
                     break;
                 default:
                     if (!pred || pred(el))
@@ -150,7 +148,7 @@ protected:
 
     /** Adds the implicit "metrics" root to the dotted `path`. */
     static std::string mStr(StringData path) {
-        return "metrics.{}"_format(path);
+        return fmt::format("metrics.{}", path);
     }
 
     /** New vector from adding implicit "metrics" to each element. */
@@ -226,7 +224,8 @@ TEST_F(MetricTreeTest, ValidateCounterMetric) {
     auto& counter = addCounter("tree.counter");
     for (auto&& incr : {1, 2}) {
         counter.increment(incr);
-        ASSERT_BSONOBJ_EQ(serialize(), mJson("{{tree:{{counter:{}}}}}"_format(counter.get())));
+        ASSERT_BSONOBJ_EQ(serialize(),
+                          mJson(fmt::format("{{tree:{{counter:{}}}}}", counter.get())));
     }
 }
 
@@ -234,7 +233,7 @@ TEST_F(MetricTreeTest, ValidateTextMetric) {
     auto& text = *MetricBuilder<std::string>{"tree.text"}.setTreeSet(&trees());
     for (auto&& str : {"hello", "bye"}) {
         text = std::string{str};
-        ASSERT_BSONOBJ_EQ(serialize(), mJson("{{tree:{{text:\"{}\"}}}}"_format(str)));
+        ASSERT_BSONOBJ_EQ(serialize(), mJson(fmt::format("{{tree:{{text:\"{}\"}}}}", str)));
     }
 }
 

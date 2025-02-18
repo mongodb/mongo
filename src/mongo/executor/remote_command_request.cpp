@@ -50,8 +50,6 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
-using namespace fmt::literals;
-
 namespace mongo {
 namespace executor {
 namespace {

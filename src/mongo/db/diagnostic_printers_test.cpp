@@ -40,7 +40,6 @@ namespace mongo {
 
 namespace {
 
-using namespace fmt::literals;
 
 static constexpr StringData kCmdName = "mockCmd"_sd;
 static constexpr StringData kCmdValue = "abcdefgh"_sd;
@@ -103,7 +102,7 @@ public:
 
     std::string printCurOpDiagnostics() {
         diagnostic_printers::CurOpPrinter printer{opCtx()};
-        return "{}"_format(printer);
+        return fmt::format("{}", printer);
     }
 
     MockCmd _cmd;
@@ -218,7 +217,7 @@ TEST_F(DiagnosticPrinterTest, OmitsAllFieldsWhenCommandDoesNotEnableDiagnosticPr
 
 TEST_F(DiagnosticPrinterTest, FormattingGracefullyExitsWhenOpCtxIsNull) {
     diagnostic_printers::CurOpPrinter printer{nullptr};
-    ASSERT_EQ(diagnostic_printers::kOpCtxIsNullMsg, "{}"_format(printer));
+    ASSERT_EQ(diagnostic_printers::kOpCtxIsNullMsg, fmt::format("{}", printer));
 }
 
 TEST_F(DiagnosticPrinterTest, CreateIndexCommandIsEligibleForDiagnosticLog) {

@@ -185,7 +185,7 @@ public:
         return _entries.size();
     }
     const auto& operator[](size_t i) const {
-        invariant(i < size(), format(FMT_STRING("{} < {}"), i, size()));
+        invariant(i < size(), fmt::format("{} < {}", i, size()));
         return _entries[i];
     }
 

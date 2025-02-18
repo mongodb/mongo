@@ -245,10 +245,9 @@ void DropCollectionCoordinator::_checkPreconditionsAndSaveArgumentsOnDoc() {
         // at this level, such as the time series collection must be resolved to remove the
         // corresponding bucket collection, or tag documents associated to non-existing collections
         // must be cleaned up.
-        using namespace fmt::literals;
         if (nss().isSystem()) {
             uassert(ErrorCodes::NamespaceNotFound,
-                    "namespace {} does not exist"_format(nss().toStringForErrorMsg()),
+                    fmt::format("namespace {} does not exist", nss().toStringForErrorMsg()),
                     *coll);
 
             uassertStatusOK(isDroppableCollection(opCtx, nss()));

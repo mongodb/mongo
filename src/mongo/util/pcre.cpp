@@ -48,23 +48,23 @@
 namespace mongo::pcre {
 namespace {
 
-using namespace fmt::literals;
 using namespace std::string_literals;
 
 std::string pcre2ErrorMessage(int e) {
     char buf[120];
     int len = pcre2_get_error_message(e, reinterpret_cast<PCRE2_UCHAR*>(buf), sizeof(buf));
     if (len < 0) {
-        return "Failed to get PCRE2 error message for code {}: {}"_format(e, [metaError = len] {
-            switch (metaError) {
-                case PCRE2_ERROR_NOMEMORY:
-                    return "NOMEMORY"s;
-                case PCRE2_ERROR_BADDATA:
-                    return "BADDATA"s;
-                default:
-                    return "code={}"_format(metaError);
-            }
-        }());
+        return fmt::format(
+            "Failed to get PCRE2 error message for code {}: {}", e, [metaError = len] {
+                switch (metaError) {
+                    case PCRE2_ERROR_NOMEMORY:
+                        return "NOMEMORY"s;
+                    case PCRE2_ERROR_BADDATA:
+                        return "BADDATA"s;
+                    default:
+                        return fmt::format("code={}", metaError);
+                }
+            }());
     }
     return std::string(buf, len);
 }
@@ -78,7 +78,7 @@ Errc toErrc(int e) {
         return Errc::OK;
     auto it =
         std::find_if(errTable.begin(), errTable.end(), [&](auto&& p) { return e == p.second; });
-    iassert(ErrorCodes::BadValue, "Unknown pcre2 error {}"_format(e), it != errTable.end());
+    iassert(ErrorCodes::BadValue, fmt::format("Unknown pcre2 error {}", e), it != errTable.end());
     return it->first;
 }
 
@@ -88,7 +88,7 @@ int fromErrc(Errc e) {
     auto it =
         std::find_if(errTable.begin(), errTable.end(), [&](auto&& p) { return e == p.first; });
     iassert(ErrorCodes::BadValue,
-            "Unknown pcre::Errc {}"_format(static_cast<int>(e)),
+            fmt::format("Unknown pcre::Errc {}", static_cast<int>(e)),
             it != errTable.end());
     return it->second;
 }
@@ -260,7 +260,7 @@ public:
                     continue;
                 }
                 iasserted(ErrorCodes::UnknownError,
-                          "substitute: {}"_format(errorMessage(toErrc(subs))));
+                          fmt::format("substitute: {}", errorMessage(toErrc(subs))));
             }
             buf.resize(bufSize);
             break;
@@ -333,7 +333,7 @@ public:
         size_t* p = pcre2_get_ovector_pointer(&*_data);
         size_t n = pcre2_get_ovector_count(&*_data);
         if (!(i < n))
-            iasserted(ErrorCodes::NoSuchKey, "Access element {} of {}"_format(i, n));
+            iasserted(ErrorCodes::NoSuchKey, fmt::format("Access element {} of {}", i, n));
         size_t b = p[2 * i + 0];
         size_t e = p[2 * i + 1];
         if (b == PCRE2_UNSET)
@@ -346,7 +346,7 @@ public:
         int rc = pcre2_substring_number_from_name(_regex->code(), (PCRE2_SPTR)name.c_str());
         if (rc < 0) {
             iasserted(ErrorCodes::NoSuchKey,
-                      "MatchData[{}]: {}"_format(name, errorMessage(toErrc(rc))));
+                      fmt::format("MatchData[{}]: {}", name, errorMessage(toErrc(rc))));
         }
         return (*this)[rc];
     }

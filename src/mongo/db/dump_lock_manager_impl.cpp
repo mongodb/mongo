@@ -45,7 +45,7 @@ namespace {
 
 template <typename T>
 std::string formatHex(T&& x) {
-    return format(FMT_STRING("{:#x}"), x);
+    return fmt::format("{:#x}", x);
 }
 
 std::string formatPtr(const void* x) {

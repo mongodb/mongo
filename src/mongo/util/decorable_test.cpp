@@ -47,8 +47,6 @@ namespace mongo {
 
 namespace {
 
-using namespace fmt::literals;
-
 class DecorableTest : public unittest::Test {
 public:
     struct Stats {
@@ -210,7 +208,8 @@ TEST_F(DecorableTest, DecorationWithOwner) {
     };
 
     X x;
-    ASSERT_TRUE(typeEq(&d.owner(x[d]), &x)) << "ref {} {}"_format((void*)&d.owner(x[d]), (void*)&x);
+    ASSERT_TRUE(typeEq(&d.owner(x[d]), &x))
+        << fmt::format("ref {} {}", (void*)&d.owner(x[d]), (void*)&x);
     ASSERT_TRUE(typeEq(d.owner(&x[d]), &x)) << "ptr";
     ASSERT_TRUE(typeEq(&d.owner(std::as_const(x[d])), &std::as_const(x))) << "cref";
     ASSERT_TRUE(typeEq(d.owner(&std::as_const(x[d])), &std::as_const(x))) << "cptr";
@@ -267,7 +266,7 @@ TEST_F(DecorableTest, Inline) {
     class Inline : public Decorable<Inline> {
     public:
         explicit Inline(const AllocationInfo& spec) : Decorable<Inline>{spec} {
-            std::cerr << "Inline: this={}\n"_format((void*)this);
+            std::cerr << fmt::format("Inline: this={}\n", (void*)this);
         }
     };
     static auto d0 = Inline::declareDecoration<int>();
@@ -279,11 +278,11 @@ TEST_F(DecorableTest, Inline) {
     };
 
     auto x = Inline::makeInline();
-    std::cerr << "x = @{}\n"_format((void*)&*x);
-    std::cerr << "x[d0]= @{} (x+{}), val={}\n"_format(
+    std::cerr << fmt::format("x = @{}\n", (void*)&*x);
+    std::cerr << fmt::format("x[d0]= @{} (x+{}), val={}\n", 
         (void*)&(*x)[d0], ptrDiff(&(*x)[d0], &*x), (*x)[d0]);
-    std::cerr << "x[d1]= @{} (x+{})\n"_format((void*)&(*x)[d1], ptrDiff(&(*x)[d1], &*x));
-    std::cerr << "x[d2]= @{} (x+{}), val={}\n"_format(
+    std::cerr << fmt::format("x[d1]= @{} (x+{})\n", (void*)&(*x)[d1], ptrDiff(&(*x)[d1], &*x));
+    std::cerr << fmt::format("x[d2]= @{} (x+{}), val={}\n", 
         (void*)&(*x)[d2], ptrDiff(&(*x)[d2], &*x), (*x)[d2]);
 }
 #endif

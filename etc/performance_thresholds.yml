@@ -42,37 +42,43 @@
 ########################################################################################################
 
 tests:
+  # The current suggested method for raising these values is to run the
+  # benchmark a few times in patches, and comparing to the recent history.
+  # From the benchmark's history page, obtain a "stable region mean"
+  # and "CV of stable region". These are available in the "Trend Charts" tab on
+  # Evergreen for the `benchmarks_sep` task.
+  #
+  # The deviations of these metrics are extremely tight.
+  # We can easily accept 2 standard deviations up from the stable mean.
+  #
+  #     threshold = mean * (1 + 2 * cv)
+  #
+  # 2025-02-16:
+  #     Router/1:  mean=20077, cv=.0228 => threshold=20993
+  #     Router/32: mean=20111, cv=.0227 => threshold=21024
+  #     Shard/1:   mean=22013, cv=.0290 => threshold=23290
+  #     Shard/32:  mean=22087, cv=.0289 => threshold=23364
   ServiceEntryPointRouterRoleBenchmarkFixture/BM_SEP_PING:
     al2023-arm64-sep-benchmark:
-      # The current suggested method for raising these values is to run the benchmark a few times in patches, get the
-      # means of these metrics in them, and then multiply them by 1.002 (+ .2%). Please make sure the new values
-      # are above the maximum values reported in those patches to prevent any future flakiness.
-      #
-      # The below thresholds are based on the stable region mean as of 2/14/25 * 1.004.
       - thread_level: 1
         metrics:
           - name: instructions_per_iteration_mean
-            value: 20620
+            value: 20993
             bound_direction: upper
       - thread_level: 32
         metrics:
           - name: instructions_per_iteration_mean
-            value: 20652
+            value: 21024
             bound_direction: upper
   ServiceEntryPointShardRoleBenchmarkFixture/BM_SEP_PING:
     al2023-arm64-sep-benchmark:
-      # The current suggested method for raising these values is to run the benchmark a few times in patches, get the
-      # means of these metrics in them, and then multiply them by 1.002 (+ .2%). Please make sure the new values
-      # are above the maximum values reported in those patches to prevent any future flakiness.
-      #
-      # The below thresholds are based on the stable region mean as of 1/30/25 * 1.004.
       - thread_level: 1
         metrics:
           - name: instructions_per_iteration_mean
-            value: 22708
+            value: 23290
             bound_direction: upper
       - thread_level: 32
         metrics:
           - name: instructions_per_iteration_mean
-            value: 22794
+            value: 23364
             bound_direction: upper

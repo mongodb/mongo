@@ -28,6 +28,7 @@
  */
 
 #include <algorithm>
+#include <fmt/format.h>
 #include <fmt/ostream.h>
 #include <iosfwd>
 #include <type_traits>

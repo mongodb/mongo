@@ -39,7 +39,6 @@ extern "C" {
 #include <mongocrypt-buffer-private.h>
 }
 
-using namespace fmt::literals;
 
 namespace mongo {
 
@@ -139,7 +138,7 @@ LibBSONValue::LibBSONValue(const BSONElement& elem) : LibBSONValue() {
         }
         default:
             uasserted(ErrorCodes::BadValue,
-                      "Unknown BSON value type {}"_format(static_cast<int>(elem.type())));
+                      fmt::format("Unknown BSON value type {}", static_cast<int>(elem.type())));
     }
 }
 
@@ -245,8 +244,9 @@ void doSerialize(const bson_value_t& value,
                 Decimal128::Value{.low64 = v.v_decimal128.low, .high64 = v.v_decimal128.high}));
             break;
         default:
-            uasserted(ErrorCodes::BadValue,
-                      "Unknown BSON value type {}"_format(static_cast<int>(value.value_type)));
+            uasserted(
+                ErrorCodes::BadValue,
+                fmt::format("Unknown BSON value type {}", static_cast<int>(value.value_type)));
     }
 }
 }  // namespace

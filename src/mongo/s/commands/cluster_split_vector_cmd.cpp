@@ -60,7 +60,6 @@
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-using namespace fmt::literals;
 
 namespace mongo {
 namespace {

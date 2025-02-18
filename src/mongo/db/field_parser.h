@@ -58,11 +58,10 @@ private:
                                 const BSONField<T>& field,
                                 StringData expected,
                                 std::string* errMsg) {
-        using namespace fmt::literals;
         if (!errMsg)
             return;
-        *errMsg = "wrong type for '{}' field, expected {}, found {}"_format(
-            field(), expected, elem.toString());
+        *errMsg = fmt::format(
+            "wrong type for '{}' field, expected {}, found {}", field(), expected, elem.toString());
     }
 
 public:
@@ -452,7 +451,6 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
                                              const BSONField<std::vector<T>>& field,
                                              std::vector<T>* out,
                                              std::string* errMsg) {
-    using namespace fmt::literals;
     if (elem.eoo()) {
         if (field.hasDefault()) {
             *out = field.getDefault();
@@ -478,8 +476,8 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
 
             if (!FieldParser::extract(next, fieldFor, &out->at(initialSize + i), &elErrMsg)) {
                 if (errMsg) {
-                    *errMsg = "error parsing element {} of field {}{}"_format(
-                        i, field(), causedBy(elErrMsg));
+                    *errMsg = fmt::format(
+                        "error parsing element {} of field {}{}", i, field(), causedBy(elErrMsg));
                 }
                 return FIELD_INVALID;
             }
@@ -545,7 +543,6 @@ FieldParser::FieldState FieldParser::extract(BSONObj doc,
                                              const BSONField<std::vector<T*>>& field,
                                              std::vector<T*>** out,
                                              std::string* errMsg) {
-    using namespace fmt::literals;
     dassert(!field.hasDefault());
 
     BSONElement elem = doc[field.name()];
@@ -574,8 +571,10 @@ FieldParser::FieldState FieldParser::extract(BSONObj doc,
 
         if (next.type() != Object) {
             if (errMsg) {
-                *errMsg = "wrong type for '{}' field contents, expected object, found {}"_format(
-                    field(), elem.type());
+                *errMsg =
+                    fmt::format("wrong type for '{}' field contents, expected object, found {}",
+                                field(),
+                                elem.type());
             }
             return FIELD_INVALID;
         }
@@ -605,7 +604,6 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
                                              const BSONField<std::map<K, T>>& field,
                                              std::map<K, T>* out,
                                              std::string* errMsg) {
-    using namespace fmt::literals;
     if (elem.eoo()) {
         if (field.hasDefault()) {
             *out = field.getDefault();
@@ -627,8 +625,10 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
             BSONField<T> fieldFor(next.fieldName(), value);
             if (!FieldParser::extract(next, fieldFor, &value, &elErrMsg)) {
                 if (errMsg) {
-                    *errMsg = "error parsing map element {} of field {}{}"_format(
-                        next.fieldName(), field(), causedBy(elErrMsg));
+                    *errMsg = fmt::format("error parsing map element {} of field {}{}",
+                                          next.fieldName(),
+                                          field(),
+                                          causedBy(elErrMsg));
                 }
                 return FIELD_INVALID;
             }

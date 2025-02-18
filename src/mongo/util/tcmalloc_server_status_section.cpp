@@ -359,7 +359,7 @@ public:
         };
 
         auto tryStat = [&](BSONObjBuilder& builder, StringData topic, StringData base) {
-            tryAppend(builder, base, format(FMT_STRING("{}.{}"), topic, base));
+            tryAppend(builder, base, fmt::format("{}.{}", topic, base));
         };
 
         _metrics.appendPerCPUMetrics(builder);

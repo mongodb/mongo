@@ -54,8 +54,6 @@
 namespace mongo {
 namespace {
 
-using namespace fmt::literals;
-
 /** Algorithm object implementing the `appendMergedTrees` function.  */
 class AppendMergedTreesInvocation {
     /** Represents progress in the iteration through the children of one node. */
@@ -169,9 +167,10 @@ public:
             if (!excluded) {
                 if (!frame.inSubtreePhase) {
                     // This node has no subtrees. It should therefore have one member.
-                    uassert(ErrorCodes::BadValue,
-                            "Collision between trees at node {}.{}"_format(_pathDiagJoin(), key),
-                            relevant.size() == 1);
+                    uassert(
+                        ErrorCodes::BadValue,
+                        fmt::format("Collision between trees at node {}.{}", _pathDiagJoin(), key),
+                        relevant.size() == 1);
                     cursor.getMetric().appendTo(*frame.bob, key);
                 } else {
                     _stack.push_back(_descentFrame(relevant, std::move(excludeSub)));
@@ -299,7 +298,7 @@ void MetricTree::add(StringData path, std::unique_ptr<ServerStatusMetric> metric
         if (!path.empty())
             _add(path, std::move(metric));
     } else {
-        _add("metrics.{}"_format(path), std::move(metric));
+        _add(fmt::format("metrics.{}", path), std::move(metric));
     }
 }
 

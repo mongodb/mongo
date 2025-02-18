@@ -45,7 +45,6 @@
 
 namespace mongo {
 namespace {
-using namespace fmt::literals;
 
 TEST(PackagedTaskTest, LambdaTaskNoArgs) {
     auto packagedGetBSON = PackagedTask([] { return BSON("x" << 42); });
@@ -57,7 +56,7 @@ TEST(PackagedTaskTest, LambdaTaskNoArgs) {
 
 TEST(PackagedTaskTest, LambdaTaskOneArg) {
     auto packagedHelloName =
-        PackagedTask([](std::string name) { return "Hello, {}!"_format(name); });
+        PackagedTask([](std::string name) { return fmt::format("Hello, {}!", name); });
     auto helloFuture = packagedHelloName.getFuture();
     ASSERT_FALSE(helloFuture.isReady());
     packagedHelloName("George");
@@ -66,7 +65,7 @@ TEST(PackagedTaskTest, LambdaTaskOneArg) {
 
 TEST(PackagedTaskTest, LambdaTaskMultipleArgs) {
     auto packagedPrintNameAndAge = PackagedTask(
-        [](std::string name, int age) { return "{} is {} years old!"_format(name, age); });
+        [](std::string name, int age) { return fmt::format("{} is {} years old!", name, age); });
     auto nameAndAgeFut = packagedPrintNameAndAge.getFuture();
     ASSERT_FALSE(nameAndAgeFut.isReady());
     packagedPrintNameAndAge("George", 24);
@@ -86,7 +85,7 @@ TEST(PackagedTaskTest, UniqueFunctionTaskNoArgs) {
 
 TEST(PackagedTaskTest, UniqueFunctionTaskOneArg) {
     unique_function<std::string(std::string)> fn = [](std::string name) {
-        return "Hello, {}!"_format(name);
+        return fmt::format("Hello, {}!", name);
     };
     auto packagedHelloName = PackagedTask(std::move(fn));
     auto helloFuture = packagedHelloName.getFuture();
@@ -97,7 +96,7 @@ TEST(PackagedTaskTest, UniqueFunctionTaskOneArg) {
 
 TEST(PackagedTaskTest, UniqueFunctionTaskMultipleArgs) {
     unique_function<std::string(std::string, int)> fn = [](std::string name, int age) {
-        return "{} is {} years old!"_format(name, age);
+        return fmt::format("{} is {} years old!", name, age);
     };
     auto packagedPrintNameAndAge = PackagedTask(std::move(fn));
     auto nameAndAgeFut = packagedPrintNameAndAge.getFuture();
@@ -134,7 +133,7 @@ TEST(PackagedTaskTest, FutureReturningTaskNoArgument) {
     auto [p, f] = makePromiseFuture<std::string>();
     auto greeting = PackagedTask([greetWordFut = std::move(f)]() mutable {
         return std::move(greetWordFut).then([](std::string greetWord) {
-            return "{}George"_format(greetWord);
+            return fmt::format("{}George", greetWord);
         });
     });
     auto greetingFut = greeting.getFuture();
@@ -149,7 +148,7 @@ TEST(PackagedTaskTest, FutureReturningTaskWithArgument) {
     auto [p, f] = makePromiseFuture<std::string>();
     auto greetingWithName = PackagedTask([greetingFut = std::move(f)](std::string name) mutable {
         return std::move(greetingFut).then([name = std::move(name)](std::string greeting) {
-            return "{}{}"_format(greeting, name);
+            return fmt::format("{}{}", greeting, name);
         });
     });
     auto greetingWithNameFut = greetingWithName.getFuture();

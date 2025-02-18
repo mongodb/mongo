@@ -84,7 +84,6 @@
 
 namespace mongo {
 
-using namespace fmt::literals;
 
 using TransactionResources = shard_role_details::TransactionResources;
 
@@ -1913,12 +1912,12 @@ void shard_role_details::checkShardingAndLocalCatalogCollectionUUIDMatch(
             // SERVER-87061.
             // TODO: SERVER-87235: Remove this condition and leave only the tassert that will be
             // introduced in SERVER-88476 below also for transaction and snapshot reads.
-            uasserted(
-                ErrorCodes::SnapshotUnavailable,
-                "Sharding catalog and local catalog collection uuid do not match. Nss: '{}', sharding uuid: '{}', local uuid: '{}'"_format(
-                    nss.toStringForErrorMsg(),
-                    shardingCollectionDescription.getUUID().toString(),
-                    collectionPtr ? collectionPtr->uuid().toString() : ""));
+            uasserted(ErrorCodes::SnapshotUnavailable,
+                      fmt::format("Sharding catalog and local catalog collection uuid do not "
+                                  "match. Nss: '{}', sharding uuid: '{}', local uuid: '{}'",
+                                  nss.toStringForErrorMsg(),
+                                  shardingCollectionDescription.getUUID().toString(),
+                                  collectionPtr ? collectionPtr->uuid().toString() : ""));
         } else {
             // TODO: SERVER-88476: reintroduce tassert here similar to the uassert above.
             static logv2::SeveritySuppressor logSeverity{

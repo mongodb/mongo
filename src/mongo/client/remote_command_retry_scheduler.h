@@ -251,8 +251,8 @@ public:
     }
 
     std::string toString() const override {
-        using namespace fmt::literals;
-        return R"!({{type: "RetryPolicyForCategory",categoryIndex: {}, maxAttempts: {}, maxTimeMS: {}}})!"_format(
+        return fmt::format(
+            R"!({{type: "RetryPolicyForCategory",categoryIndex: {}, maxAttempts: {}, maxTimeMS: {}}})!",
             static_cast<std::underlying_type_t<ErrorCategory>>(kCategory),
             _maximumAttempts,
             _maximumResponseElapsedTotal.count());

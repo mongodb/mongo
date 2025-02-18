@@ -220,7 +220,6 @@ Pipeline::SourceContainer::iterator DocumentSourceSearch::doOptimizeAt(
 }
 
 void DocumentSourceSearch::validateSortSpec(boost::optional<BSONObj> sortSpec) {
-    using namespace fmt::literals;
     if (sortSpec) {
         // Verify that sortSpec do not contain dots after '$searchSortValues', as we expect it
         // to only contain top-level fields (no nested objects).
@@ -230,7 +229,8 @@ void DocumentSourceSearch::validateSortSpec(boost::optional<BSONObj> sortSpec) {
                 key = key.substr(mongot_cursor::kSearchSortValuesFieldPrefix.size());
             }
             tassert(7320404,
-                    "planShardedSearch returned sortSpec with key containing a dot: {}"_format(key),
+                    fmt::format("planShardedSearch returned sortSpec with key containing a dot: {}",
+                                key),
                     key.find('.', 0) == std::string::npos);
         }
     }

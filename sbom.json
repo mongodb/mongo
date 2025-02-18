@@ -504,7 +504,7 @@
         "name": "Organization: github"
       },
       "name": "fmtlib/fmt",
-      "version": "7.1.3",
+      "version": "11.1.3",
       "licenses": [
         {
           "license": {
@@ -512,11 +512,11 @@
           }
         }
       ],
-      "purl": "pkg:github/fmtlib/fmt@7.1.3",
+      "purl": "pkg:github/fmtlib/fmt@11.1.3",
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Server Security"
+          "value": "Server Programmability"
         },
         {
           "name": "emits_persisted_data",

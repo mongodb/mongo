@@ -201,7 +201,7 @@ struct formatter<mongo::HostAndPort> {
         return ctx.begin();
     }
     template <typename FormatContext>
-    auto format(const mongo::HostAndPort& hp, FormatContext& ctx) {
+    auto format(const mongo::HostAndPort& hp, FormatContext& ctx) const {
         auto&& it = ctx.out();
         hp._appendToPolymorphicFunc([&](const auto& v) { it = fmt::format_to(it, "{}", v); });
         return it;

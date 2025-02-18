@@ -63,8 +63,6 @@
 
 namespace mongo {
 
-using namespace fmt::literals;
-
 struct ZoneRange {
     ZoneRange(const BSONObj& a_min, const BSONObj& a_max, const std::string& _zone);
 
@@ -385,11 +383,13 @@ public:
             const auto isFirstRange = (normalizedZoneIt == initialZoneIt);
 
             if (isFirstRange) {
-                tassert(
-                    8236530,
-                    "Unexpected first normalized zone for shard '{}'. Expected '{}' but found '{}'"_format(
-                        shardId.toString(), zoneName, zoneRange.zone),
-                    zoneRange.zone == zoneName);
+                tassert(8236530,
+                        fmt::format("Unexpected first normalized zone for shard '{}'. Expected "
+                                    "'{}' but found '{}'",
+                                    shardId.toString(),
+                                    zoneName,
+                                    zoneRange.zone),
+                        zoneRange.zone == zoneName);
             } else if (zoneRange.zone != zoneName) {
                 continue;
             }

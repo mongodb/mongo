@@ -91,8 +91,6 @@ using RecipientStateMachine = ReshardingRecipientService::RecipientStateMachine;
 namespace {
 MONGO_FAIL_POINT_DEFINE(reshardingInterruptAfterInsertStateMachineDocument);
 
-using namespace fmt::literals;
-
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
 template <class StateMachine, class ReshardingDocument>

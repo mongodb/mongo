@@ -281,14 +281,14 @@ static bool forkServer() {
         croak("closing read side of pipe failed");
     serverGlobalParams.forkReadyFd = readyPipe[1];
 
-    std::cout << format(FMT_STRING("forked process: {}"), getpid()) << std::endl;
+    std::cout << fmt::format("forked process: {}", getpid()) << std::endl;
 
     auto stdioDetach = [](FILE* fp, const char* mode, StringData name) {
         if (!freopen("/dev/null", mode, fp)) {
             int saved = errno;
-            std::cout << format(FMT_STRING("Cannot reassign {} while forking server process: {}"),
-                                name,
-                                strerror(saved))
+            std::cout << fmt::format("Cannot reassign {} while forking server process: {}",
+                                     name,
+                                     strerror(saved))
                       << std::endl;
             return false;
         }

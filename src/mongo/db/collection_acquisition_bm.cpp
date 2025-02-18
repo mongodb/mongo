@@ -46,7 +46,6 @@
 namespace mongo::repl {
 namespace {
 
-using namespace fmt::literals;
 
 MONGO_INITIALIZER_GENERAL(DisableLogging, (), ())
 (InitializerContext*) {
@@ -72,13 +71,15 @@ class CollectionAcquisitionBenchmark {
 public:
     explicit CollectionAcquisitionBenchmark(benchmark::State& state) : _state{state} {
         if constexpr (superVerbose)
-            std::cout << "CollectionAcquisitionBenchmark ctor: thread=[{}/{}]\n"_format(
-                _state.thread_index, _state.threads);
+            std::cout << fmt::format("CollectionAcquisitionBenchmark ctor: thread=[{}/{}]\n",
+                                     _state.thread_index,
+                                     _state.threads);
     }
     ~CollectionAcquisitionBenchmark() {
         if constexpr (superVerbose)
-            std::cout << "CollectionAcquisitionBenchmark dtor: thread=[{}/{}]\n"_format(
-                _state.thread_index, _state.threads);
+            std::cout << fmt::format("CollectionAcquisitionBenchmark dtor: thread=[{}/{}]\n",
+                                     _state.thread_index,
+                                     _state.threads);
     }
 
     template <typename F>
@@ -89,8 +90,8 @@ public:
 
     OperationContext* getOperationContext() {
         if constexpr (superVerbose)
-            std::cout << "getOperationContext (thread=[{}/{}])\n"_format(_state.thread_index,
-                                                                         _state.threads);
+            std::cout << fmt::format(
+                "getOperationContext (thread=[{}/{}])\n", _state.thread_index, _state.threads);
         return _uniqueOpCtx.get();
     }
 
@@ -105,7 +106,7 @@ private:
     public:
         TestEnv() {
             if constexpr (superVerbose)
-                std::cout << "Creating TestEnv @{}\n"_format((void*)this);
+                std::cout << fmt::format("Creating TestEnv @{}\n", (void*)this);
             _thread = unittest::JoinThread([this] {
                 auto uniqueTest = std::make_unique<Test>();
                 _test = uniqueTest.get();
@@ -167,7 +168,7 @@ private:
                 std::cout << "Sharing fixture\n";
         }
         if constexpr (superVerbose)
-            std::cout << "Got fixture @{}\n"_format((void*)sp.get());
+            std::cout << fmt::format("Got fixture @{}\n", (void*)sp.get());
 
         _threadClient.emplace(sp->getService());
         _uniqueOpCtx = sp->makeOperationContext();

@@ -86,7 +86,6 @@ const std::set<std::string> kNoApiVersions = {};
 const std::set<std::string> kApiVersions1 = {"1"};
 
 namespace {
-using namespace fmt::literals;
 
 const int kFailedFindCommandDebugLevel = 3;
 
@@ -589,8 +588,9 @@ bool CommandHelpers::uassertShouldAttemptParse(OperationContext* opCtx,
 void CommandHelpers::uassertCommandRunWithMajority(StringData commandName,
                                                    const WriteConcernOptions& writeConcern) {
     uassert(ErrorCodes::InvalidOptions,
-            "\"{}\" must be called with majority writeConcern, got: {} "_format(
-                commandName, writeConcern.toBSON().toString()),
+            fmt::format("\"{}\" must be called with majority writeConcern, got: {} ",
+                        commandName,
+                        writeConcern.toBSON().toString()),
             writeConcern.isMajority());
 }
 
@@ -1086,7 +1086,7 @@ void Command::initializeClusterRole(ClusterRole role) {
              std::pair{&_commandsFailed, "failed"},
              std::pair{&_commandsRejected, "rejected"},
          })
-        *ptr = &*MetricBuilder<Counter64>{"commands.{}.{}"_format(_name, stat)}.setRole(role);
+        *ptr = &*MetricBuilder<Counter64>{fmt::format("commands.{}.{}", _name, stat)}.setRole(role);
     doInitializeClusterRole(role);
 }
 
@@ -1162,7 +1162,7 @@ void CommandRegistry::registerCommand(Command* command) {
     auto ep = std::make_unique<Entry>();
     ep->command = command;
     auto [cIt, cOk] = _commands.emplace(command, std::move(ep));
-    invariant(cOk, "Command identity collision: {}"_format(name));
+    invariant(cOk, fmt::format("Command identity collision: {}", name));
 
     // When a `Command*` is introduced to `_commands`, its names are introduced
     // to `_commandNames`.
@@ -1171,7 +1171,7 @@ void CommandRegistry::registerCommand(Command* command) {
         if (key.empty())
             continue;
         auto [nIt, nOk] = _commandNames.try_emplace(key, command);
-        invariant(nOk, "Command name collision: {}"_format(key));
+        invariant(nOk, fmt::format("Command name collision: {}", key));
     }
 }
 
@@ -1207,7 +1207,7 @@ BSONObj toBSON(const CommandConstructionPlan::Entry& e) {
     bob.append("expr", e.expr);
     bob.append("roles", toString(e.roles.value_or(ClusterRole::None)));
     if (e.location)
-        bob.append("loc", "{}:{}"_format(e.location->file_name(), e.location->line()));
+        bob.append("loc", fmt::format("{}:{}", e.location->file_name(), e.location->line()));
     return bob.obj();
 }
 

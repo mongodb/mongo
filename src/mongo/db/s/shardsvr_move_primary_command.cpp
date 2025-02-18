@@ -66,7 +66,6 @@
 
 namespace mongo {
 namespace {
-using namespace fmt::literals;
 
 class ShardsvrMovePrimaryCommand final : public TypedCommand<ShardsvrMovePrimaryCommand> {
 public:
@@ -86,13 +85,13 @@ public:
 
             uassert(
                 ErrorCodes::InvalidNamespace,
-                "invalid database {}"_format(dbNss.toStringForErrorMsg()),
+                fmt::format("invalid database {}", dbNss.toStringForErrorMsg()),
                 DatabaseName::isValid(dbNss.dbName(), DatabaseName::DollarInDbNameBehavior::Allow));
 
-            uassert(
-                ErrorCodes::InvalidOptions,
-                "cannot move primary of internal database {}"_format(dbNss.toStringForErrorMsg()),
-                !dbNss.isOnInternalDb());
+            uassert(ErrorCodes::InvalidOptions,
+                    fmt::format("cannot move primary of internal database {}",
+                                dbNss.toStringForErrorMsg()),
+                    !dbNss.isOnInternalDb());
 
             sharding_ddl_util::assertDataMovementAllowed();
 
@@ -112,7 +111,7 @@ public:
                 shardRegistry->reload(opCtx);
                 const auto toShard = uassertStatusOKWithContext(
                     shardRegistry->getShard(opCtx, toShardId),
-                    "requested primary shard {} does not exist"_format(toShardId.toString()));
+                    fmt::format("requested primary shard {} does not exist", toShardId.toString()));
 
                 auto coordinatorDoc = [&] {
                     MovePrimaryCoordinatorDocument doc;
