@@ -6,28 +6,25 @@ settings:
 
 onlyBuiltDependencies: []
 
-importers:
-
-  .:
-    devDependencies:
-      '@eslint/eslintrc':
-        specifier: 3.2.0
-        version: 3.2.0
-      '@eslint/js':
-        specifier: ^9
-        version: 9.19.0
-      eslint:
-        specifier: 9.19.0
-        version: 9.19.0
-      eslint-formatter-unix:
-        specifier: ^8.40.0
-        version: 8.40.0
-      globals:
-        specifier: 14.0.0
-        version: 14.0.0
-      prettier:
-        specifier: 3.4.2
-        version: 3.4.2
+devDependencies:
+  '@eslint/eslintrc':
+    specifier: 3.2.0
+    version: 3.2.0
+  '@eslint/js':
+    specifier: ^9
+    version: 9.19.0
+  eslint:
+    specifier: 9.19.0
+    version: 9.19.0
+  eslint-formatter-unix:
+    specifier: ^8.40.0
+    version: 8.40.0
+  globals:
+    specifier: 14.0.0
+    version: 14.0.0
+  prettier:
+    specifier: 3.4.2
+    version: 3.4.2
 
 packages:
 
