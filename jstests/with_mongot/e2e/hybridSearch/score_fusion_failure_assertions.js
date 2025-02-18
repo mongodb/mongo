@@ -3,7 +3,14 @@
  * src/mongo/db/pipeline/document_source_score_fusion_test.cpp
  *
  * These will be picked up/ran by the js fuzzer suite.
- * @tags: [ featureFlagRankFusionFull, featureFlagSearchHybridScoringFull, requires_fcv_81 ]
+ *
+ * TODO SERVER-100404: Re-enable this for sharded queries.
+ * @tags: [
+ *   assumes_unsharded_collection,
+ *   featureFlagRankFusionFull,
+ *   featureFlagSearchHybridScoringFull,
+ *   requires_fcv_81
+ * ]
  */
 
 const collName = "search_score_fusion";
