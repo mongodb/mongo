@@ -99,7 +99,7 @@ function testDistinctQuerySettingsApplication(collOrViewName) {
     // This query has the key that doesn't match any provided index which guarantees that there
     // would be no DISTINCT_SCAN plan and the query planner will fall back to the `find`. In case
     // multiplanner is involved it is expected that the query will end up in query plan cache.
-    setIndexes(coll, [qstests.indexA, qstests.indexB, qstests.indexAB]);
+    setIndexes(coll, qstests.allIndexes);
 
     const querySettingsDistinctQuery = qsutils.makeDistinctQueryInstance({
         key: 'c',

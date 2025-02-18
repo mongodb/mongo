@@ -250,7 +250,7 @@ commands:
               description: "Query settings for the given query"
               type: QuerySettings
               optional: true
-              stability: unstable
+              stability: internal
             let:
                 description: "A document containing user-specified let parameter constants; i.e. values that do not change once computed."
                 type: object_owned
