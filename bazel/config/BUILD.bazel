@@ -296,6 +296,14 @@ selects.config_setting_group(
     ],
 )
 
+selects.config_setting_group(
+    name = "ppc_or_s390x",
+    match_any = [
+        "@platforms//cpu:ppc",
+        "@platforms//cpu:s390x",
+    ],
+)
+
 # --------------------------------------
 # mongo_toolchain_version options
 # --------------------------------------

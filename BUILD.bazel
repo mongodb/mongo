@@ -4,7 +4,7 @@ load("//bazel/install_rules:install_rules.bzl", "mongo_install")
 load("//bazel/toolchains:mongo_toolchain.bzl", "setup_mongo_toolchain_aliases")
 load("//bazel/config:render_template.bzl", "render_template")
 load("@npm//:eslint/package_json.bzl", eslint_bin = "bin")
-load("@aspect_rules_js//js:defs.bzl", "js_library")
+load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
 load("@aspect_bazel_lib//lib:copy_to_directory.bzl", "copy_to_directory")
 
 package(
@@ -25,7 +25,7 @@ npm_link_package(
     src = "//buildscripts/eslint-plugin-mongodb:npm_package",
 )
 
-js_library(
+mongo_js_library(
     name = "eslintrc",
     srcs = ["eslint.config.mjs"],
     deps = [

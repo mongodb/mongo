@@ -1,8 +1,8 @@
-load("@aspect_rules_js//js:defs.bzl", "js_library")
+load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
 
 package(default_visibility = ["//visibility:public"])
 
-js_library(
+mongo_js_library(
     name = "all_javascript_files",
     srcs = glob([
         "*.js",

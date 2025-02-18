@@ -27,6 +27,10 @@ js_library(
     srcs = glob([
         "*.js",
     ]),
+    target_compatible_with = select({
+        "//bazel/config:ppc_or_s390x": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     visibility = ["//visibility:public"],
 )
 """)

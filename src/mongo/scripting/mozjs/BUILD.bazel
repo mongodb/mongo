@@ -38,9 +38,9 @@ render_template(
     output = "mongohelpers_js.cpp",
 )
 
-load("@aspect_rules_js//js:defs.bzl", "js_library")
+load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
 
-js_library(
+mongo_js_library(
     name = "all",
     srcs = glob([
         "*.js",
