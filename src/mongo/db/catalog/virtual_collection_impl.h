@@ -268,8 +268,8 @@ public:
         return false;
     }
 
+    // TODO (SERVER-100717): To be implemented
     bool isNewTimeseriesWithoutView() const final {
-        unimplementedTasserted();
         return false;
     }
 
