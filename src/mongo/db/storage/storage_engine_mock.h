@@ -168,6 +168,9 @@ public:
     std::set<std::string> getDropPendingIdents() const final {
         return {};
     }
+    size_t getNumDropPendingIdents() const final {
+        return 0;
+    }
     void addDropPendingIdent(
         const stdx::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
         std::shared_ptr<Ident> ident,

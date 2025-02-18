@@ -239,6 +239,7 @@ TEST_F(KVDropPendingIdentReaperTest,
     // getAllIdentNames() returns a set of drop-pending idents known to the reaper.
     auto dropPendingIdents = reaper.getAllIdentNames();
     ASSERT_EQUALS(2U, dropPendingIdents.size());
+    ASSERT_EQUALS(2U, reaper.getNumIdents());
     ASSERT(dropPendingIdents.find(identName1) != dropPendingIdents.cend());
     ASSERT(dropPendingIdents.find(identName2) != dropPendingIdents.cend());
 
