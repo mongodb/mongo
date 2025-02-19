@@ -156,6 +156,9 @@ cst.assertNextChangesEqual({
         updateDescription: {removedFields: [], updatedFields: {b: 1}, truncatedArrays: []}
     }]
 });
+// Should throw if the cursor is made invalid by the call above
+cst.getNextBatch(cursor);
+
 mongos1ChangeDoc = cstMongos1.getOneChange(cursorMongos1);
 assert.docEq({_id: 1, a: 1}, mongos1ChangeDoc.documentKey);
 assert.docEq({_id: 1, a: 1, b: 1}, mongos1ChangeDoc.fullDocument);

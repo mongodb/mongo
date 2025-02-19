@@ -166,6 +166,7 @@ export function ChangeStreamTest(_db, options) {
     const eventModifier = options.eventModifier || canonicalizeEventForTesting;
 
     function updateResumeToken(cursor, changeEvents) {
+        // This isn't fool proof since anyone can just a getMore command on the raw cursor.
         const cursorId = String(cursor.id);
         if (!_cursorData.has(cursorId)) {
             _cursorData.set(cursorId, {});
@@ -249,6 +250,10 @@ export function ChangeStreamTest(_db, options) {
         });
     };
 
+    /**
+     * Restarts the change stream and modify 'cursor' by replacing it's contents thus updating it's
+     * cursor ID.
+     */
     self.restartChangeStream = function(cursor) {
         const cursorId = String(cursor.id);
         const cursorInfo = _cursorData.get(cursorId);
@@ -256,13 +261,13 @@ export function ChangeStreamTest(_db, options) {
             throw new Error("Cannot resume change stream - no resume token available for cursor");
         }
         const pipeline = addResumeToken(cursorInfo.pipeline, cursorInfo.resumeToken);
-        cursor = self.startWatchingChanges({
+        const newCursor = self.startWatchingChanges({
             pipeline: pipeline,
             collection: cursorInfo.collName,
             aggregateOptions: {cursor: {batchSize: 0}},
             doNotModifyInPassthroughs: cursorInfo.doNotModifyInPassthroughs
         });
-        return cursor;
+        Object.assign(cursor, newCursor);
     };
 
     /**
@@ -284,7 +289,7 @@ export function ChangeStreamTest(_db, options) {
                 if (attemptNumber === maxRetries || !isResumableChangeStreamError(e)) {
                     throw e;
                 }
-                cursor = self.restartChangeStream(cursor);
+                self.restartChangeStream(cursor);
             }
         }
         throw new Error("Failed to get next batch after retries");

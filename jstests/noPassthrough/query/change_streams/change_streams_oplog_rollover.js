@@ -99,9 +99,8 @@ while (!oplogIsRolledOver()) {
 }
 
 // Confirm that attempting to continue reading an existing change stream throws CappedPositionLost.
-assert.commandFailedWithCode(
-    testDB.runCommand({getMore: startAtDawnOfTimeStream.id, collection: testColl.getName()}),
-    ErrorCodes.CappedPositionLost);
+assert.throwsWithCode(() => cst.getNextBatch(startAtDawnOfTimeStream),
+                      ErrorCodes.CappedPositionLost);
 
 // Now confirm that attempting to resumeAfter or startAtOperationTime fails.
 ChangeStreamTest.assertChangeStreamThrowsCode({
