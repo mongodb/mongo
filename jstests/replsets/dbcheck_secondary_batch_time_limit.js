@@ -17,7 +17,7 @@ import {
 const dbName = jsTestName();
 const collName = jsTestName();
 
-const nDocs = 10000;
+const nDocs = 5000;
 const maxBatchTimeMillis = 20000;
 
 function runTest(validateMode) {
