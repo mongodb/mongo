@@ -148,7 +148,9 @@ export const forEachNonArbiterNode = (replSet, f) => {
 
 // Clear local.system.healthlog.
 export const clearHealthLog = (replSet) => {
-    forEachNonArbiterNode(replSet, conn => conn.getDB("local").system.healthlog.drop());
+    forEachNonArbiterNode(replSet,
+                          conn => assert(conn.getDB("local").system.healthlog.drop(),
+                                         `clearing health log failed for node ${conn.host}`));
     replSet.awaitReplication();
 };
 
@@ -189,7 +191,7 @@ export const awaitDbCheckCompletion =
                             return (healthlog.find({"operation": "dbCheckStop"}).itcount() == 1);
                         },
                         "dbCheck command didn't complete for database: " + db.getName() +
-                            " for RS: " + replSet.getURL() +
+                            " for node: " + node.host +
                             ", found health log: " + tojson(healthlog.find().toArray()));
                 });
             }

@@ -284,7 +284,11 @@ function testDbCheckParameters() {
         // Validate custom maxDocsPerBatch
         clearHealthLog(replSet);
         const maxDocsPerBatch = 100;
-        runDbCheck(replSet, db, multiBatchSimpleCollName, {maxDocsPerBatch: maxDocsPerBatch});
+        runDbCheck(replSet,
+                   db,
+                   multiBatchSimpleCollName,
+                   {maxDocsPerBatch: maxDocsPerBatch},
+                   true /* awaitCompletion */);
 
         let query = {"operation": "dbCheckBatch"};
         const expectedBatches = multiBatchSimpleCollSize / maxDocsPerBatch +
@@ -309,6 +313,7 @@ function testDbCheckParameters() {
         const chars = ['a', 'b', 'c', 'd', 'e'];
         coll.insertMany([...Array(nDocs).keys()].map(x => ({a: chars[x].repeat(1024 * 1024 * 2)})),
                         {ordered: false});
+        replSet.awaitReplication();
         [{maxBatchTimeMillis: 1000},
          {validateMode: "dataConsistency", maxBatchTimeMillis: 1000},
          {validateMode: "dataConsistencyAndMissingIndexKeysCheck", maxBatchTimeMillis: 1000}]
@@ -365,12 +370,14 @@ function runMultiBatchTests(collOpts) {
     assert.commandWorked(primaryDb.createCollection(multiBatchSimpleCollName, collOpts));
     primaryDb[multiBatchSimpleCollName].insertMany([...Array(10000).keys()].map(x => ({_id: x})),
                                                    {ordered: false});
+    replSet.awaitReplication();
 
     simpleTestConsistent();
     simpleTestNonSnapshot();
     concurrentTestConsistent();
     testDbCheckParameters();
     primaryDb[multiBatchSimpleCollName].drop();
+    replSet.awaitReplication();
 }
 
 [{},
