@@ -9,6 +9,7 @@
  * ]
  */
 import {
+    compareBoundaries,
     integrationTests,
     shardKeyValidationTests,
     simpleValidationTests,
@@ -71,6 +72,13 @@ function validateCRUDAfterRefine() {
     assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).x);
     assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).b);
     assert.eq(4, sessionDB.getCollection(kCollName).findOne({c: -1}).b);
+
+    // Versioned reads against secondaries should work as expected.
+    mongos.setReadPref("secondaryPreferred");
+    assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).x);
+    assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).b);
+    assert.eq(4, sessionDB.getCollection(kCollName).findOne({c: -1}).b);
+    mongos.setReadPref(null);
 }
 
 simpleValidationTests(mongos, kDbName);
@@ -103,3 +111,55 @@ assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key
 validateCRUDAfterRefine();
 
 assert.commandWorked(mongos.getDB(kDbName).runCommand({drop: kCollName}));
+
+//
+// Verify the chunk boundaries are the same for a collection sharded to a certain shard key and
+// a collection refined to that same shard key.
+//
+
+// For a shard key without nested fields.
+(() => {
+    const shardedNs = kDbName + ".shardedColl";
+    const refinedNs = kDbName + ".refinedColl";
+
+    assert.commandWorked(
+        mongos.adminCommand({shardCollection: shardedNs, key: {a: 1, b: 1, c: 1}}));
+    assert.commandWorked(
+        mongos.adminCommand({split: shardedNs, middle: {a: 0, b: MinKey, c: MinKey}}));
+    assert.commandWorked(
+        mongos.adminCommand({split: shardedNs, middle: {a: 10, b: MinKey, c: MinKey}}));
+
+    assert.commandWorked(mongos.adminCommand({shardCollection: refinedNs, key: {a: 1}}));
+    assert.commandWorked(mongos.adminCommand({split: refinedNs, middle: {a: 0}}));
+    assert.commandWorked(mongos.adminCommand({split: refinedNs, middle: {a: 10}}));
+
+    assert.commandWorked(mongos.getCollection(refinedNs).createIndex({a: 1, b: 1, c: 1}));
+    assert.commandWorked(
+        mongos.adminCommand({refineCollectionShardKey: refinedNs, key: {a: 1, b: 1, c: 1}}));
+
+    compareBoundaries(mongos, shardedNs, refinedNs);
+})();
+
+// For a shard key with nested fields.
+(() => {
+    const shardedNs = kDbName + ".nestedShardedColl";
+    const refinedNs = kDbName + ".nestedRefinedColl";
+
+    assert.commandWorked(
+        mongos.adminCommand({shardCollection: shardedNs, key: {"a.b": 1, "c.d.e": 1, f: 1}}));
+
+    assert.commandWorked(
+        mongos.adminCommand({split: shardedNs, middle: {"a.b": 0, "c.d.e": MinKey, f: MinKey}}));
+    assert.commandWorked(
+        mongos.adminCommand({split: shardedNs, middle: {"a.b": 10, "c.d.e": MinKey, f: MinKey}}));
+
+    assert.commandWorked(mongos.adminCommand({shardCollection: refinedNs, key: {"a.b": 1}}));
+    assert.commandWorked(mongos.adminCommand({split: refinedNs, middle: {"a.b": 0}}));
+    assert.commandWorked(mongos.adminCommand({split: refinedNs, middle: {"a.b": 10}}));
+
+    assert.commandWorked(mongos.getCollection(refinedNs).createIndex({"a.b": 1, "c.d.e": 1, f: 1}));
+    assert.commandWorked(mongos.adminCommand(
+        {refineCollectionShardKey: refinedNs, key: {"a.b": 1, "c.d.e": 1, f: 1}}));
+
+    compareBoundaries(mongos, shardedNs, refinedNs);
+})();

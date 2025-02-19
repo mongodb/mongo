@@ -13,6 +13,12 @@ const newKeyDoc = {
     c: 1,
     d: 1
 };
+const kChunkFieldsProjection = {
+    _id: 1,
+    uuid: 1,
+    min: 1,
+    max: 1,
+};
 
 export function dropAndReshardColl(mongos, dbName, collName, keyDoc) {
     assert.commandWorked(mongos.getDB(dbName).runCommand({drop: collName}));
@@ -128,18 +134,40 @@ export function validateConfigTagsAfterRefine(mongos, nsName) {
 }
 
 export function validateUnrelatedCollAfterRefine(
-    mongos, unrelatedName, oldCollArr, oldChunkArr, oldTagsArr) {
+    mongos,
+    unrelatedName,
+    oldCollArr,
+    oldChunkArr,
+) {
     const collArr = mongos.getCollection(kConfigCollections).find({_id: unrelatedName}).toArray();
     assert.eq(1, collArr.length);
     assert.sameMembers(oldCollArr, collArr);
 
-    const chunkArr = findChunksUtil.findChunksByNs(mongos.getDB('config'), unrelatedName).toArray();
+    const chunkArr =
+        findChunksUtil
+            .findChunksByNs(mongos.getDB('config'), unrelatedName, {}, kChunkFieldsProjection)
+            .toArray();
     assert.eq(3, chunkArr.length);
     assert.sameMembers(oldChunkArr, chunkArr);
+}
 
-    const tagsArr = mongos.getCollection(kConfigTags).find({ns: unrelatedName}).toArray();
-    assert.eq(3, tagsArr.length);
-    assert.sameMembers(oldTagsArr, tagsArr);
+// Verifies the min and max fields are the same for the chunks in the given collections.
+export function compareBoundaries(conn, shardedNs, refinedNs) {
+    const shardedArr =
+        findChunksUtil.findChunksByNs(conn.getDB("config"), shardedNs).sort({max: 1}).toArray();
+    const refinedArr =
+        findChunksUtil.findChunksByNs(conn.getDB("config"), refinedNs).sort({max: 1}).toArray();
+
+    assert(shardedArr.length && refinedArr.length, tojson(shardedArr) + ", " + tojson(refinedArr));
+    assert.eq(shardedArr.length, refinedArr.length, tojson(shardedArr) + ", " + tojson(refinedArr));
+
+    const shardedMinAndMax = shardedArr.map(obj => {
+        return {min: obj.min, max: obj.max};
+    });
+    const refinedMinAndMax = refinedArr.map(obj => {
+        return {min: obj.min, max: obj.max};
+    });
+    assert.eq(shardedMinAndMax, refinedMinAndMax);
 }
 
 export function simpleValidationTests(mongosConn, dbName) {
@@ -496,6 +524,7 @@ export function integrationTests(mongosConn, dbName, primaryShard, secondaryShar
     jsTestLog('********** COMMON INTEGRATION TESTS **********');
     const collName = "integrationTests";
     const kNsName = dbName + "." + collName;
+    const kUnrelatedName = dbName + '.baz';
 
     // Split chunk operations before and after refineCollectionShardKey should work as expected.
     dropAndReshardColl(mongosConn, dbName, collName, oldKeyDoc);
@@ -542,6 +571,30 @@ export function integrationTests(mongosConn, dbName, primaryShard, secondaryShar
     assert.commandWorked(
         mongosConn.adminCommand({refineCollectionShardKey: kNsName, key: newKeyDoc}));
     validateConfigTagsAfterRefine(mongosConn, kNsName);
+
+    // Create an unrelated namespace with 3 chunks to verify that it isn't corrupted after
+    // refineCollectionShardKey.
+    dropAndReshardColl(mongosConn, dbName, collName, oldKeyDoc);
+    assert.commandWorked(mongosConn.getCollection(kNsName).createIndex(newKeyDoc));
+
+    assert.commandWorked(
+        mongosConn.adminCommand({shardCollection: kUnrelatedName, key: oldKeyDoc}));
+    assert.commandWorked(mongosConn.adminCommand({split: kUnrelatedName, middle: {a: 0, b: 0}}));
+    assert.commandWorked(mongosConn.adminCommand({split: kUnrelatedName, middle: {a: 5, b: 5}}));
+
+    const oldCollArr =
+        mongosConn.getCollection(kConfigCollections).find({_id: kUnrelatedName}).toArray();
+    const oldChunkArr =
+        findChunksUtil
+            .findChunksByNs(mongosConn.getDB('config'), kUnrelatedName, {}, kChunkFieldsProjection)
+            .toArray();
+
+    assert.eq(1, oldCollArr.length);
+    assert.eq(3, oldChunkArr.length);
+
+    assert.commandWorked(
+        mongosConn.adminCommand({refineCollectionShardKey: kNsName, key: newKeyDoc}));
+    validateUnrelatedCollAfterRefine(mongosConn, kUnrelatedName, oldCollArr, oldChunkArr);
 
     assert.commandWorked(mongosConn.getDB(dbName).dropDatabase());
 }
