@@ -145,23 +145,9 @@ selecting ID during work on JIRA ticket `SERVER-ABCDE` you can use the JIRA
 ticket number to avoid ID collisions with other engineers by taking ID from the
 range `ABCDE00` - `ABCDE99`.
 
-Replacement fields are placed in the format string with curly braces `{}`.
-Everything not surrounded with curly braces is part of the message text. Curly
-brace characters can be output by escaping them using double braces: `{{` or
-`}}`.
-
 Attributes are created with the `_attr` user-defined literal. The intermediate
 object that gets instantiated provides the assignment operator `=` for
 assigning a value to the attribute.
-
-Attributes are associated with replacement fields in the format string by name
-or index, using names is strongly recommended. When using unnamed replacement
-fields, attributes map to replacement fields in the order they appear in the
-format string.
-
-It is allowed to have more attributes than replacement fields in a log
-statement. However, having fewer attributes than replacement fields is not
-allowed.
 
 The message string must be a compile time constant.
 This is to avoid dynamic attribute names in the log output and to be able to
@@ -229,20 +215,12 @@ can be changed by setting the `FatalMode` on the `LogOptions`.
 Debug-level logging is slightly different where an additional parameter (as
 integer) required to indicate the desired debug level:
 
-    LOGV2_DEBUG(ID, debug-level, format-string, attr0, ...);
-    LOGV2_DEBUG(ID, debug-level, format-string, message-string, attr0, ...);
+    LOGV2_DEBUG(ID, debug-level, message-string, attr0, ...);
 
     LOGV2_DEBUG_OPTIONS(
         ID,
         debug-level,
         options,
-        format-string,
-        attr0, ...);
-    LOGV2_DEBUG_OPTIONS(
-        ID,
-        debug-level,
-        options,
-        format-string,
         message-string,
         attr0, ...);
 
@@ -608,9 +586,8 @@ The assertion id can be either the logging ID by passing `UserAssertAfterLog`
 with no arguments or the assertion id can set by constructing
 `UserAssertAfterLog` with an `ErrorCodes::Error`.
 
-The assertion reason string will be a plain text formatted log (replacement
-fields filled in format-string). If replacement fields are not provided in the
-message string, attribute values will be missing from the assertion message.
+The assertion reason string will be a plain text log and can be provided with additional attribute
+arguments.
 
 ##### Examples
 
