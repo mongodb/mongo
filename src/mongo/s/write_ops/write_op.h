@@ -157,6 +157,11 @@ public:
     WriteOpState getWriteState() const;
 
     /**
+     * Returns the op's current state as a string.
+     */
+    StringData getWriteStateAsString() const;
+
+    /**
      * Returns the op's error.
      *
      * Can only be used in state _Error

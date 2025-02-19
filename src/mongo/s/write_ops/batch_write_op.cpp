@@ -833,7 +833,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
     write_ops::WriteError* lastError = nullptr;
     for (auto&& write : targetedBatch.getWrites()) {
         WriteOp& writeOp = _writeOps[write->writeOpRef.first];
-        invariant(writeOp.getWriteState() == WriteOpState_Pending);
+        invariant(writeOp.getWriteState() == WriteOpState_Pending, writeOp.getWriteStateAsString());
 
         // See if we have an error for the write
         write_ops::WriteError* writeError = nullptr;
