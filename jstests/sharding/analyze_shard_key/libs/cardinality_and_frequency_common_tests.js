@@ -402,7 +402,13 @@ export function testAnalyzeCandidateShardKeysUnshardedCollection(conn, {rst, st}
         // if index creation fails, skip this test case.
         let skipTestCase = false;
         if (testCase.indexKey && !AnalyzeShardKeyUtil.isIdKeyPattern(testCase.indexKey)) {
-            const result = coll.createIndex(testCase.indexKey, testCase.indexOptions);
+            const indexToCreate =
+                Object.assign({},
+                              {key: testCase.indexKey, name: JSON.stringify(testCase.indexKey)},
+                              testCase.indexOptions);
+            const result = db.runCommand(
+                {createIndexes: collName, indexes: [indexToCreate], writeConcern: writeConcern});
+
             if (!result.ok && result.code === ErrorCodes.CannotCreateIndex) {
                 jsTest.log(
                     "Skipping testAnalyzeCandidateShardKeyUnshardedCollection test case because CannotCreateIndex: " +
@@ -516,7 +522,13 @@ export function testAnalyzeCandidateShardKeysShardedCollection(conn, st, writeCo
         // if index creation fails, skip this test case.
         let skipTestCase = false;
         if (testCase.indexKey && !AnalyzeShardKeyUtil.isIdKeyPattern(testCase.indexKey)) {
-            const result = coll.createIndex(testCase.indexKey, testCase.indexOptions);
+            const indexToCreate =
+                Object.assign({},
+                              {key: testCase.indexKey, name: JSON.stringify(testCase.indexKey)},
+                              testCase.indexOptions);
+            const result = db.runCommand(
+                {createIndexes: collName, indexes: [indexToCreate], writeConcern: writeConcern});
+
             if (!result.ok && result.code === ErrorCodes.CannotCreateIndex) {
                 jsTest.log(
                     "Skipping testAnalyzeCandidateShardKeyUnshardedCollection test case because CannotCreateIndex: " +
@@ -599,7 +611,13 @@ export function testAnalyzeCurrentShardKeys(conn, st, writeConcern) {
         // if index creation fails, skip this test case.
         let skipTestCase = false;
         if (!AnalyzeShardKeyUtil.isIdKeyPattern(testCase.indexKey)) {
-            const result = coll.createIndex(testCase.indexKey, testCase.indexOptions);
+            const indexToCreate =
+                Object.assign({},
+                              {key: testCase.indexKey, name: JSON.stringify(testCase.indexKey)},
+                              testCase.indexOptions);
+            const result = db.runCommand(
+                {createIndexes: collName, indexes: [indexToCreate], writeConcern: writeConcern});
+
             if (!result.ok && result.code == ErrorCodes.CannotCreateIndex) {
                 jsTest.log(
                     "Skipping testAnalyzeCurrentShardKeys test case because CannotCreateIndex: " +
