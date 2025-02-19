@@ -76,10 +76,6 @@ std::unique_ptr<MatchExpression> getFilter(CommandType cmd,
     return std::unique_ptr<MatchExpression>{};
 }
 
-int64_t sizeOnDiskForDb(OperationContext* opCtx,
-                        const StorageEngine& storageEngine,
-                        const DatabaseName& dbName);
-
 template <typename ReplyItemType>
 int64_t setReplyItems(OperationContext* opCtx,
                       const std::vector<DatabaseName>& dbNames,
@@ -121,7 +117,7 @@ int64_t setReplyItems(OperationContext* opCtx,
             }
 
             writeConflictRetry(opCtx, "sizeOnDisk", NamespaceString(dbName), [&] {
-                size = sizeOnDiskForDb(opCtx, *storageEngine, dbName);
+                size = storageEngine->sizeOnDiskForDb(opCtx, dbName);
             });
             item.setSizeOnDisk(size);
             item.setEmpty(

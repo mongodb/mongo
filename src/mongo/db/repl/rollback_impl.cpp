@@ -417,7 +417,12 @@ void RollbackImpl::_stopAndWaitForIndexBuilds(OperationContext* opCtx) {
         IndexBuildsCoordinator::get(opCtx)->stopIndexBuildsForRollback(opCtx);
 
     // Get a list of all databases.
-    std::vector<DatabaseName> dbs = catalog::listDatabases();
+    StorageEngine* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    std::vector<DatabaseName> dbs;
+    {
+        Lock::GlobalLock lk(opCtx, MODE_IS);
+        dbs = storageEngine->listDatabases();
+    }
 
     // Wait for all background operations to complete by waiting on each database. Single-phase
     // index builds are not stopped before rollback, so we must wait for these index builds to
@@ -1406,7 +1411,8 @@ void RollbackImpl::_transitionFromRollbackToSecondary(OperationContext* opCtx) {
 }
 
 void RollbackImpl::_checkForAllIdIndexes(OperationContext* opCtx) {
-    std::vector<DatabaseName> dbNames = catalog::listDatabases();
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    std::vector<DatabaseName> dbNames = storageEngine->listDatabases();
     for (const auto& dbName : dbNames) {
         Lock::DBLock dbLock(opCtx, dbName, MODE_X);
         checkForIdIndexes(opCtx, dbName);

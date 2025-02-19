@@ -1188,7 +1188,7 @@ private:
         // Adds the collection to the durable catalog.
         auto storageEngine = getServiceContext()->getStorageEngine();
         std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
-            uassertStatusOK(storageEngine->getDurableCatalog()->createCollection(
+            uassertStatusOK(storageEngine->getCatalog()->createCollection(
                 opCtx, nss, options, /*allocateDefaultSpace=*/true));
         auto& catalogId = catalogIdRecordStorePair.first;
         auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
@@ -1230,8 +1230,8 @@ private:
 
         // Drops the collection from the durable catalog.
         auto storageEngine = getServiceContext()->getStorageEngine();
-        uassertStatusOK(storageEngine->getDurableCatalog()->dropCollection(
-            opCtx, writableCollection->getCatalogId()));
+        uassertStatusOK(
+            storageEngine->getCatalog()->dropCollection(opCtx, writableCollection->getCatalogId()));
 
         // Drops the collection from the in-memory catalog.
         CollectionCatalog::get(opCtx)->dropCollection(

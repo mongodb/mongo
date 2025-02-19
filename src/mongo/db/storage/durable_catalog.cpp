@@ -58,6 +58,7 @@
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine_interface.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/transaction_resources.h"
@@ -145,7 +146,7 @@ private:
 DurableCatalog::DurableCatalog(RecordStore* rs,
                                bool directoryPerDb,
                                bool directoryForIndexes,
-                               KVEngine* engine)
+                               StorageEngineInterface* engine)
     : _rs(rs),
       _directoryPerDb(directoryPerDb),
       _directoryForIndexes(directoryForIndexes),
@@ -593,7 +594,7 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalog::cr
         }
         return KeyFormat::Long;
     }();
-    Status status = _engine->createRecordStore(nss, entry.ident, options, keyFormat);
+    Status status = _engine->getEngine()->createRecordStore(nss, entry.ident, options, keyFormat);
     if (!status.isOK())
         return status;
 
@@ -601,10 +602,10 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalog::cr
     shard_role_details::getRecoveryUnit(opCtx)->onRollback(
         [ru, catalog = this, ident = entry.ident](OperationContext*) {
             // Intentionally ignoring failure
-            catalog->_engine->dropIdent(ru, ident, /*identHasSizeInfo=*/true).ignore();
+            catalog->_engine->getEngine()->dropIdent(ru, ident, /*identHasSizeInfo=*/true).ignore();
         });
 
-    auto rs = _engine->getRecordStore(opCtx, nss, entry.ident, options);
+    auto rs = _engine->getEngine()->getRecordStore(opCtx, nss, entry.ident, options);
     invariant(rs);
 
     return std::pair<RecordId, std::unique_ptr<RecordStore>>(entry.catalogId, std::move(rs));
@@ -617,14 +618,16 @@ Status DurableCatalog::createIndex(OperationContext* opCtx,
                                    const IndexDescriptor* spec) {
     std::string ident = getIndexIdent(opCtx, catalogId, spec->indexName());
 
-    Status status = _engine->createSortedDataInterface(
+    auto kvEngine = _engine->getEngine();
+    Status status = kvEngine->createSortedDataInterface(
         *shard_role_details::getRecoveryUnit(opCtx), nss, collOptions, ident, spec);
     if (status.isOK()) {
         shard_role_details::getRecoveryUnit(opCtx)->onRollback(
             [this, ident, recoveryUnit = shard_role_details::getRecoveryUnit(opCtx)](
                 OperationContext*) {
                 // Intentionally ignoring failure.
-                _engine->dropIdent(recoveryUnit, ident, /*identHasSizeInfo=*/false).ignore();
+                auto kvEngine = _engine->getEngine();
+                kvEngine->dropIdent(recoveryUnit, ident, /*identHasSizeInfo=*/false).ignore();
             });
     }
     return status;
@@ -702,29 +705,30 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalog::importCollection(
 
     shard_role_details::getRecoveryUnit(opCtx)->onRollback(
         [catalog = this, ident = entry.ident, indexIdents = indexIdents](OperationContext* opCtx) {
-            catalog->_engine->dropIdentForImport(
+            catalog->_engine->getEngine()->dropIdentForImport(
                 *opCtx, *shard_role_details::getRecoveryUnit(opCtx), ident);
             for (const auto& indexIdent : indexIdents) {
-                catalog->_engine->dropIdentForImport(
+                catalog->_engine->getEngine()->dropIdentForImport(
                     *opCtx, *shard_role_details::getRecoveryUnit(opCtx), indexIdent);
             }
         });
 
-    Status status = _engine->importRecordStore(entry.ident, storageMetadata, importOptions);
+    auto kvEngine = _engine->getEngine();
+    Status status = kvEngine->importRecordStore(entry.ident, storageMetadata, importOptions);
     if (!status.isOK())
         return status;
 
     for (const std::string& indexIdent : indexIdents) {
-        status = _engine->importSortedDataInterface(*shard_role_details::getRecoveryUnit(opCtx),
-                                                    indexIdent,
-                                                    storageMetadata,
-                                                    importOptions);
+        status = kvEngine->importSortedDataInterface(*shard_role_details::getRecoveryUnit(opCtx),
+                                                     indexIdent,
+                                                     storageMetadata,
+                                                     importOptions);
         if (!status.isOK()) {
             return status;
         }
     }
 
-    auto rs = _engine->getRecordStore(opCtx, nss, entry.ident, md.options);
+    auto rs = _engine->getEngine()->getRecordStore(opCtx, nss, entry.ident, md.options);
     invariant(rs);
 
     return DurableCatalog::ImportResult(entry.catalogId, std::move(rs), md.options.uuid.value());
@@ -790,12 +794,12 @@ Status DurableCatalog::dropAndRecreateIndexIdentForResume(OperationContext* opCt
                                                           const CollectionOptions& collOptions,
                                                           const IndexDescriptor* spec,
                                                           StringData ident) {
-    auto status =
-        _engine->dropSortedDataInterface(*shard_role_details::getRecoveryUnit(opCtx), ident);
+    auto status = _engine->getEngine()->dropSortedDataInterface(
+        *shard_role_details::getRecoveryUnit(opCtx), ident);
     if (!status.isOK())
         return status;
 
-    status = _engine->createSortedDataInterface(
+    status = _engine->getEngine()->createSortedDataInterface(
         *shard_role_details::getRecoveryUnit(opCtx), nss, collOptions, ident, spec);
 
     return status;

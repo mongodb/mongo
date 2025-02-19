@@ -42,7 +42,6 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_databases_common.h"
 #include "mongo/db/commands/list_databases_gen.h"
@@ -62,27 +61,9 @@
 #include "mongo/util/serialization_context.h"
 
 namespace mongo {
-namespace list_databases {
-int64_t sizeOnDiskForDb(OperationContext* opCtx,
-                        const StorageEngine& storageEngine,
-                        const DatabaseName& dbName) {
-    int64_t size = 0;
 
-    if (opCtx->isLockFreeReadsOp()) {
-        auto collectionCatalog = CollectionCatalog::get(opCtx);
-        for (auto&& coll : collectionCatalog->range(dbName)) {
-            size += coll->sizeOnDisk(opCtx, storageEngine);
-        }
-    } else {
-        catalog::forEachCollectionFromDb(opCtx, dbName, MODE_IS, [&](const Collection* coll) {
-            size += coll->sizeOnDisk(opCtx, storageEngine);
-            return true;
-        });
-    };
-
-    return size;
-}
-}  // namespace list_databases
+// XXX: remove and put into storage api
+std::intmax_t dbSize(const std::string& database);
 
 namespace {
 

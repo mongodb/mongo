@@ -321,10 +321,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    int64_t sizeOnDisk(OperationContext* opCtx, const StorageEngine& storageEngine) const override {
-        MONGO_UNREACHABLE;
-    }
-
     bool isEmpty(OperationContext* opCtx) const override {
         MONGO_UNREACHABLE;
     }

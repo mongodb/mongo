@@ -41,6 +41,9 @@ public:
     RecoveryUnit* newRecoveryUnit() final {
         return nullptr;
     }
+    std::vector<DatabaseName> listDatabases(boost::optional<TenantId> tenantId) const final {
+        return {};
+    }
     bool supportsCappedCollections() const final {
         return true;
     }
@@ -50,8 +53,19 @@ public:
     bool isEphemeral() const override {
         return true;
     }
-    void loadDurableCatalog(OperationContext* opCtx, LastShutdownState lastShutdownState) final {}
-    void closeDurableCatalog(OperationContext* opCtx) final {}
+    void loadCatalog(OperationContext* opCtx,
+                     boost::optional<Timestamp> stableTs,
+                     LastShutdownState lastShutdownState) final {}
+    void closeCatalog(OperationContext* opCtx) final {}
+    Status dropDatabase(OperationContext* opCtx, const DatabaseName& dbName) final {
+        return Status::OK();
+    }
+    Status dropCollectionsWithPrefix(OperationContext* opCtx,
+                                     const DatabaseName& dbName,
+                                     const std::string& collectionNamePrefix) final {
+        return Status(ErrorCodes::CommandNotSupported,
+                      "The current storage engine doesn't support dropCollections");
+    }
     void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) final {}
     Status beginBackup() final {
         return Status(ErrorCodes::CommandNotSupported,
@@ -162,10 +176,7 @@ public:
     std::shared_ptr<Ident> markIdentInUse(StringData ident) final {
         return nullptr;
     }
-    void startTimestampMonitor(
-        std::initializer_list<TimestampMonitor::TimestampListener*> listeners) final {}
-    void stopTimestampMonitor() final {}
-    void restartTimestampMonitor() final {}
+    void startTimestampMonitor() final {}
 
     void checkpoint() final {}
 
@@ -178,14 +189,14 @@ public:
         return false;
     }
 
+    int64_t sizeOnDiskForDb(OperationContext* opCtx, const DatabaseName& dbName) final {
+        return 0;
+    }
     bool isUsingDirectoryPerDb() const final {
         return false;
     }
     bool isUsingDirectoryForIndexes() const final {
         return false;
-    }
-    int64_t getIdentSize(RecoveryUnit& ru, StringData ident) const final {
-        return 0;
     }
     KVEngine* getEngine() final {
         return nullptr;
@@ -193,10 +204,10 @@ public:
     const KVEngine* getEngine() const final {
         return nullptr;
     }
-    DurableCatalog* getDurableCatalog() final {
+    DurableCatalog* getCatalog() final {
         return nullptr;
     }
-    const DurableCatalog* getDurableCatalog() const final {
+    const DurableCatalog* getCatalog() const final {
         return nullptr;
     }
 

@@ -62,7 +62,7 @@
 
 namespace mongo {
 
-class KVEngine;
+class StorageEngineInterface;
 
 /**
  * An interface to modify the on-disk catalog metadata.
@@ -98,12 +98,12 @@ public:
     DurableCatalog(RecordStore* rs,
                    bool directoryPerDb,
                    bool directoryForIndexes,
-                   KVEngine* engine);
+                   StorageEngineInterface* engine);
     DurableCatalog() = delete;
 
 
     static DurableCatalog* get(OperationContext* opCtx) {
-        return opCtx->getServiceContext()->getStorageEngine()->getDurableCatalog();
+        return opCtx->getServiceContext()->getStorageEngine()->getCatalog();
     }
 
     void init(OperationContext* opCtx);
@@ -353,6 +353,6 @@ private:
     absl::flat_hash_map<RecordId, EntryIdentifier, RecordId::Hasher> _catalogIdToEntryMap;
     mutable stdx::mutex _catalogIdToEntryMapLock;
 
-    KVEngine* const _engine;
+    StorageEngineInterface* const _engine;
 };
 }  // namespace mongo

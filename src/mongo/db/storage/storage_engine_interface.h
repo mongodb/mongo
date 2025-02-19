@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,46 +27,20 @@
  *    it in the license file.
  */
 
-#include <map>
-
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/util/uuid.h"
+#pragma once
 
 namespace mongo {
-namespace catalog {
 
-using MinVisibleTimestamp = Timestamp;
-using MinVisibleTimestampMap = std::map<UUID, MinVisibleTimestamp>;
-using RequiresTimestampExtendedRangeSupportMap = std::map<UUID, bool>;
-struct PreviousCatalogState {
-    MinVisibleTimestampMap minValidTimestampMap;
-    RequiresTimestampExtendedRangeSupportMap requiresTimestampExtendedRangeSupportMap;
+class KVEngine;
+class DurableCatalog;
+class StorageEngine;
+
+class StorageEngineInterface {
+public:
+    StorageEngineInterface() = default;
+    virtual ~StorageEngineInterface() = default;
+    virtual StorageEngine* getStorageEngine() = 0;
+    virtual KVEngine* getEngine() = 0;
+    virtual DurableCatalog* getCatalog() = 0;
 };
-
-/**
- * Closes the catalog, destroying all associated in-memory data structures for all databases. After
- * a call to this function, it is illegal to access the catalog before calling openCatalog().
- *
- * Must be called with the global lock acquired in exclusive mode.
- */
-PreviousCatalogState closeCatalog(OperationContext* opCtx);
-
-/**
- * Restores the catalog and all in-memory state after a call to closeCatalog().
- *
- * Must be called with the global lock acquired in exclusive mode.
- */
-void openCatalog(OperationContext* opCtx,
-                 const PreviousCatalogState& catalogState,
-                 Timestamp stableTimestamp);
-
-/**
- * Restores the catalog and all in-memory state after a call to
- * closeCatalog -> reinitializeStorageEngine -> startupRecovery.
- *
- * Must be called with the global lock acquired in exclusive mode.
- */
-void openCatalogAfterStorageChange(OperationContext* opCtx);
-}  // namespace catalog
 }  // namespace mongo

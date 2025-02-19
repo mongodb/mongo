@@ -296,8 +296,6 @@ public:
 
     long long dataSize(OperationContext* opCtx) const final;
 
-    int64_t sizeOnDisk(OperationContext* opCtx, const StorageEngine& storageEngine) const final;
-
     /**
      * Currently fast counts are prone to false negative as it is not tolerant to unclean shutdowns.
      * So, verify that the collection is really empty by opening the collection cursor and reading

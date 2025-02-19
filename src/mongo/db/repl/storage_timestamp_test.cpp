@@ -1855,7 +1855,7 @@ private:
 public:
     void run(bool simulatePrimary) {
         auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
-        auto durableCatalog = storageEngine->getDurableCatalog();
+        auto durableCatalog = storageEngine->getCatalog();
 
         // Declare the database to be in a "synced" state, i.e: in steady-state replication.
         Timestamp syncTime = _clock->tickClusterTime(1).asTimestamp();
@@ -1983,7 +1983,7 @@ public:
         }
 
         auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
-        auto durableCatalog = storageEngine->getDurableCatalog();
+        auto durableCatalog = storageEngine->getCatalog();
 
         NamespaceString nss =
             NamespaceString::createNamespaceString_forTest("unittests.timestampIndexBuilds");
@@ -2120,7 +2120,7 @@ TEST(StorageTimestampTest, TimestampIndexBuilds) {
 
 TEST_F(StorageTimestampTest, TimestampMultiIndexBuilds) {
     auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
-    auto durableCatalog = storageEngine->getDurableCatalog();
+    auto durableCatalog = storageEngine->getCatalog();
 
     // Create config.system.indexBuilds collection to store commit quorum value during index
     // building.
@@ -2234,7 +2234,7 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuilds) {
 
 TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
     auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
-    auto durableCatalog = storageEngine->getDurableCatalog();
+    auto durableCatalog = storageEngine->getCatalog();
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(
         "unittests.timestampMultiIndexBuildsDuringRename");
@@ -2342,7 +2342,7 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
  */
 TEST_F(StorageTimestampTest, TimestampAbortIndexBuild) {
     auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
-    auto durableCatalog = storageEngine->getDurableCatalog();
+    auto durableCatalog = storageEngine->getCatalog();
 
     // Create config.system.indexBuilds collection to store commit quorum value during index
     // building.
@@ -2455,7 +2455,7 @@ TEST_F(StorageTimestampTest, TimestampAbortIndexBuild) {
 
 TEST_F(StorageTimestampTest, TimestampIndexDropsWildcard) {
     auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
-    auto durableCatalog = storageEngine->getDurableCatalog();
+    auto durableCatalog = storageEngine->getCatalog();
 
     NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("unittests.timestampIndexDrops");
@@ -2527,7 +2527,7 @@ TEST_F(StorageTimestampTest, TimestampIndexDropsWildcard) {
 
 TEST_F(StorageTimestampTest, TimestampIndexDropsListed) {
     auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
-    auto durableCatalog = storageEngine->getDurableCatalog();
+    auto durableCatalog = storageEngine->getCatalog();
 
     NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("unittests.timestampIndexDrops");
@@ -2822,7 +2822,7 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
 
         // Grab the existing idents to identify the ident created by the index build.
         auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
-        auto durableCatalog = storageEngine->getDurableCatalog();
+        auto durableCatalog = storageEngine->getCatalog();
         std::vector<std::string> origIdents;
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
@@ -2892,7 +2892,7 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
 
 TEST_F(StorageTimestampTest, ViewCreationSeparateTransaction) {
     auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
-    auto durableCatalog = storageEngine->getDurableCatalog();
+    auto durableCatalog = storageEngine->getCatalog();
 
     const NamespaceString backingCollNss =
         NamespaceString::createNamespaceString_forTest("unittests.backingColl");
@@ -2997,7 +2997,7 @@ TEST_F(StorageTimestampTest, CreateCollectionWithSystemIndex) {
     ASSERT_GT(indexCompleteTs, _futureTs);
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
     auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
-    auto durableCatalog = storageEngine->getDurableCatalog();
+    auto durableCatalog = storageEngine->getCatalog();
     auto indexIdent = durableCatalog->getIndexIdent(_opCtx, catalogId, "user_1_db_1");
     assertIdentsMissingAtTimestamp(durableCatalog, "", indexIdent, _pastTs);
     assertIdentsMissingAtTimestamp(durableCatalog, "", indexIdent, _presentTs);
@@ -3014,7 +3014,7 @@ TEST_F(StorageTimestampTest, CreateCollectionWithSystemIndex) {
 
 TEST_F(StorageTimestampTest, MultipleTimestampsForMultikeyWrites) {
     auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
-    auto durableCatalog = storageEngine->getDurableCatalog();
+    auto durableCatalog = storageEngine->getCatalog();
     RecordId catalogId;
 
     // Create config.system.indexBuilds collection to store commit quorum value during index

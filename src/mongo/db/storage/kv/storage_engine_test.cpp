@@ -50,7 +50,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/catalog_control.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -90,16 +89,6 @@
 
 namespace mongo {
 namespace {
-
-StorageEngine::TimestampMonitor::TimestampListener kCollectionCatalogCleanupTimestampListener(
-    StorageEngine::TimestampMonitor::TimestampType::kOldest,
-    [](OperationContext* opCtx, Timestamp timestamp) {
-        if (CollectionCatalog::latest(opCtx)->catalogIdTracker().dirty(timestamp)) {
-            CollectionCatalog::write(opCtx, [timestamp](CollectionCatalog& catalog) {
-                catalog.catalogIdTracker().cleanup(timestamp);
-            });
-        }
-    });
 
 TEST_F(StorageEngineTest, ReconcileIdentsTest) {
     auto opCtx = cc().makeOperationContext();
@@ -154,9 +143,9 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
     // KVEngine was started after an unclean shutdown but not in a repair context.
     {
         Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
-        catalog::closeCatalog(opCtx.get());
-        _storageEngine->loadDurableCatalog(opCtx.get(), StorageEngine::LastShutdownState::kUnclean);
-        catalog::initializeCollectionCatalog(opCtx.get(), _storageEngine, boost::none);
+        _storageEngine->closeCatalog(opCtx.get());
+        _storageEngine->loadCatalog(
+            opCtx.get(), boost::none, StorageEngine::LastShutdownState::kUnclean);
     }
 
     ASSERT(!identExists(opCtx.get(), swCollInfo.getValue().ident));
@@ -225,11 +214,10 @@ protected:
             ASSERT_OK(startIndexBuild(opCtx, ns, indexName, buildUUID));
             wuow.commit();
         }
-        auto md =
-            _storageEngine->getDurableCatalog()->getParsedCatalogEntry(opCtx, catalogId)->metadata;
+        auto md = _storageEngine->getCatalog()->getParsedCatalogEntry(opCtx, catalogId)->metadata;
         auto offset = md->findIndexOffset(indexName);
         indexSpec = md->indexes[offset].spec;
-        return _storageEngine->getDurableCatalog()->getIndexIdent(opCtx, catalogId, indexName);
+        return _storageEngine->getCatalog()->getIndexIdent(opCtx, catalogId, indexName);
     }
 
     // Makes an internal table that contains index-resume metadata, where |pretendSideTable| is an
@@ -540,7 +528,7 @@ class StorageEngineTimestampMonitorTest : public StorageEngineTest {
 public:
     void setUp() override {
         StorageEngineTest::setUp();
-        _storageEngine->startTimestampMonitor({&kCollectionCatalogCleanupTimestampListener});
+        _storageEngine->startTimestampMonitor();
     }
 
     void waitForTimestampMonitorPass() {
@@ -616,7 +604,7 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedIndex) {
         wuow.commit();
     }
 
-    const auto indexIdent = _storageEngine->getDurableCatalog()->getIndexIdent(
+    const auto indexIdent = _storageEngine->getCatalog()->getIndexIdent(
         opCtx.get(), swCollInfo.getValue().catalogId, indexName);
 
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
@@ -662,9 +650,9 @@ TEST_F(StorageEngineTest, ReconcileTwoPhaseIndexBuilds) {
         }
     }
 
-    const auto indexIdentA = _storageEngine->getDurableCatalog()->getIndexIdent(
+    const auto indexIdentA = _storageEngine->getCatalog()->getIndexIdent(
         opCtx.get(), swCollInfo.getValue().catalogId, indexA);
-    const auto indexIdentB = _storageEngine->getDurableCatalog()->getIndexIdent(
+    const auto indexIdentB = _storageEngine->getCatalog()->getIndexIdent(
         opCtx.get(), swCollInfo.getValue().catalogId, indexB);
 
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
@@ -708,9 +696,9 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
     // KVEngine was started in a repair context.
     {
         Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
-        catalog::closeCatalog(opCtx.get());
-        _storageEngine->loadDurableCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
-        catalog::initializeCollectionCatalog(opCtx.get(), _storageEngine, boost::none);
+        _storageEngine->closeCatalog(opCtx.get());
+        _storageEngine->loadCatalog(
+            opCtx.get(), boost::none, StorageEngine::LastShutdownState::kClean);
     }
 
     ASSERT(identExists(opCtx.get(), swCollInfo.getValue().ident));
@@ -759,16 +747,14 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
     // the actual drop in storage engine.
     {
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(
-            removeEntry(opCtx.get(), collNs.ns_forTest(), _storageEngine->getDurableCatalog()));
+        ASSERT_OK(removeEntry(opCtx.get(), collNs.ns_forTest(), _storageEngine->getCatalog()));
         wuow.commit();
     }
 
     ASSERT(!collectionExists(opCtx.get(), collNs));
 
-    // When in a repair context, loadDurableCatalog() recreates catalog entries for orphaned idents.
-    _storageEngine->loadDurableCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
-    catalog::initializeCollectionCatalog(opCtx.get(), _storageEngine, boost::none);
+    // When in a repair context, loadCatalog() recreates catalog entries for orphaned idents.
+    _storageEngine->loadCatalog(opCtx.get(), boost::none, StorageEngine::LastShutdownState::kClean);
     auto identNs = swCollInfo.getValue().ident;
     std::replace(identNs.begin(), identNs.end(), '-', '_');
     NamespaceString orphanNs =
@@ -795,18 +781,17 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
     {
         AutoGetDb db(opCtx.get(), collNs.dbName(), LockMode::MODE_X);
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(
-            removeEntry(opCtx.get(), collNs.ns_forTest(), _storageEngine->getDurableCatalog()));
+        ASSERT_OK(removeEntry(opCtx.get(), collNs.ns_forTest(), _storageEngine->getCatalog()));
         wuow.commit();
     }
     ASSERT(!collectionExists(opCtx.get(), collNs));
 
-    // When in a normal startup context, loadDurableCatalog() does not recreate catalog entries for
+    // When in a normal startup context, loadCatalog() does not recreate catalog entries for
     // orphaned idents.
     {
         Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
-        _storageEngine->loadDurableCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
-        catalog::initializeCollectionCatalog(opCtx.get(), _storageEngine, boost::none);
+        _storageEngine->loadCatalog(
+            opCtx.get(), boost::none, StorageEngine::LastShutdownState::kClean);
     }
     // reconcileCatalogAndIdents() drops orphaned idents.
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
@@ -871,7 +856,7 @@ public:
                                      /*lockFileCreatedByUncleanShutdown=*/false};
         _storageEngine = std::make_unique<StorageEngineImpl>(
             opCtx.get(), std::make_unique<TimestampMockKVEngine>(), options);
-        _storageEngine->startTimestampMonitor({&kCollectionCatalogCleanupTimestampListener});
+        _storageEngine->startTimestampMonitor();
     }
 
     void tearDown() override {
@@ -1013,18 +998,10 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
     const auto oldPath = storageGlobalParams.dbpath;
     const auto newPath = boost::filesystem::path(oldPath).append(".alternate").string();
     boost::filesystem::create_directory(newPath);
-    CollectionCatalog::write(getServiceContext(), [this](CollectionCatalog& catalog) {
-        catalog.onCloseCatalog();
-        catalog.deregisterAllCollectionsAndViews(getServiceContext());
-    });
     auto lastShutdownState =
         reinitializeStorageEngine(opCtx.get(), StorageEngineInitFlags{}, [&newPath] {
             storageGlobalParams.dbpath = newPath;
         });
-    {
-        Lock::GlobalWrite globalLk(opCtx.get());
-        catalog::initializeCollectionCatalog(opCtx.get(), getServiceContext()->getStorageEngine());
-    }
     getGlobalServiceContext()->getStorageEngine()->notifyStorageStartupRecoveryComplete();
     LOGV2(5781103, "Started up storage engine in alternate location");
     ASSERT(StorageEngine::LastShutdownState::kClean == lastShutdownState);
@@ -1039,18 +1016,10 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
     ASSERT_TRUE(collectionExists(opCtx.get(), coll2Ns));
 
     LOGV2(5781104, "Starting up storage engine in original location");
-    CollectionCatalog::write(getServiceContext(), [this](CollectionCatalog& catalog) {
-        catalog.onCloseCatalog();
-        catalog.deregisterAllCollectionsAndViews(getServiceContext());
-    });
     lastShutdownState =
         reinitializeStorageEngine(opCtx.get(), StorageEngineInitFlags{}, [&oldPath] {
             storageGlobalParams.dbpath = oldPath;
         });
-    {
-        Lock::GlobalWrite globalLk(opCtx.get());
-        catalog::initializeCollectionCatalog(opCtx.get(), getServiceContext()->getStorageEngine());
-    }
     getGlobalServiceContext()->getStorageEngine()->notifyStorageStartupRecoveryComplete();
     ASSERT(StorageEngine::LastShutdownState::kClean == lastShutdownState);
     StorageEngineTest::_storageEngine = getServiceContext()->getStorageEngine();

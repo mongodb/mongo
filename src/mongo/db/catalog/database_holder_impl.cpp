@@ -47,7 +47,6 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/database_impl.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -216,6 +215,8 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
 
     audit::logDropDatabase(opCtx->getClient(), name);
 
+    auto const serviceContext = opCtx->getServiceContext();
+
     for (auto&& coll : catalog->range(name)) {
         if (!coll) {
             break;
@@ -247,8 +248,9 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
         DatabaseProfileSettings::get(opCtx->getServiceContext()).clearDatabaseProfileSettings(name);
     });
 
+    auto const storageEngine = serviceContext->getStorageEngine();
     writeConflictRetry(opCtx, "dropDatabase", NamespaceString(name), [&] {
-        catalog::dropDatabase(opCtx, name).transitional_ignore();
+        storageEngine->dropDatabase(opCtx, name).transitional_ignore();
     });
 }
 

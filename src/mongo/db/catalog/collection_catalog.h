@@ -77,31 +77,6 @@ namespace catalog {
 // namespace. This is a special class that controls opening/closing the catalog and resides in
 // catalog_control.cpp
 class CatalogControlUtils;
-
-/**
- * Must be called after DurableCatalog is loaded.
- */
-void initializeCollectionCatalog(OperationContext* opCtx,
-                                 StorageEngine* engine,
-                                 boost::optional<Timestamp> stableTs);
-void initializeCollectionCatalog(OperationContext* opCtx, StorageEngine* engine);
-
-/**
- * Creates a Collection object and registers it in the CollectionCatalog.
- */
-void initCollectionObject(OperationContext* opCtx,
-                          StorageEngine* engine,
-                          RecordId catalogId,
-                          const NamespaceString& nss,
-                          bool forRepair,
-                          Timestamp minValidTs);
-
-/**
- * Lists the databases.
- * This function doesn't return databases whose creation has committed durably but hasn't been
- * published yet in the CollectionCatalog.
- */
-std::vector<DatabaseName> listDatabases(boost::optional<TenantId> tenantId = boost::none);
 };  // namespace catalog
 
 class CollectionCatalog {
