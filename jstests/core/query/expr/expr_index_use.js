@@ -63,6 +63,7 @@ assert.commandWorked(coll.createIndex({"w.z": 1}));
  *  - nReturned:        The number of documents the pipeline is expected to return.
  *  - expectedIndex:    Either an index specification object when index use is expected or
  *                      'null' if a collection scan is expected.
+ *  - isEOF:            Boolean indicating whether the plan defaults to EOF.
  */
 function confirmExpectedExprExecution(expr, metricsToCheck, collation) {
     assert(metricsToCheck.hasOwnProperty("nReturned"),
@@ -113,6 +114,8 @@ function confirmExpectedExprExecution(expr, metricsToCheck, collation) {
             assert.neq(null, stage, tojson(explain));
             assert(stage.hasOwnProperty("keyPattern"), tojson(explain));
             assert.docEq(metricsToCheck.expectedIndex, stage.keyPattern, tojson(explain));
+        } else if (metricsToCheck.hasOwnProperty("isEOF") && metricsToCheck.isEOF) {
+            assert(getPlanStageFunc(explain, "EOF", tojson(explain)));
         } else {
             assert(getPlanStageFunc(explain, "COLLSCAN"), tojson(explain));
         }
@@ -185,13 +188,13 @@ confirmExpectedExprExecution({$lte: ["$w", [1]]}, {nReturned: 23});
 
 // A constant expression is not expected to use an index.
 confirmExpectedExprExecution(1, {nReturned: 23});
-confirmExpectedExprExecution(false, {nReturned: 0});
+confirmExpectedExprExecution(false, {nReturned: 0, isEOF: true});
 confirmExpectedExprExecution({$eq: [1, 1]}, {nReturned: 23});
-confirmExpectedExprExecution({$eq: [0, 1]}, {nReturned: 0});
-confirmExpectedExprExecution({$gt: [0, 1]}, {nReturned: 0});
+confirmExpectedExprExecution({$eq: [0, 1]}, {nReturned: 0, isEOF: true});
+confirmExpectedExprExecution({$gt: [0, 1]}, {nReturned: 0, isEOF: true});
 confirmExpectedExprExecution({$gte: [1, 0]}, {nReturned: 23});
 confirmExpectedExprExecution({$lt: [0, 1]}, {nReturned: 23});
-confirmExpectedExprExecution({$lte: [1, 0]}, {nReturned: 0});
+confirmExpectedExprExecution({$lte: [1, 0]}, {nReturned: 0, isEOF: true});
 
 // Comparison of 2 fields is not expected to use an index.
 confirmExpectedExprExecution({$eq: ["$x", "$y"]}, {nReturned: 20});

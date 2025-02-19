@@ -87,6 +87,8 @@ public:
 
     bool isTriviallyTrue() const final;
 
+    bool isTriviallyFalse() const final;
+
     bool equivalent(const MatchExpression* other) const final;
 
     MatchCategory getCategory() const final {

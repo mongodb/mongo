@@ -38,6 +38,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_internal_eq_hashed_key.h"
 #include "mongo/db/matcher/expression_tree.h"
@@ -116,6 +117,11 @@ std::unique_ptr<MatchExpression> ExprMatchExpression::clone() const {
 bool ExprMatchExpression::isTriviallyTrue() const {
     auto exprConst = dynamic_cast<ExpressionConstant*>(_expression.get());
     return exprConst && exprConst->getValue().coerceToBool();
+}
+
+bool ExprMatchExpression::isTriviallyFalse() const {
+    auto exprConst = dynamic_cast<ExpressionConstant*>(_expression.get());
+    return exprConst && !exprConst->getValue().coerceToBool();
 }
 
 namespace {
@@ -201,6 +207,10 @@ MatchExpression::ExpressionOptimizerFunc ExprMatchExpression::getOptimizer() con
         // check for 'isTriviallyTrue()'.
         if (expression->isTriviallyTrue()) {
             expression = std::make_unique<AndMatchExpression>();
+        }
+
+        if (expression->isTriviallyFalse()) {
+            expression = std::make_unique<AlwaysFalseMatchExpression>();
         }
 
         return expression;

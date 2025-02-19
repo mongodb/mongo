@@ -294,6 +294,36 @@ TEST_F(ExprMatchTest, ExprWithFalsyConstantExpressionIsNotTriviallyTrue) {
     ASSERT_FALSE(getMatchExpression()->isTriviallyTrue());
 }
 
+TEST_F(ExprMatchTest, ExprWithFalseConstantExpressionIsTriviallyFalse) {
+    createMatcher(fromjson("{$expr: false}"));
+    ASSERT_TRUE(getMatchExpression()->isTriviallyFalse());
+}
+
+TEST_F(ExprMatchTest, ExprThatOptimizesToFalseIsTriviallyFalse) {
+    createMatcher(fromjson("{$expr:{$eq:['a','b']}}"));
+    ASSERT_TRUE(getMatchExpression()->isTriviallyFalse());
+}
+
+TEST_F(ExprMatchTest, AndWithFalseConstantExpressionIsTriviallyFalse) {
+    createMatcher(fromjson("{$and:[ {$expr:false}, {_id:15} ]}"));
+    ASSERT_TRUE(getMatchExpression()->isTriviallyFalse());
+}
+
+TEST_F(ExprMatchTest, OrWithFalseConstantExpressionIsNotTriviallyFalse) {
+    createMatcher(fromjson("{$or:[ {$expr:false}, {_id:20} ]}"));
+    ASSERT_FALSE(getMatchExpression()->isTriviallyFalse());
+}
+
+TEST_F(ExprMatchTest, ExprWithNonConstantExpressionIsNotTriviallyFalse) {
+    createMatcher(fromjson("{$expr: {$sum: [\"$a\", \"$b\"]}}"));
+    ASSERT_FALSE(getMatchExpression()->isTriviallyFalse());
+}
+
+TEST_F(ExprMatchTest, ExprWithTruthyConstantExpressionsIsNotTriviallyFalse) {
+    createMatcher(fromjson("{$expr: {$sum: [1, 1, 1]}}"));
+    ASSERT_FALSE(getMatchExpression()->isTriviallyFalse());
+}
+
 DEATH_TEST_REGEX(ExprMatchTest, GetChildFailsIndexGreaterThanZero, "Tripwire assertion.*6400207") {
     BSONObj exprBson = fromjson("{$expr: {$and: [{$eq: ['$a', 1]}, {$eq: ['$b', 2]}]}}");
 

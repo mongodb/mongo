@@ -10,7 +10,7 @@
 //   # Explicitly testing optimization.
 //   requires_pipeline_optimization,
 // ]
-import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.trivial_match_expr;
 coll.drop();
@@ -44,10 +44,44 @@ function assertQueryPlanForFindContainsFilter(query = {}, msg = "") {
     assert(hasFilter(explain), msg + tojson(explain));
 }
 
+function assertQueryPlanForFindContainsEOF(query = {}, msg = "") {
+    const explain = coll.explain().find(query).finish();
+    assert(planHasStage(db, explain, "EOF"), msg + tojson(explain));
+    assert(!planHasStage(db, explain, "COLLSCAN")), msg + tojson(explain);
+}
+
+function assertQueryPlanForFindContainsExpressIxscan(query = {}, msg = "") {
+    const explain = coll.explain().find(query).finish();
+    assert(planHasStage(db, explain, "EXPRESS_IXSCAN"), msg + tojson(explain));
+    assert(!planHasStage(db, explain, "COLLSCAN")), msg + tojson(explain);
+}
+
 assertQueryPlanForAggDoesNotContainFilter([{$match: {$expr: true}}],
                                           "{$expr: true} should be optimized away");
 
 assertQueryPlanForFindDoesNotContainFilter({$expr: true}, "{$expr: true} should be optimized away");
+
+assertQueryPlanForFindContainsEOF({$expr: false}, "{$expr: false} should be optimized away");
+
+assertQueryPlanForFindContainsEOF({$expr: {$eq: ["0", "-1"]}},
+                                  "expressions that optimize to false should be optimized away");
+
+assertQueryPlanForFindContainsEOF({$expr: {$const: null}},
+                                  "$expr containing falsy constant should be optimized away");
+
+assertQueryPlanForFindContainsEOF({$and: [{$expr: false}, {_id: 15}]},
+                                  "$and containing {$expr: false} should be optimized away");
+
+assertQueryPlanForFindContainsEOF({$and: [{$expr: false}, {$expr: true}, {_id: 15}]},
+                                  "$and containing {$expr: false} should be optimized away");
+
+assertQueryPlanForFindContainsExpressIxscan(
+    {$or: [{$expr: false}, {_id: 15}]},
+    "$or expression containing false constant should be optimized to IXSCAN");
+
+assertQueryPlanForFindContainsExpressIxscan(
+    {$or: [{$expr: false}, {$expr: false}, {_id: 20}]},
+    "$or expression containing false constants should be optimized to IXSCAN");
 
 assertQueryPlanForAggDoesNotContainFilter(
     [{$match: {$expr: "foo"}}],
