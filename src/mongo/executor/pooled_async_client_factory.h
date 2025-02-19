@@ -125,9 +125,11 @@ public:
         _pool->setKeepOpen(hostAndPort, keepOpen);
     }
 
-    void appendStats(ConnectionPoolStats* stats) override {
+    void appendConnectionStats(ConnectionPoolStats* stats) const override {
         _pool->appendConnectionStats(stats);
     }
+
+    void appendStats(BSONObjBuilder& bob) const override {}
 
 private:
     class Handle : public AsyncClientFactory::AsyncClientHandle {

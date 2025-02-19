@@ -45,6 +45,7 @@
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/connection_pool_tl.h"
+#include "mongo/executor/executor_integration_test_connection_stats.h"
 #include "mongo/executor/pooled_async_client_factory.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/idl/generic_argument_gen.h"
@@ -52,6 +53,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/topology_version_gen.h"
+#include "mongo/transport/grpc_connection_stats_gen.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/unittest/integration_test.h"
@@ -158,38 +160,10 @@ public:
         return _reactor;
     }
 
-    ConnectionStatsPer getPoolStats() {
-        ConnectionPoolStats stats;
-        getPool().appendStats(&stats);
-        return stats.statsByHost[getServer()];
-    }
-
     RemoteCommandResponse assertReadOK(NetworkInterface::ExhaustResponseReader& rdr) {
         auto resp = rdr.next().get();
         LOGV2(9311390, "Received exhaust response", "response"_attr = resp.toString());
         return assertOK(resp);
-    }
-
-    /*
-     * Asserts that the connection pool stats reach a certain value within a 30 second window. The
-     * connection pool stats to test and the value they must reach are defined in f.
-     * TODO: SERVER-66126 We should be able to test directly without any wait once continuation get
-     * destructed right after they run.
-     */
-    void assertConnectionStatsSoon(std::function<bool(const ConnectionStatsPer&)> f,
-                                   StringData errMsg) {
-        // TODO SERVER-99246: reenable these assertions.
-        if (unittest::shouldUseGRPCEgress()) {
-            return;
-        }
-        auto start = getGlobalServiceContext()->getFastClockSource()->now();
-        while (getGlobalServiceContext()->getFastClockSource()->now() - start < Seconds(30)) {
-            if (f(getPoolStats())) {
-                return;
-            }
-            sleepFor(Milliseconds(100));
-        }
-        FAIL(errMsg.toString());
     }
 
 private:
@@ -225,8 +199,13 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, ReceiveMultipleResponses) {
 
     rdr.reset();
     assertConnectionStatsSoon(
+        getPool(),
+        getServer(),
         [](const ConnectionStatsPer& stats) {
             return stats.inUse + stats.available + stats.leased == 0;
+        },
+        [&](const GRPCConnectionStats& stats) {
+            return stats.getTotalInUseStreams() + stats.getTotalLeasedStreams() == 0;
         },
         "ReceiveMultipleResponses test timed out while waiting for connection count to drop to 0.");
 }
@@ -262,8 +241,13 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, CancelRead) {
 
     rdr.reset();
     assertConnectionStatsSoon(
+        getPool(),
+        getServer(),
         [](const ConnectionStatsPer& stats) {
             return stats.inUse + stats.available + stats.leased == 0;
+        },
+        [&](const GRPCConnectionStats& stats) {
+            return stats.getTotalInUseStreams() + stats.getTotalLeasedStreams() == 0;
         },
         "CancelRead test timed out while waiting for connection count to drop to 0.");
 }
@@ -327,14 +311,19 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, CommandSucceeds) {
 
     rdr.reset();
 
-    // Once command has completed, the connection should be returned to the pool.
     assertConnectionStatsSoon(
-        [](const ConnectionStatsPer& stats) { return stats.available == 1; },
-        "CommandSucceeds test timed out while waiting for the number of available "
-        "connections to reach 1.");
-    assertConnectionStatsSoon([](const ConnectionStatsPer& stats) { return stats.inUse == 0; },
-                              "CommandSucceeds test timed out while waiting for the number of in "
-                              "use connection to reach 0.");
+        getPool(),
+        getServer(),
+        [](const ConnectionStatsPer& stats) {
+            // Once command has completed, the connection should be returned to the pool
+            return stats.inUse == 0 && stats.available == 1;
+        },
+        [&](const GRPCConnectionStats& stats) {
+            // There should still be one open channel.
+            return stats.getTotalInUseStreams() == 0 && stats.getTotalOpenChannels() == 1;
+        },
+        "CommandSucceeds test timed out while waiting for 0 inUse connections and 1 available/open "
+        "connection.");
 }
 
 TEST_F(ExhaustResponseReaderIntegrationFixture, RemoteCancel) {
@@ -369,6 +358,7 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, RemoteCancel) {
                  .getNoThrow());
     cancelConn->indicateUsed();
     cancelConn->indicateSuccess();
+    cancelConn.reset();
 
     auto resp = respFut.get();
     LOGV2(9311392, "Received response after cancellation", "response"_attr = resp.toString());
@@ -377,8 +367,18 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, RemoteCancel) {
 
     rdr.reset();
     assertConnectionStatsSoon(
-        [](const ConnectionStatsPer& stats) { return stats.available == 1; },
-        "connection should be returned to the pool after graceful cancellation");
+        getPool(),
+        getServer(),
+        [](const ConnectionStatsPer& stats) {
+            // connection should be returned to the pool after graceful cancellation
+            return stats.inUse == 0 && stats.available == 2;
+        },
+        [&](const GRPCConnectionStats& stats) {
+            // There should still be one open channel.
+            return stats.getTotalInUseStreams() == 0 && stats.getTotalOpenChannels() == 1;
+        },
+        "RemoteCancel test timed out while waiting for 0 inUse connections and the correct number "
+        "of available/open connections");
 }
 
 TEST_F(ExhaustResponseReaderIntegrationFixture, LocalTimeout) {
@@ -403,9 +403,17 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, LocalTimeout) {
     // will cancel the operation early.
     auto resp = rdr->next().get();
     ASSERT_EQ(resp.status, ErrorCodes::CallbackCanceled);
-    assertConnectionStatsSoon([](const ConnectionStatsPer& stats) { return stats.available == 0; },
-                              "LocalTimeout test timed out while waiting for the number of "
-                              "available connection to reach 0.");
+    rdr.reset();
+    assertConnectionStatsSoon(
+        getPool(),
+        getServer(),
+        [](const ConnectionStatsPer& stats) { return stats.inUse == 0 && stats.available == 0; },
+        [&](const GRPCConnectionStats& stats) {
+            // There should still be one open channel.
+            return stats.getTotalInUseStreams() == 0 && stats.getTotalOpenChannels() == 1;
+        },
+        "LocalTimeout test timed out while waiting for 0 inUse connections and the correct number "
+        "of available/open connections.");
 }
 
 }  // namespace mongo::executor

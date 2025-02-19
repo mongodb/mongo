@@ -41,6 +41,7 @@
 #include "mongo/transport/grpc/grpc_transport_layer_impl.h"
 #include "mongo/transport/grpc/grpc_transport_layer_mock.h"
 #include "mongo/transport/grpc/test_fixtures.h"
+#include "mongo/transport/grpc_connection_stats_gen.h"
 #include "mongo/transport/session_workflow_test_util.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/unittest/log_test.h"
@@ -146,6 +147,19 @@ public:
             .get();
     }
 
+    std::shared_ptr<executor::AsyncClientFactory::AsyncClientHandle> getLeasedClient() {
+        return getLeasedClient(getTarget());
+    }
+
+    std::shared_ptr<executor::AsyncClientFactory::AsyncClientHandle> getLeasedClient(
+        const HostAndPort& target, bool lease = false) {
+        return getFactory()
+            .lease(target,
+                   ConnectSSLMode::kGlobalSSLMode,
+                   CommandServiceTestFixtures::kDefaultConnectTimeout)
+            .get();
+    }
+
     void waitForDisconnected(
         const std::shared_ptr<executor::AsyncClientFactory::AsyncClientHandle>& handle) {
         size_t retries = 3;
@@ -161,11 +175,48 @@ public:
         BSONObjBuilder stats;
         _tl->appendStatsForServerStatus(&stats);
         auto egressStats = stats.obj();
-        ASSERT_EQ(
-            egressStats[kStreamsSubsectionFieldName][kSuccessfulStreamsFieldName].numberLong(),
-            successfulStreams);
-        ASSERT_EQ(egressStats[kStreamsSubsectionFieldName][kFailedStreamsFieldName].numberLong(),
+        ASSERT_EQ(egressStats[kStreamsSubsectionFieldName]
+                             [GRPCConnectionStats::kTotalSuccessfulStreamsFieldName]
+                                 .numberLong(),
+                  successfulStreams);
+        ASSERT_EQ(egressStats[kStreamsSubsectionFieldName]
+                             [GRPCConnectionStats::kTotalFailedStreamsFieldName]
+                                 .numberLong(),
                   failedStreams);
+    }
+
+    void assertStatsSoon(int created, int inUse, int leased, int open) {
+        GRPCConnectionStats stats;
+        bool result = false;
+
+        int iterations = 10;
+        for (int i = 0; i < iterations; ++i) {
+            stats = checked_cast<GRPCAsyncClientFactory*>(_factory.get())->getStats();
+            if (stats.getTotalStreamsCreated() == created &&
+                stats.getTotalInUseStreams() == inUse && stats.getTotalLeasedStreams() == leased &&
+                stats.getTotalOpenChannels() == open) {
+                result = true;
+                break;
+            } else if (i == iterations - 1) {
+                break;
+            }
+
+            sleepmillis(100);
+        }
+
+        if (!result) {
+            LOGV2(9924602,
+                  "Failing AsyncClientFactory stats assertion",
+                  "created"_attr = stats.getTotalStreamsCreated(),
+                  "expectedCreated"_attr = created,
+                  "inUse"_attr = stats.getTotalInUseStreams(),
+                  "expectedInUse"_attr = inUse,
+                  "leased"_attr = stats.getTotalLeasedStreams(),
+                  "expectedLeased"_attr = leased,
+                  "open"_attr = stats.getTotalOpenChannels(),
+                  "expectedOpen"_attr = open);
+        }
+        ASSERT_TRUE(result);
     }
 
 private:
@@ -305,6 +356,33 @@ TEST_F(GRPCAsyncClientFactoryTest, RefuseShutdownWithActiveClient) {
     }
     pf.future.get();
     shutdownThread.join();
+}
+
+TEST_F(GRPCAsyncClientFactoryTest, StatsTest) {
+    auto handle = getClient();
+    auto anotherHandle = getClient();
+    auto leasedHandle = getLeasedClient();
+    assertStatsSoon(3 /*created*/, 2 /*inUse*/, 1 /*leased*/, 1 /*open*/);
+
+    // Destroy two handles.
+    handle->indicateSuccess();
+    leasedHandle->indicateFailure({ErrorCodes::CallbackCanceled, "Destroying leased client"});
+    handle.reset();
+    leasedHandle.reset();
+
+    // Handle outcome should not affect stats.
+    assertStatsSoon(3 /*created*/, 1 /*inUse*/, 0 /*leased*/, 1 /*open*/);
+
+    auto msg = makeUniqueMessage();
+    auto resp = anotherHandle->getClient().runCommand(OpMsgRequest::parse(msg)).get();
+    ASSERT_OK(getStatusFromCommandResult(resp->getCommandReply()));
+
+    // A handle is still in use after a command is run and before it is destroyed.
+    assertStatsSoon(3 /*created*/, 1 /*inUse*/, 0 /*leased*/, 1 /*open*/);
+
+    anotherHandle->indicateSuccess();
+    anotherHandle.reset();
+    assertStatsSoon(3 /*created*/, 0 /*inUse*/, 0 /*leased*/, 1 /*open*/);
 }
 
 class MockGRPCAsyncClientFactoryTest : public MockGRPCTransportLayerTest {

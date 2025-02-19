@@ -273,7 +273,7 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
             }
 
             auto it = _sessions.insert(_sessions.begin(), session);
-            _numCurrentStreams.increment();
+            _numActiveStreams.increment();
 
             session->setCleanupCallback(
                 [this, client = weak_from_this(), it = std::move(it)](Status terminationStatus) {
@@ -285,7 +285,7 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
                     if (auto anchor = client.lock()) {
                         stdx::lock_guard lk(_mutex);
                         _sessions.erase(it);
-                        _numCurrentStreams.decrement();
+                        _numActiveStreams.decrement();
 
                         if (MONGO_unlikely(_isShutdownComplete_inlock())) {
                             _shutdownCV.notify_one();
@@ -808,17 +808,11 @@ void GRPCClient::shutdown() {
     static_cast<StubFactoryImpl&>(*_stubFactory).stop();
 }
 
-void GRPCClient::appendStats(BSONObjBuilder* section) const {
-    auto numCurrentChannels = static_cast<StubFactoryImpl&>(*_stubFactory).getPoolSize();
-
-    section->append(kCurrentChannelsFieldName, numCurrentChannels);
-
-    {
-        BSONObjBuilder streamSection(section->subobjStart(kStreamsSubsectionFieldName));
-        streamSection.append(kCurrentStreamsFieldName, _numCurrentStreams.get());
-        streamSection.append(kSuccessfulStreamsFieldName, _numSuccessfulStreams.get());
-        streamSection.append(kFailedStreamsFieldName, _numFailedStreams.get());
-    }
+void GRPCClient::appendStats(GRPCConnectionStats& stats) const {
+    stats.setTotalOpenChannels(static_cast<StubFactoryImpl&>(*_stubFactory).getPoolSize());
+    stats.setTotalActiveStreams(_numActiveStreams.get());
+    stats.setTotalSuccessfulStreams(_numSuccessfulStreams.get());
+    stats.setTotalFailedStreams(_numFailedStreams.get());
 }
 
 #ifdef MONGO_CONFIG_SSL

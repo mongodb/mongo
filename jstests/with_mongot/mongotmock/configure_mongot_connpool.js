@@ -3,8 +3,6 @@
  *  requires_replication,
  *  requires_sharding,
  *  sets_replica_set_matching_strategy,
- *   # TODO SERVER-99246: re-enable this test once the connection pool stats with gRPC are correct.
- *   search_community_incompatible,
  * ]
  */
 
@@ -83,6 +81,30 @@ function prepSearchResponses(mongotConn, howMany, coll, collUUID, stWithMock = u
     }
 }
 
+function assertConnectionStats(
+    mongos, allHosts, mongoRPCArgs, gRPCArgs, checkNum, gRPC, connPoolStatsCmd = undefined) {
+    if (!gRPC) {
+        assertHasConnPoolStats(mongos, allHosts, mongoRPCArgs, checkNum, connPoolStatsCmd);
+        return;
+    }
+
+    let {
+        // TODO SERVER-100262: Assumption may no longer hold if we use multiple channels per remote.
+        available = 1,
+        active = 0,
+    } = gRPCArgs;
+
+    ++checkNum;
+    jsTestLog("Check #" + checkNum + ": " + tojson(gRPCArgs));
+
+    let res = mongos.adminCommand({[connPoolStatsCmd]: 1});
+    let executor = "NetworkInterfaceTL-MongotExecutor";
+    let stats = res[executor];
+
+    jsTestLog("Connection stats for " + executor + ": " + tojson(stats));
+    return stats.totalOpenChannels == available && stats.totalLeasedStreams == active;
+}
+
 const kPoolMinSize = 4;
 const kPoolMaxSize = 8;
 
@@ -90,7 +112,7 @@ const kPoolMaxSize = 8;
 // mocked by mongotconn and/or the mocks of stWithMock are respected. mongotConn should be a
 // connection to the mongotmock that responds to mongod's data-queries; stWithMock should contain
 // all the mongotmocks for a sharded deployment.
-function testMinAndMax(conn, mongotConn, stWithMock = undefined) {
+function testMinAndMax(conn, mongotConn, useGRPC, stWithMock = undefined) {
     // If we're testing mongos <--> mongot conn pool, we need to block the mongotmock that responds
     // to mongos rather than the mongotmock that responds to mongot's queries for actual data.
     let threads = [];
@@ -114,28 +136,34 @@ function testMinAndMax(conn, mongotConn, stWithMock = undefined) {
     // Launch an initial search query to trigger to min.
     prepSearchResponses(mongotConn, 1, coll, collUUID, stWithMock);
     launchSearchQuery(conn, threads, {times: 1});
-    currentCheckNum = assertHasConnPoolStats(conn,
-                                             [mongotMockToBlock.host],
-                                             {ready: kPoolMinSize},
-                                             currentCheckNum,
-                                             "_mongotConnPoolStats");
+    currentCheckNum = assertConnectionStats(conn,
+                                            [mongotMockToBlock.host],
+                                            {ready: kPoolMinSize},
+                                            {},
+                                            currentCheckNum,
+                                            useGRPC,
+                                            "_mongotConnPoolStats");
 
     // Increase by one.
     const newMinSize = 5;
     updateSetParameters(conn, {mongotConnectionPoolMinSize: newMinSize});
-    currentCheckNum = assertHasConnPoolStats(conn,
-                                             [mongotMockToBlock.host],
-                                             {ready: newMinSize},
-                                             currentCheckNum,
-                                             "_mongotConnPoolStats");
+    currentCheckNum = assertConnectionStats(conn,
+                                            [mongotMockToBlock.host],
+                                            {ready: newMinSize},
+                                            {},
+                                            currentCheckNum,
+                                            useGRPC,
+                                            "_mongotConnPoolStats");
 
     // Increase to maxSize
     updateSetParameters(conn, {mongotConnectionPoolMinSize: kPoolMaxSize});
-    currentCheckNum = assertHasConnPoolStats(conn,
-                                             [mongotMockToBlock.host],
-                                             {ready: kPoolMaxSize},
-                                             currentCheckNum,
-                                             "_mongotConnPoolStats");
+    currentCheckNum = assertConnectionStats(conn,
+                                            [mongotMockToBlock.host],
+                                            {ready: kPoolMaxSize},
+                                            {},
+                                            currentCheckNum,
+                                            useGRPC,
+                                            "_mongotConnPoolStats");
 
     // Ensure the search query completes successfully.
     for (let i = 0; i < threads.length; i++) {
@@ -146,8 +174,15 @@ function testMinAndMax(conn, mongotConn, stWithMock = undefined) {
     updateSetParameters(conn, {mongotConnectionPoolMinSize: 0});
     assert.commandWorked(
         conn.adminCommand({_dropConnectionsToMongot: 1, hostAndPort: [mongotMockToBlock.host]}));
-    currentCheckNum = assertHasConnPoolStats(
-        conn, [mongotMockToBlock.host], {isAbsent: true}, currentCheckNum, "_mongotConnPoolStats");
+    // TODO SERVER-100261: Once dropConnections drops channels then we will need to add "open: 0" to
+    // the arg list below
+    currentCheckNum = assertConnectionStats(conn,
+                                            [mongotMockToBlock.host],
+                                            {isAbsent: true},
+                                            {},
+                                            currentCheckNum,
+                                            useGRPC,
+                                            "_mongotConnPoolStats");
 
     // Launch kPoolMaxSize - 1 blocked finds.
     threads = [];
@@ -155,39 +190,53 @@ function testMinAndMax(conn, mongotConn, stWithMock = undefined) {
         {configureFailPoint: "mongotWaitBeforeRespondingToQuery", mode: 'alwaysOn'}));
     prepSearchResponses(mongotConn, kPoolMaxSize - 1, coll, collUUID, stWithMock);
     launchSearchQuery(conn, threads, {times: kPoolMaxSize - 1});
-    currentCheckNum = assertHasConnPoolStats(conn,
-                                             [mongotMockToBlock.host],
-                                             {active: kPoolMaxSize - 1},
-                                             currentCheckNum,
-                                             "_mongotConnPoolStats");
+
+    // If communicating over gRPC then connections do not respect connection pool configurations (we
+    // establish at most 2 TCP connections per remote, and then multiplex HTTP2 streams over those
+    // connections) so we must specify stats separately. Only gRPC stats are asserted if useGRPC ==
+    // true and only ConnectionPool stats are asserted if useGRPC == false.
+    currentCheckNum = assertConnectionStats(conn,
+                                            [mongotMockToBlock.host],
+                                            {active: kPoolMaxSize - 1},
+                                            {active: kPoolMaxSize - 1},
+                                            currentCheckNum,
+                                            useGRPC,
+                                            "_mongotConnPoolStats");
 
     // Launch two more.
     prepSearchResponses(mongotConn, 2, coll, collUUID, stWithMock);
     launchSearchQuery(conn, threads, {times: 2});
-    // We should only go up to the max of active connections.
-    currentCheckNum = assertHasConnPoolStats(conn,
-                                             [mongotMockToBlock.host],
-                                             {active: kPoolMaxSize},
-                                             currentCheckNum,
-                                             "_mongotConnPoolStats");
+    // We should only go up to the max of active connections. If communicating over gRPC then we do
+    // not respect connection pool configurations.
+    currentCheckNum = assertConnectionStats(conn,
+                                            [mongotMockToBlock.host],
+                                            {active: kPoolMaxSize},
+                                            {active: kPoolMaxSize + 1},
+                                            currentCheckNum,
+                                            useGRPC,
+                                            "_mongotConnPoolStats");
 
     // Increase the max size, which will allow us to have as many active connections as there are
     // waiting requests.
     updateSetParameters(conn, {mongotConnectionPoolMaxSize: kPoolMaxSize + 1});
-    currentCheckNum = assertHasConnPoolStats(conn,
-                                             [mongotMockToBlock.host],
-                                             {active: kPoolMaxSize + 1},
-                                             currentCheckNum,
-                                             "_mongotConnPoolStats");
+    currentCheckNum = assertConnectionStats(conn,
+                                            [mongotMockToBlock.host],
+                                            {active: kPoolMaxSize + 1},
+                                            {active: kPoolMaxSize + 1},
+                                            currentCheckNum,
+                                            useGRPC,
+                                            "_mongotConnPoolStats");
 
     // Release the search queries and assert we have the max number of connections ready.
     assert.commandWorked(mongotMockToBlock.adminCommand(
         {configureFailPoint: "mongotWaitBeforeRespondingToQuery", mode: 'off'}));
-    currentCheckNum = assertHasConnPoolStats(conn,
-                                             [mongotMockToBlock.host],
-                                             {pending: 0, ready: kPoolMaxSize + 1},
-                                             currentCheckNum,
-                                             "_mongotConnPoolStats");
+    currentCheckNum = assertConnectionStats(conn,
+                                            [mongotMockToBlock.host],
+                                            {pending: 0, ready: kPoolMaxSize + 1},
+                                            {},
+                                            currentCheckNum,
+                                            useGRPC,
+                                            "_mongotConnPoolStats");
 
     // Ensure the search queries complete successfully.
     for (let i = 0; i < threads.length; i++) {
@@ -209,7 +258,7 @@ let conn = MongoRunner.runMongod({
     }
 });
 
-testMinAndMax(conn, mongotConn);
+testMinAndMax(conn, mongotConn, mongotmock.useGRPC());
 MongoRunner.stopMongod(conn);
 mongotmock.stop();
 
@@ -234,7 +283,9 @@ let st = stWithMock.st;
 
 let mongos = st.s;
 
-testMinAndMax(
-    mongos, stWithMock.getMockConnectedToHost(st.rs0.getPrimary()).getConnection(), stWithMock);
+testMinAndMax(mongos,
+              stWithMock.getMockConnectedToHost(st.rs0.getPrimary()).getConnection(),
+              stWithMock.getMockConnectedToHost(st.rs0.getPrimary()).useGRPC(),
+              stWithMock);
 
 stWithMock.stop();

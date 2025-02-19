@@ -37,6 +37,7 @@
 #include <string>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/histogram.h"
@@ -79,6 +80,8 @@ struct ConnectionStatsPer {
     ConnectionStatsPer();
 
     ConnectionStatsPer& operator+=(const ConnectionStatsPer& other);
+
+    void appendToBSON(mongo::BSONObjBuilder& result) const;
 
     size_t inUse = 0u;
     size_t available = 0u;

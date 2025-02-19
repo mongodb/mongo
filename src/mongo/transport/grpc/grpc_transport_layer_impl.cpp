@@ -317,7 +317,7 @@ Future<std::shared_ptr<Session>> GRPCTransportLayerImpl::asyncConnectWithAuthTok
                   timeout,
                   {std::move(authToken), sslMode},
                   token,
-                  connectionMetrics)
+                  std::move(connectionMetrics))
         .then([](std::shared_ptr<EgressSession> egressSession) -> std::shared_ptr<Session> {
             return egressSession;
         });
@@ -335,7 +335,8 @@ Future<std::shared_ptr<Session>> GRPCTransportLayerImpl::asyncConnect(
             Status(ErrorCodes::InvalidSSLConfiguration,
                    "Transient SSL parameters are not supported when using gRPC"));
     }
-    return asyncConnectWithAuthToken(std::move(peer), sslMode, reactor, timeout, connectionMetrics);
+    return asyncConnectWithAuthToken(
+        std::move(peer), sslMode, reactor, timeout, std::move(connectionMetrics));
 }
 
 void GRPCTransportLayerImpl::shutdown() {

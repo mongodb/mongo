@@ -184,7 +184,7 @@ void NetworkInterfaceTL::appendConnectionStats(ConnectionPoolStats* stats) const
         return;
     }
 
-    _clientFactory->appendStats(stats);
+    _clientFactory->appendConnectionStats(stats);
 }
 
 void NetworkInterfaceTL::appendStats(BSONObjBuilder& bob) const {
@@ -194,6 +194,7 @@ void NetworkInterfaceTL::appendStats(BSONObjBuilder& bob) const {
 
     BSONObjBuilder builder = bob.subobjStart(_instanceName);
     _reactor->appendStats(builder);
+    _clientFactory->appendStats(builder);
 }
 
 NetworkInterface::Counters NetworkInterfaceTL::getCounters() const {

@@ -119,7 +119,10 @@ public:
         Milliseconds timeout,
         const CancellationToken& token = CancellationToken::uncancelable()) = 0;
 
-    virtual void appendStats(ConnectionPoolStats* stats) = 0;
+    // TODO SERVER-100677: Remove
+    virtual void appendConnectionStats(ConnectionPoolStats* stats) const {};
+
+    virtual void appendStats(BSONObjBuilder& bob) const = 0;
 
 protected:
     AsyncClientFactory() = default;

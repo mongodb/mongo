@@ -52,10 +52,12 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/executor/connection_pool.h"
+#include "mongo/executor/executor_integration_test_connection_stats.h"
 #include "mongo/executor/executor_integration_test_fixture.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
+#include "mongo/executor/network_interface_tl.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -64,6 +66,7 @@
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/transport/grpc_connection_stats_gen.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
@@ -82,16 +85,19 @@
 namespace mongo {
 namespace executor {
 namespace {
+constexpr auto kNetworkInterfaceInstanceName = "TaskExecutorTest"_sd;
+constexpr auto kNetworkInterfaceTestInstanceName = "TaskExecutorTestSetup"_sd;
+constexpr auto kNetworkInterfaceGRPCInstanceName = "FixtureNet"_sd;
 
 class TaskExecutorFixture : public ExecutorIntegrationTestFixture {
 public:
     TaskExecutorFixture() = default;
 
     void setUp() override {
-        _executor = makeExecutor("TaskExecutorTest");
+        _executor = makeExecutor(kNetworkInterfaceInstanceName);
         _executor->startup();
 
-        _testExecutor = makeExecutor("TaskExecutorTestSetup");
+        _testExecutor = makeExecutor(kNetworkInterfaceTestInstanceName);
         _testExecutor->startup();
     };
 
@@ -103,7 +109,7 @@ public:
             net = makeNetworkInterface(name.toString(), nullptr, nullptr, std::move(cpOptions));
         } else {
 #ifdef MONGO_CONFIG_GRPC
-            net = makeNetworkInterfaceGRPC("FixtureNet");
+            net = makeNetworkInterfaceGRPC(kNetworkInterfaceGRPCInstanceName);
 #else
             MONGO_UNREACHABLE;
 #endif
@@ -151,33 +157,9 @@ public:
         return false;
     }
 
-    ConnectionStatsPer getPoolStats() {
-        ConnectionPoolStats stats;
-        _executor->getNetworkInterface()->appendConnectionStats(&stats);
-        return stats.statsByHost[getServer()];
-    }
-
-    /*
-     * Asserts that the connection pool stats reach a certain value within a 30 second window. The
-     * connection pool stats to test and the value they must reach are defined in f.
-     * TODO: SERVER-66126 We should be able to test directly without any wait once continuations get
-     * destructed right after they run.
-     */
-    void assertConnectionStatsSoon(std::function<bool(const ConnectionStatsPer&)> f,
-                                   StringData errMsg) {
-        // TODO SERVER-99246: unskip these assertions.
-        if (unittest::shouldUseGRPCEgress()) {
-            return;
-        }
-
-        auto start = getGlobalServiceContext()->getFastClockSource()->now();
-        while (getGlobalServiceContext()->getFastClockSource()->now() - start < Seconds(30)) {
-            if (f(getPoolStats())) {
-                return;
-            }
-            sleepFor(Milliseconds(100));
-        }
-        FAIL(errMsg.toString());
+    const AsyncClientFactory& getFactory() {
+        return checked_pointer_cast<NetworkInterfaceTL>(_executor->getNetworkInterface())
+            ->getClientFactory_forTest();
     }
 
     std::shared_ptr<ThreadPoolTaskExecutor> _executor;
@@ -301,8 +283,14 @@ TEST_F(TaskExecutorFixture, Shutdown) {
     ASSERT_EQ(exhPf.future.getNoThrow(), ErrorCodes::CallbackCanceled);
 
     assertConnectionStatsSoon(
+        getFactory(),
+        getServer(),
         [](const ConnectionStatsPer& stats) {
             return stats.inUse + stats.available + stats.leased == 0;
+        },
+        [&](const GRPCConnectionStats& stats) {
+            // TODO SERVER-100261: Also add in total open channels once shutdown destorys channels.
+            return stats.getTotalInUseStreams() + stats.getTotalLeasedStreams() == 0;
         },
         "Connection pools should be drained after shutdown + join");
 }
@@ -399,8 +387,13 @@ TEST_F(TaskExecutorFixture, RunExhaustShouldReceiveMultipleResponses) {
     ASSERT_TRUE(waitUntilNoTasksOrDeadline(Date_t::now() + Seconds(5)));
 
     assertConnectionStatsSoon(
+        getFactory(),
+        getServer(),
         [](const ConnectionStatsPer& stats) {
             return stats.inUse + stats.available + stats.leased == 0;
+        },
+        [&](const GRPCConnectionStats& stats) {
+            return stats.getTotalInUseStreams() + stats.getTotalLeasedStreams() == 0;
         },
         "Connection should be discarded after exhaust cancel");
 }
@@ -438,8 +431,13 @@ TEST_F(TaskExecutorFixture, RunExhaustFutureShouldReceiveMultipleResponses) {
     ASSERT_FALSE(swFuture.getNoThrow().isOK());
 
     assertConnectionStatsSoon(
+        getFactory(),
+        getServer(),
         [](const ConnectionStatsPer& stats) {
             return stats.inUse + stats.available + stats.leased == 0;
+        },
+        [&](const GRPCConnectionStats& stats) {
+            return stats.getTotalInUseStreams() + stats.getTotalLeasedStreams() == 0;
         },
         "Connection should be discarded after exhaust cancel");
 }
@@ -525,8 +523,13 @@ TEST_F(TaskExecutorFixture, RunExhaustShouldStopOnFailure) {
         ASSERT_TRUE(waitUntilNoTasksOrDeadline(Date_t::now() + Seconds(5)));
 
         assertConnectionStatsSoon(
+            getFactory(),
+            getServer(),
             [](const ConnectionStatsPer& stats) {
                 return stats.inUse == 0 && stats.available == 1 && stats.leased == 0;
+            },
+            [&](const GRPCConnectionStats& stats) {
+                return stats.getTotalInUseStreams() + stats.getTotalLeasedStreams() == 0;
             },
             "Connection should be returned to the pool after exhaust command completion");
     }

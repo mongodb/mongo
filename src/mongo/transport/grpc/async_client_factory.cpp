@@ -35,6 +35,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/grpc/grpc_session.h"
+#include "mongo/transport/grpc_connection_stats_gen.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
@@ -100,14 +101,26 @@ void GRPCAsyncClientFactory::shutdown() {
     LOGV2_DEBUG(9936106,
                 kDiagnosticLogLevel,
                 "Waiting for outstanding streams to terminate",
-                "numActiveStreams"_attr = _numActiveHandles,
+                "numActiveHandles"_attr = _numActiveHandles,
                 "numFinishingStreams"_attr = _finishingClientList.size());
     _cv.wait(lk, [&]() { return _shutdownComplete(lk); });
 }
 
-void GRPCAsyncClientFactory::appendStats(executor::ConnectionPoolStats* stats) {
-    // TODO SERVER-99246: properly record "ConnectionPoolStats" for gRPC
-    MONGO_UNIMPLEMENTED;
+void GRPCAsyncClientFactory::appendStats(BSONObjBuilder& bob) const {
+    auto stats = getStats();
+    stats.serialize(&bob);
+}
+
+GRPCConnectionStats GRPCAsyncClientFactory::getStats() const {
+    GRPCConnectionStats stats;
+    checked_cast<GRPCTransportLayerImpl*>(_tl)->appendStats(stats);
+
+    stats.setTotalInUseStreams(stats.getTotalActiveStreams() - _numLeasedStreams.get());
+    stats.setTotalLeasedStreams(_numLeasedStreams.get());
+    stats.setTotalStreamsCreated(_numStreamsCreated.get());
+    stats.setTotalStreamUsageTimeMs(_totalStreamUsageTimeMs.get());
+
+    return stats;
 }
 
 void GRPCAsyncClientFactory::dropConnections() {
@@ -169,7 +182,8 @@ Future<std::shared_ptr<GRPCAsyncClientFactory::AsyncClientHandle>> GRPCAsyncClie
                 "hostAndPort"_attr = target,
                 "timeout"_attr = timeout);
 
-    return _tl->asyncConnectWithAuthToken(target, sslMode, _reactor, timeout, nullptr, token)
+    auto connMetrics = std::make_shared<ConnectionMetrics>(_svcCtx->getFastClockSource());
+    return _tl->asyncConnectWithAuthToken(target, sslMode, _reactor, timeout, connMetrics, token)
         .then([target, reactor = _reactor, svcCtx = _svcCtx](
                   std::shared_ptr<transport::Session> session) {
             return std::make_shared<AsyncDBClient>(target, std::move(session), svcCtx, reactor);
@@ -181,19 +195,25 @@ Future<std::shared_ptr<GRPCAsyncClientFactory::AsyncClientHandle>> GRPCAsyncClie
                         "hostAndPort"_attr = target,
                         "error"_attr = s);
         })
-        .then([this, target](std::shared_ptr<AsyncDBClient> client)
+        .then([this, target, lease, connMetrics](std::shared_ptr<AsyncDBClient> client)
                   -> std::shared_ptr<AsyncClientFactory::AsyncClientHandle> {
             LOGV2_DEBUG(9936102,
                         kDiagnosticLogLevel,
                         "gRPC stream establishment succeeded",
-                        "hostAndPort"_attr = client->remote());
-            auto handle = std::make_shared<Handle>(this, _svcCtx, std::move(client));
+                        "hostAndPort"_attr = target,
+                        "duration"_attr = connMetrics->total());
+            auto handle = std::make_shared<Handle>(this, _svcCtx, std::move(client), lease);
 
             stdx::lock_guard lk(_mutex);
-            auto& handlesList = _endpoints[handle->getClient().remote()].handles;
+            auto& handlesList = _endpoints[target].handles;
             handlesList.push_front({&handle->getClient()});
             handle->_it = handlesList.begin();
+            _numStreamsCreated.increment();
             _numActiveHandles++;
+            if (lease) {
+                _numLeasedStreams.increment();
+            }
+
             return handle;
         });
 }
@@ -223,11 +243,14 @@ void GRPCAsyncClientFactory::_destroyHandle(Handle& handle) {
         _numActiveHandles--;
     }
 
+    bool isLeased = handle.isLeased();
+    auto timer = handle.getAcquiredTimer();
+
     // gRPC calls must be ended with a call to finish(), which notifies the server that it is done
     // with the RPC call and should be gracefully terminated.
     checked_cast<EgressSession&>(cs->client->getTransportSession())
         .asyncFinish()
-        .getAsync([cs, this](Status s) {
+        .getAsync([cs, isLeased, acquired = std::move(timer), this](Status s) {
             LOGV2_DEBUG(9859000,
                         kDiagnosticLogLevel,
                         "Completed call to finish() on gRPC stream",
@@ -245,6 +268,11 @@ void GRPCAsyncClientFactory::_destroyHandle(Handle& handle) {
                             "clientUseCount"_attr = cs->client.use_count());
             }
             _finishingClientList.erase(*cs->it);
+
+            _totalStreamUsageTimeMs.increment(acquired->millis());
+            if (isLeased) {
+                _numLeasedStreams.decrement();
+            }
 
             if (_shutdownComplete(lk)) {
                 _cv.notify_all();

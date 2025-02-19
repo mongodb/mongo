@@ -193,6 +193,27 @@ idl_generator(
     src = "message_compressor_options_server.idl",
 )
 
+idl_generator(
+    name = "grpc_connection_stats_gen",
+    src = "grpc_connection_stats.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "grpc_connection_stats",
+    srcs = [
+        ":grpc_connection_stats_gen",
+    ],
+    hdrs = [
+        ":grpc_connection_stats_gen",
+    ],
+    deps = [
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
 mongo_cc_library(
     name = "session_util",
     srcs = [

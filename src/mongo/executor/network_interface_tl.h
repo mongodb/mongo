@@ -119,6 +119,10 @@ public:
                     Milliseconds timeout,
                     Status status) override;
 
+    const AsyncClientFactory& getClientFactory_forTest() const {
+        return *_clientFactory;
+    }
+
     /**
      * NetworkInterfaceTL's implementation of a leased network-stream
      * provided for manual use outside of the NITL's usual RPC API.

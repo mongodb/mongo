@@ -30,6 +30,7 @@
 #include "mongo/db/query/search/search_task_executors.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/db/query/search/mongot_options.h"
 #include "mongo/executor/connection_pool_stats.h"
 
 namespace mongo {
@@ -48,6 +49,15 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         auto mongotExec = executor::getMongotTaskExecutor(opCtx->getServiceContext());
+        // The metrics reported through appendConnectionPoolStats do not map cleanly to gRPC's
+        // networking concepts, so when gRPC is enabled, we report the metrics separately. This stat
+        // reporting will be revisited in SERVER-100677
+        if (globalMongotParams.useGRPC) {
+            mongotExec->appendNetworkInterfaceStats(result);
+            return true;
+        }
+
+        // TODO SERVER-100677: Unify global connection stats collection.
         executor::ConnectionPoolStats stats{};
         mongotExec->appendConnectionStats(&stats);
         stats.appendToBSON(result);

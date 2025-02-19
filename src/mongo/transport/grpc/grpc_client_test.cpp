@@ -37,6 +37,7 @@
 #include "mongo/transport/grpc/mock_client.h"
 #include "mongo/transport/grpc/mock_wire_version_provider.h"
 #include "mongo/transport/grpc/test_fixtures.h"
+#include "mongo/transport/grpc_connection_stats_gen.h"
 #include "mongo/transport/test_fixtures.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -52,25 +53,11 @@
 
 namespace mongo::transport::grpc {
 
-BSONObj getClientStats(std::shared_ptr<GRPCClient> client) {
-    BSONObjBuilder stats;
-    client->appendStats(&stats);
+GRPCConnectionStats getClientStats(std::shared_ptr<GRPCClient> client) {
+    GRPCConnectionStats stats;
+    client->appendStats(stats);
 
-    return stats.obj();
-}
-
-long long getCurrChannelMetric(std::shared_ptr<GRPCClient> client) {
-    auto obj = getClientStats(client);
-    auto currChannelsElem = obj.getField(kCurrentChannelsFieldName);
-
-    return currChannelsElem.numberLong();
-}
-
-long long getStreamsMetric(std::shared_ptr<GRPCClient> client, StringData fieldName) {
-    auto obj = getClientStats(client);
-    auto streamSubObj = obj.getObjectField(kStreamsSubsectionFieldName);
-
-    return streamSubObj.getField(fieldName).numberLong();
+    return stats;
 }
 
 class GRPCClientTest : public ServiceContextTest {
@@ -417,11 +404,11 @@ TEST_F(GRPCClientTest, GRPCClientConnectAfterReactorShutdown) {
 
 TEST_F(GRPCClientTest, GRPCClientShutdownDuringBadConnection) {
     auto waitUntilChannelCreation = [this](std::shared_ptr<GRPCClient> client) {
-        auto numChannels = getCurrChannelMetric(client);
+        auto numChannels = getClientStats(client).getTotalOpenChannels();
         auto retries = 0;
 
         while (numChannels < 1 && retries++ < 5) {
-            numChannels = getCurrChannelMetric(client);
+            numChannels = getClientStats(client).getTotalOpenChannels();
             sleepmillis(retries * 5);
         }
     };
@@ -432,11 +419,11 @@ TEST_F(GRPCClientTest, GRPCClientShutdownDuringBadConnection) {
     auto clientThreadBody = [&](auto& server, auto&) {
         auto client = makeClient();
         client->start();
-        ASSERT_EQ(getCurrChannelMetric(client), 0);
+        ASSERT_EQ(getClientStats(client).getTotalOpenChannels(), 0);
         auto res =
             client->connect(HostAndPort("localhost", 12345), getReactor(), Milliseconds::max(), {});
         waitUntilChannelCreation(client);
-        ASSERT_EQ(getCurrChannelMetric(client), 1);
+        ASSERT_EQ(getClientStats(client).getTotalOpenChannels(), 1);
         client->shutdown();
         ASSERT_THROWS_CODE(res.get(), DBException, ErrorCodes::ShutdownInProgress);
     };
@@ -452,10 +439,10 @@ TEST_F(GRPCClientTest, GRPCClientAppendStatsFailedSession) {
         auto client = makeClient();
         client->start();
 
-        ASSERT_EQ(getCurrChannelMetric(client), 0);
-        ASSERT_EQ(getStreamsMetric(client, kCurrentStreamsFieldName), 0);
-        ASSERT_EQ(getStreamsMetric(client, kSuccessfulStreamsFieldName), 0);
-        ASSERT_EQ(getStreamsMetric(client, kFailedStreamsFieldName), 0);
+        ASSERT_EQ(getClientStats(client).getTotalOpenChannels(), 0);
+        ASSERT_EQ(getClientStats(client).getTotalActiveStreams(), 0);
+        ASSERT_EQ(getClientStats(client).getTotalSuccessfulStreams(), 0);
+        ASSERT_EQ(getClientStats(client).getTotalFailedStreams(), 0);
 
         // Create a new session each for a different address
         auto session1 = client
@@ -464,8 +451,8 @@ TEST_F(GRPCClientTest, GRPCClientAppendStatsFailedSession) {
                                       CommandServiceTestFixtures::kDefaultConnectTimeout,
                                       {})
                             .get();
-        ASSERT_EQ(getCurrChannelMetric(client), 1);
-        ASSERT_EQ(getStreamsMetric(client, kCurrentStreamsFieldName), 1);
+        ASSERT_EQ(getClientStats(client).getTotalOpenChannels(), 1);
+        ASSERT_EQ(getClientStats(client).getTotalActiveStreams(), 1);
 
         auto session2 = client
                             ->connect(server.getListeningAddresses().at(1),
@@ -473,8 +460,8 @@ TEST_F(GRPCClientTest, GRPCClientAppendStatsFailedSession) {
                                       CommandServiceTestFixtures::kDefaultConnectTimeout,
                                       {})
                             .get();
-        ASSERT_EQ(getCurrChannelMetric(client), 2);
-        ASSERT_EQ(getStreamsMetric(client, kCurrentStreamsFieldName), 2);
+        ASSERT_EQ(getClientStats(client).getTotalOpenChannels(), 2);
+        ASSERT_EQ(getClientStats(client).getTotalActiveStreams(), 2);
 
         // Finish one session and cancel the other
         ASSERT_OK(session1->finish());
@@ -483,10 +470,10 @@ TEST_F(GRPCClientTest, GRPCClientAppendStatsFailedSession) {
         session1.reset();
         session2.reset();
 
-        ASSERT_EQ(getCurrChannelMetric(client), 2);
-        ASSERT_EQ(getStreamsMetric(client, kCurrentStreamsFieldName), 0);
-        ASSERT_EQ(getStreamsMetric(client, kSuccessfulStreamsFieldName), 1);
-        ASSERT_EQ(getStreamsMetric(client, kFailedStreamsFieldName), 1);
+        ASSERT_EQ(getClientStats(client).getTotalOpenChannels(), 2);
+        ASSERT_EQ(getClientStats(client).getTotalActiveStreams(), 0);
+        ASSERT_EQ(getClientStats(client).getTotalSuccessfulStreams(), 1);
+        ASSERT_EQ(getClientStats(client).getTotalFailedStreams(), 1);
     };
 
     auto options = CommandServiceTestFixtures::makeServerOptions();

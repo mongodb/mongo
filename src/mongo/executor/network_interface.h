@@ -136,6 +136,7 @@ public:
 
     /**
      * Appends information about the connections on this NetworkInterface.
+     * TODO SERVER-100677: Remove
      */
     virtual void appendConnectionStats(ConnectionPoolStats* stats) const = 0;
 

@@ -35,6 +35,7 @@
 #include "mongo/transport/grpc/channel_pool.h"
 #include "mongo/transport/grpc/client.h"
 #include "mongo/transport/grpc/mock_stub.h"
+#include "mongo/transport/grpc_connection_stats_gen.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/ssl_types.h"
@@ -56,7 +57,7 @@ public:
         Client::start();
     }
 
-    void appendStats(BSONObjBuilder* section) const override {
+    void appendStats(GRPCConnectionStats& stats) const override {
         MONGO_UNIMPLEMENTED;
     }
 

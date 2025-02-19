@@ -37,6 +37,7 @@
 #include "mongo/transport/grpc/grpc_transport_layer.h"
 #include "mongo/transport/grpc/reactor.h"
 #include "mongo/transport/grpc/server.h"
+#include "mongo/transport/grpc_connection_stats_gen.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/util/duration.h"
 
@@ -106,7 +107,19 @@ public:
             return;
         }
 
-        _client->appendStats(bob);
+        GRPCConnectionStats stats;
+        _client->appendStats(stats);
+
+        bob->append(GRPCConnectionStats::kTotalOpenChannelsFieldName, stats.getTotalOpenChannels());
+        {
+            BSONObjBuilder streamSection(bob->subobjStart(kStreamsSubsectionFieldName));
+            bob->append(GRPCConnectionStats::kTotalActiveStreamsFieldName,
+                        stats.getTotalActiveStreams());
+            bob->append(GRPCConnectionStats::kTotalSuccessfulStreamsFieldName,
+                        stats.getTotalSuccessfulStreams());
+            bob->append(GRPCConnectionStats::kTotalFailedStreamsFieldName,
+                        stats.getTotalFailedStreams());
+        }
     }
 
 #ifdef MONGO_CONFIG_SSL
@@ -143,6 +156,11 @@ public:
 
     bool isEgress() const override {
         return _options.enableEgress;
+    }
+
+    // TODO SERVER-100261: remove function and change callsites to call directly with the client.
+    void appendStats(GRPCConnectionStats& stats) const {
+        checked_pointer_cast<GRPCClient>(_client)->appendStats(stats);
     }
 
 private:

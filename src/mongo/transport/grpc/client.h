@@ -45,6 +45,7 @@
 #include "mongo/transport/grpc/grpc_session.h"
 #include "mongo/transport/grpc/reactor.h"
 #include "mongo/transport/grpc/serialization.h"
+#include "mongo/transport/grpc_connection_stats_gen.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/ssl_types.h"
@@ -52,11 +53,7 @@
 
 namespace mongo::transport::grpc {
 
-constexpr auto kCurrentChannelsFieldName = "currentChannels"_sd;
 constexpr auto kStreamsSubsectionFieldName = "streams"_sd;
-constexpr auto kCurrentStreamsFieldName = "current"_sd;
-constexpr auto kSuccessfulStreamsFieldName = "successful"_sd;
-constexpr auto kFailedStreamsFieldName = "failed"_sd;
 
 class Client : public std::enable_shared_from_this<Client> {
 public:
@@ -89,7 +86,7 @@ public:
      */
     virtual void shutdown();
 
-    virtual void appendStats(BSONObjBuilder* section) const = 0;
+    virtual void appendStats(GRPCConnectionStats& stats) const = 0;
 
 #ifdef MONGO_CONFIG_SSL
     virtual Status rotateCertificates(const SSLConfiguration& sslConfig) = 0;
@@ -123,7 +120,7 @@ protected:
      */
     void setMetadataOnClientContext(ClientContext& ctx, const ConnectOptions& options);
 
-    Counter64 _numCurrentStreams;
+    Counter64 _numActiveStreams;
     Counter64 _numSuccessfulStreams;
     Counter64 _numFailedStreams;
 
@@ -256,7 +253,7 @@ public:
 
     void start() override;
     void shutdown() override;
-    void appendStats(BSONObjBuilder* section) const override;
+    void appendStats(GRPCConnectionStats& stats) const override;
 #ifdef MONGO_CONFIG_SSL
     Status rotateCertificates(const SSLConfiguration& sslConfig) override;
 #endif

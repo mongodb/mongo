@@ -49,14 +49,17 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/executor/connection_pool_stats.h"
+#include "mongo/executor/executor_integration_test_connection_stats.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
+#include "mongo/executor/network_interface_tl.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_cursor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/transport/grpc_connection_stats_gen.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -70,6 +73,31 @@
 namespace mongo {
 namespace executor {
 namespace {
+constexpr auto kNetworkInterfaceInstanceName = "TaskExecutorCursorTest"_sd;
+
+std::pair<int, int> getCreatedAndOpenConnectionStats(std::shared_ptr<TaskExecutor> executor,
+                                                     StringData subObjName,
+                                                     const HostAndPort& remote,
+                                                     bool collectGRPCStats) {
+    int created = 0;
+    int open = 0;
+
+    if (collectGRPCStats) {
+        BSONObjBuilder bob;
+        executor->appendNetworkInterfaceStats(bob);
+        auto stats = GRPCConnectionStats::parse(IDLParserContext("GRPCStats"),
+                                                bob.obj().getObjectField(subObjName));
+        open = stats.getTotalOpenChannels();
+    } else {
+        ConnectionPoolStats stats;
+        executor->appendConnectionStats(&stats);
+
+        ConnectionStatsPer hostStats = stats.statsByHost[remote];
+        created = hostStats.created;
+        open = hostStats.inUse + hostStats.available + hostStats.refreshing + hostStats.leased;
+    }
+    return {created, open};
+}
 
 class TaskExecutorCursorFixture : public mongo::unittest::Test {
 public:
@@ -78,10 +106,10 @@ public:
     void setUp() override {
         if (!unittest::shouldUseGRPCEgress()) {
             _ni = makeNetworkInterface(
-                "TaskExecutorCursorTest", nullptr, nullptr, ConnectionPool::Options());
+                kNetworkInterfaceInstanceName, nullptr, nullptr, ConnectionPool::Options());
         } else {
 #ifdef MONGO_CONFIG_GRPC
-            _ni = makeNetworkInterfaceGRPC("TaskExecutorCursorTest");
+            _ni = makeNetworkInterfaceGRPC(kNetworkInterfaceInstanceName);
 #else
             MONGO_UNREACHABLE;
 #endif
@@ -124,6 +152,10 @@ public:
         auto cbHandle = scheduleRemoteCommand(opCtx, std::move(target), cmd);
         executor()->wait(cbHandle, opCtx);
         LOGV2(6531703, "Finished running remote command", "cmd"_attr = cmd);
+    }
+
+    const AsyncClientFactory& getFactory() {
+        return checked_cast<NetworkInterfaceTL*>(net())->getClientFactory_forTest();
     }
 
 private:
@@ -256,22 +288,13 @@ TEST_F(TaskExecutorCursorFixture, PinnedExecutorDestroyedOnUnderlying) {
  * See SERVER-65317 for more context.
  */
 TEST_F(TaskExecutorCursorFixture, ConnectionRemainsOpenAfterKillingTheCursor) {
-    // TODO SERVER-99246: unskip this test when using gRPC.
-    if (unittest::shouldUseGRPCEgress()) {
-        return;
-    }
-
     const size_t numDocs = 100;
     ASSERT_EQ(createTestData("test.test", numDocs), numDocs);
 
     auto opCtx = makeOpCtx();
     const auto target = unittest::getFixtureConnectionString().getServers().front();
 
-    auto getConnectionStatsForTarget = [&] {
-        ConnectionPoolStats stats;
-        executor()->appendConnectionStats(&stats);
-        return stats.statsByHost[target];
-    };
+    bool usingGRPC = unittest::shouldUseGRPCEgress();
 
     // We only need at most four connections to run this test, which will run the following
     // commands: `find`, `getMore`, `killCursor`, and `configureFailPoint`. Thus, the rest of this
@@ -291,7 +314,7 @@ TEST_F(TaskExecutorCursorFixture, ConnectionRemainsOpenAfterKillingTheCursor) {
         executor()->wait(cbHandle);
     }
 
-    ConnectionStatsPer beforeStats;
+    int createdBefore, openBefore;
     {
         const auto fpName = "waitAfterCommandFinishesExecution";
         runRemoteCommand(opCtx.get(),
@@ -327,28 +350,41 @@ TEST_F(TaskExecutorCursorFixture, ConnectionRemainsOpenAfterKillingTheCursor) {
 
         tec->populateCursor(opCtx.get());
 
+        // Make sure there is enough time for a connection/stream to establish.
+        assertConnectionStatsSoon(
+            getFactory(),
+            unittest::getFixtureConnectionString().getServers().front(),
+            [](const ConnectionStatsPer& stats) { return stats.inUse >= 1; },
+            [&](const GRPCConnectionStats& stats) { return stats.getTotalInUseStreams() >= 1; },
+            "Timed out waiting for at least one in use connection.");
+
         // At least one of the connections is busy running the initial `getMore` command to populate
         // the cursor. The command is blocked on the remote host and does not return until after the
         // destructor for `tec` returns.
-        beforeStats = getConnectionStatsForTarget();
-        ASSERT_GTE(beforeStats.inUse, 1);
+        auto beforeStats = getCreatedAndOpenConnectionStats(
+            executor(), "NetworkInterfaceTL-" + kNetworkInterfaceInstanceName, target, usingGRPC);
+        createdBefore = beforeStats.first;
+        openBefore = beforeStats.second;
     }
 
     // Wait for all connections to become idle -- this ensures all tasks scheduled as part of
     // cleaning up `tec` have finished running.
-    while (getConnectionStatsForTarget().inUse > 0) {
-        LOGV2(6531701, "Waiting for all connections to become idle");
-        sleepFor(Seconds(1));
+    LOGV2(6531701, "Waiting for all connections to become idle");
+    assertConnectionStatsSoon(
+        getFactory(),
+        unittest::getFixtureConnectionString().getServers().front(),
+        [](const ConnectionStatsPer& stats) { return stats.inUse == 0; },
+        [&](const GRPCConnectionStats& stats) { return stats.getTotalInUseStreams() == 0; },
+        "Timed out waiting for connections to become idle.");
+
+    auto [createdAfter, openAfter] = getCreatedAndOpenConnectionStats(
+        executor(), "NetworkInterfaceTL-" + kNetworkInterfaceInstanceName, target, usingGRPC);
+
+    // Check to see that our connection stats did not change.
+    if (!usingGRPC) {
+        ASSERT_EQ(createdBefore, createdAfter);
     }
-
-    const auto afterStats = getConnectionStatsForTarget();
-    auto countOpenConns = [](const ConnectionStatsPer& stats) {
-        return stats.inUse + stats.available + stats.refreshing + stats.leased;
-    };
-
-    // Verify that no connection is created or closed.
-    ASSERT_EQ(beforeStats.created, afterStats.created);
-    ASSERT_EQ(countOpenConns(beforeStats), countOpenConns(afterStats));
+    ASSERT_EQ(openBefore, openAfter);
 }
 
 }  // namespace

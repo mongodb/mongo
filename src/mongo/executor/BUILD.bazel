@@ -612,9 +612,11 @@ mongo_cc_library(
 mongo_cc_library(
     name = "network_interface_fixture",
     srcs = [
+        "executor_integration_test_connection_stats.cpp",
         "network_interface_integration_fixture.cpp",
     ],
     hdrs = [
+        "executor_integration_test_connection_stats.h",
         "executor_integration_test_fixture.h",
         "network_interface_integration_fixture.h",
     ],
@@ -623,6 +625,7 @@ mongo_cc_library(
         "//src/mongo/executor:network_interface_thread_pool",
         "//src/mongo/executor:thread_pool_task_executor",
         "//src/mongo/rpc:command_status",
+        "//src/mongo/transport:grpc_connection_stats",
         "//src/mongo/unittest:integration_test_main",
         "//src/mongo/util:version_impl",
         "//src/mongo/util/concurrency:thread_pool",

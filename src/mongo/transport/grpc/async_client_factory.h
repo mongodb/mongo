@@ -35,6 +35,8 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/grpc/grpc_transport_layer.h"
+#include "mongo/transport/grpc/grpc_transport_layer_impl.h"
+#include "mongo/transport/grpc_connection_stats_gen.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -79,7 +81,8 @@ public:
 
     void shutdown() override;
 
-    void appendStats(executor::ConnectionPoolStats* stats) override;
+    void appendStats(BSONObjBuilder& bob) const override;
+    GRPCConnectionStats getStats() const;
 
     // EgressConnectionCloser requirements.
 
@@ -92,12 +95,14 @@ private:
     public:
         explicit Handle(GRPCAsyncClientFactory* factory,
                         ServiceContext* svcCtx,
-                        std::shared_ptr<AsyncDBClient> client)
+                        std::shared_ptr<AsyncDBClient> client,
+                        bool lease)
             : _factory(factory),
               _client(std::move(client)),
-              _acquiredTimer(std::make_shared<Timer>(svcCtx->getTickSource())) {}
+              _acquiredTimer(std::make_shared<Timer>(svcCtx->getTickSource())),
+              _lease(lease) {}
 
-        ~Handle() {
+        ~Handle() override {
             _factory->_destroyHandle(*this);
         }
 
@@ -117,17 +122,19 @@ private:
             return _acquiredTimer;
         }
 
+        bool isLeased() const {
+            return _lease;
+        }
+
         void indicateUsed() override {
             // We don't pool gRPC streams, so we don't care when it was last used.
         }
 
         void indicateSuccess() override {
-            // TODO SERVER-99246: properly record success stats.
             _outcome = Status::OK();
         }
 
         void indicateFailure(Status s) override {
-            // TODO SERVER-99246: properly record failure stats.
             _outcome = std::move(s);
         }
 
@@ -137,6 +144,11 @@ private:
         GRPCAsyncClientFactory* _factory;
         std::shared_ptr<AsyncDBClient> _client;
         std::shared_ptr<Timer> _acquiredTimer;
+
+        //  This is tracked for stats only. gRPC leased streams aren't any different from regular
+        //  streams.
+        bool _lease;
+
         // Iterator pointing to this handle's entry in one of the factory's active handles lists.
         boost::optional<std::list<AsyncDBClient*>::iterator> _it;
 
@@ -153,6 +165,7 @@ private:
                                                     transport::ConnectSSLMode sslMode,
                                                     Milliseconds timeout,
                                                     const CancellationToken& token);
+
     void _destroyHandle(Handle& handle);
     void _dropConnections(WithLock);
     void _dropConnections(WithLock, EndpointState& target);
@@ -168,7 +181,12 @@ private:
     enum class State { kNew, kStarted, kShutdown };
     State _state{State::kNew};
 
+    // All accesses of _numActiveHandles must be guarded by the mutex.
     std::uint64_t _numActiveHandles{0};
+
+    Counter64 _numLeasedStreams;
+    Counter64 _numStreamsCreated;
+    Counter64 _totalStreamUsageTimeMs;
     stdx::unordered_map<HostAndPort, EndpointState> _endpoints;
 
     struct FinishingClientState {

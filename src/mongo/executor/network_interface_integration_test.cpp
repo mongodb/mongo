@@ -64,10 +64,12 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_pool_stats.h"
+#include "mongo/executor/executor_integration_test_connection_stats.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_integration_fixture.h"
+#include "mongo/executor/network_interface_tl.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
@@ -78,6 +80,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/transport/grpc_connection_stats_gen.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
@@ -263,6 +266,10 @@ public:
 
         ASSERT_FALSE(isCommandRunning(command));
         return ++numCurrentOpRan;
+    }
+
+    const AsyncClientFactory& getFactory() {
+        return checked_cast<NetworkInterfaceTL&>(net()).getClientFactory_forTest();
     }
 
     void runAcquireConnectionTimeoutTest(boost::optional<ErrorCodes::Error> customCode);
@@ -1213,15 +1220,16 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, ShutdownAfterSendRequest) {
 
     assertNumOps(1u, 0u, 0u, 0u);
 
-    // TODO SERVER-99246: re-enable these assertions.
-    if (unittest::shouldUseGRPCEgress()) {
-        return;
-    }
-
-    ConnectionPoolStats stats;
-    net().appendConnectionStats(&stats);
-    ASSERT_EQ(stats.totalAvailable, 0);
-    ASSERT_EQ(stats.totalInUse, 0);
+    assertConnectionStats(
+        getFactory(),
+        getServer(),
+        [](const ConnectionStatsPer& stats) { return stats.inUse == 0 && stats.available == 0; },
+        [&](const GRPCConnectionStats& stats) {
+            // TODO SERVER-100261: Open channels should be 0 after shutdown.
+            return stats.getTotalInUseStreams() == 0 && stats.getTotalOpenChannels() == 1;
+        },
+        "ShutdownAfterSendRequest failed assertion on inUse and available connection/channel "
+        "count.");
 }
 
 class NetworkInterfaceTestWithConnectHook : public NetworkInterfaceTest {
