@@ -24,22 +24,26 @@
 
 // 16MiB - maximum length in bytes of a string to be encoded.
 #define MAX_ENCODE_BYTE_LEN 16777216
+// Number of bytes which are added to the base string before encryption.
+#define OVERHEAD_BYTES 5
 
 static mc_affix_set_t *generate_prefix_or_suffix_tree(const mc_utf8_string_with_bad_char_t *base_str,
-                                                      uint32_t unfolded_codepoint_len,
+                                                      uint32_t unfolded_byte_len,
                                                       uint32_t lb,
                                                       uint32_t ub,
                                                       bool is_prefix) {
     BSON_ASSERT_PARAM(base_str);
-    // 16 * ceil(unfolded codepoint len / 16)
-    uint32_t cbclen = 16 * (uint32_t)((unfolded_codepoint_len + 15) / 16);
-    if (cbclen < lb) {
+    // We encrypt (unfolded string + 5 bytes of extra BSON info) with a 16-byte block cipher.
+    uint32_t encrypted_len = 16 * (uint32_t)((unfolded_byte_len + OVERHEAD_BYTES + 15) / 16);
+    // Max len of a string that has this encrypted len.
+    uint32_t padded_len = encrypted_len - OVERHEAD_BYTES;
+    if (padded_len < lb) {
         // No valid substrings, return empty tree
         return NULL;
     }
 
     // Total number of substrings
-    uint32_t msize = BSON_MIN(cbclen, ub) - lb + 1;
+    uint32_t msize = BSON_MIN(padded_len, ub) - lb + 1;
     uint32_t folded_codepoint_len = base_str->codepoint_len - 1; // remove one codepoint for 0xFF
     uint32_t real_max_len = BSON_MIN(folded_codepoint_len, ub);
     // Number of actual substrings, excluding padding
@@ -67,19 +71,19 @@ static mc_affix_set_t *generate_prefix_or_suffix_tree(const mc_utf8_string_with_
 }
 
 static mc_affix_set_t *generate_suffix_tree(const mc_utf8_string_with_bad_char_t *base_str,
-                                            uint32_t unfolded_codepoint_len,
+                                            uint32_t unfolded_byte_len,
                                             const mc_FLE2SuffixInsertSpec_t *spec) {
     BSON_ASSERT_PARAM(base_str);
     BSON_ASSERT_PARAM(spec);
-    return generate_prefix_or_suffix_tree(base_str, unfolded_codepoint_len, spec->lb, spec->ub, false);
+    return generate_prefix_or_suffix_tree(base_str, unfolded_byte_len, spec->lb, spec->ub, false);
 }
 
 static mc_affix_set_t *generate_prefix_tree(const mc_utf8_string_with_bad_char_t *base_str,
-                                            uint32_t unfolded_codepoint_len,
+                                            uint32_t unfolded_byte_len,
                                             const mc_FLE2PrefixInsertSpec_t *spec) {
     BSON_ASSERT_PARAM(base_str);
     BSON_ASSERT_PARAM(spec);
-    return generate_prefix_or_suffix_tree(base_str, unfolded_codepoint_len, spec->lb, spec->ub, true);
+    return generate_prefix_or_suffix_tree(base_str, unfolded_byte_len, spec->lb, spec->ub, true);
 }
 
 static uint32_t calc_number_of_substrings(uint32_t strlen, uint32_t lb, uint32_t ub) {
@@ -97,13 +101,15 @@ static uint32_t calc_number_of_substrings(uint32_t strlen, uint32_t lb, uint32_t
 }
 
 static mc_substring_set_t *generate_substring_tree(const mc_utf8_string_with_bad_char_t *base_str,
-                                                   uint32_t unfolded_codepoint_len,
+                                                   uint32_t unfolded_byte_len,
                                                    const mc_FLE2SubstringInsertSpec_t *spec) {
     BSON_ASSERT_PARAM(base_str);
     BSON_ASSERT_PARAM(spec);
-    // 16 * ceil(unfolded len / 16)
-    uint32_t cbclen = 16 * (uint32_t)((unfolded_codepoint_len + 15) / 16);
-    if (unfolded_codepoint_len > spec->mlen || cbclen < spec->lb) {
+    // We encrypt (unfolded string + 5 bytes of extra BSON info) with a 16-byte block cipher.
+    uint32_t encrypted_len = 16 * (uint32_t)((unfolded_byte_len + OVERHEAD_BYTES + 15) / 16);
+    // Max len of a string that has this encrypted len.
+    uint32_t padded_len = encrypted_len - OVERHEAD_BYTES;
+    if (padded_len < spec->lb) {
         // No valid substrings, return empty tree
         return NULL;
     }
@@ -112,30 +118,30 @@ static mc_substring_set_t *generate_substring_tree(const mc_utf8_string_with_bad
     // justifies why that calculation and this calculation are equivalent.
     // At this point, it is established that:
     //     beta <= mlen
-    //     lb <= cbclen
+    //     lb <= padded_len
     //     lb <= ub <= mlen
     //
     // So, the following formula for msize in the OST paper:
     //     maxkgram_1 = sum_(j=lb, ub, (mlen - j + 1))
-    //     maxkgram_2 = sum_(j=lb, min(ub, cbclen), (cbclen - j + 1))
+    //     maxkgram_2 = sum_(j=lb, min(ub, padded_len), (padded_len - j + 1))
     //     msize      = min(maxkgram_1, maxkgram_2)
     // can be simplified to:
-    //     msize      = sum_(j=lb, min(ub, cbclen), (min(mlen, cbclen) - j + 1))
+    //     msize      = sum_(j=lb, min(ub, padded_len), (min(mlen, padded_len) - j + 1))
     //
-    // because if cbclen <= ub, then it follows that cbclen <= ub <= mlen, and so
+    // because if padded_len <= ub, then it follows that padded_len <= ub <= mlen, and so
     //     maxkgram_1 = sum_(j=lb, ub, (mlen - j + 1))          # as above
-    //     maxkgram_2 = sum_(j=lb, cbclen, (cbclen - j + 1))    # less or equal to maxkgram_1
+    //     maxkgram_2 = sum_(j=lb, padded_len, (padded_len - j + 1))    # less or equal to maxkgram_1
     //     msize      = maxkgram_2
-    // and if cbclen > ub, then it follows that:
+    // and if padded_len > ub, then it follows that:
     //     maxkgram_1 = sum_(j=lb, ub, (mlen - j + 1))          # as above
-    //     maxkgram_2 = sum_(j=lb, ub, (cbclen - j + 1))        # same sum bounds as maxkgram_1
-    //     msize      = sum_(j=lb, ub, (min(mlen, cbclen) - j + 1))
+    //     maxkgram_2 = sum_(j=lb, ub, (padded_len - j + 1))        # same sum bounds as maxkgram_1
+    //     msize      = sum_(j=lb, ub, (min(mlen, padded_len) - j + 1))
     // in both cases, msize can be rewritten as:
-    //     msize      = sum_(j=lb, min(ub, cbclen), (min(mlen, cbclen) - j + 1))
+    //     msize      = sum_(j=lb, min(ub, padded_len), (min(mlen, padded_len) - j + 1))
 
     uint32_t folded_codepoint_len = base_str->codepoint_len - 1;
-    // If mlen < cbclen, we only need to pad to mlen
-    uint32_t padded_len = BSON_MIN(spec->mlen, cbclen);
+    // If mlen < padded_len, we only need to pad to mlen
+    padded_len = BSON_MIN(spec->mlen, padded_len);
     // Total number of substrings -- i.e. the number of valid substrings IF the string spanned the full padded length
     uint32_t msize = calc_number_of_substrings(padded_len, spec->lb, spec->ub);
     uint32_t n_real_substrings = 0;
@@ -185,11 +191,6 @@ mc_str_encode_sets_t *mc_text_search_str_encode(const mc_FLE2TextSearchInsertSpe
         CLIENT_ERR("StrEncode: String passed in was not valid UTF-8");
         return NULL;
     }
-    uint32_t unfolded_codepoint_len = mc_get_utf8_codepoint_length(spec->v, spec->len);
-    if (unfolded_codepoint_len == 0) {
-        // Empty string: We set unfolded length to 1 so that we generate fake tokens.
-        unfolded_codepoint_len = 1;
-    }
 
     mc_utf8_string_with_bad_char_t *base_string;
     if (spec->casef || spec->diacf) {
@@ -213,12 +214,13 @@ mc_str_encode_sets_t *mc_text_search_str_encode(const mc_FLE2TextSearchInsertSpe
     // Base string is the folded string plus the 0xFF character
     sets->base_string = base_string;
     if (spec->suffix.set) {
-        sets->suffix_set = generate_suffix_tree(sets->base_string, unfolded_codepoint_len, &spec->suffix.value);
+        sets->suffix_set = generate_suffix_tree(sets->base_string, spec->len, &spec->suffix.value);
     }
     if (spec->prefix.set) {
-        sets->prefix_set = generate_prefix_tree(sets->base_string, unfolded_codepoint_len, &spec->prefix.value);
+        sets->prefix_set = generate_prefix_tree(sets->base_string, spec->len, &spec->prefix.value);
     }
     if (spec->substr.set) {
+        uint32_t unfolded_codepoint_len = mc_get_utf8_codepoint_length(spec->v, spec->len);
         if (unfolded_codepoint_len > spec->substr.value.mlen) {
             CLIENT_ERR("StrEncode: String passed in was longer than the maximum length for substring indexing -- "
                        "String len: %u, max len: %u",
@@ -227,7 +229,7 @@ mc_str_encode_sets_t *mc_text_search_str_encode(const mc_FLE2TextSearchInsertSpe
             mc_str_encode_sets_destroy(sets);
             return NULL;
         }
-        sets->substring_set = generate_substring_tree(sets->base_string, unfolded_codepoint_len, &spec->substr.value);
+        sets->substring_set = generate_substring_tree(sets->base_string, spec->len, &spec->substr.value);
     }
     // Exact string is always equal to the base string up until the bad character
     _mongocrypt_buffer_from_data(&sets->exact, sets->base_string->buf.data, (uint32_t)sets->base_string->buf.len - 1);

@@ -23,17 +23,16 @@ export class SuffixField extends TextFieldBase {
         return Object.assign({"queryType": "suffixPreview"}, super.createQueryTypeDescriptor());
     }
 
-    // TODO: SERVER-100592 update with latest msize calculations
-    calculateExpectedTagCount(cplen) {
+    calculateExpectedTagCount(byte_len) {
         assert.gt(this._lb, 0);
         assert.gte(this._ub, this._lb);
-        assert.gte(cplen, 0);
-        const beta = cplen == 0 ? 1 : cplen;
-        const cbclen = Math.ceil(beta / 16) * 16;
-        if (this._lb > cbclen) {
+        assert.gte(byte_len, 0);
+        // TODO SERVER-94395 Link to documentation section explaining the StrEncode algorithm
+        const padded_len = Math.ceil((byte_len + 5) / 16) * 16 - 5;
+        if (this._lb > padded_len) {
             return 1;  // 1 is for just the exact match string
         }
-        return (Math.min(this._ub, cbclen) - this._lb + 1) +
+        return (Math.min(this._ub, padded_len) - this._lb + 1) +
             1;  // +1 includes tag for exact match string
     }
 }
@@ -57,24 +56,22 @@ export class SubstringField extends TextFieldBase {
                              super.createQueryTypeDescriptor());
     }
 
-    // TODO: SERVER-100592 update with latest msize calculations
-    calculateExpectedTagCount(cplen) {
-        assert.gte(cplen, 0);
+    calculateExpectedTagCount(byte_len) {
+        assert.gte(byte_len, 0);
         assert.gt(this._lb, 0);
         assert.gte(this._ub, this._lb);
         assert.gte(this._mlen, this._ub);
 
-        const beta = cplen == 0 ? 1 : cplen;
-        const cbclen = Math.ceil(beta / 16) * 16;
-        if (beta > this._mlen || this._lb > cbclen) {
+        const padded_len = Math.ceil((byte_len + 5) / 16) * 16 - 5;
+        if (byte_len > this._mlen || this._lb > padded_len) {
             return 1;  // 1 is for just the exact match string
         }
-        const hi = Math.min(this._ub, cbclen);
+        const hi = Math.min(this._ub, padded_len);
         const range = hi - this._lb + 1;
         const hisum = (hi * (hi + 1)) / 2;              // sum of [1..hi]
         const losum = (this._lb * (this._lb - 1)) / 2;  // sum of [1..lb)
         const maxkgram1 = (this._mlen * range) - (hisum - losum) + range;
-        const maxkgram2 = (cbclen * range) - (hisum - losum) + range;
+        const maxkgram2 = (padded_len * range) - (hisum - losum) + range;
         return Math.min(maxkgram1, maxkgram2) + 1;  // +1 includes tag for exact match string
     }
 }
@@ -92,10 +89,10 @@ export class SuffixAndPrefixField {
             this._prefixField.createQueryTypeDescriptor()
         ];
     }
-    calculateExpectedTagCount(cplen) {
+    calculateExpectedTagCount(byte_len) {
         // subtract 1 since the exact match string is doubly counted in the other call
         // to calculateExpectedTagCount.
-        return this._suffixField.calculateExpectedTagCount(cplen) +
-            this._prefixField.calculateExpectedTagCount(cplen) - 1;
+        return this._suffixField.calculateExpectedTagCount(byte_len) +
+            this._prefixField.calculateExpectedTagCount(byte_len) - 1;
     }
 }

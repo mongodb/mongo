@@ -1033,12 +1033,15 @@ TEST_F(FleCrudTest, InsertOneTextSearchSubstring) {
     auto doc = BSON("encrypted" << testString);
     auto element = doc.firstElement();
 
-    // insert element as substring-indexed where lb = 10; ub = 100
-    // unique substrings of (len >= lb) = 10
-    // so cbclen = ceil(10/16) * 16 = 16
-    // so msize = (16 - 16 + 1) + (16 - 15 + 1) .. + (16- 10 + 1) = 1 + 2 ... + 7 = 28
+    // TODO SERVER-94395 Link to documentation section explaining the StrEncode algorithm
+    // insert element as substring-indexed where len = 13, lb = 10, ub = 100
+    // unique substrings of (len >= lb):
+    // (13 - 13 + 1) + (13 - 12 + 1) + (13 - 11 + 1) + (13 - 10 + 1)
+    // = 1 + 2 + 3 + 4 = 10
+    // padded_len = ceil((13+5)/16) * 16 - 5 = 27
+    // so msize = (27 - 27 + 1) + (27 - 26 + 1) .. + (27 - 10 + 1) = 1 + 2 ... + 18 = 171
     uint32_t expectSubstrCount = 10;
-    uint32_t msize = 28;
+    uint32_t msize = 171;
     uint32_t padcount = msize - expectSubstrCount;
     uint32_t totalTags = msize + 1;  // include exact
     doSingleInsert(
@@ -1074,12 +1077,12 @@ TEST_F(FleCrudTest, InsertOneTextSearchSuffix) {
     auto doc = BSON("encrypted" << testString);
     auto element = doc.firstElement();
 
-    // insert element as suffix-indexed where lb = 10; ub = 100
+    // insert element as suffix-indexed where len = 13, lb = 10, ub = 100
     // suffixes of (len >= lb) = 4
-    // so cbclen = ceil(10/16) * 16 = 16
-    // so msize = cbclen - lb + 1 = 16 - 10 + 1
+    // padded_len = ceil((13 + 5)/16) * 16 - 5 = 27
+    // so msize = padded_len - lb + 1 = 27 - 10 + 1
     uint32_t expectSuffixCount = 4;
-    uint32_t msize = 16 - 10 + 1;  // cbclen - lb + 1
+    uint32_t msize = 27 - 10 + 1;  // padded_len - lb + 1
     uint32_t padcount = msize - expectSuffixCount;
     uint32_t totalTags = msize + 1;  // include exact
 
@@ -1116,12 +1119,12 @@ TEST_F(FleCrudTest, InsertOneTextSearchPrefix) {
     auto doc = BSON("encrypted" << testString);
     auto element = doc.firstElement();
 
-    // insert element as prefix-indexed where lb = 10; ub = 100
+    // insert element as prefix-indexed where len = 13, lb = 10, ub = 100
     // prefixes of (len >= lb) = 4
-    // so cbclen = ceil(10/16) * 16 = 16
-    // so msize = cbclen - lb + 1 = 16 - 10 + 1
+    // so padded_len = ceil((13 + 5)/16) * 16 - 5 = 27
+    // so msize = padded_len - lb + 1 = 27 - 10 + 1
     uint32_t expectPrefixCount = 4;
-    uint32_t msize = 16 - 10 + 1;  // cbclen - lb + 1
+    uint32_t msize = 27 - 10 + 1;  // padded_len - lb + 1
     uint32_t padcount = msize - expectPrefixCount;
     uint32_t totalTags = msize + 1;  // include exact
 
@@ -1157,12 +1160,12 @@ TEST_F(FleCrudTest, InsertOneTextSearchPrefixAndSuffix) {
     auto doc = BSON("encrypted" << testString);
     auto element = doc.firstElement();
 
-    // insert element as prefix and suffix indexed where lb = 10; ub = 100
+    // insert element as prefix and suffix indexed where len = 13, lb = 10, ub = 100
     // suffixes of (len >= lb) = 4
-    // so cbclen = ceil(10/16) * 16 = 16
-    // so msize = cbclen - lb + 1 = 16 - 10 + 1
+    // so padded_len = ceil((13 + 5)/16) * 16 - 5 = 27
+    // so msize = padded_len - lb + 1 = 27 - 10 + 1
     uint32_t expectSuffixCount = 4;
-    uint32_t msizeSuffix = 16 - 10 + 1;  // cbclen - lb + 1
+    uint32_t msizeSuffix = 27 - 10 + 1;  // padded_len - lb + 1
     uint32_t suffixPadCount = msizeSuffix - expectSuffixCount;
 
     // prefix counts are identical tp suffix because of the same lb
