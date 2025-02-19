@@ -479,11 +479,12 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerPicksMoreEfficientPlan) {
         auto [cq, plannerData] = createPlannerData();
         auto [solutions, expectedSums] =
             createVirtualScanQuerySolutionsForDefaultFilter(200 /*resultDocCount*/, plannerData.cq);
-
-        MultiPlanner planner{
-            std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
-        auto exec = planner.makeExecutor(std::move(cq));
-        assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
+        {
+            MultiPlanner planner{
+                std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
+            auto exec = planner.makeExecutor(std::move(cq));
+            assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
+        }
 
         {  // Run CachedPlanner to execute the cached plan.
             std::unique_ptr<PlannerInterface> cachedPlanner;
@@ -610,10 +611,10 @@ TEST_F(ClassicRuntimePlannerForSbeTest,
     RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", true);
     setUpSubPlannerTest();
 
-    auto exec = getExecutorWithSubPlanning(2 /*expectedPerBranchMultiplans*/);
+    getExecutorWithSubPlanning(2 /*expectedPerBranchMultiplans*/);
 
-    // When "featureFlagSbeFull" is enabled, the subplanner should write a single entry to the SBE
-    // plan cache and should not write to the classic cache.
+    // When "featureFlagSbeFull" is enabled, the subplanner should write a single entry to the
+    // SBE plan cache and should not write to the classic cache.
     auto&& sbePlanCache = sbe::getPlanCache(operationContext());
     ASSERT_EQ(numEntriesInCache(sbePlanCache), 1ull);
     ASSERT_EQ(numEntriesInCache(getClassicPlanCache()), 0ull);
@@ -670,11 +671,13 @@ TEST_F(ClassicRuntimePlannerForSbeTest, ClassicCachedPlannerReplansOnFailureMemo
     auto [cqForCacheWrite, plannerDataForCacheWrite] = createPlannerData();
     auto [solutions, expectedSums] = createVirtualScanQuerySolutionsForDefaultFilter(
         200 /*resultDocCount*/, plannerDataForCacheWrite.cq);
+    {
+        MultiPlanner planner{
+            std::move(plannerDataForCacheWrite), std::move(solutions), true /*shouldWriteToCache*/};
 
-    MultiPlanner planner{
-        std::move(plannerDataForCacheWrite), std::move(solutions), true /*shouldWriteToCache*/};
-    auto exec = planner.makeExecutor(std::move(cqForCacheWrite));
-    assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
+        auto exec = planner.makeExecutor(std::move(cqForCacheWrite));
+        assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
+    }
 
     {
         auto [cq, plannerData] = createPlannerData();
@@ -718,11 +721,13 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SbeCachedPlannerReplansOnFailureMemoryLi
     auto [cqForCacheWrite, plannerDataForCacheWrite] = createPlannerData();
     auto [solutions, expectedSums] = createVirtualScanQuerySolutionsForDefaultFilter(
         200 /*resultDocCount*/, plannerDataForCacheWrite.cq);
+    {
+        MultiPlanner planner{
+            std::move(plannerDataForCacheWrite), std::move(solutions), true /*shouldWriteToCache*/};
 
-    MultiPlanner planner{
-        std::move(plannerDataForCacheWrite), std::move(solutions), true /*shouldWriteToCache*/};
-    auto exec = planner.makeExecutor(std::move(cqForCacheWrite));
-    assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
+        auto exec = planner.makeExecutor(std::move(cqForCacheWrite));
+        assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
+    }
 
     std::unique_ptr<PlannerInterface> cachedPlanner;
     auto [cq, plannerData] = createPlannerData();
@@ -762,10 +767,12 @@ TEST_F(ClassicRuntimePlannerForSbeTest, ClassicCachedPlannerReplansOnHittingMaxN
     auto [cq, plannerData] = createPlannerData();
     auto [solutions, expectedSums] =
         createVirtualScanQuerySolutionsForDefaultFilter(200 /*resultDocCount*/, plannerData.cq);
-
-    MultiPlanner planner{std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
-    auto exec = planner.makeExecutor(std::move(cq));
-    assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
+    {
+        MultiPlanner planner{
+            std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
+        auto exec = planner.makeExecutor(std::move(cq));
+        assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
+    }
 
     {  // Run CachedPlanner to execute the cached plan.
         std::unique_ptr<PlannerInterface> cachedPlanner;
@@ -820,10 +827,12 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SbeCachedPlannerReplansOnHittingMaxNumRe
     auto [cq, plannerData] = createPlannerData();
     auto [solutions, expectedSums] =
         createVirtualScanQuerySolutionsForDefaultFilter(200 /*resultDocCount*/, plannerData.cq);
-
-    MultiPlanner planner{std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
-    auto exec = planner.makeExecutor(std::move(cq));
-    assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
+    {
+        MultiPlanner planner{
+            std::move(plannerData), std::move(solutions), true /*shouldWriteToCache*/};
+        auto exec = planner.makeExecutor(std::move(cq));
+        assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
+    }
 
     {  // Run CachedPlanner to execute the cached plan.
         auto [cq, plannerData] = createPlannerData();
