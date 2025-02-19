@@ -175,3 +175,10 @@ filegroup(
         "{version}/bin/llvm-symbolizer",
     ],
 )
+
+filegroup(
+    name = "clang_format",
+    srcs = [
+        "{version}/bin/clang-format",
+    ],
+)

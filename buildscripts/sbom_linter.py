@@ -227,6 +227,8 @@ def lint_sbom(
 
 
 def main() -> int:
+    os.chdir(os.environ.get("BUILD_WORKSPACE_DIRECTORY", "."))
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--format",

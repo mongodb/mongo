@@ -228,9 +228,58 @@ py_library(
     ],
 )
 
+py_binary(
+    name = "sbom_linter",
+    srcs = [
+        "sbom_linter.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "jsonschema",
+            group = "build-metrics",
+        ),
+    ],
+)
+
 bin.eslint_binary(
     name = "eslint_binary",
     # Allow the binary to be run outside bazel
     # See more details about this by commenting this out and running `bazel run //:format`
     env = {"BAZEL_BINDIR": "."},
+)
+
+sh_binary(
+    name = "auto_install_db_contrib_tool",
+    srcs = ["auto_install_db_contrib_tool.sh"],
+)
+
+sh_binary(
+    name = "setup_engflow_creds",
+    srcs = ["setup_engflow_creds.sh"],
+)
+
+sh_binary(
+    name = "consolidate_repos",
+    srcs = ["consolidate-repos.sh"],
+)
+
+sh_binary(
+    name = "consolidate_repos_enterprise",
+    srcs = ["consolidate-repos-enterprise.sh"],
+)
+
+sh_binary(
+    name = "poetry_sync",
+    srcs = ["poetry_sync.sh"],
+)
+
+sh_binary(
+    name = "setup_node_env",
+    srcs = ["setup_node_env.sh"],
+)
+
+sh_binary(
+    name = "mount_drives",
+    srcs = ["mount_drives.sh"],
 )

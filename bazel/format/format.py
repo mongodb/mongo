@@ -7,6 +7,22 @@ from buildscripts import download_buildifier
 from buildscripts.buildifier import fix_all, lint_all
 
 
+def run_rules_lint(rules_lint_format_path: pathlib.Path, check: bool) -> bool:
+    try:
+        command = [str(rules_lint_format_path)]
+        env = os.environ
+        if check:
+            print("Running rules_lint formatter in check mode")
+            env["mode"] = "check"
+        else:
+            print("Running rules_lint formatter")
+        repo_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        subprocess.run(command, check=True, env=env, cwd=repo_path)
+    except subprocess.CalledProcessError:
+        return False
+    return True
+
+
 def run_shellscripts_linters(shellscripts_linters: pathlib.Path, check: bool) -> bool:
     try:
         command = [str(shellscripts_linters)]
@@ -103,6 +119,12 @@ def main() -> int:
         required=True,
         type=pathlib.Path,
     )
+    parser.add_argument(
+        "--rules-lint-format",
+        help="Set the path to rules_lint's formatter",
+        required=True,
+        type=pathlib.Path,
+    )
 
     args = parser.parse_args()
     prettier_path: pathlib.Path = args.prettier.resolve()
@@ -112,7 +134,8 @@ def main() -> int:
 
     return (
         0
-        if run_shellscripts_linters(shellscripts_linters_path, args.check)
+        if run_rules_lint(args.rules_lint_format, args.check)
+        and run_shellscripts_linters(shellscripts_linters_path, args.check)
         and run_prettier(prettier_path, args.check)
         and run_buildifier(args.check)
         else 1

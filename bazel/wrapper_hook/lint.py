@@ -147,6 +147,12 @@ def run_rules_lint(bazel_bin, args):
         fix = "print"
         args.remove("--dry-run")
 
+    args = (
+        [arg for arg in args if arg.startswith("--") and arg != "--"]
+        + ["--"]
+        + [arg for arg in args if not arg.startswith("--")]
+    )
+
     # Actually run the lint itself
     subprocess.run([bazel_bin, "build"] + args, check=True)
 

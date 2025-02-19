@@ -161,6 +161,7 @@ def setup_mongo_toolchain_aliases():
     # Map from target's name inside the toolchain to the name we want to alias it to.
     toolchain_targets = {
         "llvm_symbolizer": "llvm_symbolizer",
+        "clang_format": "clang_format",
         "clang_tidy": "clang_tidy",
         "mongo_toolchain": "mongo_toolchain",
         "all_files": "toolchain_files",

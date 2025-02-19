@@ -1,27 +1,19 @@
-load("@npm//:prettier/package_json.bzl", prettier = "bin")
-
-# TODO: SERVER-82329 eslint binary should almost exactly mirror prettier binary
-# To update prettier change the version in package.json
-# Run `pnpm install`
-# Commit changes
-prettier.prettier_binary(
-    name = "prettier",
-    # Allow the binary to be run outside bazel
-    # See more details about this by commenting this out and running `bazel run //:format`
-    env = {"BAZEL_BINDIR": "."},
-)
+load("@aspect_rules_lint//format:defs.bzl", "format_multirun", "format_test")
 
 py_binary(
     name = "format",
     srcs = ["format.py"],
     args = [
         "--prettier",
-        "$(location :prettier)",
+        "$(location //:prettier)",
         "--shellscripts-linters",
         "$(location //buildscripts:shellscripts_linters)",
+        "--rules-lint-format",
+        "$(location :rules_lint_format)",
     ],
     data = [
-        ":prettier",
+        ":rules_lint_format",
+        "//:prettier",
         "//buildscripts:shellscripts_linters",
         "@shfmt",
     ],
@@ -33,4 +25,21 @@ py_binary(
     deps = [
         "//buildscripts:buildifier",
     ],
+)
+
+format_multirun(
+    name = "rules_lint_format",
+    css = "//:prettier",
+    graphql = "//:prettier",
+    html = "//:prettier",
+    markdown = "//:prettier",
+    sql = "//:prettier",
+    visibility = ["//visibility:public"],
+    # TODO(SERVER-101031): Use rules_lint buildifier formatter once set up
+    #   starlark = "@buildifier_prebuilt//:buildifier",
+    # TODO(SERVER-101033): Enable clang_format once a way to only format a user's changeset is set up
+    #   cc = "//:clang_format",
+    #   c = "//:clang_format",
+    # TODO(SERVER-101034): Enable rules_lint shfmt after sh files are reformatted with .editorconfig
+    #   shell = "@shfmt//:shfmt",
 )

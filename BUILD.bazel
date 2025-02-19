@@ -5,13 +5,16 @@ load("//bazel/toolchains:mongo_toolchain.bzl", "setup_mongo_toolchain_aliases")
 load("//bazel/config:render_template.bzl", "render_template")
 load("@npm//:eslint/package_json.bzl", eslint_bin = "bin")
 load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
+load("@npm//:prettier/package_json.bzl", prettier = "bin")
 load("@aspect_bazel_lib//lib:copy_to_directory.bzl", "copy_to_directory")
+load("@aspect_rules_lint//format:defs.bzl", "format_multirun", "format_test")
 
 package(
     default_visibility = ["//visibility:public"],
 )
 
 exports_files([
+    ".prettierrc",
     "pyproject.toml",
     "poetry.lock",
     "symbols.orderfile",
@@ -40,6 +43,28 @@ eslint_bin.eslint_binary(
     name = "eslint",
     data = [
         "//:eslintrc",
+    ],
+)
+
+prettier.prettier_binary(
+    name = "prettier",
+    # Include this js_library and its dependencies in the runfiles (runtime dependencies)
+    data = ["//:.prettierrc"],
+    # Allow the binary to be run outside bazel
+    # See more details about this by commenting this out and running `bazel run //:format`
+    env = {"BAZEL_BINDIR": "."},
+    fixed_args = [
+        # `require` statements in the config file will be resolved relative to its location
+        # Therefore to make it hermetic, prettier must be pointed at the copy of the config file
+        # in the runfiles folder rather than the one in the source folder.
+        "--config=\"$$JS_BINARY__RUNFILES\"/$(rlocationpath //:.prettierrc)",
+        # default log level is "log" which spams on success
+        # https://prettier.io/docs/en/cli.html#--log-level
+        # NB: prettier 2 names this loglevel, in prettier 3 it's renamed log-level, see
+        # https://prettier.io/blog/2023/07/05/3.0.0.html#cli-1
+        "--log-level=warn",
+        # Speed this up a little bit with caching
+        "--cache",
     ],
 )
 
