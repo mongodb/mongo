@@ -50,7 +50,7 @@ function testFindQuerySettingsApplication(collOrViewName) {
     const qsutils = new QuerySettingsUtils(db, collOrViewName);
     const qstests = new QuerySettingsIndexHintsTests(qsutils);
 
-    setIndexes(coll, [qstests.indexA, qstests.indexB, qstests.indexAB]);
+    setIndexes(coll, qstests.allIndexes);
 
     // Ensure that there are no query settings set.
     qsutils.removeAllQuerySettings();

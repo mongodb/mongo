@@ -32,6 +32,7 @@ export class QuerySettingsIndexHintsTests {
         this.indexA = {a: 1};
         this.indexB = {b: 1};
         this.indexAB = {a: 1, b: 1};
+        this.allIndexes = [this.indexA, this.indexB, this.indexAB]
     }
 
     static shouldCheckPlanCache(db, command) {
@@ -212,7 +213,7 @@ export class QuerySettingsIndexHintsTests {
      */
     assertQuerySettingsIndexApplication(querySettingsQuery, ns) {
         const query = this._qsutils.withoutDollarDB(querySettingsQuery);
-        for (const index of [this.indexA, this.indexB, this.indexAB]) {
+        for (const index of this.allIndexes) {
             const settings = {indexHints: {ns, allowedIndexes: [index]}};
             this._qsutils.withQuerySettings(querySettingsQuery, settings, () => {
                 this.assertIndexScanStage(query, index, ns);
@@ -280,7 +281,7 @@ export class QuerySettingsIndexHintsTests {
      */
     assertQuerySettingsLookupPipelineIndexApplication(querySettingsQuery, ns) {
         const query = this._qsutils.withoutDollarDB(querySettingsQuery);
-        for (const index of [this.indexA, this.indexB, this.indexAB]) {
+        for (const index of this.allIndexes) {
             const settings = {indexHints: {ns, allowedIndexes: [index]}};
             this._qsutils.withQuerySettings(querySettingsQuery, settings, () => {
                 this.assertLookupPipelineStage(query, index);
@@ -295,8 +296,7 @@ export class QuerySettingsIndexHintsTests {
      */
     assertQuerySettingsIndexAndLookupPipelineApplications(querySettingsQuery, mainNs, secondaryNs) {
         const query = this._qsutils.withoutDollarDB(querySettingsQuery);
-        for (const [mainCollIndex, secondaryCollIndex] of selfCrossProduct(
-                 [this.indexA, this.indexB, this.indexAB])) {
+        for (const [mainCollIndex, secondaryCollIndex] of selfCrossProduct(this.allIndexes)) {
             const settings = {
                 indexHints: [
                     {ns: mainNs, allowedIndexes: [mainCollIndex]},
@@ -319,8 +319,7 @@ export class QuerySettingsIndexHintsTests {
      */
     assertQuerySettingsIndexApplications(querySettingsQuery, mainNs, secondaryNs) {
         const query = this._qsutils.withoutDollarDB(querySettingsQuery);
-        for (const [mainCollIndex, secondaryCollIndex] of selfCrossProduct(
-                 [this.indexA, this.indexB, this.indexAB])) {
+        for (const [mainCollIndex, secondaryCollIndex] of selfCrossProduct(this.allIndexes)) {
             const settings = {
                 indexHints: [
                     {ns: mainNs, allowedIndexes: [mainCollIndex]},

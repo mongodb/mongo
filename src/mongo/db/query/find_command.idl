@@ -106,7 +106,7 @@ commands:
         description: "Query settings for the given query"
         type: QuerySettings
         optional: true
-        stability: unstable
+        stability: internal
       collation:
         description: "Specifies the collation to use for the operation."
         type: object_owned_nonempty_serialize
