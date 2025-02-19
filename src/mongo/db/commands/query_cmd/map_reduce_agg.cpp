@@ -58,6 +58,7 @@
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/explain_diagnostic_printer.h"
 #include "mongo/db/query/map_reduce_output_format.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
@@ -184,6 +185,10 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     }
 
     try {
+        // Capture diagnostics to be logged in the case of a failure.
+        ScopedDebugInfo explainDiagnostics(
+            "explainDiagnostics", diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
+
         auto resultArray = exhaustPipelineIntoBSONArray(exec);
 
         if (expCtx->getExplain()) {

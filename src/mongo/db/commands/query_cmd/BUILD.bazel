@@ -297,6 +297,7 @@ mongo_cc_library(
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
         "//src/mongo/db/pipeline/process_interface:mongod_process_interface_factory",
+        "//src/mongo/db/query:explain_diagnostic_printer",
         "//src/mongo/db/query:map_reduce_output_format",
         "//src/mongo/db/storage:storage_options",
     ],

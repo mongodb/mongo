@@ -77,6 +77,7 @@
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
+#include "mongo/db/query/explain_diagnostic_printer.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/find_command.h"
@@ -464,6 +465,10 @@ public:
             BSONObj obj, pbrt = exec->getPostBatchResumeToken();
             size_t objSize;
             bool failedToAppend = false;
+
+            // Capture diagnostics to be logged in the case of a failure.
+            ScopedDebugInfo explainDiagnostics("explainDiagnostics",
+                                               diagnostic_printers::ExplainDiagnosticPrinter{exec});
 
             // Note that unlike in find, a batch size of 0 means there is no limit on the number of
             // documents, and we may choose to pre-allocate space for the batch after the first

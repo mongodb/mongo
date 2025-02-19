@@ -216,8 +216,8 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
                  BSONObjBuilder* bob,
                  BSONObjBuilder* topLevelBob,
                  boost::optional<bool> isCached = boost::none) {
-    invariant(bob);
-    invariant(topLevelBob);
+    tassert(9378601, "encountered unexpected nullptr for BSONObjBuilder", bob);
+    tassert(9378602, "encountered unexpected nullptr for BSONObjBuilder", topLevelBob);
     tassert(9258801, "encountered unexpected nullptr for planStage", stats.common.planStage);
 
     // Stop as soon as the BSON object we're building exceeds the limit.
@@ -813,7 +813,7 @@ boost::optional<double> getWinningPlanScore(PlanStage* root) {
 }
 
 void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
-    invariant(statsOut);
+    tassert(9378600, "Encountered unexpected nullptr for PlanSummaryStats", statsOut);
     // We can get some of the fields we need from the common stats stored in the
     // root stage of the plan tree.
     const CommonStats* common = _root->getCommonStats();

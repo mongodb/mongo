@@ -71,6 +71,7 @@
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/explain_diagnostic_printer.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
@@ -236,6 +237,10 @@ public:
 
             auto exec = std::move(statusWithPlanExecutor.getValue());
             auto bodyBuilder = replyBuilder->getBodyBuilder();
+
+            // Capture diagnostics to be logged in the case of a failure.
+            ScopedDebugInfo explainDiagnostics(
+                "explainDiagnostics", diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
             Explain::explainStages(
                 exec.get(),
                 collection,
@@ -333,6 +338,9 @@ public:
             uassertStatusOK(statusWithPlanExecutor.getStatus());
 
             auto exec = std::move(statusWithPlanExecutor.getValue());
+            // Capture diagnostics to be logged in the case of a failure.
+            ScopedDebugInfo explainDiagnostics(
+                "explainDiagnostics", diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
 
             // Store the plan summary string in CurOp.
             {

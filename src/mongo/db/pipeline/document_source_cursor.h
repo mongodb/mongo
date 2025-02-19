@@ -165,6 +165,13 @@ public:
         return _exec->getPlanExplainer().getVersion();
     }
 
+    boost::optional<const PlanExplainer&> getPlanExplainer() const {
+        if (!_exec) {
+            return boost::none;
+        }
+        return _exec->getPlanExplainer();
+    }
+
     PlanExecutor::QueryFramework getQueryFramework() const {
         return _queryFramework;
     }

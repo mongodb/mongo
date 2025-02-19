@@ -60,7 +60,7 @@ std::string PlanExplainerPipeline::getPlanSummary() const {
 }
 
 void PlanExplainerPipeline::getSummaryStats(PlanSummaryStats* statsOut) const {
-    invariant(statsOut);
+    tassert(9378603, "Encountered unexpected nullptr for PlanSummaryStats", statsOut);
 
     auto source_it = _pipeline->getSources().begin();
     if (auto docSourceCursor = dynamic_cast<DocumentSourceCursor*>(source_it->get())) {
@@ -82,6 +82,16 @@ void PlanExplainerPipeline::getSummaryStats(PlanSummaryStats* statsOut) const {
 PlanExplainer::PlanStatsDetails PlanExplainerPipeline::getWinningPlanStats(
     ExplainOptions::Verbosity verbosity) const {
     // TODO SERVER-49808: Report execution stats for the pipeline.
+    if (_pipeline->getSources().empty()) {
+        return {};
+    }
+
+    if (auto docSourceCursor =
+            dynamic_cast<DocumentSourceCursor*>(_pipeline->getSources().begin()->get())) {
+        if (auto explainer = docSourceCursor->getPlanExplainer()) {
+            return explainer->getWinningPlanStats(verbosity);
+        }
+    };
     return {};
 }
 

@@ -654,6 +654,18 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "explain_diagnostic_printer",
+    srcs = [],
+    hdrs = [
+        "//src/mongo/db/query:explain_diagnostic_printer.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:commands",
+    ],
+)
+
+mongo_cc_library(
     name = "query_test_service_context",
     srcs = [
         "query_test_service_context.cpp",
@@ -730,6 +742,7 @@ mongo_cc_unit_test(
         "lru_key_value_test.cpp",
         "map_reduce_output_format_test.cpp",
         "plan_executor_express_test.cpp",
+        "plan_explainer_test.cpp",
         "plan_ranker_index_prefix_test.cpp",
         "plan_ranker_test.cpp",
         "planner_access_test.cpp",
@@ -769,7 +782,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/sbe:expression_test_base.h",
         "//src/mongo/db/exec/sbe:sbe_unittest.h",
         "//src/mongo/db/query:index_bounds_builder_test_fixture.h",
-        "//src/mongo/db/query:plan_explainer_test.cpp",
         "//src/mongo/db/query/classic_runtime_planner_for_sbe:classic_runtime_planner_for_sbe_test.cpp",
         "//src/mongo/db/query/classic_runtime_planner_for_sbe:classic_runtime_planner_for_sbe_test_util.cpp",
         "//src/mongo/db/query/classic_runtime_planner_for_sbe:classic_runtime_planner_for_sbe_test_util.h",
@@ -850,6 +862,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:aggregation_context_fixture",
         "//src/mongo/db/pipeline:aggregation_request_helper",
         "//src/mongo/db/pipeline:document_source_mock",
+        "//src/mongo/db/query:explain_diagnostic_printer",
         "//src/mongo/db/query/collation:collator_factory_mock",
         "//src/mongo/db/query/collation:collator_interface_mock",
         "//src/mongo/db/query/plan_cache:plan_cache_test_util",

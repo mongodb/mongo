@@ -88,6 +88,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/explain_diagnostic_printer.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
@@ -358,6 +359,10 @@ bool getFirstBatch(const AggExState& aggExState,
                    boost::intrusive_ptr<ExpressionContext> expCtx,
                    PlanExecutor& exec,
                    CursorResponseBuilder& responseBuilder) {
+    // Capture diagnostics to be logged in the case of a failure.
+    ScopedDebugInfo explainDiagnostics("explainDiagnostics",
+                                       diagnostic_printers::ExplainDiagnosticPrinter{&exec});
+
     auto opCtx = aggExState.getOpCtx();
     long long batchSize = aggExState.getRequest().getCursor().getBatchSize().value_or(
         aggregation_request_helper::kDefaultBatchSize);
@@ -736,6 +741,9 @@ void executeExplain(const AggExState& aggExState,
                     boost::intrusive_ptr<ExpressionContext> expCtx,
                     PlanExecutor* explainExecutor,
                     rpc::ReplyBuilderInterface* result) {
+    // Capture diagnostics to be logged in the case of a failure.
+    ScopedDebugInfo explainDiagnostics(
+        "explainDiagnostics", diagnostic_printers::ExplainDiagnosticPrinter{explainExecutor});
     auto bodyBuilder = result->getBodyBuilder();
     if (auto pipelineExec = dynamic_cast<PlanExecutorPipeline*>(explainExecutor)) {
         Explain::explainPipeline(pipelineExec,

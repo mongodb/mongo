@@ -93,6 +93,7 @@
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
+#include "mongo/db/query/explain_diagnostic_printer.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
@@ -825,6 +826,9 @@ UpdateResult performUpdate(OperationContext* opCtx,
     const auto exec = uassertStatusOK(
         getExecutorUpdate(&curOp->debug(), collection, &parsedUpdate, boost::none /* verbosity
         */));
+    // Capture diagnostics to be logged in the case of a failure.
+    ScopedDebugInfo explainDiagnostics("explainDiagnostics",
+                                       diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -954,6 +958,9 @@ long long performDelete(OperationContext* opCtx,
     const auto exec = uassertStatusOK(
         getExecutorDelete(&curOp->debug(), collection, &parsedDelete, boost::none /* verbosity
         */));
+    // Capture diagnostics to be logged in the case of a failure.
+    ScopedDebugInfo explainDiagnostics("explainDiagnostics",
+                                       diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -1293,6 +1300,9 @@ static SingleWriteResult performSingleUpdateOpNoRetry(OperationContext* opCtx,
                                                       bool* containsDotsAndDollarsField) {
     auto exec = uassertStatusOK(
         getExecutorUpdate(&curOp.debug(), collection, &parsedUpdate, boost::none /* verbosity */));
+    // Capture diagnostics to be logged in the case of a failure.
+    ScopedDebugInfo explainDiagnostics("explainDiagnostics",
+                                       diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -1904,6 +1914,9 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
 
     auto exec = uassertStatusOK(
         getExecutorDelete(&curOp.debug(), collection, &parsedDelete, boost::none /* verbosity */));
+    // Capture diagnostics to be logged in the case of a failure.
+    ScopedDebugInfo explainDiagnostics("explainDiagnostics",
+                                       diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -2246,6 +2259,9 @@ void explainUpdate(OperationContext* opCtx,
         getExecutorUpdate(&CurOp::get(opCtx)->debug(), collection, &parsedUpdate, verbosity));
     auto bodyBuilder = result->getBodyBuilder();
 
+    // Capture diagnostics to be logged in the case of a failure.
+    ScopedDebugInfo explainDiagnostics("explainDiagnostics",
+                                       diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
     Explain::explainStages(exec.get(),
                            collection.getCollectionPtr(),
                            verbosity,
@@ -2286,6 +2302,9 @@ void explainDelete(OperationContext* opCtx,
         getExecutorDelete(&CurOp::get(opCtx)->debug(), collection, &parsedDelete, verbosity));
     auto bodyBuilder = result->getBodyBuilder();
 
+    // Capture diagnostics to be logged in the case of a failure.
+    ScopedDebugInfo explainDiagnostics("explainDiagnostics",
+                                       diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
     Explain::explainStages(exec.get(),
                            collection.getCollectionPtr(),
                            verbosity,

@@ -94,6 +94,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/explain_diagnostic_printer.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/find_command.h"
@@ -517,6 +518,9 @@ public:
                                                         PlanYieldPolicy::YieldPolicy::YIELD_AUTO));
 
             auto bodyBuilder = replyBuilder->getBodyBuilder();
+            // Capture diagnostics to be logged in the case of a failure.
+            ScopedDebugInfo explainDiagnostics(
+                "explainDiagnostics", diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
             // Got the execution tree. Explain it.
             Explain::explainStages(
                 exec.get(), collection, verbosity, BSONObj(), respSc, _request.body, &bodyBuilder);
@@ -535,6 +539,9 @@ public:
             size_t numResults = 0;
             bool failedToAppend = false;
 
+            // Capture diagnostics to be logged in the case of a failure.
+            ScopedDebugInfo explainDiagnostics("explainDiagnostics",
+                                               diagnostic_printers::ExplainDiagnosticPrinter{exec});
             numResults = exec->getNextBatch(
                 batchSize,
                 FindCommon::BSONObjCursorAppender{true /* alwaysAcceptFirstDoc */,

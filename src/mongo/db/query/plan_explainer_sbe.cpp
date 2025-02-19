@@ -97,8 +97,8 @@ BSONObj replaceBSONFieldNames(const BSONObj& replace, const BSONObj& fieldNames)
 void statsToBSON(const QuerySolutionNode* node,
                  BSONObjBuilder* bob,
                  const BSONObjBuilder* topLevelBob) {
-    invariant(bob);
-    invariant(topLevelBob);
+    tassert(9378604, "encountered unexpected nullptr for BSONObjBuilder", bob);
+    tassert(9378605, "encountered unexpected nullptr for BSONObjBuilder", topLevelBob);
 
     // Stop as soon as the BSON object we're building exceeds the limit.
     if (topLevelBob->len() > internalQueryExplainSizeThresholdBytes.load()) {
@@ -352,9 +352,9 @@ void statsToBSONHelper(const sbe::PlanStageStats* stats,
                        BSONObjBuilder* bob,
                        const BSONObjBuilder* topLevelBob,
                        std::uint32_t currentDepth) {
-    invariant(stats);
-    invariant(bob);
-    invariant(topLevelBob);
+    tassert(9378607, "encountered unexpected nullptr for PlanStageStats", stats);
+    tassert(9378608, "encountered unexpected nullptr for BSONObjBuilder", bob);
+    tassert(9258809, "encountered unexpected nullptr for BSONObjBuilder", topLevelBob);
 
     // Stop as soon as the BSON object we're building exceeds the limit.
     if (topLevelBob->len() > internalQueryExplainSizeThresholdBytes.load()) {
@@ -481,7 +481,7 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
         statsToBSON(solution->root(), &bob, &bob);
     }
 
-    invariant(execPlanDebugInfo);
+    tassert(9258810, "encountered unexpected missing BSONObj", execPlanDebugInfo);
     BSONObjBuilder plan;
     if (planSummary) {
         plan.append("planSummary", *planSummary);
@@ -580,9 +580,9 @@ void PlanExplainerSBEBase::getSecondarySummaryStats(const NamespaceString& secon
 
 PlanExplainer::PlanStatsDetails PlanExplainerSBEBase::getWinningPlanStats(
     ExplainOptions::Verbosity verbosity) const {
-    invariant(_root);
+    tassert(9378606, "encountered unexpected nullptr for root PlanStage", _root);
     auto stats = _root->getStats(true /* includeDebugInfo  */);
-    invariant(stats);
+    tassert(9378611, "encountered unexpected nullptr for PlanStageStats", stats);
 
     return buildPlanStatsDetails(_solution,
                                  *stats,

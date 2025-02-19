@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/explain_diagnostic_printer.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/mock_yield_policies.h"
@@ -110,12 +111,12 @@ protected:
         wunit.commit();
     }
 
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> buildFindExecutorForFilter(
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> buildFindExecAndIter(
         BSONObj filter, bool limitOne = false) {
-        AutoGetCollection collPtr(operationContext(), kNss, LockMode::MODE_IX);
+        AutoGetCollection coll(operationContext(), kNss, LockMode::MODE_IX);
         auto colls =
             MultipleCollectionAccessor(operationContext(),
-                                       &collPtr.getCollection(),
+                                       &coll.getCollection(),
                                        kNss,
                                        false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
                                        {});
@@ -128,27 +129,62 @@ protected:
         auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
             .expCtx = expCtx,
             .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand)}});
+
+        // The explain printer checks the CurOp's Command to see if it is allowed to print it.
+        Command* cmd = CommandHelpers::findCommand(operationContext(), "find");
+        {
+            stdx::lock_guard<Client> clientLock(*operationContext()->getClient());
+            CurOp::get(operationContext())
+                ->setGenericOpRequestDetails(clientLock, kNss, cmd, BSONObj(), NetworkOp::dbQuery);
+        }
+
         auto exec = getExecutorFind(
             operationContext(), colls, std::move(cq), PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
         ASSERT(exec.isOK());
+
+        exec.getValue()->getNext(nullptr, nullptr);
         return std::move(exec.getValue());
     }
 
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> buildAggExecutor(
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> buildAggExecAndIter(
         std::vector<BSONObj> stages) {
-        AutoGetCollection collPtr(operationContext(), kNss, LockMode::MODE_IX);
-        auto colls =
-            MultipleCollectionAccessor(operationContext(),
-                                       &collPtr.getCollection(),
-                                       kNss,
-                                       false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
-                                       {});
+        Pipeline::SourceContainer sources;
+        for (const auto& s : stages) {
+            sources.push_back(DocumentSource::parse(expCtx, s).front());
+        }
+        auto pipeline = Pipeline::create(sources, expCtx);
 
-        auto pipeline = Pipeline::parse(stages, expCtx);
-        auto request = AggregateCommandRequest(kNss, stages);
-        PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
-            colls, kNss, &request, pipeline.get());
-        return plan_executor_factory::make(expCtx, std::move(pipeline));
+        {
+            AutoGetCollection collPtr(operationContext(), kNss, LockMode::MODE_IX);
+            auto colls =
+                MultipleCollectionAccessor(operationContext(),
+                                           &collPtr.getCollection(),
+                                           kNss,
+                                           false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
+                                           {});
+
+            // The explain printer checks the CurOp's Command to see if it is allowed to print it.
+            auto request = AggregateCommandRequest(kNss, stages);
+            Command* cmd = CommandHelpers::findCommand(operationContext(), "aggregate");
+            {
+                stdx::lock_guard<Client> clientLock(*operationContext()->getClient());
+                CurOp::get(operationContext())
+                    ->setGenericOpRequestDetails(
+                        clientLock, kNss, cmd, BSONObj(), NetworkOp::dbQuery);
+            }
+
+            PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
+                colls, kNss, &request, pipeline.get());
+        }
+
+        auto exec = plan_executor_factory::make(expCtx, std::move(pipeline));
+        exec->getNext(nullptr, nullptr);
+        return exec;
+    }
+
+    std::string printExplainDiagnostics(PlanExecutor* exec) {
+        diagnostic_printers::ExplainDiagnosticPrinter printer{exec};
+        return fmt::format("{}", printer);
     }
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
@@ -157,7 +193,7 @@ protected:
 TEST_F(PlanExplainerTest, ClassicSingleSolutionPlanExplain) {
     // A query against a non-indexed field will have a single solution plan that can be explained.
     // The explain output should indicate the plan that was chosen.
-    auto exec = buildFindExecutorForFilter(fromjson("{c: {$eq: 1}}"));
+    auto exec = buildFindExecAndIter(fromjson("{c: {$eq: 1}}"));
     auto& explainer = exec->getPlanExplainer();
 
     ASSERT(!explainer.isMultiPlan());
@@ -170,7 +206,7 @@ TEST_F(PlanExplainerTest, ClassicSingleSolutionPlanExplain) {
 TEST_F(PlanExplainerTest, SBESingleSolutionPlanExplain) {
     // Same as above, but with SBE enabled.
     RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", true);
-    auto exec = buildFindExecutorForFilter(fromjson("{c: {$eq: 1}}"));
+    auto exec = buildFindExecAndIter(fromjson("{c: {$eq: 1}}"));
     auto& explainer = exec->getPlanExplainer();
 
     ASSERT(!explainer.isMultiPlan());
@@ -180,11 +216,39 @@ TEST_F(PlanExplainerTest, SBESingleSolutionPlanExplain) {
     ASSERT(winningPlan.hasField("slotBasedPlan"));
 }
 
+TEST_F(PlanExplainerTest, ClassicSingleSolutionPlanExplainDiagnostics) {
+    // The ExplainDiagnosticPrinter includes the query planner and execution stats info for the
+    // query above.
+    auto exec = buildFindExecAndIter(fromjson("{c: {$eq: 1}}"));
+
+    auto explainDiagnostics = printExplainDiagnostics(exec.get());
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "COLLSCAN");
+    ASSERT_STRING_OMITS(explainDiagnostics, "slotBasedPlan");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "executionStats': {");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "isEOF: 1");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "saveState: ");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "nReturned: 0");
+}
+
+TEST_F(PlanExplainerTest, SBESingleSolutionPlanExplainDiagnostics) {
+    // Same as above, but with SBE enabled.
+    RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", true);
+    auto exec = buildFindExecAndIter(fromjson("{c: {$eq: 1}}"));
+
+    auto explainDiagnostics = printExplainDiagnostics(exec.get());
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "COLLSCAN");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "slotBasedPlan");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "executionStats': {");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "isEOF: 1");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "saveState: ");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "nReturned: 0");
+}
+
 TEST_F(PlanExplainerTest, ClassicMultiPlannerExplain) {
     // A query including sargable predicates on different fields will consider multiple plans during
     // planning. Its executor can be explained, and the explain output should indicate the plan that
     // was chosen.
-    auto exec = buildFindExecutorForFilter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
+    auto exec = buildFindExecAndIter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
     auto& explainer = exec->getPlanExplainer();
 
     ASSERT(explainer.isMultiPlan());
@@ -197,7 +261,7 @@ TEST_F(PlanExplainerTest, ClassicMultiPlannerExplain) {
 TEST_F(PlanExplainerTest, SBEMultiPlannerExplain) {
     // Same as above, but with SBE enabled.
     RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", true);
-    auto exec = buildFindExecutorForFilter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
+    auto exec = buildFindExecAndIter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
     auto& explainer = exec->getPlanExplainer();
 
     ASSERT(explainer.isMultiPlan());
@@ -207,10 +271,38 @@ TEST_F(PlanExplainerTest, SBEMultiPlannerExplain) {
     ASSERT(winningPlan.hasField("slotBasedPlan"));
 }
 
+TEST_F(PlanExplainerTest, ClassicMultiPlannerExplainDiagnostics) {
+    // The ExplainDiagnosticPrinter includes the query planner and execution stats info for the
+    // query above.
+    auto exec = buildFindExecAndIter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
+
+    auto explainDiagnostics = printExplainDiagnostics(exec.get());
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "IXSCAN");
+    ASSERT_STRING_OMITS(explainDiagnostics, "slotBasedPlan");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "executionStats': {");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "isEOF: 0");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "saveState: ");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "nReturned: 1");
+}
+
+TEST_F(PlanExplainerTest, SBEMultiPlannerExplainDiagnostics) {
+    // Same as above, but with SBE enabled.
+    RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", true);
+    auto exec = buildFindExecAndIter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
+
+    auto explainDiagnostics = printExplainDiagnostics(exec.get());
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "IXSCAN");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "slotBasedPlan");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "executionStats': {");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "isEOF: 0");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "saveState: ");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "nReturned: 1");
+}
+
 TEST_F(PlanExplainerTest, ExpressPlanIdHackExplain) {
     // An express-eligible query will have a single solution plan that can be explained.
     // The explain output should indicate the plan that was chosen.
-    auto exec = buildFindExecutorForFilter(fromjson("{_id: 1}"));
+    auto exec = buildFindExecAndIter(fromjson("{_id: 1}"));
     auto& explainer = exec->getPlanExplainer();
 
     ASSERT(!explainer.isMultiPlan());
@@ -222,7 +314,7 @@ TEST_F(PlanExplainerTest, ExpressPlanIdHackExplain) {
 
 TEST_F(PlanExplainerTest, ExpressPlanSingleFieldEqExplain) {
     // Same as above, but testing non-_id express plan.
-    auto exec = buildFindExecutorForFilter(fromjson("{a: 1}"), true /* limitOne */);
+    auto exec = buildFindExecAndIter(fromjson("{a: 1}"), true /* limitOne */);
     auto& explainer = exec->getPlanExplainer();
 
     ASSERT(!explainer.isMultiPlan());
@@ -232,36 +324,96 @@ TEST_F(PlanExplainerTest, ExpressPlanSingleFieldEqExplain) {
     ASSERT(!winningPlan.hasField("slotBasedPlan"));
 }
 
+TEST_F(PlanExplainerTest, ExpressPlanIdHackExplainDiagnostics) {
+    // The ExplainDiagnosticPrinter includes the query planner and execution stats info for the _id
+    // query above.
+    auto exec = buildFindExecAndIter(fromjson("{_id: 1}"));
+
+    auto explainDiagnostics = printExplainDiagnostics(exec.get());
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "EXPRESS_IXSCAN");
+    ASSERT_STRING_OMITS(explainDiagnostics, "slotBasedPlan");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "executionStats': {");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "nReturned: 1");
+}
+
+TEST_F(PlanExplainerTest, ExpressPlanSingleFieldEqExplainDiagnostics) {
+    // The ExplainDiagnosticPrinter includes the query planner and execution stats info for the
+    // non-_id query above.
+    auto exec = buildFindExecAndIter(fromjson("{a: 1}"), true /* limitOne */);
+
+    auto explainDiagnostics = printExplainDiagnostics(exec.get());
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "EXPRESS_IXSCAN");
+    ASSERT_STRING_OMITS(explainDiagnostics, "slotBasedPlan");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "executionStats': {");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "nReturned: 1");
+}
+
 TEST_F(PlanExplainerTest, ClassicPipelinePlanExplain) {
     // A pipeline query including sargable predicates on different fields will consider multiple
     // plans during planning. Its executor can be explained, and the explain output should indicate
     // the plan that was chosen. Note that we intentionally build a pipeline that cannot be
     // completely pushed into the find layer here.
-    auto stages = std::vector{
-        fromjson("{$match: {a: {$gte: 0}, b: {$gte: 0}}}"),
-        fromjson("{$setWindowFields: {sortBy: {_id: 1}, output: {rank: {$rank: {}}}}}")};
-    auto exec = buildAggExecutor(stages);
+    auto stages =
+        std::vector{fromjson("{$match: {a: {$gte: 0}, b: {$gte: 0}}}"),
+                    fromjson("{$redact: {$cond: {if: '$a', then: '$$PRUNE', else: '$$DESCEND'}}}")};
+    auto exec = buildAggExecAndIter(stages);
     auto& explainer = exec->getPlanExplainer();
 
-    // TODO SERVER-49808: add assertion on explain output for a pipeline executor.
+    // TODO SERVER-49808: add assertion on the pipeline part of the explain output.
     auto&& [winningPlan, _] =
         explainer.getWinningPlanStats(ExplainOptions::Verbosity::kQueryPlanner);
-    ASSERT_EQ(winningPlan.toString(), "{}");
+    ASSERT_STRING_CONTAINS(winningPlan.toString(), "IXSCAN");
+    ASSERT(!winningPlan.hasField("slotBasedPlan"));
 }
 
 TEST_F(PlanExplainerTest, SBEPipelinePlanExplain) {
     // Same as above, with SBE enabled.
     RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", true);
-    auto stages = std::vector{
-        fromjson("{$match: {a: {$gte: 0}, b: {$gte: 0}}}"),
-        fromjson("{$setWindowFields: {sortBy: {_id: 1}, output: {rank: {$rank: {}}}}}")};
-    auto exec = buildAggExecutor(stages);
+    auto stages =
+        std::vector{fromjson("{$match: {a: {$gte: 0}, b: {$gte: 0}}}"),
+                    fromjson("{$redact: {$cond: {if: '$a', then: '$$PRUNE', else: '$$DESCEND'}}}")};
+    auto exec = buildAggExecAndIter(stages);
     auto& explainer = exec->getPlanExplainer();
 
-    // TODO SERVER-49808: add assertion on explain output for a pipeline executor.
+    // TODO SERVER-49808: add assertion on the pipeline part of the explain output.
     auto&& [winningPlan, _] =
         explainer.getWinningPlanStats(ExplainOptions::Verbosity::kQueryPlanner);
-    ASSERT_EQ(winningPlan.toString(), "{}");
+    ASSERT_STRING_CONTAINS(winningPlan.toString(), "IXSCAN");
+    ASSERT(winningPlan.hasField("slotBasedPlan"));
+}
+
+TEST_F(PlanExplainerTest, ClassicPipelinePlanExplainDiagnostics) {
+    // The ExplainDiagnosticPrinter includes the query planner and execution stats info for the
+    // query above.
+    auto stages =
+        std::vector{fromjson("{$match: {a: {$gte: 0}, b: {$gte: 0}}}"),
+                    fromjson("{$redact: {$cond: {if: '$a', then: '$$PRUNE', else: '$$DESCEND'}}}")};
+    auto exec = buildAggExecAndIter(stages);
+
+    auto explainDiagnostics = printExplainDiagnostics(exec.get());
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "IXSCAN");
+    ASSERT_STRING_OMITS(explainDiagnostics, "slotBasedPlan");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "executionStats': {");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "isEOF: 0");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "saveState: ");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "nReturned: 1");
+}
+
+TEST_F(PlanExplainerTest, SBEPipelinePlanExplainDiagnostics) {
+    // Same as above, with SBE enabled.
+    RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", true);
+    auto stages =
+        std::vector{fromjson("{$match: {a: {$gte: 0}, b: {$gte: 0}}}"),
+                    fromjson("{$redact: {$cond: {if: '$a', then: '$$PRUNE', else: '$$DESCEND'}}}")};
+    auto exec = buildAggExecAndIter(stages);
+
+    auto explainDiagnostics = printExplainDiagnostics(exec.get());
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "IXSCAN");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "slotBasedPlan");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "executionStats': {");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "isEOF: 0");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "saveState: ");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "numTested: 1");
 }
 }  // namespace
 }  // namespace mongo
