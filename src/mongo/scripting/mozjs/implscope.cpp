@@ -958,8 +958,11 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
         if (JS_GetPendingException(_context, &excn)) {
             if (excn.isObject()) {
                 str::stream ss;
-                // exceptions originating from c++ don't get the "uncaught exception: " prefix
-                if (!JS::GetPrivate(excn.toObjectOrNull())) {
+                // Exceptions originating from c++ don't get the "uncaught exception: " prefix.
+                // Here we rely on the class flags to indicate the existence of private data, as
+                // calling JS::getPrivate() on objects which do not have private data is not safe.
+                if (const auto* classPtr = JS::GetClass(excn.toObjectOrNull());
+                    classPtr && !classPtr->hasPrivate()) {
                     ss << "uncaught exception: ";
                 }
                 ss << ValueWriter(_context, excn).toString();
