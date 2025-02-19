@@ -215,11 +215,11 @@ protected:
 
     int delta = 0;
     BSONObj lastResume;
-    ReshardingChangeStreamsMonitor::BatchProcessedCallback callback = [&](int documentDelta,
-                                                                          BSONObj resumeToken) {
-        delta += documentDelta;
-        lastResume = resumeToken.getOwned();
-    };
+    ReshardingChangeStreamsMonitor::BatchProcessedCallback callback =
+        [&](int documentsDelta, BSONObj resumeToken, bool completed) {
+            delta += documentsDelta;
+            lastResume = resumeToken.getOwned();
+        };
 };
 
 TEST_F(ReshardingChangeStreamsMonitorTest, SuccessfullyInitializeMonitorWithStartAtTime) {
@@ -257,6 +257,9 @@ TEST_F(ReshardingChangeStreamsMonitorTest, StartMonitoringCalledTwiceSuccessful)
     auto factory = makeCancelableOpCtx();
     monitor->startMonitoring(executor, factory);
     monitor->startMonitoring(executor, factory);
+
+    fulfillRecipientFinalEventPromise(nss);
+    monitor->awaitFinalChangeEvent().get();
 }
 
 

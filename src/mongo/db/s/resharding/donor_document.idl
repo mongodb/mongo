@@ -74,3 +74,6 @@ structs:
                 type: ReshardingDonorMetrics
                 description: "Metrics related to this donor."
                 optional: true
+            changeStreamsMonitor:
+                type: ChangeStreamsMonitorContext
+                optional: true

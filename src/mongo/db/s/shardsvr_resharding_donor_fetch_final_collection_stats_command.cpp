@@ -38,6 +38,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
+#include "mongo/db/s/resharding/resharding_donor_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
@@ -75,7 +77,32 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
-            return {0};
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
+            uassert(ErrorCodes::IllegalOperation,
+                    "_shardsvrReshardingDonorFetchFinalCollectionStats is only supported on "
+                    "shardsvr mongod",
+                    serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
+
+            auto donorMachine = resharding::tryGetReshardingStateMachineAndThrowIfShuttingDown<
+                ReshardingDonorService,
+                ReshardingDonorService::DonorStateMachine,
+                ReshardingDonorDocument>(opCtx, request().getReshardingUUID());
+
+            uassert(9858407,
+                    str::stream() << "No resharding operation in progress with uuid "
+                                  << request().getReshardingUUID(),
+                    donorMachine);
+
+            LOGV2(9858408,
+                  "Start waiting for the resharding change streams monitor to complete",
+                  "reshardingUUID"_attr = request().getReshardingUUID());
+            auto documentsDelta = (*donorMachine)->awaitChangeStreamsMonitorCompleted().get(opCtx);
+            LOGV2(9858409,
+                  "Finished waiting for the resharding change streams monitor to complete",
+                  "reshardingUUID"_attr = request().getReshardingUUID(),
+                  "documentsDelta"_attr = documentsDelta);
+            return {documentsDelta};
         }
 
     private:
