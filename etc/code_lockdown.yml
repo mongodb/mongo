@@ -180,6 +180,9 @@ teams:
     slack_tags:
       - "<@U0294T002>" # james.wahlin@mongodb.com - Director
       - "<!subteam^S080PEJEYUW>" # @leads-staff-query-integration - Leads + Staff
+  - name: "Atlas Streams"
+    slack_tags:
+      - "<!subteam^S07M9UNSX5J>" # @streams-engine-team
   - name: "Server Triage"
     slack_tags:
       - "<@U0V9XLF8R>" # kelsey.schubert@mongodb.com - Director
