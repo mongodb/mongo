@@ -4,5 +4,6 @@ description: >-
   attribute returned in explain is same for multiple explain invocations on sharded cluster deployments.
 excludes:
   - "query_settings.common_aggregation_excludes"
+  - "query_settings.query_shape_hash_stability_aggregation"
 eval:
   - "query_settings.eval_query_shape_hash_stability"

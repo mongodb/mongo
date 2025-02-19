@@ -77,6 +77,33 @@
       # them.
       - known_query_shape_computation_problem
 
+- name: query_shape_hash_stability_aggregation
+  value:
+    exclude_files:
+      # TODO SERVER-100658 Explain on non-existent collection returns empty results for sharded
+      # cluster aggregations.
+      - jstests/aggregation/sources/unwind/unwind_preserve_null_and_empty_arrays.js
+      - jstests/aggregation/sources/sample/sample_optimization.js
+      - jstests/aggregation/sources/setWindowFields/min_max_scalar_parsing.js
+      - jstests/aggregation/parsing/max_subpipeline_depth.js
+      - jstests/aggregation/sources/densify/parse.js
+      - jstests/aggregation/sources/graphLookup/basic.js
+      - jstests/aggregation/sources/out/required_last_position.js
+      - jstests/aggregation/sources/setWindowFields/parse.js
+
+- name: query_shape_hash_stability_core
+  value:
+    exclude_files:
+      # Explain cannot target shards directly.
+      - jstests/core/index/text/text_ignore_regex.js
+      - jstests/core/timeseries/query/timeseries_merge.js
+      - jstests/core/query/or_use_clustered_collection.js
+      # TODO SERVER-100658 Explain on non-existent collection returns empty results for sharded
+      # cluster aggregations.
+      - jstests/core/query/api/api_version_new_50_language_features.js
+      - jstests/core/query/api/api_version_new_51_language_features.js
+      - jstests/core/query/api/api_version_new_52_language_features.js
+
 - name: fallback_core_excludes
   value:
     exclude_files:

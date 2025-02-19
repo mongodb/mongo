@@ -8,20 +8,12 @@ filters:
   - "aggregation_mongos_pqs*":
     approvers:
       - 10gen/query-execution-query-settings
-  - "aggregation_mongos_query_shape_hash_stability.yml":
-    approvers:
-      - 10gen/query-execution-query-settings
-      - 10gen/query-integration-query-stats
   - "aggregation_multiversion_fuzzer*":
     approvers:
       - 10gen/query-optimization
   - "aggregation_pqs*":
     approvers:
       - 10gen/query-execution-query-settings
-  - "aggregation_query_shape_hash_stability.yml":
-    approvers:
-      - 10gen/query-execution-query-settings
-      - 10gen/query-integration-query-stats
   - "aggregation_sharded_collections_pqs*":
     approvers:
       - 10gen/query-execution-query-settings
@@ -47,10 +39,6 @@ filters:
   - "replica_sets_jscore_pqs*":
     approvers:
       - 10gen/query-execution-query-settings
-  - "replica_sets_jscore_query_shape_hash_stability.yml":
-    approvers:
-      - 10gen/query-execution-query-settings
-      - 10gen/query-integration-query-stats
   - "sharded_collections_pqs*":
     approvers:
       - 10gen/query-execution-query-settings
@@ -61,10 +49,6 @@ filters:
   - "sharding_pqs*":
     approvers:
       - 10gen/query-execution-query-settings
-  - "sharding_query_shape_hash_stability.yml":
-    approvers:
-      - 10gen/query-execution-query-settings
-      - 10gen/query-integration-query-stats
   - "update_fuzzer*":
     approvers:
       - 10gen/query-execution-write-exec

@@ -61,10 +61,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/*
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_expression_multiversion_fuzzer* @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_mongos_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
-/buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_mongos_query_shape_hash_stability.yml @10gen/query-execution-query-settings @10gen/query-integration-query-stats @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_multiversion_fuzzer* @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
-/buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_query_shape_hash_stability.yml @10gen/query-execution-query-settings @10gen/query-integration-query-stats @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_sharded_collections_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/aggregation_sharded_collections_query_shape_hash_stability.yml @10gen/query-execution-query-settings @10gen/query-integration-query-stats @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/bulk_write* @10gen/query-execution-write-exec @svc-auto-approve-bot
@@ -73,11 +71,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/core_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm.yml @10gen/query-optimization-runtime-planners @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/core_repeat_queries.yml @10gen/query-optimization-plan-cache @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/replica_sets_jscore_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
-/buildscripts/resmokeconfig/matrix_suites/mappings/**/replica_sets_jscore_query_shape_hash_stability.yml @10gen/query-execution-query-settings @10gen/query-integration-query-stats @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/sharded_collections_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/sharded_collections_query_shape_hash_stability.yml @10gen/query-execution-query-settings @10gen/query-integration-query-stats @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/sharding_pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
-/buildscripts/resmokeconfig/matrix_suites/mappings/**/sharding_query_shape_hash_stability.yml @10gen/query-execution-query-settings @10gen/query-integration-query-stats @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/update_fuzzer* @10gen/query-execution-write-exec @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokeconfig/matrix_suites/overrides/OWNERS.yml

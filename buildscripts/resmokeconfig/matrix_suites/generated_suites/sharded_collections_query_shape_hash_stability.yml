@@ -101,6 +101,12 @@ selector:
     - jstests/core/write/empty_ts/bypass_empty_ts_replacement_timeseries.js
     - jstests/core/query/queryable_encryption/**/*.js
     - src/mongo/db/modules/enterprise/jstests/fle2/**/*.js
+    - jstests/core/index/text/text_ignore_regex.js
+    - jstests/core/timeseries/query/timeseries_merge.js
+    - jstests/core/query/or_use_clustered_collection.js
+    - jstests/core/query/api/api_version_new_50_language_features.js
+    - jstests/core/query/api/api_version_new_51_language_features.js
+    - jstests/core/query/api/api_version_new_52_language_features.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos

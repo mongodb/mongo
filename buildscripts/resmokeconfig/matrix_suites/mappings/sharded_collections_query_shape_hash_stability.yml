@@ -5,5 +5,6 @@ description: >-
   deployments which implicitly shards accessed collections.
 excludes:
   - "query_settings.common_core_excludes"
+  - "query_settings.query_shape_hash_stability_core"
 eval:
   - "query_settings.eval_query_shape_hash_stability"
