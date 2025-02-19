@@ -4,10 +4,6 @@
  * @tags: [
  *  uses_transactions,
  *  uses_snapshot_read_concern,
- *  # Retrying an aborted transaction is allowed on shardsvrs.
- *  # TODO SERVER-64484: Remove this tag as shardsvrs running in serverless mode will error on an
- *  # attempt to retry an aborted transaction as mongods do when not running as a shardsvr.
- *  directly_against_shardsvrs_incompatible,
  * ]
  */
 
