@@ -840,6 +840,7 @@ mongo_cc_library(
     deps = [
         ":optime",
         "//src/mongo:base",
+        "//src/mongo/db/concurrency:flow_control_ticketholder",
     ],
 )
 

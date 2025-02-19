@@ -287,9 +287,7 @@ mongo_cc_library(
     hdrs = [
         "hash_block.h",
         "sha512_block.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/concurrency:flow_control_ticketholder",
+        "//src/mongo:core_headers",
     ],
     local_defines = select({
         "//bazel/config:mongo_crypto_tom": ["LTC_NO_PROTOTYPES"],

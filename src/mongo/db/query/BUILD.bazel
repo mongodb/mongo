@@ -604,12 +604,12 @@ mongo_cc_library(
     hdrs = [
         "hint_parser.h",
         ":hint_gen",
-    ],
-    header_deps = [
-        "//src/mongo/db/concurrency:flow_control_ticketholder",
+        "//src/mongo:core_headers",
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db:cluster_role",
+        "//src/mongo/db/auth:cluster_auth_mode",
     ],
 )
 
