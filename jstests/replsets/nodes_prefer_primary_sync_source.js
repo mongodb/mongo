@@ -35,8 +35,8 @@ const rst = new ReplSetTest({
             // Set 'changeSyncSourceThresholdMillis' to a higher value to mitigate failures due to
             // network jitter. As we rely on ping times to select a sync source, a smaller threshold
             // may result in unexpected sync source selections due to small network delays.
-            // We now consider nodes with ping difference <20ms to be in the same data center.
-            changeSyncSourceThresholdMillis: 20,
+            // We now consider nodes with ping difference <25ms to be in the same data center.
+            changeSyncSourceThresholdMillis: 25,
         }
     },
     settings: {
@@ -89,9 +89,9 @@ const eastDC = new DataCenter("east", [testNode]);
 // data center and central data center very minimal.
 delayMessagesBetweenDataCenters(westDC, centralDC, 50 /* delayMillis */);
 delayMessagesBetweenDataCenters(centralDC, eastDC, 50 /* delayMillis */);
-delayMessagesBetweenDataCenters(westDC, eastCentralDC, 52 /* delayMillis */);
-delayMessagesBetweenDataCenters(eastCentralDC, eastDC, 48 /* delayMillis */);
-delayMessagesBetweenDataCenters(centralDC, eastCentralDC, 2 /* delayMillis */);
+delayMessagesBetweenDataCenters(westDC, eastCentralDC, 55 /* delayMillis */);
+delayMessagesBetweenDataCenters(eastCentralDC, eastDC, 45 /* delayMillis */);
+delayMessagesBetweenDataCenters(centralDC, eastCentralDC, 5 /* delayMillis */);
 delayMessagesBetweenDataCenters(westDC, eastDC, 300 /* delayMillis */);
 
 // Hang 'testNode' in the oplog fetcher to ensure that sync source candidates are ahead of us.
@@ -114,7 +114,6 @@ jsTestLog(
 let replSetGetStatus;
 assert.soon(() => {
     replSetGetStatus = assert.commandWorked(testNode.adminCommand({replSetGetStatus: 1}));
-    jsTestLog(replSetGetStatus);
 
     // Wait for a heartbeat from the target sync source that shows that the target sync source's
     // last timestamp is at least 'advancedTimestamp'. This ensures the test node sees that the
@@ -123,16 +122,33 @@ assert.soon(() => {
     const primaryTimestamp = replSetGetStatus.members[0].optime.ts;
     const receivedCentralHb = (bsonWoCompare(primaryTimestamp, advancedTimestamp) >= 0);
 
+    if (!receivedCentralHb) {
+        jsTestLog("receivedCentralHb check failed");
+        return false;
+    }
+
     // Wait for enough heartbeats from the test node's current sync source so that our understanding
     // of the ping time is over 60 ms. This makes it likely to re-evaluate the sync source.
     const syncSourcePingTime = replSetGetStatus.members[3].pingMs;
     const receivedSyncSourceHb = (syncSourcePingTime > 60);
+
+    if (!receivedSyncSourceHb) {
+        jsTestLog("receivedSyncSourceHb check failed: syncSourcePingTime " + syncSourcePingTime);
+        return false;
+    }
 
     // Wait for enough heartbeats from the desired sync source so that our understanding of the
     // ping time to that node is at least 'changeSyncSourceThresholdMillis' less than the ping time
     // to our current sync source.
     const primaryPingTime = replSetGetStatus.members[0].pingMs;
     const exceedsChangeSyncSourceThreshold = (syncSourcePingTime - primaryPingTime > 20);
+
+    if (!exceedsChangeSyncSourceThreshold) {
+        jsTestLog("exceedsChangeSyncSourceThreshold check failed: syncSourcePingTime " +
+                  syncSourcePingTime + " primaryPingTime " + primaryPingTime);
+        return false;
+    }
+
     // Wait for primary ping to be larger than secondary ping, and their difference to be
     // considerably less than 'changeSyncSourceThresholdMillis' to ensure they are understood
     // as nodes in the same data center.
@@ -140,11 +156,15 @@ assert.soon(() => {
     const centralWithinChangeSyncSourceThreshold =
         (primaryPingTime - secondaryPingTime >= 0) && (primaryPingTime - secondaryPingTime < 20);
 
+    if (!centralWithinChangeSyncSourceThreshold) {
+        jsTestLog("centralWithinChangeSyncSourceThreshold check failed: primaryPing " +
+                  primaryPingTime + ", secondaryPing " + secondaryPingTime);
+        return false;
+    }
+
     return (receivedCentralHb && receivedSyncSourceHb && exceedsChangeSyncSourceThreshold &&
             centralWithinChangeSyncSourceThreshold);
 }, tojson(replSetGetStatus));
-
-jsTestLog(replSetGetStatus);
 
 hangOplogFetcherBeforeAdvancingLastFetched.off();
 
