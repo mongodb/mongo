@@ -128,6 +128,8 @@
 
 namespace mongo {
 
+using namespace fmt::literals;
+
 static const size_t kSerializedErrorStatusMaxSize = 1024 * 2;
 
 void sharding_ddl_util_serializeErrorStatusToBSON(const Status& status,
@@ -867,13 +869,11 @@ void assertDataMovementAllowed() {
 void assertNamespaceLengthLimit(const NamespaceString& nss, bool isUnsharded) {
     auto maxNsLen = isUnsharded ? NamespaceString::MaxUserNsCollectionLen
                                 : NamespaceString::MaxUserNsShardedCollectionLen;
-    uassert(ErrorCodes::InvalidNamespace,
-            fmt::format("Namespace too log. The namespace {} is {} characters long, but the "
-                        "maximum allowed is {}",
-                        nss.toStringForErrorMsg(),
-                        nss.size(),
-                        maxNsLen),
-            nss.size() <= maxNsLen);
+    uassert(
+        ErrorCodes::InvalidNamespace,
+        "Namespace too log. The namespace {} is {} characters long, but the maximum allowed is {}"_format(
+            nss.toStringForErrorMsg(), nss.size(), maxNsLen),
+        nss.size() <= maxNsLen);
 }
 
 void commitDatabaseMetadataToShardLocalCatalog(

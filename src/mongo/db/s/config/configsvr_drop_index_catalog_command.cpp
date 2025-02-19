@@ -180,12 +180,13 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::CommandNotSupported,
-                    fmt::format("{} command not enabled", definition()->getName()),
+                    format(FMT_STRING("{} command not enabled"), definition()->getName()),
                     feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-            uassert(ErrorCodes::IllegalOperation,
-                    fmt::format("{} can only be run on config servers", definition()->getName()),
-                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
+            uassert(
+                ErrorCodes::IllegalOperation,
+                format(FMT_STRING("{} can only be run on config servers"), definition()->getName()),
+                serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());

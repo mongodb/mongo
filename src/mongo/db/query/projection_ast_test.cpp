@@ -36,7 +36,6 @@
 
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
-#include <fmt/ranges.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -525,8 +524,9 @@ TEST_F(ProjectionASTTest, TestDebugBSONWithLiteralValue) {
 }
 
 TEST_F(ProjectionASTTest, TestDebugLargeBSONWithLiteralValue) {
+    using namespace fmt::literals;
     const auto joinFields = [](const std::vector<std::string>& fields) {
-        return fmt::format("{{{}}}", fmt::join(fields, ", "));
+        return "{{{}}}"_format(fmt::join(fields, ", "));
     };
     const auto compareProjectionAndFields = [&](const Projection& projection,
                                                 const std::vector<std::string>& fields) {
@@ -541,7 +541,7 @@ TEST_F(ProjectionASTTest, TestDebugLargeBSONWithLiteralValue) {
     // add/remove and eventually join this list together for testing debug output.
     for (size_t i = 0; i < numFields; i++) {
         std::string i_str = std::to_string(i);
-        fields.push_back(fmt::format("a{}: {{$const: '{}'}}", i_str, i_str));
+        fields.push_back("a{}: {{$const: '{}'}}"_format(i_str, i_str));
     }
 
     Projection proj = parseWithDefaultPolicies(fromjson(joinFields(fields)));

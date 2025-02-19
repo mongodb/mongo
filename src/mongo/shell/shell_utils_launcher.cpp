@@ -113,6 +113,8 @@ namespace shell_utils {
 
 namespace {
 
+using namespace fmt::literals;
+
 #ifdef _WIN32
 
 constexpr auto kFilesystemErrorRetry = 10;
@@ -477,9 +479,8 @@ inline void kill_wrapper(ProcessId pid, int sig, int port, const BSONObj& opt) {
         if (ec == posixError(ESRCH)) {
         } else {
             LOGV2_INFO(22816, "Kill failed", "error"_attr = errorMessage(ec));
-            uasserted(
-                ErrorCodes::UnknownError,
-                fmt::format("kill({}, {}) failed: {}", pid.toNative(), sig, errorMessage(ec)));
+            uasserted(ErrorCodes::UnknownError,
+                      "kill({}, {}) failed: {}"_format(pid.toNative(), sig, errorMessage(ec)));
         }
     }
 
@@ -633,7 +634,7 @@ BSONObj ReadTestPipes(const BSONObj& args, void* unused) {
             pipeRelativePaths.emplace_back(pipePathElem.str());
         } else if (pipePathElem.type() != BSONType::EOO) {
             uasserted(ErrorCodes::FailedToParse,
-                      fmt::format("Argument {} (pipe path) must be a string", fieldNum));
+                      "Argument {} (pipe path) must be a string"_format(fieldNum));
         }
         ++fieldNum;
     } while (pipePathElem.type() != BSONType::EOO);
@@ -657,7 +658,7 @@ BSONObj ReadTestPipes(const BSONObj& args, void* unused) {
 BSONObj WriteTestPipe(const BSONObj& args, void* unused) {
     int nFields = args.nFields();
     uassert(ErrorCodes::FailedToParse,
-            fmt::format("wrong number of arguments", nFields),
+            "wrong number of arguments"_format(nFields),
             nFields >= 2 && nFields <= 5);
 
     const long kStringMaxSize = 16750000;  // max allowed size for generated object's "string" field
@@ -747,7 +748,7 @@ int32_t readBytes(char* buf, int32_t count, std::ifstream& ifs) {
 BSONObj writeTestPipeBsonFileHelper(const BSONObj& args, bool async) {
     int nFields = args.nFields();
     uassert(ErrorCodes::FailedToParse,
-            fmt::format("Function requires 3 or 4 arguments but {} were given", nFields),
+            "Function requires 3 or 4 arguments but {} were given"_format(nFields),
             nFields == 3 || nFields == 4);
 
     BSONElement pipePathElem(args.getField("0"));
@@ -778,10 +779,10 @@ BSONObj writeTestPipeBsonFileHelper(const BSONObj& args, bool async) {
 
     // Open the BSON object file.
     std::ifstream ifs(bsonFilePathElem.str(), std::ios::binary | std::ios::in);
-    uassert(ErrorCodes::FileOpenFailed,
-            fmt::format(
-                "Failed to open '{}': {}", bsonFilePathElem.str(), errorMessage(lastSystemError())),
-            ifs.is_open());
+    uassert(
+        ErrorCodes::FileOpenFailed,
+        "Failed to open '{}': {}"_format(bsonFilePathElem.str(), errorMessage(lastSystemError())),
+        ifs.is_open());
 
     // Read the BSON object file into a vector of BSONObj.
     const int32_t kSizeSize = sizeof(int32_t);
@@ -804,14 +805,14 @@ BSONObj writeTestPipeBsonFileHelper(const BSONObj& args, bool async) {
                 }
             }
             uassert(ErrorCodes::InvalidBSON,
-                    fmt::format("Expected {} bytes in BSON object but got {}", size, totalRead),
+                    "Expected {} bytes in BSON object but got {}"_format(size, totalRead),
                     totalRead == size);
 
             bsonObjs.emplace_back(buf);
         } else {
             eof = true;
             uassert(ErrorCodes::InvalidBSON,
-                    fmt::format("Expected {} bytes in size field but got {}", kSizeSize, nBytes),
+                    "Expected {} bytes in size field but got {}"_format(kSizeSize, nBytes),
                     nBytes == 0);  // 0 is normal EOF
         }
     }  // while !eof
@@ -858,7 +859,7 @@ BSONObj WriteTestPipeBsonFileSync(const BSONObj& args, void* unused) {
 BSONObj WriteTestPipeObjects(const BSONObj& args, void* unused) {
     int nFields = args.nFields();
     uassert(ErrorCodes::FailedToParse,
-            fmt::format("Function requires 3 to 5 arguments but {} were given", nFields),
+            "Function requires 3 to 5 arguments but {} were given"_format(nFields),
             nFields >= 3 && nFields <= 5);
 
     BSONElement pipePathElem(args.getField("0"));

@@ -41,6 +41,7 @@
 
 namespace mongo::pcre {
 namespace {
+using namespace fmt::literals;
 using namespace std::string_literals;
 using namespace unittest::match;
 
@@ -177,7 +178,7 @@ TEST(PcreTest, StartPos) {
 
     // `MatchData` retains the `startPos` from the match call.
     for (size_t i = 0; i != ohi.size(); ++i)
-        ASSERT_EQ(hiRe.matchView(ohi, {}, i).startPos(), i) << fmt::format(" i={}", i);
+        ASSERT_EQ(hiRe.matchView(ohi, {}, i).startPos(), i) << " i="_format(i);
 }
 
 TEST(PcreTest, CompileOptions) {
@@ -196,7 +197,7 @@ TEST(PcreTest, CompileOptions) {
         Regex re{pattern, opt};
         for (size_t i = 0; i < subjects.size(); ++i)
             ASSERT_EQ(!!re.matchView(subjects[i], pcre::ANCHORED | pcre::ENDANCHORED), outMatch[i])
-                << fmt::format("opt={}, subject={}", uint32_t(opt), subjects[i]);
+                << "opt={}, subject={}"_format(uint32_t(opt), subjects[i]);
     }
 }
 

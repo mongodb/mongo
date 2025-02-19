@@ -146,11 +146,13 @@ protected:
 
 private:
     Document _applyRootReplacementExpression(const Document& input, const Document& output) const {
+        using namespace fmt::literals;
+
         _expCtx->variables.setValue(_projectionPostImageVarId, Value{output});
         auto val = _rootReplacementExpression->evaluate(input, &_expCtx->variables);
         uassert(51254,
-                fmt::format("Root-replacement expression must return a document, but got {}",
-                            typeName(val.getType())),
+                "Root-replacement expression must return a document, but got {}"_format(
+                    typeName(val.getType())),
                 val.getType() == BSONType::Object);
         return val.getDocument();
     }

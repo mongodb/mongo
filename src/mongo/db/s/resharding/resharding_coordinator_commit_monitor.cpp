@@ -71,6 +71,8 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 
+using namespace fmt::literals;
+
 namespace mongo {
 namespace resharding {
 
@@ -183,7 +185,7 @@ CoordinatorCommitMonitor::queryRemainingOperationTimeForRecipients() const {
 
         auto response = ars.next();
         auto errorContext =
-            fmt::format("Failed command: {} on {}", cmdObj.toString(), response.shardId.toString());
+            "Failed command: {} on {}"_format(cmdObj.toString(), response.shardId.toString());
 
         auto shardResponse =
             uassertStatusOKWithContext(std::move(response.swResponse), errorContext);

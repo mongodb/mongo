@@ -75,7 +75,8 @@ void ScriptEngine::setup(ExecutionEnvironment environment) {
 }
 
 std::string ScriptEngine::getInterpreterVersionString() {
-    return fmt::format("MozJS-{}", MOZJS_MAJOR_VERSION);
+    using namespace fmt::literals;
+    return "MozJS-{}"_format(MOZJS_MAJOR_VERSION);
 }
 
 namespace mozjs {

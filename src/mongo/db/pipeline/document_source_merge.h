@@ -116,11 +116,11 @@ public:
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const final {
+            using namespace fmt::literals;
             ReadConcernSupportResult result = {
                 {level == repl::ReadConcernLevel::kLinearizableReadConcern,
                  {ErrorCodes::InvalidOptions,
-                  fmt::format("{} cannot be used with a 'linearizable' read concern level",
-                              kStageName)}},
+                  "{} cannot be used with a 'linearizable' read concern level"_format(kStageName)}},
                 Status::OK()};
             auto pipelineReadConcern = LiteParsedDocumentSourceNestedPipelines::supportsReadConcern(
                 level, isImplicitDefault);

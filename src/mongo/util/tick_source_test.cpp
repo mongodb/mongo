@@ -73,6 +73,7 @@ TEST(SystemTickSourceTest, TicksPerSecond) {
 }
 
 TEST(SystemTickSourceTest, GetTicks) {
+    using namespace fmt::literals;
     using namespace std::chrono_literals;
 #ifdef _WIN32
     // Error upper bound increased for Windows systems because sleep_for is known to possibly
@@ -95,7 +96,7 @@ TEST(SystemTickSourceTest, GetTicks) {
         auto dt = (n1 - n0) * tTick;
         double err = (dt - delay) / delay;
         ASSERT_THAT(err, m::AllOf(m::Ge(kMinError), m::Le(kMaxError)))
-            << fmt::format(" n0={}, n1={}, tTick={}, delay={}, dt={}", n0, n1, tTick, delay, dt);
+            << " n0={}, n1={}, tTick={}, delay={}, dt={}"_format(n0, n1, tTick, delay, dt);
     }
 }
 

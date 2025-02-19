@@ -31,8 +31,6 @@
 
 #include <algorithm>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/format.h>
-#include <fmt/ranges.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"

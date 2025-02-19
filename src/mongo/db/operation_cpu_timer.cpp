@@ -57,6 +57,7 @@
 
 namespace mongo {
 
+using namespace fmt::literals;
 
 #if defined(__linux__)
 

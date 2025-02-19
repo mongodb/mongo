@@ -73,6 +73,8 @@
 namespace mongo {
 namespace {
 
+using namespace fmt::literals;
+
 const ReshardingDonorOplogId kResumeFromBeginning{Timestamp::min(), Timestamp::min()};
 
 repl::MutableOplogEntry makeOplog(const NamespaceString& nss,
@@ -199,7 +201,7 @@ public:
 private:
     const NamespaceString _oplogNss = NamespaceString::createNamespaceString_forTest(
         DatabaseName::kConfig,
-        fmt::format("{}xxx.yyy", NamespaceString::kReshardingLocalOplogBufferPrefix));
+        "{}xxx.yyy"_format(NamespaceString::kReshardingLocalOplogBufferPrefix));
     const NamespaceString _crudNss = NamespaceString::createNamespaceString_forTest("test.foo");
     const UUID _uuid{UUID::gen()};
 

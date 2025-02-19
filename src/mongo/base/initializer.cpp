@@ -128,11 +128,12 @@ void Initializer::_transition(State expected, State next) {
     if (_lifecycleState != expected)
         uasserted(
             ErrorCodes::IllegalOperation,
-            fmt::format(
-                "Invalid initializer state transition. Expected {} -> {}, but currently at {}",
-                fmt::underlying(expected),
-                fmt::underlying(next),
-                fmt::underlying(_lifecycleState)));
+            format(
+                FMT_STRING(
+                    "Invalid initializer state transition. Expected {} -> {}, but currently at {}"),
+                expected,
+                next,
+                _lifecycleState));
     _lifecycleState = next;
 }
 
@@ -174,7 +175,7 @@ void Initializer::executeInitializers(const std::vector<std::string>& args) {
             continue;  // Legacy initializer without re-initialization support.
 
         uassert(ErrorCodes::InternalError,
-                fmt::format("node has no init function: \"{}\"", nodeName),
+                format(FMT_STRING("node has no init function: \"{}\""), nodeName),
                 node->initFn);
         node->initFn(&context);
 
@@ -215,8 +216,9 @@ InitializerFunction Initializer::getInitializerFunctionForTesting(const std::str
 }
 
 unsigned extractRandomSeedFromOptions(const std::vector<std::string>& args) {
+    using namespace fmt::literals;
     const std::string targetArg{"--initializerShuffleSeed"};
-    const auto errMsg = fmt::format("Value must be specified for {}", targetArg);
+    const auto errMsg = "Value must be specified for {}"_format(targetArg);
 
     for (size_t i = 0; i < args.size(); i++) {
         StringData arg = args[i];

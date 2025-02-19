@@ -729,6 +729,7 @@ Status isDroppableCollection(OperationContext* opCtx, const NamespaceString& nss
             nss.isSystemDotJavascript() || nss.isSystemStatsCollection();
     };
 
+    using namespace fmt::literals;
     if (nss.isSystemDotProfile()) {
         if (DatabaseProfileSettings::get(opCtx->getServiceContext())
                 .getDatabaseProfileLevel(nss.dbName()) != 0)
@@ -741,14 +742,13 @@ Status isDroppableCollection(OperationContext* opCtx, const NamespaceString& nss
             if (!viewStats || viewStats->userTimeseries != 0) {
                 return Status(
                     ErrorCodes::CommandFailed,
-                    fmt::format(
-                        "cannot drop collection {} when time-series collections are present",
+                    "cannot drop collection {} when time-series collections are present"_format(
                         nss.toStringForErrorMsg()));
             }
         }
     } else if (!isDroppableSystemCollection(nss)) {
         return Status(ErrorCodes::IllegalOperation,
-                      fmt::format("cannot drop system collection {}", nss.toStringForErrorMsg()));
+                      "cannot drop system collection {}"_format(nss.toStringForErrorMsg()));
     }
 
     return Status::OK();

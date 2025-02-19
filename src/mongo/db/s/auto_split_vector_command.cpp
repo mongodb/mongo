@@ -54,6 +54,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+using namespace fmt::literals;
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 
@@ -117,10 +119,8 @@ public:
                                       MODE_IS);
                 uassert(
                     ErrorCodes::InvalidOptions,
-                    fmt::format(
-                        "The range {} for the namespace {} is required to be owned by one shard",
-                        rangeString(req.getMin(), req.getMax()),
-                        ns().toStringForErrorMsg()),
+                    "The range {} for the namespace {} is required to be owned by one shard"_format(
+                        rangeString(req.getMin(), req.getMax()), ns().toStringForErrorMsg()),
                     !collection.getShardingDescription().isSharded() ||
                         collection.getShardingFilter()->isRangeEntirelyOwned(
                             req.getMin(), req.getMax(), false /*includeMaxBound*/));

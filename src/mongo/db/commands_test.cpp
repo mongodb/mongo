@@ -79,6 +79,7 @@
 namespace mongo {
 namespace {
 
+using namespace fmt::literals;
 
 using service_context_test::RoleOverride;
 using service_context_test::ServerRoleIndex;
@@ -523,7 +524,7 @@ class TrivialNopCommand : public BasicCommand {
     }
 
     static std::string makeName() {
-        return fmt::format("trivialNopCommand_{}_{}", n, nextSerial());
+        return "trivialNopCommand_{}_{}"_format(n, nextSerial());
     }
 
 public:

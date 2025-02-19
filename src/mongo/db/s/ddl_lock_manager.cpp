@@ -62,6 +62,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+using namespace fmt::literals;
 namespace {
 
 const auto ddlLockManagerDecorator = ServiceContext::declareDecoration<DDLLockManager>();
@@ -100,12 +101,8 @@ void DDLLockManager::_lock(OperationContext* opCtx,
     Timer waitingTime;
     if (waitForRecovery) {
         tassert(9037199,
-                fmt::format(
-                    "Failed to wait for recovery on acquire DDL lock for namespace '{}' in mode {} "
-                    "with reason '{}': No recoverable object set",
-                    ns,
-                    modeName(mode),
-                    reason),
+                "Failed to wait for recovery on acquire DDL lock for namespace '{}' in mode {} with"
+                " reason '{}': No recoverable object set"_format(ns, modeName(mode), reason),
                 _recoverable);
         try {
             opCtx->runWithDeadline(
@@ -113,14 +110,11 @@ void DDLLockManager::_lock(OperationContext* opCtx,
                     _recoverable->waitForRecovery(opCtx);
                 });
         } catch (const ExceptionForCat<ErrorCategory::ExceededTimeLimitError>&) {
-            uasserted(ErrorCodes::LockTimeout,
-                      fmt::format(
-                          "Failed to acquire DDL lock for namespace '{}' in mode {} after {} with "
-                          "reason '{}' while waiting recovery of DDLCoordinatorService",
-                          ns,
-                          modeName(mode),
-                          waitingTime.elapsed().toString(),
-                          reason));
+            uasserted(
+                ErrorCodes::LockTimeout,
+                "Failed to acquire DDL lock for namespace '{}' in mode {} after {} with reason "
+                "'{}' while waiting recovery of DDLCoordinatorService"_format(
+                    ns, modeName(mode), waitingTime.elapsed().toString(), reason));
         }
     }
 

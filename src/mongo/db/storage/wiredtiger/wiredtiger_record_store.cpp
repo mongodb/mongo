@@ -93,6 +93,8 @@
 
 namespace mongo {
 
+using namespace fmt::literals;
+
 namespace {
 
 struct RecordIdAndWall {
@@ -876,8 +878,8 @@ void WiredTigerRecordStore::printRecordMetadata(const RecordId& recordId,
     // - If there is no oldest timestamp, the version cursor can only be called with a read
     //   timestamp of 1.
     Timestamp oldestTs = _kvEngine->getOldestTimestamp();
-    const std::string config = fmt::format("read_timestamp={:x},roundup_timestamps=(read=true)",
-                                           oldestTs.isNull() ? 1 : oldestTs.asULL());
+    const std::string config = "read_timestamp={:x},roundup_timestamps=(read=true)"_format(
+        oldestTs.isNull() ? 1 : oldestTs.asULL());
     WiredTigerBeginTxnBlock beginTxn(&session, config.c_str());
 
     // Open a version cursor. This is a debug cursor that enables iteration through the history of
@@ -1459,7 +1461,7 @@ void WiredTigerRecordStore::Oplog::_handleTruncateAfter(WiredTigerRecoveryUnit& 
     Timestamp truncTs(lastKeptId.getLong());
 
     auto conn = ru.getConnection()->conn();
-    auto durableTSConfigString = fmt::format("durable_timestamp={:x}", truncTs.asULL());
+    auto durableTSConfigString = "durable_timestamp={:x}"_format(truncTs.asULL());
     invariantWTOK(conn->set_timestamp(conn, durableTSConfigString.c_str()), *ru.getSession());
 
     _kvEngine->getOplogManager()->setOplogReadTimestamp(truncTs);

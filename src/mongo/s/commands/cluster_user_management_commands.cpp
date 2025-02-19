@@ -72,6 +72,7 @@ namespace mongo {
 
 using std::string;
 using std::stringstream;
+using namespace fmt::literals;
 
 namespace {
 
@@ -85,9 +86,8 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
 template <typename Request>
 void uassertEmptyReply(BSONObj obj) {
     uassert(ErrorCodes::BadValue,
-            fmt::format("Received unexpected response from {} command: {}",
-                        Request::kCommandName,
-                        tojson(obj)),
+            "Received unexpected response from {} command: {}"_format(Request::kCommandName,
+                                                                      tojson(obj)),
             (obj.nFields() == 1) && obj["ok"]);
 }
 
@@ -96,10 +96,8 @@ Reply parseUMCReply(BSONObj obj) try {
     return Reply::parse(IDLParserContext(Request::kCommandName), obj);
 } catch (const AssertionException& ex) {
     uasserted(ex.code(),
-              fmt::format("Received invalid response from {} command: {}, error: {}",
-                          Request::kCommandName,
-                          tojson(obj),
-                          ex.reason()));
+              "Received invalid response from {} command: {}, error: {}"_format(
+                  Request::kCommandName, tojson(obj), ex.reason()));
 }
 
 struct UserCacheInvalidatorNOOP {

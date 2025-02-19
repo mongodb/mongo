@@ -104,6 +104,8 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 
+using namespace fmt::literals;
+
 namespace mongo {
 
 namespace {
@@ -609,7 +611,7 @@ std::tuple<NamespaceString, BSONObj> validateStructuredEncryptionParams(JSContex
         uasserted(ErrorCodes::BadValue, str::stream() << cmdName << " requires 1 or 2 args");
     }
     uassert(ErrorCodes::BadValue,
-            fmt::format("1st param to {} has to be a string", cmdName),
+            "1st param to {} has to be a string"_format(cmdName),
             args.get(0).isString());
 
     std::string fullName = mozjs::ValueWriter(cx, args.get(0)).toString();
@@ -621,7 +623,7 @@ std::tuple<NamespaceString, BSONObj> validateStructuredEncryptionParams(JSContex
     BSONObj extra;
     if (args.length() >= 2) {
         uassert(ErrorCodes::BadValue,
-                fmt::format("2nd param to {} has to be an object", cmdName),
+                "2nd param to {} has to be an object"_format(cmdName),
                 args.get(1).isObject());
         extra = mozjs::ValueWriter(cx, args.get(1)).toBSON();
     }

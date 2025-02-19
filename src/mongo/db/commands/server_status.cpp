@@ -56,6 +56,7 @@ ServerStatusSectionRegistry::RoleTag ServerStatusSectionRegistry::getTagForRole(
 }
 
 void ServerStatusSectionRegistry::addSection(std::unique_ptr<ServerStatusSection> section) {
+    using namespace fmt::literals;
     // Disallow adding a section named "timing" as it is reserved for the server status command.
     dassert(section->getSectionName() != kTimingSection);
     MONGO_verify(!_runCalled.load());
@@ -74,15 +75,13 @@ void ServerStatusSectionRegistry::addSection(std::unique_ptr<ServerStatusSection
     for (auto&& it = lower; it != upper; ++it) {
         auto existingSectionRole = it->first.second;
         invariant(!areRolesIncompatible(existingSectionRole, roleTag),
-                  fmt::format("Duplicate ServerStatusSection Registration with name {} and role {}",
-                              name,
-                              fmt::streamed(role)));
+                  "Duplicate ServerStatusSection Registration with name {} and role {}"_format(
+                      name, role));
     }
     auto [iter, ok] = _sections.try_emplace({name, roleTag}, std::move(section));
-    invariant(ok,
-              fmt::format("Duplicate ServerStatusSection Registration with name {} and role {}",
-                          name,
-                          fmt::streamed(role)));
+    invariant(
+        ok,
+        "Duplicate ServerStatusSection Registration with name {} and role {}"_format(name, role));
 }
 
 ServerStatusSectionRegistry::SectionMap::const_iterator ServerStatusSectionRegistry::begin() {

@@ -49,6 +49,7 @@ namespace mongo {
 using std::ostringstream;
 using std::string;
 using std::unique_ptr;
+using namespace fmt::literals;
 
 #if 0
 #define MONGO_JPARSE_UTIL_DEBUG(message)                                \
@@ -679,10 +680,7 @@ BSONObj fromFuzzerJson(const char* jsonString, int* len) {
     }
 
     if (ret != Status::OK()) {
-        uasserted(
-            9180302,
-            fmt::format(
-                "code {}: {}: {}", fmt::underlying(ret.code()), ret.codeString(), ret.reason()));
+        uasserted(9180302, "code {}: {}: {}"_format(ret.code(), ret.codeString(), ret.reason()));
     }
     if (len)
         *len = jparseutil.offset();

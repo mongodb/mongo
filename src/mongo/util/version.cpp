@@ -128,7 +128,7 @@ const VersionInfoInterface& VersionInfoInterface::instance(NotEnabledAction acti
 }
 
 std::string VersionInfoInterface::makeVersionString(StringData binaryName) const {
-    return fmt::format("{} v{}", binaryName, version());
+    return format(FMT_STRING("{} v{}"), binaryName, version());
 }
 
 std::string VersionInfoInterface::openSSLVersion(StringData prefix, StringData suffix) const {
@@ -168,7 +168,7 @@ void VersionInfoInterface::logBuildInfo(std::ostream* os) const {
 }
 
 std::string formatVersionString(StringData versioned, const VersionInfoInterface& provider) {
-    return fmt::format("{} version v{}", versioned, provider.version());
+    return format(FMT_STRING("{} version v{}"), versioned, provider.version());
 }
 
 std::string mongoShellVersion(const VersionInfoInterface& provider) {

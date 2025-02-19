@@ -49,6 +49,7 @@
 #include "mongo/util/version/releases.h"
 
 namespace mongo {
+using namespace fmt::literals;
 using unittest::assertGet;
 
 void checkRoundTrip(const CollectionOptions& options) {

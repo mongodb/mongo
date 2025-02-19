@@ -32,8 +32,6 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <fmt/format.h>
-#include <fmt/ostream.h>
 #include <iosfwd>
 #include <type_traits>
 
@@ -539,7 +537,7 @@ absl::flat_hash_map<sbe::value::TypeTags, sbe::value::TypeTags> nextTypeTagsMap(
 sbe::value::TypeTags getNextType(sbe::value::TypeTags tag) {
     auto it = kNextTypeTagsMap.find(tag);
     tassert(9619600,
-            fmt::format("Type {} does not have a next type", fmt::streamed(tag)),
+            fmt::format("Type {} does not have a next type", tag),
             it != kNextTypeTagsMap.end());
     return it->second;
 }

@@ -75,7 +75,8 @@ void logProcessDetails(std::ostream* os) {
                       .obj();
     vii.logBuildInfo(os);
     if (os) {
-        *os << fmt::format("Operating System: {}", tojson(osInfo, ExtendedRelaxedV2_0_0, true))
+        *os << format(FMT_STRING("Operating System: {}"),
+                      tojson(osInfo, ExtendedRelaxedV2_0_0, true))
             << std::endl;
     } else {
         LOGV2(51765, "Operating System", "os"_attr = osInfo);

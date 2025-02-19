@@ -91,6 +91,8 @@
 namespace mongo {
 namespace {
 
+using namespace fmt::literals;
+
 /**
  * This test fixture does not create any resharding POSs and should be preferred to
  * `ReshardingDonorRecipientCommonTest` when they are not required.

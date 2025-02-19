@@ -81,6 +81,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
 namespace mongo {
+using namespace fmt::literals;
 const char* TimeseriesModifyStage::kStageType = "TS_MODIFY";
 
 TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
@@ -200,7 +201,7 @@ const std::vector<std::unique_ptr<FieldRef>>& TimeseriesModifyStage::_getUserLev
             _immutablePaths.emplace_back(std::make_unique<FieldRef>(timeField));
         } else {
             tasserted(7687100,
-                      fmt::format("Unexpected shard key field: {}", shardKeyField->dottedField()));
+                      "Unexpected shard key field: {}"_format(shardKeyField->dottedField()));
         }
     }
 
@@ -280,6 +281,7 @@ std::vector<BSONObj> TimeseriesModifyStage::_applyUpdate(
 
 void TimeseriesModifyStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
     const ScopedCollectionDescription& collDesc, const FieldRefSet& shardKeyPaths) {
+    using namespace fmt::literals;
     // We do not allow modifying either the current shard key value or new shard key value (if
     // resharding) without specifying the full current shard key in the query.
     // If the query is a simple equality match on _id, then '_params.canonicalQuery' will be null.
@@ -322,11 +324,9 @@ void TimeseriesModifyStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
     } else {
         FieldRefSet userLevelShardKeyPaths(_getUserLevelShardKeyPaths(collDesc));
         uassert(7717803,
-                fmt::format(
-                    "Shard key update is not allowed without specifying the full shard key in the "
-                    "query: pred = {}, shardKeyPaths = {}",
-                    _originalPredicate->serialize().toString(),
-                    userLevelShardKeyPaths.toString()),
+                "Shard key update is not allowed without specifying the full shard key in the "
+                "query: pred = {}, shardKeyPaths = {}"_format(
+                    _originalPredicate->serialize().toString(), userLevelShardKeyPaths.toString()),
                 (_originalPredicate &&
                  pathsupport::extractFullEqualityMatches(
                      *_originalPredicate, userLevelShardKeyPaths, &equalities)
@@ -353,6 +353,7 @@ void TimeseriesModifyStage::_checkUpdateChangesExistingShardKey(const BSONObj& n
                                                                 const BSONObj& oldBucket,
                                                                 const BSONObj& newMeasurement,
                                                                 const BSONObj& oldMeasurement) {
+    using namespace fmt::literals;
     const auto& collDesc = collectionAcquisition().getShardingDescription();
     const auto& shardKeyPattern = collDesc.getShardKeyPattern();
 
@@ -402,6 +403,7 @@ void TimeseriesModifyStage::_checkUpdateChangesReshardingKey(
     const BSONObj& oldBucket,
     const BSONObj& newMeasurement,
     const BSONObj& oldMeasurement) {
+    using namespace fmt::literals;
     const auto& collDesc = collectionAcquisition().getShardingDescription();
 
     auto reshardingKeyPattern = collDesc.getReshardingKeyIfShouldForwardOps();
@@ -805,7 +807,7 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
 void TimeseriesModifyStage::doRestoreStateRequiresCollection() {
     const NamespaceString& ns = collectionPtr()->ns();
     uassert(ErrorCodes::PrimarySteppedDown,
-            fmt::format("Demoted from primary while removing from {}", ns.toStringForErrorMsg()),
+            "Demoted from primary while removing from {}"_format(ns.toStringForErrorMsg()),
             !opCtx()->writesAreReplicated() ||
                 repl::ReplicationCoordinator::get(opCtx())->canAcceptWritesFor(opCtx(), ns));
 

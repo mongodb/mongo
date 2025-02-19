@@ -890,7 +890,8 @@ private:
     struct ThisRec : ScopedDebugInfoStack::Rec {
         explicit ThisRec(const ScopedDebugInfo* owner) : owner(owner) {}
         std::string toString() const override {
-            return fmt::format("{}: {}", owner->label, owner->v);
+            using namespace fmt::literals;
+            return "{}: {}"_format(owner->label, owner->v);
         }
         StringData label() const override {
             return owner->label;

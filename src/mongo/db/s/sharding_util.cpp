@@ -77,6 +77,8 @@ namespace mongo {
 
 namespace sharding_util {
 
+using namespace fmt::literals;
+
 const auto kLogRetryAttemptThreshold = 20;
 
 void tellShardsToRefreshCollection(OperationContext* opCtx,
@@ -137,10 +139,8 @@ std::vector<AsyncRequestsSender::Response> processShardResponses(
             auto response = ars.next();
 
             if (throwOnError) {
-                auto errorContext = fmt::format("Failed command {} for database '{}' on shard '{}'",
-                                                command.toString(),
-                                                dbName.toStringForErrorMsg(),
-                                                StringData{response.shardId});
+                auto errorContext = "Failed command {} for database '{}' on shard '{}'"_format(
+                    command.toString(), dbName.toStringForErrorMsg(), StringData{response.shardId});
 
                 uassertStatusOKWithContext(response.swResponse.getStatus(), errorContext);
                 const auto& respBody = response.swResponse.getValue().data;
@@ -326,7 +326,7 @@ void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
     StringData taskDescription,
     std::function<void(OperationContext*)> doWork,
     boost::optional<Backoff> backoff) {
-    const std::string newClientName = fmt::format("{}-{}", getThreadName(), taskDescription);
+    const std::string newClientName = "{}-{}"_format(getThreadName(), taskDescription);
     const auto initialTerm = repl::ReplicationCoordinator::get(opCtx)->getTerm();
 
     for (int attempt = 1;; attempt++) {
@@ -339,14 +339,14 @@ void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
 
         // If the node is no longer primary, stop retrying.
         uassert(ErrorCodes::InterruptedDueToReplStateChange,
-                fmt::format("Stepped down while {}", taskDescription),
+                "Stepped down while {}"_format(taskDescription),
                 repl::ReplicationCoordinator::get(opCtx)->getMemberState() ==
                     repl::MemberState::RS_PRIMARY);
 
         // If the term changed, that means that the step up recovery could have run or is
         // running so stop retrying in order to avoid duplicate work.
         uassert(ErrorCodes::InterruptedDueToReplStateChange,
-                fmt::format("Term changed while {}", taskDescription),
+                "Term changed while {}"_format(taskDescription),
                 initialTerm == repl::ReplicationCoordinator::get(opCtx)->getTerm());
 
         try {
@@ -407,11 +407,12 @@ ShardId selectLeastLoadedNonDrainingShard(OperationContext* opCtx) {
     auto candidateShardId = shardIds.front();
     auto candidateSize = std::numeric_limits<long long>::max();
 
+    using namespace fmt::literals;
     for (auto&& response : responsesFromShards) {
         const auto& shardId = response.shardId;
 
         auto errorContext =
-            fmt::format("Failed to get the list of databases from shard '{}'", shardId.toString());
+            "Failed to get the list of databases from shard '{}'"_format(shardId.toString());
         const auto responseValue =
             uassertStatusOKWithContext(std::move(response.swResponse), errorContext);
         const ListDatabasesReply reply =

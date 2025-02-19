@@ -263,21 +263,22 @@ Status setupBaseOptions(const std::vector<std::string>& args) {
 namespace server_options_detail {
 StatusWith<BSONObj> applySetParameterOptions(const std::map<std::string, std::string>& toApply,
                                              ServerParameterSet& parameterSet) {
+    using namespace fmt::literals;
     BSONObjBuilder summaryBuilder;
     for (const auto& [name, value] : toApply) {
         auto sp = parameterSet.getIfExists(name);
         if (!sp)
             return Status(ErrorCodes::BadValue,
-                          fmt::format("Illegal --setParameter parameter: \"{}\"", name));
+                          "Illegal --setParameter parameter: \"{}\""_format(name));
         if (!sp->allowedToChangeAtStartup())
             return Status(ErrorCodes::BadValue,
-                          fmt::format("Cannot use --setParameter to set \"{}\" at startup", name));
+                          "Cannot use --setParameter to set \"{}\" at startup"_format(name));
         BSONObjBuilder sub(summaryBuilder.subobjStart(name));
         sp->append(nullptr, &sub, "default", boost::none);
         Status status = sp->setFromString(value, boost::none);
         if (!status.isOK())
             return Status(ErrorCodes::BadValue,
-                          fmt::format("Bad value for parameter \"{}\": {}", name, status.reason()));
+                          "Bad value for parameter \"{}\": {}"_format(name, status.reason()));
         sp->append(nullptr, &sub, "value", boost::none);
     }
     return summaryBuilder.obj();

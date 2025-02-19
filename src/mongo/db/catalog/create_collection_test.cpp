@@ -521,6 +521,7 @@ TEST_F(CreateVirtualCollectionTest, VirtualCollectionOptionsWithMultiSource) {
 }
 
 TEST_F(CreateVirtualCollectionTest, InvalidVirtualCollectionOptions) {
+    using namespace fmt::literals;
 
     NamespaceString vcollNss = NamespaceString::createNamespaceString_forTest("myDb", "vcoll.name");
     auto opCtx = makeOpCtx();
@@ -539,7 +540,7 @@ TEST_F(CreateVirtualCollectionTest, InvalidVirtualCollectionOptions) {
         }
 
         ASSERT_TRUE(exceptionOccurred)
-            << fmt::format("Invalid 'url': {} must fail but succeeded", kInvalidUrl);
+            << "Invalid 'url': {} must fail but succeeded"_format(kInvalidUrl);
     }
 
     {
@@ -554,8 +555,8 @@ TEST_F(CreateVirtualCollectionTest, InvalidVirtualCollectionOptions) {
         }
 
         ASSERT_TRUE(exceptionOccurred)
-            << fmt::format("Unknown 'storageType': {} must fail but succeeded",
-                           stdx::to_underlying(kInvalidStorageTypeEnum));
+            << "Unknown 'storageType': {} must fail but succeeded"_format(
+                   stdx::to_underlying(kInvalidStorageTypeEnum));
     }
 
     {
@@ -569,9 +570,8 @@ TEST_F(CreateVirtualCollectionTest, InvalidVirtualCollectionOptions) {
             exceptionOccurred = true;
         }
 
-        ASSERT_TRUE(exceptionOccurred)
-            << fmt::format("Unknown 'fileType': {} must fail but succeeded",
-                           stdx::to_underlying(kInvalidFileTypeEnum));
+        ASSERT_TRUE(exceptionOccurred) << "Unknown 'fileType': {} must fail but succeeded"_format(
+            stdx::to_underlying(kInvalidFileTypeEnum));
     }
 }
 }  // namespace

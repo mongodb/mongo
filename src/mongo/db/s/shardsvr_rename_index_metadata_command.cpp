@@ -115,8 +115,8 @@ public:
 
             const auto txnParticipant = TransactionParticipant::get(opCtx);
             uassert(7079501,
-                    fmt::format("{} must be run as a retryable write",
-                                Request::kCommandName.toString()),
+                    format(FMT_STRING("{} must be run as a retryable write"),
+                           Request::kCommandName.toString()),
                     txnParticipant);
 
             RenameIndexCatalogOperationEnum renameOp = RenameIndexCatalogOperationEnum::kNoop;
@@ -125,9 +125,9 @@ public:
                 auto scopedCsr =
                     CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, ns());
                 uassert(7079502,
-                        fmt::format("The critical section for collection {} must be taken in "
-                                    "order to execute this command",
-                                    ns().toStringForErrorMsg()),
+                        format(FMT_STRING("The critical section for collection {} must be taken in "
+                                          "order to execute this command"),
+                               ns().toStringForErrorMsg()),
                         scopedCsr->getCriticalSectionSignal(
                             opCtx, ShardingMigrationCriticalSection::kWrite));
                 if (scopedCsr->getIndexesInCritSec(opCtx)) {
@@ -142,9 +142,9 @@ public:
                     CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(
                         opCtx, request().getToNss());
                 uassert(7079503,
-                        fmt::format("The critical section for collection {} must be taken in "
-                                    "order to execute this command",
-                                    ns().toStringForErrorMsg()),
+                        format(FMT_STRING("The critical section for collection {} must be taken in "
+                                          "order to execute this command"),
+                               ns().toStringForErrorMsg()),
                         scopedToCsr->getCriticalSectionSignal(
                             opCtx, ShardingMigrationCriticalSection::kWrite));
                 const auto& indexMetadata = scopedToCsr->getIndexesInCritSec(opCtx);

@@ -40,6 +40,7 @@
 #include "mongo/util/errno_util.h"
 
 namespace mongo {
+using namespace fmt::literals;
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -59,8 +60,8 @@ NamedPipeOutput::NamedPipeOutput(const std::string&,
                              nullptr)),  // lpSecurityAttributes
       _isOpen(false) {
     uassert(7005006,
-            fmt::format("Failed to create a named pipe, error: {}",
-                        getLastSystemErrorMessageFormatted("CreateNamedPipe", _pipeAbsolutePath)),
+            "Failed to create a named pipe, error: {}"_format(
+                getLastSystemErrorMessageFormatted("CreateNamedPipe", _pipeAbsolutePath)),
             _pipe != INVALID_HANDLE_VALUE);
 }
 
@@ -99,8 +100,8 @@ int NamedPipeOutput::write(const char* data, int size) {
 
     if (!succeeded || size != nWritten) {
         uasserted(7239301,
-                  fmt::format("Failed to write to a named pipe, error: {}",
-                              getLastSystemErrorMessageFormatted("write", _pipeAbsolutePath)));
+                  "Failed to write to a named pipe, error: {}"_format(
+                      getLastSystemErrorMessageFormatted("write", _pipeAbsolutePath)));
         return -1;
     }
 
@@ -129,7 +130,7 @@ NamedPipeInput::NamedPipeInput(const std::string& pipeRelativePath)
       _isGood(false),
       _isEof(false) {
     uassert(7001101,
-            fmt::format("Pipe path must not include '..' but {} does", _pipeAbsolutePath),
+            "Pipe path must not include '..' but {} does"_format(_pipeAbsolutePath),
             _pipeAbsolutePath.find("..") == std::string::npos);
 }
 

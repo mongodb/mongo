@@ -45,6 +45,7 @@
 namespace mongo::str {
 namespace {
 
+using namespace fmt::literals;
 using std::string;
 
 TEST(StringUtilsTest, Simple1) {
@@ -305,7 +306,7 @@ TEST(StringUtilsTest, GetCodePointLength) {
             continue;  // Avoid the invariant on 0b10xx'xxxx continuation bytes.
         if (n == 0)
             n = 1;  // 7-bit single byte code point.
-        ASSERT_EQUALS(getCodePointLength(static_cast<char>(i)), n) << fmt::format(" i:0x{:02x}", i);
+        ASSERT_EQUALS(getCodePointLength(static_cast<char>(i)), n) << " i:0x{:02x}"_format(i);
     }
 }
 

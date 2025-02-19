@@ -49,10 +49,11 @@ inline StringMap<std::string> clusterCommandTranslations = {
     {"update", "clusterUpdate"}};
 
 inline BSONObj replaceCommandNameWithClusterCommandName(BSONObj cmdObj) {
+    using namespace fmt::literals;
     auto cmdName = cmdObj.firstElement().fieldNameStringData();
     auto newNameIt = clusterCommandTranslations.find(cmdName);
     uassert(6349501,
-            fmt::format("Cannot use unsupported command {} with cluster transaction API", cmdName),
+            "Cannot use unsupported command {} with cluster transaction API"_format(cmdName),
             newNameIt != clusterCommandTranslations.end());
 
     return cmdObj.replaceFieldNames(BSON(newNameIt->second << 1));

@@ -55,6 +55,8 @@
 namespace mongo::transport {
 
 namespace {
+using namespace fmt::literals;
+
 void* runFunc(void* ctx) {
     auto taskPtr =
         std::unique_ptr<unique_function<void()>>(static_cast<unique_function<void()>*>(ctx));
@@ -145,7 +147,7 @@ Status launchServiceWorkerThread(unique_function<void()> task) {
     } catch (const std::exception& e) {
         LOGV2_ERROR(22948, "Thread creation failed", "error"_attr = e.what());
         return {ErrorCodes::InternalError,
-                fmt::format("Failed to create service entry worker thread: {}", e.what())};
+                format(FMT_STRING("Failed to create service entry worker thread: {}"), e.what())};
     }
 
     return Status::OK();

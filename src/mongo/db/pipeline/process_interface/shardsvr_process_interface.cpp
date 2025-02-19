@@ -85,6 +85,8 @@
 
 namespace mongo {
 
+using namespace fmt::literals;
+
 namespace {
 
 // Writes to the local shard. It shall only be used to write to collections that are always
@@ -483,8 +485,8 @@ void ShardServerProcessInterface::createIndexesOnEmptyCollection(
     sharding::router::CollectionRouter router(opCtx->getServiceContext(), ns);
     router.route(
         opCtx,
-        fmt::format("copying index for empty collection {}",
-                    NamespaceStringUtil::serialize(ns, SerializationContext::stateDefault())),
+        "copying index for empty collection {}"_format(
+            NamespaceStringUtil::serialize(ns, SerializationContext::stateDefault())),
         [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
             BSONObjBuilder cmdBuilder;
             cmdBuilder.append("createIndexes", ns.coll());

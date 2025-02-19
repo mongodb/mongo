@@ -113,11 +113,12 @@ public:
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const final {
-            return {{level == repl::ReadConcernLevel::kLinearizableReadConcern,
-                     {ErrorCodes::InvalidOptions,
-                      fmt::format("{} cannot be used with a 'linearizable' read concern level",
-                                  kStageName)}},
-                    Status::OK()};
+            using namespace fmt::literals;
+            return {
+                {level == repl::ReadConcernLevel::kLinearizableReadConcern,
+                 {ErrorCodes::InvalidOptions,
+                  "{} cannot be used with a 'linearizable' read concern level"_format(kStageName)}},
+                Status::OK()};
         }
 
         bool isWriteStage() const override {

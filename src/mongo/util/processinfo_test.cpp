@@ -112,12 +112,13 @@ TEST(ProcessInfo, TestSysInfo) {
         }
         return std::string();
     };
-    auto filename = fmt::format("/proc/{}/cgroup", ProcessId::getCurrent().asUInt32());
+    using namespace fmt::literals;
+    auto filename = "/proc/{}/cgroup"_format(ProcessId::getCurrent().asUInt32());
     auto cgroupInfo = getFirstLine(filename);
     const std::string v2Prefix = "0::";
     if (!cgroupInfo.empty() && cgroupInfo.rfind(v2Prefix, 0) == 0) {
         // cgroup v2
-        std::string path = fmt::format("/sys/fs/cgroup{}", cgroupInfo.substr(v2Prefix.length()));
+        std::string path = "/sys/fs/cgroup{}"_format(cgroupInfo.substr(v2Prefix.length()));
         std::vector<std::pair<std::string, std::string>> fileNameAndKeys = {
             {"cpu.max", "cpuMax"},
             {"cpu.max.burst", "cpuMaxBurst"},
@@ -126,7 +127,7 @@ TEST(ProcessInfo, TestSysInfo) {
             {"cpu.weight", "cpuWeight"}};
         for (const auto& item : fileNameAndKeys) {
             ASSERT_KEY(item.second);
-            auto str = getFirstLine(fmt::format("{}/{}", path, item.first));
+            auto str = getFirstLine("{}/{}"_format(path, item.first));
             if (!str.empty()) {
                 ASSERT_EQ(obj.getStringField(item.second), str);
             } else {
@@ -245,6 +246,8 @@ TEST(ProcessInfo, ReadTransparentHugePagesParameterValidFormat) {
 
 #if defined(__linux__) && defined(MONGO_CONFIG_GLIBC_RSEQ)
 TEST(ProcessInfo, GLIBCRseqTunable) {
+    using namespace fmt::literals;
+
     std::string glibcOriginalEnv("");
     if (auto res = getenv(ProcessInfo::kGlibcTunableEnvVar); res != nullptr) {
         glibcOriginalEnv = std::string(res);
@@ -253,7 +256,7 @@ TEST(ProcessInfo, GLIBCRseqTunable) {
     ON_BLOCK_EXIT([&]() { setenv(ProcessInfo::kGlibcTunableEnvVar, glibcOriginalEnv.c_str(), 1); });
 
     auto checkRseqSetting = [&](const char* settingName, const char* setting, bool expectOK) {
-        auto setting1 = fmt::format("{}={}", settingName, setting);
+        auto setting1 = "{}={}"_format(settingName, setting);
         setenv(ProcessInfo::kGlibcTunableEnvVar, setting1.c_str(), 1);
         auto res = ProcessInfo::checkGlibcRseqTunable();
         if (expectOK) {

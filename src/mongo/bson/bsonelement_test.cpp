@@ -46,6 +46,7 @@
 namespace mongo {
 namespace {
 
+using namespace fmt::literals;
 
 TEST(BSONElement, BinDataToString) {
     BSONObjBuilder builder;
@@ -98,7 +99,7 @@ std::string vecStr(std::vector<uint8_t> v) {
     std::string r = "[";
     StringData sep;
     for (const uint8_t& b : v) {
-        r += fmt::format("{}{:02x}", sep, (unsigned)b);
+        r += "{}{:02x}"_format(sep, (unsigned)b);
         sep = ","_sd;
     }
     r += "]";

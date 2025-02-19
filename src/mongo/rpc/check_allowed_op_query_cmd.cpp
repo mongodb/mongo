@@ -39,6 +39,8 @@
 
 namespace mongo {
 
+using namespace fmt::literals;
+
 void checkAllowedOpQueryCommand(Client& client, StringData cmd) {
     static constexpr std::array allowed{
         "hello"_sd,
@@ -61,11 +63,11 @@ void checkAllowedOpQueryCommand(Client& client, StringData cmd) {
          temporarilyAllowed.end());
 
     if (!isAllowed && !isTemporarilyAllowed) {
-        uasserted(ErrorCodes::UnsupportedOpQueryCommand,
-                  fmt::format(
-                      "Unsupported OP_QUERY command: {}. The client driver may require an upgrade. "
-                      "For more details see https://dochub.mongodb.org/core/legacy-opcode-removal",
-                      cmd));
+        uasserted(
+            ErrorCodes::UnsupportedOpQueryCommand,
+            "Unsupported OP_QUERY command: {}. The client driver may require an upgrade. "
+            "For more details see https://dochub.mongodb.org/core/legacy-opcode-removal"_format(
+                cmd));
     }
 
     if (isTemporarilyAllowed) {

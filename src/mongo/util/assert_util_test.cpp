@@ -72,7 +72,7 @@ struct MemberCallFormatter {
     constexpr auto parse(auto& ctx) {
         return ctx.begin();
     }
-    auto format(const auto& obj, auto& ctx) const {
+    auto format(const auto& obj, auto& ctx) {
         return obj.format(ctx);
     }
 };

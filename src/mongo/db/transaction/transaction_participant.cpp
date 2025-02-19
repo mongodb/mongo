@@ -133,6 +133,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
+using namespace fmt::literals;
 namespace {
 
 // Failpoint which will pause an operation just after allocating a point-in-time storage engine
@@ -626,7 +627,7 @@ void TransactionParticipant::performNoopWrite(OperationContext* opCtx, StringDat
     {
         AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
         uassert(ErrorCodes::NotWritablePrimary,
-                fmt::format("Not primary when performing noop write for {}", msg),
+                "Not primary when performing noop write for {}"_format(msg),
                 replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin));
 
         writeConflictRetry(
@@ -1256,9 +1257,8 @@ void TransactionParticipant::Participant::_setReadSnapshot(
         const auto readTimestamp = readConcernArgs.getArgsAtClusterTime()->asTimestamp();
         const auto ruTs = shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
         invariant(readTimestamp == ruTs,
-                  fmt::format("readTimestamp: {}, pointInTime: {}",
-                              readTimestamp.toString(),
-                              ruTs ? ruTs->toString() : "none"));
+                  "readTimestamp: {}, pointInTime: {}"_format(readTimestamp.toString(),
+                                                              ruTs ? ruTs->toString() : "none"));
 
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).transactionMetricsObserver.onChooseReadTimestamp(readTimestamp);

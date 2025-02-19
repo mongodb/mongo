@@ -335,7 +335,8 @@ public:
         char fieldNameStorage[fieldNameSize];
 
         auto formatFieldName = [&](char pre, size_t idx) {
-            const char* fieldNameStorageEnd = fmt::format_to(fieldNameStorage, "{}{}", pre, idx);
+            const char* fieldNameStorageEnd =
+                fmt::format_to(fieldNameStorage, FMT_STRING("{}{}"), pre, idx);
             return StringData(fieldNameStorage, fieldNameStorageEnd - fieldNameStorage);
         };
 

@@ -83,9 +83,10 @@ public:
     }
 
     void onRemove(const K& k, const V& v) {
+        using namespace fmt::literals;
         size_t budget = _estimator(k, v);
         tassert(5968300,
-                fmt::format("LRU budget underflow: current={}, budget={} ", _current, budget),
+                "LRU budget underflow: current={}, budget={} "_format(_current, budget),
                 _current >= budget);
         _current -= budget;
         _listener.onEvict(k, v, budget);

@@ -83,6 +83,7 @@ namespace {
 using std::string;
 using std::vector;
 using unittest::assertGet;
+using namespace fmt::literals;
 
 const KeyPattern kKeyPattern(BSON("_id" << 1));
 
@@ -150,8 +151,7 @@ protected:
 
     void setupManyDatabases(int startIndex, int endIndex, const ShardId& primaryShard) {
         for (int i = startIndex; i <= endIndex; i++) {
-            auto databaseName =
-                fmt::format("testDB_1234567890123456789012345678901234567890_{}", i);
+            auto databaseName = "testDB_1234567890123456789012345678901234567890_{}"_format(i);
             setupDatabase(DatabaseName::createDatabaseName_forTest(boost::none, databaseName),
                           primaryShard);
         }

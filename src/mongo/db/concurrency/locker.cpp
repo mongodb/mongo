@@ -341,7 +341,7 @@ void Locker::reacquireTicket(OperationContext* opCtx) {
             uassert(ErrorCodes::LockTimeout,
                     fmt::format("Unable to acquire ticket with mode '{}' due to detected lock "
                                 "conflict for resource {}",
-                                fmt::underlying(_modeForTicket),
+                                _modeForTicket,
                                 it.key().toString()),
                     !_lockManager->hasConflictingRequests(it.key(), it.objAddr()));
         }

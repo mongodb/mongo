@@ -891,13 +891,13 @@ void BenchRunState::onWorkerFinished() {
 
 namespace {
 void doAuth(DBClientBase& conn, StringData username, StringData password) {
+    using namespace fmt::literals;
     try {
         conn.auth(DatabaseName::kAdmin, username, password);
     } catch (DBException& e) {
         e.addContext(
-            fmt::format("User {} could not authenticate to admin db, dbmin db access is required "
-                        "to use benchRun with auth enabled",
-                        username));
+            "User {} could not authenticate to admin db, dbmin db access is required to use benchRun with auth enabled"_format(
+                username));
         throw;
     }
 }

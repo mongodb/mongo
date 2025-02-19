@@ -204,6 +204,7 @@ private:
                  bool upsert,
                  const WriteConcernOptions& writeConcern =
                      WriteConcerns::kMajorityWriteConcernShardingTimeout) {
+        using namespace fmt::literals;
         DBDirectClient dbClient(opCtx);
 
         auto commandResponse = write_ops::checkWriteErrors(dbClient.update([&] {
@@ -217,9 +218,8 @@ private:
         }()));
 
         uassert(ErrorCodes::NoMatchingDocument,
-                fmt::format("No matching document found for query {} on namespace {}",
-                            filter.toString(),
-                            _storageNss.toStringForErrorMsg()),
+                "No matching document found for query {} on namespace {}"_format(
+                    filter.toString(), _storageNss.toStringForErrorMsg()),
                 upsert || commandResponse.getN() > 0);
 
         WriteConcernResult ignoreResult;

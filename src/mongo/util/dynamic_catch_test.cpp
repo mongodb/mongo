@@ -52,6 +52,8 @@
 namespace mongo {
 namespace {
 
+using namespace fmt::literals;
+
 struct TestForeignRootException {
     explicit TestForeignRootException(std::string what) : _what{std::move(what)} {}
     const char* what() const noexcept {
@@ -162,7 +164,7 @@ TEST_F(DynamicCatchTest, RealisticScenarios) {
 TEST_F(DynamicCatchTest, NoExtraArgs) {
     DynamicCatch<> dc;
     std::string capture = ">";
-    dc.addCatch<SomeException>([&](const auto& ex) { capture += fmt::format("({})", ex.msg); });
+    dc.addCatch<SomeException>([&](const auto& ex) { capture += "({})"_format(ex.msg); });
     try {
         throw SomeException{"oops"};
     } catch (const SomeException&) {
@@ -176,7 +178,7 @@ TEST_F(DynamicCatchTest, MultipleArgs) {
     DynamicCatch<std::vector<std::string>&, const std::string&> dc;
     dc.addCatch<SomeException>(
         [](const auto& ex, std::vector<std::string>& vec, const std::string& id) {
-            vec.push_back(fmt::format("{{{}:{}}}", id, ex.msg));
+            vec.push_back("{{{}:{}}}"_format(id, ex.msg));
         });
     try {
         throw SomeException{"oops"};
@@ -184,7 +186,7 @@ TEST_F(DynamicCatchTest, MultipleArgs) {
         dc.doCatch(events, "here");
         dc.doCatch(events, "andHere");
     }
-    ASSERT_EQ(fmt::format("[{}]", fmt::join(events, ",")), "[{here:oops},{andHere:oops}]");
+    ASSERT_EQ("[{}]"_format(fmt::join(events, ",")), "[{here:oops},{andHere:oops}]");
 }
 
 DEATH_TEST_REGEX(DynamicCatchDeath,

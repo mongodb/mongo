@@ -71,6 +71,7 @@
 
 namespace mongo {
 namespace {
+using namespace fmt::literals;
 
 class PipeWaiter {
 public:
@@ -142,7 +143,7 @@ protected:
         BSONObj res = runCommand(originalAggCommand.addFields(BSON("explain" << true)));
         // Sanity checks of result.
         ASSERT_EQ(res["ok"].Number(), 1.0)
-            << fmt::format("Expected to succeed but failed. result = {}", res.toString());
+            << "Expected to succeed but failed. result = {}"_format(res.toString());
     }
 
     PseudoRandom _random{SecureRandom{}.nextInt64()};

@@ -47,6 +47,7 @@
 namespace mongo {
 namespace {
 
+using namespace fmt::literals;
 
 TEST(Construction, Empty) {
     StringData strData;
@@ -191,7 +192,7 @@ TEST(Find, Char1) {
                 auto withStdString = s.find(ch, pos);
                 auto withStringData = StringData{s}.find(ch, pos);
                 ASSERT_EQUALS(withStdString, withStringData)
-                    << fmt::format(R"(s:'{}', ch:'{}', pos:{})", s, StringData{&ch, 1}, pos);
+                    << format(FMT_STRING(R"(s:'{}', ch:'{}', pos:{})"), s, StringData{&ch, 1}, pos);
             }
         }
     }
@@ -223,7 +224,7 @@ TEST(Find, Str1) {
                 auto withStdString = s.find(sub, pos);
                 auto withStringData = StringData{s}.find(StringData{sub}, pos);
                 ASSERT_EQUALS(withStdString, withStringData)
-                    << fmt::format(R"(s:'{}', sub:'{}', pos:{})", s, sub, pos);
+                    << format(FMT_STRING(R"(s:'{}', sub:'{}', pos:{})"), s, sub, pos);
             }
         }
     }
@@ -250,12 +251,12 @@ TEST(Hasher, Str1) {
     };
     if constexpr (sizeofSizeT == 4) {
         for (auto&& s : specs)
-            ASSERT_EQUALS(tryHash(s.str), s.h4) << fmt::format("str={}", s.str);
+            ASSERT_EQUALS(tryHash(s.str), s.h4) << "str={}"_format(s.str);
     } else if constexpr (sizeofSizeT == 8) {
         for (auto&& s : specs)
-            ASSERT_EQUALS(tryHash(s.str), s.h8) << fmt::format("str={}", s.str);
+            ASSERT_EQUALS(tryHash(s.str), s.h8) << "str={}"_format(s.str);
     } else {
-        FAIL("sizeT weird size") << fmt::format("sizeof(size_t) == {}", sizeofSizeT);
+        FAIL("sizeT weird size") << " sizeof(size_t) == {}"_format(sizeofSizeT);
     }
 }
 
@@ -284,7 +285,7 @@ TEST(Rfind, Char1) {
                 auto withStdString = s.rfind(ch, pos);
                 auto withStringData = StringData{s}.rfind(ch, pos);
                 ASSERT_EQUALS(withStdString, withStringData)
-                    << fmt::format(R"(s:'{}', ch:'{}', pos:{})", s, StringData{&ch, 1}, pos);
+                    << format(FMT_STRING(R"(s:'{}', ch:'{}', pos:{})"), s, StringData{&ch, 1}, pos);
             };
             // Try all possibly-relevent `pos` arguments.
             for (size_t pos = 0; pos < s.size() + 2; ++pos)
@@ -420,8 +421,9 @@ TEST(ConstIterator, StdReplaceCopy) {
 }
 
 TEST(StringDataFmt, Fmt) {
+    using namespace fmt::literals;
     ASSERT_EQUALS(fmt::format("-{}-", "abc"_sd), "-abc-");
-    ASSERT_EQUALS(fmt::format("-{}-", "abc"_sd), "-abc-");
+    ASSERT_EQUALS("-{}-"_format("abc"_sd), "-abc-");
 }
 
 TEST(Ostream, StringDataMatchesStdString) {

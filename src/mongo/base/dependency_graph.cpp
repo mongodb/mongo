@@ -67,6 +67,7 @@ void DependencyGraph::addNode(std::string name,
 
 namespace {
 
+using namespace fmt::literals;
 
 template <typename Seq>
 void strAppendJoin(std::string& out, StringData separator, const Seq& sequence) {
@@ -87,7 +88,7 @@ void throwGraphContainsCycle(Iter first, Iter last, std::vector<std::string>* cy
         *cycle = names;
     names.push_back((*first)->name());
     uasserted(ErrorCodes::GraphContainsCycle,
-              fmt::format("Cycle in dependency graph: {}", fmt::join(names, " -> ")));
+              format(FMT_STRING("Cycle in dependency graph: {}"), fmt::join(names, " -> ")));
 }
 
 }  // namespace
@@ -122,7 +123,7 @@ std::vector<std::string> DependencyGraph::topSort(unsigned randomSeed,
     elementsStore.reserve(_nodes.size());
     for (auto iter = _nodes.begin(); iter != _nodes.end(); ++iter) {
         uassert(ErrorCodes::BadValue,
-                fmt::format("node {} was mentioned but never added", iter->first),
+                "node {} was mentioned but never added"_format(iter->first),
                 iter->second.payload);
         elementsStore.push_back(Element{iter});
     }
@@ -140,9 +141,8 @@ std::vector<std::string> DependencyGraph::topSort(unsigned randomSeed,
                            [&](StringData childName) {
                                auto iter = byName.find(childName);
                                uassert(ErrorCodes::BadValue,
-                                       fmt::format("node {} depends on missing node {}",
-                                                   element.nodeIter->first,
-                                                   childName),
+                                       "node {} depends on missing node {}"_format(
+                                           element.nodeIter->first, childName),
                                        iter != byName.end());
                                return iter->second;
                            });

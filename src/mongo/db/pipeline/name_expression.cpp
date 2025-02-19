@@ -54,9 +54,10 @@ std::string NameExpression::evaluate(ExpressionContext* expCtx, const Document& 
     }
     invariant(_expr);
 
+    using namespace fmt::literals;
     auto value = _expr->evaluate(doc, &expCtx->variables);
     uassert(8117101,
-            fmt::format("Expected string, but got {}", typeName(value.getType())),
+            "Expected string, but got {}"_format(typeName(value.getType())),
             value.getType() == BSONType::String);
 
     return value.getStringData().toString();

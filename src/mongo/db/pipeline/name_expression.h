@@ -99,8 +99,8 @@ public:
      * Returns the string literal if the name expression is a string literal.
      */
     std::string getLiteral() const {
-        tassert(
-            8117103, fmt::format("Non string literal name expression: {}", toString()), _isLiteral);
+        using namespace fmt::literals;
+        tassert(8117103, "Non string literal name expression: {}"_format(toString()), _isLiteral);
         return _name.getElement().str();
     }
 

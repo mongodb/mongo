@@ -198,6 +198,7 @@ const SpecificStats* UnionStage::getSpecificStats() const {
 }
 
 std::vector<DebugPrinter::Block> UnionStage::debugPrint() const {
+    using namespace fmt::literals;
     auto ret = PlanStage::debugPrint();
 
     ret.emplace_back(DebugPrinter::Block("[`"));
@@ -211,7 +212,7 @@ std::vector<DebugPrinter::Block> UnionStage::debugPrint() const {
 
     ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
     for (size_t childNum = 0; childNum < _children.size(); childNum++) {
-        DebugPrinter::addKeyword(ret, fmt::format("branch{}", childNum));
+        DebugPrinter::addKeyword(ret, "branch{}"_format(childNum));
 
         ret.emplace_back(DebugPrinter::Block("[`"));
         for (size_t idx = 0; idx < _inputVals[childNum].size(); idx++) {

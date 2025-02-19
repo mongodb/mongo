@@ -42,6 +42,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+using namespace fmt::literals;
+
 namespace mongo::update_oplog_entry {
 BSONObj makeDeltaOplogEntry(const doc_diff::Diff& diff) {
     BSONObjBuilder builder;

@@ -51,6 +51,7 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::sbe {
+using namespace fmt::literals;
 class BlockStagesTest : public PlanStageTestFixture {
 protected:
     BSONObj compressBucket(const BSONObj& bucket) {
@@ -164,8 +165,7 @@ protected:
             if (metaAccessor) {
                 auto metaTagVal = metaAccessor->getViewOfValue();
                 auto expectedTagVal = bson::convertFrom<true>(expectedData[i]["tag"]);
-                ASSERT_THAT(expectedTagVal, ValueEq(metaTagVal))
-                    << fmt::format("for {}th 'tag'", i);
+                ASSERT_THAT(expectedTagVal, ValueEq(metaTagVal)) << "for {}th 'tag'"_format(i);
             }
 
             // Verifies rows.
@@ -174,7 +174,7 @@ protected:
                 auto expectedTagVal = bson::convertFrom<true>(expectedData[i][cellPaths[j]]);
 
                 ASSERT_THAT(expectedTagVal, ValueEq(actualTagVal))
-                    << fmt::format("for {}th path '{}'", i, cellPaths[j]);
+                    << "for {}th path '{}'"_format(i, cellPaths[j]);
             }
 
             if (i == yieldAfter) {
@@ -806,7 +806,7 @@ void BlockStagesTest::testBlockToBitmap(
             auto tagVal = accessor->getViewOfValue();
             auto expectedTagVal = expected.getAt(i);
 
-            ASSERT_THAT(tagVal, ValueEq(expectedTagVal)) << fmt::format("for {}th 'tag'", i);
+            ASSERT_THAT(tagVal, ValueEq(expectedTagVal)) << "for {}th 'tag'"_format(i);
 
             // Test out saveState() and restoreState() for 50% of the documents (the first document,
             // the third document, the fifth document, and so on).

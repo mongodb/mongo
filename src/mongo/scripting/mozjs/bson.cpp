@@ -63,6 +63,8 @@
 namespace mongo {
 namespace mozjs {
 
+using namespace fmt::literals;
+
 const char* const BSONInfo::className = "BSON";
 
 const JSFunctionSpec BSONInfo::freeFunctions[5] = {
@@ -336,7 +338,7 @@ void bsonCompareCommon(JSContext* cx,
                        StringData funcName,
                        BSONObj::ComparisonRulesSet rules) {
     if (args.length() != 2)
-        uasserted(ErrorCodes::BadValue, fmt::format("{} needs 2 arguments", funcName));
+        uasserted(ErrorCodes::BadValue, "{} needs 2 arguments"_format(funcName));
 
     // If either argument is not proper BSON, then we wrap both objects.
     auto scope = getScope(cx);

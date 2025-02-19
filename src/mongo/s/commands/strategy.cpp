@@ -122,6 +122,7 @@
 
 namespace mongo {
 namespace {
+using namespace fmt::literals;
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeCheckingMongosShutdownInterrupt);
 const auto kOperationTime = "operationTime"_sd;
@@ -204,10 +205,8 @@ void addContextForTransactionAbortingError(StringData txnIdAsString,
                                            StmtId latestStmtId,
                                            Status& status,
                                            StringData reason) {
-    status.addContext(fmt::format("Transaction {} was aborted on statement {} due to: {}",
-                                  txnIdAsString,
-                                  latestStmtId,
-                                  reason));
+    status.addContext("Transaction {} was aborted on statement {} due to: {}"_format(
+        txnIdAsString, latestStmtId, reason));
 }
 
 // Type that executes the invocation against the database.
@@ -249,7 +248,7 @@ void ExecCommandClient::_prologue() {
             "Can't use 'local' database through mongos",
             !dbname.isLocalDB());
     uassert(ErrorCodes::InvalidNamespace,
-            fmt::format("Invalid database name: '{}'", dbname.toStringForErrorMsg()),
+            "Invalid database name: '{}'"_format(dbname.toStringForErrorMsg()),
             DatabaseName::isValid(dbname, DatabaseName::DollarInDbNameBehavior::Allow));
 
     try {
@@ -474,7 +473,7 @@ void ParseAndRunCommand::_parseCommand() {
 
     auto const command = CommandHelpers::findCommand(opCtx, _commandName);
     if (!command) {
-        const std::string errorMsg = fmt::format("no such cmd: {}", _commandName);
+        const std::string errorMsg = "no such cmd: {}"_format(_commandName);
         auto builder = replyBuilder->getBodyBuilder();
         CommandHelpers::appendCommandStatusNoThrow(builder,
                                                    {ErrorCodes::CommandNotFound, errorMsg});
@@ -587,7 +586,7 @@ void ParseAndRunCommand::_parseCommand() {
         auto result = _rec->getReplyBuilder();
         auto body = result->getBodyBuilder();
         body.append(CommandHelpers::kHelpFieldName,
-                    fmt::format("help for: {} {}", c->getName(), c->help()));
+                    "help for: {} {}"_format(c->getName(), c->help()));
         CommandHelpers::appendSimpleCommandStatus(body, true, "");
         iassert(Status(ErrorCodes::SkipCommandExecution, "Already served help command"));
     }
@@ -713,11 +712,11 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
 
         if (!clientSuppliedWriteConcern) {
             if (isInternalClientValue) {
-                uassert(5569900,
-                        fmt::format("received command without explicit writeConcern on an "
-                                    "internalClient connection {}",
-                                    redact(request.body.toString())),
-                        genericArgs.getWriteConcern());
+                uassert(
+                    5569900,
+                    "received command without explicit writeConcern on an internalClient connection {}"_format(
+                        redact(request.body.toString())),
+                    genericArgs.getWriteConcern());
             } else {
                 // This command is not from a DBDirectClient or internal client, and supports WC,
                 // but wasn't given one - so apply the default, if there is one.
@@ -756,8 +755,8 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
 
         // ClientSupplied is the only provenance that clients are allowed to pass to mongos.
         if (provenance.hasSource() && !provenance.isClientSupplied()) {
-            const auto errorMsg = fmt::format("writeConcern provenance must be unset or \"{}\"",
-                                              ReadWriteConcernProvenance::kClientSupplied);
+            const auto errorMsg = "writeConcern provenance must be unset or \"{}\""_format(
+                ReadWriteConcernProvenance::kClientSupplied);
             return appendStatusToReplyAndSkipCommandExecution(
                 {ErrorCodes::InvalidOptions, errorMsg});
         }
@@ -778,8 +777,8 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
 
         // Ensure that the WC being set on the opCtx has provenance.
         invariant(_parc->_wc->getProvenance().hasSource(),
-                  fmt::format("unexpected unset provenance on writeConcern: {}",
-                              _parc->_wc->toBSON().toString()));
+                  "unexpected unset provenance on writeConcern: {}"_format(
+                      _parc->_wc->toBSON().toString()));
 
         opCtx->setWriteConcern(*_parc->_wc);
     }
@@ -836,8 +835,8 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
 
     // ClientSupplied is the only provenance that clients are allowed to pass to mongos.
     if (provenance.hasSource() && !provenance.isClientSupplied()) {
-        const auto errorMsg = fmt::format("readConcern provenance must be unset or \"{}\"",
-                                          ReadWriteConcernProvenance::kClientSupplied);
+        const auto errorMsg = "readConcern provenance must be unset or \"{}\""_format(
+            ReadWriteConcernProvenance::kClientSupplied);
         return appendStatusToReplyAndSkipCommandExecution({ErrorCodes::InvalidOptions, errorMsg});
     }
 
@@ -857,8 +856,8 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
 
     // Ensure that the RC on the opCtx has provenance.
     invariant(readConcernArgs.getProvenance().hasSource(),
-              fmt::format("unexpected unset provenance on readConcern: {}",
-                          readConcernArgs.toBSONInner().toString()));
+              "unexpected unset provenance on readConcern: {}"_format(
+                  readConcernArgs.toBSONInner().toString()));
 
     // If we are starting a transaction, we only need to check whether the read concern is
     // appropriate for running a transaction. There is no need to check whether the specific command
@@ -874,8 +873,8 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
         }
         if (readConcernArgs.getArgsOpTime()) {
             const std::string errorMsg =
-                fmt::format("The readConcern cannot specify '{}' in a transaction",
-                            repl::ReadConcernArgs::kAfterOpTimeFieldName);
+                "The readConcern cannot specify '{}' in a transaction"_format(
+                    repl::ReadConcernArgs::kAfterOpTimeFieldName);
             return appendStatusToReplyAndSkipCommandExecution(
                 {ErrorCodes::InvalidOptions, errorMsg});
         }
@@ -891,9 +890,8 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     // resources.
     if (MONGO_unlikely(!TransactionRouter::get(opCtx) && readConcernArgs.hasLevel() &&
                        !readConcernSupport.readConcernSupport.isOK())) {
-        const std::string errorMsg = fmt::format("Command {} does not support {}",
-                                                 invocation->definition()->getName(),
-                                                 readConcernArgs.toString());
+        const std::string errorMsg = "Command {} does not support {}"_format(
+            invocation->definition()->getName(), readConcernArgs.toString());
         return appendStatusToReplyAndSkipCommandExecution(
             readConcernSupport.readConcernSupport.withContext(errorMsg));
     }

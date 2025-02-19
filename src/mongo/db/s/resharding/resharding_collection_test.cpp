@@ -65,6 +65,8 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 
+using namespace fmt::literals;
+
 namespace mongo {
 namespace {
 
@@ -106,11 +108,11 @@ TEST_F(ReshardingCollectionTest, TestWritesToTempReshardingCollection) {
     auto uuid = UUID::gen();
 
     auto tempNss = NamespaceString::createNamespaceString_forTest(
-        fmt::format("{}.system.resharding.{}", "test", uuid.toString()));
+        "{}.system.resharding.{}"_format("test", uuid.toString()));
     ASSERT_OK(client.insert(tempNss, BSON("x" << 5)));
 
     auto chunksNss = NamespaceString::createNamespaceString_forTest(
-        fmt::format("config.cache.chunks.{}.system.resharding.{}", "test", uuid.toString()));
+        "config.cache.chunks.{}.system.resharding.{}"_format("test", uuid.toString()));
     ASSERT_OK(client.insert(chunksNss, BSON("X" << 5)));
 }
 
@@ -131,11 +133,11 @@ TEST_F(ReshardingCollectionTest, TestWritesToTempReshardingCollectionStressTest)
                 auto uuid = UUID::gen();
 
                 auto tempNss = NamespaceString::createNamespaceString_forTest(
-                    fmt::format("{}.system.resharding.{}", "test", uuid.toString()));
+                    "{}.system.resharding.{}"_format("test", uuid.toString()));
                 ASSERT_OK(client.insert(tempNss, BSON("x" << 5)));
 
-                auto chunksNss = NamespaceString::createNamespaceString_forTest(fmt::format(
-                    "config.cache.chunks.{}.system.resharding.{}", "test", uuid.toString()));
+                auto chunksNss = NamespaceString::createNamespaceString_forTest(
+                    "config.cache.chunks.{}.system.resharding.{}"_format("test", uuid.toString()));
                 ASSERT_OK(client.insert(chunksNss, BSON("X" << 5)));
                 iterations.increment();
             }

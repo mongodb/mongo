@@ -395,6 +395,7 @@ executor::RemoteCommandResponse runSearchCommandWithRetries(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const BSONObj& cmdObj,
     std::function<bool(Status)> retryPolicy) {
+    using namespace fmt::literals;
     auto taskExecutor =
         executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext());
     executor::RemoteCommandResponse response = {
@@ -410,8 +411,7 @@ executor::RemoteCommandResponse runSearchCommandWithRetries(
             err = swCbHnd.getStatus();
             if (!err.isOK()) {
                 // scheduling error
-                err.addContext(
-                    fmt::format("Failed to execute search command: {}", cmdObj.toString()));
+                err.addContext("Failed to execute search command: {}"_format(cmdObj.toString()));
                 break;
             }
             if (MONGO_likely(shardedSearchOpCtxDisconnect.shouldFail())) {
@@ -454,8 +454,7 @@ executor::RemoteCommandResponse runSearchCommandWithRetries(
             err = response.status;
             if (!err.isOK()) {
                 // Local error running the command.
-                err.addContext(
-                    fmt::format("Failed to execute search command: {}", cmdObj.toString()));
+                err.addContext("Failed to execute search command: {}"_format(cmdObj.toString()));
                 break;
             }
             err = getStatusFromCommandResult(response.data);

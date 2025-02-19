@@ -255,12 +255,11 @@ ExecutorFuture<void> PinnedConnectionTaskExecutor::_ensureStream(
     }
 
     auto remote = _stream->getClient()->remote();
+    using namespace fmt::literals;
     invariant(
         target == remote,
-        fmt::format(
-            "Attempted to schedule RPC to {} on TaskExecutor that had pinned connection to {}",
-            target,
-            remote));
+        "Attempted to schedule RPC to {} on TaskExecutor that had pinned connection to {}"_format(
+            target, remote));
     return ExecutorFuture<void>(*_executor);
 }
 

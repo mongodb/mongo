@@ -36,6 +36,8 @@
 
 namespace mongo::pcre_util {
 
+using namespace fmt::literals;
+
 pcre::CompileOptions flagsToOptions(StringData optionFlags, StringData opName) {
     pcre::CompileOptions opt = pcre::UTF;
     for (char flag : optionFlags) {
@@ -55,7 +57,7 @@ pcre::CompileOptions flagsToOptions(StringData optionFlags, StringData opName) {
                 opt |= pcre::EXTENDED;
                 continue;
             default:
-                uasserted(51108, fmt::format("{} invalid flag in regex options: {}", opName, flag));
+                uasserted(51108, "{} invalid flag in regex options: {}"_format(opName, flag));
         }
     }
     return opt;

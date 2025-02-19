@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/dbdirectclient.h"
@@ -306,7 +303,7 @@ protected:
                                              "namespace: '{}', failLocalClients: true, "
                                              "failInternalCommands: true, errorCode: {}}}",
                                              nss.toString_forTest(),
-                                             fmt::streamed(code))));
+                                             code)));
         return std::tuple{fp, count};
     }
 

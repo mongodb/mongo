@@ -38,7 +38,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/platform/compiler.h"
 
 namespace mongo {
 
@@ -90,11 +89,7 @@ struct DataType {
                                     "trivially copyable. You may specialize the template to use it "
                                     "with other types.");
             if (ptr) {
-                /** Silence spurious GCC stringop-overflow false negatives. */
-                MONGO_COMPILER_DIAGNOSTIC_PUSH
-                MONGO_COMPILER_IF_GCC(MONGO_COMPILER_DIAGNOSTIC_IGNORED("-Wstringop-overflow"))
                 std::memcpy(ptr, &t, sizeof(T));
-                MONGO_COMPILER_DIAGNOSTIC_POP
             }
 
             if (advanced) {

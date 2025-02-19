@@ -66,12 +66,12 @@ struct FLEKey {
     FLEKey() = default;
 
     FLEKey(KeyMaterial dataIn) : data(std::move(dataIn)) {
+        using namespace fmt::literals;
 
         // This is not a mistake; same keys will be used in FLE2 as in FLE1
         uassert(6364500,
-                fmt::format("Length of KeyMaterial is expected to be {} bytes, found {}",
-                            kFieldLevelEncryptionKeySize,
-                            data->size()),
+                "Length of KeyMaterial is expected to be {} bytes, found {}"_format(
+                    kFieldLevelEncryptionKeySize, data->size()),
                 data->size() == kFieldLevelEncryptionKeySize);
     }
 

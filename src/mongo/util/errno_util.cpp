@@ -43,6 +43,8 @@
 
 namespace mongo {
 
+using namespace fmt::literals;
+
 #ifdef _WIN32
 namespace errno_util_win32_detail {
 int gle() {
@@ -83,7 +85,7 @@ std::string errorMessage(std::error_code ec) {
     vague = StringData{r}.startsWith("unspecified"_sd);
 #endif
     if (vague)
-        return fmt::format("Unknown error {}", ec.value());
+        return "Unknown error {}"_format(ec.value());
     return r;
 }
 

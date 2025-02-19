@@ -46,6 +46,7 @@
 
 namespace mongo {
 
+using namespace fmt::literals;
 using SPT = ServerParameterType;
 
 MONGO_INITIALIZER_GROUP(BeginServerParameterRegistration, (), ("EndServerParameterRegistration"))
@@ -88,9 +89,8 @@ ServerParameterSet* ServerParameterSet::getNodeParameterSet() {
         ServerParameterSet sps;
         sps.setValidate([](const ServerParameter& sp) {
             uassert(6225102,
-                    fmt::format(
-                        "Registering cluster-wide parameter '{}' as node-local server parameter",
-                        sp.name()),
+                    "Registering cluster-wide parameter '{}' as node-local server parameter"
+                    ""_format(sp.name()),
                     sp.isNodeLocal());
         });
         return sps;
@@ -146,9 +146,8 @@ ServerParameterSet* ServerParameterSet::getClusterParameterSet() {
         ServerParameterSet sps;
         sps.setValidate([](const ServerParameter& sp) {
             uassert(6225103,
-                    fmt::format(
-                        "Registering node-local parameter '{}' as cluster-wide server parameter",
-                        sp.name()),
+                    "Registering node-local parameter '{}' as cluster-wide server parameter"
+                    ""_format(sp.name()),
                     sp.isClusterWide());
         });
         return sps;
@@ -161,8 +160,8 @@ void ServerParameterSet::add(std::unique_ptr<ServerParameter> sp) {
         _validate(*sp);
     auto [it, ok] = _map.try_emplace(sp->name(), std::move(sp));
     uassert(23784,
-            fmt::format("Duplicate server parameter registration for '{}'",
-                        sp->name()),  // NOLINT(bugprone-use-after-move)
+            "Duplicate server parameter registration for '{}'"_format(
+                sp->name()),  // NOLINT(bugprone-use-after-move)
             ok);
 }
 
@@ -192,7 +191,7 @@ StatusWith<std::string> ServerParameter::_coerceToString(const BSONElement& elem
 }
 
 void ServerParameterSet::remove(const std::string& name) {
-    invariant(1 == _map.erase(name), fmt::format("Failed to erase key \"{}\"", name));
+    invariant(1 == _map.erase(name), "Failed to erase key \"{}\""_format(name));
 }
 
 IDLServerParameterDeprecatedAlias::IDLServerParameterDeprecatedAlias(StringData name,

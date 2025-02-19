@@ -35,7 +35,6 @@
 #include <cstring>
 #include <exception>
 #include <fmt/format.h>
-#include <fmt/ostream.h>
 #include <limits>
 #include <memory>
 #include <ostream>
@@ -66,6 +65,7 @@ namespace mongo {
 using std::ostringstream;
 using std::string;
 using std::unique_ptr;
+using namespace fmt::literals;
 
 #if 0
 #define MONGO_JSON_DEBUG(message)                                \
@@ -1588,10 +1588,7 @@ BSONObj fromJsonImpl(const char* jsonString, size_t len) {
     }
 
     if (ret != Status::OK()) {
-        uasserted(
-            16619,
-            fmt::format(
-                "code {}: {}: {}", fmt::streamed(ret.code()), ret.codeString(), ret.reason()));
+        uasserted(16619, "code {}: {}: {}"_format(ret.code(), ret.codeString(), ret.reason()));
     }
     uassert(ErrorCodes::FailedToParse,
             "Garbage at end of json string",

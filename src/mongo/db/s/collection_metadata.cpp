@@ -54,6 +54,8 @@
 
 namespace mongo {
 
+using namespace fmt::literals;
+
 CollectionMetadata::CollectionMetadata(ChunkManager cm, const ShardId& thisShardId)
     : _cm(std::move(cm)), _thisShardId(thisShardId) {}
 

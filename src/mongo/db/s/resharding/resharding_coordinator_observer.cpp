@@ -50,6 +50,8 @@
 namespace mongo {
 namespace {
 
+using namespace fmt::literals;
+
 /**
  * Retrieves the participants corresponding to the expectedState type.
  */
@@ -114,9 +116,8 @@ template <class TParticipant>
 Status getStatusFromAbortReasonWithShardInfo(const TParticipant& participant,
                                              StringData participantType) {
     return resharding::getStatusFromAbortReason(participant.getMutableState())
-        .withContext(fmt::format("{} shard {} reached an unrecoverable error",
-                                 participantType,
-                                 participant.getId().toString()));
+        .withContext("{} shard {} reached an unrecoverable error"_format(
+            participantType, participant.getId().toString()));
 }
 
 /**

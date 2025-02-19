@@ -69,10 +69,11 @@ public:
     optimizer::ProjectionName getNextId(const char (&prefix)[N]) {
         return optimizer::ProjectionName{visit(
             [&]<typename T>(T& v) -> std::string {
+                using namespace fmt::literals;
                 if constexpr (std::is_same_v<T, IdType>)
-                    return fmt::format("p{}", v++);
+                    return "p{}"_format(v++);
                 else if constexpr (std::is_same_v<T, PrefixMapType>)
-                    return fmt::format("{}_{}", prefix, v[prefix]++);
+                    return "{}_{}"_format(prefix, v[prefix]++);
             },
             _ids)};
     }

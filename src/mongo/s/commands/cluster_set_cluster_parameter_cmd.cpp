@@ -61,6 +61,8 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+
+using namespace fmt::literals;
 namespace {
 
 class SetClusterParameterCmd final : public TypedCommand<SetClusterParameterCmd> {
@@ -93,14 +95,12 @@ public:
                     request().getCommandParameter().nFields() > 0);
 
             uassert(ErrorCodes::InvalidOptions,
-                    fmt::format("{} only supports setting exactly one parameter",
-                                Request::kCommandName),
+                    "{} only supports setting exactly one parameter"_format(Request::kCommandName),
                     request().getCommandParameter().nFields() == 1);
 
             uassert(
                 ErrorCodes::NoSuchKey,
-                fmt::format(
-                    "Unknown server parameter: {}",
+                "Unknown server parameter: {}"_format(
                     query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName),
                 !request().getCommandParameter()
                      [query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName]);

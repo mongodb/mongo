@@ -72,6 +72,8 @@
 namespace mongo::logv2 {
 namespace {
 
+using namespace fmt::literals;
+
 #if _WIN32
 using stream_t = Win32SharedAccessOfstream;
 #else
@@ -140,19 +142,15 @@ Status FileRotateSink::rotate(bool rename,
 
             if (!targetExists.isOK()) {
                 return Status(ErrorCodes::FileRenameFailed, targetExists.getStatus().reason())
-                    .withContext(fmt::format("Cannot verify whether destination already exists: {}",
-                                             renameTarget));
+                    .withContext("Cannot verify whether destination already exists: {}"_format(
+                        renameTarget));
             }
 
             if (targetExists.getValue()) {
                 if (onMinorError) {
-                    onMinorError(
-                        {ErrorCodes::FileRenameFailed,
-                         fmt::format(
-                             "Target already exists during log rotation. Skipping this file. "
-                             "target={}, file={}",
-                             renameTarget,
-                             filename)});
+                    onMinorError({ErrorCodes::FileRenameFailed,
+                                  "Target already exists during log rotation. Skipping this file. "
+                                  "target={}, file={}"_format(renameTarget, filename)});
                 }
                 continue;
             }
@@ -164,15 +162,12 @@ Status FileRotateSink::rotate(bool rename,
                     if (onMinorError)
                         onMinorError(
                             {ErrorCodes::FileRenameFailed,
-                             fmt::format(
-                                 "Source file was missing during log rotation. Creating a new "
-                                 "one. file={}",
-                                 filename)});
+                             "Source file was missing during log rotation. Creating a new one. "
+                             "file={}"_format(filename)});
                 } else {
-                    return Status(
-                        ErrorCodes::FileRenameFailed,
-                        fmt::format(
-                            "Failed to rename {} to {}: {}", filename, renameTarget, ec.message()));
+                    return Status(ErrorCodes::FileRenameFailed,
+                                  "Failed to rename {} to {}: {}"_format(
+                                      filename, renameTarget, ec.message()));
                 }
             }
         }

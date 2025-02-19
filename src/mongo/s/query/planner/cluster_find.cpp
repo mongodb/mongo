@@ -140,6 +140,8 @@ namespace {
 // Ticks for server-side Javascript deprecation log messages.
 Rarely _samplerFunctionJs, _samplerWhereClause;
 
+using namespace fmt::literals;
+
 static const BSONObj kSortKeyMetaProjection = BSON("$meta"
                                                    << "sortKey");
 static const BSONObj kGeoNearDistanceMetaProjection = BSON("$meta"
@@ -584,13 +586,11 @@ Status setUpOperationContextStateForGetMore(OperationContext* opCtx,
     }
 
     auto apiParamsFromClient = APIParameters::get(opCtx);
-    uassert(
-        ErrorCodes::APIMismatchError,
-        fmt::format("API parameter mismatch: getMore used params {}, the cursor-creating command "
-                    "used {}",
-                    apiParamsFromClient.toBSON().toString(),
-                    cursor->getAPIParameters().toBSON().toString()),
-        apiParamsFromClient == cursor->getAPIParameters());
+    uassert(ErrorCodes::APIMismatchError,
+            "API parameter mismatch: getMore used params {}, the cursor-creating command "
+            "used {}"_format(apiParamsFromClient.toBSON().toString(),
+                             cursor->getAPIParameters().toBSON().toString()),
+            apiParamsFromClient == cursor->getAPIParameters());
 
     // If the originating command had a 'comment' field, we extract it and set it on opCtx. Note
     // that if the 'getMore' command itself has a 'comment' field, we give precedence to it.

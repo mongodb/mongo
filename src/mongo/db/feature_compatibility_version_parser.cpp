@@ -28,7 +28,6 @@
  */
 
 #include <fmt/format.h>
-#include <fmt/ostream.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -88,7 +87,7 @@ StringData FeatureCompatibilityVersionParser::serializeVersionForFeatureFlags(
     }
 
     uasserted(ErrorCodes::BadValue,
-              fmt::format("Invalid FCV version {} for feature flag.", fmt::underlying(version)));
+              fmt::format("Invalid FCV version {} for feature flag.", version));
 }
 
 Status FeatureCompatibilityVersionParser::validatePreviousVersionField(

@@ -47,6 +47,7 @@ namespace mongo::unittest {
 namespace {
 
 namespace fs = boost::filesystem;
+using namespace fmt::literals;
 
 GoldenTestConfig goldenTestConfig{"src/mongo/unittest/expected_output"};
 
@@ -90,7 +91,7 @@ TEST(GoldenSelfTest, GoldenTestContextGetPath) {
     // Verify that names with invalid characters fail with test asertion.
     std::string badChars = "./\\*~`!@#$%^&*()";
     for (char c : badChars) {
-        std::string badName = fmt::format("Bad{}Name", c);
+        std::string badName = "Bad{}Name"_format(c);
 
         {
             TestInfo testInfo(badName, "TestName"_sd, __FILE__, __LINE__);

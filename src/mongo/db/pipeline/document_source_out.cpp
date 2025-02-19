@@ -65,6 +65,8 @@
 
 namespace mongo {
 
+using namespace fmt::literals;
+
 MONGO_FAIL_POINT_DEFINE(hangWhileBuildingDocumentSourceOutBatch);
 MONGO_FAIL_POINT_DEFINE(outWaitAfterTempCollectionCreation);
 MONGO_FAIL_POINT_DEFINE(outWaitBeforeTempCollectionRename);
@@ -172,9 +174,8 @@ DocumentSourceOutSpec DocumentSourceOut::parseOutSpecAndResolveTargetNamespace(
                                                       spec.embeddedObject());
     } else {
         uassert(16990,
-                fmt::format("{} only supports a string or object argument, but found {}",
-                            kStageName,
-                            typeName(spec.type())),
+                "{} only supports a string or object argument, but found {}"_format(
+                    kStageName, typeName(spec.type())),
                 spec.type() == BSONType::String);
     }
 
@@ -193,10 +194,9 @@ std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::pa
                                                                  outSpec.getColl(),
                                                                  outSpec.getSerializationContext());
 
-    uassert(
-        ErrorCodes::InvalidNamespace,
-        fmt::format("Invalid {} target namespace, {}", kStageName, targetNss.toStringForErrorMsg()),
-        targetNss.isValid());
+    uassert(ErrorCodes::InvalidNamespace,
+            "Invalid {} target namespace, {}"_format(kStageName, targetNss.toStringForErrorMsg()),
+            targetNss.isValid());
     return std::make_unique<DocumentSourceOut::LiteParsed>(spec.fieldName(), std::move(targetNss));
 }
 
@@ -321,9 +321,8 @@ void DocumentSourceOut::initialize() {
         // work. If the collection becomes capped during processing, the collection options will
         // have changed, and the $out will fail.
         uassert(17152,
-                fmt::format("namespace '{}' is capped so it can't be used for {}",
-                            getOutputNs().toStringForErrorMsg(),
-                            kStageName),
+                "namespace '{}' is capped so it can't be used for {}"_format(
+                    getOutputNs().toStringForErrorMsg(), kStageName),
                 _originalOutOptions["capped"].eoo());
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         LOGV2_DEBUG(7585601,
@@ -441,22 +440,20 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<TimeseriesOptions> timeseries) {
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
-            fmt::format("{} cannot be used in a transaction", kStageName),
+            "{} cannot be used in a transaction"_format(kStageName),
             !expCtx->getOperationContext()->inMultiDocumentTransaction());
 
-    uassert(
-        ErrorCodes::InvalidNamespace,
-        fmt::format("Invalid {} target namespace, {}", kStageName, outputNs.toStringForErrorMsg()),
-        outputNs.isValid());
+    uassert(ErrorCodes::InvalidNamespace,
+            "Invalid {} target namespace, {}"_format(kStageName, outputNs.toStringForErrorMsg()),
+            outputNs.isValid());
 
     uassert(17385,
-            fmt::format("Can't {} to special collection: {}", kStageName, outputNs.coll()),
+            "Can't {} to special collection: {}"_format(kStageName, outputNs.coll()),
             !outputNs.isSystem());
 
     uassert(31321,
-            fmt::format("Can't {} to internal database: {}",
-                        kStageName,
-                        outputNs.dbName().toStringForErrorMsg()),
+            "Can't {} to internal database: {}"_format(kStageName,
+                                                       outputNs.dbName().toStringForErrorMsg()),
             !outputNs.isOnInternalDb());
     return new DocumentSourceOut(std::move(outputNs), std::move(timeseries), expCtx);
 }

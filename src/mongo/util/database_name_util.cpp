@@ -49,6 +49,7 @@
 
 namespace mongo {
 
+using namespace fmt::literals;
 std::string DatabaseNameUtil::serialize(const DatabaseName& dbName,
                                         const SerializationContext& context) {
     if (!gMultitenancySupport)
@@ -189,17 +190,15 @@ DatabaseName DatabaseNameUtil::deserializeForCommands(boost::optional<TenantId> 
                     return DatabaseName(std::move(tenantId), dbName.db(omitTenant));
                 }
 
-                uassert(8423386,
-                        fmt::format("TenantId supplied by security token as '{}' but prefixed "
-                                    "tenantId also required given expectPrefix is set true",
-                                    tenantId->toString()),
-                        dbName.tenantId());
+                uassert(
+                    8423386,
+                    "TenantId supplied by security token as '{}' but prefixed tenantId also required given expectPrefix is set true"_format(
+                        tenantId->toString()),
+                    dbName.tenantId());
                 uassert(
                     8423384,
-                    fmt::format(
-                        "TenantId from security token must match prefixed tenantId: {} prefix {}",
-                        tenantId->toString(),
-                        dbName.tenantId()->toString()),
+                    "TenantId from security token must match prefixed tenantId: {} prefix {}"_format(
+                        tenantId->toString(), dbName.tenantId()->toString()),
                     tenantId == dbName.tenantId());
                 return dbName;
             }

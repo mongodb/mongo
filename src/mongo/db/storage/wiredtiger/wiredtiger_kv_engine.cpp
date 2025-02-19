@@ -126,6 +126,8 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 
+using namespace fmt::literals;
+
 namespace mongo {
 
 namespace {
@@ -1105,9 +1107,8 @@ public:
             boost::system::error_code errorCode;
             const std::uint64_t fileSize = boost::filesystem::file_size(filePath, errorCode);
             uassert(31403,
-                    fmt::format("Failed to get a file's size. Filename: {} Error: {}",
-                                filePath.string(),
-                                errorCode.message()),
+                    "Failed to get a file's size. Filename: {} Error: {}"_format(
+                        filePath.string(), errorCode.message()),
                     !errorCode);
 
             if (options.incrementalBackup && options.srcBackupName) {
@@ -2208,10 +2209,11 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool forc
     std::string stableTSConfigString;
     auto ts = stableTimestamp.asULL();
     if (force) {
-        stableTSConfigString = fmt::format(
-            "force=true,oldest_timestamp={0:x},durable_timestamp={0:x},stable_timestamp={0:x}", ts);
+        stableTSConfigString =
+            "force=true,oldest_timestamp={0:x},durable_timestamp={0:x},stable_timestamp={0:x}"_format(
+                ts);
     } else {
-        stableTSConfigString = fmt::format("stable_timestamp={:x}", ts);
+        stableTSConfigString = "stable_timestamp={:x}"_format(ts);
     }
     invariantWTOK(_conn->set_timestamp(_conn, stableTSConfigString.c_str()), nullptr);
 
@@ -2278,8 +2280,8 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp, bool f
 
     if (force) {
         auto oldestTSConfigString =
-            fmt::format("force=true,oldest_timestamp={0:x},durable_timestamp={0:x}",
-                        newOldestTimestamp.asULL());
+            "force=true,oldest_timestamp={0:x},durable_timestamp={0:x}"_format(
+                newOldestTimestamp.asULL());
         invariantWTOK(_conn->set_timestamp(_conn, oldestTSConfigString.c_str()), nullptr);
         _oldestTimestamp.store(newOldestTimestamp.asULL());
 
@@ -2288,8 +2290,7 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp, bool f
                     "oldest_timestamp and durable_timestamp force set to {newOldestTimestamp}",
                     "newOldestTimestamp"_attr = newOldestTimestamp);
     } else {
-        auto oldestTSConfigString =
-            fmt::format("oldest_timestamp={:x}", newOldestTimestamp.asULL());
+        auto oldestTSConfigString = "oldest_timestamp={:x}"_format(newOldestTimestamp.asULL());
         invariantWTOK(_conn->set_timestamp(_conn, oldestTSConfigString.c_str()), nullptr);
         // set_timestamp above ignores backwards in time if 'force' is not set.
         if (_oldestTimestamp.load() < newOldestTimestamp.asULL())
@@ -2616,9 +2617,8 @@ StatusWith<Timestamp> WiredTigerKVEngine::_pinOldestTimestamp(
             requestedTimestamp = oldest;
         } else {
             return {ErrorCodes::SnapshotTooOld,
-                    fmt::format("Requested timestamp: {} Current oldest timestamp: {}",
-                                requestedTimestamp.toString(),
-                                oldest.toString())};
+                    "Requested timestamp: {} Current oldest timestamp: {}"_format(
+                        requestedTimestamp.toString(), oldest.toString())};
         }
     }
 
@@ -2880,12 +2880,12 @@ Status WiredTigerKVEngine::reconfigureLogging() {
 StatusWith<BSONObj> WiredTigerKVEngine::getStorageMetadata(StringData ident) const {
     auto session = _connection->getUninterruptibleSession();
 
-    auto tableMetadata = WiredTigerUtil::getMetadata(*session, fmt::format("table:{}", ident));
+    auto tableMetadata = WiredTigerUtil::getMetadata(*session, "table:{}"_format(ident));
     if (!tableMetadata.isOK()) {
         return tableMetadata.getStatus();
     }
 
-    auto fileMetadata = WiredTigerUtil::getMetadata(*session, fmt::format("file:{}.wt", ident));
+    auto fileMetadata = WiredTigerUtil::getMetadata(*session, "file:{}.wt"_format(ident));
     if (!fileMetadata.isOK()) {
         return fileMetadata.getStatus();
     }
@@ -2897,7 +2897,7 @@ StatusWith<BSONObj> WiredTigerKVEngine::getStorageMetadata(StringData ident) con
 KeyFormat WiredTigerKVEngine::getKeyFormat(RecoveryUnit& ru, StringData ident) const {
 
     const std::string wtTableConfig = uassertStatusOK(WiredTigerUtil::getMetadataCreate(
-        WiredTigerRecoveryUnit::get(ru), fmt::format("table:{}", ident)));
+        WiredTigerRecoveryUnit::get(ru), "table:{}"_format(ident)));
     return wtTableConfig.find("key_format=u") != string::npos ? KeyFormat::String : KeyFormat::Long;
 }
 

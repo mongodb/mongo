@@ -106,6 +106,8 @@
 namespace mongo {
 namespace {
 
+using namespace fmt::literals;
+
 const char kRecvChunkStatus[] = "_recvChunkStatus";
 const char kRecvChunkCommit[] = "_recvChunkCommit";
 const char kRecvChunkAbort[] = "_recvChunkAbort";

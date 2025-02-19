@@ -31,7 +31,6 @@
 
 #include <fmt/format.h>
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 
 /*
@@ -43,13 +42,13 @@
 
 namespace mongo::diagnostic_printers {
 
-constexpr inline auto kOmitUnsupportedCurOpMsg =
+static constexpr StringData kOmitUnsupportedCurOpMsg =
     "omitted: this CurOp does not support diagnostic printing"_sd;
-constexpr inline auto kOmitUnrecognizedCommandMsg = "omitted: unrecognized command"_sd;
-constexpr inline auto kOmitUnsupportedCommandMsg =
+static constexpr StringData kOmitUnrecognizedCommandMsg = "omitted: unrecognized command";
+static constexpr StringData kOmitUnsupportedCommandMsg =
     "omitted: command does not support diagnostic printing"_sd;
-constexpr inline auto kOpCtxIsNullMsg = "opCtx is null"_sd;
-constexpr inline auto kCurOpIsNullMsg = "the opCtx's curOp is null"_sd;
+static constexpr StringData kOpCtxIsNullMsg = "opCtx is null"_sd;
+static constexpr StringData kCurOpIsNullMsg = "the opCtx's curOp is null"_sd;
 
 /**
  * Indicates if the operation associated with 'opCtx' is ineligible for diagnostic logging. If the
@@ -58,39 +57,12 @@ constexpr inline auto kCurOpIsNullMsg = "the opCtx's curOp is null"_sd;
  */
 boost::optional<StringData> isIneligibleForDiagnosticPrinting(OperationContext* opCtx);
 
-class CurOpPrinter {
-public:
-    explicit CurOpPrinter(OperationContext* opCtx) : _opCtx{opCtx} {}
-
-    auto format(auto& fc) const {
-        auto out = fc.out();
-        if (auto msg = isIneligibleForDiagnosticPrinting(_opCtx))
-            return fmt::format_to(out, "{}", *msg);
-
-        Info info = _gatherInfo();
-        out = fmt::format_to(out, "{{");
-        auto field = [&, sep = ""_sd](StringData name, const auto& value) mutable {
-            out = fmt::format_to(out, "{}'{}': {}", std::exchange(sep, ", "_sd), name, value);
-        };
-        field("currentOp", info.opDebug);
-        field("opDescription", info.opDesc);
-        if (info.origCommand)
-            field("originatingCommand", *info.origCommand);
-        out = fmt::format_to(out, "}}");
-        return out;
-    }
-
-private:
-    struct Info {
-        std::string opDesc;
-        std::string opDebug;
-        boost::optional<std::string> origCommand;
-    };
-
-    Info _gatherInfo() const;
+using OutIt = fmt::detail::buffer_appender<char>;
+struct CurOpPrinter {
+    OutIt format(fmt::basic_format_context<OutIt, char>& fc) const;
 
     // This pointer must outlive this class.
-    OperationContext* _opCtx;
+    OperationContext* opCtx;
 };
 
 }  // namespace mongo::diagnostic_printers
@@ -103,7 +75,7 @@ struct formatter<mongo::diagnostic_printers::CurOpPrinter> {
         return ctx.begin();
     }
 
-    auto format(const mongo::diagnostic_printers::CurOpPrinter& obj, auto& ctx) const {
+    auto format(const mongo::diagnostic_printers::CurOpPrinter& obj, auto& ctx) {
         return obj.format(ctx);
     }
 };

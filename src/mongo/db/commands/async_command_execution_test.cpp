@@ -65,6 +65,8 @@
 namespace mongo {
 namespace {
 
+using namespace fmt::literals;
+
 class AsyncCommandExecutionTest : public unittest::Test, public ScopedGlobalServiceContextForTest {
 public:
     struct TestState;

@@ -60,6 +60,7 @@ OperationKeyManager& OperationKeyManager::get(ServiceContext* serviceContext) {
 }
 
 void OperationKeyManager::add(const OperationKey& key, OperationId id) {
+    using namespace fmt::literals;
 
     LOGV2_DEBUG(4615636,
                 2,
@@ -70,9 +71,8 @@ void OperationKeyManager::add(const OperationKey& key, OperationId id) {
     stdx::lock_guard lk(_mutex);
     auto result = _idByOperationKey.emplace(key, id).second;
 
-    uassert(ErrorCodes::BadValue,
-            fmt::format("OperationKey currently '{}' in use", key.toString()),
-            result);
+    uassert(
+        ErrorCodes::BadValue, "OperationKey currently '{}' in use"_format(key.toString()), result);
 }
 
 bool OperationKeyManager::remove(const OperationKey& key) {

@@ -49,6 +49,8 @@ namespace mongo {
 
 namespace {
 
+using namespace fmt::literals;
+
 synchronized_value<SecureRandom>& uuidGen() {
     static StaticImmortal<synchronized_value<SecureRandom>> uuidGen;
     return uuidGen.value();
@@ -66,7 +68,7 @@ StatusWith<UUID> UUID::parse(BSONElement from) {
 
 StatusWith<UUID> UUID::parse(StringData s) {
     if (!isUUIDString(s)) {
-        return {ErrorCodes::InvalidUUID, fmt::format("Invalid UUID string: {}", s)};
+        return {ErrorCodes::InvalidUUID, "Invalid UUID string: {}"_format(s)};
     }
 
     UUIDStorage uuid;
@@ -132,12 +134,11 @@ BSONObj UUID::toBSON() const {
 }
 
 std::string UUID::toString() const {
-    return fmt::format("{}-{}-{}-{}-{}",
-                       hexblob::encodeLower(&_uuid[0], 4),
-                       hexblob::encodeLower(&_uuid[4], 2),
-                       hexblob::encodeLower(&_uuid[6], 2),
-                       hexblob::encodeLower(&_uuid[8], 2),
-                       hexblob::encodeLower(&_uuid[10], 6));
+    return "{}-{}-{}-{}-{}"_format(hexblob::encodeLower(&_uuid[0], 4),
+                                   hexblob::encodeLower(&_uuid[4], 2),
+                                   hexblob::encodeLower(&_uuid[6], 2),
+                                   hexblob::encodeLower(&_uuid[8], 2),
+                                   hexblob::encodeLower(&_uuid[10], 6));
 }
 
 template <>

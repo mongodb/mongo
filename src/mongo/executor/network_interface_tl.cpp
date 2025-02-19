@@ -81,6 +81,8 @@
 namespace mongo {
 namespace executor {
 
+using namespace fmt::literals;
+
 namespace {
 MONGO_FAIL_POINT_DEFINE(triggerSendRequestNetworkTimeout);
 MONGO_FAIL_POINT_DEFINE(forceConnectionNetworkTimeout);

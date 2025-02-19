@@ -56,6 +56,7 @@
 namespace mongo {
 namespace {
 
+using namespace fmt::literals;
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorAfterPreparingToDonate);

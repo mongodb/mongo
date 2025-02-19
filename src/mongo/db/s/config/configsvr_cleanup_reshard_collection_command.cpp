@@ -71,6 +71,8 @@
 namespace mongo {
 namespace {
 
+using namespace fmt::literals;
+
 auto constructFinalMetadataRemovalUpdateOperation(OperationContext* opCtx,
                                                   const NamespaceString& nss) {
     auto query = BSON(CollectionType::kNssFieldName
@@ -131,14 +133,11 @@ public:
 
             collEntry = catalogClient->getCollection(opCtx, ns());
 
-            uassert(
-                5403504,
-                fmt::format(
+            uassert(5403504,
                     "Expected collection entry for {} to no longer have resharding metadata, but "
                     "metadata documents still exist; please rerun the cleanupReshardCollection "
-                    "command",
-                    ns().toStringForErrorMsg()),
-                !collEntry.getReshardingFields());
+                    "command"_format(ns().toStringForErrorMsg()),
+                    !collEntry.getReshardingFields());
         }
 
     private:

@@ -110,7 +110,8 @@ private:
         MatchResult match(const T& v) const override {
             if constexpr (!stdx::is_detected_v<CanMatchOp, T>) {
                 return MatchResult{
-                    false, fmt::format("Matcher does not accept {}", demangleName(typeid(T)))};
+                    false,
+                    format(FMT_STRING("Matcher does not accept {}"), demangleName(typeid(T)))};
             } else {
                 return _m->match(v);
             }
@@ -163,7 +164,7 @@ public:
     explicit RelOpBase(T v) : _v{std::move(v)} {}
 
     std::string describe() const {
-        return fmt::format("{}({})", self().name, stringify::invoke(_v));
+        return format(FMT_STRING("{}({})"), self().name, stringify::invoke(_v));
     }
 
     template <typename X, std::enable_if_t<stdx::is_detected_v<CanMatchOp, X>, int> = 0>
@@ -242,7 +243,7 @@ public:
     explicit Not(M m) : _m(std::move(m)) {}
 
     std::string describe() const {
-        return fmt::format("Not({})", _m.describe());
+        return format(FMT_STRING("Not({})"), _m.describe());
     }
 
     template <typename X>
@@ -268,7 +269,7 @@ public:
     explicit AllOf(Ms... ms) : _ms(std::move(ms)...) {}
 
     std::string describe() const {
-        return fmt::format("AllOf({})", detail::describeTupleOfMatchers(_ms));
+        return format(FMT_STRING("AllOf({})"), detail::describeTupleOfMatchers(_ms));
     }
 
     template <typename X>
@@ -301,7 +302,7 @@ public:
     explicit AnyOf(Ms... ms) : _ms(std::move(ms)...) {}
 
     std::string describe() const {
-        return fmt::format("AnyOf({})", detail::describeTupleOfMatchers(_ms));
+        return format(FMT_STRING("AnyOf({})"), detail::describeTupleOfMatchers(_ms));
     }
 
     template <typename X>
@@ -335,7 +336,7 @@ public:
     explicit Pointee(M m) : _m(std::move(m)) {}
 
     std::string describe() const {
-        return fmt::format("Pointee({})", _m.describe());
+        return format(FMT_STRING("Pointee({})"), _m.describe());
     }
 
     template <typename X>
@@ -345,7 +346,7 @@ public:
         MatchResult res = _m.match(*x);
         if (res)
             return MatchResult{true};
-        return MatchResult{false, fmt::format("{}", res.message())};
+        return MatchResult{false, format(FMT_STRING("{}"), res.message())};
     }
 
 private:
@@ -388,14 +389,15 @@ public:
     explicit ElementsAre(const Ms&... ms) : _ms(std::move(ms)...) {}
 
     std::string describe() const {
-        return fmt::format("ElementsAre({})", detail::describeTupleOfMatchers(_ms));
+        return format(FMT_STRING("ElementsAre({})"), detail::describeTupleOfMatchers(_ms));
     }
 
     template <typename X>
     MatchResult match(X&& x) const {
         if (x.size() != sizeof...(Ms)) {
             return MatchResult{
-                false, fmt::format("failed: size {} != expected size {}", x.size(), sizeof...(Ms))};
+                false,
+                format(FMT_STRING("failed: size {} != expected size {}"), x.size(), sizeof...(Ms))};
         }
         return _match(x, std::make_index_sequence<sizeof...(Ms)>{});
     }
@@ -413,12 +415,12 @@ private:
                 allOk = false;
                 std::string m;
                 if (!arr[i].message().empty())
-                    m = fmt::format(":{}", arr[i].message());
-                joiner(fmt::format("{}{}", i, m));
+                    m = format(FMT_STRING(":{}"), arr[i].message());
+                joiner(format(FMT_STRING("{}{}"), i, m));
             }
         }
         if (!allOk)
-            return MatchResult{false, fmt::format("failed: [{}]", std::string{joiner})};
+            return MatchResult{false, format(FMT_STRING("failed: [{}]"), std::string{joiner})};
         return MatchResult{true};
     }
 
@@ -456,7 +458,7 @@ public:
     explicit TupleElementsAre(const Ms&... ms) : _ms(std::move(ms)...) {}
 
     std::string describe() const {
-        return fmt::format("TupleElementsAre({})", detail::describeTupleOfMatchers(_ms));
+        return format(FMT_STRING("TupleElementsAre({})"), detail::describeTupleOfMatchers(_ms));
     }
 
     template <typename X>
@@ -464,7 +466,8 @@ public:
         size_t xSize = std::tuple_size_v<std::decay_t<X>>;
         if (xSize != sizeof...(Ms))
             return MatchResult{
-                false, fmt::format("failed: size {} != expected size {}", xSize, sizeof...(Ms))};
+                false,
+                format(FMT_STRING("failed: size {} != expected size {}"), xSize, sizeof...(Ms))};
         return _match(x, std::make_index_sequence<sizeof...(Ms)>{});
     }
 
@@ -493,7 +496,8 @@ public:
     explicit StructuredBindingsAre(const Ms&... ms) : _ms(std::move(ms)...) {}
 
     std::string describe() const {
-        return fmt::format("StructuredBindingsAre({})", detail::describeTupleOfMatchers(_ms));
+        return format(FMT_STRING("StructuredBindingsAre({})"),
+                      detail::describeTupleOfMatchers(_ms));
     }
 
     template <typename X>
@@ -578,16 +582,16 @@ class StatusIs : public Matcher {
 public:
     StatusIs(CodeM code, ReasonM reason) : _code{std::move(code)}, _reason{std::move(reason)} {}
     std::string describe() const {
-        return fmt::format("StatusIs({}, {})", _code.describe(), _reason.describe());
+        return format(FMT_STRING("StatusIs({}, {})"), _code.describe(), _reason.describe());
     }
     MatchResult match(const Status& st) const {
         MatchResult cr = _code.match(st.code());
         MatchResult rr = _reason.match(st.reason());
         stringify::Joiner joiner;
         if (!cr.message().empty())
-            joiner(fmt::format("code:{}", cr.message()));
+            joiner(format(FMT_STRING("code:{}"), cr.message()));
         if (!rr.message().empty()) {
-            joiner(fmt::format("reason:{}", rr.message()));
+            joiner(format(FMT_STRING("reason:{}"), rr.message()));
         }
         return MatchResult{cr && rr, std::string{joiner}};
     }
@@ -612,22 +616,23 @@ public:
         : _name{std::move(nameM)}, _type{std::move(typeM)}, _value{std::move(valueM)} {}
 
     std::string describe() const {
-        return fmt::format("BSONElementIs(name:{}, type:{}, value:{})",
-                           _name.describe(),
-                           _type.describe(),
-                           _value.describe());
+        return format(FMT_STRING("BSONElementIs(name:{}, type:{}, value:{})"),
+                      _name.describe(),
+                      _type.describe(),
+                      _value.describe());
     }
 
     MatchResult match(const BSONElement& x) const {
         auto nr = _name.match(std::string{x.fieldNameStringData()});
         if (!nr)
             return MatchResult{
-                false, fmt::format("name failed: {} {}", x.fieldNameStringData(), nr.message())};
+                false,
+                format(FMT_STRING("name failed: {} {}"), x.fieldNameStringData(), nr.message())};
         auto t = x.type();
         auto tr = _type.match(t);
         if (!tr)
-            return MatchResult{false,
-                               fmt::format("type failed: {} {}", typeName(x.type()), tr.message())};
+            return MatchResult{
+                false, format(FMT_STRING("type failed: {} {}"), typeName(x.type()), tr.message())};
         if (t == NumberInt)
             return detail::typeTolerantMatch(_value, x.Int());
         if (t == NumberLong)
@@ -637,8 +642,8 @@ public:
         if (t == String)
             return detail::typeTolerantMatch(_value, x.String());
         // need to support more BSON element types.
-        return MatchResult{false,
-                           fmt::format("Cannot match BSON Elements holding type {}", typeName(t))};
+        return MatchResult{
+            false, format(FMT_STRING("Cannot match BSON Elements holding type {}"), typeName(t))};
     }
 
 private:
@@ -656,7 +661,7 @@ public:
     explicit BSONObjHas(M m) : _m{std::move(m)} {}
 
     std::string describe() const {
-        return fmt::format("BSONObjHas({})", _m.describe());
+        return format(FMT_STRING("BSONObjHas({})"), _m.describe());
     }
 
     MatchResult match(const BSONObj& x) const {

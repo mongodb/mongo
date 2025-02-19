@@ -102,14 +102,16 @@
 
 namespace mongo {
 
+using namespace fmt::literals;
+
 class LinuxProc {
 public:
     LinuxProc(ProcessId pid) {
-        auto name = fmt::format("/proc/{}/stat", pid.asUInt32());
+        auto name = "/proc/{}/stat"_format(pid.asUInt32());
         FILE* f = fopen(name.c_str(), "r");
         if (!f) {
             auto ec = lastSystemError();
-            msgasserted(13538, fmt::format("couldn't open [{}] {}", name, errorMessage(ec)));
+            msgasserted(13538, "couldn't open [{}] {}"_format(name, errorMessage(ec)));
         }
         int found = fscanf(f,
                            "%d %127s %c "
@@ -169,7 +171,7 @@ public:
                              &_rtprio, &_sched
                            */
         );
-        massert(13539, fmt::format("couldn't parse [{}]", name).c_str(), found != 0);
+        massert(13539, "couldn't parse [{}]"_format(name).c_str(), found != 0);
         fclose(f);
     }
 
@@ -785,8 +787,8 @@ public:
      * return string path of cgrouop. If no cgroup v2, return an empty string.
      */
     static std::string getCgroupV2Path(const ProcessId& pid) {
-        const auto line = LinuxSysHelper::parseLineFromFile(
-            fmt::format("/proc/{}/cgroup", pid.asUInt32()).c_str());
+        const auto line =
+            LinuxSysHelper::parseLineFromFile("/proc/{}/cgroup"_format(pid.asUInt32()).c_str());
         if (line.empty()) {
             return {};
         }
@@ -797,7 +799,7 @@ public:
         // Check if the input starts with the prefix
         if (StringData{line}.startsWith(prefixV2)) {
             // cgroup v2.
-            return fmt::format("/sys/fs/cgroup{}", line.substr(prefixLength));
+            return "/sys/fs/cgroup{}"_format(line.substr(prefixLength));
         } else {
             // cgroup v1.
             return {};
@@ -818,11 +820,11 @@ public:
             auto lineStr = parseLineFromFile(fileName.c_str());
             return lineStr.empty() ? "default" : lineStr;
         };
-        cpuMax = parseLineOrDefault(fmt::format("{}/cpu.max", path));
-        cpuMaxBurst = parseLineOrDefault(fmt::format("{}/cpu.max.burst", path));
-        cpuUclampMin = parseLineOrDefault(fmt::format("{}/cpu.uclamp.min", path));
-        cpuUclampMax = parseLineOrDefault(fmt::format("{}/cpu.uclamp.max", path));
-        cpuWeight = parseLineOrDefault(fmt::format("{}/cpu.weight", path));
+        cpuMax = parseLineOrDefault("{}/cpu.max"_format(path));
+        cpuMaxBurst = parseLineOrDefault("{}/cpu.max.burst"_format(path));
+        cpuUclampMin = parseLineOrDefault("{}/cpu.uclamp.min"_format(path));
+        cpuUclampMax = parseLineOrDefault("{}/cpu.uclamp.max"_format(path));
+        cpuWeight = parseLineOrDefault("{}/cpu.weight"_format(path));
     }
 };
 
@@ -954,24 +956,24 @@ int ProcessInfo::getResidentSize() {
 
 StatusWith<std::string> ProcessInfo::readTransparentHugePagesParameter(StringData parameter,
                                                                        StringData directory) {
-    auto line =
-        LinuxSysHelper::parseLineFromFile(fmt::format("{}/{}", directory, parameter).c_str());
+    using namespace fmt::literals;
+    auto line = LinuxSysHelper::parseLineFromFile("{}/{}"_format(directory, parameter).c_str());
     if (line.empty()) {
         return {ErrorCodes::NonExistentPath,
-                fmt::format("Empty or non-existent file at {}/{}", directory, parameter)};
+                "Empty or non-existent file at {}/{}"_format(directory, parameter)};
     }
 
     std::string opMode;
     std::string::size_type posBegin = line.find('[');
     std::string::size_type posEnd = line.find(']');
     if (posBegin == std::string::npos || posEnd == std::string::npos || posBegin >= posEnd) {
-        return {ErrorCodes::FailedToParse, fmt::format("Cannot parse line: '{}'", line)};
+        return {ErrorCodes::FailedToParse, "Cannot parse line: '{}'"_format(line)};
     }
 
     opMode = line.substr(posBegin + 1, posEnd - posBegin - 1);
     if (opMode.empty()) {
         return {ErrorCodes::BadValue,
-                fmt::format("Invalid mode in {}/{}: '{}'", directory, parameter, line)};
+                "Invalid mode in {}/{}: '{}'"_format(directory, parameter, line)};
     }
 
     // Check against acceptable values of opMode.
@@ -986,17 +988,16 @@ StatusWith<std::string> ProcessInfo::readTransparentHugePagesParameter(StringDat
         acceptableValues.end()) {
         return {
             ErrorCodes::BadValue,
-            fmt::format(
-                "** WARNING: unrecognized transparent Huge Pages mode of operation in {}/{}: '{}'",
-                directory,
-                parameter,
-                opMode)};
+            "** WARNING: unrecognized transparent Huge Pages mode of operation in {}/{}: '{}'"_format(
+                directory, parameter, opMode)};
     }
 
     return std::move(opMode);
 }
 
 bool ProcessInfo::checkGlibcRseqTunable() {
+    using namespace fmt::literals;
+
     StringData glibcEnv = getenv(kGlibcTunableEnvVar);
     auto foundIndex = glibcEnv.find(kRseqKey);
 
@@ -1147,11 +1148,10 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
         appendIfExists(&bExtra, "thp_defrag", res.getValue());
     }
 
-    appendIfExists(
-        &bExtra,
-        "thp_max_ptes_none",
-        LinuxSysHelper::parseLineFromFile(
-            fmt::format("{}/khugepaged/max_ptes_none", kTranparentHugepageDirectory).c_str()));
+    appendIfExists(&bExtra,
+                   "thp_max_ptes_none",
+                   LinuxSysHelper::parseLineFromFile(
+                       "{}/khugepaged/max_ptes_none"_format(kTranparentHugepageDirectory).c_str()));
     appendIfExists(&bExtra,
                    "overcommit_memory",
                    LinuxSysHelper::parseLineFromFile("/proc/sys/vm/overcommit_memory"));
