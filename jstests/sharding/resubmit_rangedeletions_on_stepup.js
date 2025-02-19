@@ -4,6 +4,7 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getUUIDFromConfigCollections} from "jstests/libs/uuid_util.js";
+import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 // Test deliberately keeps range deletion in pending state.
@@ -34,7 +35,7 @@ function setup() {
     return st;
 }
 
-function writeRangeDeletionTask(collectionUuid, shardConn, pending, numOrphans) {
+function writeRangeDeletionTask(collectionUuid, shardConn, pending, numOrphans, shardVersion) {
     let deletionTask = {
         _id: UUID(),
         nss: ns,
@@ -42,7 +43,8 @@ function writeRangeDeletionTask(collectionUuid, shardConn, pending, numOrphans) 
         donorShardId: "unused",
         numOrphanDocs: numOrphans,
         range: {min: {x: 50}, max: {x: MaxKey}},
-        whenToClean: "now"
+        whenToClean: "now",
+        preMigrationShardVersion: shardVersion
     };
 
     if (pending)
@@ -90,7 +92,9 @@ function writeRangeDeletionTask(collectionUuid, shardConn, pending, numOrphans) 
     assert.eq(shard1Coll.find().itcount(), expectedNumDocsShard1);
 
     const collectionUuid = getUUIDFromConfigCollections(st.s, ns);
-    writeRangeDeletionTask(collectionUuid, st.shard0, false, orphanCount);
+    const shardVersion =
+        ShardVersioningUtil.getShardVersion(st.shard0, ns, true /* waitForRefresh */);
+    writeRangeDeletionTask(collectionUuid, st.shard0, false, orphanCount, shardVersion);
 
     // Step down current primary.
     let originalShard0Primary = st.rs0.getPrimary();
@@ -129,7 +133,9 @@ function writeRangeDeletionTask(collectionUuid, shardConn, pending, numOrphans) 
     }
 
     const collectionUuid = getUUIDFromConfigCollections(st.s, ns);
-    writeRangeDeletionTask(collectionUuid, st.shard0, true, orphanCount);
+    const shardVersion =
+        ShardVersioningUtil.getShardVersion(st.shard0, ns, true /* waitForRefresh */);
+    writeRangeDeletionTask(collectionUuid, st.shard0, true, orphanCount, shardVersion);
 
     const expectedNumDocsTotal = 0;
     const expectedNumDocsShard0 = 0;

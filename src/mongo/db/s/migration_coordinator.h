@@ -63,6 +63,7 @@ public:
                          ChunkRange range,
                          ChunkVersion preMigrationChunkVersion,
                          const KeyPattern& shardKeyPattern,
+                         ChunkVersion currentShardVersion,
                          bool waitForDelete);
 
     MigrationCoordinator(const MigrationCoordinatorDocument& doc);
@@ -144,6 +145,7 @@ private:
 
     MigrationCoordinatorDocument _migrationInfo;
     boost::optional<KeyPattern> _shardKeyPattern;
+    ChunkVersion _shardVersionPriorToTheMigration;
     bool _waitForDelete = false;
     boost::optional<ExecutorFuture<void>> _releaseRecipientCriticalSectionFuture;
 };

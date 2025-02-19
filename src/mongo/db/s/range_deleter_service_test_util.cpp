@@ -91,7 +91,8 @@ RangeDeletionTask createRangeDeletionTask(const UUID& collectionUUID,
                                           const BSONObj& max,
                                           CleanWhenEnum whenToClean,
                                           bool pending,
-                                          boost::optional<KeyPattern> keyPattern) {
+                                          boost::optional<KeyPattern> keyPattern,
+                                          const ChunkVersion& shardVersion) {
     RangeDeletionTask rdt;
     rdt.setId(UUID::gen());
     rdt.setNss(RangeDeleterServiceTest::nssWithUuid[collectionUUID]);
@@ -101,6 +102,7 @@ RangeDeletionTask createRangeDeletionTask(const UUID& collectionUUID,
     rdt.setWhenToClean(whenToClean);
     rdt.setPending(pending);
     rdt.setKeyPattern(keyPattern);
+    rdt.setPreMigrationShardVersion(shardVersion);
 
     return rdt;
 }
@@ -111,9 +113,10 @@ std::shared_ptr<RangeDeletionWithOngoingQueries> createRangeDeletionTaskWithOngo
     const BSONObj& max,
     CleanWhenEnum whenToClean,
     bool pending,
-    boost::optional<KeyPattern> keyPattern) {
-    return std::make_shared<RangeDeletionWithOngoingQueries>(
-        createRangeDeletionTask(collectionUUID, min, max, whenToClean, pending, keyPattern));
+    boost::optional<KeyPattern> keyPattern,
+    const ChunkVersion& collectionVersion) {
+    return std::make_shared<RangeDeletionWithOngoingQueries>(createRangeDeletionTask(
+        collectionUUID, min, max, whenToClean, pending, keyPattern, collectionVersion));
 }
 
 SharedSemiFuture<void> registerAndCreatePersistentTask(

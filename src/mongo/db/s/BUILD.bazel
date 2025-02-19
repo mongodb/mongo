@@ -88,6 +88,7 @@ idl_generator(
         "//src/mongo/db:keypattern_gen",
         "//src/mongo/db/session:logical_session_id_gen",
         "//src/mongo/s:chunk_range_gen",
+        "//src/mongo/s:chunk_version_gen",
         "//src/mongo/s:sharding_types_gen",
     ],
 )

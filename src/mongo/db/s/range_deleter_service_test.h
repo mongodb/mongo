@@ -109,12 +109,14 @@ private:
                                                         logv2::LogSeverity::Debug(2)};
 };
 
-RangeDeletionTask createRangeDeletionTask(const UUID& collectionUUID,
-                                          const BSONObj& min,
-                                          const BSONObj& max,
-                                          CleanWhenEnum whenToClean = CleanWhenEnum::kNow,
-                                          bool pending = true,
-                                          boost::optional<KeyPattern> keyPattern = boost::none);
+RangeDeletionTask createRangeDeletionTask(
+    const UUID& collectionUUID,
+    const BSONObj& min,
+    const BSONObj& max,
+    CleanWhenEnum whenToClean = CleanWhenEnum::kNow,
+    bool pending = true,
+    boost::optional<KeyPattern> keyPattern = boost::none,
+    const ChunkVersion& shardVersion = ChunkVersion::IGNORED());
 
 std::shared_ptr<RangeDeletionWithOngoingQueries> createRangeDeletionTaskWithOngoingQueries(
     const UUID& collectionUUID,
@@ -122,7 +124,8 @@ std::shared_ptr<RangeDeletionWithOngoingQueries> createRangeDeletionTaskWithOngo
     const BSONObj& max,
     CleanWhenEnum whenToClean = CleanWhenEnum::kNow,
     bool pending = true,
-    boost::optional<KeyPattern> keyPattern = boost::none);
+    boost::optional<KeyPattern> keyPattern = boost::none,
+    const ChunkVersion& shardVersion = ChunkVersion::IGNORED());
 
 SharedSemiFuture<void> registerAndCreatePersistentTask(
     OperationContext* opCtx,

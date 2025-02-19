@@ -5,6 +5,7 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getUUIDFromConfigCollections} from "jstests/libs/uuid_util.js";
+import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -22,6 +23,8 @@ assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 50}}));
 // Move chunk [50, inf) to shard1.
 assert.commandWorked(st.s.adminCommand(
     {moveChunk: ns, find: {x: 50}, to: st.shard1.shardName, _waitForDelete: true}));
+
+const shardVersion = ShardVersioningUtil.getShardVersion(st.shard0, ns);
 
 let testDB = st.s.getDB(dbName);
 let testColl = testDB.foo;
@@ -74,7 +77,8 @@ let testColl = testDB.foo;
         pending: true,
         numOrphanDocs: orphanCount,
         range: {min: {x: 70}, max: {x: 90}},
-        whenToClean: "now"
+        whenToClean: "now",
+        preMigrationShardVersion: shardVersion
     };
 
     const rangeDeletionNs = "config.rangeDeletions";
@@ -127,7 +131,8 @@ let testColl = testDB.foo;
         pending: true,
         numOrphanDocs: 0,
         range: {min: {x: 70}, max: {x: 90}},
-        whenToClean: "now"
+        whenToClean: "now",
+        preMigrationShardVersion: shardVersion
     };
 
     const rangeDeletionNs = "config.rangeDeletions";

@@ -16,10 +16,23 @@ export var ShardVersioningUtil = (function() {
     /*
      * Returns the metadata for the collection in the shard's catalog cache.
      */
-    let getMetadataOnShard = function(shard, ns) {
-        let res = shard.adminCommand({getShardVersion: ns, fullMetadata: true});
-        assert.commandWorked(res);
+    let getMetadataOnShard = function(shard, ns, waitForRefresh = false) {
+        if (waitForRefresh) {
+            // Wait for the last routing table cache refresh to be persisted on disk
+            assert.commandWorked(shard.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+        }
+
+        let res =
+            assert.commandWorked(shard.adminCommand({getShardVersion: ns, fullMetadata: true}));
         return res.metadata;
+    };
+
+    /*
+     * Returns the shard version of a collection on the given shard.
+     */
+    let getShardVersion = function(shard, ns, waitForRefresh = false) {
+        let res = getMetadataOnShard(shard, ns, waitForRefresh);
+        return {e: res.shardVersionEpoch, t: res.shardVersionTimestamp, v: res.shardVersion};
     };
 
     /*
@@ -72,6 +85,7 @@ export var ShardVersioningUtil = (function() {
     return {
         kIgnoredShardVersion,
         getMetadataOnShard,
+        getShardVersion,
         assertCollectionVersionEquals,
         assertCollectionVersionOlderThan,
         assertShardVersionEquals,

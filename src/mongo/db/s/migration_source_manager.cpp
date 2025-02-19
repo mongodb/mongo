@@ -441,6 +441,7 @@ void MigrationSourceManager::startClone() {
                              ChunkRange(*_args.getMin(), *_args.getMax()),
                              *_chunkVersion,
                              KeyPattern(metadata.getKeyPattern()),
+                             metadata.getShardPlacementVersion(),
                              _args.getWaitForDelete());
 
         _state = kCloning;

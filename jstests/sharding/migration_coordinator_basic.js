@@ -8,6 +8,19 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
+
+function is81orAbove() {
+    // Requires all primary shard nodes to be running the fcvRequired version.
+    let isFcvGreater = true;
+    st.forEachConnection(function(conn) {
+        const fcvDoc = conn.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+        if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.1") < 0) {
+            isFcvGreater = false;
+        }
+    });
+    return isFcvGreater;
+}
 
 function getNewNs(dbName) {
     if (typeof getNewNs.counter == 'undefined') {
@@ -62,22 +75,49 @@ function assertEventuallyDoesNotHaveMigrationCoordinatorDoc(conn) {
     });
 }
 
-function assertHasRangeDeletionDoc({conn, pending, whenToClean, ns, uuid, processing}) {
+function assertHasRangeDeletionDoc(
+    {conn, pending, whenToClean, ns, uuid, processing, preMigrationShardVersion}) {
     const query = {
         nss: ns,
         collectionUuid: uuid,
         donorShardId: st.shard0.shardName,
         "range.min._id": MinKey,
         "range.max._id": MaxKey,
-        pending: (pending ? true : {$exists: false}),
-        whenToClean: whenToClean,
-        processing: (processing ? true : {$exists: false})
+        whenToClean: whenToClean
     };
+
+    const doc = conn.getDB("config").getCollection("rangeDeletions").findOne(query);
     assert.neq(null,
-               conn.getDB("config").getCollection("rangeDeletions").findOne(query),
+               doc,
                "did not find document matching query " + tojson(query) +
                    ", contents of config.rangeDeletions on " + conn + ": " +
                    tojson(conn.getDB("config").getCollection("rangeDeletions").find().toArray()));
+    if (pending) {
+        assert.eq(pending,
+                  doc.pending,
+                  "Unexpected value on `pending` field. Range deletion doc found: " + tojson(doc));
+    } else {
+        assert(!doc.hasOwnProperty('pending'),
+               "Field `pending` was not expected to be present. Range deletion doc found: " +
+                   tojson(doc));
+    }
+    if (processing) {
+        assert.eq(
+            processing,
+            doc.processing,
+            "Unexpected value on `processing` field. Range deletion doc found: " + tojson(doc));
+    } else {
+        assert(!doc.hasOwnProperty('processing'),
+               "Field `processing` was not expected to be present. Range deletion doc found: " +
+                   tojson(doc));
+    }
+    if (is81orAbove()) {
+        assert.eq(
+            preMigrationShardVersion,
+            doc.preMigrationShardVersion,
+            "Unexpected value on `preMigrationShardVersion` field. Range deletion doc found: " +
+                tojson(doc));
+    }
 }
 
 function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
@@ -101,6 +141,8 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
     // Shard the collection.
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
     const [uuid, epoch] = getCollectionUuidAndEpoch(ns);
+    const preMigrationShardVersion =
+        ShardVersioningUtil.getShardVersion(st.shard0, ns, true /* waitForRefresh */);
 
     // Run the moveChunk asynchronously, pausing during cloning to allow the test to make
     // assertions.
@@ -113,10 +155,24 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
     // Assert that the durable state for coordinating the migration was written correctly.
     step4Failpoint.wait();
     assertHasMigrationCoordinatorDoc({conn: st.shard0, ns, uuid, epoch});
-    assertHasRangeDeletionDoc(
-        {conn: st.shard0, pending: true, whenToClean: "delayed", ns, uuid, processing: false});
-    assertHasRangeDeletionDoc(
-        {conn: st.shard1, pending: true, whenToClean: "now", ns, uuid, processing: false});
+    assertHasRangeDeletionDoc({
+        conn: st.shard0,
+        pending: true,
+        whenToClean: "delayed",
+        ns,
+        uuid,
+        processing: false,
+        preMigrationShardVersion
+    });
+    assertHasRangeDeletionDoc({
+        conn: st.shard1,
+        pending: true,
+        whenToClean: "now",
+        ns,
+        uuid,
+        processing: false,
+        preMigrationShardVersion: ShardVersioningUtil.kIgnoredShardVersion
+    });
     step4Failpoint.off();
 
     // Allow the moveChunk to finish.
@@ -150,6 +206,8 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
     // Shard the collection.
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
     const [uuid, epoch] = getCollectionUuidAndEpoch(ns);
+    const preMigrationShardVersion =
+        ShardVersioningUtil.getShardVersion(st.shard0, ns, true /* waitForRefresh */);
 
     // Turn on a failpoint to make the migration commit fail on the config server.
     let migrationCommitVersionErrorFailpoint =
@@ -170,10 +228,24 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
     // Assert that the durable state for coordinating the migration was written correctly.
     step4Failpoint.wait();
     assertHasMigrationCoordinatorDoc({conn: st.shard0, ns, uuid, epoch});
-    assertHasRangeDeletionDoc(
-        {conn: st.shard0, pending: true, whenToClean: "delayed", ns, uuid, processing: false});
-    assertHasRangeDeletionDoc(
-        {conn: st.shard1, pending: true, whenToClean: "now", ns, uuid, processing: false});
+    assertHasRangeDeletionDoc({
+        conn: st.shard0,
+        pending: true,
+        whenToClean: "delayed",
+        ns,
+        uuid,
+        processing: false,
+        preMigrationShardVersion
+    });
+    assertHasRangeDeletionDoc({
+        conn: st.shard1,
+        pending: true,
+        whenToClean: "now",
+        ns,
+        uuid,
+        processing: false,
+        preMigrationShardVersion: ShardVersioningUtil.kIgnoredShardVersion
+    });
     step4Failpoint.off();
 
     // Assert that the recipient has 'numDocs' orphans.
