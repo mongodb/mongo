@@ -235,9 +235,9 @@ TEST_F(ReshardingChangeStreamsMonitorTest, SuccessfullyInitializeMonitorWithStar
     ASSERT_FALSE(lastResume.isEmpty());
 }
 
-DEATH_TEST_F(ReshardingChangeStreamsMonitorTest,
-             FailIfAwaitEventCalledBeforeStartMonitoring,
-             "Attempted to await completion before starting the resharding change streams") {
+DEATH_TEST_REGEX_F(ReshardingChangeStreamsMonitorTest,
+                   FailIfAwaitEventCalledBeforeStartMonitoring,
+                   "Tripwire assertion.*1009073") {
     createCollectionAndInsertDocuments(0 /*minDocValue*/, 9 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 

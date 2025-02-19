@@ -353,13 +353,10 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
     std::vector<BSONObj>& backingBsonObjs) {
     // Noop change events:
     //   - reshardBegin: A resharding operation begins.
-    //   - reshardBlockingWrites: Collection being resharded starts to block writes.
     //   - reshardDoneCatchUp: "Catch up" phase of reshard operation completes.
     //   - shardCollection: A shardCollection operation has completed.
-    std::vector<StringData> internalOpTypes = {"reshardBegin"_sd,
-                                               "reshardBlockingWrites"_sd,
-                                               "reshardDoneCatchUp"_sd,
-                                               "shardCollection"_sd};
+    std::vector<StringData> internalOpTypes = {
+        "reshardBegin"_sd, "reshardDoneCatchUp"_sd, "shardCollection"_sd};
 
     // Noop change events that are only applicable when merging results on router:
     //   - migrateChunkToNewShard: A chunk migrated to a shard that didn't have any chunks.
@@ -367,9 +364,11 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
         internalOpTypes.push_back("migrateChunkToNewShard"_sd);
     }
 
-    // Only return the 'migrateLastChunkFromShard' event if 'showSystemEvents' is set.
+    // Only return the 'migrateLastChunkFromShard' event and the 'reshardBlockingWrites' event if
+    // 'showSystemEvents' is set.
     if (expCtx->getChangeStreamSpec()->getShowSystemEvents()) {
         internalOpTypes.push_back("migrateLastChunkFromShard"_sd);
+        internalOpTypes.push_back("reshardBlockingWrites"_sd);
     }
 
     internalOpTypes.push_back("refineCollectionShardKey"_sd);

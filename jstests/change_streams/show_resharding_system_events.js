@@ -113,6 +113,13 @@ let expectedReshardingEvents = [
     {
         ns: origNs,
         collectionUUID: oldUUID,
+        reshardingUUID: newUUID,
+        operationType: "reshardBlockingWrites",
+        operationDescription: {reshardingUUID: newUUID, type: "reshardFinalOp"}
+    },
+    {
+        ns: origNs,
+        collectionUUID: oldUUID,
         operationType: "reshardCollection",
         operationDescription: {
             reshardUUID: newUUID,
@@ -152,9 +159,11 @@ function assertChangeStreamEventSequence(csConfig, expectedEvents) {
 // With showSystemEvents set to true, we expect to see the full sequence of events.
 assertChangeStreamEventSequence({showSystemEvents: true}, expectedReshardingEvents);
 
-// With showSystemEvents set to false, we expect to only see events on the original namespace.
+// With showSystemEvents set to false, we expect to only see events on the original namespace and
+// not see the "reshardBlockingWrites" event.
 const nonSystemEvents =
-    expectedReshardingEvents.filter((event) => (event.ns && event.ns.coll === testColl.getName()));
+    expectedReshardingEvents.filter((event) => (event.ns && event.ns.coll === testColl.getName() &&
+                                                event.operationType != "reshardBlockingWrites"));
 assertChangeStreamEventSequence({showSystemEvents: false}, nonSystemEvents);
 
 st.stop();

@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/s/resharding/resharding_change_streams_monitor.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/logv2/log.h"
@@ -73,7 +74,7 @@ ReshardingChangeStreamsMonitor::ReshardingChangeStreamsMonitor(
 void ReshardingChangeStreamsMonitor::startMonitoring(
     std::shared_ptr<executor::TaskExecutor> executor, CancelableOperationContextFactory factory) {
     if (_finalEventPromise) {
-        LOGV2(9981900, "The resharding change streams monitor has already been scheduled.");
+        LOGV2(9981900, "The resharding change streams monitor has already completed.");
         return;
     }
 
@@ -81,9 +82,8 @@ void ReshardingChangeStreamsMonitor::startMonitoring(
     ExecutorFuture<void>(executor)
         .then([this, executor, factory]() {
             auto opCtx = factory.makeOperationContext(&cc());
-            auto aggReq = _createChangeStreamAggregation(opCtx.get());
-
-            _consumeChangeStream(opCtx.get(), aggReq);
+            auto aggRequest = _makeAggregateCommandRequest();
+            _consumeChangeEvents(opCtx.get(), aggRequest);
         })
         .onCompletion([this](Status status) {
             if (!status.isOK()) {
@@ -101,51 +101,59 @@ void ReshardingChangeStreamsMonitor::startMonitoring(
 }
 
 SharedSemiFuture<void> ReshardingChangeStreamsMonitor::awaitFinalChangeEvent() {
-    invariant(_finalEventPromise,
-              "Attempted to await completion before starting the resharding change streams.");
+    tassert(1009073,
+            "Attempted to wait for the resharding change streams monitor to complete without "
+            "starting it",
+            _finalEventPromise);
 
     // Block until the final change event is observed.
     return _finalEventPromise->getFuture();
 }
 
-AggregateCommandRequest ReshardingChangeStreamsMonitor::_createChangeStreamAggregation(
-    OperationContext* opCtx) {
-    using Doc = Document;
-    using Arr = std::vector<Value>;
-    using V = Value;
+AggregateCommandRequest ReshardingChangeStreamsMonitor::_makeAggregateCommandRequest() {
+    tassert(1009071,
+            str::stream() << "Expected the change streams monitor to have 'startAt' or "
+                             "'startAfter' but it has neither of them",
+            _startAt || _startAfter);
+    tassert(1009072,
+            str::stream() << "Expected the change streams monitor to have 'startAt' or "
+                             "'startAfter' but it has both of them",
+            !_startAt || !_startAfter);
 
-    auto mongoProcessInterface = MongoProcessInterface::create(opCtx);
-    BSONArray operationTypesArray = _getOperationTypesToMonitor();
-
-    auto expCtx = ExpressionContextBuilder{}
-                      .opCtx(opCtx)
-                      .mongoProcessInterface(std::move(mongoProcessInterface))
-                      .ns(_monitorNS)
-                      .build();
-
-    BSONObjBuilder builder;
-    builder.append(DocumentSourceChangeStreamSpec::kAllowToRunOnSystemNSFieldName, true);
-    builder.append(DocumentSourceChangeStreamSpec::kShowMigrationEventsFieldName, true);
-
-    invariant(_startAt || _startAfter);
-    invariant(!_startAt || !_startAfter);
+    DocumentSourceChangeStreamSpec changeStreamSpec;
+    changeStreamSpec.setAllowToRunOnSystemNS(_monitorNS.isSystem());
+    // The events against the temporary resharding collection are only ouput when
+    // 'showMigrationEvents' is true.
+    changeStreamSpec.setShowMigrationEvents(true);
+    // The 'reshardBlockingWrites' event, which is the final event when monitoring on a donor, is
+    // only output when "showSystemEvents" is true.
+    changeStreamSpec.setShowSystemEvents(!_isRecipient);
     if (_startAt) {
-        builder.append(DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName, *_startAt);
+        changeStreamSpec.setStartAtOperationTime(*_startAt);
     } else {
-        builder.append(DocumentSourceChangeStreamSpec::kStartAfterFieldName, *_startAfter);
+        auto resumeToken = ResumeToken::parse(*_startAfter);
+        changeStreamSpec.setStartAfter(std::move(resumeToken));
     }
-    BSONObj changeStreamStage = BSON(DocumentSourceChangeStream::kStageName << builder.obj());
+    BSONObj changeStreamStage =
+        BSON(DocumentSourceChangeStream::kStageName << changeStreamSpec.toBSON());
 
-    BSONObj matchStage =
-        BSON("$match" << BSON("operationType" << BSON("$in" << operationTypesArray)));
+    BSONArrayBuilder operationTypesArrayBuilder;
+    operationTypesArrayBuilder.append(DocumentSourceChangeStream::kInsertOpType);
+    operationTypesArrayBuilder.append(DocumentSourceChangeStream::kDeleteOpType);
+    if (_isRecipient) {
+        operationTypesArrayBuilder.append(DocumentSourceChangeStream::kReshardDoneCatchUpOpType);
+    } else {
+        operationTypesArrayBuilder.append(DocumentSourceChangeStream::kReshardBlockingWritesOpType);
+    }
+    BSONObj matchStage = BSON("$match" << BSON(DocumentSourceChangeStream::kOperationTypeField
+                                               << BSON("$in" << operationTypesArrayBuilder.arr())));
 
     const std::vector<BSONObj> rawPipeline = {changeStreamStage, matchStage};
-
-    return AggregateCommandRequest(_monitorNS, rawPipeline);
+    return {_monitorNS, std::move(rawPipeline)};
 }
 
-void ReshardingChangeStreamsMonitor::_consumeChangeStream(OperationContext* opCtx,
-                                                          AggregateCommandRequest aggRequest) {
+void ReshardingChangeStreamsMonitor::_consumeChangeEvents(
+    OperationContext* opCtx, const AggregateCommandRequest& aggRequest) {
     DBDirectClient client(opCtx);
     auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
         &client, aggRequest, false /* secondaryOk */, false /* useExhaust*/));
@@ -197,23 +205,6 @@ void ReshardingChangeStreamsMonitor::_processChangeEvent(const BSONObj changeEve
     }
 
     _numEventsProcessed += 1;
-}
-
-BSONArray ReshardingChangeStreamsMonitor::_getOperationTypesToMonitor() {
-    std::vector<StringData> operationTypes = {DocumentSourceChangeStream::kInsertOpType,
-                                              DocumentSourceChangeStream::kDeleteOpType};
-    if (_isRecipient) {
-        operationTypes.push_back(DocumentSourceChangeStream::kReshardDoneCatchUpOpType);
-    } else {
-        operationTypes.push_back(DocumentSourceChangeStream::kReshardBlockingWritesOpType);
-    }
-
-    BSONArrayBuilder operationTypesArrayBuilder;
-    for (const auto& opType : operationTypes) {
-        operationTypesArrayBuilder.append(opType);
-    }
-
-    return operationTypesArrayBuilder.arr();
 }
 
 }  // namespace mongo

@@ -1414,11 +1414,11 @@ TEST_F(ChangeStreamStageTest, TransformReshardBlockingWrites) {
                                                    nss,
                                                    BSONObj(),
                                                    uuid,
-                                                   true,  // fromMigrate
+                                                   false,  // fromMigrate
                                                    o2Field.toBSON());
 
     // TODO (SERVER-86688): Remove showExpandedEvents: true filter from $changeStream.
-    auto spec = fromjson("{$changeStream: {showMigrationEvents: true, showExpandedEvents: true}}");
+    auto spec = fromjson("{$changeStream: {showSystemEvents: true, showExpandedEvents: true}}");
 
     const auto opDesc =
         D{{"reshardingUUID", reshardingUuid}, {"type", resharding::kReshardFinalOpLogType}};

@@ -816,7 +816,6 @@ void ReshardingDonorService::DonorStateMachine::
                          NamespaceStringUtil::serialize(_metadata.getSourceNss(),
                                                         SerializationContext::stateDefault()))));
             oplog.setObject2(changeEvent.toBSON());
-            oplog.setFromMigrate(true);
             oplog.setOpTime(OplogSlot());
             oplog.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
             return oplog;
