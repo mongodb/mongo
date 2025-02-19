@@ -8,8 +8,6 @@
 //  assumes_unsharded_collection,
 //  uses_transactions,
 //  # Transactions on config and local dbs are allowed on shardsvrs.
-//  # TODO SERVER-64544: Investigate if we should ban transactions on config and local db's in
-//  # serverless. If yes, we will remove this tag.
 //  directly_against_shardsvrs_incompatible,
 // ]
 
