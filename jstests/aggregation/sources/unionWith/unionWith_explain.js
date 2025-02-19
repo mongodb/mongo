@@ -30,6 +30,10 @@ const executionStatsIngoredFields = [
     "executionTimeMillisEstimate",
     "saveState",
     "restoreState",
+    "costEstimate",
+    "cardinalityEstimate",
+    "estimatesMetadata",
+    "numKeysEstimate",
 ];
 
 const stagesIgnoredFields = [

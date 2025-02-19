@@ -62,10 +62,10 @@ export function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunctio
     const coll = db[collectionName];
 
     // Make histograms for all indexed fields.
-    if (isCollectionHistogrammable(db, coll)) {
+    if (collectionName !== undefined && isCollectionHistogrammable(db, coll)) {
         // Drop statistics collection. This should not be necessary, but it is currently a
         // workaround for SERVER-100679.
-        db.system.statistics[collectionName].drop();
+        db.system.statistics.getCollection(collectionName).drop();
 
         const indexes = coll.getIndexes();
 
