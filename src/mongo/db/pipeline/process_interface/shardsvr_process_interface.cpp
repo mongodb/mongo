@@ -303,11 +303,20 @@ void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
 
 BSONObj ShardServerProcessInterface::getCollectionOptions(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
+    return _getCollectionOptions(opCtx, nss);
+}
+
+BSONObj ShardServerProcessInterface::_getCollectionOptions(OperationContext* opCtx,
+                                                           const NamespaceString& nss,
+                                                           bool runOnPrimary) {
     if (nss.isNamespaceAlwaysUntracked()) {
         return getCollectionOptionsLocally(opCtx, nss);
     };
 
-    const auto response = _runListCollectionsCommandOnAShardedCluster(opCtx, nss);
+    // Some collections (for example temp collections) only exist on the replica set primary so we
+    // may need to run on the primary to get the options.
+    const auto response =
+        _runListCollectionsCommandOnAShardedCluster(opCtx, nss, false, runOnPrimary);
     if (response.empty()) {
         return BSONObj{};
     }
@@ -327,6 +336,13 @@ BSONObj ShardServerProcessInterface::getCollectionOptions(OperationContext* opCt
         return optionObj.getOwned();
     }
     return BSONObj{};
+}
+
+UUID ShardServerProcessInterface::fetchCollectionUUIDFromPrimary(OperationContext* opCtx,
+                                                                 const NamespaceString& nss) {
+    const auto options = _getCollectionOptions(opCtx, nss, /*runOnPrimary*/ true);
+    auto uuid = UUID::parse(options["uuid"_sd]);
+    return uassertStatusOK(uuid);
 }
 
 query_shape::CollectionType ShardServerProcessInterface::getCollectionType(

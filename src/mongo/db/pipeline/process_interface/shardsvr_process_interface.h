@@ -130,6 +130,8 @@ public:
 
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) final;
 
+    UUID fetchCollectionUUIDFromPrimary(OperationContext* opCtx, const NamespaceString& nss) final;
+
     query_shape::CollectionType getCollectionType(OperationContext* opCtx,
                                                   const NamespaceString& nss) final;
 
@@ -212,6 +214,10 @@ protected:
 private:
     boost::optional<TimeseriesOptions> _getTimeseriesOptions(OperationContext* opCtx,
                                                              const NamespaceString& ns) final;
+
+    BSONObj _getCollectionOptions(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  bool runOnPrimary = false);
 };
 
 }  // namespace mongo

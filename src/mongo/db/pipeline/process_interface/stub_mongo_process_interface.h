@@ -188,6 +188,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    UUID fetchCollectionUUIDFromPrimary(OperationContext* opCtx, const NamespaceString& nss) final {
+        MONGO_UNREACHABLE;
+    }
+
     query_shape::CollectionType getCollectionType(OperationContext* opCtx,
                                                   const NamespaceString& nss) final {
         MONGO_UNREACHABLE;

@@ -3,14 +3,13 @@
  */
 
 import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTest(st, testDb, portNum) {
-    // TODO SERVER-80853 add 'hangWhileBuildingDocumentSourceOutBatch' to this list
-    for (const failpointName
-             of ["outWaitAfterTempCollectionCreation", "outWaitBeforeTempCollectionRename"]) {
+    for (const failpointName of ["outWaitAfterTempCollectionCreation",
+                                 "outWaitBeforeTempCollectionRename",
+                                 "hangWhileBuildingDocumentSourceOutBatch"]) {
         const coll = testDb.out_source_coll;
         coll.drop();
 

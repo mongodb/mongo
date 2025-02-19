@@ -183,21 +183,7 @@ private:
 
     void finalize() override;
 
-    void flush(BatchedCommandRequest bcr, BatchedObjects batch) override {
-        DocumentSourceWriteBlock writeBlock(pExpCtx->getOperationContext());
-
-        auto insertCommand = bcr.extractInsertRequest();
-        insertCommand->setDocuments(std::move(batch));
-        auto targetEpoch = boost::none;
-
-        if (_timeseries) {
-            uassertStatusOK(pExpCtx->getMongoProcessInterface()->insertTimeseries(
-                pExpCtx, _tempNs, std::move(insertCommand), _writeConcern, targetEpoch));
-        } else {
-            uassertStatusOK(pExpCtx->getMongoProcessInterface()->insert(
-                pExpCtx, _tempNs, std::move(insertCommand), _writeConcern, targetEpoch));
-        }
-    }
+    void flush(BatchedCommandRequest bcr, BatchedObjects batch) override;
 
     std::pair<BSONObj, int> makeBatchObject(Document doc) const override {
         auto obj = doc.toBson();
@@ -266,6 +252,11 @@ private:
 
     // Tracks the current state of the temporary collection, and is used for cleanup.
     OutCleanUpProgress _tmpCleanUpState = OutCleanUpProgress::kComplete;
+
+    // The UUID of the temporary output collection, used to detect if the temp collection UUID
+    // changed during execution, which can cause incomplete results. This can happen if the primary
+    // steps down during execution.
+    boost::optional<UUID> _tempNsUUID = boost::none;
 };
 
 }  // namespace mongo

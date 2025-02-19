@@ -512,6 +512,13 @@ BSONObj CommonMongodProcessInterface::getCollectionOptions(OperationContext* opC
     return getCollectionOptionsLocally(opCtx, nss);
 }
 
+UUID CommonMongodProcessInterface::fetchCollectionUUIDFromPrimary(OperationContext* opCtx,
+                                                                  const NamespaceString& nss) {
+    BSONObj options = getCollectionOptions(opCtx, nss);
+    auto uuid = UUID::parse(options["uuid"_sd]);
+    return uassertStatusOK(uuid);
+}
+
 query_shape::CollectionType CommonMongodProcessInterface::getCollectionTypeLocally(
     OperationContext* opCtx, const NamespaceString& nss) {
     return acquireCollectionOrViewMaybeLockFree(opCtx,

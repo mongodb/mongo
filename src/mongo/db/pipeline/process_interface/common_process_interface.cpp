@@ -331,7 +331,10 @@ std::vector<DatabaseName> CommonProcessInterface::_getAllDatabasesOnAShardedClus
 }
 
 std::vector<BSONObj> CommonProcessInterface::_runListCollectionsCommandOnAShardedCluster(
-    OperationContext* opCtx, const NamespaceString& nss, bool appendPrimaryShardToTheResponse) {
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    bool appendPrimaryShardToTheResponse,
+    bool runAgainstPrimary) {
     tassert(9525809, "This method can only run on a sharded cluster", Grid::get(opCtx));
 
     const bool isCollectionless = nss.coll().empty();
@@ -378,9 +381,15 @@ std::vector<BSONObj> CommonProcessInterface::_runListCollectionsCommandOnASharde
             uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cdb->getPrimary()));
         Shard::QueryResponse resultCollections;
 
+        // Some collections (for example temp collections) only exist on the replica set primary so
+        // we may need to change the read preference to locate these.
+        const ReadPreferenceSetting readPreference = runAgainstPrimary
+            ? ReadPreferenceSetting(ReadPreference::PrimaryOnly)
+            : ReadPreferenceSetting::get(opCtx);
+
         resultCollections = uassertStatusOK(shard->runExhaustiveCursorCommand(
             opCtx,
-            ReadPreferenceSetting::get(opCtx),
+            readPreference,
             nss.dbName(),
             listCollectionsCmd.toBSON(),
             opCtx->hasDeadline() ? opCtx->getRemainingMaxTimeMillis() : Milliseconds(-1)));

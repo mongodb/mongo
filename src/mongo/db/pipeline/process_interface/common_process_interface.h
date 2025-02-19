@@ -243,7 +243,8 @@ protected:
      */
     std::vector<BSONObj> _runListCollectionsCommandOnAShardedCluster(OperationContext* opCtx,
                                                                      const NamespaceString& nss,
-                                                                     bool addPrimaryShard = false);
+                                                                     bool addPrimaryShard = false,
+                                                                     bool runOnPrimary = false);
 };
 
 }  // namespace mongo

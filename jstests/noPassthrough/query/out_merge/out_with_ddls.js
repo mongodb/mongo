@@ -77,6 +77,24 @@ function setup() {
     assert.commandWorked(batch.execute());
 }
 
+// To trigger temp collection recreation after the 'hangDollarOutAfterInsert' failpoint we require
+// multiple write batches.
+function setupLargeDocs() {
+    // Drop all DBs.
+    sourceDB.dropDatabase();
+    targetDB.dropDatabase();
+
+    st.s.adminCommand({enableSharding: sourceDB.getName(), primaryShard: st.shard0.shardName});
+
+    // Insert 20 ~1MB documents so they don't all fit in one 16MB out write batch.
+    var batch = sourceColl.initializeUnorderedBulkOp();
+    let largeVal = 'a'.repeat(1024 * 1024);
+    for (let i = 0; i < 20; i++) {
+        batch.insert({val: i, x: largeVal});
+    }
+    assert.commandWorked(batch.execute());
+}
+
 /**
  * Assert that executing a concurrent DDL operation and agg results in the aggregate failing and the
  * DDL operation succeeding, or the result is the same as if they had been run serially.
@@ -205,32 +223,36 @@ for (const targetDBExists of [true, false]) {
         }
     }));
 
-    assert.commandWorked(assertSerializedOrError({
-        desc: "Concurrent $out and movePrimary" + targetDBDesc,
-        failpointName: "hangWhileBuildingDocumentSourceOutBatch",
-        setupFn() {
-            setup();
-            maybeCreateTargetDB();
-        },
-        ddlFn() {
-            sourceDB.adminCommand({movePrimary: targetDB.getName(), to: st.shard2.shardName});
-        }
-    }));
+    assert.commandFailedWithCode(
+        assertSerializedOrError({
+            desc: "Concurrent $out and movePrimary" + targetDBDesc,
+            failpointName: "hangWhileBuildingDocumentSourceOutBatch",
+            setupFn() {
+                setup();
+                maybeCreateTargetDB();
+            },
+            ddlFn() {
+                sourceDB.adminCommand({movePrimary: targetDB.getName(), to: st.shard2.shardName});
+            }
+        }),
+        ErrorCodes.CollectionUUIDMismatch);
 
-    assert.commandWorked(assertSerializedOrError({
-        desc: "Concurrent $out and dropDatabase on targetDB" + targetDBDesc,
-        failpointName: "hangWhileBuildingDocumentSourceOutBatch",
-        setupFn() {
-            setup();
-            maybeCreateTargetDB();
-        },
-        ddlFn() {
-            assert.commandWorked(targetDB.dropDatabase());
-        },
-        // Because of the dropDatabase on the targetDB the target collection is implicitly created
-        // on a random shard by the next insert from $out.
-        ignorePlacement: true
-    }));
+    assert.commandFailedWithCode(
+        assertSerializedOrError({
+            desc: "Concurrent $out and dropDatabase on targetDB" + targetDBDesc,
+            failpointName: "hangWhileBuildingDocumentSourceOutBatch",
+            setupFn() {
+                setup();
+                maybeCreateTargetDB();
+            },
+            ddlFn() {
+                assert.commandWorked(targetDB.dropDatabase());
+            },
+            // Because of the dropDatabase on the targetDB the target collection is implicitly
+            // created on a random shard by the next insert from $out.
+            ignorePlacement: true
+        }),
+        ErrorCodes.CollectionUUIDMismatch);
 
     assert.commandWorked(assertSerializedOrError({
         desc: "Concurrent $out and dropDatabase on sourceDB" + targetDBDesc,
@@ -271,6 +293,20 @@ for (const targetDBExists of [true, false]) {
             assert(sourceColl.drop());
         }
     }));
+
+    assert.commandFailedWithCode(
+        assertSerializedOrError({
+            desc: "Concurrent $out and drop temp collection" + targetDBDesc,
+            failpointName: "hangDollarOutAfterInsert",
+            setupFn() {
+                setupLargeDocs();
+                maybeCreateTargetDB();
+            },
+            ddlFn() {
+                assert(getTempOutColl().drop());
+            }
+        }),
+        ErrorCodes.CollectionUUIDMismatch);
 
     if (!FeatureFlagUtil.isEnabled(st.s, "TrackUnshardedCollectionsUponCreation")) {
         assert.commandWorked(assertSerializedOrError({
