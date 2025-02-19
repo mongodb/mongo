@@ -117,7 +117,12 @@ buildvariants:
       - ubuntu1804-small
     stepback: false
     expansions:
-      compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo)
+      compile_flags: >-
+        --ssl
+        --ocsp-stapling=off
+        MONGO_DISTMOD=ubuntu1804
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --disable-streams
       repo_edition: enterprise
       has_packages: false
       compile_variant: ubuntu1804-ninja-build-profiles
