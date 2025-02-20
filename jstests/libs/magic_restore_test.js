@@ -357,6 +357,9 @@ export class MagicRestoreTest {
      * Calculates and stores pre-restore collection hashes.
      */
     storePreRestoreDbHashes() {
+        // On multi-node replica sets, the backup source is a secondary. Ensure the secondary is
+        // caught up to the primary before we store pre-restore hashes.
+        this.rst.awaitReplication();
         this.preRestoreDbHashes = this._getDbHashes(this.backupSource);
     }
 
