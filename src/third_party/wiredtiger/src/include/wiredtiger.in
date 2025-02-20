@@ -1213,9 +1213,9 @@ struct __wt_session {
      * WT_CONNECTION::add_encryptor.  See @ref encryption for more information., a string; default
      * \c none.}
      * @config{ ),,}
-     * @config{exclusive, fail if the object exists.  When false (the default)\, if the object
-     * exists\, check that its settings match the specified configuration., a boolean flag; default
-     * \c false.}
+     * @config{exclusive, explicitly fail with EEXIST if the object exists.  When false (the
+     * default)\, if the object exists\, silently fail without creating a new object., a boolean
+     * flag; default \c false.}
      * @config{format, the file format., a string\, chosen from the following options: \c "btree";
      * default \c btree.}
      * @config{ignore_in_memory_cache_size, allow update and insert operations to proceed even if
