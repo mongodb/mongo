@@ -163,6 +163,7 @@ private:
         DataView(storage).write<LittleEndian<int32_t>>(data.size() + 1);
         MONGO_COMPILER_DIAGNOSTIC_PUSH
         MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Warray-bounds")
+        MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wstringop-overflow")
         memcpy(storage + sizeof(int32_t), data.data(), data.size());
         MONGO_COMPILER_DIAGNOSTIC_POP
 
