@@ -67,17 +67,18 @@ RemoteCommandResponse::RemoteCommandResponse(HostAndPort hp,
 }
 
 std::string RemoteCommandResponse::toString() const {
-    return format(FMT_STRING("RemoteResponse -- "
-                             " cmd: {}"
-                             " target: {}"
-                             " status: {}"
-                             " elapsedMicros: {}"
-                             " moreToCome: {}"),
-                  data.toString(),
-                  target.toString(),
-                  status.toString(),
-                  elapsed ? StringData(elapsed->toString()) : "n/a"_sd,
-                  moreToCome);
+    return fmt::format(
+        "RemoteResponse -- "
+        " cmd: {}"
+        " target: {}"
+        " status: {}"
+        " elapsedMicros: {}"
+        " moreToCome: {}",
+        data.toString(),
+        target.toString(),
+        status.toString(),
+        elapsed ? StringData(elapsed->toString()) : "n/a"_sd,
+        moreToCome);
 }
 
 bool RemoteCommandResponse::isOK() const {

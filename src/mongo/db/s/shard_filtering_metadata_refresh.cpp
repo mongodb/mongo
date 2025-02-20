@@ -716,9 +716,8 @@ void FilteringMetadataCache::_onDbVersionMismatch(
         uasserted(ErrorCodes::InternalError, "skipShardFilteringMetadataRefresh failpoint");
     }
 
-    using namespace fmt::literals;
     tassert(ErrorCodes::IllegalOperation,
-            "Can't check version of {} database"_format(dbName.toStringForErrorMsg()),
+            fmt::format("Can't check version of {} database", dbName.toStringForErrorMsg()),
             !dbName.isAdminDB() && !dbName.isConfigDB());
 
     Timer t{};

@@ -66,8 +66,6 @@
 namespace mongo {
 namespace {
 
-using namespace fmt::literals;
-
 constexpr absl::string_view toStringView(StringData s) {
     return {s.data(), s.size()};
 }
@@ -75,8 +73,11 @@ constexpr absl::string_view toStringView(StringData s) {
 StatusWith<size_t> validateTCMallocValue(StringData name, const BSONElement& newValueElement) {
     if (!newValueElement.isNumber()) {
         return {ErrorCodes::TypeMismatch,
-                "Expected server parameter {} to have numeric type, but found {} of type {}"_format(
-                    name, newValueElement.toString(false), typeName(newValueElement.type()))};
+                fmt::format(
+                    "Expected server parameter {} to have numeric type, but found {} of type {}",
+                    name,
+                    newValueElement.toString(false),
+                    typeName(newValueElement.type()))};
     }
     static constexpr unsigned long long maxOkValue =
         std::min(static_cast<unsigned long long>(std::numeric_limits<size_t>::max()),
@@ -85,7 +86,7 @@ StatusWith<size_t> validateTCMallocValue(StringData name, const BSONElement& new
     auto valueULL = static_cast<unsigned long long>(newValueElement.safeNumberLong());
     if (valueULL > maxOkValue) {
         return Status(ErrorCodes::BadValue,
-                      "Value {} is outside range [0, {}]"_format(name, maxOkValue));
+                      fmt::format("Value {} is outside range [0, {}]", name, maxOkValue));
     }
     return static_cast<size_t>(valueULL);
 }
@@ -96,7 +97,7 @@ StatusWith<size_t> validateTCMallocValue(StringData name, const BSONElement& new
 // tcmalloc api.
 size_t getTcmallocProperty(StringData propName) {
     iassert(ErrorCodes::InternalError,
-            "Failed to retreive tcmalloc property: {}"_format(propName),
+            fmt::format("Failed to retreive tcmalloc property: {}", propName),
             propName == kMaxPerCPUCacheSizePropertyName);
     return static_cast<size_t>(tcmalloc::MallocExtension::GetMaxPerCpuCacheSize());
 }
@@ -106,7 +107,7 @@ size_t getTcmallocProperty(StringData propName) {
 void setTcmallocProperty(StringData propName, size_t value) {
     if (!RUNNING_ON_VALGRIND) {  // NOLINT
         iassert(ErrorCodes::InternalError,
-                "Failed to set internal tcmalloc property: {}"_format(propName),
+                fmt::format("Failed to set internal tcmalloc property: {}", propName),
                 propName == kMaxPerCPUCacheSizePropertyName);
         tcmalloc::MallocExtension::SetMaxPerCpuCacheSize(value);
     }
@@ -125,7 +126,7 @@ void setMemoryReleaseRate(TcmallocReleaseRateT val) {
 size_t getTcmallocProperty(StringData propName) {
     size_t value;
     iassert(ErrorCodes::InternalError,
-            "Failed to retreive tcmalloc property: {}"_format(propName),
+            fmt::format("Failed to retreive tcmalloc property: {}", propName),
             MallocExtension::instance()->GetNumericProperty(std::string{propName}.c_str(), &value));
     return value;
 }
@@ -134,7 +135,7 @@ void setTcmallocProperty(StringData propName, size_t value) {
     if (!RUNNING_ON_VALGRIND) {  // NOLINT
         iassert(
             ErrorCodes::InternalError,
-            "Failed to set internal tcmalloc property: {}"_format(propName),
+            fmt::format("Failed to set internal tcmalloc property: {}", propName),
             MallocExtension::instance()->SetNumericProperty(std::string{propName}.c_str(), value));
     }
 }
@@ -324,7 +325,7 @@ Status TCMallocReleaseRateServerParameter::setFromString(StringData tcmallocRele
     }
     if (value < 0) {
         return {ErrorCodes::BadValue,
-                "tcmallocReleaseRate cannot be negative: {}"_format(tcmallocReleaseRate)};
+                fmt::format("tcmallocReleaseRate cannot be negative: {}", tcmallocReleaseRate)};
     }
     setMemoryReleaseRate(value);
     return Status::OK();
@@ -350,9 +351,11 @@ Status validateHeapProfilingSampleIntervalBytes(long long newValue,
         return Status::OK();
     }
 
-    return {ErrorCodes::BadValue,
-            "heapProfilingSampleIntervalBytes must have a minimum rate of {} bytes or be disabled "
-            "with a rate of 0."_format(heapProfilerMinRate)};
+    return {
+        ErrorCodes::BadValue,
+        fmt::format("heapProfilingSampleIntervalBytes must have a minimum rate of {} bytes or be "
+                    "disabled with a rate of 0.",
+                    heapProfilerMinRate)};
 }
 
 namespace {

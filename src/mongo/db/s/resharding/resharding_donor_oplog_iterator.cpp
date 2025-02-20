@@ -72,8 +72,6 @@
 
 namespace mongo {
 
-using namespace fmt::literals;
-
 namespace {
 
 /**

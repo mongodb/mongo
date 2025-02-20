@@ -37,19 +37,17 @@ namespace exec::expression {
 Value evaluate(const ExpressionInternalFindPositional& expr,
                const Document& root,
                Variables* variables) {
-    using namespace fmt::literals;
-
     auto& children = expr.getChildren();
 
     auto preImage = children[0]->evaluate(root, variables);
     auto postImage = children[1]->evaluate(root, variables);
     uassert(51255,
-            "Positional operator pre-image can only be an object, but got {}"_format(
-                typeName(preImage.getType())),
+            fmt::format("Positional operator pre-image can only be an object, but got {}",
+                        typeName(preImage.getType())),
             preImage.getType() == BSONType::Object);
     uassert(51258,
-            "Positional operator post-image can only be an object, but got {}"_format(
-                typeName(postImage.getType())),
+            fmt::format("Positional operator post-image can only be an object, but got {}",
+                        typeName(postImage.getType())),
             postImage.getType() == BSONType::Object);
     return Value{projection_executor_utils::applyFindPositionalProjection(preImage.getDocument(),
                                                                           postImage.getDocument(),
@@ -60,12 +58,10 @@ Value evaluate(const ExpressionInternalFindPositional& expr,
 Value evaluate(const ExpressionInternalFindSlice& expr,
                const Document& root,
                Variables* variables) {
-    using namespace fmt::literals;
-
     auto postImage = expr.getChildren()[0]->evaluate(root, variables);
     uassert(51256,
-            "$slice operator can only be applied to an object, but got {}"_format(
-                typeName(postImage.getType())),
+            fmt::format("$slice operator can only be applied to an object, but got {}",
+                        typeName(postImage.getType())),
             postImage.getType() == BSONType::Object);
     return Value{projection_executor_utils::applyFindSliceProjection(
         postImage.getDocument(), expr.getFieldPath(), expr.getSkip(), expr.getLimit())};
@@ -74,8 +70,6 @@ Value evaluate(const ExpressionInternalFindSlice& expr,
 Value evaluate(const ExpressionInternalFindElemMatch& expr,
                const Document& root,
                Variables* variables) {
-    using namespace fmt::literals;
-
     auto input = expr.getChildren()[0]->evaluate(root, variables);
     invariant(input.getType() == BSONType::Object);
     return projection_executor_utils::applyFindElemMatchProjection(

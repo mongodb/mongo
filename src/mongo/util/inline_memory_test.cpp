@@ -43,8 +43,6 @@
 namespace mongo::inline_memory {
 namespace {
 
-using namespace fmt::literals;
-
 class MonotonicBufferResourceTest : public unittest::Test {
 public:
     template <typename T>

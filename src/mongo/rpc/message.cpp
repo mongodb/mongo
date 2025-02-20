@@ -76,7 +76,7 @@ std::string Message::opMsgDebugString() const {
         headerView.getLen(),
         headerView.getId(),
         headerView.getResponseToMsgId(),
-        headerView.getNetworkOp(),
+        fmt::underlying(headerView.getNetworkOp()),
         OpMsg::flags(*this),
         opMsgRequest.body.toString(),
         docSequences.str());

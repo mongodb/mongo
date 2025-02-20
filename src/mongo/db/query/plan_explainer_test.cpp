@@ -48,8 +48,6 @@
 namespace mongo {
 namespace {
 
-using namespace fmt::literals;
-
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.collection");
 
 // This fixture sets up a collection on namespace kNss with indexes on field "a" and "b" and 200

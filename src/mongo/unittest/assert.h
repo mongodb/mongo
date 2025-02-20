@@ -272,48 +272,44 @@
         FAIL("Expected expression " #EXPRESSION " to throw " #EXCEPTION_TYPE       \
              " but it threw nothing.")
 
-#define ASSERT_STRING_CONTAINS(BIG_STRING, CONTAINS)                            \
-    if (auto tup_ = std::tuple(std::string(BIG_STRING), std::string(CONTAINS)); \
-        std::get<0>(tup_).find(std::get<1>(tup_)) != std::string::npos) {       \
-    } else                                                                      \
-        FAIL(([&] {                                                             \
-            const auto& [haystack, sub] = tup_;                                 \
-            return format(FMT_STRING("Expected to find {} ({}) in {} ({})"),    \
-                          #CONTAINS,                                            \
-                          sub,                                                  \
-                          #BIG_STRING,                                          \
-                          haystack);                                            \
-        }()))
-
-#define ASSERT_STRING_OMITS(BIG_STRING, OMITS)                                     \
-    if (auto tup_ = std::tuple(std::string(BIG_STRING), std::string(OMITS));       \
-        std::get<0>(tup_).find(std::get<1>(tup_)) == std::string::npos) {          \
-    } else                                                                         \
-        FAIL(([&] {                                                                \
-            const auto& [haystack, omits] = tup_;                                  \
-            return format(FMT_STRING("Did not expect to find {} ({}) in {} ({})"), \
-                          #OMITS,                                                  \
-                          omits,                                                   \
-                          #BIG_STRING,                                             \
-                          haystack);                                               \
-        }()))
-
-#define ASSERT_STRING_SEARCH_REGEX(BIG_STRING, REGEX)                                          \
-    if (auto tup_ = std::tuple(std::string(BIG_STRING), mongo::pcre::Regex(REGEX));            \
-        ::mongo::unittest::searchRegex(std::get<1>(tup_), std::get<0>(tup_))) {                \
+#define ASSERT_STRING_CONTAINS(BIG_STRING, CONTAINS)                                           \
+    if (auto tup_ = std::tuple(std::string(BIG_STRING), std::string(CONTAINS));                \
+        std::get<0>(tup_).find(std::get<1>(tup_)) != std::string::npos) {                      \
     } else                                                                                     \
         FAIL(([&] {                                                                            \
-            const auto& [haystack, regex] = tup_;                                              \
-            std::string sub(REGEX);                                                            \
-            if (regex)                                                                         \
-                return format(                                                                 \
-                    FMT_STRING("Expected to find regular expression {} /{}/ in {} ({})"),      \
-                    #REGEX,                                                                    \
-                    sub,                                                                       \
-                    #BIG_STRING,                                                               \
-                    haystack);                                                                 \
-            else                                                                               \
-                return format(FMT_STRING("Invalid regular expression: {} /{}/"), #REGEX, sub); \
+            const auto& [haystack, sub] = tup_;                                                \
+            return fmt::format(                                                                \
+                "Expected to find {} ({}) in {} ({})", #CONTAINS, sub, #BIG_STRING, haystack); \
+        }()))
+
+#define ASSERT_STRING_OMITS(BIG_STRING, OMITS)                               \
+    if (auto tup_ = std::tuple(std::string(BIG_STRING), std::string(OMITS)); \
+        std::get<0>(tup_).find(std::get<1>(tup_)) == std::string::npos) {    \
+    } else                                                                   \
+        FAIL(([&] {                                                          \
+            const auto& [haystack, omits] = tup_;                            \
+            return fmt::format("Did not expect to find {} ({}) in {} ({})",  \
+                               #OMITS,                                       \
+                               omits,                                        \
+                               #BIG_STRING,                                  \
+                               haystack);                                    \
+        }()))
+
+#define ASSERT_STRING_SEARCH_REGEX(BIG_STRING, REGEX)                                        \
+    if (auto tup_ = std::tuple(std::string(BIG_STRING), mongo::pcre::Regex(REGEX));          \
+        ::mongo::unittest::searchRegex(std::get<1>(tup_), std::get<0>(tup_))) {              \
+    } else                                                                                   \
+        FAIL(([&] {                                                                          \
+            const auto& [haystack, regex] = tup_;                                            \
+            std::string sub(REGEX);                                                          \
+            if (regex)                                                                       \
+                return fmt::format("Expected to find regular expression {} /{}/ in {} ({})", \
+                                   #REGEX,                                                   \
+                                   sub,                                                      \
+                                   #BIG_STRING,                                              \
+                                   haystack);                                                \
+            else                                                                             \
+                return fmt::format("Invalid regular expression: {} /{}/", #REGEX, sub);      \
         }()))
 
 namespace mongo::unittest {
@@ -428,15 +424,15 @@ private:
         if (comparator()(a, b)) {
             return;
         }
-        _assertion = std::make_unique<TestAssertionFailure>(
-            theFile,
-            theLine,
-            format(FMT_STRING("Expected {1} {0} {2} ({3} {0} {4})"),
-                   name(),
-                   aExpression,
-                   bExpression,
-                   stringify::invoke(a),
-                   stringify::invoke(b)));
+        _assertion =
+            std::make_unique<TestAssertionFailure>(theFile,
+                                                   theLine,
+                                                   fmt::format("Expected {1} {0} {2} ({3} {0} {4})",
+                                                               name(),
+                                                               aExpression,
+                                                               bExpression,
+                                                               stringify::invoke(a),
+                                                               stringify::invoke(b)));
     }
 
 public:

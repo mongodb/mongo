@@ -31,7 +31,6 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
-#include <fmt/ostream.h>
 // IWYU pragma: no_include "cxxabi.h"
 #include <array>
 #include <cstddef>
@@ -88,8 +87,6 @@
 
 namespace mongo::transport {
 namespace {
-using namespace fmt::literals;
-
 const Status kClosedSessionError{ErrorCodes::SocketException, "Session is closed"};
 const Status kNetworkError{ErrorCodes::HostUnreachable, "Someone is unreachable"};
 const Status kShutdownError{ErrorCodes::ShutdownInProgress, "Something is shutting down"};
@@ -214,7 +211,8 @@ public:
         stdx::unique_lock lk{_mutex};
         _cv.wait(lk, [&] { return !!_cb; });
         auto h = std::exchange(_cb, {});
-        invariant(h->event() == e, "Expecting {}, got {}"_format(h->event(), e));
+        invariant(h->event() == e,
+                  fmt::format("Expecting {}, got {}", toString(h->event()), toString(e)));
         return std::move(static_cast<Expectation<e>&>(*h).cb);
     }
 
@@ -409,7 +407,7 @@ private:
      */
     template <Event event>
     EventResultT<event> _onMockEvent(const EventTiedArgumentsT<event>& args) {
-        LOGV2_DEBUG(6742616, 2, "Mock event arrived", "event"_attr = event);
+        LOGV2_DEBUG(6742616, 2, "Mock event arrived", "event"_attr = toString(event));
         return std::apply(_expect.pop<event>(), args);
     }
 

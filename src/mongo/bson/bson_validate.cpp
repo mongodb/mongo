@@ -299,14 +299,14 @@ private:
                         fmt::format(
                             "BSON type '{}' is not supported for Encrypted BSON Value subtype {}",
                             typeName(originalBsonType),
-                            encryptedBinDataType),
+                            fmt::underlying(encryptedBinDataType)),
                         isFLE2SupportedType(encryptedBinDataType, originalBsonType));
                 break;
             }
             default: {
                 uasserted(ErrorCodes::NonConformantBSON,
                           fmt::format("Unsupported Encrypted BSON Value type {} in the collection",
-                                      encryptedBinDataType));
+                                      fmt::underlying(encryptedBinDataType)));
             }
         }
     }

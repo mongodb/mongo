@@ -44,7 +44,6 @@ namespace mongo {
 namespace {
 bool localTimeZoneForDate = false;
 }
-using namespace fmt::literals;
 
 const char kMaxKeyData[] = {7, 0, 0, 0, static_cast<char>(MaxKey), 0, 0};
 const BSONObj kMaxBSONKey(kMaxKeyData);
@@ -138,7 +137,7 @@ boost::optional<BSONType> findBSONTypeAlias(StringData key) {
 
 BSONType typeFromName(StringData name) {
     auto typeAlias = findBSONTypeAlias(name);
-    uassert(ErrorCodes::BadValue, "Unknown type name: {}"_format(name), typeAlias);
+    uassert(ErrorCodes::BadValue, fmt::format("Unknown type name: {}", name), typeAlias);
     return *typeAlias;
 }
 

@@ -53,7 +53,6 @@
 namespace mongo::stats {
 namespace {
 namespace value = sbe::value;
-using namespace fmt::literals;
 
 std::string printDistribution(const DataDistribution& distr, size_t nElems) {
     std::ostringstream os;
@@ -69,11 +68,12 @@ double valueSpread(value::TypeTags tag1,
                    value::Value val2) {
     double doubleVal1 = valueToDouble(tag1, val1);
     double doubleVal2 = valueToDouble(tag2, val2);
-    uassert(
-        6660502,
-        "Data distribution values must be monotonically increasing, however encountered {} before {}"_format(
-            doubleVal1, doubleVal2),
-        doubleVal2 >= doubleVal1);
+    uassert(6660502,
+            fmt::format("Data distribution values must be monotonically increasing, however "
+                        "encountered {} before {}",
+                        doubleVal1,
+                        doubleVal2),
+            doubleVal2 >= doubleVal1);
     return doubleVal2 - doubleVal1;
 }
 
@@ -366,8 +366,11 @@ ScalarHistogram genMaxDiffHistogram(const DataDistribution& dataDistrib,
     // For example, {0, 1, 2, "foo", "bar"} needs buckets with values: 0, 2, and "bar".
     uassert(
         7299701,
-        "number of buckets: {}, the number of buckets must exceed the number of types ({}) in the data by 1. For this case the minimum number of buckets is: {}"_format(
-            numBuckets, numTypes, numTypes + 1),
+        fmt::format("number of buckets: {}, the number of buckets must exceed the number of types "
+                    "({}) in the data by 1. For this case the minimum number of buckets is: {}",
+                    numBuckets,
+                    numTypes,
+                    numTypes + 1),
         numBuckets >= (numTypes + 1));
 
     std::vector<ValFreq> topKBuckets = generateTopKBuckets(dataDistrib, numBuckets, sortArg);

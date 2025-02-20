@@ -65,7 +65,6 @@
 namespace mongo::auth {
 
 namespace {
-using namespace fmt::literals;
 
 constexpr auto kX509Str = "x509"_sd;
 constexpr auto kX509Subject = "C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel,CN=client"_sd;
@@ -74,11 +73,11 @@ constexpr auto kX509UTF8String = 12;
 BSONObj generateX509UserDocument(const StringData username) {
     const auto database = "$external"_sd;
 
-    return BSON("_id"
-                << "{}.{}"_format(database, username) << AuthorizationManager::USER_NAME_FIELD_NAME
-                << username << AuthorizationManager::USER_DB_FIELD_NAME << database << "roles"
-                << BSONArray() << "privileges" << BSONArray() << "credentials"
-                << BSON("external" << true));
+    return BSON("_id" << fmt::format("{}.{}", database, username)
+                      << AuthorizationManager::USER_NAME_FIELD_NAME << username
+                      << AuthorizationManager::USER_DB_FIELD_NAME << database << "roles"
+                      << BSONArray() << "privileges" << BSONArray() << "credentials"
+                      << BSON("external" << true));
 }
 
 // Construct a simple, structured X509 name equivalent to "CN=mongodb.com"

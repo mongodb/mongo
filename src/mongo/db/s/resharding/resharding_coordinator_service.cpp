@@ -41,7 +41,6 @@
 namespace mongo {
 namespace {
 
-using namespace fmt::literals;
 const std::string kReshardingCoordinatorActiveIndexName = "ReshardingCoordinatorActiveIndex";
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 

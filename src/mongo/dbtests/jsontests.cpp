@@ -141,7 +141,7 @@ TEST(JsonStringTest, BasicTest) {
 TEST(JsonStringTest, PrettyFormatTest) {
     auto validate = [&](int line, BSONObj obj, bool arr, std::string out) {
         ASSERT_EQUALS(obj.jsonString(ExtendedRelaxedV2_0_0, true, arr), out)
-            << format(FMT_STRING(", line {}"), line);
+            << fmt::format(", line {}", line);
     };
     validate(__LINE__, B().obj(), 0, "{}");
     validate(__LINE__, B{}.obj(), 1, "[]");

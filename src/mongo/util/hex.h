@@ -115,13 +115,13 @@ inline std::string hexdump(const void* data, size_t len) {
 /** Render `val` in upper case hex, zero-padded to its full width. */
 template <typename T, std::enable_if_t<std::is_integral_v<T>, int> = 0>
 std::string zeroPaddedHex(T val) {
-    return format(FMT_STRING("{:0{}X}"), std::make_unsigned_t<T>(val), 2 * sizeof(val));
+    return fmt::format("{:0{}X}", std::make_unsigned_t<T>(val), 2 * sizeof(val));
 }
 
 /** Render the unsigned equivalent of `val` in upper case hex. */
 template <typename T, std::enable_if_t<std::is_integral_v<T>, int> = 0>
 std::string unsignedHex(T val) {
-    return format(FMT_STRING("{:X}"), std::make_unsigned_t<T>(val));
+    return fmt::format("{:X}", std::make_unsigned_t<T>(val));
 }
 
 /**

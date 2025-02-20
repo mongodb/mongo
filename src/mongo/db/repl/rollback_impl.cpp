@@ -124,8 +124,6 @@
 namespace mongo {
 namespace repl {
 
-using namespace fmt::literals;
-
 MONGO_FAIL_POINT_DEFINE(rollbackHangAfterTransitionToRollback);
 MONGO_FAIL_POINT_DEFINE(rollbackToTimestampHangCommonPointBeforeReplCommitPoint);
 MONGO_FAIL_POINT_DEFINE(rollbackHangBeforeTransitioningToRollback);

@@ -49,8 +49,6 @@ namespace mongo::fts {
 
 namespace {
 
-using namespace fmt::literals;
-
 /**
  * Case-insensitive StringData comparator.
  * Returns true if a < b.
@@ -144,8 +142,9 @@ public:
             } else {
                 // v2 and above reject unrecognized language strings.
                 uasserted(ErrorCodes::BadValue,
-                          R"(unsupported language: "{}" for text index version {})"_format(langName,
-                                                                                           ver));
+                          fmt::format(R"(unsupported language: "{}" for text index version {})",
+                                      langName,
+                                      fmt::underlying(ver)));
             }
         }
         return *it->second;

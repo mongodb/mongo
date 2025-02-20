@@ -96,10 +96,8 @@
 namespace mongo {
 namespace {
 
-using namespace fmt::literals;
-
 const NamespaceString kLocalOplogBufferNss = NamespaceString::createNamespaceString_forTest(
-    "config", "{}xxx.yyy"_format(NamespaceString::kReshardingLocalOplogBufferPrefix));
+    fmt::format("config", "{}xxx.yyy", NamespaceString::kReshardingLocalOplogBufferPrefix));
 
 // A mock TransactionHistoryIterator to support DSReshardingIterateTransaction.
 class MockTransactionHistoryIterator : public TransactionHistoryIteratorBase {

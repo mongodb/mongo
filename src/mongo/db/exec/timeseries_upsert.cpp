@@ -211,7 +211,6 @@ BSONObj TimeseriesUpsertStage::_produceNewDocumentForInsert() {
     _getImmutablePaths();
 
     mutablebson::Document doc;
-    using namespace fmt::literals;
 
     if (_request.shouldUpsertSuppliedDocument()) {
         update::generateNewDocumentFromSuppliedDoc(opCtx(), _immutablePaths, &_request, doc);
@@ -233,7 +232,7 @@ BSONObj TimeseriesUpsertStage::_produceNewDocumentForInsert() {
     auto newDocument = doc.getObject();
     if (!DocumentValidationSettings::get(opCtx()).isInternalValidationDisabled()) {
         uassert(7655103,
-                "Document to upsert is larger than {}"_format(BSONObjMaxUserSize),
+                fmt::format("Document to upsert is larger than {}", BSONObjMaxUserSize),
                 newDocument.objsize() <= BSONObjMaxUserSize);
     }
 

@@ -347,7 +347,6 @@ constexpr StringData getMergeFieldNameForAcc() {
 };
 
 boost::intrusive_ptr<Expression> getOutputArgExpr(boost::intrusive_ptr<Expression> argExpr) {
-    using namespace fmt::literals;
     auto exprObj = dynamic_cast<ExpressionObject*>(argExpr.get());
     tassert(8808700, "Expected object-type expression", exprObj);
     auto&& exprs = exprObj->getChildExpressions();
@@ -355,7 +354,7 @@ boost::intrusive_ptr<Expression> getOutputArgExpr(boost::intrusive_ptr<Expressio
         return expr.first == AccumulatorN::kFieldNameOutput;
     });
     tassert(8808701,
-            "'{}' field not found"_format(AccumulatorN::kFieldNameOutput),
+            fmt::format("'{}' field not found", AccumulatorN::kFieldNameOutput),
             outputArgExprIt != exprs.end());
     return outputArgExprIt->second;
 };
@@ -416,10 +415,9 @@ AccumulationStatement mergeAccStmtFor(boost::intrusive_ptr<ExpressionContext> pE
 
                     // Recomputes the rewritten nested accumulator fields to the user-requested
                     // fields.
-                    using namespace fmt::literals;
                     prjArgsBuilder.append(
                         accStmts[accIdx].fieldName,
-                        "${}.{}"_format(mergeFieldName, accStmts[accIdx].fieldName));
+                        fmt::format("${}.{}", mergeFieldName, accStmts[accIdx].fieldName));
                 }
                 outputBuilder.doneFast();
             }

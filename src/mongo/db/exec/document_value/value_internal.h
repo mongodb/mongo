@@ -58,10 +58,9 @@ class Value;
 class RCString final : public RefCountable {
 public:
     static boost::intrusive_ptr<const RCString> create(StringData s) {
-        using namespace fmt::literals;
         static constexpr size_t sizeLimit = BSONObjMaxUserSize;
         uassert(16493,
-                "RCString too large. Requires size={} < limit={}"_format(s.size(), sizeLimit),
+                fmt::format("RCString too large. Requires size={} < limit={}", s.size(), sizeLimit),
                 s.size() < sizeLimit);
         return boost::intrusive_ptr{new (s) RCString{s}};
     }

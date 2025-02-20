@@ -332,11 +332,10 @@ bool SessionManagerCommon::shutdown(Milliseconds timeout) {
     // harder to dry up the server from active connections before going on to really shut down.
     // In non-sanitizer builds, a feature flag can enable a true shutdown anyway. We use the
     // flag to identify these shutdown problems in testing.
-    using namespace fmt::literals;
     if (kSanitizerBuild || gJoinIngressSessionsOnShutdown) {
         const auto result = shutdownAndWait(timeout);
         invariant(result || !gJoinIngressSessionsOnShutdown,
-                  "Shutdown did not complete within {}ms"_format(timeout.count()));
+                  fmt::format("Shutdown did not complete within {}ms", timeout.count()));
         return result;
     }
 

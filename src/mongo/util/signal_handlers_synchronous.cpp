@@ -77,8 +77,6 @@ Atomic<bool> shouldLogScopedDebugInfoInSignalHandlers{true};
 
 namespace {
 
-using namespace fmt::literals;
-
 #if defined(_WIN32)
 const char* strsignal(int signalNum) {
     // should only see SIGABRT on windows
@@ -269,9 +267,12 @@ void myInvalidParameterHandler(const wchar_t* expression,
                                unsigned int line,
                                uintptr_t pReserved) {
 
-    logNoRecursion(
-        "Invalid parameter detected in function {} in {} at line {} with expression '{}'\n"_format(
-            toUtf8String(function), toUtf8String(file), line, toUtf8String(expression)));
+    logNoRecursion(fmt::format(
+        "Invalid parameter detected in function {} in {} at line {} with expression '{}'\n",
+        toUtf8String(function),
+        toUtf8String(file),
+        line,
+        toUtf8String(expression)));
 
     abruptQuit(SIGABRT);
 }

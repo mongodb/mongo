@@ -73,15 +73,8 @@ boost::optional<StringData> isIneligibleForDiagnosticPrinting(OperationContext* 
     return boost::none;
 }
 
-OutIt CurOpPrinter::format(fmt::basic_format_context<OutIt, char>& fc) const {
-    auto out = fc.out();
-
-    if (auto msg = isIneligibleForDiagnosticPrinting(opCtx)) {
-        out = format_to(out, FMT_STRING("{}"), msg.get());
-        return out;
-    }
-
-    CurOp* curOp = CurOp::get(opCtx);
+auto CurOpPrinter::_gatherInfo() const -> Info {
+    CurOp* curOp = CurOp::get(_opCtx);
     const Command* curCommand = curOp->getCommand();
 
     // Remove sensitive fields from the command object before logging.
@@ -92,16 +85,10 @@ OutIt CurOpPrinter::format(fmt::basic_format_context<OutIt, char>& fc) const {
     curCommand->snipForLogging(&cmdToLog);
     BSONObj cmd = cmdToLog.getObject();
 
-    auto opDesc = redact(cmd).toString();
-    auto opDebug = redact(serializeOpDebug(opCtx, *curOp)).toString();
-    auto origCommand = redact(curOp->originatingCommand()).toString();
-    out = format_to(
-        out,
-        FMT_STRING("{{'currentOp': {}, 'opDescription': {}{}}}"),
-        opDebug,
-        opDesc,
-        curOp->originatingCommand().isEmpty() ? "" : ", 'originatingCommand': " + origCommand);
-    return out;
+    return {redact(cmd).toString(),
+            redact(serializeOpDebug(_opCtx, *curOp)).toString(),
+            curOp->originatingCommand().isEmpty() ? boost::optional<std::string>{}
+                                                  : redact(curOp->originatingCommand()).toString()};
 }
 
 }  // namespace mongo::diagnostic_printers

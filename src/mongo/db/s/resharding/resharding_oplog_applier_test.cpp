@@ -115,8 +115,6 @@
 namespace mongo {
 namespace {
 
-using namespace fmt::literals;
-
 class OplogIteratorMock : public ReshardingDonorOplogIteratorInterface {
 public:
     OplogIteratorMock(std::deque<repl::OplogEntry> oplogToReturn, size_t batchSize)
@@ -468,11 +466,11 @@ protected:
     const NamespaceString kCrudNs = NamespaceString::createNamespaceString_forTest("foo.bar");
     const UUID kCrudUUID = UUID::gen();
     const NamespaceString kAppliedToNs = NamespaceString::createNamespaceString_forTest(
-        "foo", "system.resharding.{}"_format(kCrudUUID.toString()));
+        "foo", fmt::format("system.resharding.{}", kCrudUUID.toString()));
     const NamespaceString kStashNs = NamespaceString::createNamespaceString_forTest(
-        "foo", "{}.{}"_format(kCrudNs.coll(), kOplogNs.coll()));
+        "foo", fmt::format("{}.{}", kCrudNs.coll(), kOplogNs.coll()));
     const NamespaceString kOtherDonorStashNs = NamespaceString::createNamespaceString_forTest(
-        "foo", "{}.{}"_format("otherstash", "otheroplog"));
+        "foo", fmt::format("{}.{}", "otherstash", "otheroplog"));
     const std::vector<NamespaceString> kStashCollections{kStashNs, kOtherDonorStashNs};
     const ShardId kMyShardId{"shard1"};
     const ShardId kOtherShardId{"shard2"};

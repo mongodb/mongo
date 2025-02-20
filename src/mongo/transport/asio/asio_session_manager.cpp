@@ -68,8 +68,7 @@ auto& connections = *ServerStatusSectionBuilder<Connections>("connections");
 }  // namespace
 
 std::string AsioSessionManager::getClientThreadName(const Session& session) const {
-    using namespace fmt::literals;
-    return "conn{}"_format(session.id());
+    return fmt::format("conn{}", session.id());
 }
 
 void AsioSessionManager::configureServiceExecutorContext(Client* client,

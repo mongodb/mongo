@@ -46,8 +46,6 @@
 
 namespace mongo::unittest {
 
-using namespace fmt::literals;
-
 void GoldenTestContext::printTestHeader(HeaderFormat format) {
     switch (format) {
         case HeaderFormat::Text:

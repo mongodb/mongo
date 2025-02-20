@@ -115,13 +115,12 @@ struct HandleRequest {
 };
 
 void HandleRequest::setupEnvironment() {
-    using namespace fmt::literals;
     auto opCtx = rec.getOpCtx();
 
     // This exception will not be returned to the caller, but will be logged and will close the
     // connection
     uassert(ErrorCodes::IllegalOperation,
-            "Message type {} is not supported."_format(op),
+            fmt::format("Message type {} is not supported.", fmt::underlying(op)),
             isSupportedRequestNetworkOp(op) &&
                 op != dbCompressed);  // Decompression should be handled above us.
 

@@ -43,8 +43,6 @@
 namespace mongo::pcre_util {
 namespace {
 
-using namespace fmt::literals;
-
 // Test compares `CompileOptions` as integers.
 TEST(PcreUtilTest, FlagsToOptions) {
     using namespace pcre::options;
@@ -130,7 +128,7 @@ TEST(PcreUtilTest, QuoteMeta) {
             r += "]";
             return r;
         };
-        auto note = "{} => {}"_format(hexdump(in), hexdump(out));
+        auto note = fmt::format("{} => {}", hexdump(in), hexdump(out));
         if (shouldEscape) {
             ASSERT_EQ(out, "\\" + in) << note;
         } else {

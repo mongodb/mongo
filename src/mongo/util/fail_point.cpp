@@ -61,8 +61,6 @@
 namespace mongo {
 namespace {
 
-using namespace fmt::literals;
-
 MONGO_FAIL_POINT_DEFINE(dummy);  // used by tests in jstests/fail_point
 
 MONGO_INITIALIZER_GENERAL(AllFailPointsRegistered, (), ())
@@ -181,7 +179,7 @@ StatusWith<FailPoint::ModeOptions> FailPoint::parseBSON(const BSONObj& obj) {
         } else if (modeStr == "alwaysOn") {
             mode = FailPoint::alwaysOn;
         } else {
-            return {ErrorCodes::BadValue, "unknown mode: {}"_format(modeStr)};
+            return {ErrorCodes::BadValue, fmt::format("unknown mode: {}", modeStr)};
         }
     } else if (modeElem.type() == Object) {
         const BSONObj modeObj(modeElem.Obj());
@@ -232,8 +230,8 @@ StatusWith<FailPoint::ModeOptions> FailPoint::parseBSON(const BSONObj& obj) {
             const double activationProbability = modeObj["activationProbability"].numberDouble();
             if (activationProbability < 0 || activationProbability > 1) {
                 return {ErrorCodes::BadValue,
-                        "activationProbability must be between 0.0 and 1.0; "
-                        "found {}"_format(activationProbability)};
+                        fmt::format("activationProbability must be between 0.0 and 1.0; found {}",
+                                    activationProbability)};
             }
             val = static_cast<int32_t>(std::numeric_limits<int32_t>::max() * activationProbability);
         } else {
@@ -327,7 +325,7 @@ Status FailPointRegistry::add(FailPoint* failPoint) {
     auto [pos, ok] = _fpMap.insert({failPoint->getName(), failPoint});
     if (!ok) {
         return {ErrorCodes::Error(51006),
-                "Fail point already registered: {}"_format(failPoint->getName())};
+                fmt::format("Fail point already registered: {}", failPoint->getName())};
     }
     return Status::OK();
 }
@@ -357,10 +355,10 @@ void FailPointRegistry::disableAllFailpoints() {
 static constexpr auto kFailPointServerParameterPrefix = "failpoint."_sd;
 
 FailPointServerParameter::FailPointServerParameter(StringData name, ServerParameterType spt)
-    : ServerParameter("{}{}"_format(kFailPointServerParameterPrefix, name), spt),
+    : ServerParameter(fmt::format("{}{}", kFailPointServerParameterPrefix, name), spt),
       _data(globalFailPointRegistry().find(name.toString())) {
     invariant(name != "failpoint.*", "Failpoint prototype was auto-registered from IDL");
-    invariant(_data != nullptr, "Unknown failpoint: {}"_format(name));
+    invariant(_data != nullptr, fmt::format("Unknown failpoint: {}", name));
 }
 
 void FailPointServerParameter::append(OperationContext* opCtx,

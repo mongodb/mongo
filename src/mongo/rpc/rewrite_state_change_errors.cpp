@@ -100,7 +100,7 @@ boost::optional<std::string> scrubErrmsg(StringData val) {
         StringData sep;
         auto out = std::back_inserter(pat);
         for (const auto& scrub : *scrubs) {
-            out = format_to(out, FMT_STRING("{}({})"), sep, scrub.pat.pattern());
+            out = fmt::format_to(out, "{}({})", sep, scrub.pat.pattern());
             sep = "|"_sd;
         }
         return pcre::Regex(pat);

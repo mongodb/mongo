@@ -103,7 +103,6 @@
 
 
 namespace mongo::shell_utils {
-using namespace fmt::literals;
 namespace {
 boost::filesystem::path getUserDir() {
 #ifdef _WIN32
@@ -638,10 +637,12 @@ protected:
 };
 
 std::string GoldenTestContextShellFailure::toString() const {
-    return "Test output verification failed: {}\n"
-           "Actual output file: {}, "
-           "expected output file: {}"
-           ""_format(message, actualOutputFile, expectedOutputFile);
+    return fmt::format(
+        "Test output verification failed: {}\n"
+        "Actual output file: {}, expected output file: {}",
+        message,
+        actualOutputFile,
+        expectedOutputFile);
 }
 
 void GoldenTestContextShellFailure::diff() const {

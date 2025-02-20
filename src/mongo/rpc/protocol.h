@@ -67,7 +67,7 @@ inline Protocol protocolForMessage(const Message& message) {
         default:
             uasserted(ErrorCodes::UnsupportedFormat,
                       fmt::format("Received a reply message with unexpected opcode: {}",
-                                  message.operation()));
+                                  fmt::underlying(message.operation())));
     }
 }
 

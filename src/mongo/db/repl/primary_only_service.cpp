@@ -373,7 +373,6 @@ void PrimaryOnlyService::startup(OperationContext* opCtx) {
 }
 
 void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
-    using namespace fmt::literals;
     SimpleBSONObjUnorderedMap<ActiveInstance> savedInstances;
     invariant(_getHasExecutor());
     auto newThenOldScopedExecutor =
@@ -474,10 +473,12 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
                 bool steppedDown = _state == State::kPaused;
                 bool shutDown = _state == State::kShutdown;
                 bool termAdvanced = _term > newTerm;
-                invariant(
-                    steppedDown || shutDown || termAdvanced,
-                    "Unexpected _state or _term; _state is {}, _term is {}, term was {} "_format(
-                        _getStateString(lk), _term, newTerm));
+                invariant(steppedDown || shutDown || termAdvanced,
+                          fmt::format(
+                              "Unexpected _state or _term; _state is {}, _term is {}, term was {} ",
+                              _getStateString(lk),
+                              _term,
+                              newTerm));
                 return;
             }
             invariant(_state == State::kRebuilding);

@@ -98,7 +98,6 @@
 namespace mongo {
 
 using namespace shardmetadatautil;
-using namespace fmt::literals;
 
 using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunks;
 
@@ -427,7 +426,7 @@ void performNoopMajorityWriteLocally(OperationContext* opCtx, StringData msg) {
     {
         AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
         uassert(ErrorCodes::NotWritablePrimary,
-                "Not primary when performing noop write for {}"_format(msg),
+                fmt::format("Not primary when performing noop write for {}", msg),
                 replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin));
 
         writeConflictRetry(

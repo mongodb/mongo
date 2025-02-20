@@ -95,11 +95,6 @@
 
 
 namespace mongo {
-namespace {
-
-using namespace fmt::literals;
-
-}  // namespace
 
 DatabaseType ShardingCatalogManager::createDatabase(
     OperationContext* opCtx,
@@ -233,12 +228,12 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
                                 BSON(ShardType::name << toShardId));
     }();
     uassert(ErrorCodes::ShardNotFound,
-            "Requested primary shard {} does not exist"_format(toShardId.toString()),
+            fmt::format("Requested primary shard {} does not exist", toShardId.toString()),
             !toShardDoc.isEmpty());
 
     const auto toShardEntry = uassertStatusOK(ShardType::fromBSON(toShardDoc));
     uassert(ErrorCodes::ShardNotFound,
-            "Requested primary shard {} is draining"_format(toShardId.toString()),
+            fmt::format("Requested primary shard {} is draining", toShardId.toString()),
             !toShardEntry.getDraining());
 
     const auto currentTime = VectorClock::get(opCtx)->getTime();

@@ -5,7 +5,7 @@ set -vxeuo pipefail
 
 FMT_GIT_URL="https://github.com/mongodb-forks/fmt.git"
 
-VERSION=7.1.3
+VERSION=11.1.3
 
 FMT_GIT_DIR=$(mktemp -d /tmp/import-fmt.XXXXXX)
 trap "rm -rf $FMT_GIT_DIR" EXIT
@@ -22,7 +22,7 @@ mkdir -p "$DIST"
 SELECTED=(
     src
     include/fmt
-    LICENSE.rst
+    LICENSE
 )
 
 tar -C "$FMT_GIT_DIR" -c -f - "${SELECTED[@]}" | tar -C "$DIST" -x -f -

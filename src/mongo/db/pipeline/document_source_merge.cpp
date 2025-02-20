@@ -67,7 +67,6 @@
 
 
 namespace mongo {
-using namespace fmt::literals;
 
 MONGO_FAIL_POINT_DEFINE(hangWhileBuildingDocumentSourceMergeBatch);
 REGISTER_DOCUMENT_SOURCE(merge,
@@ -172,15 +171,17 @@ auto withErrorContext(const auto&& callback, StringData errorMessage) {
 std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {
     uassert(ErrorCodes::TypeMismatch,
-            "{} requires a string or object argument, but found {}"_format(kStageName,
-                                                                           typeName(spec.type())),
+            fmt::format("{} requires a string or object argument, but found {}",
+                        kStageName,
+                        typeName(spec.type())),
             spec.type() == BSONType::String || spec.type() == BSONType::Object);
 
     auto mergeSpec = parseMergeSpecAndResolveTargetNamespace(spec, nss.dbName());
     auto targetNss = mergeSpec.getTargetNss();
 
     uassert(ErrorCodes::InvalidNamespace,
-            "Invalid {} target namespace: '{}'"_format(kStageName, targetNss.toStringForErrorMsg()),
+            fmt::format(
+                "Invalid {} target namespace: '{}'", kStageName, targetNss.toStringForErrorMsg()),
             targetNss.isValid());
 
     auto whenMatched =
@@ -188,10 +189,11 @@ std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed
     auto whenNotMatched = mergeSpec.getWhenNotMatched().value_or(kDefaultWhenNotMatched);
 
     uassert(51181,
-            "Combination of {} modes 'whenMatched: {}' and 'whenNotMatched: {}' "
-            "is not supported"_format(kStageName,
-                                      MergeWhenMatchedMode_serializer(whenMatched),
-                                      MergeWhenNotMatchedMode_serializer(whenNotMatched)),
+            fmt::format("Combination of {} modes 'whenMatched: {}' and 'whenNotMatched: {}' "
+                        "is not supported",
+                        kStageName,
+                        MergeWhenMatchedMode_serializer(whenMatched),
+                        MergeWhenNotMatchedMode_serializer(whenNotMatched)),
             isSupportedMergeMode(whenMatched, whenNotMatched));
     boost::optional<LiteParsedPipeline> liteParsedPipeline;
     if (whenMatched == MergeWhenMatchedModeEnum::kPipeline) {
@@ -250,29 +252,32 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
     boost::optional<ChunkVersion> collectionPlacementVersion,
     bool allowMergeOnNullishValues) {
     uassert(51189,
-            "Combination of {} modes 'whenMatched: {}' and 'whenNotMatched: {}' "
-            "is not supported"_format(kStageName,
-                                      MergeWhenMatchedMode_serializer(whenMatched),
-                                      MergeWhenNotMatchedMode_serializer(whenNotMatched)),
+            fmt::format("Combination of {} modes 'whenMatched: {}' and 'whenNotMatched: {}' "
+                        "is not supported",
+                        kStageName,
+                        MergeWhenMatchedMode_serializer(whenMatched),
+                        MergeWhenNotMatchedMode_serializer(whenNotMatched)),
             isSupportedMergeMode(whenMatched, whenNotMatched));
 
     uassert(ErrorCodes::InvalidNamespace,
-            "Invalid {} target namespace: '{}'"_format(kStageName, outputNs.toStringForErrorMsg()),
+            fmt::format(
+                "Invalid {} target namespace: '{}'", kStageName, outputNs.toStringForErrorMsg()),
             outputNs.isValid());
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
-            "{} cannot be used in a transaction"_format(kStageName),
+            fmt::format("{} cannot be used in a transaction", kStageName),
             !expCtx->getOperationContext()->inMultiDocumentTransaction());
 
     uassert(31319,
-            "Cannot {} to special collection: {}"_format(kStageName, outputNs.coll()),
+            fmt::format("Cannot {} to special collection: {}", kStageName, outputNs.coll()),
             !outputNs.isSystem() ||
                 (outputNs.isSystemStatsCollection() &&
                  isInternalClient(expCtx->getOperationContext()->getClient())));
 
     uassert(31320,
-            "Cannot {} to internal database: {}"_format(kStageName,
-                                                        outputNs.dbName().toStringForErrorMsg()),
+            fmt::format("Cannot {} to internal database: {}",
+                        kStageName,
+                        outputNs.dbName().toStringForErrorMsg()),
             !outputNs.isOnInternalDb() ||
                 isInternalClient(expCtx->getOperationContext()->getClient()));
 
@@ -291,8 +296,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
     } else {
         // Ensure the 'let' argument cannot be used with any other merge modes.
         uassert(51199,
-                "Cannot use 'let' variables with 'whenMatched: {}' mode"_format(
-                    MergeWhenMatchedMode_serializer(whenMatched)),
+                fmt::format("Cannot use 'let' variables with 'whenMatched: {}' mode",
+                            MergeWhenMatchedMode_serializer(whenMatched)),
                 !letVariables);
     }
 
@@ -310,7 +315,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
 boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::createFromBson(
     BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(51182,
-            "{} only supports a string or object argument, not {}"_format(kStageName, spec.type()),
+            fmt::format(
+                "{} only supports a string or object argument, not {}", kStageName, spec.type()),
             spec.type() == BSONType::String || spec.type() == BSONType::Object);
 
     auto mergeSpec = parseMergeSpecAndResolveTargetNamespace(

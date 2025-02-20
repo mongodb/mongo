@@ -245,18 +245,17 @@ TEST(RandomTest, NextInt32Uniformity) {
         for (size_t i = 0; i < hist.size(); ++i) {
             double dev = std::pow(std::pow((hist[i] - mu) / mu, 2), .5);
             LOGV2(22611,
-                  "{format_FMT_STRING_4_count_4_dev_6f_i_hist_i_dev_std_string_hist_i_256}",
-                  "format_FMT_STRING_4_count_4_dev_6f_i_hist_i_dev_std_string_hist_i_256"_attr =
-                      format(FMT_STRING("  [{:4}] count:{:4}, dev:{:6f}, {}"),
-                             i,
-                             hist[i],
-                             dev,
-                             std::string(hist[i] / 256, '*')));
+                  "Histogram",
+                  "hist"_attr = fmt::format("  [{:4}] count:{:4}, dev:{:6f}, {}",
+                                            i,
+                                            hist[i],
+                                            dev,
+                                            std::string(hist[i] / 256, '*')));
         }
     }
     for (size_t i = 0; i < hist.size(); ++i) {
         double dev = std::pow(std::pow(hist[i] - mu, 2) * muSqInv, .5);
-        ASSERT_LT(dev, 0.1) << format(FMT_STRING("hist[{}]={}, mu={}"), i, hist[i], mu);
+        ASSERT_LT(dev, 0.1) << fmt::format("hist[{}]={}, mu={}", i, hist[i], mu);
     }
 }
 

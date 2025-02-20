@@ -91,8 +91,6 @@
 namespace mongo {
 namespace {
 
-using namespace fmt::literals;
-
 // TODO SERVER-39704: Remove this fail point once the router can safely retry within a transaction
 // on stale version and snapshot errors.
 MONGO_FAIL_POINT_DEFINE(enableStaleVersionAndSnapshotRetriesWithinTransactions);
@@ -1336,9 +1334,10 @@ void TransactionRouter::Router::beginOrContinueTxn(OperationContext* opCtx,
             action == TransactionActions::kContinue || action == TransactionActions::kCommit) {
             uassert(
                 ErrorCodes::APIMismatchError,
-                "API parameter mismatch: transaction-continuing command used {}, the transaction's"
-                " first command used {}"_format(apiParamsFromClient.toBSON().toString(),
-                                                o().apiParameters.toBSON().toString()),
+                fmt::format("API parameter mismatch: transaction-continuing command used {}, the "
+                            "transaction's first command used {}",
+                            apiParamsFromClient.toBSON().toString(),
+                            o().apiParameters.toBSON().toString()),
                 apiParamsFromClient == o().apiParameters);
         }
         _continueTxn(opCtx, txnNumberAndRetryCounter, action);

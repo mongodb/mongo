@@ -109,8 +109,6 @@ namespace mongo {
 namespace migrationutil {
 namespace {
 
-using namespace fmt::literals;
-
 MONGO_FAIL_POINT_DEFINE(hangBeforeFilteringMetadataRefresh);
 MONGO_FAIL_POINT_DEFINE(hangInPersistMigrateCommitDecisionInterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInPersistMigrateCommitDecisionThenSimulateErrorUninterruptible);

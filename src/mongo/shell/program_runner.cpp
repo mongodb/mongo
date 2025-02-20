@@ -107,7 +107,6 @@ inline int pipe(int fds[2]) {
 #endif
 
 namespace {
-using namespace fmt::literals;
 
 void safeClose(int fd) {
 #ifndef _WIN32
@@ -343,8 +342,9 @@ HANDLE ProgramRegistry::getHandleForPid(ProcessId pid) const {
     stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
 
     auto iter = _handles.find(pid);
-    uassert(
-        ErrorCodes::BadValue, "Unregistered pid {}"_format(pid.toNative()), iter != _handles.end());
+    uassert(ErrorCodes::BadValue,
+            fmt::format("Unregistered pid {}", pid.toNative()),
+            iter != _handles.end());
     return iter->second;
 }
 

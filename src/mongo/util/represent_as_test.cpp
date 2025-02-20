@@ -50,8 +50,6 @@ namespace mongo {
 
 namespace {
 
-using namespace fmt::literals;
-
 // Char values
 const char kCharMax = std::numeric_limits<char>::max();
 const signed char kSCharMax = std::numeric_limits<signed char>::max();
@@ -369,9 +367,12 @@ void integerToDecimal128() {
         ASSERT(d);
         if (!d->isEqual(Decimal128(std::to_string(n)))) {
             FAIL(
-                "Failed expectation, representAs<Decimal128>({}) == Decimal128({}),"
-                " but !Decimal128({}).isEqual(Decimal128(std::to_string({}))"_format(
-                    n, d->toString(), d->toString(), n));
+                fmt::format("Failed expectation, representAs<Decimal128>({}) == Decimal128({}),"
+                            " but !Decimal128({}).isEqual(Decimal128(std::to_string({}))",
+                            n,
+                            d->toString(),
+                            d->toString(),
+                            n));
         }
     }
 }

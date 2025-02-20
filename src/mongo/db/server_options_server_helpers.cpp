@@ -153,8 +153,8 @@ bool shouldFork(const moe::Environment& params) {
 
 void printCommandLineOpts(std::ostream* os) {
     if (os) {
-        *os << format(FMT_STRING("Options set by command line: {}"),
-                      tojson(serverGlobalParams.parsedOpts, ExtendedRelaxedV2_0_0, true))
+        *os << fmt::format("Options set by command line: {}",
+                           tojson(serverGlobalParams.parsedOpts, ExtendedRelaxedV2_0_0, true))
             << std::endl;
     } else {
         LOGV2(21951, "Options set by command line", "options"_attr = serverGlobalParams.parsedOpts);

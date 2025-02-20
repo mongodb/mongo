@@ -61,17 +61,18 @@ public:
     }
 
     void writeInt32(fmt::memory_buffer& buffer, int32_t val) const {
-        format_to(std::back_inserter(buffer), FMT_COMPILE(R"({{"$numberInt":"{}"}})"), val);
+        fmt::format_to(std::back_inserter(buffer), FMT_COMPILE(R"({{"$numberInt":"{}"}})"), val);
     }
 
     void writeInt64(fmt::memory_buffer& buffer, int64_t val) const {
-        format_to(std::back_inserter(buffer), FMT_COMPILE(R"({{"$numberLong":"{}"}})"), val);
+        fmt::format_to(std::back_inserter(buffer), FMT_COMPILE(R"({{"$numberLong":"{}"}})"), val);
     }
 
     void writeDouble(fmt::memory_buffer& buffer, double val) const {
         if (val >= std::numeric_limits<double>::lowest() &&
             val <= std::numeric_limits<double>::max())
-            format_to(std::back_inserter(buffer), FMT_COMPILE(R"({{"$numberDouble":"{}"}})"), val);
+            fmt::format_to(
+                std::back_inserter(buffer), FMT_COMPILE(R"({{"$numberDouble":"{}"}})"), val);
         else if (std::isnan(val))
             appendTo(buffer, R"({"$numberDouble":"NaN"})"_sd);
         else if (std::isinf(val)) {
@@ -90,20 +91,20 @@ public:
         if (val.isNaN())
             appendTo(buffer, R"({"$numberDecimal":"NaN"})"_sd);
         else if (val.isInfinite())
-            format_to(std::back_inserter(buffer),
-                      FMT_COMPILE(R"({{"$numberDecimal":"{}"}})"),
-                      val.isNegative() ? "-Infinity" : "Infinity");
+            fmt::format_to(std::back_inserter(buffer),
+                           FMT_COMPILE(R"({{"$numberDecimal":"{}"}})"),
+                           val.isNegative() ? "-Infinity" : "Infinity");
         else {
-            format_to(std::back_inserter(buffer),
-                      FMT_COMPILE(R"({{"$numberDecimal":"{}"}})"),
-                      val.toString());
+            fmt::format_to(std::back_inserter(buffer),
+                           FMT_COMPILE(R"({{"$numberDecimal":"{}"}})"),
+                           val.toString());
         }
     }
 
     void writeDate(fmt::memory_buffer& buffer, Date_t val) const {
-        format_to(std::back_inserter(buffer),
-                  FMT_COMPILE(R"({{"$date":{{"$numberLong":"{}"}}}})"),
-                  val.toMillisSinceEpoch());
+        fmt::format_to(std::back_inserter(buffer),
+                       FMT_COMPILE(R"({{"$date":{{"$numberLong":"{}"}}}})"),
+                       val.toMillisSinceEpoch());
     }
 
     void writeDBRef(fmt::memory_buffer& buffer, StringData ref, OID id) const {
@@ -112,14 +113,14 @@ public:
         str::escapeForJSON(buffer, ref);
 
         // OID is a hex string and does not need to be escaped
-        format_to(std::back_inserter(buffer), FMT_COMPILE(R"(","$id":"{}"}})"), id.toString());
+        fmt::format_to(std::back_inserter(buffer), FMT_COMPILE(R"(","$id":"{}"}})"), id.toString());
     }
 
     void writeOID(fmt::memory_buffer& buffer, OID val) const {
         // OID is a hex string and does not need to be escaped
         static_assert(OID::kOIDSize == 12);
         const uint8_t* data = reinterpret_cast<const uint8_t*>(val.view().view());
-        format_to(
+        fmt::format_to(
             std::back_inserter(buffer),
             FMT_COMPILE(
                 R"({{"$oid":"{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}"}})"),
@@ -138,15 +139,15 @@ public:
     }
 
     void writeTimestamp(fmt::memory_buffer& buffer, Timestamp val) const {
-        format_to(std::back_inserter(buffer),
-                  FMT_COMPILE(R"({{"$timestamp":{{"t":{},"i":{}}}}})"),
-                  val.getSecs(),
-                  val.getInc());
+        fmt::format_to(std::back_inserter(buffer),
+                       FMT_COMPILE(R"({{"$timestamp":{{"t":{},"i":{}}}}})"),
+                       val.getSecs(),
+                       val.getInc());
     }
 
     void writeBinData(fmt::memory_buffer& buffer, StringData data, BinDataType type) const {
         if (type == newUUID && data.size() == 16) {
-            format_to(
+            fmt::format_to(
                 std::back_inserter(buffer),
                 FMT_COMPILE(
                     R"({{"$uuid":"{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}"}})"),
@@ -169,9 +170,8 @@ public:
         } else {
             appendTo(buffer, R"({"$binary":{"base64":")"_sd);
             base64::encode(buffer, data);
-            format_to(std::back_inserter(buffer),
-                      FMT_COMPILE(R"(","subType":"{:x}"}}}})"),
-                      static_cast<std::underlying_type_t<BSONType>>(type));
+            fmt::format_to(
+                std::back_inserter(buffer), FMT_COMPILE(R"(","subType":"{:x}"}}}})"), type);
         }
     }
 

@@ -147,8 +147,6 @@
 
 namespace mongo::logv2 {
 
-using namespace fmt::literals;
-
 namespace {
 
 using constants::kAttributesFieldName;
@@ -181,7 +179,7 @@ struct TypeWithOnlyStringSerialize {
     double _y{0.0};
 
     void serialize(fmt::memory_buffer& buffer) const {
-        fmt::format_to(buffer, "(x: {}, y: {})", _x, _y);
+        fmt::format_to(std::back_inserter(buffer), "(x: {}, y: {})", _x, _y);
     }
 };
 
@@ -193,7 +191,7 @@ struct TypeWithBothStringFormatters {
     }
 
     void serialize(fmt::memory_buffer& buffer) const {
-        fmt::format_to(buffer, "serialize");
+        fmt::format_to(std::back_inserter(buffer), "serialize");
     }
 };
 
@@ -1830,7 +1828,7 @@ public:
                                          BSONObj report,
                                          const TestCase& test) {
         auto context =
-            "Failed test: {} Failing report: {}"_format(test.name, mongo::tojson(report));
+            fmt::format("Failed test: {} Failing report: {}", test.name, mongo::tojson(report));
         auto& path = test.truncationInfo.path;
 
         ASSERT_FALSE(path.empty()) << context;
@@ -1844,48 +1842,49 @@ public:
         for (size_t i = 0; i < path.size(); i++) {
             const auto& segment = path.at(i);
 
-            ASSERT(fieldObj.hasField(constants::kTruncatedFieldName))
-                << "{} - missing 'truncated' field at path: {}"_format(context, currentObjPath);
+            ASSERT(fieldObj.hasField(constants::kTruncatedFieldName)) << fmt::format(
+                "{} - missing 'truncated' field at path: {}", context, currentObjPath);
 
             truncated = fieldObj.getField(constants::kTruncatedFieldName).Obj();
 
             if (segment.omitted != 0) {
-                ASSERT(fieldObj.hasField(constants::kOmittedFieldName))
-                    << "{} - missing 'omitted' field at path: {}"_format(context, currentObjPath);
+                ASSERT(fieldObj.hasField(constants::kOmittedFieldName)) << fmt::format(
+                    "{} - missing 'omitted' field at path: {}", context, currentObjPath);
                 ASSERT_EQUALS(fieldObj.getField("omitted").Int(), segment.omitted)
-                    << "{} - bad 'omitted' value at path: {}"_format(context, currentObjPath);
+                    << fmt::format("{} - bad 'omitted' value at path: {}", context, currentObjPath);
             } else {
-                ASSERT_FALSE(fieldObj.hasField("omitted"))
-                    << "{} - unexpected 'omitted' field at path: {}"_format(context,
-                                                                            currentObjPath);
+                ASSERT_FALSE(fieldObj.hasField("omitted")) << fmt::format(
+                    "{} - unexpected 'omitted' field at path: {}", context, currentObjPath);
             }
 
             currentObjPath += ".truncated";
             ASSERT(truncated.hasField(segment.fieldName))
-                << "{} - missing expected subobject {} at path {}"_format(
-                       context, segment.fieldName, currentObjPath);
+                << fmt::format("{} - missing expected subobject {} at path {}",
+                               context,
+                               segment.fieldName,
+                               currentObjPath);
 
             fieldObj = truncated.getField(segment.fieldName).Obj();
             currentObjPath += "." + segment.fieldName;
         }
         // leaf reached
         ASSERT(fieldObj.hasField("type"))
-            << "{} - missing field 'type' at path {}"_format(context, currentObjPath);
+            << fmt::format("{} - missing field 'type' at path {}", context, currentObjPath);
 
         ASSERT(fieldObj.hasField("size"))
-            << "{} - missing field 'size' at path {}"_format(context, currentObjPath);
+            << fmt::format("{} - missing field 'size' at path {}", context, currentObjPath);
 
         ASSERT(!fieldObj.hasField("omitted"))
-            << "{} - unexpected field 'omitted' at path {}"_format(context, currentObjPath);
+            << fmt::format("{} - unexpected field 'omitted' at path {}", context, currentObjPath);
 
         ASSERT(!fieldObj.hasField("truncated"))
-            << "{} - unexpected field 'truncated' at path {}"_format(context, currentObjPath);
+            << fmt::format("{} - unexpected field 'truncated' at path {}", context, currentObjPath);
 
         ASSERT_EQUALS(fieldObj.getField("type"_sd).String(), typeName(test.truncationInfo.leafType))
-            << "{} - bad 'type' value at path {}"_format(context, currentObjPath);
+            << fmt::format("{} - bad 'type' value at path {}", context, currentObjPath);
 
         ASSERT(fieldObj.getField("size"_sd).isNumber())
-            << "{} - bad 'size' value at path {}"_format(context, currentObjPath);
+            << fmt::format("{} - bad 'size' value at path {}", context, currentObjPath);
     }
 
     // Validates the reported size of the truncated attr in the log line matches the size of the
@@ -1893,8 +1892,8 @@ public:
     static void validateTruncationSize(StringData attrName,
                                        BSONObj truncatedSize,
                                        const TestCase& test) {
-        auto context =
-            "Failed test: {} Failing report: {}"_format(test.name, mongo::tojson(truncatedSize));
+        auto context = fmt::format(
+            "Failed test: {} Failing report: {}", test.name, mongo::tojson(truncatedSize));
         ASSERT(truncatedSize.hasField(attrName)) << context;
         auto reportedSize = truncatedSize.getField(attrName).Int();
         auto expectedSize = test.originalDoc.objsize();
@@ -1909,7 +1908,7 @@ public:
                                          const std::string& parentPath,
                                          size_t level) {
         static const SimpleBSONElementComparator eltCmp;
-        auto context = "Failed test: {} Path: {}"_format(test.name, parentPath);
+        auto context = fmt::format("Failed test: {} Path: {}", test.name, parentPath);
 
         auto& path = test.truncationInfo.path;
 
@@ -1928,10 +1927,10 @@ public:
 
             ASSERT_EQUALS(modifiedElement.fieldNameStringData(),
                           originalElement.fieldNameStringData())
-                << "{} - mismatched field names {} vs {}"_format(
-                       context,
-                       originalElement.fieldNameStringData(),
-                       modifiedElement.fieldNameStringData());
+                << fmt::format("{} - mismatched field names {} vs {}",
+                               context,
+                               originalElement.fieldNameStringData(),
+                               modifiedElement.fieldNameStringData());
 
             if (originalElement.fieldNameStringData() == truncatedFieldName) {
                 foundTruncatedElement = true;
@@ -1939,19 +1938,18 @@ public:
                 // if truncatedFieldName is present in the truncated object, but the test expects
                 // it to be a leaf, then it should have been omitted.
                 ASSERT_FALSE(leaf)
-                    << "{} - unexpected field {}"_format(context, truncatedFieldName);
+                    << fmt::format("{} - unexpected field {}", context, truncatedFieldName);
 
-                ASSERT_FALSE(modifiedItr.more())
-                    << "{} - truncation did not stop at field {}"_format(context,
-                                                                         truncatedFieldName);
+                ASSERT_FALSE(modifiedItr.more()) << fmt::format(
+                    "{} - truncation did not stop at field {}", context, truncatedFieldName);
 
                 ASSERT(modifiedElement.isABSONObj())
-                    << "{} - unexpected leaf element {}"_format(context, truncatedFieldName);
+                    << fmt::format("{} - unexpected leaf element {}", context, truncatedFieldName);
 
                 validateTruncationAtPath(originalElement.Obj(),
                                          modifiedElement.Obj(),
                                          test,
-                                         "{}.{}"_format(parentPath, truncatedFieldName),
+                                         fmt::format("{}.{}", parentPath, truncatedFieldName),
                                          level + 1);
             } else {
                 ASSERT(eltCmp.evaluate(originalElement == modifiedElement))
@@ -1963,18 +1961,21 @@ public:
             // if the original object has more fields than the modified object, but the truncated
             // field name is not in the modified object, then it MUST have been an omitted leaf
             // element.
-            ASSERT(leaf) << "{} - missing truncated field {}"_format(context, truncatedFieldName);
+            ASSERT(leaf) << fmt::format(
+                "{} - missing truncated field {}", context, truncatedFieldName);
 
             // The next element in the original object must be the truncated field name
             auto nextElement = originalItr.next();
             ASSERT_EQUALS(nextElement.fieldNameStringData(), truncatedFieldName)
-                << "{} - unexpected field {}, expected {}"_format(
-                       context, nextElement.fieldNameStringData(), truncatedFieldName);
+                << fmt::format("{} - unexpected field {}, expected {}",
+                               context,
+                               nextElement.fieldNameStringData(),
+                               truncatedFieldName);
 
             foundTruncatedElement = true;
         }
         ASSERT(foundTruncatedElement)
-            << "{} - missing truncated field {}"_format(context, truncatedFieldName);
+            << fmt::format("{} - missing truncated field {}", context, truncatedFieldName);
     }
 
     static void validateTruncatedAttr(const TestCase& test, const BSONObj& truncatedAttr) {
@@ -2368,7 +2369,8 @@ TEST_F(UnstructuredLoggingTest, Args) {
     std::string format_str = "format {} str {} fields";
     logd(format_str, 1, "str");  // NOLINT
     validate([&format_str](const BSONObj& obj) {
-        ASSERT_EQUALS(obj.getField(kMessageFieldName).String(), fmt::format(format_str, 1, "str"));
+        ASSERT_EQUALS(obj.getField(kMessageFieldName).String(),
+                      fmt::format(fmt::runtime(format_str), 1, "str"));
     });
 }
 
@@ -2380,7 +2382,7 @@ TEST_F(UnstructuredLoggingTest, ArgsLikeFormatSpecifier) {
     logd(format_str, 1, "{ x : 1}");  // NOLINT
     validate([&format_str](const BSONObj& obj) {
         ASSERT_EQUALS(obj.getField(kMessageFieldName).String(),
-                      fmt::format(format_str, 1, "{ x : 1}"));
+                      fmt::format(fmt::runtime(format_str), 1, "{ x : 1}"));
     });
 }
 
@@ -2389,7 +2391,7 @@ TEST_F(UnstructuredLoggingTest, ManyArgs) {
     logd(format_str, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11);  // NOLINT
     validate([&format_str](const BSONObj& obj) {
         ASSERT_EQUALS(obj.getField(kMessageFieldName).String(),
-                      fmt::format(format_str, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11));
+                      fmt::format(fmt::runtime(format_str), 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11));
     });
 }
 

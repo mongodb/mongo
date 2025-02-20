@@ -43,7 +43,6 @@ namespace mongo {
 namespace {
 
 namespace m = unittest::match;
-using namespace fmt::literals;
 
 /** Match that `x` converts to `true` and that `*x` matches `m`. */
 template <typename M>
@@ -52,7 +51,7 @@ public:
     explicit WhenDereferenced(M&& m) : _m{std::move(m)} {}
 
     std::string describe() const {
-        return "WhenDereferenced({})"_format(_m.describe());
+        return fmt::format("WhenDereferenced({})", _m.describe());
     }
 
     template <typename X>
@@ -73,7 +72,7 @@ public:
     explicit WhenBool(M&& m) : _m{std::move(m)} {}
 
     std::string describe() const {
-        return "WhenBool({})"_format(_m.describe());
+        return fmt::format("WhenBool({})", _m.describe());
     }
 
     template <typename X>

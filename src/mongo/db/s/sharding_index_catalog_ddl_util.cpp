@@ -259,7 +259,7 @@ void addShardingIndexCatalogEntryToCollection(OperationContext* opCtx,
             {
                 repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
                 BSONObjBuilder builder(indexCatalogEntry.toBSON());
-                auto idStr = format(FMT_STRING("{}_{}"), collectionUUID.toString(), name);
+                auto idStr = fmt::format("{}_{}", collectionUUID.toString(), name);
                 builder.append("_id", idStr);
                 uassertStatusOK(Helpers::insert(opCtx, idxColl, builder.obj()));
             }
@@ -437,8 +437,7 @@ void replaceCollectionShardingIndexCatalog(OperationContext* opCtx,
                     // Attach a custom generated _id.
                     auto indexBSON = i.toBSON();
                     BSONObjBuilder builder(indexBSON);
-                    auto idStr =
-                        format(FMT_STRING("{}_{}"), uuid.toString(), i.getName().toString());
+                    auto idStr = fmt::format("{}_{}", uuid.toString(), i.getName().toString());
                     builder.append("_id", idStr);
                     uassertStatusOK(Helpers::insert(opCtx, idxColl, builder.done()));
                 }

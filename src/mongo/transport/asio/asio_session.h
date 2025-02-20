@@ -46,8 +46,7 @@ template <typename SuccessValue>
 auto futurize(const std::error_code& ec, SuccessValue&& successValue) {
     using T = std::decay_t<SuccessValue>;
     if (MONGO_unlikely(ec)) {
-        using namespace fmt::literals;
-        static StaticImmortal memo = "futurize<{}>"_format(demangleName(typeid(T)));
+        static StaticImmortal memo = fmt::format("futurize<{}>", demangleName(typeid(T)));
         return Future<T>::makeReady(errorCodeToStatus(ec, *memo));
     }
     return Future<T>::makeReady(std::forward<SuccessValue>(successValue));

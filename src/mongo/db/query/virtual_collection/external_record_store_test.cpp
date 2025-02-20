@@ -61,7 +61,6 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-using namespace fmt::literals;
 
 static const std::string nonExistingPath = "non-existing";
 static constexpr int kNumPipes = 2;
@@ -162,7 +161,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeBasicRead) {
     auto inputStream = InputStream<NamedPipeInput>(pipePath);
     for (int i = 0; i < 100; ++i) {
         int nRead = inputStream.readBytes(count, _buffer);
-        ASSERT_EQ(nRead, count) << "Failed to read data up to {} bytes"_format(count);
+        ASSERT_EQ(nRead, count) << fmt::format("Failed to read data up to {} bytes", count);
         ASSERT_EQ(std::memcmp(srcBsonObj.objdata(), _buffer, count), 0)
             << "Read data is not same as the source data";
     }
@@ -188,7 +187,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeReadPartialData) {
     auto inputStream = InputStream<NamedPipeInput>(pipePath);
     // Requests more data than the pipe contains. Should only get the bytes it does contain.
     int nRead = inputStream.readBytes(kBufferSize, _buffer);
-    ASSERT_EQ(nRead, count) << "Expected nRead == {} but got {}"_format(count, nRead);
+    ASSERT_EQ(nRead, count) << fmt::format("Expected nRead == {} but got {}", count, nRead);
     ASSERT_EQ(std::memcmp(srcBsonObj.objdata(), _buffer, count), 0)
         << "Read data is not same as the source data";
 }
@@ -220,8 +219,8 @@ TEST_F(ExternalRecordStoreTest, NamedPipeReadUntilProducerDone) {
     while (true) {
         int nRead = inputStream.readBytes(count, _buffer);
         if (nRead != count) {
-            ASSERT_EQ(nRead, 0) << "Expected nRead == 0 for EOF but got something else {}"_format(
-                nRead);
+            ASSERT_EQ(nRead, 0) << fmt::format(
+                "Expected nRead == 0 for EOF but got something else {}", nRead);
             break;
         }
         ASSERT_EQ(std::memcmp(srcBsonObj.objdata(), _buffer, count), 0)
@@ -229,8 +228,8 @@ TEST_F(ExternalRecordStoreTest, NamedPipeReadUntilProducerDone) {
         ++nReceived;
     }
 
-    ASSERT_EQ(nReceived, nSent) << "Received count {} is different from the sent count {}"_format(
-        nReceived, nSent);
+    ASSERT_EQ(nReceived, nSent) << fmt::format(
+        "Received count {} is different from the sent count {}", nReceived, nSent);
 }
 
 TEST_F(ExternalRecordStoreTest, NamedPipeOpenNonExisting) {
@@ -292,10 +291,11 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes1) {
             ++objsRead[pipeIdx];
             long recId = record->id.getLong();
             ASSERT_EQ(recIdExpected, recId)
-                << "Expected record->id {} but got {}"_format(recIdExpected, recId);
+                << fmt::format("Expected record->id {} but got {}", recIdExpected, recId);
             ASSERT_EQ(record->data.size(), bsonObjs[pipeIdx][0].objsize())
-                << "record->data.size() {} != original size {}"_format(
-                       record->data.size(), bsonObjs[pipeIdx][0].objsize());
+                << fmt::format("record->data.size() {} != original size {}",
+                               record->data.size(),
+                               bsonObjs[pipeIdx][0].objsize());
             ASSERT_EQ(std::memcmp(record->data.data(),
                                   bsonObjs[pipeIdx][0].objdata(),
                                   bsonObjs[pipeIdx][0].objsize()),
@@ -307,9 +307,8 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes1) {
         }
     } while (record);
     for (int pipeIdx = 0; pipeIdx < kNumPipes; ++pipeIdx) {
-        ASSERT_EQ(objsRead[pipeIdx], kObjsPerPipe)
-            << "Expected objsRead[{}] == {} but got {}"_format(
-                   pipeIdx, kObjsPerPipe, objsRead[pipeIdx]);
+        ASSERT_EQ(objsRead[pipeIdx], kObjsPerPipe) << fmt::format(
+            "Expected objsRead[{}] == {} but got {}", pipeIdx, kObjsPerPipe, objsRead[pipeIdx]);
     }
 }
 
@@ -393,10 +392,11 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes2) {
             ++objsRead;
             long recId = record->id.getLong();
             ASSERT_EQ(recIdExpected, recId)
-                << "Expected record->id {} but got {}"_format(recIdExpected, recId);
+                << fmt::format("Expected record->id {} but got {}", recIdExpected, recId);
             ASSERT_EQ(record->data.size(), bsonObjs[objIdx].objsize())
-                << "record->data.size() {} != original size {}"_format(record->data.size(),
-                                                                       bsonObjs[objIdx].objsize());
+                << fmt::format("record->data.size() {} != original size {}",
+                               record->data.size(),
+                               bsonObjs[objIdx].objsize());
             ASSERT_EQ(std::memcmp(record->data.data(),
                                   bsonObjs[objIdx].objdata(),
                                   bsonObjs[objIdx].objsize()),
@@ -408,7 +408,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes2) {
         }
     } while (record);
     ASSERT_EQ(objsRead, numToWrite)
-        << "Expected objsRead == {} but got {}"_format(numToWrite, objsRead);
+        << fmt::format("Expected objsRead == {} but got {}", numToWrite, objsRead);
 }
 
 // Test reading multiple pipes with a MultiBsonStreamCursor with large BSON objects, much larger
@@ -478,10 +478,11 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes3) {
             ++objsRead;
             long recId = record->id.getLong();
             ASSERT_EQ(recIdExpected, recId)
-                << "Expected record->id {} but got {}"_format(recIdExpected, recId);
+                << fmt::format("Expected record->id {} but got {}", recIdExpected, recId);
             ASSERT_EQ(record->data.size(), bsonObjs[0].objsize())
-                << "record->data.size() {} != original size {}"_format(record->data.size(),
-                                                                       bsonObjs[0].objsize());
+                << fmt::format("record->data.size() {} != original size {}",
+                               record->data.size(),
+                               bsonObjs[0].objsize());
             ASSERT_EQ(
                 std::memcmp(record->data.data(), bsonObjs[0].objdata(), bsonObjs[0].objsize()), 0)
                 << "Read data is not same as the source data";
@@ -490,7 +491,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes3) {
         }
     } while (record);
     ASSERT_EQ(objsRead, numToWrite)
-        << "Expected objsRead == {} but got {}"_format(numToWrite, objsRead);
+        << fmt::format("Expected objsRead == {} but got {}", numToWrite, objsRead);
 }
 
 // Tests MultiBsonStreamCursor reading a large number of pipes with random-sized BSON objects and
@@ -511,7 +512,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes4) {
     for (int pipeIdx = 0; pipeIdx < kNumPipes; ++pipeIdx) {
         int numObjs = _random.nextInt32(2048);
         objsWritten += numObjs;
-        std::string fieldName = "field_{}"_format(pipeIdx);
+        std::string fieldName = fmt::format("field_{}", pipeIdx);
         for (int objIdx = 0; objIdx < numObjs; ++objIdx) {
             pipeBsonObjs[pipeIdx].emplace_back(
                 BSON(fieldName << getRandomString(_random.nextInt32(2048))));
@@ -520,7 +521,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes4) {
 
     // Create the pipes.
     for (int pipeIdx = 0; pipeIdx < kNumPipes; ++pipeIdx) {
-        pipePaths[pipeIdx] = "ERSTest_NamedPipeMultiplePipes4Pipe1{}"_format(pipeIdx);
+        pipePaths[pipeIdx] = fmt::format("ERSTest_NamedPipeMultiplePipes4Pipe1{}", pipeIdx);
         pipeThreads[pipeIdx] = stdx::thread(createNamedPipe,
                                             &pw[pipeIdx],
                                             pipePaths[pipeIdx],
@@ -567,10 +568,11 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes4) {
 
             long recId = record->id.getLong();
             ASSERT_EQ(recIdExpected, recId)
-                << "Expected record->id {} but got {}"_format(recIdExpected, recId);
+                << fmt::format("Expected record->id {} but got {}", recIdExpected, recId);
             ASSERT_EQ(record->data.size(), pipeBsonObjs[pipeIdx][pipeObjsRead - 1].objsize())
-                << "record->data.size() {} != original size {}"_format(
-                       record->data.size(), pipeBsonObjs[pipeIdx][pipeObjsRead - 1].objsize());
+                << fmt::format("record->data.size() {} != original size {}",
+                               record->data.size(),
+                               pipeBsonObjs[pipeIdx][pipeObjsRead - 1].objsize());
             ASSERT_EQ(std::memcmp(record->data.data(),
                                   pipeBsonObjs[pipeIdx][pipeObjsRead - 1].objdata(),
                                   pipeBsonObjs[pipeIdx][pipeObjsRead - 1].objsize()),
@@ -581,6 +583,6 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes4) {
         }
     } while (record);
     ASSERT_EQ(objsRead, objsWritten)
-        << "Expected objsRead == {} but got {}"_format(objsWritten, objsRead);
+        << fmt::format("Expected objsRead == {} but got {}", objsWritten, objsRead);
 }
 }  // namespace mongo

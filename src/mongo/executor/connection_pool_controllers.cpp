@@ -53,11 +53,11 @@ void DynamicLimitController::init(executor::ConnectionPool* parent) {
 void DynamicLimitController::addHost(PoolId id, const HostAndPort& host) {
     stdx::lock_guard lk(_mutex);
     auto ret = _poolData.insert({id, {host}});
-    using namespace fmt::literals;
-    invariant(
-        ret.second,
-        "ConnectionPool controller {} received a request to track host {} that was already being tracked."_format(
-            _name, host));
+    invariant(ret.second,
+              fmt::format("ConnectionPool controller {} received a request to track host {} that "
+                          "was already being tracked.",
+                          _name,
+                          host));
 }
 
 DynamicLimitController::HostGroupState DynamicLimitController::updateHost(PoolId id,

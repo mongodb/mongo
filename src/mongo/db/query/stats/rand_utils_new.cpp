@@ -44,7 +44,6 @@
 
 namespace mongo::stats {
 namespace value = sbe::value;
-using namespace fmt::literals;
 const std::string StrDistribution::_alphabet =
     "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
@@ -203,10 +202,10 @@ DateDistribution::DateDistribution(MixedDistributionDescriptor distrDescriptor,
     : DataTypeDistrNew(distrDescriptor, value::TypeTags::Date, weight, ndv, nullsRatio),
       _minDate(minDate),
       _maxDate(maxDate) {
-    uassert(
-        7169301,
-        "minDate: {} must be before maxDate: {}"_format(_minDate.toString(), _maxDate.toString()),
-        _minDate <= _maxDate);
+    uassert(7169301,
+            fmt::format(
+                "minDate: {} must be before maxDate: {}", _minDate.toString(), _maxDate.toString()),
+            _minDate <= _maxDate);
 }
 
 void DateDistribution::init(DatasetDescriptorNew*, std::mt19937_64& gen) {
@@ -238,7 +237,7 @@ DoubleDistribution::DoubleDistribution(MixedDistributionDescriptor distrDescript
       _min(min),
       _max(max) {
     uassert(7169302,
-            "min double: {} must be less than max double: {}"_format(_min, _max),
+            fmt::format("min double: {} must be less than max double: {}", _min, _max),
             _min <= _max);
 }
 

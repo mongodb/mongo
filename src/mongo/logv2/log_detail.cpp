@@ -38,6 +38,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <fmt/args.h>
 #include <fmt/format.h>
 #include <functional>
 #include <new>
@@ -203,10 +204,10 @@ static void checkUniqueAttrs(int32_t id, const TypeErasedAttributeStorage& attrs
         StringData sep;
         std::string msg;
         for (auto&& a : attrs) {
-            msg.append(format(FMT_STRING(R"({}"{}")"), sep, a.name));
+            msg.append(fmt::format(R"({}"{}")", sep, a.name));
             sep = ","_sd;
         }
-        uasserted(4793301, format(FMT_STRING("LOGV2 (id={}) attribute collision: [{}]"), id, msg));
+        uasserted(4793301, fmt::format("LOGV2 (id={}) attribute collision: [{}]", id, msg));
     }
 }
 
@@ -215,9 +216,7 @@ void doSafeLog(int32_t id,
                LogOptions const& options,
                StringData message,
                TypeErasedAttributeStorage const& attrs) {
-
-    signalSafeWriteToStderr(
-        format(FMT_STRING("{}({}): {}\n"), severity.toStringData(), id, message));
+    signalSafeWriteToStderr(fmt::format("{}({}): {}\n", severity.toStringData(), id, message));
 }
 
 void _doLogImpl(int32_t id,
@@ -292,7 +291,7 @@ void doLogImpl(int32_t id,
                    "Exception during log"_sd,
                    AttributeStorage{"original_msg"_attr = message, "what"_attr = ex.what()});
 
-        invariant(!kDebugBuild, format(FMT_STRING("Exception during log: {}"), ex.what()));
+        invariant(!kDebugBuild, fmt::format("Exception during log: {}", ex.what()));
     } catch (...) {
         doSafeLog(id, severity, options, message, attrs);
         throw;

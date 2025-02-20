@@ -105,14 +105,14 @@ public:
      */
     template <typename VisitorCtx, typename DS>
     void registerVisitorFunc(ConstVisitFunc f) {
-        using namespace fmt::literals;
         static_assert(std::is_polymorphic_v<VisitorCtx>,
                       "Visitor context must be polymorphic to ensure typeid returns dynamic types");
         DocumentSourceVisitorRegistryKey key{std::type_index(typeid(VisitorCtx)),
                                              std::type_index(typeid(DS))};
         tassert(6202700,
-                "duplicate const document source visitor ({}, {}) registered"_format(
-                    key.visitorContextType.name(), key.documentSourceType.name()),
+                fmt::format("duplicate const document source visitor ({}, {}) registered",
+                            key.visitorContextType.name(),
+                            key.documentSourceType.name()),
                 _constVisitorRegistry.emplace(key, f).second);
     }
 
@@ -122,15 +122,15 @@ public:
      */
     ConstVisitFunc getConstVisitorFunc(DocumentSourceVisitorContextBase& visitorCtx,
                                        const DocumentSource& ds) const {
-        using namespace fmt::literals;
         DocumentSourceVisitorRegistryKey key{std::type_index(typeid(visitorCtx)),
                                              std::type_index(typeid(ds))};
         if (auto it = _constVisitorRegistry.find(key); it != _constVisitorRegistry.end()) {
             return it->second;
         }
         tasserted(6202701,
-                  "missing entry in const visitor registry: ({}, {})"_format(
-                      key.visitorContextType.name(), key.documentSourceType.name()));
+                  fmt::format("missing entry in const visitor registry: ({}, {})",
+                              key.visitorContextType.name(),
+                              key.documentSourceType.name()));
     }
 
 private:

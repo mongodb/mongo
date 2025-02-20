@@ -1335,7 +1335,7 @@ bool WiredTigerConfigParser::isTableLoggingSettingValid() {
     while ((retCode = _next(&key, &value)) == 0) {
         invariant(key.type == WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID,
                   fmt::format("unexpected key type {} while iterating keys in configuration string",
-                              key.type));
+                              fmt::underlying(key.type)));
         if (StringData{key.str, key.len} == kLogKeyName &&
             value.type == WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRUCT) {
             WiredTigerConfigParser logSettingParser(value);

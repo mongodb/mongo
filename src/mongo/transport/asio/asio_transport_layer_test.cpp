@@ -75,8 +75,6 @@
 namespace mongo::transport {
 namespace {
 
-using namespace fmt::literals;
-
 #ifdef _WIN32
 using SetsockoptPtr = char*;
 #else
@@ -113,7 +111,7 @@ std::string loadFile(std::string filename) try {
     return {std::istreambuf_iterator<char>{f}, std::istreambuf_iterator<char>{}};
 } catch (const std::ifstream::failure& ex) {
     auto ec = lastSystemError();
-    FAIL("Failed to load file: \"{}\": {}: {}"_format(filename, ex.what(), errorMessage(ec)));
+    FAIL(fmt::format("Failed to load file: \"{}\": {}: {}", filename, ex.what(), errorMessage(ec)));
     MONGO_UNREACHABLE;
 }
 
@@ -780,7 +778,7 @@ TEST(AsioTransportLayer, ConfirmSocketSetOptionOnResetConnections) {
     auto thrown = caught.get();
     LOGV2(6101610,
           "ASIO set_option response on peer-reset connection",
-          "msg"_attr = "{}"_format(thrown ? thrown->message() : ""));
+          "msg"_attr = fmt::format("{}", thrown ? thrown->message() : ""));
 }
 
 // TODO SERVER-97299: Remove this test in favor of
@@ -979,8 +977,8 @@ public:
     static constexpr auto kProxyIP = "54.225.237.121"_sd;
     static constexpr auto kSourceRemotePort = 1000;
     static constexpr auto kProxyPort = 3000;
-    inline static const std::string kProxyProtocolHeader = "PROXY TCP4 {} {} {} {}\r\n"_format(
-        kSourceRemoteIP, kProxyIP, kSourceRemotePort, kProxyPort);
+    inline static const std::string kProxyProtocolHeader = fmt::format(
+        "PROXY TCP4 {} {} {} {}\r\n", kSourceRemoteIP, kProxyIP, kSourceRemotePort, kProxyPort);
 
     void setUp() override {
         auto options = defaultTLAOptions();
@@ -1050,7 +1048,7 @@ public:
                 // should occur immediately after the socket is opened and connected to.
                 HostAndPort target{testHostName(), port};
                 auto conn = connect(target);
-                ASSERT_OK(conn) << " target={}"_format(target);
+                ASSERT_OK(conn) << fmt::format(" target={}", target);
                 break;
             }
             case kLoadBalancerPort: {

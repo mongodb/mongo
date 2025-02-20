@@ -211,7 +211,6 @@ auto& notPrimaryUnackWrites =
 
 namespace {
 
-using namespace fmt::literals;
 
 void runCommandInvocation(const RequestExecutionContext& rec, CommandInvocation* invocation) {
     CommandHelpers::runCommandInvocation(rec.getOpCtx(), invocation, rec.getReplyBuilder());
@@ -947,7 +946,8 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
     auto apiParamsFromTxn = txnParticipant.getAPIParameters(opCtx);
     uassert(
         ErrorCodes::APIMismatchError,
-        "API parameter mismatch: {} used params {}, the transaction's first command used {}"_format(
+        fmt::format(
+            "API parameter mismatch: {} used params {}, the transaction's first command used {}",
             invocation->definition()->getName(),
             apiParamsFromClient.toBSON().toString(),
             apiParamsFromTxn.toBSON().toString()),
@@ -1056,8 +1056,9 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
         if (readConcernArgs.hasLevel() && isCreate(command)) {
             if (!readConcernSupport.readConcernSupport.isOK()) {
                 uassertStatusOK(readConcernSupport.readConcernSupport.withContext(
-                    "Command {} does not support this transaction's {}"_format(
-                        command->getName(), readConcernArgs.toString())));
+                    fmt::format("Command {} does not support this transaction's {}",
+                                command->getName(),
+                                readConcernArgs.toString())));
             }
         }
     }
@@ -1348,11 +1349,11 @@ void RunCommandAndWaitForWriteConcern::_setup() {
                 // WriteConcern should always be explicitly specified by operations received
                 // from internal clients (ie. from a mongos or mongod), even if it is empty
                 // (ie. writeConcern: {}, which is equivalent to { w: 1, wtimeout: 0 }).
-                uassert(
-                    4569201,
-                    "received command without explicit writeConcern on an internalClient connection {}"_format(
-                        redact(_execContext.getRequest().body.toString())),
-                    genericArgs.getWriteConcern());
+                uassert(4569201,
+                        fmt::format("received command without explicit writeConcern on an "
+                                    "internalClient connection {}",
+                                    redact(_execContext.getRequest().body.toString())),
+                        genericArgs.getWriteConcern());
             } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
                        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
                 if (!genericArgs.getWriteConcern()) {
@@ -1419,10 +1420,10 @@ void RunCommandAndWaitForWriteConcern::_checkWriteConcern() {
         dassert(!_extractedWriteConcern, "opGetMore contained unexpected extracted write concern");
     } else {
         dassert(_extractedWriteConcern, "no extracted write concern");
-        dassert(
-            opCtx->getWriteConcern() == _extractedWriteConcern,
-            "opCtx wc: {} extracted wc: {}"_format(opCtx->getWriteConcern().toBSON().jsonString(),
-                                                   _extractedWriteConcern->toBSON().jsonString()));
+        dassert(opCtx->getWriteConcern() == _extractedWriteConcern,
+                fmt::format("opCtx wc: {} extracted wc: {}",
+                            opCtx->getWriteConcern().toBSON().jsonString(),
+                            _extractedWriteConcern->toBSON().jsonString()));
     }
 }
 
@@ -1464,11 +1465,11 @@ StatusWith<repl::ReadConcernArgs> ExecCommandDatabase::_extractReadConcern(
             // ReadConcern should always be explicitly specified by operations received from
             // internal clients (ie. from a mongos or mongod), even if it is empty (ie.
             // readConcern: {}, meaning to use the implicit server defaults).
-            uassert(
-                4569200,
-                "received command without explicit readConcern on an internalClient connection {}"_format(
-                    redact(_execContext.getRequest().body.toString())),
-                readConcernArgs.isSpecified());
+            uassert(4569200,
+                    fmt::format("received command without explicit readConcern on an "
+                                "internalClient connection {}",
+                                redact(_execContext.getRequest().body.toString())),
+                    readConcernArgs.isSpecified());
         } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             if (!readConcernArgs.isSpecified()) {

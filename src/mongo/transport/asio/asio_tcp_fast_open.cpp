@@ -191,16 +191,15 @@ void checkSupportedByLibc(bool srv, bool cli) {
 
 void checkEnabledByKernel(bool srv, bool cli) {
 #if defined(TCP_FASTOPEN) && defined(__linux__)
-    using namespace fmt::literals;
     if (!srv && !cli)
         return;
     std::string procfile("/proc/sys/net/ipv4/tcp_fastopen");
     boost::system::error_code ec;
     iassert(ErrorCodes::BadValue,
-            "Unable to locate {}: {}"_format(procfile, errorCodeToStatus(ec).toString()),
+            fmt::format("Unable to locate {}: {}", procfile, errorCodeToStatus(ec).toString()),
             boost::filesystem::exists(procfile, ec));
     std::fstream f(procfile, std::ifstream::in);
-    iassert(ErrorCodes::BadValue, "Unable to read {}"_format(procfile), f.is_open());
+    iassert(ErrorCodes::BadValue, fmt::format("Unable to read {}", procfile), f.is_open());
 
     int64_t k;  // The kernel setting.
     f >> k;
@@ -213,8 +212,9 @@ void checkEnabledByKernel(bool srv, bool cli) {
     uint64_t effCliMask = cli << 0;
     uint64_t effSrvMask = srv << 1;
     iassert(ErrorCodes::BadValue,
-            "TCP FastOpen disabled in kernel. Set {} to {}"_format(procfile,
-                                                                   k | effCliMask | effSrvMask),
+            fmt::format("TCP FastOpen disabled in kernel. Set {} to {}",
+                        procfile,
+                        k | effCliMask | effSrvMask),
             !maskBitsMissing(k, effCliMask) && !maskBitsMissing(k, effSrvMask));
 #endif
 }

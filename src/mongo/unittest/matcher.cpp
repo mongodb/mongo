@@ -37,8 +37,6 @@
 
 namespace mongo::unittest::match {
 
-using namespace fmt::literals;
-
 struct ContainsRegex::Impl {
     explicit Impl(std::string pat) : re(std::move(pat)) {}
     pcre::Regex re;
@@ -56,7 +54,7 @@ MatchResult ContainsRegex::match(StringData x) const {
 }
 
 std::string ContainsRegex::describe() const {
-    return R"(ContainsRegex("{}"))"_format(_impl->re.pattern());
+    return fmt::format(R"(ContainsRegex("{}"))", _impl->re.pattern());
 }
 
 }  // namespace mongo::unittest::match

@@ -35,6 +35,7 @@
 #include <boost/log/utility/formatting_ostream.hpp>
 #include <cstddef>
 #include <deque>
+#include <fmt/args.h>
 #include <fmt/format.h>
 #include <functional>
 #include <string>
@@ -174,7 +175,7 @@ void PlainFormatter::operator()(boost::log::record_view const& rec,
     TextValueExtractor extractor;
     extractor.reserve(attrs.get().size());
     attrs.get().apply(extractor);
-    fmt::vformat_to(buffer, std::string_view{message}, extractor.args());
+    fmt::vformat_to(std::back_inserter(buffer), std::string_view{message}, extractor.args());
 
     size_t attributeMaxSize = buffer.size();
     if (extract<LogTruncation>(attributes::truncation(), rec).get() == LogTruncation::Enabled) {

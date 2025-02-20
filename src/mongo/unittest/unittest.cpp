@@ -123,9 +123,11 @@ public:
 
     std::string toString() const {
         std::ostringstream ss;
-        using namespace fmt::literals;
-        ss << "{:<40s} | tests: {:4d} | fails: {:4d} | time secs: {:6.3f}\n"
-              ""_format(_name, _tests, _fails.size(), _millis * 1e-3);
+        ss << fmt::format("{:<40s} | tests: {:4d} | fails: {:4d} | time secs: {:6.3f}\n",
+                          _name,
+                          _tests,
+                          _fails.size(),
+                          _millis * 1e-3);
 
         for (const auto& i : _messages) {
             ss << "\t" << i << '\n';

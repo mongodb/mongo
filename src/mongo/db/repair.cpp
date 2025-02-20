@@ -69,7 +69,6 @@
 
 namespace mongo {
 
-using namespace fmt::literals;
 
 Status rebuildIndexesForNamespace(OperationContext* opCtx,
                                   const NamespaceString& nss,
@@ -239,11 +238,12 @@ Status repairCollection(OperationContext* opCtx,
     // to run an expensive collection validation.
     if (status.code() == ErrorCodes::DataModifiedByRepair) {
         invariant(StorageRepairObserver::get(opCtx->getServiceContext())->isDataInvalidated(),
-                  "Collection '{}' ({})"_format(toStringForLogging(nss),
-                                                CollectionCatalog::get(opCtx)
-                                                    ->lookupCollectionByNamespace(opCtx, nss)
-                                                    ->uuid()
-                                                    .toString()));
+                  fmt::format("Collection '{}' ({})",
+                              toStringForLogging(nss),
+                              CollectionCatalog::get(opCtx)
+                                  ->lookupCollectionByNamespace(opCtx, nss)
+                                  ->uuid()
+                                  .toString()));
 
         // If we are a replica set member in standalone mode and we have unfinished indexes,
         // drop them before rebuilding any completed indexes. Since we have already made

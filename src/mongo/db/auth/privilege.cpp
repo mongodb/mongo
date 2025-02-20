@@ -50,11 +50,11 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-using namespace fmt::literals;
 namespace {
 void uassertNoConflict(StringData resource, StringData found, bool cond) {
-    uassert(
-        ErrorCodes::BadValue, "{} conflicts with resource type '{}'"_format(resource, found), cond);
+    uassert(ErrorCodes::BadValue,
+            fmt::format("{} conflicts with resource type '{}'", resource, found),
+            cond);
 }
 
 bool isValidCollectionName(StringData db, StringData coll) {
@@ -139,7 +139,7 @@ Privilege Privilege::resolvePrivilegeWithTenant(const boost::optional<TenantId>&
             auto db = rsrc.getDb().get();
             auto coll = rsrc.getCollection().get();
             uassert(ErrorCodes::BadValue,
-                    "'{}' is not a valid collection name"_format(coll),
+                    fmt::format("'{}' is not a valid collection name", coll),
                     coll.empty() || isValidCollectionName(db, coll));
 
             if (db.empty() && coll.empty()) {
@@ -291,9 +291,9 @@ auth::ParsedPrivilege Privilege::toParsedPrivilege() const {
             break;
 
         default:
-            uasserted(
-                ErrorCodes::InvalidOptions,
-                "{} is not a valid user-grantable resource pattern"_format(_resource.toString()));
+            uasserted(ErrorCodes::InvalidOptions,
+                      fmt::format("{} is not a valid user-grantable resource pattern",
+                                  _resource.toString()));
     }
 
     pp.setResource(rsrc);

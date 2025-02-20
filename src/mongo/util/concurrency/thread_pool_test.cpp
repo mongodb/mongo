@@ -58,7 +58,6 @@
 
 namespace {
 using namespace mongo;
-using namespace fmt::literals;
 
 MONGO_INITIALIZER(ThreadPoolCommonTests)(InitializerContext*) {
     addTestsForThreadPool("ThreadPoolCommon",
@@ -279,13 +278,13 @@ TEST_F(ThreadPoolTest, ThreadPoolRunsOnCreateThreadFunctionBeforeConsumingTasks)
     options.threadNamePrefix = "mythread";
     options.maxThreads = 1U;
     options.onCreateThread = [&](const std::string& threadName) {
-        journal.append("[onCreate({})]"_format(threadName));
+        journal.append(fmt::format("[onCreate({})]", threadName));
     };
 
     ThreadPool pool(options);
     pool.startup();
     pool.schedule([&](auto status) {
-        journal.append("[Call({})]"_format(status.toString()));
+        journal.append(fmt::format("[Call({})]", status.toString()));
         barrier.countDownAndWait();
     });
     barrier.countDownAndWait();

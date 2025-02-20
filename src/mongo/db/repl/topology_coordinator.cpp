@@ -95,8 +95,6 @@ constexpr Milliseconds TopologyCoordinator::PingStats::UninitializedPingTime;
 auto& numSyncSourceChangesDueToSignificantlyCloserNode =
     *MetricBuilder<Counter64>("repl.syncSource.numSyncSourceChangesDueToSignificantlyCloserNode");
 
-using namespace fmt::literals;
-
 std::string TopologyCoordinator::roleToString(TopologyCoordinator::Role role) {
     switch (role) {
         case TopologyCoordinator::Role::kLeader:
@@ -3617,27 +3615,31 @@ void TopologyCoordinator::processReplSetRequestVotes(const ReplSetRequestVotesAr
 
     if (args.getConfigVersionAndTerm() < _rsConfig.getConfigVersionAndTerm()) {
         response->setVoteGranted(false);
-        response->setReason("candidate's config with {} is older than mine with {}"_format(
-            args.getConfigVersionAndTerm(), _rsConfig.getConfigVersionAndTerm()));
+        response->setReason(fmt::format("candidate's config with {} is older than mine with {}",
+                                        fmt::streamed(args.getConfigVersionAndTerm()),
+                                        fmt::streamed(_rsConfig.getConfigVersionAndTerm())));
     } else if (args.getTerm() < _term) {
         response->setVoteGranted(false);
         response->setReason(
-            "candidate's term ({}) is lower than mine ({})"_format(args.getTerm(), _term));
+            fmt::format("candidate's term ({}) is lower than mine ({})", args.getTerm(), _term));
     } else if (args.getSetName() != _rsConfig.getReplSetName()) {
         response->setVoteGranted(false);
-        response->setReason("candidate's set name ({}) differs from mine ({})"_format(
-            args.getSetName(), _rsConfig.getReplSetName()));
+        response->setReason(fmt::format("candidate's set name ({}) differs from mine ({})",
+                                        args.getSetName(),
+                                        _rsConfig.getReplSetName()));
     } else if (args.getLastWrittenOpTime() < getMyLastWrittenOpTime()) {
         response->setVoteGranted(false);
-        response->setReason(
+        response->setReason(fmt::format(
             "candidate's data is staler than mine. candidate's last written OpTime: {}, "
-            "my last written OpTime: {}"_format(args.getLastWrittenOpTime().toString(),
-                                                getMyLastWrittenOpTime().toString()));
+            "my last written OpTime: {}",
+            args.getLastWrittenOpTime().toString(),
+            getMyLastWrittenOpTime().toString()));
     } else if (!args.isADryRun() && _lastVote.getTerm() == args.getTerm()) {
         response->setVoteGranted(false);
-        response->setReason("already voted for another candidate ({}) this term ({})"_format(
-            _rsConfig.getMemberAt(_lastVote.getCandidateIndex()).getHostAndPort(),
-            _lastVote.getTerm()));
+        response->setReason(
+            fmt::format("already voted for another candidate ({}) this term ({})",
+                        _rsConfig.getMemberAt(_lastVote.getCandidateIndex()).getHostAndPort(),
+                        _lastVote.getTerm()));
     } else {
         bool isSameConfig = args.getConfigVersionAndTerm() == _rsConfig.getConfigVersionAndTerm();
         int betterPrimary = _findHealthyPrimaryOfEqualOrGreaterPriority(args.getCandidateIndex());
@@ -3650,8 +3652,8 @@ void TopologyCoordinator::processReplSetRequestVotes(const ReplSetRequestVotesAr
         if (isSameConfig && _selfConfig().isArbiter() && betterPrimary >= 0) {
             response->setVoteGranted(false);
             response->setReason(
-                "can see a healthy primary ({}) of equal or greater priority"_format(
-                    _rsConfig.getMemberAt(betterPrimary).getHostAndPort()));
+                fmt::format("can see a healthy primary ({}) of equal or greater priority",
+                            _rsConfig.getMemberAt(betterPrimary).getHostAndPort()));
         } else {
             if (!args.isADryRun()) {
                 _lastVote.setTerm(args.getTerm());

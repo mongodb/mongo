@@ -208,7 +208,6 @@ private:
 
 template <typename B>
 DocumentSource::GetNextResult DocumentSourceWriter<B>::doGetNext() {
-    using namespace fmt::literals;
     if (_done) {
         return GetNextResult::makeEOF();
     }
@@ -249,8 +248,9 @@ DocumentSource::GetNextResult DocumentSourceWriter<B>::doGetNext() {
             internalQueryDocumentSourceWriterBatchExtraReservedBytes.load();
 
         uassert(7637800,
-                "Unable to proceed with write while metadata size ({}KB) exceeds {}KB"_format(
-                    initialRequestSize / 1024, BSONObjMaxUserSize / 1024),
+                fmt::format("Unable to proceed with write while metadata size ({}KB) exceeds {}KB",
+                            initialRequestSize / 1024,
+                            BSONObjMaxUserSize / 1024),
                 initialRequestSize <= BSONObjMaxUserSize);
 
         const auto maxBatchSizeBytes = BSONObjMaxUserSize - initialRequestSize;

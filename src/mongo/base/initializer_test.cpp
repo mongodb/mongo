@@ -47,7 +47,6 @@
 namespace mongo {
 namespace {
 
-using namespace fmt::literals;
 
 class InitializerTest : public unittest::Test {
 public:
@@ -128,18 +127,19 @@ public:
         for (auto req : reqs)
             if (states[req] != kInitialized)
                 uasserted(ErrorCodes::UnknownError,
-                          "(init{0}) {1} not already initialized"_format(idx, req));
+                          fmt::format("(init{0}) {1} not already initialized", idx, req));
         states[idx] = kInitialized;
     }
 
     void deinitImpl(size_t idx) {
         if (states[idx] != kInitialized)
-            uasserted(ErrorCodes::UnknownError, "(deinit{0}) {0} not initialized"_format(idx));
+            uasserted(ErrorCodes::UnknownError,
+                      fmt::format("(deinit{0}) {0} not initialized", idx));
         auto deps = graph.dependents()[idx];
         for (auto dep : deps)
             if (states[dep] != kDeinitialized)
                 uasserted(ErrorCodes::UnknownError,
-                          "(deinit{0}) {1} not already deinitialized"_format(idx, dep));
+                          fmt::format("(deinit{0}) {1} not already deinitialized", idx, dep));
         states[idx] = kDeinitialized;
     }
 
@@ -327,11 +327,11 @@ TEST(RandomSeedTest, RandomSeedParsing) {
     };
     const Spec specs[] = {
         {{"input1", "input2", opt, std::to_string(seed)}, {}, seed},
-        {{"input1", "input2", "{}={}"_format(opt, seed)}, {}, seed},
+        {{"input1", "input2", fmt::format("{}={}", opt, seed)}, {}, seed},
         {{"input1", "input2", opt}, ErrorCodes::InvalidOptions},
-        {{"input1", "input2", "{}="_format(opt)}, ErrorCodes::FailedToParse},
+        {{"input1", "input2", fmt::format("{}=", opt)}, ErrorCodes::FailedToParse},
         {{"input1", "input2", opt, "abcd"}, ErrorCodes::FailedToParse},
-        {{"input1", "input2", "{}={}"_format(opt, "abcd")}, ErrorCodes::FailedToParse},
+        {{"input1", "input2", fmt::format("{}={}", opt, "abcd")}, ErrorCodes::FailedToParse},
     };
 
     for (auto&& spec : specs) {

@@ -101,8 +101,6 @@ Milliseconds estimateRemainingTime(Milliseconds elapsedTime, double elapsedWork,
 }
 }  // namespace
 
-using namespace fmt::literals;
-
 BSONObj serializeAndTruncateReshardingErrorIfNeeded(Status originalError) {
     BSONObjBuilder originalBob;
     originalError.serializeErrorToBSON(&originalBob);
@@ -209,8 +207,8 @@ Timestamp getHighestMinFetchTimestamp(const std::vector<DonorShardEntry>& donorS
     for (auto& donor : donorShards) {
         auto donorFetchTimestamp = donor.getMutableState().getMinFetchTimestamp();
         uassert(4957300,
-                "All donors must have a minFetchTimestamp, but donor {} does not."_format(
-                    StringData{donor.getId()}),
+                fmt::format("All donors must have a minFetchTimestamp, but donor {} does not.",
+                            StringData{donor.getId()}),
                 donorFetchTimestamp.has_value());
         if (maxMinFetchTimestamp < donorFetchTimestamp.value()) {
             maxMinFetchTimestamp = donorFetchTimestamp.value();

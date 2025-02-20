@@ -41,8 +41,8 @@
 namespace mongo {
 namespace {
 Counter64* getSingletonMetricPtr(StringData commandName, StringData stat, ClusterRole role) {
-    using namespace fmt::literals;
-    return &*MetricBuilder<Counter64>{"commands.{}.{}"_format(commandName, stat)}.setRole(role);
+    return &*MetricBuilder<Counter64>{fmt::format("commands.{}.{}", commandName, stat)}.setRole(
+        role);
 }
 }  // namespace
 

@@ -69,7 +69,6 @@
 
 namespace mongo {
 namespace repl {
-using namespace fmt::literals;
 
 // Allow the heartbeat interval to be forcibly overridden on this node.
 MONGO_FAIL_POINT_DEFINE(forceHeartbeatIntervalMS);
@@ -595,8 +594,8 @@ StatusWith<ReplSetTagPattern> ReplSetConfig::findCustomWriteMode(StringData patt
     if (iter == _customWriteConcernModes.end()) {
         return StatusWith<ReplSetTagPattern>(
             ErrorCodes::UnknownReplWriteConcern,
-            "No write concern mode named '{}' found in replica set configuration"_format(
-                str::escape(patternName.toString())));
+            fmt::format("No write concern mode named '{}' found in replica set configuration",
+                        str::escape(patternName.toString())));
     }
     return StatusWith<ReplSetTagPattern>(iter->second);
 }

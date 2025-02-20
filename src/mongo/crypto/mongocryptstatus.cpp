@@ -63,8 +63,6 @@ std::string MongoCryptStatus::reason() const {
 }
 
 Status MongoCryptStatus::toStatus() const {
-    using namespace fmt::literals;
-
     StringData errorPrefix;
     switch (mongocrypt_status_type(_status)) {
         case MONGOCRYPT_STATUS_OK:
@@ -83,7 +81,7 @@ Status MongoCryptStatus::toStatus() const {
             break;
     }
 
-    return Status(ErrorCodes::LibmongocryptError, "{}: {}"_format(errorPrefix, reason()));
+    return Status(ErrorCodes::LibmongocryptError, fmt::format("{}: {}", errorPrefix, reason()));
 }
 
 }  // namespace mongo

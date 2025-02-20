@@ -60,7 +60,6 @@
 
 namespace mongo {
 namespace {
-using namespace fmt::literals;
 
 class ReshardingChangeStreamsMonitorTest : public ShardServerTestFixtureWithCatalogCacheMock {
 public:

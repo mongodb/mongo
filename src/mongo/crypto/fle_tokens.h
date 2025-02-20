@@ -404,12 +404,13 @@ public:
         static constexpr std::size_t kCipherLengthESCAndLeafFlag = kCipherLengthESCOnly + 1;
 
         static void assertLength(std::size_t sz) {
-            using namespace fmt::literals;
-            uassert(
-                ErrorCodes::BadValue,
-                "Invalid length for EncryptedStateCollectionTokensV2, expected {} or {}, got {}"_format(
-                    kCipherLengthESCOnly, kCipherLengthESCAndLeafFlag, sz),
-                (sz == kCipherLengthESCOnly) || (sz == kCipherLengthESCAndLeafFlag));
+            uassert(ErrorCodes::BadValue,
+                    fmt::format("Invalid length for EncryptedStateCollectionTokensV2, expected {} "
+                                "or {}, got {}",
+                                kCipherLengthESCOnly,
+                                kCipherLengthESCAndLeafFlag,
+                                sz),
+                    (sz == kCipherLengthESCOnly) || (sz == kCipherLengthESCAndLeafFlag));
         }
 
         std::vector<std::uint8_t> _encryptedTokens;

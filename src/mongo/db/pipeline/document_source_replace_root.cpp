@@ -58,7 +58,6 @@
 namespace mongo {
 
 using boost::intrusive_ptr;
-using namespace fmt::literals;
 
 Document ReplaceRootTransformation::applyTransformation(const Document& input) const {
     // Extract subdocument in the form of a Value.
@@ -123,8 +122,8 @@ void ReplaceRootTransformation::reportRenames(const MatchExpression* expr,
     for (const auto& path : deps.fields) {
         // Only record renames for top level paths.
         const auto oldPathTopLevelField = FieldPath::extractFirstFieldFromDottedPath(path);
-        renames.emplace(
-            std::make_pair(oldPathTopLevelField, "{}.{}"_format(prefixPath, oldPathTopLevelField)));
+        renames.emplace(std::make_pair(oldPathTopLevelField,
+                                       fmt::format("{}.{}", prefixPath, oldPathTopLevelField)));
     }
 }
 

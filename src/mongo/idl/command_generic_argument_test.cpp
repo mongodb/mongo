@@ -38,8 +38,6 @@
 namespace mongo {
 namespace test {
 
-using namespace fmt::literals;
-
 // A copy of the generic command arguments and reply fields from before they were moved to IDL in
 // SERVER-51848. We will test that the IDL definitions match these old C++ definitions.
 struct SpecialArgRecord {
@@ -96,23 +94,31 @@ static constexpr std::array<SpecialArgRecord, 35> specials{{
 TEST(CommandGenericArgument, AllGenericArgumentsAndReplyFields) {
     for (const auto& record : specials) {
         if (isGenericArgument(record.name) != record.isGenericArgument) {
-            FAIL("isGenericArgument('{}') should be {}, but it's {}"_format(
-                record.name, record.isGenericArgument, isGenericArgument(record.name)));
+            FAIL(fmt::format("isGenericArgument('{}') should be {}, but it's {}",
+                             record.name,
+                             record.isGenericArgument,
+                             isGenericArgument(record.name)));
         }
 
         if (isGenericReply(record.name) != record.isGenericReply) {
-            FAIL("isGenericReply('{}') should be {}, but it's {}"_format(
-                record.name, record.isGenericReply, isGenericReply(record.name)));
+            FAIL(fmt::format("isGenericReply('{}') should be {}, but it's {}",
+                             record.name,
+                             record.isGenericReply,
+                             isGenericReply(record.name)));
         }
 
         if (shouldForwardToShards(record.name) == record.stripFromRequest) {
-            FAIL("shouldForwardToShards('{}') should be {}, but it's {}"_format(
-                record.name, !record.stripFromRequest, shouldForwardToShards(record.name)));
+            FAIL(fmt::format("shouldForwardToShards('{}') should be {}, but it's {}",
+                             record.name,
+                             !record.stripFromRequest,
+                             shouldForwardToShards(record.name)));
         }
 
         if (shouldForwardFromShards(record.name) == record.stripFromReply) {
-            FAIL("shouldForwardFromShards('{}') should be {}, but it's {}"_format(
-                record.name, !record.stripFromReply, shouldForwardFromShards(record.name)));
+            FAIL(fmt::format("shouldForwardFromShards('{}') should be {}, but it's {}",
+                             record.name,
+                             !record.stripFromReply,
+                             shouldForwardFromShards(record.name)));
         }
     }
 }

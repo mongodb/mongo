@@ -130,7 +130,6 @@
 namespace mongo {
 namespace {
 
-using namespace fmt::literals;
 
 MONGO_FAIL_POINT_DEFINE(rsStopGetMoreCmd);
 MONGO_FAIL_POINT_DEFINE(getMoreHangAfterPinCursor);
@@ -342,8 +341,10 @@ void setUpOperationContextStateForGetMore(OperationContext* opCtx,
     auto apiParamsFromClient = APIParameters::get(opCtx);
     uassert(
         ErrorCodes::APIMismatchError,
-        "API parameter mismatch: getMore used params {}, the cursor-creating command used {}"_format(
-            apiParamsFromClient.toBSON().toString(), cursor.getAPIParameters().toBSON().toString()),
+        fmt::format(
+            "API parameter mismatch: getMore used params {}, the cursor-creating command used {}",
+            apiParamsFromClient.toBSON().toString(),
+            cursor.getAPIParameters().toBSON().toString()),
         apiParamsFromClient == cursor.getAPIParameters());
 
     setUpOperationDeadline(opCtx, cursor, cmd, disableAwaitDataFailpointActive);

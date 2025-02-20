@@ -55,7 +55,6 @@
 namespace mongo::auth {
 
 namespace {
-using namespace fmt::literals;
 
 // Signed auth tokens are for internal testing only, and require the use of a preshared key.
 // These tokens will have fixed values for kid/iss/aud fields.
@@ -147,7 +146,7 @@ ParsedTokenView parseSignedToken(StringData token) {
 
 BSONObj decodeJSON(StringData b64) try { return fromjson(base64url::decode(b64)); } catch (...) {
     auto status = exceptionToStatus();
-    uasserted(status.code(), "Unable to parse security token: {}"_format(status.reason()));
+    uasserted(status.code(), fmt::format("Unable to parse security token: {}", status.reason()));
 }
 
 }  // namespace
@@ -158,9 +157,10 @@ ValidatedTenancyScope ValidatedTenancyScopeFactory::parseUnsignedToken(Client* c
     const auto parsed = parseSignedToken(securityToken);
 
     auto header = crypto::JWSHeader::parse(ctxt, decodeJSON(parsed.header));
-    uassert(ErrorCodes::InvalidJWT,
-            "Unexpected algorithm '{}' for unsigned security token"_format(header.getAlgorithm()),
-            header.getAlgorithm() == "none");
+    uassert(
+        ErrorCodes::InvalidJWT,
+        fmt::format("Unexpected algorithm '{}' for unsigned security token", header.getAlgorithm()),
+        header.getAlgorithm() == "none");
 
     uassert(ErrorCodes::InvalidJWT,
             "Unexpected signature on unsigned security token",
@@ -225,16 +225,16 @@ ValidatedTenancyScope ValidatedTenancyScopeFactory::parseToken(Client* client,
     // These signed tokens are used exclusively by internal testing,
     // and should not ever have different values than what we create.
     uassert(ErrorCodes::BadValue,
-            "Security token must use kid == '{}'"_format(kTestOnlyKeyId),
+            fmt::format("Security token must use kid == '{}'", kTestOnlyKeyId),
             header.getKeyId() == kTestOnlyKeyId);
     uassert(ErrorCodes::BadValue,
-            "Security token must use iss == '{}'"_format(kTestOnlyIssuer),
+            fmt::format("Security token must use iss == '{}'", kTestOnlyIssuer),
             jwt.getIssuer() == kTestOnlyIssuer);
     uassert(ErrorCodes::BadValue,
-            "Security token must use aud == '{}'"_format(kTestOnlyAudience),
+            fmt::format("Security token must use aud == '{}'", kTestOnlyAudience),
             holds_alternative<std::string>(jwt.getAudience()));
     uassert(ErrorCodes::BadValue,
-            "Security token must use aud == '{}'"_format(kTestOnlyAudience),
+            fmt::format("Security token must use aud == '{}'", kTestOnlyAudience),
             std::get<std::string>(jwt.getAudience()) == kTestOnlyAudience);
 
     auto swUserName = UserName::parse(jwt.getSubject(), jwt.getTenantId());
@@ -294,8 +294,9 @@ ValidatedTenancyScope ValidatedTenancyScopeFactory::create(
     body.setExpiration(std::move(expiration));
     body.setExpectPrefix(protocol == ValidatedTenancyScope::TenantProtocol::kAtlasProxy);
 
-    std::string payload = "{}.{}"_format(base64url::encode(tojson(header.toBSON())),
-                                         base64url::encode(tojson(body.toBSON())));
+    std::string payload = fmt::format("{}.{}",
+                                      base64url::encode(tojson(header.toBSON())),
+                                      base64url::encode(tojson(body.toBSON())));
 
     auto computed =
         SHA256Block::computeHmac(reinterpret_cast<const std::uint8_t*>(secret.rawData()),
@@ -304,9 +305,10 @@ ValidatedTenancyScope ValidatedTenancyScopeFactory::create(
                                  payload.size());
 
     const std::string originalToken =
-        "{}.{}"_format(payload,
-                       base64url::encode(StringData(reinterpret_cast<const char*>(computed.data()),
-                                                    computed.size())));
+        fmt::format("{}.{}",
+                    payload,
+                    base64url::encode(StringData(reinterpret_cast<const char*>(computed.data()),
+                                                 computed.size())));
 
     if (gTestOnlyValidatedTenancyScopeKey == secret) {
         return ValidatedTenancyScope(userName, originalToken, body.getExpiration(), protocol);
@@ -330,8 +332,9 @@ ValidatedTenancyScope ValidatedTenancyScopeFactory::create(
     body.setExpiration(Date_t::max());
     body.setExpectPrefix(protocol == ValidatedTenancyScope::TenantProtocol::kAtlasProxy);
 
-    const std::string originalToken = "{}.{}."_format(base64url::encode(tojson(header.toBSON())),
-                                                      base64url::encode(tojson(body.toBSON())));
+    const std::string originalToken = fmt::format("{}.{}.",
+                                                  base64url::encode(tojson(header.toBSON())),
+                                                  base64url::encode(tojson(body.toBSON())));
     return ValidatedTenancyScope(originalToken, std::move(tenant), protocol);
 }
 
@@ -347,15 +350,16 @@ ValidatedTenancyScope ValidatedTenancyScopeFactory::create(TenantId tenant,
     header.setKeyId("none"_sd);
 
     crypto::JWT body;
-    body.setIssuer("mongodb://{}"_format(prettyHostNameAndPort(serverGlobalParams.port)));
+    body.setIssuer(fmt::format("mongodb://{}", prettyHostNameAndPort(serverGlobalParams.port)));
     body.setSubject(".");
     body.setAudience(std::string{"interal-request"});
     body.setTenantId(tenant);
     body.setExpiration(Date_t::max());
     body.setExpectPrefix(false);  // Always use default protocol, not expect prefix.
 
-    const std::string originalToken = "{}.{}."_format(base64url::encode(tojson(header.toBSON())),
-                                                      base64url::encode(tojson(body.toBSON())));
+    const std::string originalToken = fmt::format("{}.{}.",
+                                                  base64url::encode(tojson(header.toBSON())),
+                                                  base64url::encode(tojson(body.toBSON())));
     return ValidatedTenancyScope(
         originalToken, std::move(tenant), ValidatedTenancyScope::TenantProtocol::kDefault);
 }

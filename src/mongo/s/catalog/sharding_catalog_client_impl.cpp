@@ -106,8 +106,6 @@
 namespace mongo {
 namespace {
 
-using namespace fmt::literals;
-
 const ReadPreferenceSetting kConfigNearestReadPreference(ReadPreference::Nearest, TagSet{});
 const ReadPreferenceSetting kConfigPrimaryPreferredReadPreference(ReadPreference::PrimaryPreferred,
                                                                   TagSet{});
@@ -431,9 +429,9 @@ AggregateCommandRequest makeUnsplittableCollectionsDataShardAggregation(
     const auto db =
         DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest());
     stages.emplace_back(DocumentSourceMatch::create(
-        BSON(CollectionType::kNssFieldName << BSON("$regex"
-                                                   << "^{}\\."_format(pcre_util::quoteMeta(db)))
-                                           << CollectionType::kUnsplittableFieldName << true),
+        BSON(CollectionType::kNssFieldName
+             << BSON("$regex" << fmt::format("^{}\\.", pcre_util::quoteMeta(db)))
+             << CollectionType::kUnsplittableFieldName << true),
         expCtx));
 
     // 2. Retrieve config.chunks entries with the same uuid as the one from the
@@ -735,7 +733,8 @@ std::vector<CollectionType> ShardingCatalogClientImpl::getShardedCollections(
     if (!dbName.isEmpty()) {
         const auto db =
             DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest());
-        b.appendRegex(CollectionType::kNssFieldName, "^{}\\."_format(pcre_util::quoteMeta(db)));
+        b.appendRegex(CollectionType::kNssFieldName,
+                      fmt::format("^{}\\.", pcre_util::quoteMeta(db)));
     }
 
     b.append(CollectionType::kUnsplittableFieldName, BSON("$ne" << true));
@@ -765,7 +764,8 @@ std::vector<CollectionType> ShardingCatalogClientImpl::getCollections(
     if (!dbName.isEmpty()) {
         const auto db =
             DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest());
-        b.appendRegex(CollectionType::kNssFieldName, "^{}\\."_format(pcre_util::quoteMeta(db)));
+        b.appendRegex(CollectionType::kNssFieldName,
+                      fmt::format("^{}\\.", pcre_util::quoteMeta(db)));
     }
 
     auto collDocs = uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
@@ -792,7 +792,7 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getShardedCollectionName
     BSONObjBuilder b;
     const auto db =
         DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest());
-    b.appendRegex(CollectionType::kNssFieldName, "^{}\\."_format(pcre_util::quoteMeta(db)));
+    b.appendRegex(CollectionType::kNssFieldName, fmt::format("^{}\\.", pcre_util::quoteMeta(db)));
     b.append(CollectionTypeBase::kUnsplittableFieldName, BSON("$ne" << true));
 
     auto collDocs = uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
@@ -838,7 +838,7 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getUnsplittableCollectio
     BSONObjBuilder b;
     const auto db =
         DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest());
-    b.appendRegex(CollectionType::kNssFieldName, "^{}\\."_format(pcre_util::quoteMeta(db)));
+    b.appendRegex(CollectionType::kNssFieldName, fmt::format("^{}\\.", pcre_util::quoteMeta(db)));
     b.append(CollectionTypeBase::kUnsplittableFieldName, true);
 
     auto collDocs = uassertStatusOK(_exhaustiveFindOnConfig(opCtx,

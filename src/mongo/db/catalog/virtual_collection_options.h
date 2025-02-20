@@ -47,9 +47,8 @@ struct ExternalDataSourceMetadata {
                                StorageTypeEnum storageTypeEnum,
                                FileTypeEnum fileTypeEnum)
         : url(urlStr), storageType(storageTypeEnum), fileType(fileTypeEnum) {
-        using namespace fmt::literals;
         uassert(6968500,
-                "File url must start with {}"_format(kUrlProtocolFile),
+                fmt::format("File url must start with {}", kUrlProtocolFile),
                 urlStr.startsWith(kUrlProtocolFile));
         uassert(6968501, "Storage type must be 'pipe'", storageType == StorageTypeEnum::pipe);
         uassert(6968502, "File type must be 'bson'", fileType == FileTypeEnum::bson);

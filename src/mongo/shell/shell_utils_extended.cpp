@@ -85,7 +85,6 @@ namespace mongo {
 using std::ifstream;
 using std::string;
 using std::stringstream;
-using namespace fmt::literals;
 
 /**
  * These utilities are thread safe but do not provide mutually exclusive access to resources
@@ -191,15 +190,18 @@ BSONObj cat(const BSONObj& args, void* data) {
     }
 
     ifstream f(filePath.valueStringDataSafe().rawData(), mode);
-    uassert(CANT_OPEN_FILE, "couldn't open file {}"_format(filePath.str()), f.is_open());
+    uassert(CANT_OPEN_FILE, fmt::format("couldn't open file {}", filePath.str()), f.is_open());
     std::streamsize fileSize = 0;
     // will throw on filesystem error
     fileSize = boost::filesystem::file_size(filePath.str());
     static constexpr auto kFileSizeLimit = 1024 * 1024 * 16;
     uassert(
         13301,
-        "cat() : file {} too big to load as a variable (file is {} bytes, limit is {} bytes.)"_format(
-            filePath.str(), fileSize, kFileSizeLimit),
+        fmt::format(
+            "cat() : file {} too big to load as a variable (file is {} bytes, limit is {} bytes.)",
+            filePath.str(),
+            fileSize,
+            kFileSizeLimit),
         fileSize < kFileSizeLimit);
 
     std::ostringstream ss;
@@ -221,7 +223,7 @@ BSONObj copyFileRange(const BSONObj& args, void* data) {
     int64_t length = it.next().Long();
 
     std::ifstream in(src, std::ios::binary | std::ios::in);
-    uassert(CANT_OPEN_FILE, "Couldn't open file {} for reading"_format(src), in.is_open());
+    uassert(CANT_OPEN_FILE, fmt::format("Couldn't open file {} for reading", src), in.is_open());
 
     in.exceptions(std::ifstream::badbit);
 
@@ -250,7 +252,7 @@ BSONObj copyFileRange(const BSONObj& args, void* data) {
     }
 
     std::ofstream out(dest, std::ios::binary | std::ios::out | std::ios::in);
-    uassert(CANT_OPEN_FILE, "Couldn't open file {} for writing"_format(dest), out.is_open());
+    uassert(CANT_OPEN_FILE, fmt::format("Couldn't open file {} for writing", dest), out.is_open());
 
     out.exceptions(std::ofstream::eofbit | std::ofstream::failbit | std::ofstream::badbit);
 
@@ -258,10 +260,11 @@ BSONObj copyFileRange(const BSONObj& args, void* data) {
     out.write(buffer.data(), bytesRead);
     out.close();
 
-    uassert(9663000,
-            "Couldn't write {} bytes starting at {} from file {} to {}"_format(
-                length, offset, src, dest),
-            out);
+    uassert(
+        9663000,
+        fmt::format(
+            "Couldn't write {} bytes starting at {} from file {} to {}", length, offset, src, dest),
+        out);
 
     return BSON("n" << bytesRead << "earlyEOF" << earlyEOF);
 }
@@ -575,7 +578,7 @@ BSONObj generateStorageBSON(const BSONObj& args, void* data) {
 
     std::ofstream out(storageBSONPath.string(), std::ios::binary | std::ios::out | std::ios::trunc);
     uassert(CANT_OPEN_FILE,
-            "Couldn't open file {} for writing"_format(storageBSONPath.string()),
+            fmt::format("Couldn't open file {} for writing", storageBSONPath.string()),
             out.is_open());
 
     out.exceptions(std::ofstream::eofbit | std::ofstream::failbit | std::ofstream::badbit);

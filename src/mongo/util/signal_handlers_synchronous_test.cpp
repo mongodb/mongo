@@ -51,7 +51,6 @@
 
 namespace mongo {
 namespace {
-using namespace fmt::literals;
 
 // Tests of signals that should be ignored raise each signal twice, to ensure that the handler isn't
 // reset.
@@ -68,9 +67,11 @@ using namespace fmt::literals;
 
 #ifdef __linux__
 // The si_code field is always SI_TKILL when using raise
-#define DUMP_SIGINFO(SIGNUM)                                                                    \
-    DEATH_TEST(DumpSiginfoTest, SIGNUM##_, "Dumping siginfo (si_code={}): "_format(SI_TKILL)) { \
-        ASSERT_EQ(0, raise(SIGNUM));                                                            \
+#define DUMP_SIGINFO(SIGNUM)                                                               \
+    DEATH_TEST(DumpSiginfoTest,                                                            \
+               SIGNUM##_,                                                                  \
+               fmt::format("Dumping siginfo (si_code={}): ", fmt::underlying(SI_TKILL))) { \
+        ASSERT_EQ(0, raise(SIGNUM));                                                       \
     }
 #else
 #define DUMP_SIGINFO(SIGNUM)

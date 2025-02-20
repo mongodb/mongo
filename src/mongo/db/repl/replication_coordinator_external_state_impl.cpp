@@ -152,8 +152,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
-using namespace fmt::literals;
-
 namespace mongo {
 namespace repl {
 namespace {
@@ -722,7 +720,8 @@ StatusWith<BSONObj> ReplicationCoordinatorExternalStateImpl::loadLocalConfigDocu
                         opCtx, NamespaceString::kSystemReplSetNamespace, config)) {
                     return StatusWith<BSONObj>(
                         ErrorCodes::NoMatchingDocument,
-                        "Did not find replica set configuration document in {}"_format(
+                        fmt::format(
+                            "Did not find replica set configuration document in {}",
                             NamespaceString::kSystemReplSetNamespace.toStringForErrorMsg()));
                 }
                 return StatusWith<BSONObj>(config);

@@ -43,7 +43,6 @@
 
 namespace mongo {
 
-using namespace fmt::literals;
 
 bool isRetryableWriteCommand(Service* service, StringData cmdName) {
     auto command = CommandHelpers::findCommand(service, cmdName);
@@ -97,9 +96,11 @@ void validateSessionOptions(const OperationSessionInfoFromClient& sessionOptions
 
     if (!sessionOptions.getAutocommit() && sessionOptions.getTxnNumber()) {
         uassert(ErrorCodes::NotARetryableWriteCommand,
-                "txnNumber may only be provided for multi-document transactions and retryable "
-                "write commands. autocommit:false was not provided, and {} is not a retryable "
-                "write command."_format(command->getName()),
+                fmt::format(
+                    "txnNumber may only be provided for multi-document transactions and retryable "
+                    "write commands. autocommit:false was not provided, and {} is not a retryable "
+                    "write command.",
+                    command->getName()),
                 command->supportsRetryableWrite());
     }
 

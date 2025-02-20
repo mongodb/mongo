@@ -90,9 +90,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-
-using namespace fmt::literals;
-
 namespace mongo {
 
 namespace {
@@ -1600,7 +1597,7 @@ void BalancerDefragmentationPolicy::_persistPhaseUpdate(OperationContext* opCtx,
     }()});
     auto response = write_ops::checkWriteErrors(dbClient.update(updateOp));
     uassert(ErrorCodes::NoMatchingDocument,
-            "Collection {} not found while persisting phase change"_format(uuid.toString()),
+            fmt::format("Collection {} not found while persisting phase change", uuid.toString()),
             response.getN() > 0);
     WriteConcernResult ignoreResult;
     const auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();

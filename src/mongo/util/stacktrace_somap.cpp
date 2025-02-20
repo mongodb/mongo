@@ -168,7 +168,7 @@ void processLoadSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
                 case ELFCLASS64:
                     return "ELFCLASS64";
             }
-            return format(FMT_STRING("[elfClass unknown: {}]"), c);
+            return fmt::format("[elfClass unknown: {}]", c);
         };
         LOGV2_WARNING(23843,
                       "Unexpected ELF class (i.e. bit width)",

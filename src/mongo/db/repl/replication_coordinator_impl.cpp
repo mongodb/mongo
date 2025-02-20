@@ -221,8 +221,6 @@ auto& totalOpsRunning = *MetricBuilder<Counter64>("repl.stateTransition.totalOpe
 auto& numAutoReconfigsForRemovalOfNewlyAddedFields =
     *MetricBuilder<Counter64>{"repl.reconfig.numAutoReconfigsForRemovalOfNewlyAddedFields"};
 
-using namespace fmt::literals;
-
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 using CallbackFn = executor::TaskExecutor::CallbackFn;
 using CallbackHandle = executor::TaskExecutor::CallbackHandle;
@@ -3945,10 +3943,10 @@ Status ReplicationCoordinatorImpl::awaitConfigCommitment(OperationContext* opCtx
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     // Check writable primary before waiting.
     if (!_readWriteAbility->canAcceptNonLocalWrites(lk)) {
-        return {
-            ErrorCodes::PrimarySteppedDown,
-            "replSetReconfig should only be run on a writable PRIMARY. Current state {};"_format(
-                _memberState.toString())};
+        return {ErrorCodes::PrimarySteppedDown,
+                fmt::format(
+                    "replSetReconfig should only be run on a writable PRIMARY. Current state {};",
+                    _memberState.toString())};
     }
     auto configOplogCommitmentOpTime = _topCoord->getConfigOplogCommitmentOpTime();
     auto oplogWriteConcern = _getOplogCommitmentWriteConcern(lk);

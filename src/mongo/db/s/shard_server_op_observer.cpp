@@ -713,34 +713,34 @@ void ShardServerOpObserver::onModifyCollectionShardingIndexCatalog(OperationCont
         case ShardingIndexCatalogOpEnum::rename: {
             auto renameEntry = ShardingIndexCatalogRenameEntry::parse(
                 IDLParserContext("OplogModifyCatalogEntryContext"), indexDoc);
-            shard_role_details::getRecoveryUnit(opCtx)->onCommit([renameEntry](
-                                                                     OperationContext* opCtx,
-                                                                     boost::optional<Timestamp>) {
-                std::vector<IndexCatalogType> fromIndexes;
-                boost::optional<UUID> uuid;
-                {
-                    auto fromCSR =
-                        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                            opCtx, renameEntry.getFromNss());
-                    auto indexCache = fromCSR->getIndexesInCritSec(opCtx);
-                    indexCache->forEachGlobalIndex([&](const auto& index) {
-                        fromIndexes.push_back(index);
-                        return true;
-                    });
-                    uuid.emplace(indexCache->getCollectionIndexes().uuid());
+            shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                [renameEntry](OperationContext* opCtx, boost::optional<Timestamp>) {
+                    std::vector<IndexCatalogType> fromIndexes;
+                    boost::optional<UUID> uuid;
+                    {
+                        auto fromCSR =
+                            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+                                opCtx, renameEntry.getFromNss());
+                        auto indexCache = fromCSR->getIndexesInCritSec(opCtx);
+                        indexCache->forEachGlobalIndex([&](const auto& index) {
+                            fromIndexes.push_back(index);
+                            return true;
+                        });
+                        uuid.emplace(indexCache->getCollectionIndexes().uuid());
 
-                    fromCSR->clearIndexes(opCtx);
-                }
-                auto toCSR = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                    opCtx, renameEntry.getToNss());
-                uassert(7079505,
-                        format(FMT_STRING("The critical section for collection {} must be taken in "
-                                          "order to execute this command"),
-                               renameEntry.getToNss().toStringForErrorMsg()),
-                        toCSR->getCriticalSectionSignal(opCtx,
-                                                        ShardingMigrationCriticalSection::kWrite));
-                toCSR->replaceIndexes(opCtx, fromIndexes, {*uuid, renameEntry.getLastmod()});
-            });
+                        fromCSR->clearIndexes(opCtx);
+                    }
+                    auto toCSR =
+                        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+                            opCtx, renameEntry.getToNss());
+                    uassert(7079505,
+                            fmt::format("The critical section for collection {} must be taken in "
+                                        "order to execute this command",
+                                        renameEntry.getToNss().toStringForErrorMsg()),
+                            toCSR->getCriticalSectionSignal(
+                                opCtx, ShardingMigrationCriticalSection::kWrite));
+                    toCSR->replaceIndexes(opCtx, fromIndexes, {*uuid, renameEntry.getLastmod()});
+                });
             break;
         }
         default:

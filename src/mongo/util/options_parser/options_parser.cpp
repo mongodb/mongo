@@ -993,8 +993,7 @@ Status addYAMLNodesToEnvironment(const YAML::Node& root,
             // If this is not a special field name, and we are in a sub object, append our
             // current fieldName to the selector for the sub object we are traversing
             else {
-                using namespace fmt::literals;
-                dottedName = "{}.{}"_format(parentPath, fieldName);
+                dottedName = fmt::format("{}.{}", parentPath, fieldName);
             }
         }
 

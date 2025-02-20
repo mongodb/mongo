@@ -47,7 +47,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
-using namespace fmt::literals;
 
 namespace mongo::crypto {
 namespace {

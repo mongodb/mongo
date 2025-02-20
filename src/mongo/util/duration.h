@@ -509,6 +509,11 @@ StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Durat
     return streamPut(os, dp);
 }
 
+template <typename Period>
+auto format_as(const Duration<Period>& dur) {
+    return dur.toString();
+}
+
 /**
  * Make a std::chrono::duration from an arithmetic expression and a period ratio.
  * This does not do any math or precision changes. It's just a type-deduced wrapper

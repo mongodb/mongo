@@ -52,8 +52,7 @@ class MultiBsonStreamCursor : public SeekableRecordCursor {
 public:
     MultiBsonStreamCursor(const VirtualCollectionOptions& vopts)
         : _numStreams(vopts.dataSources.size()), _vopts(vopts) {
-        using namespace fmt::literals;
-        tassert(6968310, "_numStreams {} <= 0"_format(_numStreams), _numStreams > 0);
+        tassert(6968310, fmt::format("_numStreams {} <= 0", _numStreams), _numStreams > 0);
         _streamReader = getInputStream(_vopts.dataSources[_streamIdx].url);
     }
 
