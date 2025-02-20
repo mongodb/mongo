@@ -46,7 +46,7 @@ valid_mongocryptd_variants=(
 if [ $(find . -name mongocryptd${exe} | wc -l) -ge 1 ]; then
   echo "Validating that ${build_variant} is a known enterprise task for mongocryptd"
   for valid_mongocryptd_variant in "${valid_mongocryptd_variants[@]}"; do
-    if [[ "$build_variant" == "$valid_mongocryptd_variant" ]]; then
+    if [[ "$build_variant" == "$valid_mongocryptd_variant" ]] || "$build_variant" == "${valid_mongocryptd_variant}-toolchain-v5"; then
       exit 0
     fi
   done
