@@ -218,24 +218,56 @@ void resetDDLBlockingForTopologyChangeIfNeeded(OperationContext* opCtx) {
 AggregateCommandRequest makeUnshardedCollectionsOnSpecificShardAggregation(OperationContext* opCtx,
                                                                            const ShardId& shardId,
                                                                            bool isCount = false) {
-    BSONObj listStage = BSON("$listClusterCatalog" << BSON("shards" << true));
-    BSONObj matchStage =
-        BSON("$match" << BSON("$and" << BSON_ARRAY(BSON("sharded" << false << "shards" << shardId)
-                                                   << BSON("db" << BSON("$ne"
-                                                                        << "config"))
-                                                   << BSON("db" << BSON("$ne"
-                                                                        << "admin")))));
-    BSONObj countStage = BSON("$count"
-                              << "totalCount");
+    static const BSONObj listStage = fromjson(R"({
+       $listClusterCatalog: { "shards": true }
+     })");
+    const BSONObj matchStage = fromjson(str::stream() << R"({
+       $match: {
+           $and: [
+               { sharded: false },
+               { db: {$ne: 'config'} },
+               { db: {$ne: 'admin'} },
+               { shards: ")" << shardId << R"("},
+               { type: {$nin: ["timeseries","view"]} },
+               { ns: {$not: {$regex: "^enxcol_\..*(\.esc|\.ecc|\.ecoc|\.ecoc\.compact)$"} }},
+               { $or: [
+                    {ns: {$not: { $regex: "\.system\." }}},
+                    {ns: {$regex: "\.system\.buckets\."}}
+               ]}
+           ]
+        }
+    })");
+    static const BSONObj projectStage = fromjson(R"({
+       $project: {
+           _id: 0,
+           ns: {
+               $cond: [
+                   "$options.timeseries",
+                   {
+                       $replaceAll: {
+                           input: "$ns",
+                           find: ".system.buckets",
+                           replacement: ""
+                       }
+                   },
+                   "$ns"
+               ]
+           }
+       }
+    })");
+    const BSONObj countStage = BSON("$count"
+                                    << "totalCount");
 
     auto dbName = NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin);
 
     std::vector<mongo::BSONObj> pipeline;
-    pipeline.reserve(isCount ? 3 : 2);
+    pipeline.reserve(4);
     pipeline.push_back(listStage);
     pipeline.push_back(matchStage);
     if (isCount) {
         pipeline.push_back(countStage);
+    } else {
+        pipeline.push_back(projectStage);
     }
 
     AggregateCommandRequest aggRequest{dbName, pipeline};
