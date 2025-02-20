@@ -182,3 +182,9 @@ feature_flags:
     cpp_varname: feature_flags::gTerminateSecondaryReadsUponRangeDeletion
     default: false
     shouldBeFCVGated: false
+  # TODO (SERVER-99655): remove this feature flag
+  featureFlagSnapshotFCVInDDLCoordinators:
+    description: "Feature flag to enable snapshotting of the operation FCV at the start of DDL operations."
+    cpp_varname: feature_flags::gSnapshotFCVInDDLCoordinators
+    default: false
+    shouldBeFCVGated: true
