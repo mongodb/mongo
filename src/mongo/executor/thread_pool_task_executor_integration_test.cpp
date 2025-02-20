@@ -289,8 +289,8 @@ TEST_F(TaskExecutorFixture, Shutdown) {
             return stats.inUse + stats.available + stats.leased == 0;
         },
         [&](const GRPCConnectionStats& stats) {
-            // TODO SERVER-100261: Also add in total open channels once shutdown destorys channels.
-            return stats.getTotalInUseStreams() + stats.getTotalLeasedStreams() == 0;
+            return (stats.getTotalInUseStreams() + stats.getTotalLeasedStreams() +
+                    stats.getTotalOpenChannels()) == 0;
         },
         "Connection pools should be drained after shutdown + join");
 }

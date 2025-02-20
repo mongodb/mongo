@@ -174,12 +174,10 @@ function testMinAndMax(conn, mongotConn, useGRPC, stWithMock = undefined) {
     updateSetParameters(conn, {mongotConnectionPoolMinSize: 0});
     assert.commandWorked(
         conn.adminCommand({_dropConnectionsToMongot: 1, hostAndPort: [mongotMockToBlock.host]}));
-    // TODO SERVER-100261: Once dropConnections drops channels then we will need to add "open: 0" to
-    // the arg list below
     currentCheckNum = assertConnectionStats(conn,
                                             [mongotMockToBlock.host],
                                             {isAbsent: true},
-                                            {},
+                                            {open: 0},
                                             currentCheckNum,
                                             useGRPC,
                                             "_mongotConnPoolStats");

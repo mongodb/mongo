@@ -278,9 +278,6 @@ private:
             const auto& cs = prev->second;
             if (cs->keepOpen() || keepCb(cs))
                 continue;
-            // TODO SERVER-100261: Remove this invariant once we guarantee that any existing stubs
-            // will have their stream canceled.
-            invariant(cs.use_count() == 1, "Attempted to drop a channel with existing stubs");
             droppedChannels.push_back(std::move(prev->second));
             _channels.erase(prev);
             _channelsSize.decrement();

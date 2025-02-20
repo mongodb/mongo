@@ -82,7 +82,7 @@ std::unique_ptr<NetworkInterface> makeNetworkInterfaceGRPC(
     StringData instanceName, std::unique_ptr<rpc::EgressMetadataHook> metadataHook) {
     return makeNetworkInterfaceWithClientFactory(
         instanceName,
-        std::make_shared<transport::grpc::GRPCAsyncClientFactory>(),
+        std::make_shared<transport::grpc::GRPCAsyncClientFactory>(makeInstanceName(instanceName)),
         std::move(metadataHook));
 }
 #endif

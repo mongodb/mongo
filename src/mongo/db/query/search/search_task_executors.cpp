@@ -122,15 +122,6 @@ struct State {
 
 const auto getExecutorHolder = ServiceContext::declareDecoration<State>();
 
-ServiceContext::ConstructorActionRegisterer searchExecutorsCAR{
-    "SearchTaskExecutors",
-    [](ServiceContext* service) {},
-    [](ServiceContext* service) {
-        // Destruction implicitly performs the needed shutdown and join()
-        getExecutorHolder(service).mongotExecutor.reset();
-        getExecutorHolder(service).searchIndexMgmtExecutor.reset();
-    }};
-
 }  // namespace
 
 std::shared_ptr<TaskExecutor> getMongotTaskExecutor(ServiceContext* svc) {
@@ -154,6 +145,25 @@ void startupSearchExecutorsIfNeeded(ServiceContext* svc) {
     if (!globalSearchIndexParams.host.empty()) {
         LOGV2_INFO(8267401, "Starting up search index management task executor.");
         getSearchIndexManagementTaskExecutor(svc)->startup();
+    }
+}
+
+void shutdownSearchExecutorsIfNeeded(ServiceContext* svc) {
+    auto& state = getExecutorHolder(svc);
+    if (!globalMongotParams.host.empty()) {
+        LOGV2_INFO(10026102, "Shutting down mongot task executor.");
+        // Deleting the executor will also call shutdown() and join(), but might as well call them
+        // explicitly here.
+        state.mongotExecutor->shutdown();
+        state.mongotExecutor->join();
+        state.mongotExecutor.reset();
+    }
+
+    if (!globalSearchIndexParams.host.empty()) {
+        LOGV2_INFO(10026103, "Shutting down search index management task executor.");
+        state.searchIndexMgmtExecutor->shutdown();
+        state.searchIndexMgmtExecutor->join();
+        state.searchIndexMgmtExecutor.reset();
     }
 }
 

@@ -177,17 +177,6 @@ TEST_F(ChannelPoolTest, DropAllChannelsWithNoStubs) {
     ASSERT_EQ(pool().size(), 0);
 }
 
-DEATH_TEST_F(ChannelPoolTest, DropAllChannelsWithStubs, "invariant") {
-    const auto kNumChannels = 10;
-    for (int i = 1; i <= kNumChannels; i++) {
-        auto stub = pool().createStub({"FakeHost", 123 + i}, ConnectSSLMode::kDisableSSL);
-        if (i == kNumChannels) {
-            ASSERT_EQ(pool().size(), kNumChannels);
-            pool().dropAllChannels();  // Must be fatal.
-        }
-    }
-}
-
 TEST_F(ChannelPoolTest, CannotDropIdleChannelWhileCreatingNewStub) {
     unittest::Barrier beforeCreatingStub(2);
     stdx::thread worker([&] {

@@ -73,6 +73,8 @@ public:
 
     void stopAcceptingSessions() override;
 
+    std::shared_ptr<Client> createGRPCClient(BSONObj clientMetadata) override;
+
     StatusWith<std::shared_ptr<Session>> connectWithAuthToken(
         HostAndPort peer,
         ConnectSSLMode sslMode,
@@ -102,25 +104,7 @@ public:
         std::shared_ptr<ConnectionMetrics> connectionMetrics,
         std::shared_ptr<const SSLConnectionContext> transientSSLContext) override;
 
-    void appendStatsForServerStatus(BSONObjBuilder* bob) const override {
-        if (!_client) {
-            return;
-        }
-
-        GRPCConnectionStats stats;
-        _client->appendStats(stats);
-
-        bob->append(GRPCConnectionStats::kTotalOpenChannelsFieldName, stats.getTotalOpenChannels());
-        {
-            BSONObjBuilder streamSection(bob->subobjStart(kStreamsSubsectionFieldName));
-            bob->append(GRPCConnectionStats::kTotalActiveStreamsFieldName,
-                        stats.getTotalActiveStreams());
-            bob->append(GRPCConnectionStats::kTotalSuccessfulStreamsFieldName,
-                        stats.getTotalSuccessfulStreams());
-            bob->append(GRPCConnectionStats::kTotalFailedStreamsFieldName,
-                        stats.getTotalFailedStreams());
-        }
-    }
+    void appendStatsForServerStatus(BSONObjBuilder* bob) const override;
 
 #ifdef MONGO_CONFIG_SSL
     Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
@@ -158,18 +142,24 @@ public:
         return _options.enableEgress;
     }
 
-    // TODO SERVER-100261: remove function and change callsites to call directly with the client.
-    void appendStats(GRPCConnectionStats& stats) const {
-        checked_pointer_cast<GRPCClient>(_client)->appendStats(stats);
-    }
-
 private:
     mutable stdx::mutex _mutex;
     bool _isShutdown = false;
 
-    std::shared_ptr<Client> _client;
+    // This default client is used in synchronous networking (DBClientGRPCStream). Asynchronous
+    // networking uses the client returned by createGRPCClient.
+    std::shared_ptr<Client> _defaultClient;
     std::unique_ptr<Server> _server;
     ServiceContext* const _svcCtx;
+
+    // Callers that acquire a client through createGRPCClient should be responsible for all actions
+    // related to the client, but we still need access to all clients to fit into some of the
+    // existing TransportLayer abstractions (ie, rotateCertificates must operate on all clients).
+    struct ClientEntry {
+        std::weak_ptr<Client> client;
+        std::list<ClientEntry>::iterator iter;
+    };
+    std::list<ClientEntry> _clients;
 
     /**
      * The GRPCTransportLayer starts an egress reactor on an _ioThread that is provided to
@@ -179,6 +169,8 @@ private:
      */
     stdx::thread _ioThread;
     std::shared_ptr<GRPCReactor> _egressReactor;
+
+    GRPCClient::Options _clientOptions;
 
     // Invalidated after setup().
     std::vector<std::unique_ptr<Service>> _services;

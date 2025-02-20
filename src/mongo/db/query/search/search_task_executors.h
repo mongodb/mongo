@@ -54,5 +54,7 @@ std::shared_ptr<TaskExecutor> getSearchIndexManagementTaskExecutor(ServiceContex
  */
 void startupSearchExecutorsIfNeeded(ServiceContext* svc);
 
+void shutdownSearchExecutorsIfNeeded(ServiceContext* svc);
+
 }  // namespace executor
 }  // namespace mongo

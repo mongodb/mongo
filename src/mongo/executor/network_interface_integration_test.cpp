@@ -1225,8 +1225,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, ShutdownAfterSendRequest) {
         getServer(),
         [](const ConnectionStatsPer& stats) { return stats.inUse == 0 && stats.available == 0; },
         [&](const GRPCConnectionStats& stats) {
-            // TODO SERVER-100261: Open channels should be 0 after shutdown.
-            return stats.getTotalInUseStreams() == 0 && stats.getTotalOpenChannels() == 1;
+            return stats.getTotalInUseStreams() == 0 && stats.getTotalOpenChannels() == 0;
         },
         "ShutdownAfterSendRequest failed assertion on inUse and available connection/channel "
         "count.");

@@ -70,6 +70,11 @@ namespace {
 inline Status makeShutdownTerminationStatus() {
     return {ErrorCodes::ShutdownInProgress, "gRPC client is shutting down"};
 }
+
+inline Status makeDroppedConnectionCancelStatus() {
+    return {ErrorCodes::CallbackCanceled,
+            "Cancelled stream establishment due to dropping the associated connection"};
+}
 }  // namespace
 
 Client::Client(TransportLayer* tl, ServiceContext* svcCtx, const BSONObj& clientMetadata)
@@ -89,19 +94,22 @@ void Client::start() {
 
 void Client::shutdown() {
     decltype(_sessions) sessions;
-    decltype(_pendingStreamStates) pendingStreamStates;
+    decltype(_remoteStates) remoteStates;
     {
         stdx::lock_guard lk(_mutex);
         invariant(std::exchange(_state, ClientState::kShutdown) != ClientState::kShutdown,
                   "Cannot shut down a gRPC client more than once");
         sessions = _sessions;
-        pendingStreamStates = _pendingStreamStates;
+        remoteStates = _remoteStates;
     }
 
     // Cancel all outstanding connect timers and stream establishment attempts.
-    for (auto& streamState : pendingStreamStates) {
-        streamState->cancel(Status(ErrorCodes::ShutdownInProgress,
-                                   "Cancelled stream establishment due to gRPC client shutdown"));
+    for (auto&& it : remoteStates) {
+        for (auto&& streamState : it.second.pendingStreamStates) {
+            streamState->cancel(
+                Status(ErrorCodes::ShutdownInProgress,
+                       "Cancelled stream establishment due to gRPC client shutdown"));
+        }
     }
 
     size_t terminated = 0;
@@ -139,8 +147,7 @@ void Client::setMetadataOnClientContext(ClientContext& ctx, const ConnectOptions
 }
 
 bool Client::_isShutdownComplete_inlock() {
-    return _state == ClientState::kShutdown && _pendingStreamStates.size() == 0 &&
-        _sessions.empty();
+    return _state == ClientState::kShutdown && _numPendingStreams == 0 && _sessions.empty();
 }
 
 Future<std::shared_ptr<EgressSession>> Client::connect(
@@ -166,7 +173,8 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
 
         streamState = std::make_shared<PendingStreamState>(
             remote, options.sslMode, std::move(connectionMetrics), token);
-        streamState->registerWithClient(lk, *this);
+        streamState->registerWithClient(lk, remote, *this);
+        _numPendingStreams++;
     }
 
     if (timeout > Milliseconds(0) && timeout < Milliseconds::max()) {
@@ -222,11 +230,7 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
 
                         streamState->cancel(Status(
                             ErrorCodes::ExceededTimeLimit,
-                            fmt::format(
-                                "Exceeded deadline of {} waiting for gRPC call to start. The "
-                                "channel to the remote {} may be overloaded",
-                                deadline.get().toString(),
-                                streamState->getRemote())));
+                            fmt::format("Exceeded time limit waiting for gRPC call to start")));
                     });
             }
 
@@ -299,7 +303,8 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
             streamState->cancelTimer();
 
             stdx::lock_guard lk(_mutex);
-            streamState->unregisterFromClient(lk, *this);
+            _numPendingStreams--;
+            streamState->unregisterFromClient(lk, streamState->getRemote(), *this);
             if (MONGO_unlikely(_isShutdownComplete_inlock())) {
                 _shutdownCV.notify_one();
             }
@@ -322,13 +327,19 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
         });
 }
 
-void Client::PendingStreamState::registerWithClient(WithLock, Client& client) {
-    _iter =
-        client._pendingStreamStates.insert(client._pendingStreamStates.end(), shared_from_this());
+void Client::PendingStreamState::registerWithClient(WithLock,
+                                                    const HostAndPort& remote,
+                                                    Client& client) {
+    auto& streamList = client._remoteStates[remote].pendingStreamStates;
+    _iter = streamList.insert(streamList.end(), shared_from_this());
 }
 
-void Client::PendingStreamState::unregisterFromClient(WithLock, Client& client) {
-    client._pendingStreamStates.erase(_iter);
+void Client::PendingStreamState::unregisterFromClient(WithLock,
+                                                      const HostAndPort& remote,
+                                                      Client& client) {
+    auto streamStateIt = client._remoteStates.find(remote);
+    invariant(streamStateIt != client._remoteStates.end());
+    streamStateIt->second.pendingStreamStates.erase(_iter);
 }
 
 void Client::PendingStreamState::cancel(Status reason) {
@@ -358,6 +369,14 @@ Status Client::PendingStreamState::getCancellationReason() {
         return _cancellationReason;
     }
     return Status(ErrorCodes::CallbackCanceled, "gRPC stream establishment was cancelled");
+}
+
+size_t Client::getPendingStreamEstablishments(const HostAndPort& target) {
+    stdx::lock_guard lg(_mutex);
+    if (auto it = _remoteStates.find(target); it != _remoteStates.end()) {
+        return it->second.pendingStreamStates.size();
+    }
+    return 0;
 }
 
 namespace {
@@ -626,10 +645,6 @@ public:
         return _pool->createStub(std::move(remote), sslMode);
     }
 
-    auto getPoolSize() const {
-        return _pool->size();
-    }
-
     void stop() {
         _prunerService.stop();
         _pool->dropAllChannels();
@@ -645,8 +660,8 @@ public:
     }
 #endif
 
-    void dropAllChannels_forTest() {
-        _pool->dropAllChannels();
+    const std::shared_ptr<ChannelPool<std::shared_ptr<Channel>, Stub>>& getChannelPool() {
+        return _pool;
     }
 
 private:
@@ -809,7 +824,8 @@ void GRPCClient::shutdown() {
 }
 
 void GRPCClient::appendStats(GRPCConnectionStats& stats) const {
-    stats.setTotalOpenChannels(static_cast<StubFactoryImpl&>(*_stubFactory).getPoolSize());
+    stats.setTotalOpenChannels(
+        static_cast<StubFactoryImpl&>(*_stubFactory).getChannelPool()->size());
     stats.setTotalActiveStreams(_numActiveStreams.get());
     stats.setTotalSuccessfulStreams(_numSuccessfulStreams.get());
     stats.setTotalFailedStreams(_numFailedStreams.get());
@@ -821,8 +837,41 @@ Status GRPCClient::rotateCertificates(const SSLConfiguration& config) {
 }
 #endif
 
-void GRPCClient::dropAllChannels_forTest() {
-    static_cast<StubFactoryImpl&>(*_stubFactory).dropAllChannels_forTest();
+void GRPCClient::dropConnections() {
+    _dropPendingStreamEstablishments([](const HostAndPort& remote) { return true; });
+
+    // Now drop all of the channels themselves.
+    static_cast<StubFactoryImpl&>(*_stubFactory).getChannelPool()->dropAllChannels();
+}
+
+void GRPCClient::dropConnections(const HostAndPort& target) {
+    _dropPendingStreamEstablishments(
+        [target](const HostAndPort& remote) { return remote == target; });
+
+    // Now drop all of the channels themselves.
+    static_cast<StubFactoryImpl&>(*_stubFactory).getChannelPool()->dropChannelsByTarget(target);
+}
+
+void GRPCClient::_dropPendingStreamEstablishments(
+    std::function<bool(const HostAndPort&)> shouldDrop) {
+    stdx::lock_guard lk(_mutex);
+    // Cancel all outstanding connect timers and stream establishment attempts.
+    for (auto&& it : _remoteStates) {
+        if (!it.second.keepOpen && shouldDrop(it.first)) {
+            for (auto&& streamState : it.second.pendingStreamStates) {
+                streamState->cancel(makeDroppedConnectionCancelStatus());
+            }
+        }
+    }
+}
+
+void GRPCClient::setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen) {
+    stdx::lock_guard lk(_mutex);
+    _remoteStates[hostAndPort].keepOpen = keepOpen;
+
+    static_cast<StubFactoryImpl&>(*_stubFactory)
+        .getChannelPool()
+        ->setKeepOpen(hostAndPort, keepOpen);
 }
 
 Future<Client::CallContext> GRPCClient::_streamFactory(const HostAndPort& remote,

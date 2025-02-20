@@ -536,6 +536,13 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
             Grid::get(serviceContext)->catalogCache()->shutDownAndJoin();
         }
 
+        {
+            TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                                      "Shutting down the search task executors",
+                                                      &shutdownTimeElapsedBuilder);
+            executor::shutdownSearchExecutorsIfNeeded(serviceContext);
+        }
+
         // Finish shutting down the TransportLayers
         if (auto tlm = serviceContext->getTransportLayerManager()) {
             TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),

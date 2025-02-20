@@ -65,6 +65,18 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
+    void dropConnections() override {
+        MONGO_UNIMPLEMENTED;
+    }
+
+    void dropConnections(const HostAndPort& target) override {
+        MONGO_UNIMPLEMENTED;
+    }
+
+    void setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen) override {
+        MONGO_UNIMPLEMENTED;
+    }
+
 private:
     Future<CallContext> _streamFactory(const HostAndPort& remote,
                                        const std::shared_ptr<GRPCReactor>& reactor,

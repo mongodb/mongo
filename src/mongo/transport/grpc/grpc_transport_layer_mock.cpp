@@ -70,11 +70,8 @@ Status GRPCTransportLayerMock::setup() {
     }
 
     if (_options.enableEgress) {
-        _client = std::make_shared<MockClient>(this,
-                                               _svcCtx,
-                                               std::move(_mockClientAddress),
-                                               std::move(_resolver),
-                                               makeClientMetadataDocument());
+        _client = std::make_shared<MockClient>(
+            this, _svcCtx, _mockClientAddress, _resolver, makeClientMetadataDocument());
     }
 
     if (_options.bindIpList.empty()) {
@@ -125,6 +122,11 @@ void GRPCTransportLayerMock::shutdown() {
         _reactor->stop();
         _ioThread.join();
     }
+}
+
+std::shared_ptr<Client> GRPCTransportLayerMock::createGRPCClient(BSONObj clientMetadata) {
+    return std::make_shared<MockClient>(
+        this, _svcCtx, _mockClientAddress, _resolver, clientMetadata);
 }
 
 StatusWith<std::shared_ptr<Session>> GRPCTransportLayerMock::connectWithAuthToken(

@@ -897,7 +897,7 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest,
             ASSERT_GRPC_STUB_CONNECTED(stub);
 
             ASSERT_OK(client->connect(addr, reactor, Milliseconds(500), {}).getNoThrow());
-            client->dropAllChannels_forTest();
+            client->dropConnections();
 
             // Overwrite the tmp files to hold new, invalid certs.
             boost::filesystem::copy_file(kInvalidPEMFile,
@@ -973,14 +973,14 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest, ClientUsesOldCertsUntilRotate) 
 
             // After rotating on the server side, connecting from the client should fail, as it is
             // still using the old certificates.
-            client->dropAllChannels_forTest();
+            client->dropConnections();
             ASSERT_NOT_OK(
                 client
                     ->connect(addr, reactor, CommandServiceTestFixtures::kDefaultConnectTimeout, {})
                     .getNoThrow());
 
             // After rotation, connection should now succeed.
-            client->dropAllChannels_forTest();
+            client->dropConnections();
 
             SSLConfiguration newConfig{};
             newConfig.serverCertificateExpirationDate = Date_t::fromMillisSinceEpoch(1234);

@@ -72,11 +72,12 @@ public:
         sslGlobalParams.sslMode.store(SSLParams::SSLModes::SSLMode_requireSSL);
 
         auto clientCache = std::make_shared<ClientCache>();
+        auto tlOptions = CommandServiceTestFixtures::makeTLOptions();
+        // Set up a few listening addresses to test different targets.
+        tlOptions.bindIpList = {"localhost", "127.0.0.1", "::1"};
 
         _tl = std::make_unique<GRPCTransportLayerImpl>(
-            svcCtx,
-            CommandServiceTestFixtures::makeTLOptions(),
-            std::make_unique<GRPCSessionManager>(svcCtx, clientCache));
+            svcCtx, tlOptions, std::make_unique<GRPCSessionManager>(svcCtx, clientCache));
 
         uassertStatusOK(_tl->registerService(std::make_unique<CommandService>(
             _tl.get(),
@@ -110,12 +111,13 @@ public:
             _reactor->drain();
         });
 
-        _factory = std::make_unique<GRPCAsyncClientFactory>();
+        _factory = std::make_unique<GRPCAsyncClientFactory>("AsyncClientFactoryTest");
         _factory->startup(svcCtx, _tl.get(), _reactor);
     }
 
     void tearDown() override {
         _factory->shutdown();
+        _factory.reset();
         _reactor->stop();
         _reactorThread.join();
         _tl->shutdown();
@@ -128,6 +130,10 @@ public:
 
     GRPCTransportLayer& getTransportLayer() {
         return *_tl;
+    }
+
+    const ReactorHandle& getReactor() {
+        return _reactor;
     }
 
     const HostAndPort& getTarget() {
@@ -166,6 +172,12 @@ public:
         while (handle->getClient().isStillConnected() && retries-- > 0) {
             sleepmillis(100);
         }
+    }
+
+    UUID getChannelIdForClient(
+        const std::shared_ptr<executor::AsyncClientFactory::AsyncClientHandle>& client) {
+        return checked_cast<EgressSession&>(client->getClient().getTransportSession())
+            .getChannelId();
     }
 
     void shutdownAndAssertOnTransportStats(int successfulStreams, int failedStreams) {
@@ -275,30 +287,121 @@ TEST_F(GRPCAsyncClientFactoryTest, ConcurrentUsage) {
 TEST_F(GRPCAsyncClientFactoryTest, DropAllConnections) {
     {
         auto handle1 = getClient();
+        auto handle1ChannelId = getChannelIdForClient(handle1);
         ON_BLOCK_EXIT([&] { handle1->indicateSuccess(); });
         auto handle2 = getClient();
         ON_BLOCK_EXIT([&] { handle2->indicateSuccess(); });
+
+        ASSERT_EQ(handle1ChannelId, getChannelIdForClient(handle2));
 
         getFactory().dropConnections();
         auto msg = OpMsgRequest::parseOwned(makeUniqueMessage());
         ASSERT_EQ(handle1->getClient().runCommand(msg).getNoThrow(), ErrorCodes::CallbackCanceled);
         ASSERT_EQ(handle2->getClient().runCommand(msg).getNoThrow(), ErrorCodes::CallbackCanceled);
+
+        // New sessions succeed and use a different underlying channel.
+        auto handle3 = getClient();
+        ON_BLOCK_EXIT([&] { handle3->indicateSuccess(); });
+
+        ASSERT_NE(handle1ChannelId, getChannelIdForClient(handle3));
+
+        ASSERT_OK(handle3->getClient().runCommand(msg).getNoThrow());
     }
 
-    shutdownAndAssertOnTransportStats(0 /*successful streams*/, 2 /*failed streams*/);
+    shutdownAndAssertOnTransportStats(1 /*successful streams*/, 2 /*failed streams*/);
+}
+
+TEST_F(GRPCAsyncClientFactoryTest, DropConnectionToTarget) {
+    {
+        auto target1 = getTransportLayer().getListeningAddresses()[0];
+        auto handle1 = getClient(target1);
+        ON_BLOCK_EXIT([&] { handle1->indicateSuccess(); });
+
+        auto target2 = getTransportLayer().getListeningAddresses()[1];
+        auto handle2 = getClient(target2);
+        ON_BLOCK_EXIT([&] { handle2->indicateSuccess(); });
+
+        // They are using different channels because they are connected to different remotes.
+        ASSERT_NE(getChannelIdForClient(handle1), getChannelIdForClient(handle2));
+
+        getFactory().dropConnections(target1);
+
+        auto msg = OpMsgRequest::parseOwned(makeUniqueMessage());
+        ASSERT_EQ(handle1->getClient().runCommand(msg).getNoThrow(), ErrorCodes::CallbackCanceled);
+
+        // The other target is unaffected by dropConnections.
+        ASSERT_OK(handle2->getClient().runCommand(msg).getNoThrow());
+    }
+
+    shutdownAndAssertOnTransportStats(1 /*successful streams*/, 1 /*failed streams*/);
+}
+
+TEST_F(GRPCAsyncClientFactoryTest, DropConnectionsWhileConnecting) {
+    {
+        // Start a stream establishment attempt that will hang until cancelled.
+        auto connAttempt = getFactory().get(
+            HostAndPort("localhost", 12345), ConnectSSLMode::kGlobalSSLMode, Milliseconds::max());
+        assertStatsSoon(0 /*created*/, 0 /*inUse*/, 0 /*leased*/, 1 /*open*/);
+        getFactory().dropConnections();
+        auto status = connAttempt.getNoThrow().getStatus();
+        ASSERT_NOT_OK(status);
+        ASSERT_EQ(status.code(), ErrorCodes::CallbackCanceled);
+        ASSERT_EQ(status.reason(),
+                  "Cancelled stream establishment due to dropping the associated connection");
+    }
+
+    shutdownAndAssertOnTransportStats(0 /*successful streams*/, 0 /*failed streams*/);
+}
+
+TEST_F(GRPCAsyncClientFactoryTest, DropConnectionsWhileConnectingWithKeepOpen) {
+    {
+        CancellationSource cancelSource;
+        auto remote = HostAndPort("localhost", 12345);
+        getFactory().setKeepOpen(remote, true);
+
+        // Start a stream establishment attempt that will hang until cancelled.
+        auto connAttempt = getFactory().get(
+            remote, ConnectSSLMode::kGlobalSSLMode, Milliseconds::max(), cancelSource.token());
+        assertStatsSoon(0 /*created*/, 0 /*inUse*/, 0 /*leased*/, 1 /*open*/);
+        getFactory().dropConnections();
+
+        // The first dropConnections does not affect the connect Future.
+        ASSERT_FALSE(connAttempt.isReady());
+
+        // Cancel the cancellation token to terminate the stream establishment.
+        cancelSource.cancel();
+        auto status = connAttempt.getNoThrow().getStatus();
+        ASSERT_NOT_OK(status);
+        ASSERT_EQ(status.code(), ErrorCodes::CallbackCanceled);
+        ASSERT_EQ(status.reason(), "gRPC stream establishment was cancelled");
+    }
+
+    shutdownAndAssertOnTransportStats(0 /*successful streams*/, 0 /*failed streams*/);
 }
 
 TEST_F(GRPCAsyncClientFactoryTest, KeepOpen) {
     {
-        auto handle = getClient();
-        ON_BLOCK_EXIT([&] { handle->indicateSuccess(); });
-        getFactory().setKeepOpen(handle->getClient().remote(), true);
+        auto handle1 = getClient();
+        ON_BLOCK_EXIT([&] { handle1->indicateSuccess(); });
+        getFactory().setKeepOpen(handle1->getClient().remote(), true);
+
+        // Drop all connections to check that keep open applied.
         getFactory().dropConnections();
+
         auto msg = OpMsgRequest::parseOwned(makeUniqueMessage());
-        ASSERT_OK(handle->getClient().runCommand(msg).getNoThrow());
+        // We can still run a command on the old session.
+        ASSERT_OK(handle1->getClient().runCommand(msg).getNoThrow());
+
+        // New sessions are also unaffected.
+        auto handle2 = getClient();
+        ON_BLOCK_EXIT([&] { handle2->indicateSuccess(); });
+        ASSERT_OK(handle2->getClient().runCommand(msg).getNoThrow());
+
+        // The same channel is used for the remote on new sessions because it was kept open.
+        ASSERT_EQ(getChannelIdForClient(handle1), getChannelIdForClient(handle2));
     }
 
-    shutdownAndAssertOnTransportStats(1 /*successful streams*/, 0 /*failed streams*/);
+    shutdownAndAssertOnTransportStats(2 /*successful streams*/, 0 /*failed streams*/);
 }
 
 TEST_F(GRPCAsyncClientFactoryTest, Shutdown) {
@@ -358,7 +461,7 @@ TEST_F(GRPCAsyncClientFactoryTest, RefuseShutdownWithActiveClient) {
     shutdownThread.join();
 }
 
-TEST_F(GRPCAsyncClientFactoryTest, StatsTest) {
+TEST_F(GRPCAsyncClientFactoryTest, PerClientStatsTest) {
     auto handle = getClient();
     auto anotherHandle = getClient();
     auto leasedHandle = getLeasedClient();
@@ -385,13 +488,68 @@ TEST_F(GRPCAsyncClientFactoryTest, StatsTest) {
     assertStatsSoon(3 /*created*/, 0 /*inUse*/, 0 /*leased*/, 1 /*open*/);
 }
 
+TEST_F(GRPCAsyncClientFactoryTest, CumulativeStatsTest) {
+    std::unique_ptr<GRPCAsyncClientFactory> factory1;
+    std::unique_ptr<GRPCAsyncClientFactory> factory2;
+    {
+        factory1 = std::make_unique<GRPCAsyncClientFactory>("AsyncClientFactoryTest-1");
+        factory2 = std::make_unique<GRPCAsyncClientFactory>("AsyncClientFactoryTest-2");
+        factory1->startup(getServiceContext(), &getTransportLayer(), getReactor());
+        factory2->startup(getServiceContext(), &getTransportLayer(), getReactor());
+        ON_BLOCK_EXIT([&] {
+            factory1->shutdown();
+            factory2->shutdown();
+        });
+
+        auto client1 = factory1
+                           ->get(getTarget(),
+                                 ConnectSSLMode::kGlobalSSLMode,
+                                 CommandServiceTestFixtures::kDefaultConnectTimeout)
+                           .get();
+        ON_BLOCK_EXIT([&] { client1->indicateSuccess(); });
+
+        auto client2 = factory2
+                           ->get(getTarget(),
+                                 ConnectSSLMode::kGlobalSSLMode,
+                                 CommandServiceTestFixtures::kDefaultConnectTimeout)
+                           .get();
+        ON_BLOCK_EXIT([&] { client2->indicateSuccess(); });
+
+        // Assert that at the factory level, we only show stats per client.
+        GRPCConnectionStats stats1 = factory1->getStats();
+        ASSERT_EQ(stats1.getTotalStreamsCreated(), 1);
+        ASSERT_EQ(stats1.getTotalInUseStreams(), 1);
+        ASSERT_EQ(stats1.getTotalLeasedStreams(), 0);
+        ASSERT_EQ(stats1.getTotalOpenChannels(), 1);
+
+        GRPCConnectionStats stats2 = factory2->getStats();
+        ASSERT_EQ(stats2.getTotalStreamsCreated(), 1);
+        ASSERT_EQ(stats2.getTotalInUseStreams(), 1);
+        ASSERT_EQ(stats2.getTotalLeasedStreams(), 0);
+        ASSERT_EQ(stats2.getTotalOpenChannels(), 1);
+
+        // At the TL level, we see all channels and streams.
+        BSONObjBuilder stats;
+        getTransportLayer().appendStatsForServerStatus(&stats);
+        auto egressStats = stats.obj();
+        ASSERT_EQ(egressStats[GRPCConnectionStats::kTotalOpenChannelsFieldName].numberLong(), 2);
+        ASSERT_EQ(egressStats[kStreamsSubsectionFieldName]
+                             [GRPCConnectionStats::kTotalActiveStreamsFieldName]
+                                 .numberLong(),
+                  2);
+    }
+    // And we also count 2 successful streams at the TL level.
+    shutdownAndAssertOnTransportStats(2 /*successful streams*/, 0 /*failed streams*/);
+}
+
 class MockGRPCAsyncClientFactoryTest : public MockGRPCTransportLayerTest {
 public:
     void setUp() override {
         MockGRPCTransportLayerTest::setUp();
 
         _net = executor::makeNetworkInterfaceWithClientFactory(
-            "MockGRPCAsyncClientFactoryTest", std::make_shared<GRPCAsyncClientFactory>());
+            "MockGRPCAsyncClientFactoryTest",
+            std::make_shared<GRPCAsyncClientFactory>("MockGRPCAsyncClientFactoryTest"));
         _net->startup();
     }
 

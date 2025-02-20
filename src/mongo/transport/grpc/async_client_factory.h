@@ -34,6 +34,7 @@
 #include "mongo/executor/async_client_factory.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/transport/grpc/client.h"
 #include "mongo/transport/grpc/grpc_transport_layer.h"
 #include "mongo/transport/grpc/grpc_transport_layer_impl.h"
 #include "mongo/transport/grpc_connection_stats_gen.h"
@@ -55,7 +56,7 @@ public:
     static constexpr auto kDiagnosticLogLevel = 4;
     static constexpr auto kDefaultStreamEstablishmentTimeout = Seconds(20);
 
-    GRPCAsyncClientFactory();
+    GRPCAsyncClientFactory(std::string instanceName);
 
     ~GRPCAsyncClientFactory() override;
 
@@ -175,6 +176,8 @@ private:
             _finishingClientList.size() == 0;
     }
 
+    std::string _instanceName;
+
     stdx::condition_variable _cv;
     stdx::mutex _mutex;
 
@@ -200,5 +203,6 @@ private:
     ServiceContext* _svcCtx;
     GRPCTransportLayer* _tl;
     transport::ReactorHandle _reactor;
+    std::shared_ptr<Client> _client;
 };
 }  // namespace mongo::transport::grpc

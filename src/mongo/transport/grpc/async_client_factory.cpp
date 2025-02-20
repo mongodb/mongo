@@ -30,8 +30,10 @@
 #include "mongo/transport/grpc/async_client_factory.h"
 
 #include "mongo/client/async_client.h"
+#include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/async_client_factory.h"
+#include "mongo/executor/egress_connection_closer_manager.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/grpc/grpc_session.h"
@@ -41,12 +43,14 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/version.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace mongo::transport::grpc {
 
-GRPCAsyncClientFactory::GRPCAsyncClientFactory() {}
+GRPCAsyncClientFactory::GRPCAsyncClientFactory(std::string instanceName)
+    : _instanceName(std::move(instanceName)) {}
 
 GRPCAsyncClientFactory::~GRPCAsyncClientFactory() {
     shutdown();
@@ -68,6 +72,17 @@ void GRPCAsyncClientFactory::startup(ServiceContext* svcCtx,
     _svcCtx = svcCtx;
     _tl = checked_cast<GRPCTransportLayer*>(tl);
     _reactor = std::move(reactor);
+
+    executor::EgressConnectionCloserManager::get(_svcCtx).add(this);
+
+    BSONObjBuilder bob;
+    auto versionString =
+        VersionInfoInterface::instance(VersionInfoInterface::NotEnabledAction::kFallback).version();
+    ClientMetadata::serialize(_instanceName, versionString, &bob);
+
+    auto metadataDoc = bob.obj();
+    _client = _tl->createGRPCClient(metadataDoc.getObjectField(kMetadataDocumentName).getOwned());
+    _client->start();
 }
 
 SemiFuture<std::shared_ptr<GRPCAsyncClientFactory::AsyncClientHandle>> GRPCAsyncClientFactory::get(
@@ -90,7 +105,8 @@ GRPCAsyncClientFactory::lease(const HostAndPort& target,
 
 void GRPCAsyncClientFactory::shutdown() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    if (std::exchange(_state, State::kShutdown) == State::kShutdown) {
+    if (auto state = std::exchange(_state, State::kShutdown);
+        state == State::kShutdown || state == State::kNew) {
         return;
     }
 
@@ -98,12 +114,16 @@ void GRPCAsyncClientFactory::shutdown() {
 
     _dropConnections(lk);
 
+    executor::EgressConnectionCloserManager::get(_svcCtx).remove(this);
+
     LOGV2_DEBUG(9936106,
                 kDiagnosticLogLevel,
                 "Waiting for outstanding streams to terminate",
                 "numActiveHandles"_attr = _numActiveHandles,
                 "numFinishingStreams"_attr = _finishingClientList.size());
     _cv.wait(lk, [&]() { return _shutdownComplete(lk); });
+
+    _client->shutdown();
 }
 
 void GRPCAsyncClientFactory::appendStats(BSONObjBuilder& bob) const {
@@ -113,7 +133,7 @@ void GRPCAsyncClientFactory::appendStats(BSONObjBuilder& bob) const {
 
 GRPCConnectionStats GRPCAsyncClientFactory::getStats() const {
     GRPCConnectionStats stats;
-    checked_cast<GRPCTransportLayerImpl*>(_tl)->appendStats(stats);
+    _client->appendStats(stats);
 
     stats.setTotalInUseStreams(stats.getTotalActiveStreams() - _numLeasedStreams.get());
     stats.setTotalLeasedStreams(_numLeasedStreams.get());
@@ -125,15 +145,20 @@ GRPCConnectionStats GRPCAsyncClientFactory::getStats() const {
 
 void GRPCAsyncClientFactory::dropConnections() {
     stdx::unique_lock lk(_mutex);
+    if (_state == State::kShutdown || _state == State::kNew) {
+        return;
+    }
+    _client->dropConnections();
     _dropConnections(lk);
 }
 
 void GRPCAsyncClientFactory::dropConnections(const HostAndPort& target) {
     stdx::lock_guard lk(_mutex);
-
-    if (_state == State::kShutdown) {
+    if (_state == State::kShutdown || _state == State::kNew) {
         return;
     }
+
+    _client->dropConnections(target);
 
     auto it = _endpoints.find(target);
     if (it == _endpoints.end()) {
@@ -145,6 +170,12 @@ void GRPCAsyncClientFactory::dropConnections(const HostAndPort& target) {
 
 void GRPCAsyncClientFactory::setKeepOpen(const HostAndPort& target, bool keepOpen) {
     stdx::lock_guard lk(_mutex);
+    if (_state == State::kShutdown || _state == State::kNew) {
+        return;
+    }
+
+    _client->setKeepOpen(target, keepOpen);
+
     auto it = _endpoints.find(target);
     if (it == _endpoints.end()) {
         return;
@@ -183,7 +214,13 @@ Future<std::shared_ptr<GRPCAsyncClientFactory::AsyncClientHandle>> GRPCAsyncClie
                 "timeout"_attr = timeout);
 
     auto connMetrics = std::make_shared<ConnectionMetrics>(_svcCtx->getFastClockSource());
-    return _tl->asyncConnectWithAuthToken(target, sslMode, _reactor, timeout, connMetrics, token)
+    return _client
+        ->connect(target,
+                  checked_pointer_cast<GRPCReactor>(_reactor),
+                  timeout,
+                  {boost::none /**authToken */, sslMode},
+                  token,
+                  connMetrics)
         .then([target, reactor = _reactor, svcCtx = _svcCtx](
                   std::shared_ptr<transport::Session> session) {
             return std::make_shared<AsyncDBClient>(target, std::move(session), svcCtx, reactor);
@@ -194,6 +231,29 @@ Future<std::shared_ptr<GRPCAsyncClientFactory::AsyncClientHandle>> GRPCAsyncClie
                         "gRPC stream establishment failed",
                         "hostAndPort"_attr = target,
                         "error"_attr = s);
+        })
+        .onError<ErrorCodes::ExceededTimeLimit>([this, target, timeout](Status s) mutable
+                                                -> StatusWith<std::shared_ptr<AsyncDBClient>> {
+            if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
+                size_t activeCalls;
+                {
+                    stdx::lock_guard lk(_mutex);
+                    activeCalls = _endpoints[target].handles.size();
+                }
+
+                // TODO SERVER-100262: Remove this log line or add diagnostics about how many calls
+                // are on the specific channel used by the stream.
+                LOGV2(10026101,
+                      "Exceeded time limit while starting gRPC call",
+                      "hostAndPort"_attr = target,
+                      "timeout"_attr = timeout,
+                      "error"_attr = s,
+                      "activeStreamEstablishmentAttempts"_attr =
+                          _client->getPendingStreamEstablishments(target),
+                      "activeCalls"_attr = activeCalls);
+            }
+
+            return s;
         })
         .then([this, target, lease, connMetrics](std::shared_ptr<AsyncDBClient> client)
                   -> std::shared_ptr<AsyncClientFactory::AsyncClientHandle> {
@@ -289,8 +349,6 @@ void GRPCAsyncClientFactory::_dropConnections(WithLock lk) {
 }
 
 void GRPCAsyncClientFactory::_dropConnections(WithLock lk, EndpointState& target) {
-    // TODO SERVER-100261: drop channels from the client too.
-
     if (target.keepOpen) {
         return;
     }

@@ -43,6 +43,10 @@ class InternalSearchMongotRemoteTest : service_context_test::WithSetupTransportL
     void setUp() override {
         executor::startupSearchExecutorsIfNeeded(getServiceContext());
     }
+
+    void tearDown() override {
+        executor::shutdownSearchExecutorsIfNeeded(getServiceContext());
+    }
 };
 
 boost::intrusive_ptr<DocumentSource> createFromBson(

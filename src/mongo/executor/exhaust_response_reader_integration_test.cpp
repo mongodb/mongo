@@ -72,6 +72,7 @@ namespace mongo::executor {
 class ExhaustResponseReaderIntegrationFixture : public unittest::Test {
 public:
     void setUp() override {
+        const auto instanceName = "ExhaustResponseReader";
         auto connectionString = unittest::getFixtureConnectionString();
         auto server = connectionString.getServers().front();
 
@@ -86,11 +87,11 @@ public:
         if (!unittest::shouldUseGRPCEgress()) {
             ConnectionPool::Options connPoolOptions;
             connPoolOptions.minConnections = 0;
-            _pool = std::make_shared<PooledAsyncClientFactory>(
-                "ExhaustResponseReader", connPoolOptions, nullptr);
+            _pool =
+                std::make_shared<PooledAsyncClientFactory>(instanceName, connPoolOptions, nullptr);
         } else {
 #ifdef MONGO_CONFIG_GRPC
-            _pool = std::make_shared<transport::grpc::GRPCAsyncClientFactory>();
+            _pool = std::make_shared<transport::grpc::GRPCAsyncClientFactory>(instanceName);
 #else
             MONGO_UNREACHABLE;
 #endif

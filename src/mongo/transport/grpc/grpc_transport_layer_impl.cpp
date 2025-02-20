@@ -193,30 +193,29 @@ Status GRPCTransportLayerImpl::setup() {
             _server = std::make_unique<Server>(std::move(services), serverOptions);
         }
         if (_options.enableEgress) {
-            GRPCClient::Options clientOptions{};
-
             if (!sslGlobalParams.sslClusterCAFile.empty()) {
-                clientOptions.tlsCAFile = sslGlobalParams.sslClusterCAFile;
+                _clientOptions.tlsCAFile = sslGlobalParams.sslClusterCAFile;
             } else if (!sslGlobalParams.sslCAFile.empty()) {
-                clientOptions.tlsCAFile = sslGlobalParams.sslCAFile;
+                _clientOptions.tlsCAFile = sslGlobalParams.sslCAFile;
             }
             if (!sslGlobalParams.sslClusterFile.empty()) {
-                clientOptions.tlsCertificateKeyFile = sslGlobalParams.sslClusterFile;
+                _clientOptions.tlsCertificateKeyFile = sslGlobalParams.sslClusterFile;
             } else if (!sslGlobalParams.sslPEMKeyFile.empty()) {
-                clientOptions.tlsCertificateKeyFile = sslGlobalParams.sslPEMKeyFile;
+                _clientOptions.tlsCertificateKeyFile = sslGlobalParams.sslPEMKeyFile;
             }
-            clientOptions.tlsAllowInvalidHostnames = sslGlobalParams.sslAllowInvalidHostnames;
-            clientOptions.tlsAllowInvalidCertificates = sslGlobalParams.sslAllowInvalidCertificates;
+            _clientOptions.tlsAllowInvalidHostnames = sslGlobalParams.sslAllowInvalidHostnames;
+            _clientOptions.tlsAllowInvalidCertificates =
+                sslGlobalParams.sslAllowInvalidCertificates;
             iassert(ErrorCodes::InvalidOptions,
                     "gRPC egress networking enabled but no client metadata document was provided",
                     _options.clientMetadata.has_value());
-            _client = std::make_shared<GRPCClient>(
-                this, _svcCtx, *_options.clientMetadata, std::move(clientOptions));
+            _defaultClient = std::make_shared<GRPCClient>(
+                this, _svcCtx, *_options.clientMetadata, _clientOptions);
         }
 
         iassert(ErrorCodes::InvalidOptions,
                 "gRPC cannot be setup with both ingress and egress disabled",
-                _client || _server);
+                _defaultClient || _server);
 
         return Status::OK();
     } catch (const DBException& e) {
@@ -232,7 +231,7 @@ Status GRPCTransportLayerImpl::start() {
                 !_isShutdown);
         iassert(ErrorCodes::NotYetInitialized,
                 "gRPC networking has not been setup yet",
-                _client || _server);
+                _defaultClient || _server);
 
         // TODO SERVER-97619: Depending on the resolution of SERVER-97619, we may need to move the
         // log and uasserts out of this block.
@@ -262,7 +261,7 @@ Status GRPCTransportLayerImpl::start() {
                                                _options.unixDomainSocketPermissions);
             }
         }
-        if (_client) {
+        if (_defaultClient) {
             _ioThread = stdx::thread([this] {
                 setThreadName("GRPCDefaultEgressReactor");
                 LOGV2_DEBUG(9715105, 2, "Starting the default egress gRPC reactor");
@@ -271,7 +270,7 @@ Status GRPCTransportLayerImpl::start() {
                 _egressReactor->drain();
                 LOGV2_DEBUG(9715107, 2, "Finished drain of the default egress gRPC reactor");
             });
-            _client->start();
+            _defaultClient->start();
         }
         return Status::OK();
     } catch (const DBException& ex) {
@@ -279,13 +278,30 @@ Status GRPCTransportLayerImpl::start() {
     }
 }
 
+std::shared_ptr<Client> GRPCTransportLayerImpl::createGRPCClient(BSONObj clientMetadata) {
+    std::lock_guard lk(_mutex);
+    auto iter = _clients.insert(_clients.end(), ClientEntry());
+    auto client =
+        std::shared_ptr<GRPCClient>(new GRPCClient(this, _svcCtx, clientMetadata, _clientOptions),
+                                    [this, iter](GRPCClient* client) {
+                                        {
+                                            std::lock_guard lk(_mutex);
+                                            _clients.erase(iter);
+                                        }
+                                        delete client;
+                                    });
+    _clients.back().client = client;
+    _clients.back().iter = iter;
+    return client;
+}
+
 StatusWith<std::shared_ptr<Session>> GRPCTransportLayerImpl::connectWithAuthToken(
     HostAndPort peer,
     ConnectSSLMode sslMode,
     Milliseconds timeout,
     boost::optional<std::string> authToken) {
-    invariant(_client);
-    return _client
+    invariant(_defaultClient);
+    return _defaultClient
         ->connect(std::move(peer), _egressReactor, timeout, {std::move(authToken), sslMode})
         .getNoThrow();
 }
@@ -310,8 +326,8 @@ Future<std::shared_ptr<Session>> GRPCTransportLayerImpl::asyncConnectWithAuthTok
     std::shared_ptr<ConnectionMetrics> connectionMetrics,
     const CancellationToken& token,
     boost::optional<std::string> authToken) {
-    invariant(_client);
-    return _client
+    invariant(_defaultClient);
+    return _defaultClient
         ->connect(std::move(peer),
                   checked_pointer_cast<GRPCReactor>(reactor),
                   timeout,
@@ -345,11 +361,13 @@ void GRPCTransportLayerImpl::shutdown() {
         return;
     }
 
+    invariant(_clients.empty());
+
     if (_server) {
         _server->shutdown();
     }
-    if (_client) {
-        _client->shutdown();
+    if (_defaultClient) {
+        _defaultClient->shutdown();
     }
     if (_ioThread.joinable()) {
         LOGV2_DEBUG(9715108, 2, "Stopping default egress gRPC reactor");
@@ -369,6 +387,46 @@ void GRPCTransportLayerImpl::stopAcceptingSessions() {
     }
 }
 
+void GRPCTransportLayerImpl::appendStatsForServerStatus(BSONObjBuilder* bob) const {
+    if (!_defaultClient) {
+        return;
+    }
+
+    GRPCConnectionStats accumulatedStats;
+    _defaultClient->appendStats(accumulatedStats);
+
+    {
+        std::lock_guard lk(_mutex);
+        for (auto&& clientEntry : _clients) {
+            if (auto c = clientEntry.client.lock()) {
+                GRPCConnectionStats stats;
+                c->appendStats(stats);
+                accumulatedStats.setTotalOpenChannels(accumulatedStats.getTotalOpenChannels() +
+                                                      stats.getTotalOpenChannels());
+                accumulatedStats.setTotalActiveStreams(accumulatedStats.getTotalActiveStreams() +
+                                                       stats.getTotalActiveStreams());
+                accumulatedStats.setTotalSuccessfulStreams(
+                    accumulatedStats.getTotalSuccessfulStreams() +
+                    stats.getTotalSuccessfulStreams());
+                accumulatedStats.setTotalFailedStreams(accumulatedStats.getTotalFailedStreams() +
+                                                       stats.getTotalFailedStreams());
+            }
+        }
+    }
+
+    bob->append(GRPCConnectionStats::kTotalOpenChannelsFieldName,
+                accumulatedStats.getTotalOpenChannels());
+    {
+        BSONObjBuilder{bob->subobjStart(kStreamsSubsectionFieldName)}
+            .append(GRPCConnectionStats::kTotalActiveStreamsFieldName,
+                    accumulatedStats.getTotalActiveStreams())
+            .append(GRPCConnectionStats::kTotalSuccessfulStreamsFieldName,
+                    accumulatedStats.getTotalSuccessfulStreams())
+            .append(GRPCConnectionStats::kTotalFailedStreamsFieldName,
+                    accumulatedStats.getTotalFailedStreams());
+    }
+}
+
 #ifdef MONGO_CONFIG_SSL
 Status GRPCTransportLayerImpl::rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
                                                   bool asyncOCSPStaple) {
@@ -383,14 +441,31 @@ Status GRPCTransportLayerImpl::rotateCertificates(std::shared_ptr<SSLManagerInte
         }
     }
 
-    if (_client) {
-        if (auto status = _client->rotateCertificates(manager->getSSLConfiguration());
+    if (_defaultClient) {
+        if (auto status = _defaultClient->rotateCertificates(manager->getSSLConfiguration());
             !status.isOK()) {
             LOGV2_DEBUG(
                 9886803, 1, "Failed to rotate egress gRPC TLS certificates", "error"_attr = status);
             return status;
         }
     }
+
+    {
+        std::lock_guard lk(_mutex);
+        for (auto&& clientEntry : _clients) {
+            if (auto c = clientEntry.client.lock()) {
+                if (auto status = c->rotateCertificates(manager->getSSLConfiguration());
+                    !status.isOK()) {
+                    LOGV2_DEBUG(10026100,
+                                1,
+                                "Failed to rotate egress gRPC TLS certificates",
+                                "error"_attr = status);
+                    return status;
+                }
+            }
+        }
+    }
+
 
     LOGV2_DEBUG(9886804, 1, "gRPC TLS certificates successfully rotated");
     return Status::OK();

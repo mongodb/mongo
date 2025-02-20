@@ -417,14 +417,16 @@ TEST_F(GRPCClientTest, GRPCClientShutdownDuringBadConnection) {
     };
 
     auto clientThreadBody = [&](auto& server, auto&) {
+        auto target = HostAndPort("localhost", 12345);
         auto client = makeClient();
         client->start();
         ASSERT_EQ(getClientStats(client).getTotalOpenChannels(), 0);
-        auto res =
-            client->connect(HostAndPort("localhost", 12345), getReactor(), Milliseconds::max(), {});
+        auto res = client->connect(target, getReactor(), Milliseconds::max(), {});
         waitUntilChannelCreation(client);
         ASSERT_EQ(getClientStats(client).getTotalOpenChannels(), 1);
+        ASSERT_EQ(client->getPendingStreamEstablishments(target), 1);
         client->shutdown();
+        ASSERT_EQ(getClientStats(client).getTotalOpenChannels(), 0);
         ASSERT_THROWS_CODE(res.get(), DBException, ErrorCodes::ShutdownInProgress);
     };
 
@@ -530,7 +532,7 @@ TEST_F(GRPCClientTest, UniqueChannelIdsAfterDropChannel) {
                                       {})
                             .get();
 
-        client->dropAllChannels_forTest();
+        client->dropConnections();
 
         auto session2 = client
                             ->connect(server.getListeningAddresses().at(0),

@@ -72,6 +72,9 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
+    std::shared_ptr<Client> createGRPCClient(
+        BSONObj clientMetadata = makeClientMetadataDocument()) override;
+
     StatusWith<std::shared_ptr<Session>> connectWithAuthToken(
         HostAndPort peer,
         ConnectSSLMode sslMode,
@@ -151,7 +154,6 @@ private:
     std::shared_ptr<GRPCReactor> _reactor;
     stdx::thread _ioThread;
 
-    // Invalidated after setup().
     MockClient::MockResolver _resolver;
     const HostAndPort _mockClientAddress;
 };
