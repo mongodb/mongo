@@ -416,3 +416,63 @@ buildvariants:
       - "amazon2-arm64-large"
     tasks:
       - name: .crypt
+
+  - name: amazon2023-x86-compile
+    display_name: "* Compile for Amazon Linux 2023 x86"
+    expansions:
+      <<: *shared_compile_expansions
+      compile_variant: amazon2023-x86-compile
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=amazon2023
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --release
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    run_on:
+      - amazon2023.3-xlarge
+    tasks:
+      - name: compile_and_archive_dist_test_TG
+      - name: package_supplementary_data
+
+  - name: amazon2023-arm64-compile
+    display_name: "* Compile for Amazon Linux 2023 arm64"
+    expansions:
+      <<: *shared_compile_expansions
+      compile_variant: amazon2023-arm64-compile
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=amazon2023
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --release
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    run_on:
+      - amazon2023.3-arm64-xlarge
+    tasks:
+      - name: compile_and_archive_dist_test_TG
+      - name: package_supplementary_data
+
+  - name: amazon2023-arm64-mongocrypt-shlib-compile
+    display_name: Compile mongo_crypt_v1.so for Amazon Linux 2023 arm64
+    modules: *modules
+    expansions:
+      <<: *shared_compile_expansions
+      compile_variant: amazon2023-arm64-compile
+      use_scons_cache: true
+      compile_flags: >-
+        --separate-debug
+        MONGO_DISTMOD=amazon2023
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --release
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --allocator=system
+        --enterprise-features=fle,search,vector_search
+        --js-engine=none
+        --link-model=dynamic-sdk
+        --enable-http-client=off
+        --ssl=off
+        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+        CCFLAGS="-fno-gnu-unique"
+    run_on:
+      - amazon2023.3-arm64-xlarge
+    tasks:
+      - name: .crypt
