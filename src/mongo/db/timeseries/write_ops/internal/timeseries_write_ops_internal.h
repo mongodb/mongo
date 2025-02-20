@@ -156,4 +156,20 @@ std::vector<bucket_catalog::BatchedInsertContext> buildBatchedInsertContexts(
     const TimeseriesOptions& timeseriesOptions,
     const std::vector<BSONObj>& userMeasurementsBatch,
     std::vector<WriteStageErrorAndIndex>& errorsAndIndices);
+
+/**
+ * Given a BatchedInsertContext, will stage writes to eligible buckets until all measurements have
+ * been staged into an eligible bucket. When there is any RolloverReason that isn't kNone when
+ * attempting to stage a measurement into a bucket, the function will find another eligible
+ * buckets until all measurements are inserted.
+ */
+std::vector<std::shared_ptr<bucket_catalog::WriteBatch>> stageInsertBatch(
+    OperationContext* opCtx,
+    bucket_catalog::BucketCatalog& bucketCatalog,
+    const Collection* bucketsColl,
+    const OperationId& opId,
+    const StringDataComparator* comparator,
+    uint64_t storageCacheSizeBytes,
+    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+    bucket_catalog::BatchedInsertContext& batch);
 }  // namespace mongo::timeseries::write_ops::internal

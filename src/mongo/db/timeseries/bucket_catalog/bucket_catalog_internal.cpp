@@ -852,7 +852,10 @@ bool tryToInsertIntoBucketWithoutRollover(BucketCatalog& catalog,
                                     storageCacheSizeBytes,
                                     comparator);
         if (reason != RolloverReason::kNone) {
-            // We would not be able to insert this measurement without rolling over the bucket.
+            // We cannot insert this measurement without rolling over the bucket.
+            // Mark the bucket's RolloverAction so this bucket won't be eligible for staging the
+            // next measurement.
+            bucket.rolloverAction = getRolloverAction(reason);
             return false;
         }
     }
@@ -1699,6 +1702,8 @@ bool stageInsertBatchIntoEligibleBucket(BucketCatalog& catalog,
                                         Bucket& eligibleBucket,
                                         size_t& currentPosition,
                                         std::shared_ptr<WriteBatch>& writeBatch) {
+    invariant(currentPosition < batch.measurementsTimesAndIndices.size());
+
     // getEligibleBucket guarantees that we will successfully insert at least one measurement
     // (batch.measurementsTimesAndIndices[currentPosition]) into the provided bucket without rolling
     // it over, which allows us to unconditionally initialize the writeBatch.

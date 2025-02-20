@@ -37,6 +37,7 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 #include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/bucket_compression_failure.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -1122,6 +1123,66 @@ std::vector<bucket_catalog::BatchedInsertContext> buildBatchedInsertContexts(
                                                                    errorsAndIndices);
 }
 
+std::vector<std::shared_ptr<bucket_catalog::WriteBatch>> stageInsertBatch(
+    OperationContext* opCtx,
+    bucket_catalog::BucketCatalog& bucketCatalog,
+    const Collection* bucketsColl,
+    const OperationId& opId,
+    const StringDataComparator* comparator,
+    uint64_t storageCacheSizeBytes,
+    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+    bucket_catalog::BatchedInsertContext& batch) {
+    // Save the catalog era value from before we make any further checks. This guarantees that we
+    // don't miss a direct write that happens sometime in between our decision to potentially reopen
+    // a bucket below, and actually reopening it in a subsequent reentrant call. Any direct write
+    // will increment the era, so the reentrant call can check the current value and return a write
+    // conflict if it sees a newer era.
+    const auto catalogEra = getCurrentEra(bucketCatalog.bucketStateRegistry);
+    auto& stripe = *bucketCatalog.stripes[batch.stripeNumber];
+    stdx::lock_guard stripeLock{stripe.mutex};
+    std::vector<std::shared_ptr<bucket_catalog::WriteBatch>> writeBatches;
+    size_t currentPosition = 0;
+    bool needsAnotherBucket = true;
+
+    while (needsAnotherBucket) {
+        auto [measurement, measurementTimestamp, _] =
+            batch.measurementsTimesAndIndices[currentPosition];
+        auto& eligibleBucket = bucket_catalog::getEligibleBucket(opCtx,
+                                                                 bucketCatalog,
+                                                                 stripe,
+                                                                 stripeLock,
+                                                                 bucketsColl,
+                                                                 measurement,
+                                                                 batch.key,
+                                                                 measurementTimestamp,
+                                                                 batch.options,
+                                                                 comparator,
+                                                                 catalogEra,
+                                                                 storageCacheSizeBytes,
+                                                                 compressAndWriteBucketFunc,
+                                                                 batch.stats);
+
+        // We have a guarantee that eligibleBucket can insert at least one measurement in the batch,
+        // so this will always be assigned a relevant writeBatch.
+        std::shared_ptr<bucket_catalog::WriteBatch> writeBatch;
+        needsAnotherBucket =
+            !(bucket_catalog::internal::stageInsertBatchIntoEligibleBucket(bucketCatalog,
+                                                                           bucketsColl,
+                                                                           opId,
+                                                                           comparator,
+                                                                           batch,
+                                                                           stripe,
+                                                                           stripeLock,
+                                                                           storageCacheSizeBytes,
+                                                                           eligibleBucket,
+                                                                           currentPosition,
+                                                                           writeBatch));
+        writeBatches.emplace_back(writeBatch);
+    }
+
+    invariant(currentPosition == batch.measurementsTimesAndIndices.size());
+    return writeBatches;
+}
 }  // namespace internal
 
 }  // namespace mongo::timeseries::write_ops

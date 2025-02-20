@@ -25,6 +25,7 @@ mongo_cc_library(
         "global_bucket_catalog.cpp",
         "measurement_map.cpp",
         "reopening.cpp",
+        "rollover.cpp",
         "write_batch.cpp",
     ],
     hdrs = [
@@ -40,6 +41,7 @@ mongo_cc_library(
         "global_bucket_catalog.h",
         "measurement_map.h",
         "reopening.h",
+        "rollover.h",
         "write_batch.h",
     ],
     deps = [
