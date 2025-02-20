@@ -1343,7 +1343,7 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                             const auto nextZoneMax = keyPattern.extendRangeBound(
                                 nextZone.getObjectField(TagsType::max()), false);
                             currentZone = ChunkRange(nextZoneMin, nextZoneMax);
-                            zonesCursor->next();  // Advance cursor
+                            zonesCursor->nextSafe();  // Advance cursor
                         }
                     } else {
                         currentZone = boost::none;
