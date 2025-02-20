@@ -338,8 +338,8 @@ types:
             Ensures that the version strings in featureCompatibilityVersion documents
             serialize/deserialize to a fixed set of string values
         cpp_type: "multiversion::FeatureCompatibilityVersion"
-        serializer: "::mongo::FeatureCompatibilityVersionParser::serializeVersion"
-        deserializer: "mongo::FeatureCompatibilityVersionParser::parseVersion"
+        serializer: "::mongo::FeatureCompatibilityVersionParser::serializeVersionForFcvString"
+        deserializer: "::mongo::FeatureCompatibilityVersionParser::parseVersionForFcvString"
         is_view: false
 
     IDLAnyType:

@@ -1664,6 +1664,14 @@ mongo_cc_library(
 )
 
 idl_generator(
+    name = "version_context_gen",
+    src = "version_context.idl",
+    deps = [
+        ":basic_types_gen",
+    ],
+)
+
+idl_generator(
     name = "keys_collection_manager_gen",
     src = "keys_collection_manager.idl",
     deps = [
@@ -1869,6 +1877,8 @@ mongo_cc_library(
         "shard_id.cpp",
         "shutdown_in_progress_quiesce_info.cpp",
         "tenant_id.cpp",
+        "version_context.cpp",
+        "version_context_gen",
         "write_concern_idl.cpp",
         "write_concern_options.cpp",
         ":basic_types_gen",
@@ -1925,6 +1935,7 @@ mongo_cc_library(
         "//src/mongo/db:keypattern.h",
         "//src/mongo/db:server_parameter_gen",
         "//src/mongo/db:shutdown_in_progress_quiesce_info.h",
+        "//src/mongo/db:version_context.h",
         "//src/mongo/db/auth:validated_tenancy_scope_gen",
         "//src/mongo/db/repl:member_config.h",
         "//src/mongo/db/repl:member_id.h",
@@ -2304,6 +2315,7 @@ mongo_cc_library(
         "repl_set_member_in_standalone_mode.cpp",
         "server_recovery.cpp",
         "service_context.cpp",
+        "version_context_decoration.cpp",
     ],
     hdrs = [
         "cancelable_operation_context.h",
@@ -4095,6 +4107,7 @@ mongo_cc_unit_test(
         "resource_yielder_test.cpp",
         "service_context_test.cpp",
         "thread_client_test.cpp",
+        "version_context_test.cpp",
         "wire_version_test.cpp",
         "//src/mongo/unittest:join_thread.h",
         "//src/mongo/util:executor_test_util.h",

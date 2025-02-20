@@ -40,42 +40,56 @@ namespace mongo {
  * Helpers to parse featureCompatibilityVersion document BSON objects into
  * multiversion::FeatureCompatibilityVersion enums.
  *
- * Also, act as helpers to serialize and deserialize "fcv_string" idl type.
+ * Also, act as helpers to serialize and deserialize "fcv_string" and "ofcv_string" idl types.
  */
-class FeatureCompatibilityVersionParser {
-public:
+struct FeatureCompatibilityVersionParser {
+    using GenericFCV = multiversion::GenericFCV;
+    using FCV = multiversion::FeatureCompatibilityVersion;
+
     /**
-     * Used to verify that the FCV value provided is valid and equal to one of
-     * { lastLTS, lastContinuous, latest }.
-     *
-     * Note: Deserializer for "fcv_string" idl type.
+     * Deserializer for "ofcv_string" idl type. Throws an ErrorCodes::BadValue exception when
+     * the FCV value provided is not equal to one of {LastLTS, LastContinuous, Latest,
+     * UpgradingFromLastLTSToLates, DowngradingFromLatestToLastLTS,
+     * UpgradingFromLastContinuousToLatest, DowngradingFromLatestToLastContinuous,
+     * UpgradingFromLastLTSToLastContinuous}
      */
-    static multiversion::FeatureCompatibilityVersion parseVersion(StringData versionString);
+    static FCV parseVersionForOfcvString(StringData versionString);
+
+    /**
+     * Deserializer for "fcv_string" idl type. Throws an exception with the error code 4926900,
+     * when the FCV value provided is not equal to one of {LastLTS, LastContinuous, Latest}
+     */
+    static FCV parseVersionForFcvString(StringData versionString);
 
     // Used to parse FCV values for feature flags. It is acceptable to have feature flag versions
     // that are not one of { lastLTS, lastContinuous, latest } while the server code is
     // transitioning to the next LTS release. This is to avoid having the upgrade of FCV constants
     // be blocked on old code removal.
-    static multiversion::FeatureCompatibilityVersion parseVersionForFeatureFlags(
-        StringData versionString);
+    static FCV parseVersionForFeatureFlags(StringData versionString);
 
     /**
-     * Note: Serializer for "fcv_string" idl type.
+     * Serializer for "ofcv_string" idl type. Asserts through an invariant that
+     * the FCV value provided is equal to one of {LastLTS, LastContinuous, Latest,
+     * Upgrading*, Downgrading*}
      */
-    static StringData serializeVersion(multiversion::FeatureCompatibilityVersion version);
+    static StringData serializeVersionForOfcvString(FCV version);
 
-    static StringData serializeVersionForFeatureFlags(
-        multiversion::FeatureCompatibilityVersion version);
+    /**
+     * Serializer for "fcv_string" idl type. Asserts through an invariant that
+     * the FCV value provided is equal to one of {LastLTS, LastContinuous, Latest}
+     */
+    static StringData serializeVersionForFcvString(FCV version);
 
-    static Status validatePreviousVersionField(multiversion::FeatureCompatibilityVersion version);
+    static StringData serializeVersionForFeatureFlags(FCV version);
+
+    static Status validatePreviousVersionField(FCV version);
 
     /**
      * Parses the featureCompatibilityVersion document from the server configuration collection
      * (admin.system.version), and returns the state represented by the combination of the
      * targetVersion and version.
      */
-    static StatusWith<multiversion::FeatureCompatibilityVersion> parse(
-        const BSONObj& featureCompatibilityVersionDoc);
+    static StatusWith<FCV> parse(const BSONObj& featureCompatibilityVersionDoc);
 };
 
 }  // namespace mongo

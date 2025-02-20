@@ -297,6 +297,18 @@ constexpr TransitionFCVInfo getTransitionFCVInfo(FeatureCompatibilityVersion v) 
 }
 
 /**
+ * Parses 'versionString' to its corresponding FCV enum.
+ * Throws 'ErrorCodes::BadValue' when 'versionString' has no matching enum.
+ */
+inline FeatureCompatibilityVersion parseVersion(StringData versionString) {
+    for (auto&& [fcv, name] : multiversion::extendedFCVTable)
+        if (name == versionString)
+            return fcv;
+    uasserted(ErrorCodes::BadValue,
+              fmt::format("Invalid FCV value {}.", versionString));
+}
+
+/**
  * Parses 'versionString', of the form "X.Y", to its corresponding FCV enum. For example, "5.1"
  * will be parsed as FeatureCompatibilityVersion::$fcv_cpp_name(Version("5.1")).
  * Throws 'ErrorCodes::BadValue' when 'versionString' is not of the form "X.Y", and has no matching
@@ -307,7 +319,7 @@ inline FeatureCompatibilityVersion parseVersionForFeatureFlags(StringData versio
         if (ptr->second == versionString)
             return ptr->first;
     uasserted(ErrorCodes::BadValue,
-              fmt::format("Invalid FCV version {} for feature flag.", versionString));
+              fmt::format("Invalid FCV value {} for feature flag.", versionString));
 }
 
 /*

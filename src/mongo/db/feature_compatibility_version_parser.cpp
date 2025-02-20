@@ -43,55 +43,99 @@
 
 namespace mongo {
 
+namespace {
+
 using GenericFCV = multiversion::GenericFCV;
+using FCV = multiversion::FeatureCompatibilityVersion;
 
-multiversion::FeatureCompatibilityVersion FeatureCompatibilityVersionParser::parseVersion(
-    StringData versionString) {
-    if (versionString == multiversion::toString(GenericFCV::kLastLTS)) {
-        return GenericFCV::kLastLTS;
-    }
-    if (versionString == multiversion::toString(GenericFCV::kLastContinuous)) {
-        return GenericFCV::kLastContinuous;
-    }
-    if (versionString == multiversion::toString(GenericFCV::kLatest)) {
-        return GenericFCV::kLatest;
+constexpr std::array validOfcvVersions{GenericFCV::kLatest,
+                                       GenericFCV::kLastContinuous,
+                                       GenericFCV::kLastLTS,
+                                       GenericFCV::kUpgradingFromLastLTSToLatest,
+                                       GenericFCV::kDowngradingFromLatestToLastLTS,
+                                       GenericFCV::kUpgradingFromLastContinuousToLatest,
+                                       GenericFCV::kDowngradingFromLatestToLastContinuous,
+                                       GenericFCV::kUpgradingFromLastLTSToLastContinuous};
+
+constexpr std::array validFcvVersions{
+    GenericFCV::kLatest, GenericFCV::kLastContinuous, GenericFCV::kLastLTS};
+
+template <typename T, std::size_t N>
+constexpr bool isValueInArray(const std::array<T, N>& arr, const T& value) {
+    return std::find(arr.begin(), arr.end(), value) != arr.end();
+}
+
+/*
+ * Helper used to parse the `versionString` against the `validVersions`
+ */
+template <std::size_t N>
+StatusWith<FCV> parseVersion(const std::array<FCV, N>& validVersions, StringData versionString) {
+    try {
+        const auto version = multiversion::parseVersion(versionString);
+        if (isValueInArray(validVersions, version)) {
+            return version;
+        }
+    } catch (const ExceptionFor<ErrorCodes::BadValue>&) {
     }
 
+    // Create a comma-separated list of valid versions
+    std::ostringstream validVersionsStream;
+    StringData sep;
+    for (auto&& ver : validVersions) {
+        validVersionsStream << sep << "'" << toString(ver) << "'";
+        sep = ", ";
+    }
+
+    return Status{ErrorCodes::BadValue,
+                  str::stream() << "Invalid feature compatibility version value '" << versionString
+                                << "'. Expected one of the following versions: '"
+                                << validVersionsStream.str()};
+}
+
+}  // namespace
+
+FCV FeatureCompatibilityVersionParser::parseVersionForOfcvString(StringData versionString) {
+    return uassertStatusOK(parseVersion(validOfcvVersions, versionString));
+}
+
+FCV FeatureCompatibilityVersionParser::parseVersionForFcvString(StringData versionString) {
+    const auto version = parseVersion(validFcvVersions, versionString);
+    if (version.isOK()) {
+        return version.getValue();
+    }
     uasserted(4926900,
-              str::stream() << "Invalid feature compatibility version value '" << versionString
-                            << "'; expected '" << multiversion::toString(GenericFCV::kLastLTS)
-                            << "' or '" << multiversion::toString(GenericFCV::kLastContinuous)
-                            << "' or '" << multiversion::toString(GenericFCV::kLatest) << "'. See "
+              str::stream() << version.getStatus().reason() << ". See "
                             << feature_compatibility_version_documentation::compatibilityLink()
                             << ".");
 }
 
-multiversion::FeatureCompatibilityVersion
-FeatureCompatibilityVersionParser::parseVersionForFeatureFlags(StringData versionString) {
+FCV FeatureCompatibilityVersionParser::parseVersionForFeatureFlags(StringData versionString) {
     return multiversion::parseVersionForFeatureFlags(versionString);
 }
 
-StringData FeatureCompatibilityVersionParser::serializeVersion(
-    multiversion::FeatureCompatibilityVersion version) {
-    invariant(version == GenericFCV::kLastLTS || version == GenericFCV::kLastContinuous ||
-                  version == GenericFCV::kLatest,
-              "Invalid feature compatibility version value");
-
+StringData FeatureCompatibilityVersionParser::serializeVersionForOfcvString(FCV version) {
+    invariant(isValueInArray(validOfcvVersions, version),
+              str::stream() << "Invalid feature compatibility version value: "
+                            << multiversion::toString(version));
     return multiversion::toString(version);
 }
 
-StringData FeatureCompatibilityVersionParser::serializeVersionForFeatureFlags(
-    multiversion::FeatureCompatibilityVersion version) {
+StringData FeatureCompatibilityVersionParser::serializeVersionForFcvString(FCV version) {
+    invariant(isValueInArray(validFcvVersions, version),
+              str::stream() << "Invalid feature compatibility version value: "
+                            << multiversion::toString(version));
+    return multiversion::toString(version);
+}
+
+StringData FeatureCompatibilityVersionParser::serializeVersionForFeatureFlags(FCV version) {
     if (multiversion::isStandardFCV(version)) {
         return multiversion::toString(version);
     }
-
     uasserted(ErrorCodes::BadValue,
               fmt::format("Invalid FCV version {} for feature flag.", version));
 }
 
-Status FeatureCompatibilityVersionParser::validatePreviousVersionField(
-    multiversion::FeatureCompatibilityVersion version) {
+Status FeatureCompatibilityVersionParser::validatePreviousVersionField(FCV version) {
     if (version == GenericFCV::kLatest) {
         return Status::OK();
     }
@@ -99,7 +143,7 @@ Status FeatureCompatibilityVersionParser::validatePreviousVersionField(
                   "when present, 'previousVersion' field must be the latest binary version");
 }
 
-StatusWith<multiversion::FeatureCompatibilityVersion> FeatureCompatibilityVersionParser::parse(
+StatusWith<FCV> FeatureCompatibilityVersionParser::parse(
     const BSONObj& featureCompatibilityVersionDoc) {
     try {
         auto fcvDoc = FeatureCompatibilityVersionDocument::parse(
