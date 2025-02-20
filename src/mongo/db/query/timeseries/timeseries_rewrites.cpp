@@ -30,10 +30,26 @@
 #include "mongo/db/query/timeseries/timeseries_rewrites.h"
 #include "mongo/db/pipeline/document_source_coll_stats.h"
 #include "mongo/db/pipeline/document_source_index_stats.h"
+#include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 
 namespace mongo {
 namespace timeseries {
+
+namespace {
+/**
+ * Build the $_internalConvertBucketIndexStats stage.
+ */
+BSONObj buildConvertIndexStatsStage(const StringData timeField,
+                                    const boost::optional<StringData>& metaField) {
+    auto bob = BSONObjBuilder{};
+    bob.append(timeseries::kTimeFieldName, timeField);
+    if (metaField) {
+        bob.append(timeseries::kMetaFieldName, *metaField);
+    }
+    return BSON(DocumentSourceInternalConvertBucketIndexStats::kStageName << bob.obj());
+}
+}  // namespace
 
 std::vector<BSONObj> rewritePipelineForTimeseriesCollection(
     const std::vector<BSONObj>& pipeline,
@@ -46,11 +62,15 @@ std::vector<BSONObj> rewritePipelineForTimeseriesCollection(
         const auto& firstStage = *pipeline.begin();
         if (const auto firstStageName = firstStage.firstElementFieldName();
             firstStageName == DocumentSourceCollStats::kStageName) {
-            // TODO(SERVER-100561): Handle $collStats as the first stage.
+            // Don't insert the $_internalUnpackBucket stage.
             return pipeline;
         } else if (firstStageName == DocumentSourceIndexStats::kStageName) {
-            // TODO(SERVER-100562): Handle $indexStats as the first stage.
-            return pipeline;
+            auto newPipeline = std::vector<BSONObj>{};
+            newPipeline.reserve(pipeline.size() + 1);
+            newPipeline.push_back(pipeline[0]);
+            newPipeline.push_back(buildConvertIndexStatsStage(timeField, metaField));
+            newPipeline.insert(newPipeline.begin() + 2, pipeline.begin() + 1, pipeline.end());
+            return newPipeline;
         }
     }
 

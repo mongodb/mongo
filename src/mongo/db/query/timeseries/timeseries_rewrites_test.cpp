@@ -53,4 +53,35 @@ TEST(TimeseriesRewritesTest, InternalUnpackBucketRewriteTest) {
               DocumentSourceInternalUnpackBucket::kStageNameInternal);
 }
 
+TEST(TimeseriesRewritesTest, InsertIndexStatsConversionStage) {
+    const auto indexStatsStage = BSON("$indexStats" << BSON("a"
+                                                            << "1"));
+    const auto matchStage = BSON("$match" << BSON("b" << 2));
+    const auto originalPipeline = std::vector{indexStatsStage, matchStage};
+    const auto rewrittenPipeline = timeseries::rewritePipelineForTimeseriesCollection(
+        originalPipeline, "time"_sd, {"food"_sd}, {}, {}, {});
+
+    ASSERT_EQ(rewrittenPipeline.size(), originalPipeline.size() + 1);
+    ASSERT_BSONOBJ_EQ(rewrittenPipeline[0], indexStatsStage);
+    ASSERT_BSONOBJ_EQ(rewrittenPipeline[1],
+                      BSON("$_internalConvertBucketIndexStats" << BSON("timeField"
+                                                                       << "time"
+                                                                       << "metaField"
+                                                                       << "food")));
+    ASSERT_BSONOBJ_EQ(rewrittenPipeline[2], matchStage);
+}
+
+TEST(TimeseriesRewritesTest, DontInsertUnpackStageWhenCollStatsPresent) {
+    const auto collStatsStage = BSON("$collStats" << BSON("a"
+                                                          << "1"));
+    const auto matchStage = BSON("$match" << BSON("b" << 2));
+    const auto originalPipeline = std::vector{collStatsStage, matchStage};
+    const auto rewrittenPipeline = timeseries::rewritePipelineForTimeseriesCollection(
+        originalPipeline, "time"_sd, {"food"_sd}, {}, {}, {});
+
+    ASSERT_EQ(rewrittenPipeline.size(), originalPipeline.size());
+    ASSERT_BSONOBJ_EQ(rewrittenPipeline[0], collStatsStage);
+    ASSERT_BSONOBJ_EQ(rewrittenPipeline[1], matchStage);
+}
+
 }  // namespace mongo
