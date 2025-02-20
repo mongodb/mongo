@@ -481,6 +481,7 @@ export class MagicRestoreTest {
      * entries exists. Optionally takes an op type to filter.
      */
     assertOplogCountForNamespace(node, findObj, expectedNumEntries) {
+        this.rst.awaitReplication();
         const entries =
             node.getDB("local").getCollection('oplog.rs').find(findObj).sort({ts: -1}).toArray();
         assert.eq(entries.length,
