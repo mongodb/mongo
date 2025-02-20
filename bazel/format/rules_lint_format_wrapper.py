@@ -3,21 +3,21 @@ import os
 import pathlib
 import subprocess
 
-from buildscripts import download_buildifier
-from buildscripts.buildifier import fix_all, lint_all
+from buildscripts.unittest_grouper import validate_bazel_groups
 
 
-def run_rules_lint(rules_lint_format_path: pathlib.Path, check: bool) -> bool:
+def run_rules_lint(
+    rules_lint_format_path: pathlib.Path, rules_lint_format_check_path: pathlib.Path, check: bool
+) -> bool:
     try:
-        command = [str(rules_lint_format_path)]
-        env = os.environ
         if check:
+            command = [str(rules_lint_format_check_path)]
             print("Running rules_lint formatter in check mode")
-            env["mode"] = "check"
         else:
+            command = [str(rules_lint_format_path)]
             print("Running rules_lint formatter")
         repo_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        subprocess.run(command, check=True, env=env, cwd=repo_path)
+        subprocess.run(command, check=True, env=os.environ, cwd=repo_path)
     except subprocess.CalledProcessError:
         return False
     return True
@@ -36,19 +36,6 @@ def run_shellscripts_linters(shellscripts_linters: pathlib.Path, check: bool) ->
     except subprocess.CalledProcessError:
         return False
     return True
-
-
-def run_buildifier(check: bool) -> bool:
-    binary_path = os.path.join(os.curdir, "buildifier")
-    if not os.path.exists(binary_path):
-        download_buildifier.download(download_location=os.curdir)
-    if check:
-        print("Running buildifier linter")
-        return lint_all(binary_path, generate_report=True)
-    else:
-        print("Running buildifier formatter")
-        fix_all(binary_path)
-        return True
 
 
 def run_prettier(prettier: pathlib.Path, check: bool) -> bool:
@@ -125,6 +112,12 @@ def main() -> int:
         required=True,
         type=pathlib.Path,
     )
+    parser.add_argument(
+        "--rules-lint-format-check",
+        help="Set the path to rules_lint's formatter check script",
+        required=True,
+        type=pathlib.Path,
+    )
 
     args = parser.parse_args()
     prettier_path: pathlib.Path = args.prettier.resolve()
@@ -132,12 +125,13 @@ def main() -> int:
 
     os.chdir(default_dir)
 
+    validate_bazel_groups(generate_report=True, fix=not args.check)
+
     return (
         0
-        if run_rules_lint(args.rules_lint_format, args.check)
+        if run_rules_lint(args.rules_lint_format, args.rules_lint_format_check, args.check)
         and run_shellscripts_linters(shellscripts_linters_path, args.check)
         and run_prettier(prettier_path, args.check)
-        and run_buildifier(args.check)
         else 1
     )
 

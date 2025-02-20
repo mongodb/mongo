@@ -1,8 +1,8 @@
 load("@aspect_rules_lint//format:defs.bzl", "format_multirun", "format_test")
 
 py_binary(
-    name = "format",
-    srcs = ["format.py"],
+    name = "rules_lint_format_wrapper",
+    srcs = ["rules_lint_format_wrapper.py"],
     args = [
         "--prettier",
         "$(location //:prettier)",
@@ -10,9 +10,12 @@ py_binary(
         "$(location //buildscripts:shellscripts_linters)",
         "--rules-lint-format",
         "$(location :rules_lint_format)",
+        "--rules-lint-format-check",
+        "$(location :rules_lint_format.check)",
     ],
     data = [
         ":rules_lint_format",
+        ":rules_lint_format.check",
         "//:prettier",
         "//buildscripts:shellscripts_linters",
         "@shfmt",
@@ -20,10 +23,10 @@ py_binary(
     env = {
         "SHFMT_PATH": "$(execpath @shfmt//:shfmt)",
     },
-    main = "format.py",
+    main = "rules_lint_format_wrapper.py",
     visibility = ["//visibility:public"],
     deps = [
-        "//buildscripts:buildifier",
+        "//buildscripts:unittest_grouper",
     ],
 )
 
@@ -34,9 +37,8 @@ format_multirun(
     html = "//:prettier",
     markdown = "//:prettier",
     sql = "//:prettier",
+    starlark = "@buildifier_prebuilt//:buildifier",
     visibility = ["//visibility:public"],
-    # TODO(SERVER-101031): Use rules_lint buildifier formatter once set up
-    #   starlark = "@buildifier_prebuilt//:buildifier",
     # TODO(SERVER-101033): Enable clang_format once a way to only format a user's changeset is set up
     #   cc = "//:clang_format",
     #   c = "//:clang_format",

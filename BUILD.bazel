@@ -70,7 +70,7 @@ prettier.prettier_binary(
 
 alias(
     name = "format",
-    actual = "//bazel/format",
+    actual = "//bazel/format:rules_lint_format_wrapper",
 )
 
 alias(
