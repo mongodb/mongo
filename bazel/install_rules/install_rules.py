@@ -91,3 +91,5 @@ for depfile in args.depfile:
             install(binary, "bin")
         for lib in content["libs"]:
             install(lib, "lib")
+        for root in content["roots"]:
+            install(root, "")

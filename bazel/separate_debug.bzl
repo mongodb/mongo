@@ -1,5 +1,12 @@
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 
+TagInfo = provider(
+    doc = "A rule provider to pass around tags that were passed to rules.",
+    fields = {
+        "tags": "Bazel tags that were attached to the rule.",
+    },
+)
+
 WITH_DEBUG_SUFFIX = "_with_debug"
 CC_SHARED_LIBRARY_SUFFIX = "_shared"
 SHARED_ARCHIVE_SUFFIX = "_shared_archive"
@@ -540,14 +547,20 @@ def extract_debuginfo_impl(ctx):
         # for the intermediates because we end up taking a dependency
         # on the _with_debug .a files
         if ctx.attr.skip_archive and ctx.attr.cc_shared_library == None:
-            return ctx.attr.binary_with_debug[CcInfo]
-        return linux_extraction(ctx, cc_toolchain, inputs)
+            return_info = [ctx.attr.binary_with_debug[CcInfo]]
+        else:
+            return_info = linux_extraction(ctx, cc_toolchain, inputs)
     elif ctx.target_platform_has_constraint(macos_constraint):
         if ctx.attr.skip_archive and ctx.attr.cc_shared_library == None:
-            return ctx.attr.binary_with_debug[CcInfo]
-        return macos_extraction(ctx, cc_toolchain, inputs)
+            return_info = [ctx.attr.binary_with_debug[CcInfo]]
+        else:
+            return_info = macos_extraction(ctx, cc_toolchain, inputs)
     elif ctx.target_platform_has_constraint(windows_constraint):
-        return windows_extraction(ctx, cc_toolchain, inputs)
+        return_info = windows_extraction(ctx, cc_toolchain, inputs)
+
+    tag_provider = TagInfo(tags = ctx.attr.tags)
+    return_info.append(tag_provider)
+    return return_info
 
 extract_debuginfo = rule(
     extract_debuginfo_impl,

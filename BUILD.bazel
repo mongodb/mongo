@@ -8,6 +8,7 @@ load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
 load("@npm//:prettier/package_json.bzl", prettier = "bin")
 load("@aspect_bazel_lib//lib:copy_to_directory.bzl", "copy_to_directory")
 load("@aspect_rules_lint//format:defs.bzl", "format_multirun", "format_test")
+load("//bazel/install_rules:install_rules.bzl", "TEST_TAGS")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -264,24 +265,5 @@ mongo_install(
             "//conditions:default": [],
         }),
     )
-    for target_name in [
-        "bsoncolumn_bm",
-        "mongo_benchmark",
-        "mongo_fuzzer_test",
-        "mongo_integration_test",
-        "mongo_unittest",
-        "mongo_unittest_first_group",
-        "mongo_unittest_second_group",
-        "mongo_unittest_third_group",
-        "mongo_unittest_fourth_group",
-        "mongo_unittest_fifth_group",
-        "mongo_unittest_sixth_group",
-        "mongo_unittest_seventh_group",
-        "mongo_unittest_eighth_group",
-        "query_bm",
-        "repl_bm",
-        "sharding_bm",
-        "sep_bm",
-        "storage_bm",
-    ]
+    for target_name in TEST_TAGS.keys()
 ]

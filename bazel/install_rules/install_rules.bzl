@@ -6,13 +6,81 @@ load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("@rules_pkg//pkg:providers.bzl", "PackageFilesInfo")
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load("//bazel:mongo_src_rules.bzl", "SANITIZER_DATA", "SANITIZER_ENV")
+load("//bazel:separate_debug.bzl", "TagInfo")
 
 MongoInstallInfo = provider(
     doc = "A install rule provider to pass around deps files",
     fields = {
         "deps_files": "Install rule file describing the files installed for passing to script",
+        "test_file": "File containing list of installed tests",
         "src_map": "contents of the dep file for use in rules",
     },
+)
+
+# This is a dictionary because there are no sets in bazel
+# and we want to look up if the value exists quickly
+TEST_TAGS = {
+    "bsoncolumn_bm": 1,
+    "mongo_benchmark": 1,
+    "mongo_fuzzer_test": 1,
+    "mongo_integration_test": 1,
+    "mongo_unittest": 1,
+    "mongo_unittest_first_group": 1,
+    "mongo_unittest_second_group": 1,
+    "mongo_unittest_third_group": 1,
+    "mongo_unittest_fourth_group": 1,
+    "mongo_unittest_fifth_group": 1,
+    "mongo_unittest_sixth_group": 1,
+    "mongo_unittest_seventh_group": 1,
+    "mongo_unittest_eighth_group": 1,
+    "query_bm": 1,
+    "repl_bm": 1,
+    "sharding_bm": 1,
+    "sep_bm": 1,
+    "storage_bm": 1,
+}
+
+TestBinaryInfo = provider(
+    doc = "Test binaries returned by this target.",
+    fields = {
+        "test_binaries": "group of all test binaries",
+    },
+)
+
+def test_binary_aspect_impl(target, ctx):
+    """Collect all test binaries from transitive srcs and deps
+
+    Args:
+        target: current target
+        ctx: context of current target
+
+    Returns:
+        struct containing collected test binaries
+    """
+    transitive_deps = []
+
+    if TagInfo in target:
+        for tag in target[TagInfo].tags:
+            if tag in TEST_TAGS:
+                transitive_deps.append(target.files)
+                break
+
+    if hasattr(ctx.rule.attr, "srcs"):
+        for src in ctx.rule.attr.srcs:
+            if TestBinaryInfo in src:
+                transitive_deps.append(src[TestBinaryInfo].test_binaries)
+
+    if hasattr(ctx.rule.attr, "deps"):
+        for dep in ctx.rule.attr.deps:
+            if TestBinaryInfo in dep:
+                transitive_deps.append(dep[TestBinaryInfo].test_binaries)
+
+    test_binaries = depset(transitive = transitive_deps)
+    return [TestBinaryInfo(test_binaries = test_binaries)]
+
+test_binary_aspect = aspect(
+    implementation = test_binary_aspect_impl,
+    attr_aspects = ["srcs", "deps"],
 )
 
 def get_constraints(ctx):
@@ -29,7 +97,7 @@ def get_constraints(ctx):
     windows_constraint = ctx.attr._windows_constraint[platform_common.ConstraintValueInfo]
     return linux_constraint, macos_constraint, windows_constraint
 
-def check_binary(ctx, basename):
+def is_binary_file(ctx, basename):
     """Check if file looks like a binary
 
     Args:
@@ -50,7 +118,7 @@ def check_binary(ctx, basename):
         ctx.fail("Unknown OS")
         return False
 
-def check_debug(ctx, basename):
+def is_debug_file(ctx, basename):
     """Check if file looks a debug file
 
     Args:
@@ -103,14 +171,14 @@ def sort_file(ctx, file, install_dir, file_map, is_directory):
     bin_install = install_dir + "/bin/" + basename
     lib_install = install_dir + "/lib/" + basename
 
-    if check_binary(ctx, basename):
-        if not check_debug(ctx, basename):
+    if is_binary_file(ctx, basename):
+        if not is_debug_file(ctx, basename):
             if ctx.attr.debug != "debug":
                 file_map["binaries"][file] = declare_output(ctx, bin_install, is_directory)
         elif ctx.attr.debug != "stripped":
             file_map["binaries_debug"][file] = declare_output(ctx, bin_install, is_directory)
 
-    elif not check_debug(ctx, basename):
+    elif not is_debug_file(ctx, basename):
         if ctx.attr.debug != "debug":
             file_map["dynamic_libs"][file] = declare_output(ctx, lib_install, is_directory)
 
@@ -135,16 +203,20 @@ def mongo_install_rule_impl(ctx):
         "dynamic_libs_debug": {},
         "dynamic_libs": {},
     }
+    test_files = []
     outputs = []
     install_dir = ctx.label.name
 
     # sort direct sources
     for input_bin in ctx.attr.srcs:
+        test_files.extend(input_bin[TestBinaryInfo].test_binaries.to_list())
         for bin in input_bin.files.to_list():
             sort_file(ctx, bin.path, install_dir, file_map, bin.is_directory)
 
     # sort dependency install files
     for dep in ctx.attr.deps:
+        test_files.extend(dep[TestBinaryInfo].test_binaries.to_list())
+
         # Create a map of filename to if its a directory, ie. { coolfolder: True, coolfile: False } as the json loses that info
         file_directory_map = {file_dep.basename: file_dep.is_directory for file_dep in dep[DefaultInfo].files.to_list()}
         src_map = json.decode(dep[MongoInstallInfo].src_map.to_list()[0])
@@ -169,12 +241,29 @@ def mongo_install_rule_impl(ctx):
     if len(bins) == 1 and ctx.attr.debug != "debug" and file_map["binaries"][bins[0]].basename.endswith("_test"):
         unittest_bin = file_map["binaries"][bins[0]]
 
+    # Write installed_tests.txt which contains the list of all test files installed
+    input_deps = []
+    installed_tests = []
+    for file in test_files:
+        if not is_debug_file(ctx, file.basename):
+            installed_tests.append(file_map["binaries"][file.path].path)
+
+    installed_test_list_file = None
+    if len(installed_tests) > 0:
+        installed_test_list_file = ctx.actions.declare_file("install_deps/" + install_dir + "_test_list.txt")
+        ctx.actions.write(
+            output = installed_test_list_file,
+            content = "\n".join(installed_tests),
+        )
+        input_deps.append(installed_test_list_file)
+
     # create a dep file for passing all the files we intend to install
     # to the python script
     name = ctx.label.package + "_" + install_dir
     name = name.replace("/", "_")
     deps_file = ctx.actions.declare_file("install_deps/" + name + "/" + install_dir)
     json_out = struct(
+        roots = [] if installed_test_list_file == None else [installed_test_list_file.path],
         bins = bins,
         libs = libs,
     )
@@ -202,7 +291,9 @@ def mongo_install_rule_impl(ctx):
         full_install_dir += "/" + ctx.label.package
     full_install_dir += "/" + install_dir
 
-    inputs = depset(direct = [deps_file], transitive = [
+    input_deps.append(deps_file)
+
+    inputs = depset(direct = input_deps, transitive = [
         ctx.attr._install_script.files,
         python.files,
     ] + [f.files for f in ctx.attr.srcs] + [dep[MongoInstallInfo].deps_files for dep in ctx.attr.deps] + [dep[DefaultInfo].files for dep in ctx.attr.deps])
@@ -246,6 +337,7 @@ def mongo_install_rule_impl(ctx):
         ),
         MongoInstallInfo(
             deps_files = depset([deps_file], transitive = [dep[MongoInstallInfo].deps_files for dep in ctx.attr.deps]),
+            test_file = installed_test_list_file,
             src_map = depset([json_out.to_json()]),
         ),
     ]
@@ -253,8 +345,8 @@ def mongo_install_rule_impl(ctx):
 mongo_install_rule = rule(
     mongo_install_rule_impl,
     attrs = {
-        "srcs": attr.label_list(),
-        "deps": attr.label_list(providers = [PackageFilesInfo]),
+        "srcs": attr.label_list(aspects = [test_binary_aspect]),
+        "deps": attr.label_list(providers = [PackageFilesInfo], aspects = [test_binary_aspect]),
         "debug": attr.string(),
         "_install_script": attr.label(allow_single_file = True, default = "//bazel/install_rules:install_rules.py"),
         "_linux_constraint": attr.label(default = "@platforms//os:linux"),
