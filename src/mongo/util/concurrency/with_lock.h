@@ -106,9 +106,3 @@ private:
 };
 
 }  // namespace mongo
-
-namespace std {
-// No moving a WithLock:
-template <>
-mongo::WithLock&& move<mongo::WithLock>(mongo::WithLock&&) noexcept = delete;
-}  // namespace std
