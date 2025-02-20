@@ -25,7 +25,8 @@ function isShutdownError(error) {
     // propagates the error code.
     return error.code === ErrorCodes.ShutdownInProgress ||
         error.code === ErrorCodes.InterruptedAtShutdown ||
-        error.message.includes("The server is in quiesce mode and will shut down");
+        error.message.includes("The server is in quiesce mode and will shut down") ||
+        error.message.includes("interrupted at shutdown");
 }
 
 /**
