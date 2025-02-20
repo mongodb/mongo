@@ -171,26 +171,23 @@ TEST_F(FeatureFlagTest, ServerStatus) {
     }
 }
 
+// (Generic FCV reference): feature flag test
+static const ServerGlobalParams::FCVSnapshot kLastLTSFCVSnapshot(
+    multiversion::GenericFCV::kLastLTS);
+static const ServerGlobalParams::FCVSnapshot kLatestFCVSnapshot(multiversion::GenericFCV::kLatest);
+static const ServerGlobalParams::FCVSnapshot kUninitializedFCVSnapshot(
+    multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior);
+
 // Test feature flags are enabled and not enabled based on fcv
 TEST_F(FeatureFlagTest, IsEnabledTrue) {
     // Test FCV checks with enabled flag
     // Test newest version
-    // (Generic FCV reference): feature flag test
-    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
-
-    ASSERT_TRUE(feature_flags::gFeatureFlagBlender.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-    ASSERT_TRUE(feature_flags::gFeatureFlagSpoon.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+    ASSERT_TRUE(feature_flags::gFeatureFlagBlender.isEnabled(kLatestFCVSnapshot));
+    ASSERT_TRUE(feature_flags::gFeatureFlagSpoon.isEnabled(kLatestFCVSnapshot));
 
     // Test oldest version
-    // (Generic FCV reference): feature flag test
-    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastLTS);
-
-    ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-    ASSERT_TRUE(feature_flags::gFeatureFlagSpoon.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+    ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabled(kLastLTSFCVSnapshot));
+    ASSERT_TRUE(feature_flags::gFeatureFlagSpoon.isEnabled(kLastLTSFCVSnapshot));
 }
 
 // Test feature flags are disabled regardless of fcv
@@ -200,22 +197,33 @@ TEST_F(FeatureFlagTest, IsEnabledFalse) {
     ASSERT_OK(_featureFlagBlender->setFromString("false", boost::none));
     ASSERT_OK(_featureFlagSpoon->setFromString("false", boost::none));
 
-    // (Generic FCV reference): feature flag test
-    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
-
-    ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-    ASSERT_FALSE(feature_flags::gFeatureFlagSpoon.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+    ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabled(kLatestFCVSnapshot));
+    ASSERT_FALSE(feature_flags::gFeatureFlagSpoon.isEnabled(kLatestFCVSnapshot));
 
     // Test oldest version
-    // (Generic FCV reference): feature flag test
-    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastLTS);
+    ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabled(kLastLTSFCVSnapshot));
+    ASSERT_FALSE(feature_flags::gFeatureFlagSpoon.isEnabled(kLastLTSFCVSnapshot));
+}
 
-    ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-    ASSERT_FALSE(feature_flags::gFeatureFlagSpoon.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+// Test isEnabled variants with a fallback for uninitialized FCV
+TEST_F(FeatureFlagTest, IsEnabledUseLastLTSFCVWhenUninitialized) {
+    ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabledUseLastLTSFCVWhenUninitialized(
+        kLastLTSFCVSnapshot));
+    ASSERT_TRUE(feature_flags::gFeatureFlagBlender.isEnabledUseLastLTSFCVWhenUninitialized(
+        kLatestFCVSnapshot));
+
+    ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabledUseLastLTSFCVWhenUninitialized(
+        kUninitializedFCVSnapshot));
+}
+
+TEST_F(FeatureFlagTest, IsEnabledUseLatestFCVWhenUninitialized) {
+    ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabledUseLatestFCVWhenUninitialized(
+        kLastLTSFCVSnapshot));
+    ASSERT_TRUE(feature_flags::gFeatureFlagBlender.isEnabledUseLatestFCVWhenUninitialized(
+        kLatestFCVSnapshot));
+
+    ASSERT_TRUE(feature_flags::gFeatureFlagBlender.isEnabledUseLatestFCVWhenUninitialized(
+        kUninitializedFCVSnapshot));
 }
 
 // Test that the RAIIServerParameterControllerForTest works correctly on a feature flag.
@@ -224,21 +232,17 @@ TEST_F(FeatureFlagTest, RAIIFeatureFlagController) {
     ASSERT_OK(_featureFlagBlender->setFromString("false", boost::none));
     {
         RAIIServerParameterControllerForTest controller("featureFlagBlender", true);
-        ASSERT_TRUE(feature_flags::gFeatureFlagBlender.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+        ASSERT_TRUE(feature_flags::gFeatureFlagBlender.isEnabled(kLatestFCVSnapshot));
     }
-    ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+    ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabled(kLatestFCVSnapshot));
 
     // Set true feature flag to false
     ASSERT_OK(_featureFlagBlender->setFromString("true", boost::none));
     {
         RAIIServerParameterControllerForTest controller("featureFlagBlender", false);
-        ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+        ASSERT_FALSE(feature_flags::gFeatureFlagBlender.isEnabled(kLatestFCVSnapshot));
     }
-    ASSERT_TRUE(feature_flags::gFeatureFlagBlender.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+    ASSERT_TRUE(feature_flags::gFeatureFlagBlender.isEnabled(kLatestFCVSnapshot));
 }
 
 // Test feature flags that should not be FCV Gated
