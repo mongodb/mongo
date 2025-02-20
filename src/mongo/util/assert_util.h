@@ -860,7 +860,7 @@ inline ScopedDebugInfoStack& scopedDebugInfoStack() {
  * broad hint as to what the thread is doing. Pops that datum at scope
  * exit. By default, attaches to the thread_local ScopedDebugInfoStack.
  * If the thread encounters a fatal error, the thread's ScopedDebugInfoStack
- * is logged.
+ * is logged. The formatting of the data is done lazily during failure handling.
  *
  * Example:
  *
@@ -871,7 +871,12 @@ inline ScopedDebugInfoStack& scopedDebugInfoStack() {
  *     }
  *
  * ScopedDebugInfo must only be used with trivially formattable values. Since it's diagnostic
- * information, formattted during error handling, formatting must not itself fail.
+ * information, formatted during error handling, formatting must not itself fail. For example,
+ * formatting should not require synchronization or reading from disk. Since the result is logged,
+ * the formatting must follow the usual log redaction guidance.
+ *
+ * The lifetime of the ScopedDebugInfo must be carefully considered. By default, a ScopedDebugInfo
+ * is attached to a thread_local stack, so it must not outlive the thread that created it.
  */
 template <typename T>
 class ScopedDebugInfo {
