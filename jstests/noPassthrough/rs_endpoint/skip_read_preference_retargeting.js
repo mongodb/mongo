@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   requires_fcv_80,
+ *   featureFlagDualCatalogCache,
  *   featureFlagReplicaSetEndpoint,
  *   featureFlagRouterPort,
  * ]
@@ -18,14 +19,6 @@ const rst = new ReplSetTest({
     nodeOptions: {
         setParameter: {
             featureFlagAllMongodsAreSharded: true,
-            // TODO (SERVER-84243): When the feature flag below is enabled, the collections in this
-            // test would be tracked so a read on a secondary may trigger a catalog cache refresh.
-            // The router service on mongod currently uses the ShardServerCatalogCacheLoader.
-            // As a result, a refresh on a secondary with replica set endpoint enabled currently
-            // involves running _flushDatabaseCacheUpdates on the primary and then waiting for the
-            // refreshed metadata to get replicated. This test later pauses replication on one of
-            // the secondaries. So the refresh on that secondary is expected to hang.
-            featureFlagTrackUnshardedCollectionsUponCreation: false,
             logComponentVerbosity: tojson({sharding: 2}),
         }
     },

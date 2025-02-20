@@ -1004,7 +1004,6 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnStepDownHook() {
             TransactionCoordinatorService::get(_service)->interrupt();
         }
 
-        // TODO SERVER-84243: replace with cache for filtering metadata
         FilteringMetadataCache::get(_service)->onStepDown();
     }
     if (auto validator = LogicalTimeValidator::get(_service)) {
@@ -1104,7 +1103,6 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         PeriodicShardedIndexConsistencyChecker::get(_service).onStepUp(_service);
         TransactionCoordinatorService::get(_service)->initializeIfNeeded(opCtx, term);
 
-        // TODO SERVER-84243: replace with cache for filtering metadata
         FilteringMetadataCache::get(_service)->onStepUp();
 
         ShardingCatalogManager::get(opCtx)->scheduleAsyncUnblockDDLCoordinators(opCtx);

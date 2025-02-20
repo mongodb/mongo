@@ -37,9 +37,9 @@ namespace mongo {
  * In-memory only cache for routing information, meant to support the worker threads of the
  * Config Server (the Balancer Subsystem and the PeriodicShardedIndexConsistencyChecker).
  *
- * TODO SERVER-84243 Delete this file and replace usages with the dedicated CatalogCache for routing
- * information.
- **/
+ * TODO (SERVER-97261): Delete this file and replace usages with the dedicated CatalogCache for
+ * routing information.
+ */
 class RoutingInformationCache : public CatalogCache {
 
 public:

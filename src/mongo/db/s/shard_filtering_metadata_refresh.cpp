@@ -292,8 +292,6 @@ void FilteringMetadataCache::shutDown() {
 }
 
 void FilteringMetadataCache::onStepDown() {
-    // TODO (SERVER-84243): Remove this once FilteringMetadataCache is always instantiated with a
-    // SSCCL as part of its constructor.
     tassert(9539100,
             "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",
             _loader);
@@ -302,8 +300,6 @@ void FilteringMetadataCache::onStepDown() {
 }
 
 void FilteringMetadataCache::onStepUp() {
-    // TODO (SERVER-84243): Remove this once FilteringMetadataCache is always instantiated with a
-    // SSCCL as part of its constructor.
     tassert(9539101,
             "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",
             _loader);
@@ -312,8 +308,6 @@ void FilteringMetadataCache::onStepUp() {
 }
 
 void FilteringMetadataCache::onReplicationRollback() {
-    // TODO (SERVER-84243): Remove this once FilteringMetadataCache is always instantiated with a
-    // SSCCL as part of its constructor.
     tassert(9539102,
             "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",
             _loader);
@@ -323,8 +317,6 @@ void FilteringMetadataCache::onReplicationRollback() {
 
 void FilteringMetadataCache::notifyOfCollectionRefreshEndMarkerSeen(const NamespaceString& nss,
                                                                     const Timestamp& commitTime) {
-    // TODO (SERVER-84243): Remove this once FilteringMetadataCache is always instantiated with a
-    // SSCCL as part of its constructor.
     tassert(9539103,
             "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",
             _loader);
@@ -334,8 +326,6 @@ void FilteringMetadataCache::notifyOfCollectionRefreshEndMarkerSeen(const Namesp
 
 void FilteringMetadataCache::waitForCollectionFlush(OperationContext* opCtx,
                                                     const NamespaceString& nss) {
-    // TODO (SERVER-84243): Remove this once FilteringMetadataCache is always instantiated with a
-    // SSCCL as part of its constructor.
     tassert(9539104,
             "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",
             _loader);
@@ -345,8 +335,6 @@ void FilteringMetadataCache::waitForCollectionFlush(OperationContext* opCtx,
 
 void FilteringMetadataCache::waitForDatabaseFlush(OperationContext* opCtx,
                                                   const DatabaseName& dbName) {
-    // TODO (SERVER-84243): Remove this once FilteringMetadataCache is always instantiated with a
-    // SSCCL as part of its constructor.
     tassert(9539105,
             "FilteringMetadataCache has not yet been initialized with a CatalogCacheLoader",
             _loader);
