@@ -167,15 +167,7 @@ void ensureFulfilledPromise(WithLock lk, SharedPromise<void>& sp) {
     }
 }
 
-template <typename Type>
-void ensureFulfilledPromise(WithLock lk, SharedPromise<Type>& sp, Type value) {
-    if (!sp.getFuture().isReady()) {
-        sp.emplaceValue(value);
-    }
-}
-
-template <typename Type>
-void ensureFulfilledPromise(WithLock lk, SharedPromise<Type>& sp, Status error) {
+void ensureFulfilledPromise(WithLock lk, SharedPromise<void>& sp, Status error) {
     if (!sp.getFuture().isReady()) {
         sp.setError(error);
     }
@@ -272,7 +264,6 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
       _metadata{donorDoc.getCommonReshardingMetadata()},
       _recipientShardIds{donorDoc.getRecipientShards()},
       _donorCtx{donorDoc.getMutableState()},
-      _changeStreamsMonitorCtx{donorDoc.getChangeStreamsMonitor()},
       _donorMetricsToRestore{donorDoc.getMetrics() ? donorDoc.getMetrics().value()
                                                    : ReshardingDonorMetrics()},
       _externalState{std::move(externalState)},
@@ -290,20 +281,6 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
       }()) {
     invariant(_externalState);
 
-    if (_changeStreamsMonitorCtx) {
-        invariant(_metadata.getPerformVerification());
-
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        ensureFulfilledPromise(lk,
-                               _changeStreamMonitorStartTimeSelected,
-                               _changeStreamsMonitorCtx->getStartAtOperationTime());
-        if (_changeStreamsMonitorCtx->getCompleted()) {
-            ensureFulfilledPromise(lk, _changeStreamsMonitorStarted);
-            ensureFulfilledPromise(
-                lk, _changeStreamsMonitorCompleted, _changeStreamsMonitorCtx->getDocumentsDelta());
-        }
-    }
-
     _metrics->onStateTransition(boost::none, _donorCtx.getState());
 }
 
@@ -320,16 +297,10 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
                            executor, abortToken);
                    })
                    .then([this, executor, abortToken] {
-                       return _createAndStartChangeStreamsMonitor(executor, abortToken);
-                   })
-                   .then([this, executor, abortToken] {
                        return _awaitAllRecipientsDoneApplyingThenTransitionToPreparingToBlockWrites(
                            executor, abortToken);
                    })
-                   .then([this] { _writeTransactionOplogEntryThenTransitionToBlockingWrites(); })
-                   .then([this, executor, abortToken] {
-                       return _awaitChangeStreamsMonitorCompleted(executor, abortToken);
-                   });
+                   .then([this] { _writeTransactionOplogEntryThenTransitionToBlockingWrites(); });
            })
         .onTransientError([](const Status& status) {
             LOGV2(5633603,
@@ -352,8 +323,6 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
 
             {
                 stdx::lock_guard<stdx::mutex> lk(_mutex);
-                ensureFulfilledPromise(lk, _changeStreamsMonitorStarted, status);
-                ensureFulfilledPromise(lk, _changeStreamsMonitorCompleted, status);
                 ensureFulfilledPromise(lk, _critSecWasAcquired, status);
                 ensureFulfilledPromise(lk, _critSecWasPromoted, status);
             }
@@ -532,8 +501,6 @@ Status ReshardingDonorService::DonorStateMachine::_runMandatoryCleanup(
 
         stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-        ensureFulfilledPromise(lk, _changeStreamsMonitorStarted, statusForPromise);
-        ensureFulfilledPromise(lk, _changeStreamsMonitorCompleted, statusForPromise);
         ensureFulfilledPromise(lk, _critSecWasAcquired, statusForPromise);
         ensureFulfilledPromise(lk, _critSecWasPromoted, statusForPromise);
         ensureFulfilledPromise(lk, _completionPromise, statusForPromise);
@@ -763,9 +730,6 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
 
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     return _updateCoordinator(opCtx.get(), executor)
-        .then([this, executor, abortToken] {
-            return _createAndStartChangeStreamsMonitor(executor, abortToken);
-        })
         .then([this, abortToken] {
             return future_util::withCancellation(_allRecipientsDoneCloning.getFuture(), abortToken);
         })
@@ -957,147 +921,6 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
     _transitionToDone(false /* aborted */);
 }
 
-SharedSemiFuture<void>
-ReshardingDonorService::DonorStateMachine::createAndStartChangeStreamsMonitor(
-    const Timestamp& cloneTimestamp) {
-    if (!_metadata.getPerformVerification()) {
-        return Status{ErrorCodes::IllegalOperation,
-                      "Cannot start the change streams monitor when verification is not enabled"};
-    }
-
-    {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        auto startAtOperationTime = cloneTimestamp + 1;
-        ensureFulfilledPromise(lk, _changeStreamMonitorStartTimeSelected, startAtOperationTime);
-    }
-    return _changeStreamsMonitorStarted.getFuture();
-}
-
-SharedSemiFuture<void>
-ReshardingDonorService::DonorStateMachine::awaitChangeStreamsMonitorStarted() {
-    if (!_metadata.getPerformVerification()) {
-        return Status{ErrorCodes::IllegalOperation,
-                      "Cannot wait for the change streams monitor to start when verification is "
-                      "not enabled. The monitor only exists when verification is enabled"};
-    }
-    return _changeStreamsMonitorStarted.getFuture();
-}
-
-SharedSemiFuture<int64_t>
-ReshardingDonorService::DonorStateMachine::awaitChangeStreamsMonitorCompleted() {
-    if (!_metadata.getPerformVerification()) {
-        return Status{ErrorCodes::IllegalOperation,
-                      "Cannot wait for the change streams monitor to complete when verification is "
-                      "not enabled. The monitor only exists when verification is enabled"};
-    }
-
-    return _changeStreamsMonitorCompleted.getFuture();
-}
-
-ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_createAndStartChangeStreamsMonitor(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& abortToken) {
-    if (!_metadata.getPerformVerification() || _changeStreamsMonitorStarted.getFuture().isReady()) {
-        return ExecutorFuture<void>(**executor, Status::OK());
-    }
-
-    return future_util::withCancellation(_changeStreamMonitorStartTimeSelected.getFuture(),
-                                         abortToken)
-        .thenRunOn(**executor)
-        .then([this, executor, abortToken](const Timestamp& startAtOperationTime) {
-            if (!_changeStreamsMonitorCtx) {
-                LOGV2(9858400,
-                      "Initializing the change streams monitor",
-                      "reshardingUUID"_attr = _metadata.getReshardingUUID(),
-                      "startAtOperationTime"_attr = startAtOperationTime);
-                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-
-                ChangeStreamsMonitorContext changeStreamsMonitorCtx(startAtOperationTime,
-                                                                    0 /* documentsDelta */);
-                _updateDonorDocument(opCtx.get(), std::move(changeStreamsMonitorCtx));
-
-                // Wait for the write above to be majority committed to make sure it cannot be
-                // rolled back after this donor acknowledges to the coordinator that it has started
-                // the change streams monitor.
-                auto clientOpTime =
-                    repl::ReplClientInfo::forClient(opCtx.get()->getClient()).getLastOp();
-                return WaitForMajorityService::get(opCtx.get()->getServiceContext())
-                    .waitUntilMajorityForWrite(clientOpTime, abortToken)
-                    .thenRunOn(**executor);
-            }
-
-            return ExecutorFuture<void>(**executor, Status::OK());
-        })
-        .then([this, executor, abortToken] {
-            auto batchCallback = [this, anchor = shared_from_this()](
-                                     int documentsDelta, BSONObj resumeToken, bool completed) {
-                LOGV2(9858404,
-                      "Persisting change streams monitor's progress",
-                      "reshardingUUID"_attr = _metadata.getReshardingUUID(),
-                      "documentsDelta"_attr = documentsDelta,
-                      "completed"_attr = completed);
-                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-
-                auto changeStreamsMonitorCtx = _changeStreamsMonitorCtx.get();
-                changeStreamsMonitorCtx.setResumeToken(resumeToken.getOwned());
-                changeStreamsMonitorCtx.setDocumentsDelta(
-                    changeStreamsMonitorCtx.getDocumentsDelta() + documentsDelta);
-                changeStreamsMonitorCtx.setCompleted(completed);
-
-                _updateDonorDocument(opCtx.get(), std::move(changeStreamsMonitorCtx));
-            };
-
-            if (_changeStreamsMonitorCtx->getResumeToken()) {
-                _changeStreamsMonitor = std::make_unique<ReshardingChangeStreamsMonitor>(
-                    ReshardingChangeStreamsMonitor(_metadata.getSourceNss(),
-                                                   *_changeStreamsMonitorCtx->getResumeToken(),
-                                                   false /* isRecipient */,
-                                                   batchCallback));
-            } else {
-                _changeStreamsMonitor =
-                    std::make_unique<ReshardingChangeStreamsMonitor>(ReshardingChangeStreamsMonitor(
-                        _metadata.getSourceNss(),
-                        _changeStreamsMonitorCtx->getStartAtOperationTime(),
-                        false /* isRecipient */,
-                        batchCallback));
-            }
-
-            LOGV2(9858401,
-                  "Starting the change streams monitor",
-                  "reshardingUUID"_attr = _metadata.getReshardingUUID());
-            _changeStreamsMonitor->startMonitoring(**executor, *_cancelableOpCtxFactory);
-            _changeStreamsMonitorStarted.emplaceValue();
-        });
-}
-
-ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_awaitChangeStreamsMonitorCompleted(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& abortToken) {
-    if (!_metadata.getPerformVerification() ||
-        _changeStreamsMonitorCompleted.getFuture().isReady()) {
-        return ExecutorFuture<void>(**executor, Status::OK());
-    }
-
-    invariant(_changeStreamsMonitor);
-    return future_util::withCancellation(_changeStreamsMonitor->awaitFinalChangeEvent(), abortToken)
-        .thenRunOn(**executor)
-        .onCompletion([this](Status status) {
-            LOGV2(9858402,
-                  "The change streams monitor completed",
-                  "reshardingUUID"_attr = _metadata.getReshardingUUID(),
-                  "status"_attr = status);
-
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
-            if (status.isOK()) {
-                ensureFulfilledPromise(lk,
-                                       _changeStreamsMonitorCompleted,
-                                       _changeStreamsMonitorCtx->getDocumentsDelta());
-            } else {
-                ensureFulfilledPromise(lk, _changeStreamsMonitorCompleted, status);
-            }
-        });
-}
-
 void ReshardingDonorService::DonorStateMachine::_transitionState(DonorStateEnum newState) {
     invariant(newState != DonorStateEnum::kDonatingInitialData &&
               newState != DonorStateEnum::kError && newState != DonorStateEnum::kDone);
@@ -1267,16 +1090,17 @@ void ReshardingDonorService::DonorStateMachine::commit() {
     }
 }
 
-void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(OperationContext* opCtx,
-                                                                     const BSONObj& updateMod) {
+void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
+    DonorShardContext&& newDonorCtx) {
+    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     const auto& nss = NamespaceString::kDonorReshardingOperationsNamespace;
 
-    writeConflictRetry(opCtx, "_updateDonorDocument", nss, [&] {
+    writeConflictRetry(opCtx.get(), "DonorStateMachine::_updateDonorDocument", nss, [&] {
         auto coll = acquireCollection(
-            opCtx,
+            opCtx.get(),
             CollectionAcquisitionRequest(nss,
                                          PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                         repl::ReadConcernArgs::get(opCtx),
+                                         repl::ReadConcernArgs::get(opCtx.get()),
                                          AcquisitionPrerequisites::kWrite),
             MODE_X);
 
@@ -1284,33 +1108,18 @@ void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(OperationCo
                 str::stream() << nss.toStringForErrorMsg() << " does not exist",
                 coll.exists());
 
-        WriteUnitOfWork wuow(opCtx);
-        Helpers::update(opCtx,
+        WriteUnitOfWork wuow(opCtx.get());
+        Helpers::update(opCtx.get(),
                         coll,
                         BSON(ReshardingDonorDocument::kReshardingUUIDFieldName
                              << _metadata.getReshardingUUID()),
-                        updateMod);
+                        BSON("$set" << BSON(ReshardingDonorDocument::kMutableStateFieldName
+                                            << newDonorCtx.toBSON())));
         wuow.commit();
     });
-}
 
-void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
-    DonorShardContext&& newDonorCtx) {
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-    _updateDonorDocument(opCtx.get(),
-                         BSON("$set" << BSON(ReshardingDonorDocument::kMutableStateFieldName
-                                             << newDonorCtx.toBSON())));
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _donorCtx = newDonorCtx;
-}
-
-void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
-    OperationContext* opCtx, ChangeStreamsMonitorContext&& newChangeStreamsMonitorCtx) {
-    _updateDonorDocument(opCtx,
-                         BSON("$set" << BSON(ReshardingDonorDocument::kChangeStreamsMonitorFieldName
-                                             << newChangeStreamsMonitorCtx.toBSON())));
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _changeStreamsMonitorCtx = newChangeStreamsMonitorCtx;
 }
 
 void ReshardingDonorService::DonorStateMachine::_removeDonorDocument(

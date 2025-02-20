@@ -324,6 +324,8 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                    .then([this, executor] {
                        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kCloning) {
                            _tellAllRecipientsToRefresh(executor);
+                       }
+                       if (_coordinatorDoc.getState() <= CoordinatorStateEnum::kBlockingWrites) {
                            _tellAllDonorsToStartChangeStreamsMonitor(executor);
                        }
                    })

@@ -214,7 +214,6 @@ executor:
         roleGraphInvalidationIsFatal: 1
         queryAnalysisWriterIntervalSecs: 1
         queryAnalysisSamplerConfigurationRefreshSecs: 1
-        reshardingVerificationChangeStreamsEventsBatchSize: 25
     num_rs_nodes_per_shard: 3
     num_shards: 2
     num_mongos: 2

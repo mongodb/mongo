@@ -44,19 +44,12 @@ assert.commandWorked(inputCollection.insert([
 const mongos = inputCollection.getMongo();
 const recipientShardNames = reshardingTest.recipientShardNames;
 
-const reshardingOptions = {
+reshardingTest.withReshardingInBackground({
     newShardKeyPattern: {newKey: 1},
     newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
-};
-const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
-if (!isMultiversion) {
-    // TODO (SERVER-100668): Make sure that the change streams cursor is closed when there is an
-    // interrupt.
-    reshardingOptions.performVerification = false;
-}
-
-reshardingTest.withReshardingInBackground(
-    reshardingOptions, () => {}, {expectedErrorCode: ErrorCodes.DuplicateKey});
+},
+                                          () => {},
+                                          {expectedErrorCode: ErrorCodes.DuplicateKey});
 
 const timeout = 5000;
 assert.soon(() => {
@@ -67,7 +60,7 @@ assert.soon(() => {
                             ])
                             .toArray();
     if (idleCursors.length > 0) {
-        jsTest.log("Found idle cursors: " + tojson(idleCursors));
+        jsonTestLog(idleCursors);
     }
     return idleCursors.length == 0;
 }, "timed out awaiting cloning cursors to be cleaned up", timeout);
