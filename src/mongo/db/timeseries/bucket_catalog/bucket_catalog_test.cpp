@@ -154,6 +154,9 @@ protected:
     void _testUseAlternateBucketSkipsConflictingBucket(
         std::function<void(BucketCatalog&, Bucket&)>);
 
+    void _testBucketMetadataFieldOrdering(const BSONObj& inputMetadata,
+                                          const BSONObj& expectedMetadata);
+
     std::vector<BSONObj> _generateMeasurementsWithRolloverReason(RolloverReason reason) const;
 
     void _testStageInsertBatchIntoEligibleBucket(std::vector<BSONObj> batchOfMeasurements,
@@ -602,6 +605,18 @@ void BucketCatalogTest::_testUseAlternateBucketSkipsConflictingBucket(
                                            time));
 }
 
+void BucketCatalogTest::_testBucketMetadataFieldOrdering(const BSONObj& inputMetadata,
+                                                         const BSONObj& expectedMetadata) {
+    auto swBucketKeyAndTime = internal::extractBucketingParameters(
+        getTrackingContext(_bucketCatalog->trackingContexts, TrackingScope::kOpenBucketsByKey),
+        UUID::gen(),
+        _getTimeseriesOptions(_ns1),
+        BSON(_timeField << Date_t::now() << _metaField << inputMetadata));
+    ASSERT_OK(swBucketKeyAndTime);
+
+    auto metadata = swBucketKeyAndTime.getValue().first.metadata.toBSON();
+    ASSERT_EQ(metadata.woCompare(BSON(_metaField << expectedMetadata)), 0);
+}
 // _generateMeasurementsWithRolloverReason enables us to easily get measurement vectors that have
 // the input RolloverReason.
 std::vector<BSONObj> BucketCatalogTest::_generateMeasurementsWithRolloverReason(
@@ -2772,6 +2787,15 @@ TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverkSche
                                             currBatchedInsertContextsIndex,
                                             numMeasurementsInWriteBatch,
                                             1 /* numBatchedInsertContexts */);
+}
+
+TEST_F(BucketCatalogTest, BucketMetadataNormalization) {
+    _testBucketMetadataFieldOrdering(BSON("a" << 1 << "b" << 1), BSON("a" << 1 << "b" << 1));
+    _testBucketMetadataFieldOrdering(BSON("b" << 1 << "a" << 1), BSON("a" << 1 << "b" << 1));
+    _testBucketMetadataFieldOrdering(BSON("nested" << BSON("a" << 1 << "b" << 1)),
+                                     BSON("nested" << BSON("a" << 1 << "b" << 1)));
+    _testBucketMetadataFieldOrdering(BSON("nested" << BSON("b" << 1 << "a" << 1)),
+                                     BSON("nested" << BSON("a" << 1 << "b" << 1)));
 }
 
 
