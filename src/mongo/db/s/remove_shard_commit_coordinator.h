@@ -89,6 +89,18 @@ private:
     void _commitRemoveShard(OperationContext* opCtx,
                             std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
+    // Allows ddl operations to resume in the cluster.
+    void _resumeDDLOperations(OperationContext* opCtx);
+
+    // TODO (SERVER-99433) Remove once replica set endpoint is fully discontinued.
+    // Updates the "hasTwoOrMoreShard" cluster cardinality parameter if this shard removal leaves
+    // only one shard in the cluster and the coordinator was started with the parameter
+    // `shouldUpdateClusterCardinality` set to true.
+    void _updateClusterCardinalityParameterIfNeeded(OperationContext* opCtx);
+
+    // Sets the result of the remove shard and logs the completion.
+    void _finalizeShardRemoval(OperationContext* opCtx);
+
     // Set on successful completion of the coordinator.
     boost::optional<RemoveShardProgress> _result;
 };

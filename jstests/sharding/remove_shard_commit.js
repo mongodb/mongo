@@ -14,6 +14,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardTransitionUtil} from "jstests/libs/shard_transition_util.js";
 import {getShardNames} from "jstests/libs/sharded_cluster_fixture_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {checkClusterParameter} from "jstests/sharding/libs/cluster_cardinality_parameter_util.js";
 
 const dbName = 'test';
 const collName = 'foo';
@@ -43,7 +44,7 @@ function moveAllChunksOffShard(st, shardName, otherShard) {
     });
 }
 
-const st = new ShardingTest({shards: 2});
+const st = new ShardingTest({shards: 3});
 let isConfigShard = TestData.configShard;
 
 // Setup a sharded collection with a chunk on the first shard (this is the config shard in an
@@ -96,17 +97,29 @@ if (isConfigShard) {
 
 // If we are in the config shard scenario, the range deletions are now cleaned up. If we are not
 // in the config shard scenario, we should ignore the range deletions.
-jsTest.log("Test that the coordinator will commit the shard removal and bump the topology time.");
+jsTest.log(
+    "Test that the coordinator will commit the shard removal, bump the topology time, and unblock DDLs.");
 let initialTopologyTime = getTopologyTime(st);
 let shardName = st.shard0.shardName;
-assert.commandFailedWithCode(
-    st.configRS.getPrimary().adminCommand(
-        {_configsvrRemoveShardCommit: st.shard0.shardName, writeConcern: {w: "majority"}}),
-    ErrorCodes.NotImplemented);
+assert.commandWorked(st.configRS.getPrimary().adminCommand(
+    {_configsvrRemoveShardCommit: st.shard0.shardName, writeConcern: {w: "majority"}}));
 
 let finalTopologyTime = getTopologyTime(st);
 assert(!getShardNames(st.s).includes(shardName));
 assert.gt(timestampCmp(finalTopologyTime, initialTopologyTime), 0);
+
+assert.commandWorked(st.s.adminCommand({shardCollection: "test.dummyColl", key: {x: 1}}));
+
+checkClusterParameter(st.configRS, true);
+
+jsTest.log("Remove another shard and check the cluster cardinality parameter");
+assert.commandWorked(st.configRS.getPrimary().adminCommand(
+    {_configsvrRemoveShardCommit: st.shard1.shardName, writeConcern: {w: "majority"}}));
+
+// If replica set endpoint is enabled, we should drop the cluster cardinality parameter after
+// removing the second shard.
+let expectedValue = TestData.testingReplicaSetEndpoint ? false : true;
+checkClusterParameter(st.configRS, expectedValue);
 
 rangeDeletionFailpoint.off();
 st.stop();

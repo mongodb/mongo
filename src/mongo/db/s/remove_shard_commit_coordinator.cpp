@@ -30,6 +30,7 @@
 #include "mongo/db/s/remove_shard_commit_coordinator.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/s/remove_shard_exception.h"
+#include "mongo/db/s/sharding_logging.h"
 
 #include "mongo/db/s/topology_change_helpers.h"
 
@@ -67,18 +68,16 @@ ExecutorFuture<void> RemoveShardCommitCoordinator::_runImpl(
 
                                      _commitRemoveShard(opCtx, executor);
                                  }))
-        .then([this, anchor = shared_from_this()] {
-            const auto opCtxHolder = cc().makeOperationContext();
-            auto* opCtx = opCtxHolder.get();
-            getForwardableOpMetadata().setOn(opCtx);
+        .then(_buildPhaseHandler(Phase::kResumeDDLs,
+                                 [this, executor = executor, anchor = shared_from_this()] {
+                                     const auto opCtxHolder = cc().makeOperationContext();
+                                     auto* opCtx = opCtxHolder.get();
+                                     getForwardableOpMetadata().setOn(opCtx);
 
-            // TODO (SERVER-97827): remove once there is an actual phase which unblocks the
-            // coordinators along the happy path.
-            topology_change_helpers::unblockDDLCoordinators(opCtx);
-
-            uasserted(ErrorCodes::NotImplemented,
-                      "The removeShardCommit coordinator is still incomplete.");
-        })
+                                     _resumeDDLOperations(opCtx);
+                                     _updateClusterCardinalityParameterIfNeeded(opCtx);
+                                     _finalizeShardRemoval(opCtx);
+                                 }))
         .onError([this, anchor = shared_from_this()](const Status& status) {
             if (_doc.getPhase() < Phase::kStopDDLsAndCleanupData) {
                 return status;
@@ -88,7 +87,7 @@ ExecutorFuture<void> RemoveShardCommitCoordinator::_runImpl(
             auto* opCtx = opCtxHolder.get();
             getForwardableOpMetadata().setOn(opCtx);
 
-            if (!_isRetriableErrorForDDLCoordinator(status)) {
+            if (!_mustAlwaysMakeProgress() && !_isRetriableErrorForDDLCoordinator(status)) {
                 triggerCleanup(opCtx, status);
             }
 
@@ -106,7 +105,7 @@ ExecutorFuture<void> RemoveShardCommitCoordinator::_cleanupOnAbort(
             auto* opCtx = opCtxHolder.get();
             getForwardableOpMetadata().setOn(opCtx);
 
-            topology_change_helpers::unblockDDLCoordinators(opCtx);
+            _resumeDDLOperations(opCtx);
         });
 }
 
@@ -194,6 +193,41 @@ void RemoveShardCommitCoordinator::_commitRemoveShard(
         // Don't remove the config shard's RSM because it is used to target the config server.
         ReplicaSetMonitor::remove(_doc.getReplicaSetName().toString());
     }
+}
+
+void RemoveShardCommitCoordinator::_resumeDDLOperations(OperationContext* opCtx) {
+    // Note that we do not attach session information here because the block of DDL coordinators is
+    // done via a cluster parameter and so the only remote write commands are run as part of that
+    // coordinator which is responsible for handling the replay protection of those updates.
+    topology_change_helpers::unblockDDLCoordinators(opCtx);
+}
+
+void RemoveShardCommitCoordinator::_updateClusterCardinalityParameterIfNeeded(
+    OperationContext* opCtx) {
+    // Only update the parameter if the coordinator was started with
+    // `shouldUpdateClusterCardinality` set to true.
+    if (!_doc.getShouldUpdateClusterCardinality())
+        return;
+
+    // Call the helper which acquires the clusterCardinalityParameterLock so we don't need to expose
+    // that mutex. This may issue an additional setClusterParameter command when the number of
+    // shards is 2, but as this should be a noop (and we don't expect this path to be taken anyways)
+    // this is ok.
+    uassertStatusOK(
+        ShardingCatalogManager::get(opCtx)->updateClusterCardinalityParameterIfNeeded(opCtx));
+}
+
+void RemoveShardCommitCoordinator::_finalizeShardRemoval(OperationContext* opCtx) {
+    _result = RemoveShardProgress(ShardDrainingStateEnum::kCompleted);
+    // Record finish in changelog
+    auto catalogManager = ShardingCatalogManager::get(opCtx);
+    ShardingLogging::get(opCtx)->logChange(opCtx,
+                                           "removeShard",
+                                           NamespaceString::kEmpty,
+                                           BSON("shard" << _doc.getShardId().toString()),
+                                           ShardingCatalogClient::kLocalWriteConcern,
+                                           catalogManager->localConfigShard(),
+                                           catalogManager->localCatalogClient());
 }
 
 RemoveShardProgress RemoveShardCommitCoordinator::getResult(OperationContext* opCtx) {

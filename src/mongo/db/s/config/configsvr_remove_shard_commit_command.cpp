@@ -27,9 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/s/remove_shard_commit_coordinator.h"
 #include "mongo/db/s/remove_shard_draining_progress_gen.h"
 #include "mongo/db/s/remove_shard_exception.h"
+#include "mongo/db/s/replica_set_endpoint_feature_flag.h"
 #include "mongo/db/s/topology_change_helpers.h"
 #include "mongo/s/request_types/remove_shard_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
@@ -78,12 +80,17 @@ public:
                 return std::make_pair(shard->getId(), shard->getConnString().getReplicaSetName());
             }();
 
-            auto removeShardCommitCoordinator =
-                [&, shardId = shardId, replicaSetName = replicaSetName]() {
+            const auto removeShardCommitCoordinator =
+                [&, shardId = shardId, replicaSetName = replicaSetName] {
+                    // Required for check of replica set endpoint feature flag.
+                    FixedFCVRegion fcvRegion(opCtx);
+
                     auto coordinatorDoc = RemoveShardCommitCoordinatorDocument();
                     coordinatorDoc.setShardId(shardId);
                     coordinatorDoc.setReplicaSetName(replicaSetName);
                     coordinatorDoc.setIsTransitionToDedicated(shardId == ShardId::kConfigServerId);
+                    coordinatorDoc.setShouldUpdateClusterCardinality(
+                        replica_set_endpoint::isFeatureFlagEnabled());
                     coordinatorDoc.setShardingDDLCoordinatorMetadata(
                         {{NamespaceString::kConfigsvrShardsNamespace,
                           DDLCoordinatorTypeEnum::kRemoveShardCommit}});
