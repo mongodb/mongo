@@ -398,6 +398,12 @@ std::vector<std::pair<stats::SBEValue, stats::SBEValue>> generateIntervals(
             // re-running values the same values if the number of queries is larger than the size of
             // the interval.
             auto ndv = interval.second - interval.first;
+            if (queryTypeInfo.typeTag == sbe::value::TypeTags::StringSmall ||
+                queryTypeInfo.typeTag == sbe::value::TypeTags::StringBig) {
+                // Because 'interval' for strings is too small for 'ndv', set 'ndv' to
+                // 'numberOfQueries' to ensure there are enough distinct values.
+                ndv = numberOfQueries;
+            }
             generateDataUniform(
                 numberOfQueries, interval, {queryTypeInfo}, seedQueriesLow, ndv, sbeValLow);
             break;
@@ -411,6 +417,12 @@ std::vector<std::pair<stats::SBEValue, stats::SBEValue>> generateIntervals(
             // re-running values the same values if the number of queries is larger than the size of
             // the interval.
             auto ndv = intervalLow.second - intervalLow.first;
+            if (queryTypeInfo.typeTag == sbe::value::TypeTags::StringSmall ||
+                queryTypeInfo.typeTag == sbe::value::TypeTags::StringBig) {
+                // Because 'interval' for strings is too small for 'ndv', set 'ndv' to
+                // 'numberOfQueries' to ensure there are enough distinct values.
+                ndv = numberOfQueries;
+            }
             generateDataUniform(
                 numberOfQueries, intervalLow, {queryTypeInfo}, seedQueriesLow, ndv, sbeValLow);
 

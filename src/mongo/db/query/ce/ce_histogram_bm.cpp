@@ -158,9 +158,16 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
     std::vector<stats::SBEValue> data;
     const size_t seedData = 1724178214;
     const size_t seedQueries = 2431475868;
-    const int numberOfQueries = 100;
+    const int numberOfQueries = 10000;
 
     auto ndv = (configuration.dataInterval.second - configuration.dataInterval.first) / 2;
+    if (configuration.sbeDataType == sbe::value::TypeTags::StringSmall ||
+        configuration.sbeDataType == sbe::value::TypeTags::StringBig) {
+        // 'dataInterval' for strings is too small for 'ndv' as it represents string lengths. So we
+        // set 'ndv' to a larger number to ensure we have enough distinct values for histograms to
+        // partition buckets.
+        ndv = numberOfQueries;
+    }
 
     // Create one by one the values.
     switch (configuration.dataDistribution) {
