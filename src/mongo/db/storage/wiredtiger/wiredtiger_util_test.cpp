@@ -1152,7 +1152,7 @@ TEST_F(WiredTigerUtilTest, DropWithConflictingDHandle) {
     Status status = wtRCToStatus(ret, wtSession);
 
     ASSERT_EQUALS(EBUSY, ret);
-    ASSERT_EQUALS(ErrorCodes::ConflictingOperationInProgress, status);
+    ASSERT_EQUALS(ErrorCodes::ObjectIsBusy, status);
 
     int err, sub_level_err;
     const char* err_msg;
@@ -1190,10 +1190,11 @@ TEST_F(WiredTigerUtilTest, DropWithUncommittedData) {
     Status status = wtRCToStatus(ret, wtSession);
 
     ASSERT_EQUALS(EBUSY, ret);
-    ASSERT_EQUALS(ErrorCodes::OngoingTransaction, status);
+    ASSERT_EQUALS(ErrorCodes::ObjectIsBusy, status);
 
-    int err, sub_level_err;
-    const char* err_msg;
+    int err = 0;
+    int sub_level_err = WT_NONE;
+    const char* err_msg = "";
     wtSession.get_last_error(&err, &sub_level_err, &err_msg);
 
     ASSERT_EQUALS(WT_UNCOMMITTED_DATA, sub_level_err);
@@ -1225,17 +1226,20 @@ TEST_F(WiredTigerUtilTest, DropWithDirtyData) {
     ASSERT_EQUALS(0, cursor->close(cursor));
 
     // The transaction takes time to be committed to disk, so we may get
-    // ErrorCodes::UncheckpointedData if it is still committing in WT. In this case we should sleep,
-    // then retry with increasing sleep time.
+    // the sub-level error code WT_UNCOMMITTED_DATA if it is still committing in WT. In this case we
+    // should sleep, then retry with increasing sleep time.
     int tryCount = 1;
     const int kRetryLimit = 5;
     do {
         sleepsecs(tryCount);
         int ret = wtSession.drop(uri.c_str(), nullptr);
-        Status status = wtRCToStatus(ret, wtSession);
 
-        // We can get ErrorCodes::OngoingTransaction if WT is still committing, so we retry.
-        if (status == ErrorCodes::OngoingTransaction) {
+        int err = 0;
+        int sub_level_err = WT_NONE;
+        const char* err_msg = "";
+        wtSession.get_last_error(&err, &sub_level_err, &err_msg);
+
+        if (sub_level_err == WT_UNCOMMITTED_DATA) {
             ++tryCount;
             continue;
         }
@@ -1243,12 +1247,6 @@ TEST_F(WiredTigerUtilTest, DropWithDirtyData) {
         // We should expect this drop to fail because the data has been committed
         // but not checkpointed.
         ASSERT_EQUALS(EBUSY, ret);
-        ASSERT_EQUALS(ErrorCodes::UncheckpointedData, status);
-
-        int err, sub_level_err;
-        const char* err_msg;
-        wtSession.get_last_error(&err, &sub_level_err, &err_msg);
-
         ASSERT_EQUALS(WT_DIRTY_DATA, sub_level_err);
         ASSERT_EQUALS("the table has dirty data and can not be dropped yet"_sd,
                       StringData(err_msg));

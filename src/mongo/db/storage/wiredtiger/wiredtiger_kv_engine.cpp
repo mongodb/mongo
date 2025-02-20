@@ -1850,7 +1850,7 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
     Status status = _drop(session, uri.c_str(), "checkpoint_wait=false");
     LOGV2_DEBUG(22338, 1, "WT drop", "uri"_attr = uri, "status"_attr = status);
 
-    if (isBusy(status)) {
+    if (status == ErrorCodes::ObjectIsBusy) {
         return status;
     }
     if (MONGO_unlikely(WTDropEBUSY.shouldFail())) {
@@ -1868,12 +1868,7 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
         onDrop();
     }
 
-    if (status == ErrorCodes::NoSuchFile) {
-        // Ident doesn't exist, it is effectively dropped.
-        return Status::OK();
-    }
-    invariant(status);
-    return Status::OK();
+    return status;
 }
 
 void WiredTigerKVEngine::dropIdentForImport(Interruptible& interruptible,
@@ -1913,11 +1908,7 @@ void WiredTigerKVEngine::dropIdentForImport(Interruptible& interruptible,
                       "uri"_attr = uri,
                       "config"_attr = config,
                       "status"_attr = dropStatus);
-    } while (KVEngine::isBusy(dropStatus));
-    if (dropStatus == ErrorCodes::NoSuchFile) {
-        // If the ident doesn't exist then it has already been dropped.
-        return;
-    }
+    } while (dropStatus == ErrorCodes::ObjectIsBusy);
     invariant(dropStatus);
 }
 
@@ -2974,19 +2965,37 @@ Status WiredTigerKVEngine::autoCompact(RecoveryUnit& ru, const AutoCompactOption
 }
 
 Status WiredTigerKVEngine::_drop(WiredTigerSession& session, const char* uri, const char* config) {
-    Status status = wtRCToStatus(session.drop(uri, config), session);
+    int ret = session.drop(uri, config);
 
-    // If we failed due to uncheckpointed data, checkpoint and retry the operation so that it will
-    // attempt to clean up the dirty elements during checkpointing, thus allowing the operation to
-    // succeed if it was the only reason to fail.
-    if (status == ErrorCodes::UncheckpointedData) {
-        _checkpoint(session);
-        status = wtRCToStatus(session.drop(uri, config), session);
+    // If ident doesn't exist, it is effectively dropped.
+    if (ret == 0 || ret == ENOENT) {
+        return Status::OK();
     }
 
-    // TODO: SERVER-100390 add dump and debug info if we the drop failed.
+    int err = 0;
+    int sub_level_err = WT_NONE;
+    const char* err_msg = "";
 
-    return status;
+    session.get_last_error(&err, &sub_level_err, &err_msg);
+
+    // We should never run into these situations when we are already in the process of dropping the
+    // table.
+    // TODO: SERVER-100890 Re-enable this invariant once we have fixed the bug that causes this to
+    // fail.
+    // invariant(sub_level_err != WT_UNCOMMITTED_DATA);
+    invariant(sub_level_err != WT_CONFLICT_TABLE_LOCK);
+    invariant(sub_level_err != WT_CONFLICT_SCHEMA_LOCK);
+
+    // If we failed due to uncheckpointed data, checkpoint and retry the operation so that
+    // it will attempt to clean up the dirty elements during checkpointing, thus allowing
+    // the operation to succeed if it was the only reason to fail.
+    if (sub_level_err == WT_DIRTY_DATA) {
+        // Checkpoint and retry.
+        _checkpoint(session);
+        ret = session.drop(uri, config);
+    }
+    // TODO: SERVER-100390 add dump and debug info if the drop failed here.
+    return wtRCToStatus(ret, session);
 }
 
 }  // namespace mongo

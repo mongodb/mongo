@@ -168,15 +168,6 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
         if (sub_level_err == WT_BACKGROUND_COMPACT_ALREADY_RUNNING) {
             return Status(ErrorCodes::AlreadyInitialized, s);
         }
-        if (sub_level_err == WT_DIRTY_DATA) {
-            return Status(ErrorCodes::UncheckpointedData, s);
-        }
-        if (sub_level_err == WT_UNCOMMITTED_DATA) {
-            return Status(ErrorCodes::OngoingTransaction, s);
-        }
-        if (sub_level_err == WT_CONFLICT_DHANDLE) {
-            return Status(ErrorCodes::ConflictingOperationInProgress, s);
-        }
 
         // Return OK when we have an unhandled sublevel error code.
         return Status::OK();
@@ -214,9 +205,6 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
     }
     if (retCode == EBUSY) {
         return Status(ErrorCodes::ObjectIsBusy, s);
-    }
-    if (retCode == ENOENT) {
-        return Status(ErrorCodes::NoSuchFile, s);
     }
 
     uassert(ErrorCodes::ExceededMemoryLimit, s, retCode != WT_CACHE_FULL);

@@ -220,7 +220,7 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
                                              ident::isCollectionIdent(identName),
                                              identInfo->onDrop);
             if (!status.isOK()) {
-                if (KVEngine::isBusy(status)) {
+                if (status == ErrorCodes::ObjectIsBusy) {
                     LOGV2_PROD_ONLY(6936300,
                                     "Drop-pending ident is still in use",
                                     "ident"_attr = identName,

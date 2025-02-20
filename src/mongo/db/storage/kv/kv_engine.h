@@ -547,16 +547,6 @@ public:
     }
 
     /**
-     * Returns if the status is related to an error due to being busy.
-     */
-    static bool isBusy(Status status) {
-        return status == ErrorCodes::UncheckpointedData ||
-            status == ErrorCodes::OngoingTransaction ||
-            status == ErrorCodes::ConflictingOperationInProgress ||
-            status == ErrorCodes::ObjectIsBusy;
-    }
-
-    /**
      * The destructor will never be called from mongod, but may be called from tests.
      * Engines may assume that this will only be called in the case of clean shutdown, even if
      * cleanShutdown() hasn't been called.
