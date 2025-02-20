@@ -667,10 +667,6 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecuto
         std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> pipelines;
         // Any pipeline that relies on calls to mongot requires additional setup.
         if (search_helpers::isMongotPipeline(pipeline.get())) {
-            uassert(6253506,
-                    "Cannot have exchange specified in a search pipeline",
-                    !aggExState.getRequest().getExchange());
-
             // Release locks early, before we generate the search pipeline, so that we don't hold
             // them during network calls to mongot. This is fine for search pipelines since they are
             // not reading any local (lock-protected) data in the main pipeline.
@@ -1003,6 +999,18 @@ StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> preparePipeline(
                                        aggExState.getRequest().getEncryptionInformation().value(),
                                        std::move(pipeline));
         aggExState.getRequest().getEncryptionInformation()->setCrudProcessed(true);
+    }
+
+    if (search_helpers::isMongotPipeline(pipeline.get())) {
+        // Before preparing the pipeline executor, we need to do dependency analysis to validate
+        // the metadata dependencies.
+        // TODO SERVER-40900 Consider performing $meta validation for all queries at this point
+        // before optimization.
+        pipeline->validateMetaDependencies();
+
+        uassert(6253506,
+                "Cannot have exchange specified in a search pipeline",
+                !aggExState.getRequest().getExchange());
     }
 
     pipeline->optimizePipeline();

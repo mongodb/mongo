@@ -77,6 +77,18 @@ public:
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
+    DepsTracker::State getDependencies(DepsTracker* deps) const override {
+        // This stage doesn't currently support tracking field dependencies since mongot is
+        // responsible for determining what fields to return. We do need to track metadata
+        // dependencies though, so downstream stages know they are allowed to access "searchScore"
+        // metadata.
+        // TODO SERVER-101100 Implement logic for dependency analysis.
+
+        deps->setMetadataAvailable(DocumentMetadataFields::kSearchScore);
+
+        return DepsTracker::State::NOT_SUPPORTED;
+    }
+
     static const Id& id;
 
     Id getId() const override {

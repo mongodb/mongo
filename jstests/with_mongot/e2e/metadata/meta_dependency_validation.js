@@ -133,8 +133,13 @@ const MetaFields = Object.freeze({
         shouldBeValidated: true,
         debugName: "sortKey",
         validSortKey: false,
-        firstStageRequired:
-            [FirstStageOptions.SORT, FirstStageOptions.GEO_NEAR, FirstStageOptions.SCORE]
+        firstStageRequired: [
+            FirstStageOptions.SORT,
+            FirstStageOptions.GEO_NEAR,
+            FirstStageOptions.SCORE,
+            FirstStageOptions.SEARCH,
+            FirstStageOptions.VECTOR_SEARCH
+        ]
     },
     SEARCH_SCORE_DETAIS: {
         name: "searchScoreDetails",
@@ -223,36 +228,21 @@ function shouldQuerySucceed(metaField, firstStage, metaReferencingStageName) {
         return true;
     }
 
-    // TODO SERVER-100404: There is some inconsistent behavior on sharded collections, identified
-    // here. In summary, if you have a query with a $sort but no $geoNear on a sharded collection,
-    // then try to reference $geoNear-related metadata from within a $project or $group (but not
-    // $sort), the query will not throw an error as expected.
-    if (isSharded &&
-        ((metaField === MetaFields.GEO_NEAR_PT || metaField === MetaFields.GEO_NEAR_DIST) &&
-         firstStage === FirstStageOptions.SORT && metaReferencingStageName !== "$sort")) {
-        return true;
-    }
-
-    // TODO SERVER-100404: $meta: "score" should be allowed to access "searchScore" and
-    // "vectorSearchScore" on sharded collections.
-    if (isSharded && metaField === MetaFields.SCORE &&
-        (firstStage === FirstStageOptions.SEARCH ||
-         firstStage === FirstStageOptions.VECTOR_SEARCH)) {
-        return false;
-    }
-
-    // TODO SERVER-100394: We should make meta field validation take place when $search or
-    // $vectorSearch is the first stage, but for now it's skipped.
-    if (firstStage === FirstStageOptions.SEARCH || firstStage === FirstStageOptions.VECTOR_SEARCH) {
-        // This is a very specific edge case that's inconsistent but actually is the proper
-        // behavior. Even though validation is typically skipped on $search queries for now, a
-        // sharded $search query will perform validation for references to "textScore". Once
-        // SERVER-100394 is done, all $search cases should follow suit.
-        if (isSharded && metaField === MetaFields.TEXT_SCORE) {
-            return false;
+    // There is some inconsistent behavior for $geoNear-related metadata.
+    if (metaField === MetaFields.GEO_NEAR_PT || metaField === MetaFields.GEO_NEAR_DIST) {
+        // TODO SERVER-100404: If you have a query with a $sort but no $geoNear on a sharded
+        // collection, then try to reference $geoNear-related metadata from within a $project or
+        // $group (but not $sort), the query will not throw an error as expected.
+        if (isSharded && firstStage === FirstStageOptions.SORT &&
+            metaReferencingStageName !== "$sort") {
+            return true;
         }
 
-        return true;
+        // TODO SERVER-99965 Mongot queries skip validation for "geoNearDist" and "geoNearPoint".
+        if (firstStage === FirstStageOptions.SEARCH ||
+            firstStage === FirstStageOptions.VECTOR_SEARCH) {
+            return true;
+        }
     }
 
     // TODO SERVER-100402: {$meta: "sortKey"} referenced under a $group currently succeeds, even if

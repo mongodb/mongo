@@ -78,6 +78,17 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
+    DepsTracker::State getDependencies(DepsTracker* deps) const final {
+        // This stage doesn't currently support tracking field dependencies since mongot is
+        // responsible for determining what fields to return. We do need to track metadata
+        // dependencies though, so downstream stages know they are allowed to access
+        // "vectorSearchScore" metadata.
+        // TODO SERVER-101100 Implement logic for dependency analysis.
+
+        deps->setMetadataAvailable(DocumentMetadataFields::kVectorSearchScore);
+        return DepsTracker::State::NOT_SUPPORTED;
+    }
+
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
         auto expCtx = newExpCtx ? newExpCtx : pExpCtx;

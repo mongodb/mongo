@@ -43,9 +43,6 @@ bool isScoreStage(const boost::intrusive_ptr<DocumentSource>& stage);
 
 /**
  * Checks if this pipeline will generate score metadata.
- *
- * TODO SERVER-100394 This custom logic should be able to be replaced by using DepsTracker to
- * walk the pipeline and see if "score" metadata is produced.
  */
 bool isScoredPipeline(const Pipeline& pipeline);
 

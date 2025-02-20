@@ -628,6 +628,13 @@ DepsTracker::State DocumentSourceMatch::getDependencies(const MatchExpression* e
         // A $text aggregation field should return EXHAUSTIVE_FIELDS, since we don't necessarily
         // know what field it will be searching without examining indices.
         deps->needWholeDocument = true;
+
+        // This may look confusing, but we must call two setters on the DepsTracker for different
+        // purposes. We mark "textScore" as available metadata that can be consumed by any
+        // downstream stage for $meta field validation. We also also mark that this stage does
+        // require "textScore" so that the executor knows to produce the metadata.
+        // TODO SERVER-100902 Split $meta validation out of dependency tracking.
+        deps->setMetadataAvailable(DocumentMetadataFields::kTextScore);
         deps->setNeedsMetadata(DocumentMetadataFields::kTextScore);
         return DepsTracker::State::EXHAUSTIVE_FIELDS;
     }

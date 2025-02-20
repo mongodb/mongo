@@ -785,6 +785,17 @@ DepsTracker Pipeline::getDependenciesForContainer(
     return deps;
 }
 
+// TODO SERVER-100902 Split $meta validation out of DepsTracker.
+void Pipeline::validateMetaDependencies(QueryMetadataBitSet availableMetadata) const {
+    // TODO SERVER-35424 / SERVER-99965 Right now we don't validate geo near metadata here, so
+    // we mark it as available. We should implement better dependency tracking for $geoNear.
+    availableMetadata |= DepsTracker::kAllGeoNearData;
+
+    // We can ignore the return value since we're only concerned that the pipeline has been
+    // validated.
+    (void)getDependenciesForContainer(getContext(), _sources, availableMetadata);
+}
+
 Status Pipeline::canRunOnRouter() const {
     for (auto&& stage : _sources) {
         auto constraints = stage->constraints(_splitState);

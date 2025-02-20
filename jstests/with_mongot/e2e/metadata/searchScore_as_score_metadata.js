@@ -3,8 +3,7 @@
  * and that the "vector search score" metadata (previously known as 'vectorSearchScore') in
  * $vectorSearch pipelines are both accessible by the 'score' metadata field.
  *
- * TODO SERVER-100404: Re-enable this for sharded queries.
- * @tags: [ assumes_unsharded_collection, featureFlagRankFusionFull, requires_fcv_81 ]
+ * @tags: [ featureFlagRankFusionFull, requires_fcv_81 ]
  */
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";

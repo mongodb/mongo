@@ -115,7 +115,11 @@ public:
      * shards pipeline, until a stage needs to be split.
      */
     PipelineSplitter& split() {
-        _prepopulateTextScoreMetadata();
+        // Before splitting the pipeline, we need to do dependency analysis to validate if we have
+        // text score metadata. This is because the planner will not have any way of knowing
+        // whether the split half provides this metadata after shards are targeted, because the
+        // shard executing the merging half only sees a $mergeCursors stage.
+        _splitPipeline.mergePipeline->validateMetaDependencies();
 
         // We will move stages one by one from the merging half to the shards, as possible.
         _findSplitPoint();
@@ -463,25 +467,6 @@ private:
             BSON("$project" << mergeDeps.toProjectionWithoutMetadata()).firstElement(),
             _splitPipeline.shardsPipeline->getContext());
         _splitPipeline.shardsPipeline->pushBack(project);
-    }
-
-    /**
-     * Before splitting the pipeline, we need to do dependency analysis to validate if we have
-     * text score metadata. This is because the planner will not have any way of knowing
-     * whether the split half provides this metadata after shards are targeted, because the
-     * shard executing the merging half only sees a $mergeCursors stage.
-     */
-    void _prepopulateTextScoreMetadata() const {
-        auto queryObj = _splitPipeline.mergePipeline->getInitialQuery();
-        auto availableMetadata = DocumentSourceMatch::isTextQuery(queryObj)
-            ? DepsTracker::kOnlyTextScore
-            : DepsTracker::kNoMetadata;
-
-
-        // TODO SERVER-35424 / SERVER-100404 Right now we don't validate geo near metadata here, so
-        // we mark it as available. We should implement better dependency tracking for $geoNear.
-        availableMetadata |= DepsTracker::kAllGeoNearData;
-        (void)_splitPipeline.mergePipeline->getDependencies(availableMetadata);
     }
 
     /**
