@@ -355,7 +355,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     std::stringstream ss;
     ss << "create,";
     ss << "cache_size=" << cacheSizeMB << "M,";
-    ss << "session_max=33000,";
+    ss << "session_max=" << gWiredTigerSessionMax << ",";
     ss << "eviction=(threads_min=4,threads_max=4),";
 
     if (gWiredTigerEvictionDirtyTargetGB)

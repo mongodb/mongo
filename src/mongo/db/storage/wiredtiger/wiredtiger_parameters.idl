@@ -100,6 +100,16 @@ server_parameters:
         validator:
           lte: 0
         redact: false
+    
+    wiredTigerSessionMax:
+        description: 'WiredTiger session max'
+        set_at: startup
+        cpp_vartype: int32_t
+        cpp_varname: gWiredTigerSessionMax
+        default: 33000
+        validator:
+          gte: 1
+        redact: false
 
     wiredTigerEvictionDirtyTargetGB:
       description: >-
