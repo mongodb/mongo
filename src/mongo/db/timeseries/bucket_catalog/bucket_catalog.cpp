@@ -764,6 +764,52 @@ StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catal
     return {std::make_pair(std::move(insertContext), std::move(time))};
 }
 
+std::vector<Bucket*> findAndRolloverOpenBuckets(BucketCatalog& catalog,
+                                                Stripe& stripe,
+                                                WithLock stripeLock,
+                                                const BucketKey& bucketKey,
+                                                const Date_t& time,
+                                                const Seconds& bucketMaxSpanSeconds) {
+    std::vector<Bucket*> potentialBuckets;
+    auto openBuckets = internal::findOpenBuckets(stripe, stripeLock, bucketKey);
+    Bucket* bucketWithoutRolloverAction = nullptr;
+    for (const auto& openBucket : openBuckets) {
+        switch (openBucket->rolloverAction) {
+            case RolloverAction::kNone:
+                if (internal::isBucketStateEligibleForInsertsAndCleanup(
+                        catalog, stripe, stripeLock, openBucket)) {
+                    // Only one uncleared open bucket is allowed for each key.
+                    invariant(bucketWithoutRolloverAction == nullptr);
+                    // Save the bucket with 'RolloverAction::kNone' to add it to the end of
+                    // 'potentialBuckets'.
+                    bucketWithoutRolloverAction = openBucket;
+                }
+                break;
+            case RolloverAction::kHardClose:
+                internal::rollover(
+                    catalog, stripe, stripeLock, *openBucket, openBucket->rolloverAction);
+                break;
+            case RolloverAction::kArchive:
+            case RolloverAction::kSoftClose:
+                auto bucketMinTime = openBucket->minTime;
+                if (time >= bucketMinTime && time - bucketMinTime < bucketMaxSpanSeconds &&
+                    internal::isBucketStateEligibleForInsertsAndCleanup(
+                        catalog, stripe, stripeLock, openBucket)) {
+                    // The time range and the state of the bucket are eligible.
+                    potentialBuckets.push_back(openBucket);
+                } else {
+                    internal::rollover(
+                        catalog, stripe, stripeLock, *openBucket, openBucket->rolloverAction);
+                }
+                break;
+        }
+    }
+    if (bucketWithoutRolloverAction) {
+        potentialBuckets.push_back(bucketWithoutRolloverAction);
+    }
+    return potentialBuckets;
+}
+
 StatusWith<tracking::unique_ptr<Bucket>> getReopenedBucket(
     OperationContext* opCtx,
     BucketCatalog& catalog,

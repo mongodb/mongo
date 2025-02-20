@@ -146,23 +146,30 @@ Bucket* useBucket(BucketCatalog& catalog,
                   const StringDataComparator* comparator);
 
 /**
- * Retrieve an open bucket from 'stripe' given a bucket key.
+ * Retrieve all open buckets from 'stripe' given a bucket key.
  */
-Bucket* findOpenBucket(BucketCatalog& catalog,
-                       Stripe& stripe,
-                       WithLock stripeLock,
-                       const BucketKey& bucketKey);
+std::vector<Bucket*> findOpenBuckets(Stripe& stripe,
+                                     WithLock stripeLock,
+                                     const BucketKey& bucketKey);
 
 /**
- * Check if a given bucket is eligible for new inserts.
- * Return true if the bucket can accept new inserts. Mark the bucket not idle.
- * Return false if the bucket is rolled over or has a state that conflicts with inserts. Clean up
- * the bucket from the catalog.
+ * Return true if a given bucket's state is eligible for new inserts. Otherwise, return false.
+ * Clean up the bucket from the catalog if there is a conflicting state.
  */
-bool checkBucketInsertEligibility(BucketCatalog& catalog,
-                                  Stripe& stripe,
-                                  WithLock stripeLock,
-                                  Bucket* bucket);
+bool isBucketStateEligibleForInsertsAndCleanup(BucketCatalog& catalog,
+                                               Stripe& stripe,
+                                               WithLock stripeLock,
+                                               Bucket* bucket);
+
+/**
+ * Rollover 'bucket' according to 'action' if the bucket does not contain uncommitted measurements.
+ * Mark the bucket's 'rolloverAction' otherwise.
+ */
+void rollover(BucketCatalog& catalog,
+              Stripe& stripe,
+              WithLock stripeLock,
+              Bucket& bucket,
+              RolloverAction action);
 
 /**
  * Retrieve a previously closed bucket for write use if one exists in the catalog. Considers buckets

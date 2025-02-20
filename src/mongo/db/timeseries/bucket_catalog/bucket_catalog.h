@@ -395,6 +395,22 @@ StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catal
                                                             const TimeseriesOptions& options,
                                                             const BSONObj& measurementDoc);
 
+/**
+ * Finds all buckets with 'bucketKey' by criteria in the following order:
+ *  - A bucket with RolloverAction::kSoftClose or RolloverAction::kArchive, and 'time' fits in
+ *    its time range. The bucket's state is eligible for insert. There may be many such buckets.
+ *  - A bucket with RolloverAction::kNone. The bucket's state is eligible for insert. There can be
+ *    at most one such bucket, and it will be the last entry in the returned vector if it exists.
+ * Rolls over buckets that don't satisfy the above requirements and cleans up buckets with states
+ * conflicting with insert.
+ */
+std::vector<Bucket*> findAndRolloverOpenBuckets(BucketCatalog& catalog,
+                                                Stripe& stripe,
+                                                WithLock stripeLock,
+                                                const BucketKey& bucketKey,
+                                                const Date_t& time,
+                                                const Seconds& bucketMaxSpanSeconds);
+
 using CompressAndWriteBucketFunc = std::function<void(
     OperationContext*, const bucket_catalog::BucketId&, const NamespaceString&, StringData)>;
 

@@ -288,33 +288,26 @@ Bucket* useBucketAndChangePreparedState(BucketStateRegistry& registry,
     return nullptr;
 }
 
-Bucket* findOpenBucket(BucketCatalog& catalog,
-                       Stripe& stripe,
-                       WithLock stripeLock,
-                       const BucketKey& bucketKey) {
+std::vector<Bucket*> findOpenBuckets(Stripe& stripe,
+                                     WithLock stripeLock,
+                                     const BucketKey& bucketKey) {
+    std::vector<Bucket*> openBuckets;
     if (const auto& it = stripe.openBucketsByKey.find(bucketKey);
         it != stripe.openBucketsByKey.end()) {
         const auto& openBucketSet = it->second;
         for (Bucket* openBucket : openBucketSet) {
-            return openBucket;
+            openBuckets.push_back(openBucket);
         }
     }
-    return nullptr;
+    return openBuckets;
 }
 
-bool checkBucketInsertEligibility(BucketCatalog& catalog,
-                                  Stripe& stripe,
-                                  WithLock stripeLock,
-                                  Bucket* bucket) {
-    if (bucket->rolloverAction != RolloverAction::kNone) {
-        return false;
-    }
-
+bool isBucketStateEligibleForInsertsAndCleanup(BucketCatalog& catalog,
+                                               Stripe& stripe,
+                                               WithLock stripeLock,
+                                               Bucket* bucket) {
     auto state = materializeAndGetBucketState(catalog.bucketStateRegistry, bucket);
     if (!state) {
-        // If state is missing, it was already aborted and is just waiting to be cleaned up after
-        // the prepared batch is resolved.
-        invariant(bucket->preparedBatch);
         return false;
     }
 
@@ -332,7 +325,6 @@ bool checkBucketInsertEligibility(BucketCatalog& catalog,
         return false;
     }
 
-    markBucketNotIdle(stripe, stripeLock, *bucket);
     return true;
 }
 
@@ -1431,6 +1423,28 @@ Bucket& rollover(BucketCatalog& catalog,
 
     return allocateBucket(
         catalog, stripe, stripeLock, key, timeseriesOptions, time, comparator, stats);
+}
+
+void rollover(BucketCatalog& catalog,
+              Stripe& stripe,
+              WithLock stripeLock,
+              Bucket& bucket,
+              RolloverAction action) {
+    invariant(action != RolloverAction::kNone);
+    if (allCommitted(bucket)) {
+        // The bucket does not contain any measurements that are yet to be committed, so we can take
+        // action now.
+        ExecutionStatsController stats = getExecutionStats(catalog, bucket.bucketId.collectionUUID);
+        if (action == RolloverAction::kArchive) {
+            archiveBucket(catalog, stripe, stripeLock, bucket, stats);
+        } else {
+            closeOpenBucket(catalog, stripe, stripeLock, bucket, stats);
+        }
+    } else {
+        // We must keep the bucket around until all measurements are committed, just mark
+        // the action we chose now so we know what to do when the last batch finishes.
+        bucket.rolloverAction = action;
+    }
 }
 
 std::pair<RolloverAction, RolloverReason> determineRolloverAction(
