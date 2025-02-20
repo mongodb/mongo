@@ -35,10 +35,8 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_type.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/assert.h"
 
@@ -723,14 +721,6 @@ TEST(InternalExprEqMatchExpression, CorrectlyMatchesArrayElement) {
     ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY("b" << 6))));
     ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(BSON("b" << 6)))));
     ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("a" << 1)));
-}
-
-TEST(InternalSchemaEqMatchExpression, DoesNotTraverseThroughAnArrayWithANumericalPathComponent) {
-    BSONObj operand = BSON("" << 5);
-    InternalExprEqMatchExpression eq("a.0.b"_sd, operand.firstElement());
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON("0" << BSON("b" << 5)))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON("0" << BSON("b" << 6)))));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(BSON("b" << 7)))));
 }
 
 TEST(InternalExprEqMatchExpression, CorrectlyMatchesNullElement) {
@@ -3317,128 +3307,6 @@ TEST(ExpressionBinDataSubTypeTest, DoesNotMatchString) {
                             << "str");
     InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::bdtCustom);
     ASSERT_FALSE(exec::matcher::matchesSingleElement(&type, notMatch["a"]));
-}
-
-TEST(InternalSchemaBinDataEncryptedTypeTest, DoesNotTraverseLeafArrays) {
-    MatcherTypeSet typeSet;
-    typeSet.bsonTypes.insert(BSONType::String);
-    typeSet.bsonTypes.insert(BSONType::Date);
-    InternalSchemaBinDataEncryptedTypeExpression expr("a"_sd, std::move(typeSet));
-
-    FleBlobHeader blob;
-    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
-    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
-    auto binData = BSONBinData(
-        reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
-
-    BSONObj matchingDoc = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
-                                                  sizeof(FleBlobHeader),
-                                                  BinDataType::Encrypt));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&expr, BSON("a" << binData)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&expr, BSON("a" << BSON_ARRAY(binData))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&expr, BSON("a" << BSONArray())));
-}
-
-TEST(InternalSchemaBinDataEncryptedTypeTest, DoesNotMatchShortBinData) {
-    MatcherTypeSet typeSet;
-    typeSet.bsonTypes.insert(BSONType::String);
-    typeSet.bsonTypes.insert(BSONType::Date);
-    InternalSchemaBinDataEncryptedTypeExpression expr("a"_sd, std::move(typeSet));
-
-    FleBlobHeader blob;
-    blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
-    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
-    auto binData = BSONBinData(reinterpret_cast<const void*>(&blob),
-                               sizeof(FleBlobHeader) - sizeof(blob.originalBsonType),
-                               BinDataType::Encrypt);
-
-    ASSERT_FALSE(exec::matcher::matchesBSON(&expr,
-                                            BSON("a" << binData << "foo"
-                                                     << "bar")));
-}
-
-TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, DoesNotTraverseLeafArrays) {
-    InternalSchemaBinDataFLE2EncryptedTypeExpression expr("a"_sd, BSONType::String);
-
-    FleBlobHeader blob;
-    blob.fleBlobSubtype = static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValue);
-    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
-
-    auto binData = BSONBinData(
-        reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(&expr, BSON("a" << binData)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&expr, BSON("a" << BSON_ARRAY(binData))));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&expr, BSON("a" << BSONArray())));
-}
-
-TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, DoesNotMatchShortBinData) {
-    InternalSchemaBinDataFLE2EncryptedTypeExpression expr("a"_sd, BSONType::String);
-
-    FleBlobHeader blob;
-    blob.fleBlobSubtype = static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValue);
-    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
-
-    auto binData = BSONBinData(reinterpret_cast<const void*>(&blob),
-                               sizeof(FleBlobHeader) - sizeof(blob.originalBsonType),
-                               BinDataType::Encrypt);
-    auto emptyBinData = BSONBinData(reinterpret_cast<const void*>(&blob), 0, BinDataType::Encrypt);
-
-    ASSERT_FALSE(exec::matcher::matchesBSON(&expr,
-                                            BSON("a" << binData << "foo"
-                                                     << "bar")));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&expr, BSON("a" << emptyBinData)));
-}
-
-TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, MatchesOnlyFLE2ServerSubtypes) {
-    InternalSchemaBinDataFLE2EncryptedTypeExpression expr("a"_sd, BSONType::String);
-
-    FleBlobHeader blob;
-    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
-
-    for (uint8_t i = 0; i < idlEnumCount<EncryptedBinDataType>; i++) {
-        blob.fleBlobSubtype = i;
-        auto binData = BSONBinData(
-            reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
-
-        if (i == static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValue) ||
-            i == static_cast<uint8_t>(EncryptedBinDataType::kFLE2RangeIndexedValue) ||
-            i == static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValueV2) ||
-            i == static_cast<uint8_t>(EncryptedBinDataType::kFLE2RangeIndexedValueV2) ||
-            i == static_cast<uint8_t>(EncryptedBinDataType::kFLE2UnindexedEncryptedValue) ||
-            i == static_cast<uint8_t>(EncryptedBinDataType::kFLE2UnindexedEncryptedValueV2) ||
-            i == static_cast<uint8_t>(EncryptedBinDataType::kFLE2TextIndexedValue)) {
-            ASSERT_TRUE(exec::matcher::matchesBSON(&expr, BSON("a" << binData)));
-        } else {
-            ASSERT_FALSE(exec::matcher::matchesBSON(&expr, BSON("a" << binData)));
-        }
-    }
-}
-
-TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, DoesNotMatchIncorrectBsonType) {
-    InternalSchemaBinDataFLE2EncryptedTypeExpression encryptedString("ssn"_sd, BSONType::String);
-    InternalSchemaBinDataFLE2EncryptedTypeExpression encryptedInt("age"_sd, BSONType::NumberInt);
-
-    FleBlobHeader blob;
-    blob.fleBlobSubtype = static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValue);
-    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
-
-    auto binData = BSONBinData(
-        reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
-    ASSERT_TRUE(exec::matcher::matchesBSON(&encryptedString, BSON("ssn" << binData)));
-    ASSERT_FALSE(exec::matcher::matchesBSON(&encryptedInt, BSON("age" << binData)));
-
-    blob.originalBsonType = BSONType::NumberInt;
-    binData = BSONBinData(
-        reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
-    ASSERT_FALSE(exec::matcher::matchesBSON(&encryptedString, BSON("ssn" << binData)));
-    ASSERT_TRUE(exec::matcher::matchesBSON(&encryptedInt, BSON("age" << binData)));
 }
 
 }  // namespace mongo::evaluate_matcher_test
