@@ -34,6 +34,14 @@ idl_generator(
     ],
 )
 
+idl_generator(
+    name = "ftdc_feature_flag_gen",
+    src = "ftdc_feature_flag.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "ftdc",
     srcs = [
@@ -48,6 +56,7 @@ mongo_cc_library(
         "metadata_compressor.cpp",
         "util.cpp",
         "varint.cpp",
+        ":ftdc_feature_flag_gen",
     ],
     hdrs = [
         "block_compressor.h",
