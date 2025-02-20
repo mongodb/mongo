@@ -38,6 +38,7 @@
 #include <wiredtiger.h>
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_managed_session.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
@@ -64,13 +65,6 @@ public:
                          WiredTigerKVEngine* engine = nullptr);
     ~WiredTigerConnection();
 
-    /**
-     * This deleter automatically releases WiredTigerSession objects when no longer needed.
-     */
-    class WiredTigerSessionDeleter {
-    public:
-        void operator()(WiredTigerSession* session) const;
-    };
 
     // RAII type to block and unblock the WiredTigerConnection to shut down.
     class BlockShutdown {
@@ -88,18 +82,18 @@ public:
     };
 
     /**
-     * Returns a smart pointer to a previously released session for reuse, or creates a new session.
+     * Returns an RAII wrapper to a previously released session for reuse, or creates a new session.
      * This method must only be called while holding the global lock to avoid races with
      * shuttingDown, but otherwise is thread safe.
      * The passed in OperationContext is used to propagate interrupts from MongoDB to WiredTiger. If
      * interrupts are not needed call getUninterruptibleSession()
      */
-    std::unique_ptr<WiredTigerSession, WiredTigerSessionDeleter> getSession(
-        OperationContext* opCtx);
+    WiredTigerManagedSession getSession(OperationContext* opCtx);
+
     /**
      * As above but does not propagate interrupts
      */
-    std::unique_ptr<WiredTigerSession, WiredTigerSessionDeleter> getUninterruptibleSession();
+    WiredTigerManagedSession getUninterruptibleSession();
 
 
     /**
@@ -203,9 +197,10 @@ private:
      * Returns a session to the cache for later reuse. If closeAll was called between getting this
      * session and releasing it, the session is directly released. This method is thread safe.
      */
-    void _releaseSession(WiredTigerSession* session);
+    void _releaseSession(std::unique_ptr<WiredTigerSession> session);
 
     friend class WiredTigerSession;
+    friend class WiredTigerManagedSession;
     WT_CONNECTION* _conn;             // not owned
     ClockSource* const _clockSource;  // not owned
     WiredTigerKVEngine* _engine;      // not owned, might be NULL
@@ -219,7 +214,7 @@ private:
     static const uint32_t kShuttingDownMask = 1 << 31;
 
     stdx::mutex _cacheLock;
-    typedef std::vector<WiredTigerSession*> SessionCache;
+    typedef std::vector<std::unique_ptr<WiredTigerSession>> SessionCache;
     SessionCache _sessions;
 
     // Bumped when all open sessions need to be closed
@@ -230,12 +225,6 @@ private:
     stdx::condition_variable _prepareCommittedOrAbortedCond;
     AtomicWord<std::uint64_t> _prepareCommitOrAbortCounter{0};
 };
-
-/**
- * A unique handle type for WiredTigerSession pointers obtained from a WiredTigerConnection.
- */
-typedef std::unique_ptr<WiredTigerSession, typename WiredTigerConnection::WiredTigerSessionDeleter>
-    UniqueWiredTigerSession;
 
 static constexpr char kWTRepairMsg[] =
     "Please read the documentation for starting MongoDB with --repair here: "

@@ -116,7 +116,7 @@ public:
     }
 
 private:
-    UniqueWiredTigerSession const _session;
+    WiredTigerManagedSession const _session;
     WT_CURSOR* _cursor = nullptr;  // Owned
 };
 }  // namespace mongo

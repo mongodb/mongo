@@ -97,7 +97,7 @@ TEST(WiredTigerConnectionTest, CheckSessionCacheCleanup) {
     WiredTigerConnection* connection = harnessHelper.getConnection();
     ASSERT_EQUALS(connection->getIdleSessionsCount(), 0U);
     {
-        UniqueWiredTigerSession _session = connection->getUninterruptibleSession();
+        WiredTigerManagedSession _session = connection->getUninterruptibleSession();
         ASSERT_EQUALS(connection->getIdleSessionsCount(), 0U);
     }
     // Destroying of a session puts it in the session cache
@@ -119,7 +119,7 @@ TEST(WiredTigerConnectionTest, CheckSessionCacheCleanup) {
 TEST(WiredTigerConnectionTest, ReleaseCursorDuringShutdown) {
     WiredTigerConnectionHarnessHelper harnessHelper("");
     WiredTigerConnection* connection = harnessHelper.getConnection();
-    UniqueWiredTigerSession session = connection->getUninterruptibleSession();
+    WiredTigerManagedSession session = connection->getUninterruptibleSession();
     // Simulates the cursor already being deleted during shutdown.
     WT_CURSOR* cursor = nullptr;
 
@@ -140,7 +140,7 @@ TEST(WiredTigerConnectionTest, ReleaseSessionAfterShutdown) {
     // Assert that there are no idle sessions in the cache to start off with.
     ASSERT_EQ(connection->getIdleSessionsCount(), 0);
     {
-        UniqueWiredTigerSession session = connection->getUninterruptibleSession();
+        WiredTigerManagedSession session = connection->getUninterruptibleSession();
         WT_CURSOR* cursor = nullptr;
 
         connection->shuttingDown();

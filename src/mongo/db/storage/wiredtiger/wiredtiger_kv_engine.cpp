@@ -2025,12 +2025,12 @@ void WiredTigerKVEngine::_checkpoint(WiredTigerSession& session) try {
 }
 
 void WiredTigerKVEngine::checkpoint() {
-    UniqueWiredTigerSession session = _connection->getUninterruptibleSession();
+    WiredTigerManagedSession session = _connection->getUninterruptibleSession();
     return _checkpoint(*session);
 }
 
 void WiredTigerKVEngine::forceCheckpoint(bool useStableTimestamp) {
-    UniqueWiredTigerSession session = _connection->getUninterruptibleSession();
+    WiredTigerManagedSession session = _connection->getUninterruptibleSession();
     return _checkpoint(*session, useStableTimestamp);
 }
 

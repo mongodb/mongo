@@ -229,6 +229,7 @@ private:
     };
 
     friend class WiredTigerConnection;
+    friend class WiredTigerManagedSession;
 
     // The cursor cache is a list of pairs that contain an ID and cursor
     typedef std::list<CachedCursor> CursorCache;

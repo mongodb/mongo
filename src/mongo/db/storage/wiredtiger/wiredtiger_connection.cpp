@@ -30,8 +30,11 @@
 #include <cerrno>
 #include <cstdlib>
 
+#include <algorithm>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <functional>
+#include <iterator>
 #include <wiredtiger.h>
 
 #include "mongo/base/error_codes.h"
@@ -125,27 +128,29 @@ void WiredTigerConnection::closeExpiredIdleSessions(int64_t idleTimeMillis) {
     }
 
     auto cutoffTime = _clockSource->now() - Milliseconds(idleTimeMillis);
-    SessionCache sessionsToClose;
-
-    {
-        stdx::lock_guard<stdx::mutex> lock(_cacheLock);
-        // Discard all sessions that became idle before the cutoff time
-        for (auto it = _sessions.begin(); it != _sessions.end();) {
-            auto session = *it;
-            invariant(session->getIdleExpireTime() != Date_t::min());
-            if (session->getIdleExpireTime() < cutoffTime) {
-                it = _sessions.erase(it);
-                sessionsToClose.push_back(session);
-            } else {
-                ++it;
-            }
-        }
-    }
 
     // Closing expired idle sessions is expensive, so do it outside of the cache mutex. This helps
     // to avoid periodic operation latency spikes as seen in SERVER-52879.
-    for (auto session : sessionsToClose) {
-        delete session;
+    SessionCache sessionsToClose;
+    {
+        stdx::lock_guard<stdx::mutex> lock(_cacheLock);
+
+        // Discard all sessions that became idle before the cutoff time
+        auto isSessionExpired = [cutoffTime](auto& session) {
+            invariant(session->getIdleExpireTime() != Date_t::min());
+            return session->getIdleExpireTime() < cutoffTime;
+        };
+        // Re-order non expired sessions to the beginning and return the position of the first
+        // expired.
+        auto it = std::partition(_sessions.begin(), _sessions.end(), std::not_fn(isSessionExpired));
+
+        // Move expired session
+        sessionsToClose.insert(sessionsToClose.end(),
+                               std::make_move_iterator(it),
+                               std::make_move_iterator(_sessions.end()));
+
+        // Erase moved sessions
+        _sessions.erase(it, _sessions.end());
     }
 }
 
@@ -158,23 +163,19 @@ void WiredTigerConnection::closeAll() {
         _epoch.fetchAndAdd(1);
         _sessions.swap(swap);
     }
-
-    for (SessionCache::iterator i = swap.begin(); i != swap.end(); i++) {
-        delete (*i);
-    }
 }
 
 bool WiredTigerConnection::isEphemeral() {
     return _engine && _engine->isEphemeral();
 }
 
-UniqueWiredTigerSession WiredTigerConnection::getSession(OperationContext* opCtx) {
+WiredTigerManagedSession WiredTigerConnection::getSession(OperationContext* opCtx) {
     auto session = getUninterruptibleSession();
     session->_attachOperationContext(opCtx);
     return session;
 }
 
-UniqueWiredTigerSession WiredTigerConnection::getUninterruptibleSession() {
+WiredTigerManagedSession WiredTigerConnection::getUninterruptibleSession() {
     // We should never be able to get here after _shuttingDown is set, because no new
     // operations should be allowed to start.
     invariant(!(_shuttingDown.load() & kShuttingDownMask));
@@ -184,19 +185,19 @@ UniqueWiredTigerSession WiredTigerConnection::getUninterruptibleSession() {
         if (!_sessions.empty()) {
             // Get the most recently used session so that if we discard sessions, we're
             // discarding older ones
-            WiredTigerSession* cachedSession = _sessions.back();
+            std::unique_ptr<WiredTigerSession> cachedSession = std::move(_sessions.back());
             _sessions.pop_back();
             // Reset the idle time
             cachedSession->setIdleExpireTime(Date_t::min());
-            return UniqueWiredTigerSession(cachedSession);
+            return WiredTigerManagedSession(std::move(cachedSession));
         }
     }
 
     // Outside of the cache partition lock, but on release will be put back on the cache
-    return UniqueWiredTigerSession(new WiredTigerSession(this, _epoch.load()));
+    return WiredTigerManagedSession(std::make_unique<WiredTigerSession>(this, _epoch.load()));
 }
 
-void WiredTigerConnection::_releaseSession(WiredTigerSession* session) {
+void WiredTigerConnection::_releaseSession(std::unique_ptr<WiredTigerSession> session) {
     invariant(session);
 
     BlockShutdown blockShutdown(this);
@@ -210,7 +211,6 @@ void WiredTigerConnection::_releaseSession(WiredTigerSession* session) {
         // information. Since shutting down the WT_CONNECTION will close all WT_SESSIONS, we
         // shouldn't also try to directly close this session.
         session->dropSessionBeforeDeleting();
-        delete session;
         return;
     }
 
@@ -238,16 +238,12 @@ void WiredTigerConnection::_releaseSession(WiredTigerSession* session) {
     session->setIdleExpireTime(_clockSource->now());
     {
         stdx::lock_guard<stdx::mutex> lock(_cacheLock);
-        _sessions.push_back(session);
+        _sessions.emplace_back(std::move(session));
     }
 
     if (_engine) {
         _engine->sizeStorerPeriodicFlush();
     }
-}
-
-void WiredTigerConnection::WiredTigerSessionDeleter::operator()(WiredTigerSession* session) const {
-    session->_connection->_releaseSession(session);
 }
 
 WT_SESSION* WiredTigerConnection::_openSession(WiredTigerSession* session,

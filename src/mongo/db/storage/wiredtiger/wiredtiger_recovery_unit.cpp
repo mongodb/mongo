@@ -170,14 +170,14 @@ void WiredTigerRecoveryUnit::doAbortUnitOfWork() {
 }
 
 void WiredTigerRecoveryUnit::_ensureSession() {
-    if (!_unique_session) {
+    if (!_managed_sesion) {
         invariant(!_session);
         if (_opCtx) {
-            _unique_session = _connection->getSession(_opCtx);
+            _managed_sesion = _connection->getSession(_opCtx);
         } else {
-            _unique_session = _connection->getUninterruptibleSession();
+            _managed_sesion = _connection->getUninterruptibleSession();
         }
-        _session = _unique_session.get();
+        _session = _managed_sesion.get();
     }
 }
 
