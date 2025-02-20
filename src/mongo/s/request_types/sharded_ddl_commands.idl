@@ -77,8 +77,8 @@ enums:
         description: "Operation to execute for the _shardsvrCommitToShardLocalCatalog command."
         type: string
         values:
-            kInsertDatabaseMetadata: "insertDatabaseMetadata"
-            kRemoveDatabaseMetadata: "removeDatabaseMetadata"
+            kCreateDatabase: "createDatabase"
+            kDropDatabase: "dropDatabase"
 
 structs:
 

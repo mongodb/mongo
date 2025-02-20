@@ -884,7 +884,7 @@ void commitDatabaseMetadataToShardLocalCatalog(
     const CancellationToken& token) {
     auto shardsvrRequest = [&]() {
         switch (request.op) {
-            case CommitToShardLocalCatalogOpEnum::kInsertDatabaseMetadata: {
+            case CommitToShardLocalCatalogOpEnum::kCreateDatabase: {
                 tassert(1003892,
                         "Expecting to find database metadata in this operation",
                         request.dbVersion);
@@ -897,14 +897,16 @@ void commitDatabaseMetadataToShardLocalCatalog(
                 updateRequest.setDbMetadata(dbType);
                 return updateRequest;
             }
-            case CommitToShardLocalCatalogOpEnum::kRemoveDatabaseMetadata: {
+            case CommitToShardLocalCatalogOpEnum::kDropDatabase: {
                 ShardsvrCommitToShardLocalCatalog updateRequest{NamespaceString{request.dbName}};
                 updateRequest.setDbName(request.dbName);
                 updateRequest.setOperation(request.op);
                 return updateRequest;
             }
             default:
-                MONGO_UNREACHABLE;
+                tasserted(ErrorCodes::IllegalOperation,
+                          str::stream() << "Received an unkown commit operation: "
+                                        << CommitToShardLocalCatalogOp_serializer(request.op));
         }
     }();
 

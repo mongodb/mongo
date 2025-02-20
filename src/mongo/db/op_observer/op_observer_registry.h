@@ -555,9 +555,10 @@ public:
             o->onMajorityCommitPointUpdate(service, newCommitPoint);
     }
 
-    void onDatabaseMetadataUpdate(OperationContext* opCtx, const DatabaseName& nss) override {
+    void onDatabaseMetadataUpdate(OperationContext* opCtx,
+                                  const DatabaseMetadataUpdateOplogEntry& entry) override {
         for (auto& o : _observers)
-            o->onDatabaseMetadataUpdate(opCtx, nss);
+            o->onDatabaseMetadataUpdate(opCtx, entry);
     }
 
 private:

@@ -29,101 +29,12 @@
 
 #include "mongo/db/s/shard_local_catalog_operations.h"
 
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/query/write_ops/delete.h"
+#include "mongo/db/query/find_command_gen.h"
 
 namespace mongo {
 
-namespace {
-
-CollectionAcquisition acquireConfigShardDatabasesCollection(OperationContext* opCtx) {
-    return acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest(NamespaceString::kConfigShardDatabasesNamespace,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                     repl::ReadConcernArgs::kLocal,
-                                     AcquisitionPrerequisites::kWrite),
-        MODE_IX);
-}
-
-void insertDatabaseMetadataEntry(OperationContext* opCtx,
-                                 const CollectionAcquisition& collection,
-                                 const BSONObj& doc) {
-    uassertStatusOK(Helpers::insert(opCtx, collection, doc));
-}
-
-void deleteDatabaseMetadataEntry(OperationContext* opCtx,
-                                 const CollectionAcquisition& collection,
-                                 const DatabaseName& dbName) {
-    const auto dbNameStr =
-        DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
-
-    deleteObjects(
-        opCtx, collection, BSON(DatabaseType::kDbNameFieldName << dbNameStr), true /* justOne */);
-}
-
-bool existsDatabaseMetadata(OperationContext* opCtx, const DatabaseName& dbName) {
-    const auto dbNameStr =
-        DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
-
-    BSONObj res;
-    return Helpers::findById(opCtx,
-                             NamespaceString::kConfigShardDatabasesNamespace,
-                             BSON(DatabaseType::kDbNameFieldName << dbNameStr),
-                             res);
-}
-
-}  // namespace
-
 namespace shard_local_catalog_operations {
-
-void insertDatabaseMetadata(OperationContext* opCtx, const DatabaseType& db) {
-    auto coll = acquireConfigShardDatabasesCollection(opCtx);
-
-    if (coll.exists() && existsDatabaseMetadata(opCtx, db.getDbName())) {
-        return;
-    }
-
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
-
-    if (!coll.exists()) {
-        ScopedLocalCatalogWriteFence scopedLocalCatalogWriteFence(opCtx, &coll);
-        auto db = DatabaseHolder::get(opCtx)->openDb(opCtx, coll.nss().dbName());
-        db->createCollection(opCtx, coll.nss());
-    }
-
-    invariant(coll.exists());
-
-    // Perform writes to update the database metadata to a durable collection.
-    insertDatabaseMetadataEntry(opCtx, coll, db.toBSON());
-
-    wuow.commit();
-}
-
-void removeDatabaseMetadata(OperationContext* opCtx, const DatabaseName& dbName) {
-    auto coll = acquireConfigShardDatabasesCollection(opCtx);
-
-    // This method is based on the assumption that previous database metadata exists, which implies
-    // that the authoritative collection should also be present. If that collection is not found, it
-    // indicates an inconsistency in the metadata. In other words, there is a database that was not
-    // registered in the shard-local catalog.
-    invariant(coll.exists());
-
-    if (!existsDatabaseMetadata(opCtx, dbName)) {
-        return;
-    }
-
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
-
-    // Perform deletes to remove the database metadata from the durable collection.
-    deleteDatabaseMetadataEntry(opCtx, coll, dbName);
-
-    wuow.commit();
-}
 
 std::unique_ptr<DBClientCursor> readAllDatabaseMetadata(OperationContext* opCtx) {
     FindCommandRequest findOp(NamespaceString::kConfigShardDatabasesNamespace);

@@ -117,6 +117,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
+#include "mongo/db/s/database_metadata_oplog_application.h"
 #include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -138,6 +139,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/catalog/type_index_catalog.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/catalog/type_oplog_catalog_metadata_gen.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
@@ -1160,6 +1162,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
     {"databaseMetadataUpdate",
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
           -> Status {
+         applyDatabaseMetadataUpdate(opCtx, *op);
          return Status::OK();
      }}},
 };

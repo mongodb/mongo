@@ -539,9 +539,8 @@ TEST_F(MetadataConsistencyTest, FindMissingDatabaseMetadataInShardLocalCatalogCa
     }
 
     // Validate that we can find the inconsistency.
-    const auto inconsistencies =
-        metadata_consistency_util::checkDatabaseMetadataConsistencyInShardLocalCatalogCache(
-            operationContext(), _dbName, dbInGlobalCatalog.getVersion(), _shardId);
+    const auto inconsistencies = metadata_consistency_util::checkDatabaseMetadataConsistency(
+        operationContext(), dbInGlobalCatalog);
 
     assertOneInconsistencyFound(
         MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardLocalCatalogCache,
@@ -567,9 +566,8 @@ TEST_F(MetadataConsistencyTest, FindInconsistentDatabaseVersionInShardLocalCatal
     }
 
     // Validate that we can find the inconsistency.
-    const auto inconsistencies =
-        metadata_consistency_util::checkDatabaseMetadataConsistencyInShardLocalCatalogCache(
-            operationContext(), _dbName, dbInGlobalCatalog.getVersion(), _shardId);
+    const auto inconsistencies = metadata_consistency_util::checkDatabaseMetadataConsistency(
+        operationContext(), dbInGlobalCatalog);
 
     assertOneInconsistencyFound(
         MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardLocalCatalogCache,

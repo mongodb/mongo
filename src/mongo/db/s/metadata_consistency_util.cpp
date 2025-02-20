@@ -438,6 +438,34 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardLo
     return inconsistencies;
 }
 
+std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardLocalCatalogCache(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    const DatabaseVersion& dbVersionInGlobalCatalog,
+    const ShardId& primaryShard) {
+    std::vector<MetadataInconsistencyItem> inconsistencies;
+
+    const auto dbVersionInCache = [&]() {
+        AutoGetDb autoDb(opCtx, dbName, MODE_IS);
+        const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName);
+        return scopedDss->getDbVersion(opCtx, true /* useDssForTesting */);
+    }();
+
+    if (!dbVersionInCache) {
+        inconsistencies.emplace_back(makeInconsistency(
+            MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardLocalCatalogCache,
+            MissingDatabaseMetadataInShardLocalCatalogCacheDetails{
+                dbName, primaryShard, dbVersionInGlobalCatalog}));
+    } else if (dbVersionInGlobalCatalog != *dbVersionInCache) {
+        inconsistencies.emplace_back(makeInconsistency(
+            MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardLocalCatalogCache,
+            InconsistentDatabaseVersionInShardLocalCatalogCacheDetails{
+                dbName, primaryShard, dbVersionInGlobalCatalog, *dbVersionInCache}));
+    }
+
+    return inconsistencies;
+}
+
 }  // namespace
 
 
@@ -1063,35 +1091,6 @@ std::vector<MetadataInconsistencyItem> checkCollectionShardingMetadataConsistenc
     return inconsistencies;
 }
 
-// TODO (SERVER-99804): Move this function into the unnamed namespace.
-std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardLocalCatalogCache(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const DatabaseVersion& dbVersionInGlobalCatalog,
-    const ShardId& primaryShard) {
-    std::vector<MetadataInconsistencyItem> inconsistencies;
-
-    const auto dbVersionInCache = [&]() {
-        AutoGetDb autoDb(opCtx, dbName, MODE_IS);
-        const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName);
-        return scopedDss->getDbVersion(opCtx, true /* useDssForTesting */);
-    }();
-
-    if (!dbVersionInCache) {
-        inconsistencies.emplace_back(makeInconsistency(
-            MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardLocalCatalogCache,
-            MissingDatabaseMetadataInShardLocalCatalogCacheDetails{
-                dbName, primaryShard, dbVersionInGlobalCatalog}));
-    } else if (dbVersionInGlobalCatalog != *dbVersionInCache) {
-        inconsistencies.emplace_back(makeInconsistency(
-            MetadataInconsistencyTypeEnum::kInconsistentDatabaseVersionInShardLocalCatalogCache,
-            InconsistentDatabaseVersionInShardLocalCatalogCacheDetails{
-                dbName, primaryShard, dbVersionInGlobalCatalog, *dbVersionInCache}));
-    }
-
-    return inconsistencies;
-}
-
 std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistency(
     OperationContext* opCtx, const DatabaseType& dbInGlobalCatalog) {
     std::vector<MetadataInconsistencyItem> inconsistencies;
@@ -1100,14 +1099,13 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistency(
     const auto dbVersionInGlobalCatalog = dbInGlobalCatalog.getVersion();
     const auto primaryShard = dbInGlobalCatalog.getPrimary();
 
-    // TODO (SERVER-99804): Enable the following checks.
-    // auto shardLocalCatalogCacheInconsistencies =
-    //     checkDatabaseMetadataConsistencyInShardLocalCatalogCache(opCtx, dbName,
-    //     dbVersionInGlobalCatalog);
-    //
-    // inconsistencies.insert(inconsistencies.end(),
-    //                        std::make_move_iterator(shardLocalCatalogCacheInconsistencies.begin()),
-    //                        std::make_move_iterator(shardLocalCatalogCacheInconsistencies.end()));
+    auto shardLocalCatalogCacheInconsistencies =
+        checkDatabaseMetadataConsistencyInShardLocalCatalogCache(
+            opCtx, dbName, dbVersionInGlobalCatalog, primaryShard);
+
+    inconsistencies.insert(inconsistencies.end(),
+                           std::make_move_iterator(shardLocalCatalogCacheInconsistencies.begin()),
+                           std::make_move_iterator(shardLocalCatalogCacheInconsistencies.end()));
 
     auto shardLocalCatalogInconsistencies = checkDatabaseMetadataConsistencyInShardLocalCatalog(
         opCtx, dbName, dbVersionInGlobalCatalog, primaryShard);

@@ -149,13 +149,6 @@ std::vector<MetadataInconsistencyItem> checkZonesConsistency(OperationContext* o
 std::vector<MetadataInconsistencyItem> checkCollectionShardingMetadataConsistency(
     OperationContext* opCtx, const CollectionType& collection);
 
-// TODO (SERVER-99804): Move this function into the unnamed namespace.
-std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardLocalCatalogCache(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const DatabaseVersion& dbVersionInGlobalCatalog,
-    const ShardId& primaryShard);
-
 /**
  * Checks for inconsistencies in the database's metadata between the global catalog and the
  * shard-local catalog.

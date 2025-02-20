@@ -725,14 +725,14 @@ void MovePrimaryCoordinator::commitMetadataToShards(
     const CancellationToken& token) {
     if (_doc.getAuthoritativeShardCommit().get_value_or(false)) {
         sharding_ddl_util::DatabaseMetadataCommitRequest removeRequest{
-            CommitToShardLocalCatalogOpEnum::kRemoveDatabaseMetadata,
+            CommitToShardLocalCatalogOpEnum::kDropDatabase,
             _dbName,
             ShardingState::get(opCtx)->shardId()};
         sharding_ddl_util::commitDatabaseMetadataToShardLocalCatalog(
             opCtx, removeRequest, getNewSession(opCtx), executor, token);
 
         sharding_ddl_util::DatabaseMetadataCommitRequest insertRequest{
-            CommitToShardLocalCatalogOpEnum::kInsertDatabaseMetadata,
+            CommitToShardLocalCatalogOpEnum::kCreateDatabase,
             _dbName,
             _doc.getToShardId(),
             preCommitDbVersion};

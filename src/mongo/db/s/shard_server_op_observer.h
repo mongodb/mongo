@@ -136,6 +136,9 @@ public:
 
     void onReplicationRollback(OperationContext* opCtx,
                                const RollbackObserverInfo& rbInfo) override;
+
+    void onDatabaseMetadataUpdate(OperationContext* opCtx,
+                                  const DatabaseMetadataUpdateOplogEntry& entry) override;
 };
 
 }  // namespace mongo

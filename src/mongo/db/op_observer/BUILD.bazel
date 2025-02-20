@@ -119,6 +119,7 @@ mongo_cc_library(
         "//src/mongo/s/catalog:type_chunk_base_gen",
         "//src/mongo/s/catalog:type_chunk_range.h",
         "//src/mongo/s/catalog:type_chunk_range_base_gen",
+        "//src/mongo/s/catalog:type_oplog_catalog_metadata_gen",
         "//src/mongo/s/resharding:type_collection_fields_gen",
         "//src/mongo/scripting:engine.h",
         "//src/mongo/util:lazily_initialized.h",

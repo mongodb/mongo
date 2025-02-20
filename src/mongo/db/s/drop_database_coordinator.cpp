@@ -131,7 +131,7 @@ void removeDatabaseMetadataFromShard(OperationContext* opCtx,
                                      const CancellationToken& token) {
     if (isAuthoritativeShardCommitEnabled) {
         sharding_ddl_util::DatabaseMetadataCommitRequest request{
-            CommitToShardLocalCatalogOpEnum::kRemoveDatabaseMetadata,
+            CommitToShardLocalCatalogOpEnum::kDropDatabase,
             dbName,
             ShardingState::get(opCtx)->shardId()};
 

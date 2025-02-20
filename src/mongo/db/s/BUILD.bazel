@@ -547,13 +547,16 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    # TODO (SERVER-101057): Review this library.
     name = "sharding_catalog",
     srcs = [
+        "database_metadata_oplog_application.cpp",
         "shard_local_catalog_operations.cpp",
         "sharding_index_catalog_ddl_util.cpp",
         ":shard_authoritative_catalog_gen",
     ],
     hdrs = [
+        "database_metadata_oplog_application.h",
         "shard_local_catalog_operations.h",
         "sharding_index_catalog_ddl_util.h",
     ],

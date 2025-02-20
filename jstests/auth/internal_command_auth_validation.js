@@ -509,7 +509,7 @@ const internalCommandsMap = {
         testname: "_shardsvrCommitToShardLocalCatalog",
         command: {
             _shardsvrCommitToShardLocalCatalog: "x.y",
-            operation: "insertDatabaseMetadata",
+            operation: "createDatabase",
         },
     },
     _shardsvrDropCollection: {

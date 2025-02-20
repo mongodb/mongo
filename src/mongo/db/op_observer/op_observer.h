@@ -58,6 +58,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/transaction/transaction_operations.h"
+#include "mongo/s/catalog/type_oplog_catalog_metadata_gen.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
@@ -675,10 +676,10 @@ public:
                                              const repl::OpTime& newCommitPoint) = 0;
 
     /**
-     * Called when the authoritative DSS is updated. This function is a placeholder, the name and/or
-     * parameters are subjet to change.
+     * Called when the authoritative DSS is updated.
      */
-    virtual void onDatabaseMetadataUpdate(OperationContext* opCtx, const DatabaseName& nss) = 0;
+    virtual void onDatabaseMetadataUpdate(OperationContext* opCtx,
+                                          const DatabaseMetadataUpdateOplogEntry& entry) = 0;
 
     struct Times;
 

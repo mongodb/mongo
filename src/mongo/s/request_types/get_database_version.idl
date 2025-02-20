@@ -41,3 +41,9 @@ commands:
         namespace: type
         api_version: ""
         type: string
+        # TODO (SERVER-100036): Remove the `useDssForTesting` parameter.
+        fields:
+            useDssForTesting:
+                description: 'Use the alternative DSS in memory structure'
+                type: bool
+                optional: true

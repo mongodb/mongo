@@ -189,7 +189,7 @@ void CreateDatabaseCoordinator::_commitShardLocalCatalog(
     const CancellationToken& token) {
     if (_doc.getAuthoritativeShardCommit().get_value_or(false)) {
         sharding_ddl_util::DatabaseMetadataCommitRequest request{
-            CommitToShardLocalCatalogOpEnum::kInsertDatabaseMetadata,
+            CommitToShardLocalCatalogOpEnum::kCreateDatabase,
             db.getDbName(),
             db.getPrimary(),
             db.getVersion()};

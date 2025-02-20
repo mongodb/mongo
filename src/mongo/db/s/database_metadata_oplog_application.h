@@ -29,21 +29,14 @@
 
 #pragma once
 
-#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog_entry.h"
 
 namespace mongo {
 
-namespace shard_local_catalog_operations {
-
 /**
- * Read database metadata from all databases in the shard-local catalog.
- *
- * This function reads the database metadata from the replicated durable collection
- * `config.shard.databases`.
+ * Applies the oplog 'c' entry to insert database metadata into the local catalog cache.
  */
-std::unique_ptr<DBClientCursor> readAllDatabaseMetadata(OperationContext* opCtx);
-
-}  // namespace shard_local_catalog_operations
+void applyDatabaseMetadataUpdate(OperationContext* opCtx, const repl::OplogEntry& op);
 
 }  // namespace mongo

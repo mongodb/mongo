@@ -97,13 +97,16 @@ public:
                     str::stream() << definition()->getName() << " can only be run on shard servers",
                     serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
-            auto dbName = _targetDb();
+            const auto dbName = _targetDb();
+            const auto useDssForTesting = request().getUseDssForTesting();
+
             AutoGetDb autoDb(opCtx, dbName, MODE_IS);
             const auto scopedDss =
                 DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName);
 
             BSONObj versionObj;
-            if (const auto dbVersion = scopedDss->getDbVersion(opCtx)) {
+            if (const auto dbVersion =
+                    scopedDss->getDbVersion(opCtx, useDssForTesting.value_or(false))) {
                 versionObj = dbVersion->toBSON();
             }
             result->getBodyBuilder().append("dbVersion", versionObj);

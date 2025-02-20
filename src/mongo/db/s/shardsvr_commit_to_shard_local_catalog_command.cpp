@@ -33,9 +33,10 @@
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/s/shard_local_catalog_operations.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/s/catalog/type_database_gen.h"
+#include "mongo/s/catalog/type_oplog_catalog_metadata_gen.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/sharding_state.h"
@@ -100,28 +101,46 @@ public:
                 newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
                 switch (request().getOperation()) {
-                    case CommitToShardLocalCatalogOpEnum::kInsertDatabaseMetadata: {
+                    case CommitToShardLocalCatalogOpEnum::kCreateDatabase: {
                         tassert(1003890,
                                 "Expecting database metadata in the command",
                                 request().getDbMetadata());
 
                         const auto db = *request().getDbMetadata();
+                        const auto dbNameStr = DatabaseNameUtil::serialize(
+                            db.getDbName(), SerializationContext::stateDefault());
 
                         tassert(1003891,
                                 "Expecting to be in the shard from the primary shard of the "
                                 "database metadata",
                                 db.getPrimary() == ShardingState::get(newOpCtx.get())->shardId());
 
-                        shard_local_catalog_operations::insertDatabaseMetadata(newOpCtx.get(), db);
+                        auto newOpCtxPtr = newOpCtx.get();
+                        newOpCtxPtr->getServiceContext()->getOpObserver()->onDatabaseMetadataUpdate(
+                            newOpCtxPtr,
+                            {dbNameStr,
+                             DatabaseMetadataUpdateOpEnum::kCreate,
+                             DatabaseMetadataUpdateCreateEntry{db}});
                         break;
                     }
-                    case CommitToShardLocalCatalogOpEnum::kRemoveDatabaseMetadata: {
-                        shard_local_catalog_operations::removeDatabaseMetadata(
-                            newOpCtx.get(), request().getDbName());
+                    case CommitToShardLocalCatalogOpEnum::kDropDatabase: {
+                        const auto dbName = request().getDbName();
+                        const auto dbNameStr = DatabaseNameUtil::serialize(
+                            dbName, SerializationContext::stateDefault());
+
+                        auto newOpCtxPtr = newOpCtx.get();
+                        newOpCtxPtr->getServiceContext()->getOpObserver()->onDatabaseMetadataUpdate(
+                            newOpCtxPtr,
+                            {dbNameStr,
+                             DatabaseMetadataUpdateOpEnum::kDrop,
+                             DatabaseMetadataUpdateDropEntry{dbName}});
                         break;
                     }
                     default:
-                        MONGO_UNREACHABLE;
+                        tasserted(ErrorCodes::IllegalOperation,
+                                  str::stream() << "Received an unkown commit operation: "
+                                                << CommitToShardLocalCatalogOp_serializer(
+                                                       request().getOperation()));
                 }
             }
 

@@ -3162,7 +3162,7 @@ export const authCommandsLib = {
         },
         {
           testname: "_shardsvrCommitToShardLocalCatalog",
-          command: {_shardsvrCommitToShardLocalCatalog: "test.x", operation: "insertDatabaseMetadata"},
+          command: {_shardsvrCommitToShardLocalCatalog: "test.x", operation: "createDatabase"},
           skipSharded: true,
           testcases: [
             {
