@@ -74,6 +74,7 @@ public:
     void reset() final {
         _prevX1Y1 = boost::none;
         _prevX2Y2 = boost::none;
+        _lastSeenElement = Value();
     }
 
 private:

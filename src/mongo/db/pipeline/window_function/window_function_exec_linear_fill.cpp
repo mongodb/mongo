@@ -112,7 +112,7 @@ Value WindowFunctionExecLinearFill::getNext(boost::optional<Document> current) {
     // or (10, -100) when we interpolate on the third document.
 
     uassert(6050106,
-            "There can be no repeated values in the sort field",
+            "There can be no repeated values in the sort field in the same partition",
             ValueComparator{}.evaluate(sortFieldValue != _lastSeenElement));
     if (!_lastSeenElement.missing())
         // Throw an error If the sort value was previously of type numeric, but we've just found a
