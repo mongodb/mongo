@@ -10,7 +10,12 @@ executor:
   archive:
     hooks:
       - ValidateCollections
-  config: {}
+  config:
+    program_options:
+      tlsMode: "preferTLS"
+      tlsCAFile: jstests/libs/ca.pem
+      tlsCertificateKeyFile: jstests/libs/client.pem
+      useEgressGRPC: true
   hooks:
     - class: ValidateCollections
     - class: CleanEveryN

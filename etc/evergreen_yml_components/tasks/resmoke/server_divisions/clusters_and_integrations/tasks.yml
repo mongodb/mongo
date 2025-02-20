@@ -3137,6 +3137,7 @@ task_groups:
     tasks:
       - compile_integration_test
       - integration_tests_standalone
+      - integration_tests_standalone_grpc
       - integration_tests_replset
       - integration_tests_replset_ssl_auth
       - integration_tests_sharded
@@ -3147,15 +3148,10 @@ task_groups:
       - compile_integration_test
       - integration_tests_standalone
       - integration_tests_standalone_audit
+      - integration_tests_standalone_grpc
       - integration_tests_replset
       - integration_tests_replset_ssl_auth
       - integration_tests_sharded
-
-  - <<: *compile_task_group_template
-    name: compile_grpc_integration_and_test_parallel_stream_TG
-    tasks:
-      - compile_integration_test
-      - integration_tests_standalone_grpc
 
   # SERVER-76006
   # This is a compile stream meant for non-cached and/or underpowered systems.
@@ -3172,6 +3168,7 @@ task_groups:
       - compile_integration_test
       - integration_tests_standalone
       - integration_tests_standalone_audit
+      - integration_tests_standalone_grpc
       - integration_tests_replset
       - integration_tests_replset_ssl_auth
       - integration_tests_sharded

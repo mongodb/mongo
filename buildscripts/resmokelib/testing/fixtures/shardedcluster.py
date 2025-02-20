@@ -446,11 +446,11 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
         return ",".join([mongos.get_internal_connection_string() for mongos in self.mongos])
 
-    def get_shell_connection_string(self):
+    def get_shell_connection_string(self, use_grpc=False):
         if self.mongos is None:
             raise ValueError("Must call setup() before calling get_shell_connection_string()")
 
-        return ",".join([mongos.get_shell_connection_string() for mongos in self.mongos])
+        return ",".join([mongos.get_shell_connection_string(use_grpc) for mongos in self.mongos])
 
     def _get_replica_set_endpoint(self):
         # The replica set endpoint would only become active after the replica set has become a
@@ -991,8 +991,8 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         """Return the internal connection string."""
         return f"{self._get_hostname()}:{self.port}"
 
-    def get_shell_connection_string(self):
-        port = self.port if not self.config.SHELL_GRPC else self.grpcPort
+    def get_shell_connection_string(self, use_grpc=False):
+        port = self.port if not (self.config.SHELL_GRPC or use_grpc) else self.grpcPort
         return f"{self._get_hostname()}:{port}"
 
     def get_shell_connection_url(self):

@@ -664,7 +664,6 @@ buildvariants:
     tasks:
       - name: compile_ninja_quick_TG
       - name: compile_test_parallel_unittest_stream_TG
-      - name: compile_grpc_integration_and_test_parallel_stream_TG
       - name: compile_test_parallel_core_stream_TG
       - name: compile_test_parallel_dbtest_stream_TG
       - name: generate_buildid_to_debug_symbols_mapping

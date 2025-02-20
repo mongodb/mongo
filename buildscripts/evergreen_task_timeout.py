@@ -36,6 +36,7 @@ IGNORED_SUITES = {
     "integration_tests_sharded",
     "integration_tests_standalone",
     "integration_tests_standalone_audit",
+    "integration_tests_standalone_grpc",
     "mongos_test",
     "server_selection_json_test",
     "sdam_json_test",

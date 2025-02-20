@@ -124,7 +124,9 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             self.router_port = fixturelib.get_next_port(job_num)
             mongod_options["routerPort"] = self.router_port
 
-        if "featureFlagGRPC" in self.config.ENABLED_FEATURE_FLAGS:
+        if "featureFlagGRPC" in self.config.ENABLED_FEATURE_FLAGS or self.mongod_options[
+            "set_parameters"
+        ].get("featureFlagGRPC"):
             self.grpcPort = fixturelib.get_next_port(job_num)
             self.mongod_options["grpcPort"] = self.grpcPort
 
@@ -340,8 +342,8 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         """Return the internal connection string."""
         return f"{self._get_hostname()}:{self.port}"
 
-    def get_shell_connection_string(self):
-        port = self.port if not self.config.SHELL_GRPC else self.grpcPort
+    def get_shell_connection_string(self, use_grpc=False):
+        port = self.port if not (self.config.SHELL_GRPC or use_grpc) else self.grpcPort
         return f"{self._get_hostname()}:{port}"
 
     def get_shell_connection_url(self):
