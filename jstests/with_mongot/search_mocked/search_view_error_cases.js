@@ -163,19 +163,17 @@ runTest({
 
 runTest({
     name: "scoreFusion_search_view",
-    pipeline: [{
-        $scoreFusion: {inputs: {pipelines: {search1: [{$search: {}}]}}, inputNormalization: "none"}
-    }],
+    pipeline: [
+        {$scoreFusion: {input: {pipelines: {search1: [{$search: {}}]}}, inputNormalization: "none"}}
+    ],
     errorCode: 9475801
 });
 
 runTest({
     name: "scoreFusion_vectorSearch_view",
     pipeline: [{
-        $scoreFusion: {
-            inputs: {pipelines: {vectorSearch1: [{$vectorSearch: {}}]}},
-            inputNormalization: "none"
-        }
+        $scoreFusion:
+            {input: {pipelines: {vectorSearch1: [{$vectorSearch: {}}]}}, inputNormalization: "none"}
     }],
     errorCode: 9475801
 });

@@ -32,7 +32,6 @@
 #include "mongo/unittest/unittest.h"
 
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_score.h"
 #include "mongo/db/pipeline/document_source_score_fusion.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -54,7 +53,7 @@ private:
     RAIIServerParameterControllerForTest rankFusionFlag{"featureFlagRankFusionFull", true};
 };
 
-TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNoInputsField) {
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNoInputField) {
     auto spec = fromjson(R"({
         $scoreFusion: {
         }
@@ -88,10 +87,10 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfUnknownField) {
                        ErrorCodes::IDLUnknownField);
 }
 
-TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInputsIsNotObject) {
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInputIsNotObject) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {pipelines: "not an object"},
+            input: {pipelines: "not an object"},
             inputNormalization: "none"
         }
     })");
@@ -104,7 +103,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInputsIsNotObject) {
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNoPipeline) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {}
             },
             inputNormalization: "none"
@@ -119,7 +118,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNoPipeline) {
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfMissingPipeline) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {},
+            input: {},
             inputNormalization: "none"
         }
     })");
@@ -132,7 +131,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfMissingPipeline) {
 TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowed) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     name1: [
                         {
@@ -241,7 +240,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowed) {
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineIsNotArray) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     authorMatch: {
                         $match : { author : "Agatha Christie" }
@@ -257,10 +256,10 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineIsNotArray) {
                        ErrorCodes::TypeMismatch);
 }
 
-TEST_F(DocumentSourceScoreFusionTest, ErrorsIfUnknownFieldInsideInputs) {
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfUnknownFieldInsideInput) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     name1: [
                         {
@@ -288,7 +287,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfUnknownFieldInsideInputs) {
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipeline) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     pipeOne: [
                         { $match : { author : "Agatha Christie" } },
@@ -308,7 +307,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipeline) {
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipelineWithFirstPipelineValid) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     pipeOne: [
                         { $match : { author : "Agatha Christie" } },
@@ -331,7 +330,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipelineWithFirstPipeline
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipelineWithSecondPipelineValid) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     pipeOne: [
                         { $match : { age : 50 } }
@@ -354,7 +353,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipelineWithSecondPipelin
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfEmptyPipeline) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     pipeOne: []
                 }
@@ -375,7 +374,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowed) {
                                       {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     name1: [
                         {
@@ -536,7 +535,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowed) {
 TEST_F(DocumentSourceScoreFusionTest, CheckMultipleStagesInPipelineAllowed) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     name1: [
                         {
@@ -649,7 +648,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArguments
                                       {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     name1: [
                         { $match : { author : "Agatha Christie" } },
@@ -887,7 +886,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArguments
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInputNormalizationNotString) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     name1: [
                         {
@@ -915,7 +914,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInputNormalizationNotString) {
 TEST_F(DocumentSourceScoreFusionTest, CheckAnyTypeAllowedForScore) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     name1: [
                         {
@@ -1025,7 +1024,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckAnyTypeAllowedForScore) {
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfWeightsIsNotObject) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     name1: [
                         {
@@ -1057,7 +1056,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfWeightsIsNotObject) {
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfEmptyWeights) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     name1: [
                         {
@@ -1093,7 +1092,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfWeightsArrayMixedIntsDecimals) {
                                       {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     name1: [
                         {
@@ -1264,11 +1263,12 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfWeightsArrayMixedIntsDecimals) {
         asOneObj);
 }
 
-TEST_F(DocumentSourceScoreFusionTest, ScoreNullsMustBeNumericOrNull) {
-
+// There was a time when we had some parsing support for 'scoreNulls'. This test just confirms it is
+// no longer an accepted argument.
+TEST_F(DocumentSourceScoreFusionTest, ScoreNullsIsRejected) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     name1: [
                         {
@@ -1284,107 +1284,19 @@ TEST_F(DocumentSourceScoreFusionTest, ScoreNullsMustBeNumericOrNull) {
                     ]
                 }
             },
-            score: "expression",
-            inputNormalization: "none",
-            combination: {
-                weights: {
-                    name1: 5
-                }
-            },
             scoreNulls: 0
         }
     })");
 
-    const auto desugaredList =
-        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
-    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
-    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
-
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "expectedStages": [
-                {
-                    $search: {
-                        index: "search_index",
-                        text: {
-                            query: "mystery",
-                            path: "genres"
-                        }
-                    }
-                },
-                {
-                    $match: {
-                        author: "dave"
-                    }
-                },
-                {
-                    "$replaceRoot": {
-                        "newRoot": {
-                            "docs": "$$ROOT"
-                        }
-                    }
-                },
-                {
-                    "$addFields": {
-                        "name1_score": {
-                            "$multiply": [
-                                {
-                                    $meta: "score"
-                                },
-                                {
-                                    "$const": 5.0
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "$group": {
-                        "_id": "$docs._id",
-                        "docs": {
-                            "$first": "$docs"
-                        },
-                        "name1_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$name1_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        }
-                    }
-                },
-                {
-                    "$setMetadata": {
-                        "score": {
-                            "$add": [
-                                "$name1_score"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "$sort": {
-                        "$computed0": {$meta: "score"},
-                        "_id": 1
-                    }
-                },
-                {
-                    "$replaceRoot": {
-                        "newRoot": "$docs"
-                    }
-                }
-            ]
-        })",
-        asOneObj);
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::IDLUnknownField);
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorIfOptionalFieldsIncludedMoreThanOnce) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     name1: [
                         {
@@ -1407,9 +1319,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorIfOptionalFieldsIncludedMoreThanOnce)
                 weights: {
                     name1: 5
                 }
-            },
-            scoreNulls: 0,
-            scoreNulls: 0
+            }
         }
     })");
 
@@ -1421,7 +1331,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorIfOptionalFieldsIncludedMoreThanOnce)
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfSearchMetaUsed) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     name1: [
                         { $match : { author : "Agatha Christie" } },
@@ -1453,7 +1363,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfSearchMetaUsed) {
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfSearchStoredSourceUsed) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     name1: [
                         { $match : { author : "Agatha Christie" } },
@@ -1486,7 +1396,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfSearchStoredSourceUsed) {
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     name1: [
                         { $match : { author : "Agatha Christie" } },
@@ -1529,7 +1439,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionwithAllowed) {
 
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     name1: [
                         { $sample: { size: 10 } },
@@ -1771,7 +1681,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNestedUnionWithModifiesFields) {
 
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     name1: [
                         { $sample: { size: 10 } },
@@ -1812,7 +1722,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNestedUnionWithModifiesFields) {
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfIncludeProject) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     name1: [
                         { $match : { author : "Agatha Christie" } },
@@ -1837,7 +1747,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfIncludeProject) {
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameDuplicated) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     foo: [
                         { $match : { author : "Agatha Christie" } },
@@ -1871,7 +1781,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameDuplicated) {
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameStartsWithDollar) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     $matchAuthor: [
                         { $match : { author : "Agatha Christie" } },
@@ -1902,7 +1812,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameStartsWithDollar) {
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameContainsDot) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     matchAuthor: [
                         { $match : { author : "Agatha Christie" } },
@@ -1933,7 +1843,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameContainsDot) {
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfGeoNearPipeline) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     name1: [
                         {
@@ -1970,7 +1880,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfGeoNearPipeline) {
 TEST_F(DocumentSourceScoreFusionTest, CheckIfScoreWithGeoNearDistanceMetadataPipeline) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            inputs: {
+            input: {
                 pipelines: {
                     name1: [
                         { $match : { author : "Agatha Christie" } },

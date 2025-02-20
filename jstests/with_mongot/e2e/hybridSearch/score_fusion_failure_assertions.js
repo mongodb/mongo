@@ -42,7 +42,7 @@ function runPipeline(pipeline) {
 // Check that a single input pipeline is allowed.
 assert.commandWorked(runPipeline([{
     $scoreFusion: {
-        inputs: {pipelines: searchMatchAsClause},
+        input: {pipelines: searchMatchAsClause},
         inputNormalization: "none",
         combination: {weights: {score2: 5}}
     }
@@ -51,7 +51,7 @@ assert.commandWorked(runPipeline([{
 // Error if the weights array doesn't have elements of type safe double
 assert.commandFailedWithCode(runPipeline([{
                                  $scoreFusion: {
-                                     inputs: {pipelines: searchMatchAsClause},
+                                     input: {pipelines: searchMatchAsClause},
                                      score: "expression",
                                      inputNormalization: "none",
                                      combination: {weights: {score2: "hi"}}
@@ -62,7 +62,7 @@ assert.commandFailedWithCode(runPipeline([{
 // Check that an array of ints for weights is a valid input
 assert.commandWorked(runPipeline([{
     $scoreFusion: {
-        inputs: {pipelines: vectorSearchClauseAndSearchClause},
+        input: {pipelines: vectorSearchClauseAndSearchClause},
         score: "expression",
         inputNormalization: "none",
         combination: {weights: {score1: 5, search1: 100}}
@@ -72,20 +72,9 @@ assert.commandWorked(runPipeline([{
 // Check that a mixed array of ints/decimals for weights is a valid input
 assert.commandWorked(runPipeline([{
     $scoreFusion: {
-        inputs: {pipelines: vectorSearchClauseAndSearchClause},
+        input: {pipelines: vectorSearchClauseAndSearchClause},
         score: "expression",
         inputNormalization: "none",
         combination: {weights: {score1: 5, search1: 100.2}}
-    }
-}]));
-
-// Check that including all optional arguments is parsed correctly
-assert.commandWorked(runPipeline([{
-    $scoreFusion: {
-        inputs: {pipelines: searchMatchAsClause},
-        score: "expression",
-        inputNormalization: "none",
-        combination: {weights: {score2: 5}},
-        scoreNulls: 0
     }
 }]));

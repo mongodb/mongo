@@ -374,7 +374,7 @@ std::unique_ptr<DocumentSourceScoreFusion::LiteParsed> DocumentSourceScoreFusion
             spec.type() == BSONType::Object);
 
     auto parsedSpec = ScoreFusionSpec::parse(IDLParserContext(kStageName), spec.embeddedObject());
-    auto inputPipesObj = parsedSpec.getInputs().getPipelines();
+    auto inputPipesObj = parsedSpec.getInput().getPipelines();
 
     // Parse each pipeline.
     std::vector<LiteParsedPipeline> liteParsedPipelines;
@@ -397,7 +397,7 @@ parseAndValidateScoredSelectionPipelines(const BSONElement& elem,
                                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>> inputPipelines;
     std::map<std::string, BSONObj> scorePaths;
-    for (const auto& elem : spec.getInputs().getPipelines()) {
+    for (const auto& elem : spec.getInput().getPipelines()) {
         auto pipeline = Pipeline::parse(parsePipelineFromBSON(elem), pExpCtx);
         // Ensure that all pipelines are valid scored selection pipelines.
         scoreFusionPipelineValidator(*pipeline);

@@ -45,7 +45,7 @@ structs:
     description: Specification for a $scoreFusion stage.
     strict: true
     fields:
-      inputs:
+      input:
         description: The set of sub-pipelines' results to be merged with score fusion.
         type: ScoreFusionInputsSpec
         optional: false
@@ -61,10 +61,5 @@ structs:
         description: The set of pipeline weights to match up with the input pipelines.
         type: ScoreFusionCombinationSpec
         optional: true
-      scoreNulls:
-        description: Value to assign missing or null scores
-        type: IDLAnyType
-        optional: true
-
 
       
