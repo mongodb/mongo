@@ -1,0 +1,47 @@
+/**
+ * Tests explaining read operations on a time-series buckets collection.
+ *
+ * @tags: [
+ *   # Refusing to run a test that issues an aggregation command with explain because it may return
+ *   # incomplete results if interrupted by a stepdown.
+ *   does_not_support_stepdowns,
+ *   featureFlagRawDataCrudOperations,
+ *   requires_timeseries,
+ * ]
+ */
+
+const coll = db[jsTestName()];
+const bucketsColl = db["system.buckets." + coll.getName()];
+
+const timeField = "t";
+const metaField = "m";
+const time = new Date("2024-01-01T00:00:00Z");
+
+coll.drop();
+assert.commandWorked(db.createCollection(
+    coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}));
+
+assert.commandWorked(coll.insert([
+    {[timeField]: time, [metaField]: 1, a: "a"},
+    {[timeField]: time, [metaField]: 2, a: "b"},
+    {[timeField]: time, [metaField]: 2, a: "c"},
+]));
+
+const assertExplain = function(explain) {
+    if (explain.shards) {
+        for (const shardExplain of Object.values(explain.shards)) {
+            assert.eq(shardExplain.queryPlanner.namespace, bucketsColl.getFullName());
+        }
+    } else if (explain.queryPlanner.namespace) {
+        assert.eq(explain.queryPlanner.namespace, bucketsColl.getFullName());
+    } else {
+        for (const shardPlan of explain.queryPlanner.winningPlan.shards) {
+            assert.eq(shardPlan.namespace, bucketsColl.getFullName());
+        }
+    }
+};
+
+assertExplain(bucketsColl.explain().aggregate([{$match: {"control.count": 2}}]));
+assertExplain(bucketsColl.explain().count({"control.count": 2}));
+assertExplain(bucketsColl.explain().distinct("control.count"));
+assertExplain(bucketsColl.explain().find({"control.count": 2}).finish());
