@@ -34,13 +34,6 @@ if [[ -z "${bazel_scons_diff_targets}" ]]; then
   exit 0
 fi
 
-# Set the JAVA_HOME directories for ppc64le and s390x since their bazel binaries are not compiled with a built-in JDK.
-if [[ $ARCH == "ppc64le" ]]; then
-  export JAVA_HOME="/usr/lib/jvm/java-21-openjdk"
-elif [[ $ARCH == "s390x" ]]; then
-  export JAVA_HOME="/usr/lib/jvm/java-21-openjdk"
-fi
-
 eval ${compile_env} $python ./buildscripts/bazel_scons_diff.py \
   --bazel_binary ${bazel_binary} \
   ${extra_args} \

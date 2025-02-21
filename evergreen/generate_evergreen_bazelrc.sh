@@ -37,7 +37,6 @@ if bazel_rbe_supported && [[ "${evergreen_remote_exec}" != "on" ]]; then
   echo "common --remote_executor=" >> .bazelrc.evergreen
   echo "common --modify_execution_info=.*=+no-remote-exec" >> .bazelrc.evergreen
   echo "common --jobs=auto" >> .bazelrc.evergreen
-  echo "common:linux --local_resources=cpu=HOST_CPUS" >> .bazelrc.evergreen
 fi
 
 uri="https://spruce.mongodb.com/task/${task_id:?}?execution=${execution:?}"

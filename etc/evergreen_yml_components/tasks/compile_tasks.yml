@@ -504,64 +504,6 @@ tasks:
           ninja_file: "build.ninja"
           targets: "install-wiredtiger compiledb"
 
-  - name: compile_ninja_default_profile
-    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    commands:
-      - func: "scons compile"
-        vars:
-          generating_for_ninja: true
-          separate_debug: off
-          task_compile_flags: >-
-            --build-profile=default
-            --ninja
-      - func: "f_expansions_write"
-      - func: "ninja compile"
-        vars:
-          ninja_file: "build.ninja"
-
-  - name: compile_ninja_default_profile_linux
-    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    commands:
-      - func: "scons compile"
-        vars:
-          generating_for_ninja: true
-          separate_debug: off
-          task_compile_flags: >-
-            --build-profile=default
-            --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
-            --ninja
-      - func: "f_expansions_write"
-      - func: "ninja compile"
-        vars:
-          ninja_file: "build.ninja"
-          targets: "install-devcore compiledb"
-
-  - name: compile_ninja_opt_profile
-    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    commands:
-      - func: "scons compile"
-        vars:
-          generating_for_ninja: true
-          separate_debug: off
-          task_compile_flags: >-
-            --build-profile=opt
-            CCACHE=
-            ICECC=
-      - func: "f_expansions_write"
-      - func: "ninja compile"
-        vars:
-          ninja_file: "opt.ninja"
-          targets: "install-devcore compiledb"
-
   - name: compile_ninja_bazel
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
     depends_on:
@@ -582,26 +524,6 @@ tasks:
           ninja_file: "fast.ninja"
           targets: "install-wiredtiger compiledb"
 
-  - name: compile_ninja_fast_profile
-    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    commands:
-      - func: "scons compile"
-        vars:
-          generating_for_ninja: true
-          separate_debug: off
-          task_compile_flags: >-
-            --build-profile=fast
-            CCACHE=
-            ICECC=
-      - func: "f_expansions_write"
-      - func: "ninja compile"
-        vars:
-          ninja_file: "fast.ninja"
-          targets: "install-devcore compiledb"
-
   - name: compile_ninja_fast_icecc
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
     depends_on:
@@ -621,46 +543,6 @@ tasks:
       - func: "ninja compile"
         vars:
           ninja_file: "fast.ninja"
-          targets: "install-devcore compiledb"
-
-  - name: compile_ninja_san_profile
-    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    commands:
-      - func: "scons compile"
-        vars:
-          generating_for_ninja: true
-          separate_debug: off
-          task_compile_flags: >-
-            --build-profile=san
-            --linker=lld
-            CCACHE=
-            ICECC=
-      - func: "f_expansions_write"
-      - func: "ninja compile"
-        vars:
-          ninja_file: "san.ninja"
-          targets: "install-devcore compiledb"
-
-  - name: compile_ninja_compiledb_profile
-    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    commands:
-      - func: "scons compile"
-        vars:
-          generating_for_ninja: true
-          separate_debug: off
-          task_compile_flags: >-
-            --build-profile=compiledb
-            --ninja
-      - func: "f_expansions_write"
-      - func: "ninja compile"
-        vars:
-          ninja_file: "compiledb.ninja"
           targets: "install-devcore compiledb"
 
   - name: compile_ninja_next
@@ -2054,40 +1936,10 @@ task_groups:
       - compile_ninja_quick
 
   - <<: *compile_task_group_template
-    name: compile_ninja_default_profile_TG
-    tasks:
-      - compile_ninja_default_profile
-
-  - <<: *compile_task_group_template
-    name: compile_ninja_default_profile_linux_TG
-    tasks:
-      - compile_ninja_default_profile_linux
-
-  - <<: *compile_task_group_template
-    name: compile_ninja_opt_profile_TG
-    tasks:
-      - compile_ninja_opt_profile
-
-  - <<: *compile_task_group_template
-    name: compile_ninja_san_profile_TG
-    tasks:
-      - compile_ninja_san_profile
-
-  - <<: *compile_task_group_template
-    name: compile_ninja_fast_profile_TG
-    tasks:
-      - compile_ninja_fast_profile
-
-  - <<: *compile_task_group_template
     name: compile_ninja_fast_icecc_TG
     tags: []
     tasks:
       - compile_ninja_fast_icecc
-
-  - <<: *compile_task_group_template
-    name: compile_ninja_compiledb_profile_TG
-    tasks:
-      - compile_ninja_compiledb_profile
 
   - <<: *compile_task_group_template
     name: compile_run_and_archive_dbtest_TG

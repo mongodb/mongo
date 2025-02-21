@@ -102,12 +102,8 @@ buildvariants:
         --ssl MONGO_DISTMOD=rhel88
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      unittest_compile_flags: >-
-        BAZEL_FLAGS=--jobs=4
-      integration_test_compile_flags: >-
-        BAZEL_FLAGS=--jobs=4
       compile_all_but_not_unittests_flags: >-
-        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
+        BAZEL_FLAGS="--linkopt=-s"
       test_flags: --excludeWithAnyTags=requires_external_data_source
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
@@ -166,12 +162,8 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --modules=
-      unittest_compile_flags: >-
-        BAZEL_FLAGS=--jobs=4
-      integration_test_compile_flags: >-
-        BAZEL_FLAGS=--jobs=4
       compile_all_but_not_unittests_flags: >-
-        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
+        BAZEL_FLAGS="--linkopt=-s"
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits
         --enableEnterpriseTests=off
@@ -217,12 +209,8 @@ buildvariants:
         --ssl MONGO_DISTMOD=rhel88
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      unittest_compile_flags: >-
-        BAZEL_FLAGS=--jobs=4
-      integration_test_compile_flags: >-
-        BAZEL_FLAGS=--jobs=4
       compile_all_but_not_unittests_flags: >-
-        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
+        BAZEL_FLAGS="--linkopt=-s"
       test_flags: --excludeWithAnyTags=requires_external_data_source,resource_intensive
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
@@ -271,12 +259,8 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --modules=
-      unittest_compile_flags: >-
-        BAZEL_FLAGS=--jobs=4
-      integration_test_compile_flags: >-
-        BAZEL_FLAGS=--jobs=4
       compile_all_but_not_unittests_flags: >-
-        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
+        BAZEL_FLAGS="--linkopt=-s"
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source
         --enableEnterpriseTests=off
@@ -320,12 +304,8 @@ buildvariants:
       push_name: linux
       push_arch: x86_64-enterprise-rhel93
       compile_flags: --ssl MONGO_DISTMOD=rhel93 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      unittest_compile_flags: >-
-        BAZEL_FLAGS=--jobs=4
-      integration_test_compile_flags: >-
-        BAZEL_FLAGS=--jobs=4
       compile_all_but_not_unittests_flags: >-
-        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
+        BAZEL_FLAGS="--linkopt=-s"
       test_flags: --excludeWithAnyTags=requires_external_data_source
       crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
       multiversion_platform: rhel93
@@ -375,12 +355,8 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --modules=
-      unittest_compile_flags: >-
-        BAZEL_FLAGS=--jobs=4
-      integration_test_compile_flags: >-
-        BAZEL_FLAGS=--jobs=4
       compile_all_but_not_unittests_flags: >-
-        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
+        BAZEL_FLAGS="--linkopt=-s"
       test_flags: >-
         --excludeWithAnyTags=requires_external_data_source
         --enableEnterpriseTests=off
@@ -429,12 +405,8 @@ buildvariants:
         --ssl MONGO_DISTMOD=rhel93
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      unittest_compile_flags: >-
-        BAZEL_FLAGS=--jobs=4
-      integration_test_compile_flags: >-
-        BAZEL_FLAGS=--jobs=4
       compile_all_but_not_unittests_flags: >-
-        BAZEL_FLAGS="--jobs=4 --linkopt=-s"
+        BAZEL_FLAGS="--linkopt=-s"
       test_flags: --excludeWithAnyTags=requires_external_data_source
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic

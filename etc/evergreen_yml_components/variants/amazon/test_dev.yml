@@ -454,7 +454,7 @@ buildvariants:
         --thin-lto
         --pgo
         --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
-        BAZEL_FLAGS="--keep_going --local_resources=cpu=HOST_CPUS*.1"
+        BAZEL_FLAGS="--keep_going"
     run_on:
       - amazon2-arm64-latest-xlarge
     tasks:
@@ -480,7 +480,7 @@ buildvariants:
         --thin-lto
         --pgo
         --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
-        BAZEL_FLAGS="--keep_going --local_resources=cpu=HOST_CPUS*.1"
+        BAZEL_FLAGS="--keep_going"
     run_on:
       - amazon2023.3-arm64-xlarge
     tasks:
@@ -505,7 +505,7 @@ buildvariants:
         --remote-exec-release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --bolt
-        BAZEL_FLAGS="--linkopt=-Wl,--emit-relocs --local_resources=cpu=HOST_CPUS*.1"
+        BAZEL_FLAGS="--linkopt=-Wl,--emit-relocs"
     run_on:
       - amazon2-arm64-latest-xlarge
     tasks:
@@ -530,7 +530,7 @@ buildvariants:
         --remote-exec-release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --bolt
-        BAZEL_FLAGS="--linkopt=-Wl,--emit-relocs --local_resources=cpu=HOST_CPUS*.1"
+        BAZEL_FLAGS="--linkopt=-Wl,--emit-relocs"
     run_on:
       - amazon2023.3-arm64-xlarge
     tasks:
@@ -560,7 +560,6 @@ buildvariants:
         --ssl=off
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
         CCFLAGS="-fno-gnu-unique"
-        BAZEL_FLAGS="--local_resources=cpu=HOST_CPUS*.1"
     run_on:
       - amazon2-arm64-latest-xlarge
     tasks:
@@ -589,7 +588,6 @@ buildvariants:
         --ssl=off
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
         CCFLAGS="-fno-gnu-unique"
-        BAZEL_FLAGS="--local_resources=cpu=HOST_CPUS*.1"
     run_on:
       - amazon2023.3-arm64-xlarge
     tasks:
@@ -610,7 +608,6 @@ buildvariants:
         --remote-exec-release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --streams-release-build
-        BAZEL_FLAGS="--local_resources=cpu=HOST_CPUS*.1"
     run_on:
       - amazon2-latest-xlarge
     tasks:
@@ -632,7 +629,6 @@ buildvariants:
         --remote-exec-release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --streams-release-build
-        BAZEL_FLAGS="--local_resources=cpu=HOST_CPUS*.1"
     run_on:
       - amazon2023.3-xlarge
     tasks:

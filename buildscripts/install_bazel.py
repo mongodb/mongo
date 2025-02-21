@@ -11,8 +11,6 @@ import time
 import urllib.request
 
 _S3_HASH_MAPPING = {
-    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-7.2.1-ppc64le": "4ecc7f1396b8d921c6468b34cc8ed356c4f2dbe8a154c25d681a61ccb5dfc9cb",
-    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-7.2.1-s390x": "2f5f7fd747620d96e885766a4027347c75c0f455c68219211a00e72fc6413be9",
     "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-darwin-amd64": "f2ba5f721a995b54bab68c6b76a340719888aa740310e634771086b6d1528ecd",
     "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-darwin-arm64": "69fa21cd2ccffc2f0970c21aa3615484ba89e3553ecce1233a9d8ad9570d170e",
     "https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-linux-amd64": "d28b588ac0916abd6bf02defb5433f6eddf7cba35ffa808eabb65a44aab226f7",
@@ -72,11 +70,6 @@ def _sha256_file(filename: str) -> str:
 
 
 def _verify_s3_hash(s3_path: str, local_path: str) -> None:
-    if s3_path not in _S3_HASH_MAPPING:
-        raise Exception(
-            f"S3 path not found in hash mapping, unable to verify downloaded for s3 path: {s3_path}"
-        )
-
     hash_string = _sha256_file(local_path)
     if hash_string != _S3_HASH_MAPPING[s3_path]:
         raise Exception(
@@ -111,33 +104,28 @@ def install_bazel(binary_directory: str) -> str:
         platform.machine().lower().replace("aarch64", "arm64").replace("x86_64", "amd64")
     )
     normalized_os = sys.platform.replace("win32", "windows").replace("darwin", "macos")
-
-    # TODO(SERVER-86050): remove the branch once bazelisk is built on s390x & ppc64le
     is_bazelisk_supported = normalized_arch not in ["ppc64le", "s390x"]
-    binary_filename = "bazelisk" if is_bazelisk_supported else "bazel"
-
+    binary_filename = "bazelisk"
     binary_path = os.path.join(binary_directory, binary_filename)
     if os.path.exists(binary_path):
         print(f"{binary_filename} already exists ({binary_path}), skipping download")
         _set_bazel_permissions(binary_path)
         return binary_path
 
-    print(f"Downloading {binary_filename}...")
-    # TODO(SERVER-86050): remove the branch once bazelisk is built on s390x & ppc64le
     if is_bazelisk_supported:
+        print(f"Downloading {binary_filename}...")
         ext = ".exe" if normalized_os == "windows" else ""
         os_str = normalized_os.replace("macos", "darwin")
         s3_path = f"https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-{os_str}-{normalized_arch}{ext}"
+        _download_path_with_retry(s3_path, binary_path)
+        _verify_s3_hash(s3_path, binary_path)
+        print(f"Downloaded {binary_filename} to {binary_path}")
+
     else:
-        print(
-            "Warning: Bazelisk is not supported on this platform. Installing Bazel directly instead."
-        )
-        s3_path = f"https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-7.2.1-{normalized_arch}"
-
-    _download_path_with_retry(s3_path, binary_path)
-    _verify_s3_hash(s3_path, binary_path)
-
-    print(f"Downloaded {binary_filename} to {binary_path}")
+        print("Using bazel/bazelisk.py on unsupported platform.")
+        repo_dir = os.path.dirname(os.path.dirname(__file__))
+        bazelisk_py = os.path.join(repo_dir, "bazel", "bazelisk.py")
+        shutil.copyfile(bazelisk_py, binary_path)
 
     _set_bazel_permissions(binary_path)
     return binary_path

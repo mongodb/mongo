@@ -41,11 +41,6 @@ common:macos --repo_env=BAZEL_NO_APPLE_CPP_TOOLCHAIN=1
 
 common:windows --features=-compiler_param_file
 
-# Restrict local actions to 20% to prevent linking from hitting OOM issues, but give the
-# freedom to remote execution to schedule more compilation actions.
-common --local_resources=cpu=HOST_CPUS*.2
-common:windows --local_resources=cpu=HOST_CPUS
-common:macos --local_resources=cpu=HOST_CPUS
 
 # while in hybrid build state, using local unsandboxed linking should be faster. When most of our link
 # targets have been converted (i.e. unittest binaries) and we can BWOB, remote linking should be faster
@@ -217,7 +212,6 @@ common:dbg_aubsan --//bazel/config:linkstatic=False
 common:dbg_aubsan --//bazel/config:allocator=system
 common:dbg_aubsan --//bazel/config:asan=True
 common:dbg_aubsan --//bazel/config:ubsan=True
-common:dbg_aubsan --local_resources=cpu=HOST_CPUS
 common:dbg_aubsan --enable_platform_specific_config=true
 
 # Build with thread sanitizers
@@ -229,7 +223,6 @@ common:dbg_tsan --//bazel/config:allocator=system
 common:dbg_tsan --//bazel/config:tsan=True
 common:dbg_tsan --//bazel/config:libunwind=off
 common:dbg_tsan --//bazel/config:skip_archive=False
-common:dbg_tsan --local_resources=cpu=HOST_CPUS
 common:dbg_tsan --enable_platform_specific_config=true
 
 # Profile for building optimized code - the build is slow, the code is fast #################################################
@@ -384,13 +377,11 @@ common:local --remote_cache_compression=false
 common:local --grpc_keepalive_time=0s
 common:local --legacy_important_outputs
 common:local --jobs=auto
-common:local --local_resources=cpu=HOST_CPUS
 
 # Disable remote execution but keep remote cache enabled
 --config=no-remote-exec
 common:no-remote-exec --remote_executor=
 common:no-remote-exec --jobs=auto
-common:no-remote-exec --local_resources=cpu=HOST_CPUS
 
 # Disable remote execution and caching for public releases
 --config=public-release

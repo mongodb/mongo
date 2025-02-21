@@ -743,6 +743,12 @@ def validate_remote_execution_certs(env: SCons.Environment.Environment) -> bool:
             os.path.expanduser(f"{appdata}/engflow_auth/tokens/sodalite.cluster.engflow.com")
         ):
             return True
+        elif platform.system() == "Darwin" and os.path.exists(
+            os.path.expanduser(
+                "~/Library/Application Support/engflow_auth/tokens/sodalite.cluster.engflow.com"
+            )
+        ):
+            return True
         elif os.path.exists(
             os.path.expanduser("~/.config/engflow_auth/tokens/sodalite.cluster.engflow.com")
         ):
@@ -1157,7 +1163,6 @@ def bazel_execroot(env):
 
 
 def prefetch_toolchain(env, version):
-    setup_bazel_env_vars()
     setup_max_retry_attempts()
     bazel_bin_dir = (
         env.GetOption("evergreen-tmp-dir")
@@ -1227,7 +1232,6 @@ def handle_bazel_program_exception(env, target, outputs):
                 scons_node_str = bazel_output_file.replace(
                     f"{env['BAZEL_OUT_DIR']}/src", env.Dir("$BUILD_DIR").path.replace("\\", "/")
                 )
-
                 Globals.scons2bazel_targets[scons_node_str.replace("\\", "/")] = {
                     "bazel_target": target,
                     "bazel_output": bazel_output_file.replace("\\", "/"),
@@ -1262,7 +1266,6 @@ def handle_bazel_program_exception(env, target, outputs):
                 scons_node_str = bazel_output_file.replace(
                     f"{env['BAZEL_OUT_DIR']}/src", env.Dir("$BUILD_DIR").path.replace("\\", "/")
                 )
-
                 Globals.scons2bazel_targets[scons_node_str.replace("\\", "/")] = {
                     "bazel_target": target,
                     "bazel_output": bazel_output_file.replace("\\", "/"),
@@ -1278,12 +1281,6 @@ def cleanup_gitinfo_bazelrc():
                 os.remove(gitinfo_bazelrc_file)
             except:
                 pass
-
-
-def setup_bazel_env_vars() -> None:
-    # Set the JAVA_HOME directories for ppc64le and s390x since their bazel binaries are not compiled with a built-in JDK.
-    if platform.machine().lower() in {"ppc64le", "s390x"}:
-        Globals.bazel_env_variables["JAVA_HOME"] = "/usr/lib/jvm/java-21-openjdk"
 
 
 def setup_max_retry_attempts() -> None:
@@ -1522,7 +1519,6 @@ def generate(env: SCons.Environment.Environment) -> None:
     if normalized_os == "macos" and evergreen_tmp_dir:
         bazel_internal_flags.append(f"--sandbox_writable_path={evergreen_tmp_dir}")
 
-    setup_bazel_env_vars()
     setup_max_retry_attempts()
 
     if not is_local_execution(env) and not public_release:

@@ -79,6 +79,5 @@ common --bes_keywords=rawCommandLineBase64={b64_cmd_line}
 
     current_hash = hashlib.md5(bazelrc_contents.encode()).hexdigest()
     if existing_hash != current_hash:
-        print(f"Generating new {workstation_file} file...")
         with open(workstation_file, "w") as f:
             f.write(bazelrc_contents)

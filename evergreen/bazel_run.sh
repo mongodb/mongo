@@ -28,14 +28,7 @@ else
   LOCAL_ARG="--config=local"
 fi
 
-# Set the base URL for the bazelisk binaries to download from our s3 bucket
-export BAZELISK_BASE_URL=https://mdb-build-public.s3.amazonaws.com/bazel-binaries
-
 BAZEL_BINARY=$(bazel_get_binary_path)
-if is_s390x_or_ppc64le; then
-  # Set the JAVA_HOME directories for ppc64le and s390x since their bazel binaries are not compiled with a built-in JDK.
-  export JAVA_HOME="/usr/lib/jvm/java-21-openjdk"
-fi
 
 # AL2 stores certs in a nonstandard location
 if [[ -f /etc/os-release ]]; then
