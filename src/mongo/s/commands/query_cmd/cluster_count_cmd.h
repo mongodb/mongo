@@ -142,29 +142,7 @@ public:
 
         std::vector<AsyncRequestsSender::Response> shardResponses;
         try {
-            auto cmdObj = [&] {
-                if (!OptionalBool::parseFromBSON(
-                        originalCmdObj[CountCommandRequest::kRawDataFieldName]) ||
-                    !CollectionRoutingInfoTargeter{opCtx, nss}.timeseriesNamespaceNeedsRewrite(
-                        nss)) {
-                    return originalCmdObj;
-                }
-
-                nss = nss.makeTimeseriesBucketsNamespace();
-
-                // Rewrite the command object to use the buckets namespace.
-                BSONObjBuilder builder{originalCmdObj.objsize()};
-                for (auto&& [fieldName, elem] : originalCmdObj) {
-                    if (fieldName == CountCommandRequest::kCommandName) {
-                        builder.append(fieldName, nss.coll());
-                    } else {
-                        builder.append(elem);
-                    }
-                }
-
-                return builder.obj();
-            }();
-
+            auto cmdObj = translateCmdObjForRawData(opCtx, originalCmdObj, nss);
             auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
 
             uassert(ErrorCodes::InvalidOptions,
@@ -328,23 +306,24 @@ public:
                    rpc::ReplyBuilderInterface* result) const override {
         Impl::checkCanExplainHere(opCtx);
 
-        const BSONObj& cmdObj = request.body;
+        const BSONObj& originalCmdObj = request.body;
 
         auto curOp = CurOp::get(opCtx);
         curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
 
-        CountCommandRequest countRequest(NamespaceStringOrUUID(NamespaceString{}));
-        try {
-            countRequest = CountCommandRequest::parse(IDLParserContext("count"), request);
-        } catch (...) {
-            return exceptionToStatus();
-        }
-
-        const NamespaceString nss = parseNs(countRequest.getDbName(), cmdObj);
+        auto nss = parseNs(request.parseDbName(), originalCmdObj);
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid namespace specified '" << nss.toStringForErrorMsg()
                               << "'",
                 nss.isValid());
+
+        auto cmdObj = translateCmdObjForRawData(opCtx, originalCmdObj, nss);
+        CountCommandRequest countRequest(NamespaceStringOrUUID(NamespaceString{}));
+        try {
+            countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
+        } catch (...) {
+            return exceptionToStatus();
+        }
 
         uassert(ErrorCodes::InvalidOptions,
                 "rawData is not enabled",
@@ -440,6 +419,29 @@ private:
         }
 
         return num;
+    }
+
+    static BSONObj translateCmdObjForRawData(OperationContext* opCtx,
+                                             const BSONObj& cmdObj,
+                                             NamespaceString& ns) {
+        if (!OptionalBool::parseFromBSON(cmdObj[CountCommandRequest::kRawDataFieldName]) ||
+            !CollectionRoutingInfoTargeter{opCtx, ns}.timeseriesNamespaceNeedsRewrite(ns)) {
+            return cmdObj;
+        }
+
+        ns = ns.makeTimeseriesBucketsNamespace();
+
+        // Rewrite the command object to use the buckets namespace.
+        BSONObjBuilder builder{cmdObj.objsize()};
+        for (auto&& [fieldName, elem] : cmdObj) {
+            if (fieldName == CountCommandRequest::kCommandName) {
+                builder.append(fieldName, ns.coll());
+            } else {
+                builder.append(elem);
+            }
+        }
+
+        return builder.obj();
     }
 };
 

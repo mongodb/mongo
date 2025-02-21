@@ -42,6 +42,6 @@ const assertExplain = function(explain) {
 };
 
 assertExplain(bucketsColl.explain().aggregate([{$match: {"control.count": 2}}]));
-assertExplain(bucketsColl.explain().count({"control.count": 2}));
+assertExplain(coll.explain().count({"control.count": 2}, {rawData: true}));
 assertExplain(bucketsColl.explain().distinct("control.count"));
 assertExplain(bucketsColl.explain().find({"control.count": 2}).finish());

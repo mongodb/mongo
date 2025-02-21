@@ -208,6 +208,18 @@ public:
             // Start the query planning timer.
             CurOp::get(opCtx)->beginQueryPlanningTimer();
 
+            auto ns = [&] {
+                if (request().getRawData()) {
+                    auto [isTimeseriesViewRequest, ns] =
+                        timeseries::isTimeseriesViewRequest(opCtx, request());
+                    if (isTimeseriesViewRequest) {
+                        ctx.emplace(opCtx, ns);
+                        return ns;
+                    }
+                }
+                return _ns;
+            }();
+
             if (ctx->getView()) {
                 // Relinquish locks. The aggregation command will re-acquire them.
                 ctx.reset();
@@ -220,16 +232,16 @@ public:
             auto rangePreverser = buildRangePreserverForShardedCollections(opCtx, collection);
 
             auto expCtx = makeExpressionContextForGetExecutor(
-                opCtx, request().getCollation().value_or(BSONObj()), _ns, verbosity);
+                opCtx, request().getCollation().value_or(BSONObj()), ns, verbosity);
 
             // Create an RAII object that prints useful information about the ExpressionContext in
             // the case of a tassert or crash.
             ScopedDebugInfo expCtxDiagnostics(
                 "ExpCtxDiagnostics", command_diagnostics::ExpressionContextPrinter{expCtx});
 
-            const auto extensionsCallback = getExtensionsCallback(collection, opCtx, _ns);
+            const auto extensionsCallback = getExtensionsCallback(collection, opCtx, ns);
             auto parsedFind = uassertStatusOK(
-                parsed_find_command::parseFromCount(expCtx, request(), *extensionsCallback, _ns));
+                parsed_find_command::parseFromCount(expCtx, request(), *extensionsCallback, ns));
 
             auto statusWithPlanExecutor =
                 getExecutorCount(expCtx, &collection, std::move(parsedFind), request());
