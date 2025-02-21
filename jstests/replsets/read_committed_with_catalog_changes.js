@@ -209,9 +209,28 @@ function assertReadsBlock(db, coll) {
 }
 
 function assertReadsSucceed(coll, timeoutMs = 20000) {
-    var res =
-        coll.runCommand('find', {"readConcern": {"level": "majority"}, "maxTimeMS": timeoutMs});
-    assert.commandWorked(res, 'reading from ' + coll.getFullName());
+    // It is possible for the read to fail with QueryPlanKilled if the underlying collection is
+    // dropped and recreated. This can happen if the read obtains a snapshot that contains the
+    // original coll, then yields (thus releasing the snapshot), then the collection is dropped and
+    // recreated. When the read reacquires the collection, it will establish a snapshot that has a
+    // different UUID than the original collection, leading to a QueryPlanKilled error.
+    //
+    // As a result, retry until the command succeeds while catching the QueryPlanKilled error.
+    let res;
+    assert.soon(() => {
+        res =
+            coll.runCommand('find', {"readConcern": {"level": "majority"}, "maxTimeMS": timeoutMs});
+        if (res.ok) {
+            return true;
+        }
+
+        jsTestLog(`reading from ${coll.getFullName()} failed with error ${res.code}`);
+        // Retry if the error code is QueryPlanKilled.
+        return res.code != ErrorCodes.QueryPlanKilled;
+    });
+    // Assert that the command succeeded eventually.
+    assert.commandWorked(res);
+
     // Exhaust the cursor to avoid leaking cursors on the server.
     new DBCommandCursor(coll.getDB(), res).itcount();
 }
