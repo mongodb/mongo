@@ -1,7 +1,5 @@
 /**
  * Tests that an aggregation pipeline cannot have more than one $_internalUnpackBucket stage.
- *
- * @tags: [ do_not_wrap_aggregations_in_facets ]
  */
 
 const coll = db.multiple_unpack_bucket_error;

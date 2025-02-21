@@ -141,7 +141,7 @@ public:
                                      PositionRequirement::kNone,
                                      HostTypeRequirement::kNone,
                                      DiskUseRequirement::kNoDiskUse,
-                                     FacetRequirement::kNotAllowed,
+                                     FacetRequirement::kAllowed,
                                      TransactionRequirement::kAllowed,
                                      LookupRequirement::kAllowed,
                                      UnionRequirement::kAllowed,

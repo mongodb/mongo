@@ -259,25 +259,25 @@ TEST_F(InternalUnpackBucketExecTest, UnpackNeitherIncludeNorExcludeDefaultsToEmp
     auto source = DocumentSourceMock::createForTest(
         {
             R"({
-    control: {'version': 1},
-    meta: {'m1': 999, 'm2': 9999},
-    data: {
-        _id: {'0':1, '1':2},
-        time: {'0':Date(1), '1':Date(2)},
-        a:{'0':1, '1':2},
-        b:{'1':1}
-    }
-})",
+      control: {'version': 1},
+      meta: {'m1': 999, 'm2': 9999},
+      data: {
+          _id: {'0':1, '1':2},
+          time: {'0':Date(1), '1':Date(2)},
+          a:{'0':1, '1':2},
+          b:{'1':1}
+      }
+  })",
             R"({
-    control: {'version': 1},
-    meta: {m1: 9, m2: 9, m3: 9},
-    data: {
-        _id: {'0':3, '1':4},
-        time: {'0':Date(3), '1':Date(4)},
-        a:{'0':1, '1':2},
-        b:{'1':1}
-    }
-})"},
+      control: {'version': 1},
+      meta: {m1: 9, m2: 9, m3: 9},
+      data: {
+          _id: {'0':3, '1':4},
+          time: {'0':Date(3), '1':Date(4)},
+          a:{'0':1, '1':2},
+          b:{'1':1}
+      }
+  })"},
         expCtx);
     unpack->setSource(source.get());
 
@@ -694,24 +694,24 @@ TEST_F(InternalUnpackBucketExecTest, BucketUnpackerHandlesMissingMetadata) {
     auto source = DocumentSourceMock::createForTest(
         {
             R"(
-{
-    control: {'version': 1},
-    meta: {
-        'm1': 999, 'm2': 9999
-    },
-    data: {
-        _id: {'1':1, '0':2, '2': 3},
-        time: {'1':Date(1), '0': Date(2), '2': Date(3)}
-    }
-})",
+  {
+      control: {'version': 1},
+      meta: {
+          'm1': 999, 'm2': 9999
+      },
+      data: {
+          _id: {'1':1, '0':2, '2': 3},
+          time: {'1':Date(1), '0': Date(2), '2': Date(3)}
+      }
+  })",
             R"(
-{
-    control: {'version': 1},
-    data: {
-        _id: {'1':4, '0':5, '2':6},
-        time: {'1':Date(4), '0': Date(5), '2': Date(6)}
-    }
-})"},
+  {
+      control: {'version': 1},
+      data: {
+          _id: {'1':4, '0':5, '2':6},
+          time: {'1':Date(4), '0': Date(5), '2': Date(6)}
+      }
+  })"},
         expCtx);
     unpack->setSource(source.get());
 
@@ -977,5 +977,107 @@ TEST_F(InternalUnpackBucketExecTest, RedactsCorrectly) {
         "computedMetaProjFields: [\"HASH<a>\", \"HASH<b>\", \"HASH<c>\"]}}",
         redact(*docSource));
 }
+
+TEST_F(InternalUnpackBucketExecTest, BucketExercisesPauseExecutionCorrectly) {
+    auto ctx = getExpCtx();
+    auto spec = BSON(DocumentSourceInternalUnpackBucket::kStageNameInternal
+                     << BSON(DocumentSourceInternalUnpackBucket::kExclude
+                             << BSONArray() << timeseries::kTimeFieldName << kUserDefinedTimeName
+                             << timeseries::kMetaFieldName << kUserDefinedMetaName
+                             << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds << 3600));
+    auto bucketSource =
+        DocumentSourceInternalUnpackBucket::createFromBsonInternal(spec.firstElement(), ctx);
+
+    auto bucketOneJson = R"(
+        {
+            control: {'version': 1},
+            meta: {
+                'm1': 999, 'm2': 9999
+            },
+            data: {
+                _id: [1, 2, 3],
+                time: [Date(1), Date(2), Date(3)]
+            }
+        })";
+    auto bucketTwoJson = R"(
+            {
+                control: {'version': 1},
+                meta: {
+                    'm1': 999, 'm2': 9999
+                },
+                data: {
+                    _id: [4, 5, 6],
+                    time: [Date(4), Date(5), Date(6)]
+                }
+            })";
+
+    auto mock =
+        DocumentSourceMock::createForTest({DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document(fromjson(bucketOneJson)),
+                                           DocumentSource::GetNextResult::makePauseExecution(),
+                                           Document(fromjson(bucketTwoJson)),
+                                           DocumentSource::GetNextResult::makePauseExecution()},
+                                          ctx);
+
+    auto expectedBucketOneDocs = std::vector<Document>{
+        Document(fromjson("{time: Date(1), myMeta: {m1: 999, m2: 9999}, _id: 1}")),
+        Document(fromjson("{time: Date(2), myMeta: {m1: 999, m2: 9999}, _id: 2}")),
+        Document(fromjson("{time: Date(3), myMeta: {m1: 999, m2: 9999}, _id: 3}"))};
+
+    auto expectedBucketTwoDocs = std::vector<Document>{
+        Document(fromjson("{time: Date(4), myMeta: {m1: 999, m2: 9999}, _id: 4}")),
+        Document(fromjson("{time: Date(5), myMeta: {m1: 999, m2: 9999}, _id: 5}")),
+        Document(fromjson("{time: Date(6), myMeta: {m1: 999, m2: 9999}, _id: 6}"))};
+
+    bucketSource->setSource(mock.get());
+    auto next = bucketSource->getNext();
+    ASSERT_TRUE(next.isPaused());
+    next = bucketSource->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    for (auto&& expectedDoc : expectedBucketOneDocs) {
+        ASSERT_TRUE(next.isAdvanced());
+        ASSERT_DOCUMENT_EQ(next.getDocument(), expectedDoc);
+        next = bucketSource->getNext();
+    }
+    ASSERT_TRUE(next.isPaused());
+    next = bucketSource->getNext();
+    for (auto&& expectedDoc : expectedBucketTwoDocs) {
+        ASSERT_TRUE(next.isAdvanced());
+        ASSERT_DOCUMENT_EQ(next.getDocument(), expectedDoc);
+        next = bucketSource->getNext();
+    }
+    ASSERT_TRUE(next.isPaused());
+    next = bucketSource->getNext();
+    ASSERT_TRUE(next.isEOF());
+}
+
+TEST_F(InternalUnpackBucketExecTest, AssertConstraints) {
+    auto ctx = getExpCtx();
+    auto bson = fromjson(
+        R"({
+             $_internalUnpackBucket: {
+                 include: [ 'a', 'b', 'c' ],
+                 timeField : 'time',
+                 metaField : 'meta',
+                 bucketMaxSpanSeconds : 3600,
+                 computedMetaProjFields : [ 'a', 'b', 'c' ]
+             }
+         })");
+    auto bucketSource = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
+        bson.firstElement(), getExpCtx());
+
+    auto constraints = bucketSource->constraints();
+    ASSERT_FALSE(constraints.mustRunLocally());
+    ASSERT_TRUE(constraints.isAllowedInsideFacetStage());
+    ASSERT_FALSE(constraints.isAllowedInChangeStream());
+    ASSERT_FALSE(constraints.isChangeStreamStage());
+    ASSERT_FALSE(constraints.requiresChangeStream());
+    ASSERT_TRUE(constraints.isAllowedInTransaction());
+    ASSERT_TRUE(constraints.isAllowedInLookupPipeline());
+    ASSERT_TRUE(constraints.isAllowedInUnionPipeline());
+    ASSERT_TRUE(constraints.isAllowedInsideFacetStage());
+    ASSERT_FALSE(constraints.writesPersistentData());
+}
+
 }  // namespace
 }  // namespace mongo
