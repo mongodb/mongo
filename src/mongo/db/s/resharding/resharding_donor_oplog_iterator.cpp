@@ -99,8 +99,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingDonorOplogIterator::makePip
     using Arr = std::vector<Value>;
     using V = Value;
 
-    StringMap<ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces[_oplogBufferNss.coll()] = {_oplogBufferNss, std::vector<BSONObj>{}};
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[_oplogBufferNss] = {_oplogBufferNss, std::vector<BSONObj>{}};
     auto expCtx = ExpressionContextBuilder{}
                       .opCtx(opCtx)
                       .mongoProcessInterface(std::move(mongoProcessInterface))

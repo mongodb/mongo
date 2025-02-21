@@ -76,7 +76,8 @@ public:
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& specElem);
+                                                 const BSONElement& specElem,
+                                                 const LiteParserOptions& options);
 
         explicit LiteParsed(std::string parseTimeName,
                             NamespaceString nss,

@@ -254,10 +254,6 @@ NamespaceString NamespaceString::makeCommandNamespace(const DatabaseName& dbName
     return NamespaceString(dbName, "$cmd");
 }
 
-NamespaceString NamespaceString::makeDummyNamespace(const boost::optional<TenantId>& tenantId) {
-    return NamespaceString(tenantId, DatabaseName::kConfig.db(omitTenant), "dummy.namespace");
-}
-
 std::string NamespaceString::getSisterNS(StringData local) const {
     MONGO_verify(local.size() && local[0] != '.');
     return db_deprecated().toString() + "." + local.toString();

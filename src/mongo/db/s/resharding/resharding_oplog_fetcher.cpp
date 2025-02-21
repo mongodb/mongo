@@ -107,9 +107,9 @@
 namespace mongo {
 namespace {
 boost::intrusive_ptr<ExpressionContext> _makeExpressionContext(OperationContext* opCtx) {
-    StringMap<ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces[NamespaceString::kRsOplogNamespace.coll()] = {
-        NamespaceString::kRsOplogNamespace, std::vector<BSONObj>()};
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[NamespaceString::kRsOplogNamespace] = {NamespaceString::kRsOplogNamespace,
+                                                              std::vector<BSONObj>()};
     return ExpressionContextBuilder{}
         .opCtx(opCtx)
         .mongoProcessInterface(MongoProcessInterface::create(opCtx))

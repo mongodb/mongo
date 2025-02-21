@@ -37,7 +37,8 @@ namespace mongo {
 class LiteParsedSearchStage : public LiteParsedDocumentSourceNestedPipelines {
 public:
     static std::unique_ptr<LiteParsedSearchStage> parse(const NamespaceString& nss,
-                                                        const BSONElement& spec) {
+                                                        const BSONElement& spec,
+                                                        const LiteParserOptions& options) {
         // Set the mongot stage's pipeline, if applicable.
         auto pipelineElem = spec.Obj()["pipeline"];
         boost::optional<LiteParsedPipeline> liteParsedPipeline;

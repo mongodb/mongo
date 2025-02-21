@@ -319,9 +319,8 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfEmptyPipeline) {
 
 TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsAllowed) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(
-        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
-                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
 
     auto spec = fromjson(R"({
         $rankFusion: {
@@ -709,9 +708,8 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
 
 TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleUnionwithAllowed) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(
-        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
-                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
     auto nsToUnionWith1 = NamespaceString::createNamespaceString_forTest(
         expCtx->getNamespaceString().dbName(), "novels");
     expCtx->addResolvedNamespaces({nsToUnionWith1});
@@ -945,9 +943,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleUnionwithAllowed) {
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfNestedUnionWithModifiesFields) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(
-        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
-                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
     auto nsToUnionWith1 = NamespaceString::createNamespaceString_forTest(
         expCtx->getNamespaceString().dbName(), "novels");
     expCtx->addResolvedNamespaces({nsToUnionWith1});
@@ -995,9 +992,8 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfNestedUnionWithModifiesFields) {
 
 TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocsAndNoDistanceField) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(
-        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
-                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
     auto spec = fromjson(R"({
         $rankFusion: {
             input: {
@@ -1399,9 +1395,8 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfWeightsIsNotObject) {
 
 TEST_F(DocumentSourceRankFusionTest, DoesNotErrorIfEmptyWeights) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(
-        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
-                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
 
     auto spec = fromjson(R"({
         $rankFusion: {
@@ -1436,9 +1431,8 @@ TEST_F(DocumentSourceRankFusionTest, DoesNotErrorIfEmptyWeights) {
 
 TEST_F(DocumentSourceRankFusionTest, DoesNotErrorIfOnlySomeWeights) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(
-        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
-                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
 
     auto spec = fromjson(R"({
         $rankFusion: {
@@ -1620,9 +1614,8 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfNegativeWeightValue) {
 
 TEST_F(DocumentSourceRankFusionTest, CheckWeightsApplied) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(
-        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
-                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
     auto spec = fromjson(R"({
         $rankFusion: {
             input: {
@@ -1835,9 +1828,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsApplied) {
 // combination.weights; checks that the weights are applied to the pipeline with the same name.
 TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedToCorrectPipeline) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(
-        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
-                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
     auto spec = fromjson(R"({
         $rankFusion: {
             input: {
@@ -2048,9 +2040,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedToCorrectPipeline) {
 
 TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(
-        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
-                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
     auto spec = fromjson(R"({
         $rankFusion: {
             input: {
@@ -2633,9 +2624,8 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
 TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(
-        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
-                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
     auto spec = fromjson(R"({
         $rankFusion: {
             input: {
@@ -3073,9 +3063,8 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfPipelineNameContainsDot) {
 
 TEST_F(DocumentSourceRankFusionTest, QueryShapeDebugString) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(
-        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
-                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
 
     auto spec = fromjson(R"({
         $rankFusion: {
@@ -3277,9 +3266,8 @@ TEST_F(DocumentSourceRankFusionTest, QueryShapeDebugString) {
 
 TEST_F(DocumentSourceRankFusionTest, RepresentativeQueryShape) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(
-        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
-                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
 
     auto spec = fromjson(R"({
         $rankFusion: {

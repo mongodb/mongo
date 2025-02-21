@@ -75,7 +75,8 @@ public:
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& specElem) {
+                                                 const BSONElement& specElem,
+                                                 const LiteParserOptions& options) {
             uassert(5447000,
                     str::stream() << "$collStats must take a nested object but found: " << specElem,
                     specElem.type() == BSONType::Object);

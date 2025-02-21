@@ -438,8 +438,8 @@ public:
                                          const NamespaceString& nss,
                                          std::vector<RemoteCursor>&& cursors) {
 
-            StringMap<ResolvedNamespace> resolvedNamespaces;
-            resolvedNamespaces[nss.coll()] = {nss, std::vector<BSONObj>{}};
+            ResolvedNamespaceMap resolvedNamespaces;
+            resolvedNamespaces[nss] = {nss, std::vector<BSONObj>{}};
 
             auto expCtx = ExpressionContextBuilder{}
                               .opCtx(opCtx)

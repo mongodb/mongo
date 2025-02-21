@@ -101,7 +101,7 @@ NamespaceString parseGraphLookupFromAndResolveNamespace(const BSONElement& elem,
 using boost::intrusive_ptr;
 
 std::unique_ptr<DocumentSourceGraphLookUp::LiteParsed> DocumentSourceGraphLookUp::LiteParsed::parse(
-    const NamespaceString& nss, const BSONElement& spec) {
+    const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "the $graphLookup stage specification must be an object, but found "
                           << typeName(spec.type()),

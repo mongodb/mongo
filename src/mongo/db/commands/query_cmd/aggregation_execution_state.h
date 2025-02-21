@@ -175,7 +175,7 @@ public:
         }
     }
 
-    StatusWith<StringMap<ResolvedNamespace>> resolveInvolvedNamespaces() const;
+    StatusWith<ResolvedNamespaceMap> resolveInvolvedNamespaces() const;
 
     /**
      * Setter functions

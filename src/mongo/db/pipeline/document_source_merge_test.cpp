@@ -41,11 +41,9 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/tenant_id.h"
@@ -69,6 +67,10 @@ const StringData kDefaultWhenNotMatchedMode =
 
 class DocumentSourceMergeTest : public AggregationContextFixture {
 public:
+    DocumentSourceMergeTest()
+        : AggregationContextFixture(NamespaceString::createNamespaceString_forTest(
+              boost::none, "unittests", "pipeline_test")) {}
+
     boost::intrusive_ptr<DocumentSourceMerge> createMergeStage(BSONObj spec) {
         auto specElem = spec.firstElement();
         boost::intrusive_ptr<DocumentSourceMerge> mergeStage = dynamic_cast<DocumentSourceMerge*>(
@@ -1067,8 +1069,8 @@ TEST_F(DocumentSourceMergeServerlessTest,
 
         // Pass collection name as a string.
         auto stageSpec = BSON("$merge" << _targetColl);
-        auto liteParsedLookup =
-            DocumentSourceMerge::LiteParsed::parse(nss, stageSpec.firstElement());
+        auto liteParsedLookup = DocumentSourceMerge::LiteParsed::parse(
+            nss, stageSpec.firstElement(), LiteParserOptions{});
         auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
         ASSERT_EQ(1, namespaceSet.size());
         ASSERT_EQ(1ul,
@@ -1092,8 +1094,8 @@ TEST_F(DocumentSourceMergeServerlessTest,
         // Pass collection name as a db + coll object.
         auto stageSpec =
             BSON("$merge" << BSON("into" << BSON("db" << _targetDb << "coll" << _targetColl)));
-        auto liteParsedLookup =
-            DocumentSourceMerge::LiteParsed::parse(nss, stageSpec.firstElement());
+        auto liteParsedLookup = DocumentSourceMerge::LiteParsed::parse(
+            nss, stageSpec.firstElement(), LiteParserOptions{});
         auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
         ASSERT_EQ(1, namespaceSet.size());
         ASSERT_EQ(1ul,
@@ -1116,7 +1118,8 @@ TEST_F(DocumentSourceMergeServerlessTest,
     auto stageSpec =
         BSON("$merge" << BSON("into" << BSON("db" << nss.dbName().toStringWithTenantId_forTest()
                                                   << "coll" << _targetColl)));
-    auto liteParsedLookup = DocumentSourceMerge::LiteParsed::parse(nss, stageSpec.firstElement());
+    auto liteParsedLookup =
+        DocumentSourceMerge::LiteParsed::parse(nss, stageSpec.firstElement(), LiteParserOptions{});
     auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
     ASSERT_EQ(1, namespaceSet.size());
     ASSERT_EQ(1ul,

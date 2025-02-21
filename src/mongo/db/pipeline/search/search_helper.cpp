@@ -259,7 +259,7 @@ void addResolvedNamespaceForSearch(const NamespaceString& origNss,
                                    const ResolvedView& resolvedView,
                                    boost::intrusive_ptr<ExpressionContext> expCtx,
                                    boost::optional<UUID> uuid) {
-    expCtx->addResolvedNamespace(origNss.coll().toString(),
+    expCtx->addResolvedNamespace(origNss,
                                  ResolvedNamespace(resolvedView.getNamespace(),
                                                    resolvedView.getPipeline(),
                                                    uuid,

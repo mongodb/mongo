@@ -192,7 +192,8 @@ TEST_F(DocumentSourceOutServerlessTest,
 
     auto stageSpec = BSON("$out"
                           << "some_collection");
-    auto liteParsedLookup = DocumentSourceOut::LiteParsed::parse(nss, stageSpec.firstElement());
+    auto liteParsedLookup =
+        DocumentSourceOut::LiteParsed::parse(nss, stageSpec.firstElement(), LiteParserOptions{});
     auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
     ASSERT_EQ(1, namespaceSet.size());
     ASSERT_EQ(1ul,
@@ -205,7 +206,8 @@ TEST_F(DocumentSourceOutServerlessTest,
                                     << "target_db"
                                     << "coll"
                                     << "some_collection"));
-    liteParsedLookup = DocumentSourceOut::LiteParsed::parse(nss, stageSpec.firstElement());
+    liteParsedLookup =
+        DocumentSourceOut::LiteParsed::parse(nss, stageSpec.firstElement(), LiteParserOptions{});
     namespaceSet = liteParsedLookup->getInvolvedNamespaces();
     ASSERT_EQ(1, namespaceSet.size());
     ASSERT_EQ(1ul,

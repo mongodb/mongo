@@ -119,6 +119,8 @@ struct ResolvedNamespace {
     // LiteParsedPipeline object when it's already being stored here.
 };
 
+using ResolvedNamespaceMap = absl::flat_hash_map<NamespaceString, ResolvedNamespace>;
+
 enum class ExpressionContextCollationMatchesDefault { kYes, kNo };
 
 class ExpressionContext : public RefCountable {
@@ -322,7 +324,7 @@ public:
      * namespace not involved in the pipeline.
      */
     const ResolvedNamespace& getResolvedNamespace(const NamespaceString& nss) const {
-        auto it = _params.resolvedNamespaces.find(nss.coll());
+        auto it = _params.resolvedNamespaces.find(nss);
         tassert(9453000,
                 str::stream() << "No resolved namespace provided for " << nss.toStringForErrorMsg(),
                 it != _params.resolvedNamespaces.end());
@@ -363,12 +365,12 @@ public:
         return !_params.explain;
     }
 
-    void setResolvedNamespaces(StringMap<ResolvedNamespace> resolvedNamespaces) {
+    void setResolvedNamespaces(ResolvedNamespaceMap resolvedNamespaces) {
         _params.resolvedNamespaces = std::move(resolvedNamespaces);
     }
 
-    void addResolvedNamespace(StringData collName, const ResolvedNamespace& resolvedNs) {
-        auto it = _params.resolvedNamespaces.find(collName);
+    void addResolvedNamespace(NamespaceString nss, const ResolvedNamespace& resolvedNs) {
+        auto it = _params.resolvedNamespaces.find(nss);
 
         // Assert that the resolved namespace we are adding either doesn't exist in the map or we
         // are reassigning the same value (no modification allowed). Only perform the uuid check if
@@ -381,13 +383,13 @@ public:
                      (!it->second.uuid.has_value() || !resolvedNs.uuid.has_value() ||
                       it->second.uuid.value() == resolvedNs.uuid.value())));
 
-        _params.resolvedNamespaces[collName] = resolvedNs;
+        _params.resolvedNamespaces[nss] = resolvedNs;
     }
 
     void addResolvedNamespaces(
         const mongo::stdx::unordered_set<mongo::NamespaceString>& resolvedNamespaces) {
         for (const auto& nss : resolvedNamespaces) {
-            _params.resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
+            _params.resolvedNamespaces.try_emplace(nss, nss, std::vector<BSONObj>{});
         }
     }
 
@@ -725,6 +727,16 @@ public:
         _params.forcePlanCache = forcePlanCache;
     }
 
+    bool getAllowGenericForeignDbLookup() const {
+        return _params.allowGenericForeignDbLookup;
+    }
+
+    // Should only be used to test parsing with the flag. Otherwise, this flag should only be set
+    // when creating a new ExpressionContext.
+    bool setAllowGenericForeignDbLookup_forTest(bool allowGenericForeignDbLookup) {
+        return _params.allowGenericForeignDbLookup = allowGenericForeignDbLookup;
+    }
+
     const TimeZoneDatabase* getTimeZoneDatabase() const {
         return _params.timeZoneDatabase;
     }
@@ -925,7 +937,7 @@ protected:
         std::shared_ptr<MongoProcessInterface> mongoProcessInterface = nullptr;
         NamespaceString ns;
         // A map from namespace to the resolved namespace, in case any views are involved.
-        StringMap<ResolvedNamespace> resolvedNamespaces;
+        ResolvedNamespaceMap resolvedNamespaces;
         SerializationContext serializationContext;
         // If known, the UUID of the execution namespace for this aggregation command.
         // TODO(SERVER-78226): Replace `ns` and `uuid` with a type which can express "nss and uuid".
@@ -1015,6 +1027,11 @@ protected:
         // Forces the plan cache to be used even if there's only one solution available. Queries
         // that are ineligible will still not be cached.
         bool forcePlanCache = false;
+        // Allows the foreign collection of a lookup to be in a different database than the local
+        // collection using "from: {db: ..., coll: ...}" syntax. Currently, this should only be used
+        // for streams since this isn't allowed in MQL beyond some exemptions for internal
+        // collection in the local database.
+        bool allowGenericForeignDbLookup = false;
     };
 
     ExpressionContextParams _params;
@@ -1084,6 +1101,9 @@ protected:
     DocumentComparator _documentComparator;
     ValueComparator _valueComparator;
 
+    // A map from namespace to the resolved namespace, in case any views are involved.
+    ResolvedNamespaceMap _resolvedNamespaces;
+
     int _interruptCounter = kInterruptCheckPeriod;
 
     bool _isCappedDelete = false;
@@ -1137,7 +1157,7 @@ public:
     ExpressionContextBuilder& collator(std::unique_ptr<CollatorInterface>&&);
     ExpressionContextBuilder& mongoProcessInterface(std::shared_ptr<MongoProcessInterface>);
     ExpressionContextBuilder& ns(NamespaceString);
-    ExpressionContextBuilder& resolvedNamespace(StringMap<ResolvedNamespace>);
+    ExpressionContextBuilder& resolvedNamespace(ResolvedNamespaceMap);
     ExpressionContextBuilder& serializationContext(SerializationContext);
     ExpressionContextBuilder& collUUID(boost::optional<UUID>);
     ExpressionContextBuilder& explain(boost::optional<ExplainOptions::Verbosity>);
@@ -1165,6 +1185,7 @@ public:
     ExpressionContextBuilder& exprDeprecatedForApiV1(bool);
     ExpressionContextBuilder& enabledCounters(bool);
     ExpressionContextBuilder& forcePlanCache(bool);
+    ExpressionContextBuilder& allowGenericForeignDbLookup(bool);
     ExpressionContextBuilder& jsHeapLimitMB(boost::optional<int>);
     ExpressionContextBuilder& timeZoneDatabase(const TimeZoneDatabase*);
     ExpressionContextBuilder& changeStreamTokenVersion(int);

@@ -108,10 +108,10 @@ const auto kViewsPermittedDontSkipRSTL =
         .globalLockSkipOptions({{.skipRSTLLock = false}});  // Make sure we don't skip the RSTL
 
 AggregateCommandRequest makeCollectionsAndIndexesAggregation(OperationContext* opCtx) {
-    StringMap<ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces[NamespaceString::kShardCollectionCatalogNamespace.coll()] = {
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[NamespaceString::kShardCollectionCatalogNamespace] = {
         NamespaceString::kShardCollectionCatalogNamespace, std::vector<BSONObj>()};
-    resolvedNamespaces[NamespaceString::kShardIndexCatalogNamespace.coll()] = {
+    resolvedNamespaces[NamespaceString::kShardIndexCatalogNamespace] = {
         NamespaceString::kShardIndexCatalogNamespace, std::vector<BSONObj>()};
 
     auto expCtx = ExpressionContextBuilder{}

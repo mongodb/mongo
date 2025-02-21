@@ -169,7 +169,7 @@ auto withErrorContext(const auto&& callback, StringData errorMessage) {
 }  // namespace
 
 std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed::parse(
-    const NamespaceString& nss, const BSONElement& spec) {
+    const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
     uassert(ErrorCodes::TypeMismatch,
             fmt::format("{} requires a string or object argument, but found {}",
                         kStageName,

@@ -67,7 +67,7 @@ ExpressionContextBuilder& ExpressionContextBuilder::ns(NamespaceString ns) {
 }
 
 ExpressionContextBuilder& ExpressionContextBuilder::resolvedNamespace(
-    StringMap<ResolvedNamespace> resolvedNamespaces) {
+    ResolvedNamespaceMap resolvedNamespaces) {
     params.resolvedNamespaces = std::move(resolvedNamespaces);
     return *this;
 }
@@ -190,6 +190,12 @@ ExpressionContextBuilder& ExpressionContextBuilder::forcePlanCache(bool forcePla
     return *this;
 }
 
+ExpressionContextBuilder& ExpressionContextBuilder::allowGenericForeignDbLookup(
+    bool allowGenericForeignDbLookup) {
+    params.allowGenericForeignDbLookup = allowGenericForeignDbLookup;
+    return *this;
+}
+
 ExpressionContextBuilder& ExpressionContextBuilder::collUUID(boost::optional<UUID> collUUID) {
     params.collUUID = std::move(collUUID);
     return *this;
@@ -292,13 +298,13 @@ ExpressionContextBuilder& ExpressionContextBuilder::viewNS(
 }
 
 ExpressionContextBuilder& ExpressionContextBuilder::withReplicationResolvedNamespaces() {
-    StringMap<ResolvedNamespace> resolvedNamespaces;
+    ResolvedNamespaceMap resolvedNamespaces;
 
-    resolvedNamespaces[NamespaceString::kSessionTransactionsTableNamespace.coll()] = {
+    resolvedNamespaces[NamespaceString::kSessionTransactionsTableNamespace] = {
         NamespaceString::kSessionTransactionsTableNamespace, std::vector<BSONObj>()};
 
-    resolvedNamespaces[NamespaceString::kRsOplogNamespace.coll()] = {
-        NamespaceString::kRsOplogNamespace, std::vector<BSONObj>()};
+    resolvedNamespaces[NamespaceString::kRsOplogNamespace] = {NamespaceString::kRsOplogNamespace,
+                                                              std::vector<BSONObj>()};
 
     resolvedNamespace(std::move(resolvedNamespaces));
     return *this;

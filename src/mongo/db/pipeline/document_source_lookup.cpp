@@ -133,7 +133,8 @@ void lookupPipeValidator(const Pipeline& pipeline) {
 // {from: {db: "config", coll: "cache.chunks.*"}, ...} or
 // {from: {db: "local", coll: "oplog.rs"}, ...}
 NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
-                                                   const DatabaseName& defaultDb) {
+                                                   const DatabaseName& defaultDb,
+                                                   bool allowGenericForeignDbLookup) {
     // The object syntax only works for 'cache.chunks.*', 'local.oplog.rs'
     //  which are not user namespaces so object type is
     // omitted from the error message below.
@@ -167,7 +168,7 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
         str::stream() << "$lookup with syntax {from: {db:<>, coll:<>},..} is not supported for db: "
                       << nss.dbName().toStringForErrorMsg() << " and coll: " << nss.coll(),
         nss.isConfigDotCacheDotChunks() || nss == NamespaceString::kRsOplogNamespace ||
-            isConfigSvrSupportedCollection);
+            isConfigSvrSupportedCollection || allowGenericForeignDbLookup);
     return nss;
 }
 
@@ -457,7 +458,7 @@ void validateLookupCollectionlessPipeline(const BSONElement& pipeline) {
 }
 
 std::unique_ptr<DocumentSourceLookUp::LiteParsed> DocumentSourceLookUp::LiteParsed::parse(
-    const NamespaceString& nss, const BSONElement& spec) {
+    const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "the $lookup stage specification must be an object, but found "
                           << typeName(spec.type()),
@@ -471,7 +472,8 @@ std::unique_ptr<DocumentSourceLookUp::LiteParsed> DocumentSourceLookUp::LitePars
         validateLookupCollectionlessPipeline(pipelineElem);
         fromNss = NamespaceString::makeCollectionlessAggregateNSS(nss.dbName());
     } else {
-        fromNss = parseLookupFromAndResolveNamespace(fromElement, nss.dbName());
+        fromNss = parseLookupFromAndResolveNamespace(
+            fromElement, nss.dbName(), options.allowGenericForeignDbLookup);
     }
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "invalid $lookup namespace: " << fromNss.toStringForErrorMsg(),
@@ -1503,7 +1505,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
 
         if (argName == kFromField) {
             fromNs = parseLookupFromAndResolveNamespace(argument,
-                                                        pExpCtx->getNamespaceString().dbName());
+                                                        pExpCtx->getNamespaceString().dbName(),
+                                                        pExpCtx->getAllowGenericForeignDbLookup());
             continue;
         }
 

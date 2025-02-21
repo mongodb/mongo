@@ -51,7 +51,9 @@ namespace mongo {
 namespace DocumentSourceDocuments {
 class LiteParsed : public LiteParsedDocumentSource {
 public:
-    static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss, const BSONElement& spec) {
+    static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
+                                             const BSONElement& spec,
+                                             const LiteParserOptions& options) {
         return std::make_unique<LiteParsed>(spec.fieldName());
     }
 

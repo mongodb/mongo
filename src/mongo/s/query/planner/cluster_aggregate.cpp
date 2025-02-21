@@ -126,9 +126,9 @@ Rarely _samplerAccumulatorJs, _samplerFunctionJs;
 // mongod. Note that this function must be called before forwarding an aggregation command on an
 // unsharded collection, in order to verify that the involved namespaces are allowed to be sharded.
 auto resolveInvolvedNamespaces(const stdx::unordered_set<NamespaceString>& involvedNamespaces) {
-    StringMap<ResolvedNamespace> resolvedNamespaces;
+    ResolvedNamespaceMap resolvedNamespaces;
     for (auto&& nss : involvedNamespaces) {
-        resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
+        resolvedNamespaces.try_emplace(nss, nss, std::vector<BSONObj>{});
     }
     return resolvedNamespaces;
 }
@@ -161,7 +161,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     const boost::optional<CollectionRoutingInfo>& cri,
     BSONObj collationObj,
     boost::optional<UUID> uuid,
-    StringMap<ResolvedNamespace> resolvedNamespaces,
+    ResolvedNamespaceMap resolvedNamespaces,
     bool hasChangeStream,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
 

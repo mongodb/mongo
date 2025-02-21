@@ -59,6 +59,17 @@ namespace mongo {
 
 class LiteParsedPipeline;
 
+struct LiteParserOptions {
+    // Allows the foreign collection of a lookup to be in a different database than the local
+    // collection using "from: {db: ..., coll: ...}" syntax. Currently, this should only be used
+    // for streams since this isn't allowed in MQL beyond some exemptions for internal
+    // collection in the local database. While this flag also exists on expressionContext, we also
+    // need this in the LiteParseContext to correctly throw errors when a non-streams pipeline tries
+    // to use foreign db syntax for $lookup beyond the exempted internal collections during lite
+    // parsing since lite parsing doesn't have an expressionContext.
+    bool allowGenericForeignDbLookup = false;
+};
+
 /**
  * A lightly parsed version of a DocumentSource. It is not executable and not guaranteed to return a
  * parse error when encountering an invalid specification. Instead, the purpose of this class is to
@@ -75,8 +86,8 @@ public:
      * performed, and the BSONElement will be the element whose field name is the name of this stage
      * (e.g. the first and only element in {$limit: 1}).
      */
-    using Parser = std::function<std::unique_ptr<LiteParsedDocumentSource>(const NamespaceString&,
-                                                                           const BSONElement&)>;
+    using Parser = std::function<std::unique_ptr<LiteParsedDocumentSource>(
+        const NamespaceString&, const BSONElement&, const LiteParserOptions&)>;
 
     struct LiteParserInfo {
         Parser parser;
@@ -107,8 +118,10 @@ public:
      * Function that will be used as an alternate parser for a document source that has been
      * disabled.
      */
-    static std::unique_ptr<LiteParsedDocumentSource> parseDisabled(NamespaceString nss,
-                                                                   const BSONElement& spec) {
+    static std::unique_ptr<LiteParsedDocumentSource> parseDisabled(
+        NamespaceString nss,
+        const BSONElement& spec,
+        const LiteParserOptions& options = LiteParserOptions{}) {
         uasserted(
             ErrorCodes::QueryFeatureNotAllowed,
             str::stream() << spec.fieldName()
@@ -128,8 +141,10 @@ public:
      * Extracts the first field name from 'spec', and delegates to the parser that was registered
      * with that field name using registerParser() above.
      */
-    static std::unique_ptr<LiteParsedDocumentSource> parse(const NamespaceString& nss,
-                                                           const BSONObj& spec);
+    static std::unique_ptr<LiteParsedDocumentSource> parse(
+        const NamespaceString& nss,
+        const BSONObj& spec,
+        const LiteParserOptions& options = LiteParserOptions{});
 
     /**
      * Returns the foreign collection(s) referenced by this stage (that is, any collection that
@@ -310,8 +325,8 @@ public:
      * your stage doesn't need to communicate any special behavior before registering a
      * DocumentSource using this parser.
      */
-    static std::unique_ptr<LiteParsedDocumentSourceDefault> parse(const NamespaceString& nss,
-                                                                  const BSONElement& spec) {
+    static std::unique_ptr<LiteParsedDocumentSourceDefault> parse(
+        const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
         return std::make_unique<LiteParsedDocumentSourceDefault>(spec.fieldName());
     }
 
@@ -335,8 +350,8 @@ public:
      * stage doesn't need to communicate any special behavior before registering a DocumentSource
      * using this parser.
      */
-    static std::unique_ptr<LiteParsedDocumentSourceInternal> parse(const NamespaceString& nss,
-                                                                   const BSONElement& spec) {
+    static std::unique_ptr<LiteParsedDocumentSourceInternal> parse(
+        const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
         return std::make_unique<LiteParsedDocumentSourceInternal>(spec.fieldName());
     }
 

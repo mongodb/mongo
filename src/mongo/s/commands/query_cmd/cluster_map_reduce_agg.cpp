@@ -122,8 +122,8 @@ auto makeExpressionContext(OperationContext* opCtx,
     }
 
     // Resolve involved namespaces.
-    StringMap<ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces.try_emplace(nss, nss, std::vector<BSONObj>{});
     if (parsedMr.getOutOptions().getOutputType() != OutputType::InMemory) {
         auto outNss = parsedMr.getOutOptions().getDatabaseName()
             ? NamespaceStringUtil::deserialize(boost::none,
@@ -132,7 +132,7 @@ auto makeExpressionContext(OperationContext* opCtx,
                                                SerializationContext::stateDefault())
             : NamespaceStringUtil::deserialize(parsedMr.getNamespace().dbName(),
                                                parsedMr.getOutOptions().getCollectionName());
-        resolvedNamespaces.try_emplace(outNss.coll(), outNss, std::vector<BSONObj>{});
+        resolvedNamespaces.try_emplace(outNss, outNss, std::vector<BSONObj>{});
     }
     auto runtimeConstants = Variables::generateRuntimeConstants(opCtx);
     if (parsedMr.getScope()) {

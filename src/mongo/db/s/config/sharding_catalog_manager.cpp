@@ -355,10 +355,10 @@ public:
                     std::vector<NamespaceString>&& resolvedNamespaces)
         : _expCtx{ExpressionContextBuilder{}.opCtx(opCtx).ns(nss).build()} {
 
-        StringMap<ResolvedNamespace> resolvedNamespacesMap;
+        ResolvedNamespaceMap resolvedNamespacesMap;
 
         for (const auto& collNs : resolvedNamespaces) {
-            resolvedNamespacesMap[collNs.coll()] = {collNs, std::vector<BSONObj>() /* pipeline */};
+            resolvedNamespacesMap[collNs] = {collNs, std::vector<BSONObj>() /* pipeline */};
         }
 
         _expCtx->setResolvedNamespaces(resolvedNamespacesMap);

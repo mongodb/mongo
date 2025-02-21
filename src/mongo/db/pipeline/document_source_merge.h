@@ -112,7 +112,8 @@ public:
               _whenNotMatched(whenNotMatched) {}
 
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& spec);
+                                                 const BSONElement& spec,
+                                                 const LiteParserOptions& options);
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const final {

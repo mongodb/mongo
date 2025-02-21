@@ -879,8 +879,8 @@ SamplingBasedSplitPolicy::_makePipelineDocumentSource(OperationContext* opCtx,
                                                       int samplesPerChunk,
                                                       MakePipelineOptions opts) {
     auto rawPipeline = createRawPipeline(shardKey, numInitialChunks, samplesPerChunk);
-    StringMap<ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces[ns.coll()] = {ns, std::vector<BSONObj>{}};
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[ns] = {ns, std::vector<BSONObj>{}};
 
     auto pi = [&]() -> std::shared_ptr<MongoProcessInterface> {
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||

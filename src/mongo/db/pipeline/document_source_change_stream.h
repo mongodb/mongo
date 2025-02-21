@@ -79,7 +79,8 @@ public:
     class LiteParsed : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& spec) {
+                                                 const BSONElement& spec,
+                                                 const LiteParserOptions& options) {
             uassert(6188500,
                     str::stream() << "$changeStream must take a nested object but found: " << spec,
                     spec.type() == BSONType::Object);
@@ -365,7 +366,7 @@ class LiteParsedDocumentSourceChangeStreamInternal final
     : public DocumentSourceChangeStream::LiteParsed {
 public:
     static std::unique_ptr<LiteParsedDocumentSourceChangeStreamInternal> parse(
-        const NamespaceString& nss, const BSONElement& spec) {
+        const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
         return std::make_unique<LiteParsedDocumentSourceChangeStreamInternal>(
             spec.fieldName(), nss, spec);
     }

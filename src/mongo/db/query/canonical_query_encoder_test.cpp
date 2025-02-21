@@ -75,7 +75,7 @@ namespace {
 using std::unique_ptr;
 
 static const NamespaceString foreignNss =
-    NamespaceString::createNamespaceString_forTest("testdb.foreigncoll");
+    NamespaceString::createNamespaceString_forTest("test.foreigncoll");
 
 unittest::GoldenTestConfig goldenTestConfig{"src/mongo/db/test_output/query"};
 

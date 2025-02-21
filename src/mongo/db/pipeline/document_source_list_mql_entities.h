@@ -47,7 +47,8 @@ public:
     class LiteParsed : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& specElem) {
+                                                 const BSONElement& specElem,
+                                                 const LiteParserOptions& options) {
             return std::make_unique<LiteParsed>(specElem.fieldName());
         }
 

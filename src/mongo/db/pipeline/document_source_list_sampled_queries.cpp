@@ -123,7 +123,8 @@ void DocumentSourceListSampledQueries::reattachToOperationContext(OperationConte
 
 std::unique_ptr<DocumentSourceListSampledQueries::LiteParsed>
 DocumentSourceListSampledQueries::LiteParsed::parse(const NamespaceString& nss,
-                                                    const BSONElement& specElem) {
+                                                    const BSONElement& specElem,
+                                                    const LiteParserOptions& options) {
     uassert(6876000,
             str::stream() << kStageName << " must take a nested object but found: " << specElem,
             specElem.type() == BSONType::Object);

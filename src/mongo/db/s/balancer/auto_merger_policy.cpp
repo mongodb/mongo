@@ -269,11 +269,11 @@ AutoMergerPolicy::_getNamespacesWithMergeableChunksPerShard(OperationContext* op
         // Build an aggregation pipeline to get the collections with mergeable chunks placed on a
         // specific shard
 
-        StringMap<ResolvedNamespace> resolvedNamespaces;
-        resolvedNamespaces[NamespaceString::kConfigsvrChunksNamespace.coll()] = {
+        ResolvedNamespaceMap resolvedNamespaces;
+        resolvedNamespaces[NamespaceString::kConfigsvrChunksNamespace] = {
             NamespaceString::kConfigsvrChunksNamespace, std::vector<BSONObj>()};
-        resolvedNamespaces[CollectionType::ConfigNS.coll()] = {CollectionType::ConfigNS,
-                                                               std::vector<BSONObj>()};
+        resolvedNamespaces[CollectionType::ConfigNS] = {CollectionType::ConfigNS,
+                                                        std::vector<BSONObj>()};
 
         Pipeline::SourceContainer stages;
         auto expCtx = ExpressionContextBuilder{}

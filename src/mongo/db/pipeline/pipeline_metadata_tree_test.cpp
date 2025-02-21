@@ -65,8 +65,6 @@
 #include "mongo/db/pipeline/pipeline_metadata_tree.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/intrusive_counter.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo {
 namespace {
@@ -101,12 +99,12 @@ protected:
     void introduceCollection(StringData collectionName) {
         NamespaceString fromNs =
             NamespaceString::createNamespaceString_forTest("test", collectionName);
-        _resolvedNamespaces.insert({fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}});
+        _resolvedNamespaces.insert({fromNs, {fromNs, std::vector<BSONObj>()}});
         getExpCtx()->setResolvedNamespaces(_resolvedNamespaces);
     }
 
 private:
-    StringMap<ResolvedNamespace> _resolvedNamespaces;
+    ResolvedNamespaceMap _resolvedNamespaces;
 };
 
 using namespace pipeline_metadata_tree;
@@ -532,13 +530,11 @@ TEST_F(PipelineMetadataTreeTest, ZipWalksAPipelineAndTreeInTandemAndInOrder) {
 
 TEST_F(PipelineMetadataTreeTest, MakeTreeWithEmptyPipeline) {
     auto pipeline = Pipeline::parse({}, getExpCtx());
-    auto result = makeTree<std::string>(
-        {{NamespaceString::createNamespaceString_forTest("unittests.pipeline_test"),
-          std::string("input")}},
-        *pipeline,
-        [](const auto&, const auto&, const DocumentSource& source) {
-            return std::string("not called");
-        });
+    auto result = makeTree<std::string>({{getExpCtx()->getNamespaceString(), std::string("input")}},
+                                        *pipeline,
+                                        [](const auto&, const auto&, const DocumentSource& source) {
+                                            return std::string("not called");
+                                        });
     ASSERT_FALSE(result.first);
     ASSERT_EQ(result.second, "input"_sd);
 }

@@ -59,6 +59,10 @@ using namespace std::string_literals;
 
 class ChangeStreamRewriteTest : public AggregationContextFixture {
 public:
+    ChangeStreamRewriteTest()
+        : AggregationContextFixture(NamespaceString::createNamespaceString_forTest(
+              boost::none, "unittests", "pipeline_test")) {}
+
     std::string getNsDbRegexMatchExpr(const std::string& field, const std::string& regex) {
         return str::stream()
             << "{$expr: {$let: {vars: {oplogField: {$cond: [{ $eq: [{ $type: ['" << field

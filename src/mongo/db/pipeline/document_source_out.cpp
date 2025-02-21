@@ -188,7 +188,7 @@ NamespaceString DocumentSourceOut::makeBucketNsIfTimeseries(const NamespaceStrin
 }
 
 std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::parse(
-    const NamespaceString& nss, const BSONElement& spec) {
+    const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
     auto outSpec = parseOutSpecAndResolveTargetNamespace(spec, nss.dbName());
     NamespaceString targetNss = NamespaceStringUtil::deserialize(nss.dbName().tenantId(),
                                                                  outSpec.getDb(),

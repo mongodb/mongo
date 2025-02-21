@@ -527,9 +527,8 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfEmptyPipeline) {
 
 TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowed) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(
-        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
-                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
     auto spec = fromjson(R"({
         $scoreFusion: {
             input: {
@@ -695,9 +694,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedSigmoid) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
     RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(
-        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
-                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
     auto spec = fromjson(R"({
         $scoreFusion: {
             input: {
@@ -977,7 +975,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultipleStagesInPipelineAllowed) {
                         }
                     }
                 },
-                { 
+                {
                     $match: {
                         author: "dave"
                     }
@@ -1048,9 +1046,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultipleStagesInPipelineAllowed) {
 
 TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArgumentsAllowed) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(
-        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
-                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
     auto spec = fromjson(R"({
         $scoreFusion: {
             input: {
@@ -1093,12 +1090,12 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArguments
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "expectedStages": [
-                { 
-                    $match: { 
+                {
+                    $match: {
                         author : "Agatha Christie"
                     }
                 },
-                { 
+                {
                     $setMetadata: {
                         score: {
                             $divide: [
@@ -1549,9 +1546,8 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfEmptyWeights) {
 
 TEST_F(DocumentSourceScoreFusionTest, CheckIfWeightsArrayMixedIntsDecimals) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(
-        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
-                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
     auto spec = fromjson(R"({
         $scoreFusion: {
             input: {
@@ -1896,9 +1892,8 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
 
 TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionwithAllowed) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(
-        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
-                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
     auto nsToUnionWith1 = NamespaceString::createNamespaceString_forTest(
         expCtx->getNamespaceString().dbName(), "novels");
     expCtx->addResolvedNamespaces({nsToUnionWith1});
@@ -1950,7 +1945,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionwithAllowed) {
                         "size": 10
                     }
                 },
-                { 
+                {
                     $setMetadata: {
                         score: {
                             $divide: [
@@ -2026,7 +2021,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionwithAllowed) {
                                     ]
                                 }
                             },
-                            { 
+                            {
                                 $setMetadata: {
                                     score: {
                                         $divide: [
@@ -2138,9 +2133,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionwithAllowed) {
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNestedUnionWithModifiesFields) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(
-        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
-                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
     auto nsToUnionWith1 = NamespaceString::createNamespaceString_forTest(
         expCtx->getNamespaceString().dbName(), "novels");
     expCtx->addResolvedNamespaces({nsToUnionWith1});
@@ -2369,7 +2363,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfScoreWithGeoNearDistanceMetadataPip
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "expectedStages": [
-                { 
+                {
                     $match: {
                         author: "Agatha Christie"
                     }

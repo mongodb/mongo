@@ -51,8 +51,8 @@ public:
      */
     class LiteParsedListSearchIndexes final : public LiteParsedDocumentSource {
     public:
-        static std::unique_ptr<LiteParsedListSearchIndexes> parse(const NamespaceString& nss,
-                                                                  const BSONElement& spec) {
+        static std::unique_ptr<LiteParsedListSearchIndexes> parse(
+            const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
             return std::make_unique<LiteParsedListSearchIndexes>(spec.fieldName(), nss);
         }
 

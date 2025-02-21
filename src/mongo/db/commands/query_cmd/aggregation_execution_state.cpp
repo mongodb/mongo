@@ -500,14 +500,14 @@ const MultipleCollectionAccessor CollectionlessAggCatalogState::_emptyMultipleCo
 
 }  // namespace
 
-StatusWith<StringMap<ResolvedNamespace>> AggExState::resolveInvolvedNamespaces() const {
+StatusWith<ResolvedNamespaceMap> AggExState::resolveInvolvedNamespaces() const {
     auto request = getRequest();
     auto pipelineInvolvedNamespaces = getInvolvedNamespaces();
 
     // If there are no involved namespaces, return before attempting to take any locks. This is
     // important for collectionless aggregations, which may be expected to run without locking.
     if (pipelineInvolvedNamespaces.empty()) {
-        return {StringMap<ResolvedNamespace>()};
+        return {ResolvedNamespaceMap()};
     }
 
     // Acquire a single const view of the CollectionCatalog and use it for all view and collection
@@ -519,13 +519,13 @@ StatusWith<StringMap<ResolvedNamespace>> AggExState::resolveInvolvedNamespaces()
 
     std::deque<NamespaceString> involvedNamespacesQueue(pipelineInvolvedNamespaces.begin(),
                                                         pipelineInvolvedNamespaces.end());
-    StringMap<ResolvedNamespace> resolvedNamespaces;
+    ResolvedNamespaceMap resolvedNamespaces;
 
     while (!involvedNamespacesQueue.empty()) {
         auto involvedNs = std::move(involvedNamespacesQueue.front());
         involvedNamespacesQueue.pop_front();
 
-        if (resolvedNamespaces.find(involvedNs.coll()) != resolvedNamespaces.end()) {
+        if (resolvedNamespaces.find(involvedNs) != resolvedNamespaces.end()) {
             continue;
         }
 
@@ -541,10 +541,10 @@ StatusWith<StringMap<ResolvedNamespace>> AggExState::resolveInvolvedNamespaces()
             auto&& underlyingNs = resolvedView.getValue().getNamespace();
             // Attempt to acquire UUID of the underlying collection using lock free method.
             auto uuid = catalog->lookupUUIDByNSS(_opCtx, underlyingNs);
-            resolvedNamespaces[ns.coll()] = {underlyingNs,
-                                             resolvedView.getValue().getPipeline(),
-                                             uuid,
-                                             true /*involvedNamespaceIsAView*/};
+            resolvedNamespaces[ns] = {underlyingNs,
+                                      resolvedView.getValue().getPipeline(),
+                                      uuid,
+                                      true /*involvedNamespaceIsAView*/};
 
             // We parse the pipeline corresponding to the resolved view in case we must resolve
             // other view namespaces that are also involved.
@@ -576,14 +576,14 @@ StatusWith<StringMap<ResolvedNamespace>> AggExState::resolveInvolvedNamespaces()
                     return status;
                 }
             } else {
-                resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
+                resolvedNamespaces[involvedNs] = {involvedNs, std::vector<BSONObj>{}};
             }
         } else if (catalog->lookupCollectionByNamespace(_opCtx, involvedNs)) {
             // Attempt to acquire UUID of the collection using lock free method.
             auto uuid = catalog->lookupUUIDByNSS(_opCtx, involvedNs);
             // If 'involvedNs' refers to a collection namespace, then we resolve it as an empty
             // pipeline in order to read directly from the underlying collection.
-            resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}, uuid};
+            resolvedNamespaces[involvedNs] = {involvedNs, std::vector<BSONObj>{}, uuid};
         } else if (catalog->lookupView(_opCtx, involvedNs)) {
             auto status = resolveViewDefinition(involvedNs);
             if (!status.isOK()) {
@@ -592,7 +592,7 @@ StatusWith<StringMap<ResolvedNamespace>> AggExState::resolveInvolvedNamespaces()
         } else {
             // 'involvedNs' is neither a view nor a collection, so resolve it as an empty pipeline
             // to treat it as reading from a non-existent collection.
-            resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
+            resolvedNamespaces[involvedNs] = {involvedNs, std::vector<BSONObj>{}};
         }
     }
 

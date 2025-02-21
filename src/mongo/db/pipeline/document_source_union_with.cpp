@@ -162,7 +162,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::clone(
 }
 
 std::unique_ptr<DocumentSourceUnionWith::LiteParsed> DocumentSourceUnionWith::LiteParsed::parse(
-    const NamespaceString& nss, const BSONElement& spec) {
+    const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
     uassert(ErrorCodes::FailedToParse,
             str::stream()
                 << "the $unionWith stage specification must be an object or string, but found "

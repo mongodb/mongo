@@ -100,8 +100,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingTxnCloner::makePipeline(
     std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
     const boost::optional<LogicalSessionId>& startAfter) {
     const auto& sourceNss = NamespaceString::kSessionTransactionsTableNamespace;
-    StringMap<ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces[sourceNss.coll()] = {sourceNss, std::vector<BSONObj>{}};
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[sourceNss] = {sourceNss, std::vector<BSONObj>{}};
     auto expCtx = ExpressionContextBuilder{}
                       .opCtx(opCtx)
                       .mongoProcessInterface(std::move(mongoProcessInterface))

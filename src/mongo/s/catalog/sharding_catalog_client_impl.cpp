@@ -171,10 +171,10 @@ void toBatchError(const Status& status, BatchedCommandResponse* response) {
 AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opCtx,
                                                            const NamespaceString& nss,
                                                            const ChunkVersion& sinceVersion) {
-    StringMap<ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces[CollectionType::ConfigNS.coll()] = {CollectionType::ConfigNS,
-                                                           std::vector<BSONObj>()};
-    resolvedNamespaces[NamespaceString::kConfigsvrChunksNamespace.coll()] = {
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[CollectionType::ConfigNS] = {CollectionType::ConfigNS,
+                                                    std::vector<BSONObj>()};
+    resolvedNamespaces[NamespaceString::kConfigsvrChunksNamespace] = {
         NamespaceString::kConfigsvrChunksNamespace, std::vector<BSONObj>()};
 
     auto expCtx = ExpressionContextBuilder{}
@@ -349,10 +349,10 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
 AggregateCommandRequest makeCollectionAndIndexesAggregation(OperationContext* opCtx,
                                                             const NamespaceString& nss) {
     auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(CollectionType::ConfigNS).build();
-    StringMap<ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces[CollectionType::ConfigNS.coll()] = {CollectionType::ConfigNS,
-                                                           std::vector<BSONObj>()};
-    resolvedNamespaces[NamespaceString::kConfigsvrIndexCatalogNamespace.coll()] = {
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[CollectionType::ConfigNS] = {CollectionType::ConfigNS,
+                                                    std::vector<BSONObj>()};
+    resolvedNamespaces[NamespaceString::kConfigsvrIndexCatalogNamespace] = {
         NamespaceString::kConfigsvrIndexCatalogNamespace, std::vector<BSONObj>()};
     expCtx->setResolvedNamespaces(resolvedNamespaces);
 
@@ -405,10 +405,10 @@ AggregateCommandRequest makeUnsplittableCollectionsDataShardAggregation(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     const std::vector<ShardId>& excludedShards) {
-    StringMap<ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces[CollectionType::ConfigNS.coll()] = {CollectionType::ConfigNS,
-                                                           std::vector<BSONObj>()};
-    resolvedNamespaces[NamespaceString::kConfigsvrChunksNamespace.coll()] = {
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[CollectionType::ConfigNS] = {CollectionType::ConfigNS,
+                                                    std::vector<BSONObj>()};
+    resolvedNamespaces[NamespaceString::kConfigsvrChunksNamespace] = {
         NamespaceString::kConfigsvrChunksNamespace, std::vector<BSONObj>()};
     auto expCtx = ExpressionContextBuilder{}
                       .opCtx(opCtx)
@@ -1142,9 +1142,9 @@ StatusWith<std::vector<TagsType>> ShardingCatalogClientImpl::getTagsForCollectio
 
 std::vector<NamespaceString> ShardingCatalogClientImpl::getAllNssThatHaveZonesForDatabase(
     OperationContext* opCtx, const DatabaseName& dbName) {
-    StringMap<ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces[TagsType::ConfigNS.coll()] = {TagsType::ConfigNS,
-                                                     std::vector<BSONObj>() /* pipeline */};
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[TagsType::ConfigNS] = {TagsType::ConfigNS,
+                                              std::vector<BSONObj>() /* pipeline */};
     auto expCtx = ExpressionContextBuilder{}
                       .opCtx(opCtx)
                       .resolvedNamespace(std::move(resolvedNamespaces))
@@ -1711,10 +1711,10 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
       }
     ])
         */
-    StringMap<ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces[NamespaceString::kConfigsvrShardsNamespace.coll()] = {
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[NamespaceString::kConfigsvrShardsNamespace] = {
         NamespaceString::kConfigsvrShardsNamespace, std::vector<BSONObj>() /* pipeline */};
-    resolvedNamespaces[NamespaceString::kConfigsvrPlacementHistoryNamespace.coll()] = {
+    resolvedNamespaces[NamespaceString::kConfigsvrPlacementHistoryNamespace] = {
         NamespaceString::kConfigsvrPlacementHistoryNamespace,
         std::vector<BSONObj>() /* pipeline */};
     auto expCtx = ExpressionContextBuilder{}

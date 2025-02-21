@@ -90,7 +90,8 @@ public:
                                                         std::move(foreignNss)) {}
 
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& spec);
+                                                 const BSONElement& spec,
+                                                 const LiteParserOptions& options);
 
 
         Status checkShardedForeignCollAllowed(const NamespaceString& nss,

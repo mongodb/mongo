@@ -463,8 +463,8 @@ TEST_F(ShardedUnionTest, IncorporatesViewDefinitionAndRetriesWhenViewErrorReceiv
         expCtx()->getNamespaceString().db_forTest(), "view");
     // Mock out the view namespace as emtpy for now - this is what it would be when parsing in a
     // sharded cluster - only later would we learn the actual view definition.
-    expCtx()->setResolvedNamespaces(StringMap<ResolvedNamespace>{
-        {nsToUnionWith.coll().toString(), {nsToUnionWith, std::vector<BSONObj>{}}}});
+    expCtx()->setResolvedNamespaces(
+        ResolvedNamespaceMap{{nsToUnionWith, {nsToUnionWith, std::vector<BSONObj>{}}}});
     auto bson = BSON("$unionWith" << nsToUnionWith.coll());
     auto unionWith = DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx());
     expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));

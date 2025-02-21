@@ -568,7 +568,7 @@ void OplogFetcher::_setMetadataWriterAndReader() {
 AggregateCommandRequest OplogFetcher::_makeAggregateCommandRequest(long long maxTimeMs,
                                                                    Timestamp startTs) const {
     auto opCtx = cc().makeOperationContext();
-    StringMap<ResolvedNamespace> resolvedNamespaces;
+    ResolvedNamespaceMap resolvedNamespaces;
     auto expCtx = ExpressionContextBuilder{}
                       .opCtx(opCtx.get())
                       .mongoProcessInterface(MongoProcessInterface::create(opCtx.get()))

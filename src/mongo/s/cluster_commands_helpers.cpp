@@ -173,8 +173,8 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTarg
         }
     }();
 
-    StringMap<ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces.emplace(nss.coll(), ResolvedNamespace(nss, std::vector<BSONObj>{}));
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces.emplace(nss, ResolvedNamespace(nss, std::vector<BSONObj>{}));
 
     auto expCtx = ExpressionContextBuilder{}
                       .opCtx(opCtx)

@@ -408,8 +408,8 @@ DocumentSource::GetNextResult DocumentSourceAnalyzeShardKeyReadWriteDistribution
 }
 
 std::unique_ptr<DocumentSourceAnalyzeShardKeyReadWriteDistribution::LiteParsed>
-DocumentSourceAnalyzeShardKeyReadWriteDistribution::LiteParsed::parse(const NamespaceString& nss,
-                                                                      const BSONElement& specElem) {
+DocumentSourceAnalyzeShardKeyReadWriteDistribution::LiteParsed::parse(
+    const NamespaceString& nss, const BSONElement& specElem, const LiteParserOptions& options) {
     uassert(
         ErrorCodes::IllegalOperation,
         str::stream() << kStageName << " is not supported on a standalone mongod",

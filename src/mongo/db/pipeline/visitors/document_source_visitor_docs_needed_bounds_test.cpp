@@ -122,8 +122,8 @@ protected:
         auto expCtx = getExpCtx();
         NamespaceString nsToUnionWith = NamespaceString::createNamespaceString_forTest(
             expCtx->getNamespaceString().dbName(), "coll");
-        expCtx->setResolvedNamespaces(StringMap<ResolvedNamespace>{
-            {nsToUnionWith.coll().toString(), {nsToUnionWith, std::vector<BSONObj>()}}});
+        expCtx->setResolvedNamespaces(
+            ResolvedNamespaceMap{{nsToUnionWith, {nsToUnionWith, std::vector<BSONObj>()}}});
         auto bson =
             BSON("$unionWith" << BSON(
                      "coll" << nsToUnionWith.coll() << "pipeline"
@@ -170,8 +170,8 @@ protected:
         auto expCtx = getExpCtx();
         NamespaceString lookupNs = NamespaceString::createNamespaceString_forTest(
             expCtx->getNamespaceString().dbName(), "coll");
-        expCtx->setResolvedNamespaces(StringMap<ResolvedNamespace>{
-            {lookupNs.coll().toString(), {lookupNs, std::vector<BSONObj>()}}});
+        expCtx->setResolvedNamespaces(
+            ResolvedNamespaceMap{{lookupNs, {lookupNs, std::vector<BSONObj>()}}});
         auto bson = BSON("$lookup" << BSON("from" << lookupNs.coll() << "as"
                                                   << "out"
                                                   << "localField"
