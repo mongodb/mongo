@@ -8439,9 +8439,9 @@ export const authCommandsLib = {
                       }
                     }
                   ]
-                }
-              },
-              inputNormalization: "none"
+                },
+                normalization: "none"
+              }
             }
           }]
         },

@@ -53,10 +53,6 @@ structs:
         description: Logic to combine all scores together
         type: IDLAnyType
         optional: true
-      inputNormalization:
-        description: none for no normalization, sigmoid and minMaxScaler for the type of normalization
-        type: string
-        optional: false
       combination:
         description: The set of pipeline weights to match up with the input pipelines.
         type: ScoreFusionCombinationSpec

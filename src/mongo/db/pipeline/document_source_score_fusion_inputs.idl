@@ -32,6 +32,16 @@ global:
 imports:
   - "mongo/db/basic_types.idl"
   - "mongo/db/pipeline/aggregate_command.idl"
+
+enums:
+  ScoreFusionNormalization:
+    description: Input Normalization options
+    type: string
+    values:
+      kNone : "none"
+      kSigmoid : "sigmoid"
+      kMinMaxScaler : "minMaxScaler"
+
 structs:
   ScoreFusionInputsSpec:
     description: Specification for an input subpipeline to $scoreFusion.
@@ -42,4 +52,8 @@ structs:
         type: object_owned
         optional: false
         validator:
-            {callback: "validatePipelinesObject"}
+          {callback: "validatePipelinesObject"}
+      normalization:
+        description: Type of score normalization function (none, sigmoid, minMaxScaler)
+        type: ScoreFusionNormalization
+        optional: false

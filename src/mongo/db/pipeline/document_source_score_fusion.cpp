@@ -154,7 +154,7 @@ boost::intrusive_ptr<DocumentSource> buildScoreAddFieldsStage(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const StringData inputPipelineName,
     const BSONObj& scorePath,
-    const StringData inputNormalization,
+    const ScoreFusionNormalizationEnum normalization,
     const double weight) {
     const std::string score = fmt::format("{}_score", inputPipelineName);
     BSONObjBuilder bob;
@@ -164,7 +164,23 @@ boost::intrusive_ptr<DocumentSource> buildScoreAddFieldsStage(
             BSONObjBuilder scoreField(addFieldsBob.subobjStart(score));
             {
                 BSONArrayBuilder multiplyArray(scoreField.subarrayStart("$multiply"_sd));
-                multiplyArray.append(scorePath);
+                BSONObj normalizationScorePath;
+                switch (normalization) {
+                    case mongo::ScoreFusionNormalizationEnum::kSigmoid:
+                        normalizationScorePath = BSON("$sigmoid" << scorePath);
+                        break;
+                    case ScoreFusionNormalizationEnum::kMinMaxScaler:
+                        // TODO SERVER-100211: Handle minMaxScaler expression behavior.
+                        uasserted(ErrorCodes::NotImplemented,
+                                  "minMaxScaler input normalization is not yet supported");
+                        break;
+                    case ScoreFusionNormalizationEnum::kNone:
+                        // In the case of no normalization, parse just the score operator
+                        // itself.
+                        normalizationScorePath = std::move(scorePath);
+                        break;
+                }
+                multiplyArray.append(normalizationScorePath);
                 multiplyArray.append(weight);
             }
         }
@@ -196,7 +212,7 @@ boost::intrusive_ptr<DocumentSource> buildReplaceRootStage(
 std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
     const StringData inputPipelineOneName,
     const BSONObj& scorePath,
-    const StringData inputNormalization,
+    const ScoreFusionNormalizationEnum normalization,
     const double weight,
     const std::unique_ptr<Pipeline, PipelineDeleter>& firstInputPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -208,8 +224,8 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
     }
 
     outputStages.emplace_back(buildReplaceRootStage(expCtx));
-    outputStages.emplace_back(buildScoreAddFieldsStage(
-        expCtx, inputPipelineOneName, scorePath, inputNormalization, weight));
+    outputStages.emplace_back(
+        buildScoreAddFieldsStage(expCtx, inputPipelineOneName, scorePath, normalization, weight));
     return outputStages;
 }
 
@@ -316,7 +332,7 @@ boost::intrusive_ptr<DocumentSource> buildSetScoreStage(
 boost::intrusive_ptr<DocumentSource> buildUnionWithPipelineStage(
     const std::string& inputPipelineName,
     const BSONObj& scorePath,
-    const StringData inputNormalization,
+    const ScoreFusionNormalizationEnum normalization,
     const double weight,
     const std::unique_ptr<Pipeline, PipelineDeleter>& oneInputPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -326,7 +342,7 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipelineStage(
 
     inputPipelineStages->pushBack(buildReplaceRootStage(expCtx));
     inputPipelineStages->pushBack(
-        buildScoreAddFieldsStage(expCtx, inputPipelineName, scorePath, inputNormalization, weight));
+        buildScoreAddFieldsStage(expCtx, inputPipelineName, scorePath, normalization, weight));
     std::vector<BSONObj> bsonPipeline = inputPipelineStages->serializeToBson();
 
     auto collName = expCtx->getNamespaceString().coll();
@@ -430,9 +446,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
     const std::map<std::string, BSONObj>& scorePaths,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     StringMap<double> weights = extractAndValidateWeights(spec, inputPipelines);
-    // TODO (SERVER-94663): Validate inputNormalization field is one of the following: "none",
-    // "sigmoid", "minMaxScaler"
-    StringData inputNormalization = spec.getInputNormalization();
+    ScoreFusionNormalizationEnum normalization = spec.getInput().getNormalization();
     std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
     for (auto it = inputPipelines.begin(); it != inputPipelines.end(); it++) {
         const auto& [inputPipelineName, inputPipelineStages] = *it;
@@ -445,7 +459,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
             // Stages for the first pipeline.
             auto firstPipelineStages = buildFirstPipelineStages(inputPipelineName,
                                                                 scorePaths.at(inputPipelineName),
-                                                                inputNormalization,
+                                                                normalization,
                                                                 pipelineWeight,
                                                                 inputPipelineStages,
                                                                 pExpCtx);
@@ -457,7 +471,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
             // we wrap then in a $unionWith stage to append it to the total desugared output.
             auto unionWithStage = buildUnionWithPipelineStage(inputPipelineName,
                                                               scorePaths.at(inputPipelineName),
-                                                              inputNormalization,
+                                                              normalization,
                                                               pipelineWeight,
                                                               inputPipelineStages,
                                                               pExpCtx);

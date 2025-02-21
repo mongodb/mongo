@@ -66,7 +66,7 @@ intrusive_ptr<Expression> buildMetadataExpression(const intrusive_ptr<Expression
     intrusive_ptr<Expression> scoreAndNormalizeExpr = [&]() {
         switch (spec.getNormalizeFunction()) {
             // $sigomid will recursively parse and nest the score Expression.
-            case NormalizeFunctionEnum::kSigmoid:
+            case ScoreNormalizeFunctionEnum::kSigmoid:
                 return ExpressionSigmoid::parseExpressionSigmoid(
                     pExpCtx.get(), spec.getScore().getElement(), pExpCtx->variablesParseState);
             // TODO SERVER-94600: Handle minMaxScaler expression behavior.

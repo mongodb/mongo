@@ -35,6 +35,11 @@ const searchMatchAsClause = {
     ]
 };
 
+const scoreInputPipelines = {
+    score3: [{$match: {author: "Agatha Christie"}}, {$score: {score: 50.0}}],
+    score4: [{$match: {author: "dave"}}, {$score: {score: 10.0}}]
+};
+
 function runPipeline(pipeline) {
     return db.runCommand({aggregate: collName, pipeline, cursor: {}});
 }
@@ -42,8 +47,7 @@ function runPipeline(pipeline) {
 // Check that a single input pipeline is allowed.
 assert.commandWorked(runPipeline([{
     $scoreFusion: {
-        input: {pipelines: searchMatchAsClause},
-        inputNormalization: "none",
+        input: {pipelines: searchMatchAsClause, normalization: "none"},
         combination: {weights: {score2: 5}}
     }
 }]));
@@ -51,9 +55,8 @@ assert.commandWorked(runPipeline([{
 // Error if the weights array doesn't have elements of type safe double
 assert.commandFailedWithCode(runPipeline([{
                                  $scoreFusion: {
-                                     input: {pipelines: searchMatchAsClause},
+                                     input: {pipelines: searchMatchAsClause, normalization: "none"},
                                      score: "expression",
-                                     inputNormalization: "none",
                                      combination: {weights: {score2: "hi"}}
                                  }
                              }]),
@@ -62,9 +65,8 @@ assert.commandFailedWithCode(runPipeline([{
 // Check that an array of ints for weights is a valid input
 assert.commandWorked(runPipeline([{
     $scoreFusion: {
-        input: {pipelines: vectorSearchClauseAndSearchClause},
+        input: {pipelines: vectorSearchClauseAndSearchClause, normalization: "none"},
         score: "expression",
-        inputNormalization: "none",
         combination: {weights: {score1: 5, search1: 100}}
     }
 }]));
@@ -72,9 +74,38 @@ assert.commandWorked(runPipeline([{
 // Check that a mixed array of ints/decimals for weights is a valid input
 assert.commandWorked(runPipeline([{
     $scoreFusion: {
-        input: {pipelines: vectorSearchClauseAndSearchClause},
+        input: {pipelines: vectorSearchClauseAndSearchClause, normalization: "none"},
         score: "expression",
-        inputNormalization: "none",
         combination: {weights: {score1: 5, search1: 100.2}}
+    }
+}]));
+
+// Check that including all optional arguments is parsed correctly
+assert.commandWorked(runPipeline([{
+    $scoreFusion: {
+        input: {pipelines: searchMatchAsClause, normalization: "none"},
+        score: "expression",
+        combination: {weights: {score2: 5}}
+    }
+}]));
+
+// Check that invalid normalization option throws BadValue error. The correct spelling or value
+// is "minMaxScaler" with an e, not "minMaxScalar" with an a.
+assert.commandFailedWithCode(
+    runPipeline([{
+        $scoreFusion: {
+            input: {pipelines: scoreInputPipelines, normalization: "minMaxScalar"},
+            score: "expression",
+            combination: {weights: {score3: 5, score4: 10}}
+        }
+    }]),
+    ErrorCodes.BadValue);
+
+// Check that sigmoid option parsed correctly
+assert.commandWorked(runPipeline([{
+    $scoreFusion: {
+        input: {pipelines: scoreInputPipelines, normalization: "sigmoid"},
+        score: "expression",
+        combination: {weights: {score3: 5, score4: 10}}
     }
 }]));

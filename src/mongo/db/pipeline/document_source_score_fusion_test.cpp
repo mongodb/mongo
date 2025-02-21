@@ -78,7 +78,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfUnknownField) {
     auto spec = fromjson(R"({
         $scoreFusion: {
             unknown: "bad field",
-            inputNormalization: "none"
+            normalization: "none"
         }
     })");
 
@@ -90,8 +90,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfUnknownField) {
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInputIsNotObject) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            input: {pipelines: "not an object"},
-            inputNormalization: "none"
+            input: {pipelines: "not an object", normalization: "none"}
         }
     })");
 
@@ -104,9 +103,9 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNoPipeline) {
     auto spec = fromjson(R"({
         $scoreFusion: {
             input: {
-                pipelines: {}
-            },
-            inputNormalization: "none"
+                pipelines: {},
+                normalization: "none"
+            }
         }
     })");
 
@@ -118,8 +117,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNoPipeline) {
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfMissingPipeline) {
     auto spec = fromjson(R"({
         $scoreFusion: {
-            input: {},
-            inputNormalization: "none"
+            input: {normalization: "none"}
         }
     })");
 
@@ -128,7 +126,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfMissingPipeline) {
                        ErrorCodes::IDLFailedToParse);
 }
 
-TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowed) {
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfMissingNormalization) {
     auto spec = fromjson(R"({
         $scoreFusion: {
             input: {
@@ -145,8 +143,34 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowed) {
                         }
                     ]
                 }
-            },
-            inputNormalization: "none"
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::IDLFailedToParse);
+}
+
+TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowedNormalizationNone) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    name1: [
+                        {
+                            $vectorSearch: {
+                                queryVector: [1.0, 2.0, 3.0],
+                                path: "plot_embedding",
+                                numCandidates: 300,
+                                index: "vector_index",
+                                limit: 10
+                            }
+                        }
+                    ]
+                },
+                normalization: "none"
+            }
         }
     })");
 
@@ -237,6 +261,140 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowed) {
         asOneObj);
 }
 
+TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowedNormalizationSigmoid) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    name1: [
+                        {
+                            $vectorSearch: {
+                                queryVector: [1.0, 2.0, 3.0],
+                                path: "plot_embedding",
+                                numCandidates: 300,
+                                index: "vector_index",
+                                limit: 10
+                            }
+                        }
+                    ]
+                },
+                normalization: "sigmoid"
+            }
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$vectorSearch": {
+                        "queryVector": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "path": "plot_embedding",
+                        "numCandidates": 300,
+                        "index": "vector_index",
+                        "limit": 10
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "name1_score": {
+                            "$multiply": [
+                                {
+                                    $divide: [
+                                        {
+                                            $const: 1
+                                        },
+                                        {
+                                            $add: [
+                                                {
+                                                    $const: 1
+                                                },
+                                                {
+                                                    $exp: [
+                                                        {
+                                                            $multiply: [
+                                                                {
+                                                                    $const: -1
+                                                                },
+                                                                {
+                                                                    $meta: "score"
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": 1
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$add": [
+                                "$name1_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+}
+
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineIsNotArray) {
     auto spec = fromjson(R"({
         $scoreFusion: {
@@ -245,9 +403,9 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineIsNotArray) {
                     authorMatch: {
                         $match : { author : "Agatha Christie" }
                     }
-                }
-            },
-            inputNormalization: "none"
+                },
+                normalization: "none"
+            }
         }
     })");
 
@@ -273,9 +431,9 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfUnknownFieldInsideInput) {
                         }
                     ]
                 },
-                unknown: "bad field"
-            },
-            inputNormalization: "none"
+                unknown: "bad field",
+                normalization: "none"
+            }
         }
     })");
 
@@ -293,9 +451,9 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipeline) {
                         { $match : { author : "Agatha Christie" } },
                         { $sort: {author: 1} }
                     ]
-                }
-            },
-            inputNormalization: "none"
+                },
+                normalization: "none"
+            }
         }
     })");
 
@@ -316,9 +474,9 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipelineWithFirstPipeline
                     pipeTwo: [
                         { $match : { age : 50 } }
                     ]
-                }
-            },
-            inputNormalization: "none"
+                },
+                normalization: "none"
+            }
         }
     })");
 
@@ -339,9 +497,9 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipelineWithSecondPipelin
                         { $match : { author : "Agatha Christie" } },
                         { $score: { score: "$age" } }
                     ]
-                }
-            },
-            inputNormalization: "none"
+                },
+                normalization: "none"
+            }
         }
     })");
 
@@ -356,9 +514,9 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfEmptyPipeline) {
             input: {
                 pipelines: {
                     pipeOne: []
-                }
-            },
-            inputNormalization: "none"
+                },
+                normalization: "none"
+            }
         }
     })");
 
@@ -398,9 +556,9 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowed) {
                             }
                         }
                     ]
-                }
-            },
-            inputNormalization: "none"
+                },
+                normalization: "none"
+            }
         }
     })");
 
@@ -532,6 +690,253 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowed) {
         asOneObj);
 }
 
+TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedSigmoid) {
+    // Feature flag needed to use 'score' meta field
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(
+        StringMap<ResolvedNamespace>{{expCtx->getNamespaceString().coll().toString(),
+                                      {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    name1: [
+                        {$score: {score: "$score_50"}}
+                    ],
+                    name2: [
+                        {$score: {score: "$score_10"}}
+                    ]
+                },
+                normalization: "sigmoid"
+            }
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$divide": [
+                                {
+                                    "$const": 1
+                                },
+                                {
+                                    "$add": [
+                                        {
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$exp": [
+                                                {
+                                                    "$multiply": [
+                                                        {
+                                                            "$const": -1
+                                                        },
+                                                        "$score_50"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "name1_score": {
+                            "$multiply": [
+                                {
+                                    "$divide": [
+                                        {
+                                            "$const": 1
+                                        },
+                                        {
+                                            "$add": [
+                                                {
+                                                    "$const": 1
+                                                },
+                                                {
+                                                    "$exp": [
+                                                        {
+                                                            "$multiply": [
+                                                                {
+                                                                    "$const": -1
+                                                                },
+                                                                {
+                                                                    "$meta": "score"
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "$const": 1
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$setMetadata": {
+                                    "score": {
+                                        "$divide": [
+                                            {
+                                                "$const": 1
+                                            },
+                                            {
+                                                "$add": [
+                                                    {
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$exp": [
+                                                            {
+                                                                "$multiply": [
+                                                                    {
+                                                                        "$const": -1
+                                                                    },
+                                                                    "$score_10"
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "name2_score": {
+                                        "$multiply": [
+                                            {
+                                                "$divide": [
+                                                    {
+                                                        "$const": 1
+                                                    },
+                                                    {
+                                                        "$add": [
+                                                            {
+                                                                "$const": 1
+                                                            },
+                                                            {
+                                                                "$exp": [
+                                                                    {
+                                                                        "$multiply": [
+                                                                            {
+                                                                                "$const": -1
+                                                                            },
+                                                                            {
+                                                                                "$meta": "score"
+                                                                            }
+                                                                        ]
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "$const": 1
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "name2_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$name2_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$add": [
+                                "$name1_score",
+                                "$name2_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+}
+
 TEST_F(DocumentSourceScoreFusionTest, CheckMultipleStagesInPipelineAllowed) {
     auto spec = fromjson(R"({
         $scoreFusion: {
@@ -549,9 +954,9 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultipleStagesInPipelineAllowed) {
                         },
                         { $match : { author : "dave" } }
                     ]
-                }
-            },
-            inputNormalization: "none"
+                },
+                normalization: "none"
+            }
         }
     })");
 
@@ -676,9 +1081,9 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArguments
                             }
                         }
                     ]
-                }
-            },
-            inputNormalization: "none"
+                },
+                normalization: "none"
+            }
         }
     })");
     const auto desugaredList =
@@ -883,7 +1288,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArguments
         asOneObj);
 }
 
-TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInputNormalizationNotString) {
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNoNormalization) {
     auto spec = fromjson(R"({
         $scoreFusion: {
             input: {
@@ -901,14 +1306,71 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInputNormalizationNotString) {
                         { $match : { author : "dave" } }
                     ]
                 }
-            },
-            inputNormalization: 10
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::IDLFailedToParse);
+}
+
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNormalizationNotString) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    name1: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        },
+                        { $match : { author : "dave" } }
+                    ]
+                },
+                normalization: 1.0
+            }
         }
     })");
 
     ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
                        ErrorCodes::TypeMismatch);
+}
+
+// Note: This test errors as expected because the correct input normalization value is spelled as
+// 'minMaxScaler' with an e, not 'minMaxScalar' with an a.
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNormalizationInvalidValue) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    name1: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        },
+                        { $match : { author : "dave" } }
+                    ]
+                },
+                normalization: "minMaxScalar"
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::BadValue);
 }
 
 TEST_F(DocumentSourceScoreFusionTest, CheckAnyTypeAllowedForScore) {
@@ -928,10 +1390,10 @@ TEST_F(DocumentSourceScoreFusionTest, CheckAnyTypeAllowedForScore) {
                         },
                         { $match : { author : "dave" } }
                     ]
-                }
+                },
+                normalization: "none"
             },
-            score: "expression",
-            inputNormalization: "none"
+            score: "expression"
         }
     })");
 
@@ -1038,10 +1500,10 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfWeightsIsNotObject) {
                         },
                         { $match : { author : "dave" } }
                     ]
-                }
+                },
+                normalization: "none"
             },
             score: "expression",
-            inputNormalization: "none",
             combination:  {
                 weights: "my bad"
             }
@@ -1070,10 +1532,10 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfEmptyWeights) {
                         },
                         { $match : { author : "dave" } }
                     ]
-                }
+                },
+                normalization: "none"
             },
             score: "expression",
-            inputNormalization: "none",
             combination: {
                 weights: {}
             }
@@ -1117,10 +1579,10 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfWeightsArrayMixedIntsDecimals) {
                             }
                         }
                     ]
-                }
+                },
+                normalization: "none"
             },
             score: "expression",
-            inputNormalization: "none",
             combination: {
                 weights: {
                     name1: 5,
@@ -1282,6 +1744,13 @@ TEST_F(DocumentSourceScoreFusionTest, ScoreNullsIsRejected) {
                         },
                         { $match : { author : "dave" } }
                     ]
+                },
+                normalization: "none"
+            },
+            score: "expression",
+            combination: {
+                weights: {
+                    name1: 5
                 }
             },
             scoreNulls: 0
@@ -1310,11 +1779,11 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorIfOptionalFieldsIncludedMoreThanOnce)
                         },
                         { $match : { author : "dave" } }
                     ]
-                }
+                },
+                normalization: "none"
             },
             score: "expression",
             score: "duplicate",
-            inputNormalization: "none",
             combination: {
                 weights: {
                     name1: 5
@@ -1349,9 +1818,9 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfSearchMetaUsed) {
                         },
                         { $score: { score : { $subtract: [4.0, 2] } } }
                     ]
-                }
-            },
-            inputNormalization: "none"
+                },
+                normalization: "none"
+            }
         }
     })");
 
@@ -1382,9 +1851,9 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfSearchStoredSourceUsed) {
                         },
                         { $sort: {genres: 1} }
                     ]
-                }
-            },
-            inputNormalization: "none"
+                },
+                normalization: "none"
+            }
         }
     })");
 
@@ -1414,9 +1883,9 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
                         },
                         { $score: { score : 5.0 } }
                     ]
-                }
-            },
-            inputNormalization: "none"
+                },
+                normalization: "none"
+            }
         }
     })");
 
@@ -1462,9 +1931,9 @@ TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionwithAllowed) {
                         },
                         { $score: { score : 5.0 } }
                     ]
-                }
-            },
-            inputNormalization: "none"
+                },
+                normalization: "none"
+            }
         }
     })");
 
@@ -1708,9 +2177,9 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNestedUnionWithModifiesFields) {
                         },
                         { $score: { score : 5.0 } }
                     ]
-                }
-            },
-            inputNormalization: "none"
+                },
+                normalization: "none"
+            }
         }
     })");
 
@@ -1733,9 +2202,9 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfIncludeProject) {
                         { $score: { score : 5.0 } },
                         { $project: { author: 1 } }
                     ]
-                }
-            },
-            inputNormalization: "none"
+                },
+                normalization: "none"
+            }
         }
     })");
 
@@ -1767,9 +2236,9 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameDuplicated) {
                     foo: [
                         { $score: { score: 5.0 } }
                     ]
-                }
-            },
-            inputNormalization: "none"
+                },
+                normalization: "none"
+            }
         }
     })");
 
@@ -1798,9 +2267,9 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameStartsWithDollar) {
                             }
                         }
                     ]
-                }
-            },
-            inputNormalization: "none"
+                },
+                normalization: "none"
+            }
         }
     })");
 
@@ -1829,9 +2298,9 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameContainsDot) {
                             }
                         }
                     ]
-                }
-            },
-            inputNormalization: "none"
+                },
+                normalization: "none"
+            }
         }
     })");
 
@@ -1866,9 +2335,9 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfGeoNearPipeline) {
                             }
                         }
                     ]
-                }
-            },
-            inputNormalization: "none"
+                },
+                normalization: "none"
+            }
         }
     })");
 
@@ -1886,9 +2355,9 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfScoreWithGeoNearDistanceMetadataPip
                         { $match : { author : "Agatha Christie" } },
                         { $score: { score: { $meta: "geoNearDistance" } } }
                     ]
-                }
-            },
-            inputNormalization: "none"
+                },
+                normalization: "none"
+            }
         }
     })");
 
