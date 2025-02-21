@@ -4,6 +4,7 @@
  */
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
 
 if (typeof db === 'undefined') {
     throw new Error(
@@ -40,7 +41,7 @@ const isIgnorableError = function ignorableError(codeName) {
  * This function should not throw if everything is working properly.
  */
 const validateCollectionsBackgroundThread = function validateCollectionsBackground(
-    host, isIgnorableErrorFunc) {
+    newMongoWithRetry, host, isIgnorableErrorFunc) {
     // Calls 'func' with the print() function overridden to be a no-op.
     const quietly = (func) => {
         const printOriginal = print;
@@ -57,7 +58,7 @@ const validateCollectionsBackgroundThread = function validateCollectionsBackgrou
     // could lead to generating an overwhelming amount of log messages.
     let conn;
     quietly(() => {
-        conn = new Mongo(host);
+        conn = newMongoWithRetry(host);
     });
     assert.neq(null,
                conn,
@@ -152,7 +153,7 @@ const validateCollectionsBackgroundThread = function validateCollectionsBackgrou
 };
 
 if (topology.type === Topology.kStandalone) {
-    let res = validateCollectionsBackgroundThread(topology.mongod);
+    let res = validateCollectionsBackgroundThread(newMongoWithRetry, topology.mongod);
     assert.commandWorked(
         res,
         () => 'background collection validation against the standalone failed: ' + tojson(res));
@@ -160,8 +161,10 @@ if (topology.type === Topology.kStandalone) {
     const threads = [];
     try {
         for (let replicaMember of topology.nodes) {
-            const thread =
-                new Thread(validateCollectionsBackgroundThread, replicaMember, isIgnorableError);
+            const thread = new Thread(validateCollectionsBackgroundThread,
+                                      newMongoWithRetry,
+                                      replicaMember,
+                                      isIgnorableError);
             threads.push(thread);
             thread.start();
         }

@@ -6,6 +6,7 @@ import {
 } from "jstests/libs/check_shard_filtering_metadata_helpers.js";
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
 import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 
 assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a server?');
@@ -48,7 +49,9 @@ for (let shardName of Object.keys(topology.shards)) {
     // Skipping checking sharded collection metadata because any workload on the suite could perform
     // an operation that is known to leave incorrect metadata (such as refineCollectionShardKey).
     shard.nodes.forEach(node => {
-        CheckShardFilteringMetadataHelpers.run(
-            db.getMongo(), new Mongo(node), shardName, true /* skipCheckShardedCollections */);
+        CheckShardFilteringMetadataHelpers.run(db.getMongo(),
+                                               newMongoWithRetry(node),
+                                               shardName,
+                                               true /* skipCheckShardedCollections */);
     });
 }

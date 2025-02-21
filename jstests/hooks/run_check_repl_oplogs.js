@@ -1,4 +1,5 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
 
 var startTime = Date.now();
 assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a mongod?');
@@ -18,13 +19,14 @@ if (db.getMongo().isMongos()) {
 
     // Run check on every shard.
     configDB.shards.find().forEach(shardEntry => {
-        let newConn = new Mongo(shardEntry.host, undefined, {gRPC: false});
+        let newConn = newMongoWithRetry(shardEntry.host, undefined, {gRPC: false});
         runCheckOnReplSet(newConn.getDB('admin'));
     });
 
     // Run check on config server.
     let cmdLineOpts = db.adminCommand({getCmdLineOpts: 1});
-    let configConn = new Mongo(cmdLineOpts.parsed.sharding.configDB, undefined, {gRPC: false});
+    let configConn =
+        newMongoWithRetry(cmdLineOpts.parsed.sharding.configDB, undefined, {gRPC: false});
     runCheckOnReplSet(configConn.getDB('admin'));
 } else {
     runCheckOnReplSet(db);

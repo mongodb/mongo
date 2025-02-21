@@ -6,6 +6,7 @@
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {MagicRestoreTest} from "jstests/libs/magic_restore_test.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
 
 // Starts up a new node on dbpath where a backup cursor has already been written from sourceConn.
 // sourceConn must also contain a timestamp in `test.magic_restore_checkpointTimestamp` of when the
@@ -317,7 +318,7 @@ const topology = DiscoverTopology.findConnectedNodes(db);
 if (topology.type == Topology.kShardedCluster) {
     // Perform restore for the config server.
     const path = MongoRunner.dataPath + '../magicRestore/configsvr/node0';
-    let configMongo = new Mongo(topology.configsvr.nodes[0]);
+    let configMongo = newMongoWithRetry(topology.configsvr.nodes[0]);
 
     // Config shards must perform both dedicated config server and shard server steps in restore, so
     // we must make the distinction between a config shard and dedicated config server in the
@@ -340,7 +341,7 @@ if (topology.type == Topology.kShardedCluster) {
     // Need to iterate over the shards and do one restore per shard.
     for (const [shardName, shard] of Object.entries(topology.shards)) {
         const dbPathPrefix = MongoRunner.dataPath + '../magicRestore/' + shardName + '/node0';
-        let nodeMongo = new Mongo(shard.nodes[0]);
+        let nodeMongo = newMongoWithRetry(shard.nodes[0]);
         performMagicRestore(nodeMongo, dbPathPrefix, "shard", shardName, {"replSet": shardName});
     }
 } else {

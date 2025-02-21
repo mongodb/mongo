@@ -1,3 +1,6 @@
+
+import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
+
 // Interval between test loops.
 const kTestLoopPeriodMs = 20 * 1000;
 
@@ -96,7 +99,7 @@ function getConfigServer(connection) {
     var rx = /.*\/(.*)/g;
     var arr = rx.exec(res);
     jsTestLog(`Config server: ${arr[1]} extracted from ${tojson(res)}`);
-    return new Mongo(arr[1]);
+    return newMongoWithRetry(arr[1]);
 }
 
 function doFailInjectionLoop(db) {

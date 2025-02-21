@@ -4,6 +4,7 @@
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
 import {
     assertForDbCheckErrorsForAllNodes,
     runDbCheckForDatabase
@@ -23,13 +24,13 @@ TestData.disableImplicitSessions = true;
 const conn = db.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(conn);
 
-const exceptionFilteredBackgroundDbCheck = function(hosts) {
+const exceptionFilteredBackgroundDbCheck = function(newMongoWithRetry, hosts) {
     // Set a higher rate to let 'maxDocsPerBatch' be the only limiting factor.
     assert.commandWorkedOrFailedWithCode(
         db.adminCommand({setParameter: 1, maxDbCheckMBperSec: 1024}), ErrorCodes.InvalidOptions);
 
     hosts.forEach((host) => {
-        const hostConn = new Mongo(host);
+        const hostConn = newMongoWithRetry(host);
         assert.commandWorkedOrFailedWithCode(
             hostConn.getDB("admin").adminCommand(
                 {setParameter: 1, dbCheckSecondaryBatchMaxTimeMs: 30000}),
@@ -128,13 +129,14 @@ const exceptionFilteredBackgroundDbCheck = function(hosts) {
 };
 
 if (topology.type === Topology.kReplicaSet) {
-    let res = exceptionFilteredBackgroundDbCheck(topology.nodes);
+    let res = exceptionFilteredBackgroundDbCheck(newMongoWithRetry, topology.nodes);
     assert.commandWorked(res, () => 'dbCheck replication consistency check failed: ' + tojson(res));
 } else if (topology.type === Topology.kShardedCluster) {
     const threads = [];
     try {
         if (topology.configsvr.type === Topology.kReplicaSet) {
-            const thread = new Thread(exceptionFilteredBackgroundDbCheck, topology.configsvr.nodes);
+            const thread = new Thread(
+                exceptionFilteredBackgroundDbCheck, newMongoWithRetry, topology.configsvr.nodes);
             threads.push(thread);
             thread.start();
         }
@@ -142,7 +144,8 @@ if (topology.type === Topology.kReplicaSet) {
         for (let shardName of Object.keys(topology.shards)) {
             const shard = topology.shards[shardName];
             if (shard.type === Topology.kReplicaSet) {
-                const thread = new Thread(exceptionFilteredBackgroundDbCheck, shard.nodes);
+                const thread =
+                    new Thread(exceptionFilteredBackgroundDbCheck, newMongoWithRetry, shard.nodes);
                 threads.push(thread);
                 thread.start();
             } else {

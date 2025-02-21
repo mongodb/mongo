@@ -10,6 +10,7 @@ import {
     openBackupCursor
 } from "jstests/libs/backup_utils.js";
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
+import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
 
 function writeMetadataInfo(conn, checkpoint) {
     let testDB = conn.getDB("magic_restore_metadata");
@@ -55,7 +56,7 @@ if (topology.type == Topology.kReplicaSet) {
     const path = MongoRunner.dataPath + '../magicRestore/configsvr/node0';
     restorePaths.push(path);
 
-    let nodeMongo = new Mongo(topology.configsvr.nodes[0]);
+    let nodeMongo = newMongoWithRetry(topology.configsvr.nodes[0]);
     nodes.push(nodeMongo);
 
     let [cursor, metadata] = takeBackup(nodeMongo, path);
@@ -74,7 +75,7 @@ if (topology.type == Topology.kReplicaSet) {
         const dbPathPrefix = MongoRunner.dataPath + '../magicRestore/' + shardName + '/node0';
         restorePaths.push(dbPathPrefix);
 
-        let nodeMongo = new Mongo(shard.nodes[0]);
+        let nodeMongo = newMongoWithRetry(shard.nodes[0]);
         let [cursor, metadata] = takeBackup(nodeMongo, dbPathPrefix);
 
         nodes.push(nodeMongo);

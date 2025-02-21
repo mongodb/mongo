@@ -3,6 +3,7 @@
 import {CollectionValidator} from "jstests/hooks/validate_collections.js";
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
 
 assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a mongod?');
 const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
@@ -50,7 +51,7 @@ if (requiredFCV) {
     // multi-statement transaction. We temporarily raise the transactionLifetimeLimitSeconds to be
     // 24 hours to avoid spurious failures from it having been set to a lower value.
     originalTransactionLifetimeLimitSeconds = hostList.map(hostStr => {
-        const conn = new Mongo(hostStr);
+        const conn = newMongoWithRetry(hostStr);
         const res = assert.commandWorked(
             conn.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 24 * 60 * 60}));
         return {conn, originalValue: res.was};
