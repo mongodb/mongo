@@ -2,6 +2,4 @@
 *.core
 *.new
 */1727963727765/**/*.results
-tests/*
-!tests/selfTests/
-!tests/manual_tests
+tests/query-correctness-tests-*
