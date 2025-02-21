@@ -153,6 +153,25 @@ TEST(Commands, appendCommandStatusErrorExtraInfo) {
     ASSERT_BSONOBJ_EQ(actualResult.obj(), expectedResult.obj());
 }
 
+TEST(Commands, appendCommandStatusErrorWithWriteConcernError) {
+    BSONObjBuilder actualResult;
+
+    const Status realStatus(ErrorCodes::ImmutableField, "tried to modify immutable _id field");
+    WriteConcernErrorDetail wceDetail;
+    wceDetail.setStatus(Status{ErrorCodes::WriteConcernTimeout, "timed out waiting for wc"});
+    const Status status(ErrorWithWriteConcernErrorInfo(realStatus, wceDetail), "wrapped status");
+
+    CommandHelpers::appendCommandStatusNoThrow(actualResult, status);
+
+    BSONObjBuilder expectedResult;
+    expectedResult.append("ok", 0.0);
+    expectedResult.append("errmsg", realStatus.reason());
+    expectedResult.append("code", realStatus.code());
+    expectedResult.append("codeName", realStatus.codeString());
+    expectedResult.append("writeConcernError", wceDetail.toBSON());
+    ASSERT_BSONOBJ_EQ(actualResult.obj(), expectedResult.obj());
+}
+
 DEATH_TEST(Commands, appendCommandStatusInvalidOkValue, "invariant") {
     BSONObjBuilder actualResult;
     actualResult.append("a", "b");

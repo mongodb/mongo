@@ -399,8 +399,7 @@ bool CommandHelpers::appendCommandStatusNoThrow(BSONObjBuilder& result,
     }
 
     appendSimpleCommandStatus(result, status.isOK(), status.reason());
-    BSONObj tmp = result.asTempObj();
-    if (!status.isOK() && !tmp.hasField("code")) {
+    if (!status.isOK() && !result.asTempObj().hasField("code")) {
         result.append("code", status.code());
         result.append("codeName", ErrorCodes::errorString(status.code()));
     }
@@ -409,7 +408,7 @@ bool CommandHelpers::appendCommandStatusNoThrow(BSONObjBuilder& result,
         extraInfo->serialize(&result);
     }
 
-    if (writeConcernErrorDetail && !tmp.hasField(kWriteConcernErrorFieldName)) {
+    if (writeConcernErrorDetail && !result.asTempObj().hasField(kWriteConcernErrorFieldName)) {
         result.append(kWriteConcernErrorFieldName, writeConcernErrorDetail->toBSON());
     }
 
