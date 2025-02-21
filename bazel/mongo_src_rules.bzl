@@ -2162,7 +2162,11 @@ def _mongo_cc_binary_and_test(
         }),
         "target_compatible_with": target_compatible_with + enterprise_compatible,
         "additional_linker_inputs": additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
-        "exec_properties": exec_properties,
+        "exec_properties": exec_properties | select({
+            # Debug compression significantly reduces .o, .dwo, and .a sizes
+            "//bazel/config:compress_debug_compile_enabled": {"cpp_link.coefficient": "6.0"},
+            "//conditions:default": {"cpp_link.coefficient": "2.0"},
+        }),
         "env": env | SANITIZER_ENV,
     } | kwargs
 
