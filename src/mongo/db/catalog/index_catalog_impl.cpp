@@ -675,7 +675,6 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
 StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationContext* opCtx,
                                                                    Collection* collection,
                                                                    BSONObj spec) {
-    invariant(collection->uuid() == collection->uuid());
     CollectionCatalog::get(opCtx)->invariantHasExclusiveAccessToCollection(opCtx, collection->ns());
     invariant(collection->isEmpty(opCtx),
               str::stream() << "Collection must be empty. Collection: "
