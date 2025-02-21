@@ -89,6 +89,8 @@ public:
                          .containsCustomizedGetLastErrorDefaults());
 
             auto addShardCmd = request();
+            auto shardIdUpsertCmd = add_shard_util::createShardIdentityUpsertForAddShard(
+                addShardCmd, ShardingCatalogClient::kMajorityWriteConcern);
 
             // A request dispatched through a local client is served within the same thread that
             // submits it (so that the opCtx needs to be used as the vehicle to pass the WC to the
@@ -97,54 +99,17 @@ public:
             ScopeGuard resetWCGuard([&] { opCtx->setWriteConcern(originalWC); });
             opCtx->setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern);
 
-            BSONObj newIdentity = addShardCmd.getShardIdentity().toBSON().addFields(
-                BSON("_id" << add_shard_util::kShardIdentityDocumentId));
-
-            write_ops::InsertCommandRequest insertOp(
-                NamespaceString::kServerConfigurationNamespace);
-            insertOp.setDocuments({newIdentity});
-            BSONObjBuilder cmdObjBuilder;
-            insertOp.serialize(&cmdObjBuilder);
-            cmdObjBuilder.append(WriteConcernOptions::kWriteConcernField,
-                                 ShardingCatalogClient::kMajorityWriteConcern.toBSON());
-
             DBDirectClient localClient(opCtx);
-
             BSONObj res;
-            localClient.runCommand(DatabaseName::kAdmin, cmdObjBuilder.obj(), res);
-            const auto status = getStatusFromWriteCommandReply(res);
-            if (status.code() != ErrorCodes::DuplicateKey) {
-                uassertStatusOK(status);
-                return;
-            }
 
-            // If we have a duplicate key, that means, we already have a shardIdentity document. If
-            // so, we only allow it to be the very same as the one in the command, otherwise a
-            // cluster could steal an other cluster's shard without the former knowing it.
-            const auto existingIdentity =
-                localClient.findOne(NamespaceString::kServerConfigurationNamespace,
-                                    BSON("_id" << add_shard_util::kShardIdentityDocumentId));
+            localClient.runCommand(DatabaseName::kAdmin, shardIdUpsertCmd, res);
 
-            invariant(!existingIdentity.isEmpty());
-
-            uassert(ErrorCodes::IllegalOperation,
-                    "Shard already has an identity that differs",
-                    newIdentity.woCompare(existingIdentity,
-                                          {},
-                                          BSONObj::ComparisonRules::kConsiderFieldName |
-                                              BSONObj::ComparisonRules::kIgnoreFieldOrder) == 0);
+            uassertStatusOK(getStatusFromWriteCommandReply(res));
 
             const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
             invariant(balancerConfig);
             // Ensure we have the most up-to-date balancer configuration
             uassertStatusOK(balancerConfig->refreshAndCheck(opCtx));
-
-            localClient.update(NamespaceString::kServerConfigurationNamespace,
-                               BSON("_id"
-                                    << "AddShardStats"),
-                               BSON("$inc" << BSON("count" << 1)),
-                               true /* upsert */,
-                               false /* multi */);
         }
 
     private:
