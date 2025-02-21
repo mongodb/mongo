@@ -1,50 +1,142 @@
-# Give build system 3rd party controls to the build team
-# This might become something we give to the owners of the third party modules eventually
-# During the bazel conversion this makes sense to be the build team
 version: 1.0.0
 filters:
-  - "*":
+  - "abseil-cpp":
+    approvers:
+      - 10gen/server-programmability
+  - "asio-master":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "aws-sdk":
+    approvers:
+      - 10gen/streams-engine
+  - "benchmark":
+    approvers:
+      - 10gen/server-programmability
+  - "boost":
+    approvers:
+      - 10gen/server-programmability
+  - "cares":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "croaring":
+    approvers:
+      - 10gen/query-execution
+  - "fmt":
+    approvers:
+      - 10gen/server-programmability
+  - "gperftools":
+    approvers:
+      - 10gen/server-workload-scheduling
+  - "grpc":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "icu4c*":
+    approvers:
+      - 10gen/query-execution
+  - "immer":
+    approvers:
+      - 10gen/server-storage-execution
+  - "IntelRDFPMathLib*":
+    approvers:
+      - 10gen/server-programmability
+  - "JSON-Schema-Test-Suite":
+    approvers:
+      - 10gen/query-optimization
+  - "libbson":
     approvers:
       - 10gen/server-security
+  - "libmongocrypt":
+    approvers:
+      - 10gen/server-security
+  - "librdkafka":
+    approvers:
+      - 10gen/streams-engine
+  - "libstemmer_c":
+    approvers:
+      - 10gen/query-integration  
+  - "mock_ocsp_responder":
+    approvers:
+      - 10gen/server-security
+  - "mozjs":
+    approvers:
+      - 10gen/query-integration-javascript
+      - 10gen/server-security
+  - "murmurhash3":
+    approvers:
+      - 10gen/server-storage-execution
+  - "nlohmann-json":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "node":
+    approvers:
+      - 10gen/server-workload-scheduling
+  - "opentelemetry-cpp":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "opentelemetry-proto":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "pcre2":
+    approvers:
+      - 10gen/query-execution
+  - "protobuf":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "re2":
+    approvers:
+      - 10gen/server-programmability
+  - "s2":
+    approvers:
+      - 10gen/query-integration
+  - "SafeInt":
+    approvers:
+      - 10gen/server-programmability
+  - "sasl":
+    approvers:
+      - 10gen/server-security
+  - "schemastore.org":
+    approvers:
+      - 10gen/query-optimization
+  - "scons*":
+    approvers:
+      - 10gen/devprod-build
+  - "snappy":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "tcmalloc":
+    approvers:
+      - 10gen/server-workload-scheduling
+  - "timelib":
+    approvers:
+      - 10gen/query-execution
+  - "tomcrypt*":
+    approvers:
+      - 10gen/server-security
+  - "unicode*":
+    approvers:
+      - 10gen/query-execution
+  - "unwind":
+    approvers:
+      - 10gen/server-programmability
+  - "valgrind":
+    approvers:
+      - 10gen/devprod-build
+  # We're not ready for this yet, there some dependent tooling work to make sure we can vendor changes from the wiredtiger repo without being disruptive.
+  # - "wiredtiger":
+  #   approvers:
+  #     - 10gen/storage-engines
+  - "yaml-cpp":
+    approvers:
+      - 10gen/server-security
+  - "zlib":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "zstandard":
+    approvers:
+      - 10gen/server-networking-and-observability
   - "SConscript":
     approvers:
       - 10gen/devprod-build
   - "*.bazel":
     approvers:
-      - 10gen/devprod-build
-  - "mozjs":
-    approvers:
-      - 10gen/query-integration-javascript
-      - 10gen/server-security
-  - "asio-master":
-    approvers:
-      - 10gen/server-networking-and-observability
-      - 10gen/devprod-build
-  - "cares":
-    approvers:
-      - 10gen/server-networking-and-observability
-      - 10gen/devprod-build
-  - "grpc":
-    approvers:
-      - 10gen/server-networking-and-observability
-      - 10gen/devprod-build
-  - "nlohmann-json":
-    approvers:
-      - 10gen/server-networking-and-observability
-      - 10gen/devprod-build
-  - "protobuf":
-    approvers:
-      - 10gen/server-networking-and-observability
-      - 10gen/devprod-build
-  - "snappy":
-    approvers:
-      - 10gen/server-networking-and-observability
-      - 10gen/devprod-build
-  - "zlib":
-    approvers:
-      - 10gen/server-networking-and-observability
-      - 10gen/devprod-build
-  - "zstandard":
-    approvers:
-      - 10gen/server-networking-and-observability
       - 10gen/devprod-build

@@ -2476,18 +2476,48 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/watchdog/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/third_party/OWNERS.yml
-/src/third_party/**/* @10gen/server-security @svc-auto-approve-bot
+/src/third_party/**/abseil-cpp @10gen/server-programmability @svc-auto-approve-bot
+/src/third_party/**/asio-master @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/third_party/**/aws-sdk @10gen/streams-engine @svc-auto-approve-bot
+/src/third_party/**/benchmark @10gen/server-programmability @svc-auto-approve-bot
+/src/third_party/**/boost @10gen/server-programmability @svc-auto-approve-bot
+/src/third_party/**/cares @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/third_party/**/croaring @10gen/query-execution @svc-auto-approve-bot
+/src/third_party/**/fmt @10gen/server-programmability @svc-auto-approve-bot
+/src/third_party/**/gperftools @10gen/server-workload-scheduling @svc-auto-approve-bot
+/src/third_party/**/grpc @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/third_party/**/icu4c* @10gen/query-execution @svc-auto-approve-bot
+/src/third_party/**/immer @10gen/server-storage-execution @svc-auto-approve-bot
+/src/third_party/**/IntelRDFPMathLib* @10gen/server-programmability @svc-auto-approve-bot
+/src/third_party/**/JSON-Schema-Test-Suite @10gen/query-optimization @svc-auto-approve-bot
+/src/third_party/**/libbson @10gen/server-security @svc-auto-approve-bot
+/src/third_party/**/libmongocrypt @10gen/server-security @svc-auto-approve-bot
+/src/third_party/**/librdkafka @10gen/streams-engine @svc-auto-approve-bot
+/src/third_party/**/libstemmer_c @10gen/query-integration @svc-auto-approve-bot
+/src/third_party/**/mock_ocsp_responder @10gen/server-security @svc-auto-approve-bot
+/src/third_party/**/mozjs @10gen/query-integration-javascript @10gen/server-security @svc-auto-approve-bot
+/src/third_party/**/murmurhash3 @10gen/server-storage-execution @svc-auto-approve-bot
+/src/third_party/**/nlohmann-json @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/third_party/**/node @10gen/server-workload-scheduling @svc-auto-approve-bot
+/src/third_party/**/opentelemetry-cpp @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/third_party/**/opentelemetry-proto @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/third_party/**/pcre2 @10gen/query-execution @svc-auto-approve-bot
+/src/third_party/**/protobuf @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/third_party/**/re2 @10gen/server-programmability @svc-auto-approve-bot
+/src/third_party/**/s2 @10gen/query-integration @svc-auto-approve-bot
+/src/third_party/**/SafeInt @10gen/server-programmability @svc-auto-approve-bot
+/src/third_party/**/sasl @10gen/server-security @svc-auto-approve-bot
+/src/third_party/**/schemastore.org @10gen/query-optimization @svc-auto-approve-bot
+/src/third_party/**/scons* @10gen/devprod-build @svc-auto-approve-bot
+/src/third_party/**/snappy @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/third_party/**/tcmalloc @10gen/server-workload-scheduling @svc-auto-approve-bot
+/src/third_party/**/timelib @10gen/query-execution @svc-auto-approve-bot
+/src/third_party/**/tomcrypt* @10gen/server-security @svc-auto-approve-bot
+/src/third_party/**/unicode* @10gen/query-execution @svc-auto-approve-bot
+/src/third_party/**/unwind @10gen/server-programmability @svc-auto-approve-bot
+/src/third_party/**/valgrind @10gen/devprod-build @svc-auto-approve-bot
+/src/third_party/**/yaml-cpp @10gen/server-security @svc-auto-approve-bot
+/src/third_party/**/zlib @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/third_party/**/zstandard @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/third_party/**/SConscript @10gen/devprod-build @svc-auto-approve-bot
 /src/third_party/**/*.bazel @10gen/devprod-build @svc-auto-approve-bot
-/src/third_party/**/mozjs @10gen/query-integration-javascript @10gen/server-security @svc-auto-approve-bot
-/src/third_party/**/asio-master @10gen/devprod-build @10gen/server-networking-and-observability @svc-auto-approve-bot
-/src/third_party/**/cares @10gen/devprod-build @10gen/server-networking-and-observability @svc-auto-approve-bot
-/src/third_party/**/grpc @10gen/devprod-build @10gen/server-networking-and-observability @svc-auto-approve-bot
-/src/third_party/**/nlohmann-json @10gen/devprod-build @10gen/server-networking-and-observability @svc-auto-approve-bot
-/src/third_party/**/protobuf @10gen/devprod-build @10gen/server-networking-and-observability @svc-auto-approve-bot
-/src/third_party/**/snappy @10gen/devprod-build @10gen/server-networking-and-observability @svc-auto-approve-bot
-/src/third_party/**/zlib @10gen/devprod-build @10gen/server-networking-and-observability @svc-auto-approve-bot
-/src/third_party/**/zstandard @10gen/devprod-build @10gen/server-networking-and-observability @svc-auto-approve-bot
-
-# The following patterns are parsed from ./src/third_party/wiredtiger/OWNERS.yml
-/src/third_party/wiredtiger/**/*
