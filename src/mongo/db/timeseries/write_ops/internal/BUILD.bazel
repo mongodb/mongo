@@ -42,6 +42,9 @@ mongo_cc_unit_test(
         "//src/mongo/db/catalog:catalog_test_fixture",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/query/write_ops:write_ops_exec",
+        "//src/mongo/db/timeseries:timeseries_metadata",
+        "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/db/timeseries/bucket_catalog",
         "//src/mongo/db/timeseries/write_ops:timeseries_write_ops",
     ],
 )

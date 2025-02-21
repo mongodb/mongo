@@ -771,7 +771,6 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
     std::shared_ptr<WriteBatch> writeBatch;
     auto successfulInsertion =
         internal::stageInsertBatchIntoEligibleBucket(*_bucketCatalog,
-                                                     bucketsColl.get(),
                                                      _opCtx->getOpID(),
                                                      bucketsColl->getDefaultCollator(),
                                                      currentBatch,
@@ -816,7 +815,6 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
         auto currBatch = batchedInsertContexts[currBatchedInsertContextsIndex[i]];
         successfulInsertion =
             internal::stageInsertBatchIntoEligibleBucket(*_bucketCatalog,
-                                                         bucketsColl.get(),
                                                          _opCtx->getOpID(),
                                                          bucketsColl->getDefaultCollator(),
                                                          currBatch,

@@ -530,7 +530,6 @@ void closeArchivedBucket(BucketCatalog& catalog, const BucketId& bucketId);
  * Also increments `currentPosition` to one past the index of the last measurement inserted.
  */
 bool stageInsertBatchIntoEligibleBucket(BucketCatalog& catalog,
-                                        const Collection* bucketsColl,
                                         OperationId opId,
                                         const StringDataComparator* comparator,
                                         BatchedInsertContext& batch,

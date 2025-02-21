@@ -51,7 +51,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-namespace mongo::timeseries::write_ops {
+namespace mongo::timeseries::write_ops::internal {
 
 namespace {
 
@@ -641,8 +641,6 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
 
 }  // namespace
 
-namespace internal {
-
 NamespaceString ns(const mongo::write_ops::InsertCommandRequest& request) {
     return request.getNamespace();
 }
@@ -1126,7 +1124,7 @@ std::vector<bucket_catalog::BatchedInsertContext> buildBatchedInsertContexts(
 std::vector<std::shared_ptr<bucket_catalog::WriteBatch>> stageInsertBatch(
     OperationContext* opCtx,
     bucket_catalog::BucketCatalog& bucketCatalog,
-    const Collection* bucketsColl,
+    const CollectionPtr& bucketsColl,
     const OperationId& opId,
     const StringDataComparator* comparator,
     uint64_t storageCacheSizeBytes,
@@ -1167,7 +1165,6 @@ std::vector<std::shared_ptr<bucket_catalog::WriteBatch>> stageInsertBatch(
         std::shared_ptr<bucket_catalog::WriteBatch> writeBatch;
         needsAnotherBucket =
             !(bucket_catalog::internal::stageInsertBatchIntoEligibleBucket(bucketCatalog,
-                                                                           bucketsColl,
                                                                            opId,
                                                                            comparator,
                                                                            batch,
@@ -1183,6 +1180,48 @@ std::vector<std::shared_ptr<bucket_catalog::WriteBatch>> stageInsertBatch(
     invariant(currentPosition == batch.measurementsTimesAndIndices.size());
     return writeBatches;
 }
-}  // namespace internal
 
-}  // namespace mongo::timeseries::write_ops
+
+StatusWith<std::vector<std::shared_ptr<bucket_catalog::WriteBatch>>> prepareInsertsToBuckets(
+    OperationContext* opCtx,
+    bucket_catalog::BucketCatalog& bucketCatalog,
+    const CollectionPtr& bucketsColl,
+    const TimeseriesOptions& timeseriesOptions,
+    OperationId opId,
+    const StringDataComparator* comparator,
+    uint64_t storageCacheSizeBytes,
+    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+    const std::vector<BSONObj>& userMeasurementsBatch,
+    std::vector<WriteStageErrorAndIndex>& errorsAndIndices) {
+    auto batchedInsertContexts = buildBatchedInsertContexts(bucketCatalog,
+                                                            bucketsColl->uuid(),
+                                                            timeseriesOptions,
+                                                            userMeasurementsBatch,
+                                                            errorsAndIndices);
+
+    // Any errors in the user batch will early-exit and be attempted one-at-a-time.
+    if (!errorsAndIndices.empty()) {
+        return errorsAndIndices.front().error;
+    }
+
+    std::vector<std::shared_ptr<bucket_catalog::WriteBatch>> results;
+
+    for (auto& batchedInsertContext : batchedInsertContexts) {
+        auto writeBatches = stageInsertBatch(opCtx,
+                                             bucketCatalog,
+                                             bucketsColl,
+                                             opId,
+                                             comparator,
+                                             storageCacheSizeBytes,
+                                             compressAndWriteBucketFunc,
+                                             batchedInsertContext);
+
+        // Append all returned write batches to results, since multiple buckets may have been
+        // targeted.
+        results.insert(results.end(), writeBatches.begin(), writeBatches.end());
+    }
+
+    return results;
+}
+
+}  // namespace mongo::timeseries::write_ops::internal

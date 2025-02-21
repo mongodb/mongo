@@ -1706,7 +1706,6 @@ void closeArchivedBucket(BucketCatalog& catalog, const BucketId& bucketId) {
 }
 
 bool stageInsertBatchIntoEligibleBucket(BucketCatalog& catalog,
-                                        const Collection* bucketsColl,
                                         const OperationId opId,
                                         const StringDataComparator* comparator,
                                         BatchedInsertContext& batch,

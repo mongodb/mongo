@@ -31,12 +31,13 @@
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
 #include "mongo/unittest/unittest.h"
 
-namespace mongo::timeseries {
+namespace mongo::timeseries::write_ops::internal {
 namespace {
 static constexpr uint64_t kStorageCacheSizeBytes = 1024 * 1024 * 1024;
 class TimeseriesWriteOpsInternalTest : public CatalogTestFixture {
@@ -53,6 +54,10 @@ protected:
         bucket_catalog::RolloverReason reason) const;
 
     TimeseriesOptions _getTimeseriesOptions(const NamespaceString& ns) const;
+
+    const CollatorInterface* _getCollator(const NamespaceString& ns) const;
+
+    uint64_t _getStorageCacheSizeBytes() const;
 
     void _testBuildBatchedInsertContextWithMetaField(
         std::vector<BSONObj>& userMeasurementsBatch,
@@ -75,10 +80,14 @@ protected:
     StringData _timeField = "time";
     StringData _metaField = "meta";
     StringData _metaValue = "a";
+    StringData _metaValue2 = "b";
     UUID _uuid = UUID::gen();
 
     // Strings used to simulate kSize/kCachePressure rollover reason.
     std::string _bigStr = std::string(1000, 'a');
+
+    // Should not be called
+    CompressAndWriteBucketFunc _compressBucket = nullptr;
 };
 
 void TimeseriesWriteOpsInternalTest::setUp() {
@@ -103,6 +112,17 @@ TimeseriesOptions TimeseriesWriteOpsInternalTest::_getTimeseriesOptions(
     const NamespaceString& ns) const {
     AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IS);
     return *autoColl->getTimeseriesOptions();
+}
+
+const CollatorInterface* TimeseriesWriteOpsInternalTest::_getCollator(
+    const NamespaceString& ns) const {
+    AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IS);
+    return autoColl->getDefaultCollator();
+}
+
+uint64_t TimeseriesWriteOpsInternalTest::_getStorageCacheSizeBytes() const {
+    return _opCtx->getServiceContext()->getStorageEngine()->getEngine()->getCacheSizeMB() * 1024 *
+        1024;
 }
 
 // _generateMeasurementsWithRolloverReason enables us to easily get measurement vectors that have
@@ -347,7 +367,7 @@ void TimeseriesWriteOpsInternalTest::_testStageInsertBatch(
         auto writeBatches =
             write_ops::internal::stageInsertBatch(_opCtx,
                                                   *_bucketCatalog,
-                                                  bucketsColl.get(),
+                                                  bucketsColl,
                                                   _opCtx->getOpID(),
                                                   nullptr /*comparator*/,
                                                   kStorageCacheSizeBytes,
@@ -432,8 +452,10 @@ TEST_F(TimeseriesWriteOpsInternalTest,
         mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:01:00.000Z"}, "meta":"a", "x":5})"),
     };
     stdx::unordered_map<std::string, std::vector<size_t>> metaFieldValueToCorrectIndexOrderMap;
-    metaFieldValueToCorrectIndexOrderMap.try_emplace("a", std::initializer_list<size_t>{4, 0});
-    metaFieldValueToCorrectIndexOrderMap.try_emplace("b", std::initializer_list<size_t>{3});
+    metaFieldValueToCorrectIndexOrderMap.try_emplace(_metaValue.toString(),
+                                                     std::initializer_list<size_t>{4, 0});
+    metaFieldValueToCorrectIndexOrderMap.try_emplace(_metaValue2.toString(),
+                                                     std::initializer_list<size_t>{3});
     stdx::unordered_set<size_t> expectedIndicesWithErrors{1, 2};
     _testBuildBatchedInsertContextWithMetaField(
         userMeasurementsBatch, metaFieldValueToCorrectIndexOrderMap, expectedIndicesWithErrors);
@@ -507,5 +529,229 @@ TEST_F(TimeseriesWriteOpsInternalTest, InsertBatchHandlesRolloverReasonkSize) {
     std::vector<size_t> numWriteBatches{2};
     _testStageInsertBatch(batchOfMeasurementsWithSize, numWriteBatches);
 }
+
+TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsSimpleOneFullBucket) {
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
+        "db_timeseries_write_ops_internal_test", "ts");
+
+    auto tsOptions = _getTimeseriesOptions(_ns);
+    std::vector<BSONObj> userBatch;
+    for (auto i = 0; i < gTimeseriesBucketMaxCount; i++) {
+        userBatch.emplace_back(BSON(_timeField << Date_t::now() << _metaField << _metaValue));
+    }
+
+    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+
+    AutoGetCollection autoColl(_opCtx, _ns.makeTimeseriesBucketsNamespace(), MODE_IS);
+    const auto& bucketsColl = autoColl.getCollection();
+
+    auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
+                                                  *_bucketCatalog,
+                                                  bucketsColl,
+                                                  tsOptions,
+                                                  _opCtx->getOpID(),
+                                                  _getCollator(_ns),
+                                                  _getStorageCacheSizeBytes(),
+                                                  _compressBucket,
+                                                  userBatch,
+                                                  errorsAndIndices);
+
+    ASSERT_TRUE(swWriteBatches.isOK());
+    ASSERT_TRUE(errorsAndIndices.empty());
+
+    auto& writeBatches = swWriteBatches.getValue();
+    ASSERT_EQ(writeBatches.size(), 1);
+
+    for (size_t i = 0; i < writeBatches.size(); i++) {
+        ASSERT_EQ(writeBatches[i]->isReopened, false);
+        ASSERT_EQ(writeBatches[i]->bucketIsSortedByTime, true);
+        ASSERT_EQ(writeBatches[i]->opId, _opCtx->getOpID());
+    }
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsMultipleBucketsOneMeta) {
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
+        "db_timeseries_write_ops_internal_test", "ts");
+
+    auto tsOptions = _getTimeseriesOptions(_ns);
+    std::vector<BSONObj> userBatch;
+    for (auto i = 0; i < 2 * gTimeseriesBucketMaxCount; i++) {
+        userBatch.emplace_back(BSON(_timeField << Date_t::now() << _metaField << _metaValue));
+    }
+    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+
+    AutoGetCollection autoColl(_opCtx, _ns.makeTimeseriesBucketsNamespace(), MODE_IS);
+    const auto& bucketsColl = autoColl.getCollection();
+
+    auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
+                                                  *_bucketCatalog,
+                                                  bucketsColl,
+                                                  tsOptions,
+                                                  _opCtx->getOpID(),
+                                                  _getCollator(_ns),
+                                                  _getStorageCacheSizeBytes(),
+                                                  _compressBucket,
+                                                  userBatch,
+                                                  errorsAndIndices);
+
+    ASSERT_TRUE(swWriteBatches.isOK());
+    ASSERT_TRUE(errorsAndIndices.empty());
+
+    auto& writeBatches = swWriteBatches.getValue();
+    ASSERT_EQ(writeBatches.size(), 2);
+
+    for (size_t i = 0; i < writeBatches.size(); i++) {
+        ASSERT_EQ(writeBatches[i]->isReopened, false);
+        ASSERT_EQ(writeBatches[i]->bucketIsSortedByTime, true);
+        ASSERT_EQ(writeBatches[i]->opId, _opCtx->getOpID());
+    }
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsMultipleBucketsMultipleMetas) {
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
+        "db_timeseries_write_ops_internal_test", "ts");
+
+    auto tsOptions = _getTimeseriesOptions(_ns);
+    std::vector<BSONObj> userBatch;
+    for (auto i = 0; i < gTimeseriesBucketMaxCount; i++) {
+        userBatch.emplace_back(BSON(_timeField << Date_t::now() << _metaField << _metaValue));
+    }
+    for (auto i = 0; i < gTimeseriesBucketMaxCount; i++) {
+        userBatch.emplace_back(BSON(_timeField << Date_t::now() << _metaField << "m"));
+    }
+    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+
+    AutoGetCollection autoColl(_opCtx, _ns.makeTimeseriesBucketsNamespace(), MODE_IS);
+    const auto& bucketsColl = autoColl.getCollection();
+
+    auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
+                                                  *_bucketCatalog,
+                                                  bucketsColl,
+                                                  tsOptions,
+                                                  _opCtx->getOpID(),
+                                                  _getCollator(_ns),
+                                                  _getStorageCacheSizeBytes(),
+                                                  _compressBucket,
+                                                  userBatch,
+                                                  errorsAndIndices);
+
+    ASSERT_TRUE(swWriteBatches.isOK());
+    ASSERT_TRUE(errorsAndIndices.empty());
+
+    auto& writeBatches = swWriteBatches.getValue();
+    ASSERT_EQ(writeBatches.size(), 2);
+
+    for (size_t i = 0; i < writeBatches.size(); i++) {
+        ASSERT_EQ(writeBatches[i]->isReopened, false);
+        ASSERT_EQ(writeBatches[i]->bucketIsSortedByTime, true);
+        ASSERT_EQ(writeBatches[i]->opId, _opCtx->getOpID());
+    }
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest,
+       PrepareInsertsToBucketsMultipleBucketsMultipleMetasInterleaved) {
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
+        "db_timeseries_write_ops_internal_test", "ts");
+
+    auto tsOptions = _getTimeseriesOptions(_ns);
+    std::vector<BSONObj> userBatch;
+    for (auto i = 0; i < 2 * gTimeseriesBucketMaxCount; i++) {
+        userBatch.emplace_back(BSON(_timeField << Date_t::now() << _metaField
+                                               << (i % 2 == 0 ? _metaValue : _metaValue2)));
+    }
+    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+
+    AutoGetCollection autoColl(_opCtx, _ns.makeTimeseriesBucketsNamespace(), MODE_IS);
+    const auto& bucketsColl = autoColl.getCollection();
+
+    auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
+                                                  *_bucketCatalog,
+                                                  bucketsColl,
+                                                  tsOptions,
+                                                  _opCtx->getOpID(),
+                                                  _getCollator(_ns),
+                                                  _getStorageCacheSizeBytes(),
+                                                  _compressBucket,
+                                                  userBatch,
+                                                  errorsAndIndices);
+
+    ASSERT_TRUE(swWriteBatches.isOK());
+    ASSERT_TRUE(errorsAndIndices.empty());
+
+    auto& writeBatches = swWriteBatches.getValue();
+    ASSERT_EQ(writeBatches.size(), 2);
+
+    for (size_t i = 0; i < writeBatches.size(); i++) {
+        ASSERT_EQ(writeBatches[i]->isReopened, false);
+        ASSERT_EQ(writeBatches[i]->bucketIsSortedByTime, true);
+        ASSERT_EQ(writeBatches[i]->opId, _opCtx->getOpID());
+    }
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsBadMeasurementsAll) {
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
+        "db_timeseries_write_ops_internal_test", "ts");
+
+    auto tsOptions = _getTimeseriesOptions(_ns);
+    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    AutoGetCollection autoColl(_opCtx, _ns.makeTimeseriesBucketsNamespace(), MODE_IS);
+    const auto& bucketsColl = autoColl.getCollection();
+
+    std::vector<BSONObj> userMeasurementsBatch{
+        mongo::fromjson(R"({"meta":"a", "x":2})"),  // Malformed measurement, missing time field
+        mongo::fromjson(R"({"meta":"a", "x":3})"),  // Malformed measurement, missing time field
+    };
+
+    auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
+                                                  *_bucketCatalog,
+                                                  bucketsColl,
+                                                  tsOptions,
+                                                  _opCtx->getOpID(),
+                                                  _getCollator(_ns),
+                                                  _getStorageCacheSizeBytes(),
+                                                  _compressBucket,
+                                                  userMeasurementsBatch,
+                                                  errorsAndIndices);
+
+    ASSERT_FALSE(swWriteBatches.isOK());
+    ASSERT_EQ(errorsAndIndices.size(), 2);
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsBadMeasurementsSome) {
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
+        "db_timeseries_write_ops_internal_test", "ts");
+
+    auto tsOptions = _getTimeseriesOptions(_ns);
+    std::vector<WriteStageErrorAndIndex> errorsAndIndices;
+    AutoGetCollection autoColl(_opCtx, _ns.makeTimeseriesBucketsNamespace(), MODE_IS);
+    const auto& bucketsColl = autoColl.getCollection();
+
+    std::vector<BSONObj> userMeasurementsBatch{
+        mongo::fromjson(R"({"meta":"a", "x":2})"),  // Malformed measurement, missing time field
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:05:00.000Z"}, "meta":"a", "x":3})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:02:00.000Z"}, "meta":"a", "x":3})"),
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T10:03:00.000Z"}, "meta":"b", "x":3})"),
+        mongo::fromjson(R"({"meta":"b", "x":3})"),  // Malformed measurement, missing time field
+        mongo::fromjson(R"({"time":{"$date":"2025-01-30T09:02:00.000Z"}, "meta":"b", "x":3})"),
+    };
+
+    auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
+                                                  *_bucketCatalog,
+                                                  bucketsColl,
+                                                  tsOptions,
+                                                  _opCtx->getOpID(),
+                                                  _getCollator(_ns),
+                                                  _getStorageCacheSizeBytes(),
+                                                  _compressBucket,
+                                                  userMeasurementsBatch,
+                                                  errorsAndIndices);
+
+    ASSERT_FALSE(swWriteBatches.isOK());
+    ASSERT_EQ(errorsAndIndices.size(), 2);
+
+    ASSERT_EQ(errorsAndIndices[0].index, 0);
+    ASSERT_EQ(errorsAndIndices[1].index, 4);
+}
+
 }  // namespace
-}  // namespace mongo::timeseries
+}  // namespace mongo::timeseries::write_ops::internal

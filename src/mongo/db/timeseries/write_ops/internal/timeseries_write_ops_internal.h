@@ -166,10 +166,29 @@ std::vector<bucket_catalog::BatchedInsertContext> buildBatchedInsertContexts(
 std::vector<std::shared_ptr<bucket_catalog::WriteBatch>> stageInsertBatch(
     OperationContext* opCtx,
     bucket_catalog::BucketCatalog& bucketCatalog,
-    const Collection* bucketsColl,
+    const CollectionPtr& bucketsColl,
     const OperationId& opId,
     const StringDataComparator* comparator,
     uint64_t storageCacheSizeBytes,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
     bucket_catalog::BatchedInsertContext& batch);
+
+/**
+ * Stages compatible measurements into appropriate bucket(s).
+ * Returns a non-success status if any measurements are malformed, and further
+ * returns the index into 'userMeasurementsBatch' of each failure in 'errorsAndIndices'.
+ * Returns a write batch per bucket that the measurements are staged to.
+ */
+StatusWith<std::vector<std::shared_ptr<bucket_catalog::WriteBatch>>> prepareInsertsToBuckets(
+    OperationContext* opCtx,
+    bucket_catalog::BucketCatalog& bucketCatalog,
+    const CollectionPtr& bucketsColl,
+    const TimeseriesOptions& timeseriesOptions,
+    OperationId opId,
+    const StringDataComparator* comparator,
+    uint64_t storageCacheSizeBytes,
+    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+    const std::vector<BSONObj>& userMeasurementsBatch,
+    std::vector<WriteStageErrorAndIndex>& errorsAndIndices);
+
 }  // namespace mongo::timeseries::write_ops::internal
