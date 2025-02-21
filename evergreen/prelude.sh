@@ -7,6 +7,10 @@ set -o errexit
 # path the directory that contains this script.
 evergreen_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 
+workdir=$(realpath ${evergreen_dir}/../..)
+mkdir -p ${workdir}/bin
+export PATH=$PATH:${workdir}/bin
+
 function timeout_and_retry {
   TIMEOUT=$1
   shift

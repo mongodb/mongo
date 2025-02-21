@@ -1,27 +1,10 @@
 function setup_db_contrib_tool {
-
-  mkdir -p ${workdir}/pipx
-  export PIPX_HOME="${workdir}/pipx"
-  export PIPX_BIN_DIR="${workdir}/pipx/bin"
-  export PATH="$PATH:$PIPX_BIN_DIR"
-
-  for i in {1..5}; do
-    python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" && RET=0 && break || RET=$? && sleep 1
-    echo "Failed to install pip and wheel, retrying..."
-  done
-
-  if [ $RET -ne 0 ]; then
-    echo "Failed to install pip and wheel"
-    exit $RET
+  # check if db-contrib-tool is already installed
+  if [[ $(type -P db-contrib-tool) ]]; then
+    return 0
   fi
 
-  TIMEOUT=180
-  ARCH="$(uname -m)"
-  if [[ "$ARCH" == "ppc64le" || "$ARCH" == "ppc64" || "$ARCH" == "ppc" ]]; then
-    # For some reason ppc64le takes significantly longer to run this on average
-    TIMEOUT=360
-  fi
-  timeout_and_retry $TIMEOUT python -m pipx install -vv --force "db-contrib-tool==0.8.8" --pip-args="--no-cache-dir"
+  $python evergreen/download_db_contrib_tool.py
 }
 
 function use_db_contrib_tool_mongot {
