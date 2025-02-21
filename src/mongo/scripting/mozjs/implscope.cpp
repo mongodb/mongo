@@ -138,6 +138,10 @@ const StringData kOutOfMemory = "Out of memory";
 const StringData kUnknownError = "Unknown Failure from JSInterpreter";
 }  // namespace ErrorMessage
 
+const StringData kTestDataFieldName = "TestData";
+const StringData kLogFormatFieldName = "logFormat";
+const StringData kExtraAttrFieldName = "extraAttr";
+
 /**
  * Runtime's can race on first creation (on some function statics), so we just
  * serialize the initial Runtime creation.
@@ -150,20 +154,78 @@ bool closeToMaxMemory() {
 }
 
 /**
- * Logs the given status as plain text.
+ * Splits the given string into a BSONArray of strings based on the given delimiter.
  */
-void logStatus(const Status& status) {
-    str::stream ss;
-    ss << redact(status.reason());
-    if (auto extraInfo = status.extraInfo<JSExceptionInfo>()) {
-        ss << " :\n" << extraInfo->stack;
+BSONArray splitToBSONArray(const std::string& str, const char delimiter) {
+    BSONArrayBuilder builder;
+    std::string tmp;
+    std::stringstream ss(str);
+    while (getline(ss, tmp, delimiter)) {
+        builder.append(tmp);
     }
+    return builder.arr();
+}
 
-    LOGV2_INFO_OPTIONS(
-        20163,
-        logv2::LogOptions(logv2::LogTag::kPlainShell, logv2::LogTruncation::Disabled),
-        "{jsError}",
-        "jsError"_attr = std::string(ss));
+/**
+ * Reads 'logFormat' setting from the global 'TestData' object when present.
+ */
+bool isLogFormatJson(MozJSScriptEngine* engine,
+                     JSContext* context,
+                     const JS::HandleObject& global) {
+    return (engine->executionEnvironment() == ExecutionEnvironment::TestRunner &&
+            ObjectWrapper(context, global)
+                    .getObject(kTestDataFieldName.data())
+                    .getStringField(kLogFormatFieldName) == "json");
+}
+
+/**
+ * Logs the given status either as plain text or as JSON depending on the 'plainShell' parameter.
+ */
+void logStatus(const Status& status, bool plainShell) {
+    if (plainShell) {
+        str::stream ss;
+        ss << redact(status.reason());
+        if (auto extraInfo = status.extraInfo<JSExceptionInfo>()) {
+            if (!extraInfo->extraAttr.isEmpty()) {
+                ss << " : " << extraInfo->extraAttr;
+            }
+            ss << " :\n" << extraInfo->stack;
+        }
+
+        LOGV2_INFO_OPTIONS(
+            20163,
+            logv2::LogOptions(logv2::LogTag::kPlainShell, logv2::LogTruncation::Disabled),
+            "{jsError}",
+            "jsError"_attr = std::string(ss));
+    } else {
+        // Collect status data into log entry attributes.
+        logv2::DynamicAttributes attrs;
+        attrs.add("errmsg", redact(status.reason()));
+        attrs.add("code", status.code());
+        if (auto codeString = status.codeString(); !codeString.empty()) {
+            attrs.add("codeName", codeString);
+        }
+        if (auto extraInfo = status.extraInfo<JSExceptionInfo>()) {
+            attrs.add("originalError", extraInfo->originalError);
+            if (!extraInfo->stack.empty()) {
+                // By default stack is one multi-line string, so we're adding some minimal
+                // formatting here for the convenience.
+                attrs.add("stack", splitToBSONArray(extraInfo->stack, '\n'));
+            }
+            if (!extraInfo->extraAttr.isEmpty()) {
+                attrs.add("extra", extraInfo->extraAttr);
+            }
+        }
+        if (status.reason().starts_with(ErrorMessage::kUncaughtException.data())) {
+            LOGV2_ERROR(10004100, "uncaught exception", attrs);
+        } else if (status.reason().starts_with(ErrorMessage::kOutOfMemory.data())) {
+            LOGV2_ERROR(10004101, "out of memory exception", attrs);
+        } else if (status.reason().starts_with(ErrorMessage::kUnknownError.data())) {
+            LOGV2_ERROR(10004102, "unknown error", attrs);
+        } else {
+            LOGV2_ERROR(10004103, "mongo exception", attrs);
+        }
+    }
 }
 }  // namespace
 
@@ -1203,7 +1265,7 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
     JS_ClearPendingException(_context);
 
     if (reportError)
-        logStatus(_status);
+        logStatus(_status, !isLogFormatJson(_engine, _context, _global));
 
     // Clear the status state
     auto status = std::move(_status);
@@ -1259,7 +1321,9 @@ Status MozJSImplScope::_checkForPendingException() {
             auto colNum = errorObj.getNumberInt(InternedString::columnNumber);
             stackStr = str::stream() << "@" << fnameStr << ":" << lineNum << ":" << colNum << "\n";
         }
-        return Status(JSExceptionInfo(std::move(stackStr), status), ss);
+        // Extract 'extraAttr' object property that might be present in case of an assertion error.
+        auto extraAttrObj = errorObj.getObject(kExtraAttrFieldName.data());
+        return Status(JSExceptionInfo(std::move(stackStr), status, std::move(extraAttrObj)), ss);
     }
 
     ss << ErrorMessage::kUncaughtException << ": "

@@ -1267,6 +1267,15 @@ tests.push(function assertInvalidLogLevelAndSeverityThrows() {
     });
 });
 
+tests.push(function assertIgnoreNonObjectExtraAttr() {
+    const err = new Error("Oops!");
+    err.extraAttr = "not an object";
+    err.code = ErrorCodes.JSInterpreterFailure;
+    assert.throwsWithCode(() => {
+        throw err;
+    }, ErrorCodes.JSInterpreterFailure);
+});
+
 /* main */
 
 tests.forEach((test) => {
