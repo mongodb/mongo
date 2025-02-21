@@ -29,8 +29,6 @@ selector:
     # TODO SERVER-100610: Test directly or indirectly asserts on specific plan chosen
     - jstests/aggregation/sources/unionWith/unionWith.js
 
-    # TODO SERVER-100144 remove excluded PBTs
-    - jstests/aggregation/sources/agg_stages_basic_behavior_pbt.js
   exclude_with_any_tags:
     # Profiler entries will have different shape in CBR
     - requires_profiling

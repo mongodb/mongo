@@ -41,7 +41,6 @@ selector:
     - jstests/aggregation/sources/unionWith/unionWith_query_stats.js
     - jstests/aggregation/sources/lookup/lookup_single_solution_cache.js
     - jstests/aggregation/sources/bucket/collation_bucket.js
-    - jstests/aggregation/sources/agg_stages_basic_behavior_pbt.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - does_not_support_repeated_reads
