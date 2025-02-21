@@ -155,8 +155,7 @@ for (const foundDoc of results) {
     assertFieldPresent("rank", secondVectorDetails);
     assertFieldPresent("weight", secondVectorDetails);
     assert.eq(secondVectorDetails["weight"], 2.8);
-    // TODO SERVER-100404: Re-enable "value" field.
-    // assertFieldPresent("value", secondVectorDetails);  // Original 'score' AKA vectorSearchScore.
+    assertFieldPresent("value", secondVectorDetails);  // Original 'score' AKA vectorSearchScore.
     assertFieldPresent("details",
                        secondVectorDetails);  // Not checking description contents, just that its
                                               // present and not our placeholder value.
@@ -167,8 +166,7 @@ for (const foundDoc of results) {
     assert.eq(vectorDetails["inputPipelineName"], "vector");
     assertFieldPresent("details", vectorDetails);
     assert.eq(vectorDetails["details"], []);
-    // TODO SERVER-100404: Re-enable "value" field.
-    // assertFieldPresent("value", vectorDetails);  // Original 'score' AKA vectorSearchScore.
+    assertFieldPresent("value", vectorDetails);  // Original 'score' AKA vectorSearchScore.
     assertFieldPresent("rank", vectorDetails);
     assertFieldPresent("weight", vectorDetails);
     assert.eq(vectorDetails["weight"], 0.5);

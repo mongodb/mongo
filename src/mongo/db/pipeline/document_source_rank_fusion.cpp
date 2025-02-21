@@ -718,10 +718,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
         // If not, the default is one.
         double pipelineWeight = getPipelineWeight(weights, name);
 
-        // TODO SERVER-100404 Once $meta: "score" validation works for sharded queries, we can
-        // use hybrid_scoring_util::isScoredPipeline to toggle inputGeneratesScore.
-        const bool inputGeneratesScore = false;
-
+        const bool inputGeneratesScore = hybrid_scoring_util::isScoredPipeline(*pipeline);
         if (outputStages.empty()) {
             // First pipeline.
             makeSureSortKeyIsOutput(pipeline->getSources());

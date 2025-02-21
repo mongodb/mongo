@@ -2811,6 +2811,9 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                                                 "$meta": "scoreDetails"
                                             },
                                             {
+                                                "value": {
+                                                    "$meta": "score"
+                                                },
                                                 "details": []
                                             }
                                         ]
