@@ -21,6 +21,7 @@ variables:
       - debian12
       - enterprise-debian12-64
       - enterprise-rhel-81-ppc64le
+      - enterprise-rhel-9-ppc64le
       - ubi8
       - rhel8
       - rhel-8-arm64

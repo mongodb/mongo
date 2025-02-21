@@ -15,7 +15,13 @@ function setup_db_contrib_tool {
     exit $RET
   fi
 
-  timeout_and_retry 180 python -m pipx install -vv --force "db-contrib-tool==0.8.8" --pip-args="--no-cache-dir"
+  TIMEOUT=180
+  ARCH="$(uname -m)"
+  if [[ "$ARCH" == "ppc64le" || "$ARCH" == "ppc64" || "$ARCH" == "ppc" ]]; then
+    # For some reason ppc64le takes significantly longer to run this on average
+    TIMEOUT=360
+  fi
+  timeout_and_retry $TIMEOUT python -m pipx install -vv --force "db-contrib-tool==0.8.8" --pip-args="--no-cache-dir"
 }
 
 function use_db_contrib_tool_mongot {

@@ -43,6 +43,11 @@ TOOLCHAIN_MAP_V4 = {
         "sha": "b62574a447e0e5120475c7ef0ec0e821548a32a103999ed350b05adcc9073b55",
         "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_rhel81_ppc64le_acdc1709a01126c67dbd4f0f37491e171f64ec29_24_10_11_23_01_02.tar.gz",
     },
+    "rhel9_ppc64le": {
+        "platform_name": "rhel9-ppc64le",
+        "sha": "d7dd11ebe71918399543860a268c951ea22818bfb4f2c9b8b3a5e6d039bc6b67",
+        "url": "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/bazel_v4_toolchain_builder_rhel90_ppc64le_53ac9105dff523c4dec626034a4702548aabfdc9_25_02_20_04_39_07.tar.gz",
+    },
     "rhel8_s390x": {
         "platform_name": "rhel80-zseries",
         "sha": "5d4f93968672f324e532b62eb9345351b407a866650d824eee79d295d6613606",

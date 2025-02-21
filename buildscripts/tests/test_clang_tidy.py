@@ -1,6 +1,7 @@
 """Unit tests for clang_tidy.py and apply_clang_tidy_fixes.py."""
 
 import os
+import platform
 import sys
 import tempfile
 import unittest
@@ -15,8 +16,10 @@ from mongo_toolchain import get_mongo_toolchain
 
 
 @unittest.skipIf(
-    sys.platform == "win32" or sys.platform == "darwin",
-    reason="clang_tidy.py is only run on linux",
+    sys.platform == "win32"
+    or sys.platform == "darwin"
+    or platform.machine().lower() in {"ppc64le", "s390x"},
+    reason="clang_tidy.py is only run on linux x86_64 or linux arm64",
 )
 class TestClangTidy(unittest.TestCase):
     def setUp(self):

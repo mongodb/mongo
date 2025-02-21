@@ -140,7 +140,7 @@ class EnterpriseDistro(packager.Distro):
             if self.dname == "ubuntu":
                 return ["ubuntu1604", "ubuntu1804"]
             if self.dname == "redhat":
-                return ["rhel71", "rhel81"]
+                return ["rhel71", "rhel81", "rhel9"]
             return []
         if arch == "s390x":
             if self.dname == "redhat":

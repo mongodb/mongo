@@ -1203,6 +1203,24 @@ GDWARF_FEATURES = select({
     "//conditions:default": [],
 })
 
+# TODO(SERVER-101099): Remove this once builds are containerized and system libraries inside the containers
+# no longer contain debug symbols.
+#
+# In RHEL8 and RHEL9 the debug symbols for libgcc aren't stripped and are instead split, which still leaves behind
+# debug symbols in the libgcc shared object file. These debug symbols are created with gdwarf32, so they're limited to
+# a 32 bit address space. Even if the mongodb binaries are compiled with gdwarf64, there's a chance that the gdwarf32
+# libgcc debug symbols will be placed after the gdwarf64 debug symbols. This started happening in the RHEL9 ppc64le
+# build.
+#
+# The workaround for this is stripping the debug symbols from libgcc and statically compiling the libgcc from the
+# toolchain into the mongodb binaries. The longer term solution for this is to containerize the non-remote-execution
+# build and strip the debug symbols inside the container, or patch the compilers to properly order gdwarf32 symbols
+# before gdwarf64 symbols. See https://reviews.llvm.org/D96144
+LIBGCC_LINKFLAGS = select({
+    "//bazel/config:rhel9_ppc64le_gcc_linkstatic": ["-static-libgcc"],
+    "//conditions:default": [],
+})
+
 # These are added as both copts and linker flags. This should also be added after any debugging flags on the command
 # line to ensure debugging is disabled.
 DISABLE_DEBUGGING_SYMBOLS_FEATURE = select({
@@ -1511,7 +1529,8 @@ MONGO_GLOBAL_LINKFLAGS = (
     SASL_WINDOWS_LINKFLAGS +
     PGO_PROFILE_FLAGS +
     SANITIZE_WITHOUT_TSAN_LINKFLAGS +
-    SHARED_ARCHIVE_LINKFLAGS
+    SHARED_ARCHIVE_LINKFLAGS +
+    LIBGCC_LINKFLAGS
 )
 
 MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS = SYMBOL_ORDER_FILES

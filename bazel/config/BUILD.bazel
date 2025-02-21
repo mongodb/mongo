@@ -139,6 +139,27 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "rhel9_ppc64le_gcc",
+    match_all = [
+        "@platforms//os:linux",
+        "@platforms//cpu:ppc",
+        ":compiler_type_gcc",
+        "//bazel/platforms:rhel9",
+    ],
+)
+
+selects.config_setting_group(
+    name = "rhel9_ppc64le_gcc_linkstatic",
+    match_all = [
+        "@platforms//os:linux",
+        "@platforms//cpu:ppc",
+        ":compiler_type_gcc",
+        "//bazel/platforms:rhel9",
+        ":linkstatic_enabled",
+    ],
+)
+
+selects.config_setting_group(
     name = "linux_clang",
     match_all = [
         "@platforms//os:linux",
@@ -269,6 +290,14 @@ selects.config_setting_group(
         "@platforms//cpu:aarch64",
         "@platforms//cpu:x86_64",
         "@platforms//cpu:ppc",
+    ],
+)
+
+selects.config_setting_group(
+    name = "not_s390x_or_ppc",
+    match_any = [
+        "@platforms//cpu:aarch64",
+        "@platforms//cpu:x86_64",
     ],
 )
 

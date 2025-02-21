@@ -24,6 +24,7 @@ valid_mongocryptd_variants=(
   "enterprise-rhel-8-64-bit-suggested"
   "enterprise-rhel-8-arm64"
   "enterprise-rhel-83-s390x"
+  "enterprise-rhel-9-ppc64le"
   "enterprise-rhel-90-64-bit"
   "enterprise-rhel-90-arm64"
   "enterprise-rhel-93-64-bit"
