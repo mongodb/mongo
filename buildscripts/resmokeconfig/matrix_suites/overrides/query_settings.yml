@@ -66,6 +66,8 @@
       # This test performs an '{_id: <id>}' query with a collator. This will not pass query settings validation. This
       # is a design decision due to mongos lacking collation information.
       - jstests/aggregation/sources/bucket/collation_bucket.js
+      # TODO SERVER-96805 Investigate why wildcard index candidate plans are non-deterministic.
+      - jstests/aggregation/sources/agg_stages_basic_behavior_pbt.js
     exclude_with_any_tags:
       - assumes_standalone_mongod
       - does_not_support_repeated_reads

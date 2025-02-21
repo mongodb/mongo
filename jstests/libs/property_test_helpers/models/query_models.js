@@ -16,7 +16,7 @@ const scalarArb = fc.oneof(fc.constant(null),
                            fc.integer({min: -30, max: 30}),
                            // Strings starting with `$` can be confused with fields.
                            fc.string().filter(s => !s.startsWith('$')),
-                           fc.date());
+                           fc.date({min: new Date(1969, 0), max: new Date(1971, 0)}));
 export const leafParametersPerFamily = 10;
 export class LeafParameter {
     constructor(concreteValues) {
@@ -32,16 +32,26 @@ const leafParameterArb =
     });
 
 const fieldArb = fc.constantFrom('t', 'm', 'm.m1', 'm.m2', 'a', 'b', 'array');
-const assignableFieldArb = fc.constantFrom('m', 't', 'a', 'b');
+const simpleFieldArb = fc.constantFrom('m', 't', 'a', 'b');
 const dollarFieldArb = fieldArb.map(f => "$" + f);
 const comparisonArb = fc.constantFrom('$eq', '$lt', '$lte', '$gt', '$gte');
 const accumulatorArb =
     fc.constantFrom(undefined, '$count', '$min', '$max', '$minN', '$maxN', '$sum');
 
 // Inclusion/Exclusion projections. {$project: {_id: 1, a: 0}}
-const projectArb = fc.tuple(fieldArb, fc.boolean()).map(function([field, includeField]) {
-    return {$project: {_id: 1, [field]: includeField}};
-});
+
+export function getSingleFieldProjectArb(isInclusion, {simpleFieldsOnly = false} = {}) {
+    const projectedFieldArb = simpleFieldsOnly ? simpleFieldArb : fieldArb;
+    return fc.record({field: projectedFieldArb, includeId: fc.boolean()})
+        .map(function({field, includeId}) {
+            const includeIdVal = includeId ? 1 : 0;
+            const includeFieldVal = isInclusion ? 1 : 0;
+            return {$project: {_id: includeIdVal, [field]: includeFieldVal}};
+        });
+}
+const projectArb = fc.oneof(getSingleFieldProjectArb(true /*isInclusion*/),
+                            getSingleFieldProjectArb(false /*isInclusion*/));
+
 // Project from one field to another. {$project {a: '$b'}}
 const computedProjectArb = fc.tuple(fieldArb, dollarFieldArb).map(function([destField, srcField]) {
     return {$project: {[destField]: srcField}};
@@ -96,16 +106,15 @@ function getMatchArb(allowOrs) {
     });
 }
 
-const sortArb = fc.tuple(fieldArb, fc.constantFrom(1, -1)).map(function([field, sortOrder]) {
+export const sortArb = fc.tuple(fieldArb, fc.constantFrom(1, -1)).map(function([field, sortOrder]) {
     // TODO SERVER-91164 sort on multiple fields
     return {$sort: {[field]: sortOrder}};
 });
 
 // TODO SERVER-91164 include $top/$bottom and other accumulators, allow null as the groupby argument
 // {$group: {_id: '$a', b: {$min: '$c'}}}
-const groupArb =
-    fc.tuple(
-          dollarFieldArb, assignableFieldArb, accumulatorArb, dollarFieldArb, fc.integer({min: 1}))
+export const groupArb =
+    fc.tuple(dollarFieldArb, simpleFieldArb, accumulatorArb, dollarFieldArb, fc.integer({min: 1}))
         .map(function([gbField, outputField, acc, dataField, minMaxNumResults]) {
             if (acc === undefined) {
                 // Simple $group with no accumulator
@@ -123,8 +132,8 @@ const groupArb =
             return {$group: {_id: gbField, [outputField]: accSpec}};
         });
 
-const limitArb = fc.record({$limit: fc.integer({min: 1, max: 5})});
-const skipArb = fc.record({$skip: fc.integer({min: 1, max: 5})});
+export const limitArb = fc.record({$limit: fc.integer({min: 1, max: 5})});
+export const skipArb = fc.record({$skip: fc.integer({min: 1, max: 5})});
 
 /*
  * Return the arbitraries for agg stages that are allowed given:

@@ -12,6 +12,8 @@ selector:
     # TODO SERVER-100610: Test asserts on plan choice and CBR chooses different plan
     - jstests/aggregation/optimization/use_query_sort.js
 
+    # TODO SERVER-100144 remove excluded PBTs
+    - jstests/aggregation/sources/agg_stages_basic_behavior_pbt.js
   exclude_with_any_tags:
     # Profiler entries will have different shape in CBR
     - requires_profiling
