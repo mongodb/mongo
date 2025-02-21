@@ -361,8 +361,7 @@ auto makeTransportLayer(ServiceContext* svcCtx) {
 #ifdef MONGO_CONFIG_GRPC
         uassert(9715900,
                 "Egress GRPC for search is not enabled",
-                feature_flags::gEgressGrpcForSearch.isEnabledUseLatestFCVWhenUninitialized(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+                feature_flags::gEgressGrpcForSearch.isEnabled());
         useEgressGRPC = true;
 #else
         LOGV2_ERROR(
