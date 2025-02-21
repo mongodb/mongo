@@ -496,8 +496,7 @@ public:
     StaticCatalogClient* _mockCatalogClient;
 };
 
-TEST_F(SubmitRangeDeletionTaskTest,
-       FailsAndDeletesTaskIfFilteringMetadataIsUnknownEvenAfterRefresh) {
+TEST_F(SubmitRangeDeletionTaskTest, FailsAndDeletesTaskIfDatabaseDoesNotExist) {
     auto opCtx = operationContext();
     auto deletionTask = createDeletionTask(opCtx, kTestNss, kDefaultUUID, 0, 10, _myShardName);
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
@@ -521,7 +520,7 @@ TEST_F(SubmitRangeDeletionTaskTest,
     ASSERT_EQ(store.count(opCtx), 0);
 }
 
-TEST_F(SubmitRangeDeletionTaskTest, FailsAndDeletesTaskIfNamespaceIsUnshardedEvenAfterRefresh) {
+TEST_F(SubmitRangeDeletionTaskTest, FailsAndDeletesTaskIfCollectionDoesNotExist) {
     auto opCtx = operationContext();
 
     auto deletionTask = createDeletionTask(opCtx, kTestNss, kDefaultUUID, 0, 10, _myShardName);
@@ -548,36 +547,7 @@ TEST_F(SubmitRangeDeletionTaskTest, FailsAndDeletesTaskIfNamespaceIsUnshardedEve
     ASSERT_EQ(store.count(opCtx), 0);
 }
 
-TEST_F(SubmitRangeDeletionTaskTest,
-       FailsAndDeletesTaskIfNamespaceIsUnshardedBeforeAndAfterRefresh) {
-    auto opCtx = operationContext();
-
-    auto deletionTask = createDeletionTask(opCtx, kTestNss, kDefaultUUID, 0, 10, _myShardName);
-
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-
-    store.add(opCtx, deletionTask);
-    ASSERT_EQ(store.count(opCtx), 1);
-    migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
-
-    // Mock an empty result for the task's collection and force a refresh so the node believes the
-    // collection is unsharded.
-    _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
-    _mockCatalogCacheLoader->setCollectionRefreshReturnValue(
-        Status(ErrorCodes::NamespaceNotFound, "dummy errmsg"));
-    forceShardFilteringMetadataRefresh(opCtx, kTestNss);
-
-    auto cleanupCompleteFuture = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
-
-    // The task should not have been submitted, and the task's entry should have been removed from
-    // the persistent store.
-    ASSERT_THROWS_CODE(cleanupCompleteFuture.get(opCtx),
-                       AssertionException,
-                       ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist);
-    ASSERT_EQ(store.count(opCtx), 0);
-}
-
-TEST_F(SubmitRangeDeletionTaskTest, SucceedsIfFilteringMetadataUUIDMatchesTaskUUID) {
+TEST_F(SubmitRangeDeletionTaskTest, SucceedsIfCollectionUUIDMatchesTaskUUID) {
     auto opCtx = operationContext();
 
     auto collectionUUID = createCollectionAndGetUUID(kTestNss);
@@ -603,9 +573,35 @@ TEST_F(SubmitRangeDeletionTaskTest, SucceedsIfFilteringMetadataUUIDMatchesTaskUU
     cleanupCompleteFuture.get(opCtx);
 }
 
-TEST_F(
-    SubmitRangeDeletionTaskTest,
-    SucceedsIfFilteringMetadataInitiallyUnknownButFilteringMetadataUUIDMatchesTaskUUIDAfterRefresh) {
+TEST_F(SubmitRangeDeletionTaskTest, FailsIfCollectionUUIDDoesNotMatchTaskUUID) {
+    auto opCtx = operationContext();
+
+    auto collectionUUID = createCollectionAndGetUUID(kTestNss);
+    auto deletionTask = createDeletionTask(opCtx, kTestNss, UUID::gen(), 0, 10, _myShardName);
+
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+
+    store.add(opCtx, deletionTask);
+    ASSERT_EQ(store.count(opCtx), 1);
+    migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
+
+    // Force a metadata refresh with the task's UUID before the task is submitted.
+    auto coll = makeCollectionType(collectionUUID, kEpoch, kDefaultTimestamp);
+    _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
+    _mockCatalogCacheLoader->setCollectionRefreshReturnValue(coll);
+    _mockCatalogCacheLoader->setChunkRefreshReturnValue(
+        makeChangedChunks(ChunkVersion(1, 0, kEpoch, kDefaultTimestamp)));
+    _mockCatalogClient->setCollections({coll});
+    forceShardFilteringMetadataRefresh(opCtx, kTestNss);
+
+    auto cleanupCompleteFuture = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
+    ASSERT_THROWS_CODE(cleanupCompleteFuture.get(opCtx),
+                       AssertionException,
+                       ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist);
+    ASSERT_EQ(store.count(opCtx), 0);
+}
+
+TEST_F(SubmitRangeDeletionTaskTest, SucceedsAfterRefreshIfFilteringMetadataInitiallyUnknown) {
     auto opCtx = operationContext();
 
     auto collectionUUID = createCollectionAndGetUUID(kTestNss);
@@ -616,6 +612,12 @@ TEST_F(
     store.add(opCtx, deletionTask);
     ASSERT_EQ(store.count(opCtx), 1);
     migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
+
+    {
+        // Ensure filtering metadata are UNKNOWN
+        AutoGetCollection autoColl(opCtx, kTestNss, MODE_IX);
+        CollectionShardingRuntime::get(opCtx, kTestNss)->clearFilteringMetadata(opCtx);
+    }
 
     // Make the refresh triggered by submitting the task return a UUID that matches the task's UUID.
     auto coll = makeCollectionType(collectionUUID, kEpoch, kDefaultTimestamp);
@@ -625,78 +627,9 @@ TEST_F(
         makeChangedChunks(ChunkVersion(1, 0, kEpoch, kDefaultTimestamp)));
     _mockCatalogClient->setCollections({coll});
 
-    auto metadata = makeShardedMetadata(opCtx, collectionUUID);
-    csr().setFilteringMetadata(opCtx, metadata);
-
     // The task should have been submitted successfully.
     auto cleanupCompleteFuture = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
     cleanupCompleteFuture.get(opCtx);
-}
-
-TEST_F(SubmitRangeDeletionTaskTest,
-       SucceedsIfTaskNamespaceInitiallyUnshardedButUUIDMatchesAfterRefresh) {
-    auto opCtx = operationContext();
-
-    // Force a metadata refresh with no collection entry so the node believes the namespace is
-    // unsharded when the task is submitted.
-    _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
-    _mockCatalogCacheLoader->setCollectionRefreshReturnValue(
-        Status(ErrorCodes::NamespaceNotFound, "dummy errmsg"));
-    forceShardFilteringMetadataRefresh(opCtx, kTestNss);
-
-    auto collectionUUID = createCollectionAndGetUUID(kTestNss);
-    auto deletionTask = createDeletionTask(opCtx, kTestNss, collectionUUID, 0, 10, _myShardName);
-
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-
-    store.add(opCtx, deletionTask);
-    ASSERT_EQ(store.count(opCtx), 1);
-    migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
-
-    // Make the refresh triggered by submitting the task return a UUID that matches the task's UUID.
-    auto matchingColl = makeCollectionType(collectionUUID, kEpoch, kDefaultTimestamp);
-    _mockCatalogCacheLoader->setCollectionRefreshReturnValue(matchingColl);
-    _mockCatalogCacheLoader->setChunkRefreshReturnValue(
-        makeChangedChunks(ChunkVersion(10, 0, kEpoch, kDefaultTimestamp)));
-    _mockCatalogClient->setCollections({matchingColl});
-
-    auto metadata = makeShardedMetadata(opCtx, collectionUUID);
-    csr().setFilteringMetadata(opCtx, metadata);
-
-    // The task should have been submitted successfully.
-    auto cleanupCompleteFuture = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
-    cleanupCompleteFuture.get(opCtx);
-}
-
-TEST_F(SubmitRangeDeletionTaskTest,
-       FailsAndDeletesTaskIfFilteringMetadataUUIDDifferentFromTaskUUIDEvenAfterRefresh) {
-    auto opCtx = operationContext();
-
-    auto deletionTask = createDeletionTask(opCtx, kTestNss, kDefaultUUID, 0, 10, _myShardName);
-
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-
-    store.add(opCtx, deletionTask);
-    ASSERT_EQ(store.count(opCtx), 1);
-    migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
-
-    // Make the refresh triggered by submitting the task return an arbitrary UUID.
-    const auto otherEpoch = OID::gen();
-    const auto otherTimestamp = Timestamp(3, 0);
-    auto otherColl = makeCollectionType(UUID::gen(), otherEpoch, otherTimestamp);
-    _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
-    _mockCatalogCacheLoader->setCollectionRefreshReturnValue(otherColl);
-    _mockCatalogCacheLoader->setChunkRefreshReturnValue(
-        makeChangedChunks(ChunkVersion(1, 0, otherEpoch, otherTimestamp)));
-    _mockCatalogClient->setCollections({otherColl});
-
-    // The task should not have been submitted, and the task's entry should have been removed from
-    // the persistent store.
-    auto cleanupCompleteFuture = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
-    ASSERT_THROWS_CODE(cleanupCompleteFuture.get(opCtx),
-                       AssertionException,
-                       ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist);
-    ASSERT_EQ(store.count(opCtx), 0);
 }
 
 }  // namespace

@@ -381,10 +381,13 @@ ExecutorFuture<void> cleanUpRange(ServiceContext* serviceContext,
                        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
                        auto csr = CollectionShardingRuntime::get(opCtx, nss);
                        auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
-                       auto optCollDescr = csr->getCurrentMetadataIfKnown();
+                       if (!csr->getCriticalSectionSignal(
+                               opCtx, ShardingMigrationCriticalSection::kWrite)) {
+                           auto optCollDescr = csr->getCurrentMetadataIfKnown();
 
-                       if (optCollDescr) {
-                           uassert(ErrorCodes::
+                           if (optCollDescr) {
+                               uassert(
+                                   ErrorCodes::
                                        RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist,
                                    str::stream() << "Filtering metadata for " << nss
                                                  << (optCollDescr->isSharded()
@@ -394,18 +397,19 @@ ExecutorFuture<void> cleanUpRange(ServiceContext* serviceContext,
                                    deletionTaskUuidMatchesFilteringMetadataUuid(
                                        opCtx, optCollDescr, deletionTask));
 
-                           LOGV2(22026,
-                                 "Submitting range deletion task",
-                                 "deletionTask"_attr = redact(deletionTask.toBSON()),
-                                 "migrationId"_attr = deletionTask.getId());
+                               LOGV2(22026,
+                                     "Submitting range deletion task",
+                                     "deletionTask"_attr = redact(deletionTask.toBSON()),
+                                     "migrationId"_attr = deletionTask.getId());
 
-                           const auto whenToClean =
-                               deletionTask.getWhenToClean() == CleanWhenEnum::kNow
-                               ? CollectionShardingRuntime::kNow
-                               : CollectionShardingRuntime::kDelayed;
+                               const auto whenToClean =
+                                   deletionTask.getWhenToClean() == CleanWhenEnum::kNow
+                                   ? CollectionShardingRuntime::kNow
+                                   : CollectionShardingRuntime::kDelayed;
 
-                           return csr->cleanUpRange(
-                               deletionTask.getRange(), deletionTask.getId(), whenToClean);
+                               return csr->cleanUpRange(
+                                   deletionTask.getRange(), deletionTask.getId(), whenToClean);
+                           }
                        }
                    }
 
