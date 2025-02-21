@@ -93,7 +93,7 @@ def install_buildozer(download_location: str = "./"):
     url = f"{BUILDOZER_RELEASE_URL}{binary_name}"
 
     file_location = os.path.join(download_location, f"buildozer{extension}")
-    urllib.request.urlretrieve(url, file_location)
+    _download_path_with_retry(url, file_location)
     os.chmod(file_location, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
     return file_location
 

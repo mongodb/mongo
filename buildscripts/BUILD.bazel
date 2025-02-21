@@ -24,6 +24,10 @@ py_binary(
             "typer",
             group = "core",
         ),
+        dependency(
+            "retry",
+            group = "testing",
+        ),
     ],
 )
 
@@ -149,6 +153,10 @@ py_library(
             "typing-extensions",
             group = "core",
         ),
+        dependency(
+            "retry",
+            group = "testing",
+        ),
         "simple_report",
     ],
 )
@@ -159,6 +167,12 @@ py_library(
         "download_buildifier.py",
     ],
     visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "retry",
+            group = "testing",
+        ),
+    ],
 )
 
 py_binary(

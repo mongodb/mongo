@@ -4,10 +4,17 @@ import platform
 import stat
 import urllib.request
 
+from retry import retry
+
 BUILDIFIER_VERSION = "v6.4.0"
 RELEASE_URL = (
     f"https://mdb-build-public.s3.amazonaws.com/bazel-buildifier-binaries/{BUILDIFIER_VERSION}/"
 )
+
+
+@retry(tries=3, delay=5)
+def _download_with_retry(*args, **kwargs):
+    return urllib.request.urlretrieve(*args, **kwargs)
 
 
 def determine_platform():
@@ -48,7 +55,7 @@ def download(download_location: str = "./"):
     url = f"{RELEASE_URL}{binary_name}"
 
     file_location = os.path.join(download_location, f"buildifier{extension}")
-    urllib.request.urlretrieve(url, file_location)
+    _download_with_retry(url, file_location)
     print(f"Downloaded buildifier from {url} to {file_location}")
     os.chmod(file_location, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
     print(f"Set user executable permissions on {file_location}")

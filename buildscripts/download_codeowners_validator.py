@@ -11,6 +11,7 @@ import zipfile
 from typing import Annotated
 
 import typer
+from retry import retry
 
 VALIDATOR_VERSION = "0.7.4"
 VALIDATOR_BINARY_NAME = "codeowners-validator"
@@ -73,6 +74,11 @@ def sha256_file(filename: str) -> str:
         return sha256_hash.hexdigest()
 
 
+@retry(tries=3, delay=5)
+def _download_with_retry(*args, **kwargs):
+    return urllib.request.urlretrieve(*args, **kwargs)
+
+
 def download_validator_binary(download_location: str):
     """Download the codeowners-validator binary."""
 
@@ -97,7 +103,7 @@ def download_validator_binary(download_location: str):
 
     # Download the archive
     archive_location = os.path.join(download_location, binary_name)
-    urllib.request.urlretrieve(url, archive_location)
+    _download_with_retry(url, archive_location)
     print(f"Downloaded codeowners-validator from {url} to {archive_location}")
 
     # Extract archive

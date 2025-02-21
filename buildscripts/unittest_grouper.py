@@ -10,6 +10,8 @@ import time
 import urllib.request
 from typing import Dict, List
 
+from retry import retry
+
 from buildscripts.simple_report import make_report, put_report, try_combine_reports
 
 sys.path.append(".")
@@ -28,6 +30,11 @@ groups_sort_keys = {
     "seventh": 7,
     "eighth": 8,
 }
+
+
+@retry(tries=3, delay=5)
+def _download_with_retry(*args, **kwargs):
+    return urllib.request.urlretrieve(*args, **kwargs)
 
 
 def determine_platform():
@@ -68,7 +75,7 @@ def download_buildozer(download_location: str = "./"):
     url = f"{RELEASE_URL}{binary_name}"
 
     file_location = os.path.join(download_location, f"buildozer{extension}")
-    urllib.request.urlretrieve(url, file_location)
+    _download_with_retry(url, file_location)
     os.chmod(file_location, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
     return file_location
 
