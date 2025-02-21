@@ -217,7 +217,7 @@ function analyzeShardKey(ns, shardKey, indexKey) {
               `shard key values got deleted while the command was running. ${tojsononeline(res)}`);
         return res;
     }
-    if (res.code == 7826501) {
+    if (res.code == 7826501 || res.code == 7826502) {
         print(`Failed to analyze the shard key because $collStats indicates that the collection ` +
               `is empty. ${tojsononeline(res)}`);
         return res;
