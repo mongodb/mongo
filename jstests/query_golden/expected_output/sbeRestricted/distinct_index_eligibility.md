@@ -27,7 +27,7 @@
 Execution Engine: sbe
 ```json
 {
-	"queryShapeHash" : "091EB94278A1F85267F3544B6ECD5890DFDB1D53FDE9A7D5FEEB911C428C4A54",
+	"queryShapeHash" : "032E5B996E22D67FF5B909BB4D963F54372307CBECE35923143ACF815B7DE95B",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -95,7 +95,7 @@ Execution Engine: sbe
 Execution Engine: classic
 ```json
 {
-	"queryShapeHash" : "091EB94278A1F85267F3544B6ECD5890DFDB1D53FDE9A7D5FEEB911C428C4A54",
+	"queryShapeHash" : "032E5B996E22D67FF5B909BB4D963F54372307CBECE35923143ACF815B7DE95B",
 	"stages" : [
 		{
 			"$cursor" : {
@@ -179,7 +179,7 @@ Execution Engine: classic
 Execution Engine: sbe
 ```json
 {
-	"queryShapeHash" : "9BC802D6FC495962065BF0847511778C78810FDE9598FA921AD057035FD6327F",
+	"queryShapeHash" : "64CFE6E39DB3056D464E804B38D1199EFE2E317E40E1A66F213E6E9DEFBEAE49",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -224,7 +224,7 @@ Execution Engine: sbe
 Execution Engine: classic
 ```json
 {
-	"queryShapeHash" : "9BC802D6FC495962065BF0847511778C78810FDE9598FA921AD057035FD6327F",
+	"queryShapeHash" : "64CFE6E39DB3056D464E804B38D1199EFE2E317E40E1A66F213E6E9DEFBEAE49",
 	"stages" : [
 		{
 			"$cursor" : {
@@ -281,7 +281,7 @@ Execution Engine: classic
 ### Summarized explain
 ```json
 {
-	"queryShapeHash" : "28EA60B44617FE1C60E96E928E1A442CB819DBD37D1B88B62234E5D52985D523",
+	"queryShapeHash" : "1B20F3793EBB0427565F8D4C8BA4FA1E5EADC999B6588BA21896EC90769B57BB",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -332,7 +332,7 @@ Execution Engine: classic
 ### Summarized explain
 ```json
 {
-	"queryShapeHash" : "246577E6358122F9987A766BA54FD210A7CD32BD545D012BBF0E306FE8AAD0FB",
+	"queryShapeHash" : "E533AB4142A054A3104112E9558EFA2E8B597532D3D2FEE269284CFBF1CC6250",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -380,7 +380,7 @@ Execution Engine: classic
 ### Summarized explain
 ```json
 {
-	"queryShapeHash" : "246577E6358122F9987A766BA54FD210A7CD32BD545D012BBF0E306FE8AAD0FB",
+	"queryShapeHash" : "E533AB4142A054A3104112E9558EFA2E8B597532D3D2FEE269284CFBF1CC6250",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -403,7 +403,7 @@ Execution Engine: classic
 ### Summarized explain
 ```json
 {
-	"queryShapeHash" : "CD06A55A8CF0B75DEEF9069F1DF542FFA9797E2B886DF4BE69B8F9C0DE9BC071",
+	"queryShapeHash" : "817405761FF62C71619482EDFA46189A4695E0E46F0CE7E03E42DEB8AEC40001",
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
@@ -422,7 +422,7 @@ Execution Engine: classic
 			"indexName" : "$**_1",
 			"isMultiKey" : false,
 			"isPartial" : false,
-			"isSparse" : true,
+			"isSparse" : false,
 			"isUnique" : false,
 			"keyPattern" : {
 				"$_path" : 1,
