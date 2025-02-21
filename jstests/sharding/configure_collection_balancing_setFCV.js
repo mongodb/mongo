@@ -10,6 +10,7 @@
 // TODO SERVER-62693 get rid of this file once 6.0 branches out
 
 'use strict';
+load("jstests/sharding/libs/defragmentation_util.js");
 
 const st = new ShardingTest({mongos: 1, shards: 1, other: {enableBalancer: false}});
 
@@ -25,8 +26,8 @@ const downgradeVersion = lastLTSFCV;
 assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
 /* Test that
- * - downgrade can be performed while a collection is undergoing defragmentation
- * - at the end of the process,  per-collection balancing fields are removed upon setFCV < 5.3
+ * - downgrade cannot be performed while a collection is undergoing defragmentation
+ * - at the end of the process, per-collection balancing fields are removed upon setFCV < 5.3
  */
 {
     assert.commandWorked(st.s.adminCommand({
@@ -45,6 +46,18 @@ assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFC
     assert(!shardEntryBeforeSetFCV.allowAutoSplit);
     assert(configEntryBeforeSetFCV.defragmentCollection);
 
+    assert.commandFailedWithCode(
+        st.s.adminCommand({setFeatureCompatibilityVersion: downgradeVersion}),
+        ErrorCodes.CannotDowngrade);
+
+    // abort defragmentation and await finish
+    assert.commandWorked(
+        st.s.adminCommand({configureCollectionBalancing: fullNs, defragmentCollection: false}));
+    st.startBalancer();
+    defragmentationUtil.waitForEndOfDefragmentation(st.s, fullNs);
+    st.stopBalancer();
+
+    // downgrade without any defragmentations running should work
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: downgradeVersion}));
 
     var configEntryAfterSetFCV =
@@ -54,6 +67,7 @@ assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFC
     assert.isnull(configEntryAfterSetFCV.noAutoSplit);
     assert.isnull(shardEntryAfterSetFCV.maxChunkSizeBytes);
     assert.isnull(shardEntryAfterSetFCV.allowAutoSplit);
+    assert.isnull(configEntryAfterSetFCV.defragmentCollection);
 }
 
 st.stop();

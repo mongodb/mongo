@@ -70,5 +70,21 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShards(
  */
 void downgradeCollectionBalancingFieldsToPre53(OperationContext* opCtx);
 
+/**
+ * Unset the `maxChunkSizeBytes` and `noAutoSplit` flags from the config.system.sessions collection
+ * entry in config.collections.
+ */
+void downgradeSessionsCollectionBalancingConfigurationToPre60(OperationContext* opCtx);
+
+
+/*
+ * Set data-size aware balancing options for the sessions collection starting from FCV 6.0:
+ * - Set maxChunkSizeBytes to a value that has empirically proven to be optimal (~200KB)
+ * - Set the `noAutoSplit` flag. This is needed because ongoing auto-splitter rounds do not
+ *   synchronize with FCV changes, hence the auto-splitter may observe the new chunk size and
+ *   trigger an invariant because the value is lower than 1MB (SERVER-67346).
+ */
+void upgradeSessionsCollectionOptionsForDataSizeAwareBalancing(OperationContext* opCtx);
+
 }  // namespace sharding_util
 }  // namespace mongo

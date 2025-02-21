@@ -85,6 +85,8 @@ const char* BalancerSettingsType::kBalancerModes[] = {"full", "autoSplitOnly", "
 
 const char ChunkSizeSettingsType::kKey[] = "chunksize";
 const uint64_t ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes{128 * 1024 * 1024};
+const int ChunkSizeSettingsType::kConfigSessionsDefaultMaxChunkSizeBytes{
+    200 * 1000};  // average doc size * desired no. docs per chunk
 
 const char AutoSplitSettingsType::kKey[] = "autosplit";
 

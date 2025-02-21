@@ -146,6 +146,10 @@ public:
     // configuration
     static const uint64_t kDefaultMaxChunkSizeBytes;
 
+    // Default value to use for the max chunk size for the config.system.settings collection in FCV
+    // 60 if one is not provided.
+    static const int kConfigSessionsDefaultMaxChunkSizeBytes;
+
     /**
      * Constructs a settings object with the default values. To be used when no chunk size settings
      * have been specified.

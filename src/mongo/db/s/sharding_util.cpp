@@ -38,9 +38,11 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/type_shard_collection.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/balancer_configuration.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 
 namespace mongo {
@@ -149,6 +151,47 @@ void downgradeCollectionBalancingFieldsToPre53(OperationContext* opCtx) {
     WriteConcernResult ignoreResult;
     auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     uassertStatusOK(waitForWriteConcern(opCtx, latestOpTime, majorityWC, &ignoreResult));
+}
+
+
+void upgradeSessionsCollectionOptionsForDataSizeAwareBalancing(OperationContext* opCtx) {
+    auto filterQuery =
+        BSON("_id" << NamespaceString::kLogicalSessionsNamespace.ns()
+                   << CollectionType::kMaxChunkSizeBytesFieldName << BSON("$exists" << false));
+    auto updateQuery =
+        BSON("$set" << BSON(CollectionType::kMaxChunkSizeBytesFieldName
+                            << ChunkSizeSettingsType::kConfigSessionsDefaultMaxChunkSizeBytes
+                            << CollectionType::kNoAutoSplitFieldName << true));
+
+    uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
+        opCtx,
+        CollectionType::ConfigNS,
+        filterQuery,
+        updateQuery,
+        false,
+        ShardingCatalogClient::kLocalWriteConcern));
+}
+
+void downgradeSessionsCollectionBalancingConfigurationToPre60(OperationContext* opCtx) {
+    if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+        return;
+    }
+
+    auto filterQuery =
+        BSON("_id" << NamespaceString::kLogicalSessionsNamespace.ns()
+                   << CollectionType::kMaxChunkSizeBytesFieldName
+                   << ChunkSizeSettingsType::kConfigSessionsDefaultMaxChunkSizeBytes);
+    auto updateQuery =
+        BSON("$unset" << BSON(CollectionType::kNoAutoSplitFieldName
+                              << 1 << CollectionType::kMaxChunkSizeBytesFieldName << 1));
+
+    uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
+        opCtx,
+        CollectionType::ConfigNS,
+        filterQuery,
+        updateQuery,
+        false,
+        ShardingCatalogClient::kLocalWriteConcern));
 }
 
 }  // namespace sharding_util

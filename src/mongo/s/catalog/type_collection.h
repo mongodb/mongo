@@ -156,6 +156,10 @@ public:
         return !getNoAutoSplit().get_value_or(false);
     }
 
+    void setAllowAutoSplit(bool value) {
+        CollectionTypeBase::setNoAutoSplit(!value);
+    }
+
     bool getAllowBalance() const {
         return !getNoBalance() && !getDefragmentCollection();
     }

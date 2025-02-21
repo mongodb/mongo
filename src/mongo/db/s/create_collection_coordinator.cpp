@@ -55,6 +55,7 @@
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
@@ -915,6 +916,14 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
                         Date_t::now(),
                         *_collectionUUID,
                         _shardKeyPattern->getKeyPattern());
+    if (nss() == NamespaceString::kLogicalSessionsNamespace &&
+        feature_flags::gNoMoreAutoSplitter.isEnabled(serverGlobalParams.featureCompatibility)) {
+        // Same logic as `sharding_util::upgradeSessionsCollectionOptionsForDataSizeAwareBalancing`.
+        // It is safe to check for the feature flag within the coordinator because 6.0 coordinators
+        // are drained upon setFeatureCompatibilityVersion.
+        coll.setMaxChunkSizeBytes(ChunkSizeSettingsType::kConfigSessionsDefaultMaxChunkSizeBytes);
+        coll.setAllowAutoSplit(false);
+    }
 
     if (_request.getTimeseries()) {
         TypeCollectionTimeseriesFields timeseriesFields;

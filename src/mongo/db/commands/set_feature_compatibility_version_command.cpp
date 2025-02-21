@@ -335,6 +335,17 @@ public:
             // Set the client's last opTime to the system last opTime so no-ops wait for
             // writeConcern.
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+
+            if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+                requestedVersion == multiversion::GenericFCV::kLatest) {
+                // The draining of shardCollection here is needed to ensure that a retried FCV
+                // upgrade will actually complete with the right balancing configuration for
+                // config.system.sessions .
+                ShardingDDLCoordinatorService::getService(opCtx)
+                    ->waitForCoordinatorsOfGivenTypeToComplete(
+                        opCtx, DDLCoordinatorTypeEnum::kCreateCollectionPre60Compatible);
+            }
+
             return true;
         }
 
@@ -426,6 +437,37 @@ public:
                     uassert(ErrorCodes::CannotDowngrade,
                             "Cannot downgrade while user write blocking is enabled.",
                             !isBlockingUserWrites);
+                }
+
+                if (requestedVersion == multiversion::GenericFCV::kLastLTS) {
+                    // Explicitly checking the version because the defragmentation infrastructure is
+                    // only available since v5.3, with no feature flag associated to it.
+                    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                        // Make sure no collection is currently being defragmented. It is
+                        // insufficient to abort ongoing defragmentations because doing so does not
+                        // immediately clear the defragmentation state and relies on the balancer
+                        // secondary thread eventually doing so which we cannot guarantee in the
+                        // case that the user downgrades their binaries.
+                        DBDirectClient client(opCtx);
+                        const BSONObj collBeingDefragmentedQuery =
+                            BSON(CollectionType::kDefragmentCollectionFieldName
+                                 << BSON("$exists" << true));
+
+                        FindCommandRequest findRequest{CollectionType::ConfigNS};
+                        findRequest.setFilter(collBeingDefragmentedQuery);
+                        auto cursor = client.find(std::move(findRequest));
+
+                        if (cursor->more()) {
+                            const auto collectionBeingDefragmented = CollectionType(cursor->next());
+                            uasserted(
+                                ErrorCodes::CannotDowngrade,
+                                str::stream()
+                                    << "Cannot downgrade the cluster because collection "
+                                    << collectionBeingDefragmented.getNss().toString()
+                                    << "being defragmented. Please drain all the defragmentation "
+                                       "processes before downgrading.");
+                        }
+                    }
                 }
 
                 // TODO (SERVER-65572): Remove setClusterParameter serialization and collection
@@ -586,6 +628,15 @@ public:
                 false /* setTargetVersion */);
         }
 
+        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+            requestedVersion == multiversion::GenericFCV::kLatest) {
+            // Drain old create coordinators to make sure sessions collection can only be created
+            // with the correct balancing options from now on.
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(
+                    opCtx, DDLCoordinatorTypeEnum::kCreateCollectionPre60Compatible);
+        }
+
         return true;
     }
 
@@ -674,6 +725,11 @@ private:
             uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
+
+            // Upgrade the session collection's balancing configuration just after upgrading the FCV
+            // on all shards in order to make sure not to overlap with a create coordinator that
+            // started under a different FCV (and would not set such options).
+            sharding_util::upgradeSessionsCollectionOptionsForDataSizeAwareBalancing(opCtx);
         }
 
         if (feature_flags::gFeatureFlagInternalTransactions.isEnabledOnVersion(requestedVersion)) {
@@ -1016,6 +1072,11 @@ private:
             uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
+
+            // Unset 6.0 sessions collection's balancing configuration once all shards are
+            // downgraded: create coordinator will have drained, so no risk for such balancing
+            // options to be set at creation.
+            sharding_util::downgradeSessionsCollectionBalancingConfigurationToPre60(opCtx);
         }
 
         if (chunkResizeAsyncTask.has_value()) {

@@ -1465,15 +1465,19 @@ void BalancerDefragmentationPolicyImpl::startCollectionDefragmentations(Operatio
 void BalancerDefragmentationPolicyImpl::abortCollectionDefragmentation(OperationContext* opCtx,
                                                                        const NamespaceString& nss) {
     stdx::lock_guard<Latch> lk(_stateMutex);
-    auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss, {});
-    if (coll.getDefragmentCollection()) {
-        if (_defragmentationStates.contains(coll.getUuid())) {
-            // Notify phase to abort current phase
-            _defragmentationStates.at(coll.getUuid())->userAbort();
-            _onStateUpdated();
+    try {
+        auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss, {});
+        if (coll.getDefragmentCollection()) {
+            if (_defragmentationStates.contains(coll.getUuid())) {
+                // Notify phase to abort current phase
+                _defragmentationStates.at(coll.getUuid())->userAbort();
+                _onStateUpdated();
+            }
+            // Change persisted phase to kSplitChunks
+            _persistPhaseUpdate(opCtx, DefragmentationPhaseEnum::kSplitChunks, coll.getUuid());
         }
-        // Change persisted phase to kSplitChunks
-        _persistPhaseUpdate(opCtx, DefragmentationPhaseEnum::kSplitChunks, coll.getUuid());
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // No-op because the collection has been dropped
     }
 }
 
