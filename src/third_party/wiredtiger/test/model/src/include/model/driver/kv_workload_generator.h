@@ -78,6 +78,7 @@ struct kv_workload_generator_spec {
     /* Probabilities of special operations. */
     float checkpoint;
     float crash;
+    float evict;
     float restart;
     float rollback_to_stable;
     float set_oldest_timestamp;
@@ -89,6 +90,9 @@ struct kv_workload_generator_spec {
 
     /* The probability of starting a prepared transaction. */
     float prepared_transaction;
+
+    /* The maximum delay after preparing a transaction (expressed as operation count). */
+    size_t max_delay_after_prepare;
 
     /* Probabilities of transaction rollback. */
     float nonprepared_transaction_rollback;
@@ -115,6 +119,7 @@ protected:
      */
     enum class op_category {
         none,
+        evict,
         remove,
         update,
     };
@@ -445,15 +450,6 @@ protected:
     {
         return _workload_ptr;
     }
-
-protected:
-    /*
-     * kv_workload_generator::assert_timestamps --
-     *     Assert that the timestamps are assigned correctly. Call this function one sequence at a
-     *     time.
-     */
-    void assert_timestamps(const kv_workload_sequence &sequence, const operation::any &op,
-      timestamp_t &oldest, timestamp_t &stable);
 
     /*
      * kv_workload_generator::assign_timestamps --

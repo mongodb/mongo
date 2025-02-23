@@ -97,6 +97,16 @@ public:
     bool exists(kv_checkpoint_ptr checkpoint) const;
 
     /*
+     * kv_table_item::exists --
+     *     Check whether the latest value exists for the given transaction snapshot.
+     */
+    inline bool
+    exists(kv_transaction_ptr txn) const
+    {
+        return get(std::move(txn)) != NONE;
+    }
+
+    /*
      * kv_table_item::exists_opt --
      *     Check whether the latest value exists, using the checkpoint if provided.
      */
@@ -176,7 +186,18 @@ public:
      * kv_table_item::has_prepared --
      *     Check whether the item has any prepared updates for the given timestamp.
      */
-    bool has_prepared(timestamp_t timestamp) const;
+    bool has_prepared(timestamp_t timestamp = k_timestamp_max) const;
+
+    /*
+     * kv_table_item::implicit --
+     *     Check if the item has been created implicitly and exists only implicitly.
+     */
+    inline bool
+    implicit() const
+    {
+        std::lock_guard lock_guard(_lock);
+        return _updates.size() == 1 && (*_updates.begin())->implicit();
+    }
 
     /*
      * kv_table_item::rollback_to_stable --

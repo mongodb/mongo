@@ -26,6 +26,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <sys/time.h>
+#include <sys/resource.h>
+
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -35,6 +38,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "wiredtiger.h"
@@ -43,6 +47,7 @@ extern "C" {
 }
 
 #include "model/driver/kv_workload_generator.h"
+#include "model/driver/kv_workload_runner_wt.h"
 #include "model/test/util.h"
 #include "model/test/wiredtiger_util.h"
 #include "model/kv_database.h"
@@ -57,7 +62,7 @@ extern char *__wt_optarg;
 /*
  * Connection configuration.
  */
-#define ENV_CONFIG_BASE "create=true,log=(enabled=false)"
+#define DEFAULT_CONNECTION_CONFIG ""
 
 /*
  * Home (sub-)directory for counterexample reduction.
@@ -65,10 +70,16 @@ extern char *__wt_optarg;
 #define REDUCTION_HOME "REDUCE"
 
 /*
- * Table configuration: Use small pages to force WiredTiger to generate deeper trees with less
- * effort than we would have generated otherwise.
+ * The file names for workloads.
  */
-#define TABLE_CONFIG_BASE "leaf_page_max=4KB"
+#define MAIN_WORKLOAD_FILE "model_test.workload"
+#define REDUCED_WORKLOAD_FILE "reduced.workload"
+
+/*
+ * Table configuration: Use small pages by default to force WiredTiger to generate deeper trees with
+ * less effort than we would have generated otherwise.
+ */
+#define DEFAULT_TABLE_CONFIG "leaf_page_max=4KB"
 
 /*
  * run_and_verify --
@@ -76,7 +87,7 @@ extern char *__wt_optarg;
  */
 static void
 run_and_verify(std::shared_ptr<model::kv_workload> workload, const std::string &home,
-  const std::string &conn_config, const std::string &table_config)
+  const std::string &conn_config_override = "", const std::string &table_config_override = "")
 {
     /* Run the workload in the model. */
     model::kv_database database;
@@ -86,6 +97,10 @@ run_and_verify(std::shared_ptr<model::kv_workload> workload, const std::string &
 
         /* When we load the workload from WiredTiger, that would be after running recovery. */
         database.restart();
+    } catch (model::known_issue_exception &e) {
+        std::cerr << "Warning: Reproduced known WiredTiger issue " << e.issue()
+                  << " (skip the rest of the test)" << std::endl;
+        return;
     } catch (std::exception &e) {
         throw std::runtime_error(
           "Failed to run the workload in the model: " + std::string(e.what()));
@@ -93,7 +108,7 @@ run_and_verify(std::shared_ptr<model::kv_workload> workload, const std::string &
 
     /* Create the database directory and save the workload. */
     testutil_recreate_dir(home.c_str());
-    std::string workload_file = home + DIR_DELIM_STR + "WORKLOAD";
+    std::string workload_file = home + DIR_DELIM_STR + MAIN_WORKLOAD_FILE;
     std::ofstream workload_out;
     workload_out.open(workload_file);
     if (!workload_out.is_open())
@@ -106,8 +121,8 @@ run_and_verify(std::shared_ptr<model::kv_workload> workload, const std::string &
     /* Run the workload in WiredTiger. */
     std::vector<int> ret_wt;
     try {
-        ret_wt =
-          workload->run_in_wiredtiger(home.c_str(), conn_config.c_str(), table_config.c_str());
+        ret_wt = workload->run_in_wiredtiger(
+          home.c_str(), conn_config_override.c_str(), table_config_override.c_str());
     } catch (std::exception &e) {
         throw std::runtime_error(
           "Failed to run the workload in WiredTiger: " + std::string(e.what()));
@@ -128,8 +143,11 @@ run_and_verify(std::shared_ptr<model::kv_workload> workload, const std::string &
 
     /* Open the WiredTiger database to verify. */
     WT_CONNECTION *conn;
+    std::string conn_config_verify = model::kv_workload_runner_wt::k_config_base;
+    if (conn_config_override != "")
+        conn_config_verify += "," + conn_config_override;
     int ret =
-      wiredtiger_open(home.c_str(), nullptr /* event handler */, conn_config.c_str(), &conn);
+      wiredtiger_open(home.c_str(), nullptr /* event handler */, conn_config_verify.c_str(), &conn);
     if (ret != 0)
         throw std::runtime_error("Cannot open the database: " +
           std::string(wiredtiger_strerror(ret)) + " (" + std::to_string(ret) + ")");
@@ -194,6 +212,7 @@ update_spec(model::kv_workload_generator_spec &spec, std::string &conn_config,
 
         UPDATE_SPEC(checkpoint, float);
         UPDATE_SPEC(crash, float);
+        UPDATE_SPEC(evict, float);
         UPDATE_SPEC(restart, float);
         UPDATE_SPEC(rollback_to_stable, float);
         UPDATE_SPEC(set_oldest_timestamp, float);
@@ -203,6 +222,7 @@ update_spec(model::kv_workload_generator_spec &spec, std::string &conn_config,
         UPDATE_SPEC(update_existing, float);
 
         UPDATE_SPEC(prepared_transaction, float);
+        UPDATE_SPEC(max_delay_after_prepare, uint64);
         UPDATE_SPEC(nonprepared_transaction_rollback, float);
         UPDATE_SPEC(prepared_transaction_rollback_after_prepare, float);
         UPDATE_SPEC(prepared_transaction_rollback_before_prepare, float);
@@ -276,13 +296,191 @@ load_workload(const char *file)
 }
 
 /*
+ * reduce_counterexample_context_t --
+ *     The context for counterexample reduction.
+ */
+struct reduce_counterexample_context_t {
+    const std::string conn_config_override;
+    const std::string main_home;
+    const std::string reduce_home;
+    const std::string table_config_override;
+
+    size_t round;
+
+    /*
+     * reduce_counterexample_context_t::reduce_counterexample_context_t --
+     *     Initialize the context.
+     */
+    reduce_counterexample_context_t(const std::string &main_home, const std::string &reduce_home,
+      const std::string &conn_config_override, const std::string &table_config_override)
+        : main_home(main_home), reduce_home(reduce_home),
+          conn_config_override(conn_config_override), table_config_override(table_config_override),
+          round(0)
+    {
+    }
+};
+
+/*
+ * reduce_counterexample_by_aspect --
+ *     Try to find a smaller workload that reproduces a failure, focusing on a specific aspect
+ *     specified by the corresponding lambda arguments for detecting and extracting the operation
+ *     aspect (e.g., its sequence number or its table ID) and any other condition under which the
+ *     operation should be always included in the tested workload. The parameters to the lambdas are
+ *     the operation itself and its index in the workload. Return the reduced workload, or the
+ *     workload parameter itself if no reduction has been found.
+ */
+template <typename T>
+static std::shared_ptr<model::kv_workload>
+reduce_counterexample_by_aspect(reduce_counterexample_context_t &context,
+  std::shared_ptr<model::kv_workload> workload, const char *aspect_name_plural,
+  std::function<bool(const model::kv_workload_operation &, size_t)> has_aspect,
+  std::function<T(const model::kv_workload_operation &, size_t)> aspect_value,
+  std::function<bool(const model::kv_workload_operation &, size_t)> always_include)
+{
+    /* Extract the list of aspect values and associate each one with a 0-based index. */
+    std::unordered_map<T, size_t> aspect_value_to_index;
+    for (size_t i = 0; i < workload->size(); i++) {
+        model::kv_workload_operation &op = (*workload)[i];
+        if (!has_aspect(op, i))
+            continue;
+        const T value = aspect_value(op, i);
+        if (aspect_value_to_index.find(value) == aspect_value_to_index.end())
+            aspect_value_to_index[value] = aspect_value_to_index.size();
+    }
+
+    if (aspect_value_to_index.size() <= 1)
+        return workload; /* Nothing to reduce on. */
+
+    /*
+     * Find the minimal subset that causes a failure by using an algorithm similar to binary search:
+     * Remove the first half of the workload and then see if the failure happens again. If it does,
+     * then that part of the workload can be eliminated. If the failure does not happen, it means
+     * that the eliminated part of the workload includes something that contributes to the failure.
+     * In the next iteration, try removing only half of the removed range - first the first half and
+     * then the second half.
+     */
+    std::vector<bool> enabled(aspect_value_to_index.size(), true);
+    std::shared_ptr<model::kv_workload> reduced;
+
+    std::deque<std::pair<size_t, size_t>> ranges_to_remove;
+    ranges_to_remove.push_back(std::pair<size_t, size_t>(0, aspect_value_to_index.size() / 2));
+    ranges_to_remove.push_back(
+      std::pair<size_t, size_t>(aspect_value_to_index.size() / 2, aspect_value_to_index.size()));
+
+    while (!ranges_to_remove.empty()) {
+        std::pair<size_t, size_t> range = ranges_to_remove.front();
+        ranges_to_remove.pop_front();
+        if (range.first >= range.second)
+            continue;
+
+        /* Print progress. Print the range as 1-based, inclusive range. */
+        context.round++;
+        std::cout << "Counterexample reduction: Round " << context.round << ", remove "
+                  << aspect_name_plural << " " << range.first + 1 << "-" << range.second
+                  << std::endl;
+
+        /* Create a workload with a subset of the operations. */
+        std::shared_ptr<model::kv_workload> w = std::make_shared<model::kv_workload>();
+        for (size_t i = 0; i < workload->size(); i++) {
+            const model::kv_workload_operation &op = (*workload)[i];
+
+            /*
+             * Always include operations that are not applicable to the aspect of the workload on
+             * which we are focusing.
+             */
+            if (!has_aspect(op, i) || always_include(op, i)) {
+                *w << op;
+                continue;
+            }
+
+            /* Include the operation depending on the aspect value. */
+            const T value = aspect_value(op, i);
+            size_t index = aspect_value_to_index[value];
+            if (enabled[index] && !(index >= range.first && index < range.second))
+                *w << op;
+        }
+
+        /*
+         * Validate that we didn't just produce a malformed workload.
+         *
+         * The workload construction algorithm above already guarantees that the transactions are
+         * included or removed in their entirety and that the workload creates all of its tables, so
+         * we don't need to check for undefined transaction or table IDs.
+         */
+        bool skip = false;
+        if (!w->verify_timestamps())
+            skip = true;
+
+        /* Clean up the previous database directory, if it exists. */
+        if (!skip)
+            testutil_remove(context.reduce_home.c_str());
+
+        /* Try the reduced workload. */
+        try {
+            if (!skip)
+                run_and_verify(w, context.reduce_home, context.conn_config_override,
+                  context.table_config_override);
+            else
+                std::cout << "Counterexample reduction: Skip running a malformed workload"
+                          << std::endl;
+
+            /* There was no error, so try removing only just the halves. */
+            if (range.first + 1 < range.second) {
+                size_t m = (range.first + range.second) / 2;
+                ranges_to_remove.push_back(std::pair<size_t, size_t>(range.first, m));
+                ranges_to_remove.push_back(std::pair<size_t, size_t>(m, range.second));
+            }
+        } catch (std::exception &e) {
+            std::cout << "Counterexample reduction: " << e.what() << std::endl;
+
+            /* There was an error, so we can remove the range from next iteration. */
+            for (size_t i = range.first; i < range.second; i++)
+                enabled[i] = false;
+
+            /* This is the best workload reduction so far, so save it. */
+            reduced = w;
+        }
+    }
+
+    return reduced ? reduced : workload;
+}
+
+/*
  * reduce_counterexample --
  *     Try to find a smaller workload that reproduces a failure.
  */
 static void
-reduce_counterexample(std::shared_ptr<model::kv_workload> workload, const std::string &home,
-  const std::string &conn_config, const std::string &table_config)
+reduce_counterexample(std::shared_ptr<model::kv_workload> workload, const std::string &main_home,
+  const std::string &reduce_home, const std::string &conn_config_override = "",
+  const std::string &table_config_override = "")
 {
+    reduce_counterexample_context_t context{
+      main_home, reduce_home, conn_config_override, table_config_override};
+
+    /*
+     * Turn off generating core dumps during the counterexample reduction. Each failed run could
+     * possibly result in dumping a core, leading to tens or even hundreds of core dumps.
+     */
+    struct rlimit prev_core_limit;
+    int r = getrlimit(RLIMIT_CORE, &prev_core_limit);
+    if (r != 0)
+        throw std::runtime_error(
+          std::string("Failed to get the current core dump limit: ") + strerror(errno));
+
+    model::at_cleanup reset_core_limit([&prev_core_limit]() {
+        int r = setrlimit(RLIMIT_CORE, &prev_core_limit);
+        if (r != 0)
+            std::cerr << "Failed to reset the core dump limit: " << strerror(errno) << std::endl;
+    });
+
+    struct rlimit new_core_limit;
+    memset(&new_core_limit, 0, sizeof(new_core_limit));
+    /* Preserve the maximum limit for resetting the current value to work at cleanup. */
+    new_core_limit.rlim_max = prev_core_limit.rlim_max;
+    r = setrlimit(RLIMIT_CORE, &new_core_limit);
+    if (r != 0)
+        throw std::runtime_error(std::string("Failed to set core dump limit: ") + strerror(errno));
+
     /*
      * Separate the workload back into sequences, where a sequence is a transaction or just a single
      * non-transactional operations, such as database restart or set stable timestamp. We will not
@@ -345,84 +543,52 @@ reduce_counterexample(std::shared_ptr<model::kv_workload> workload, const std::s
         }
     }
 
-    /*
-     * Find the minimal subset that causes a failure by using an algorithm similar to binary search:
-     * Remove the first half of the workload and then see if the failure happens again. If it does,
-     * then that part of the workload can be eliminated. If the failure does not happen, it means
-     * that the eliminated part of the workload includes something that contributes to the failure.
-     * In the next iteration, try removing only half of the removed range - first the first half and
-     * then the second half.
-     */
-    std::vector<bool> enabled(sequences.size(), true);
-    std::shared_ptr<model::kv_workload> reduced;
+    std::shared_ptr<model::kv_workload> w = workload;
 
-    std::deque<std::pair<size_t, size_t>> ranges_to_remove;
-    ranges_to_remove.push_back(std::pair<size_t, size_t>(0, sequences.size() / 2));
-    ranges_to_remove.push_back(std::pair<size_t, size_t>(sequences.size() / 2, sequences.size()));
+    /* Reduce the workload based on sequences. */
+    w = reduce_counterexample_by_aspect<size_t>(
+      context, w, "sequences",
+      [](
+        const model::kv_workload_operation &op, size_t) { return op.seq_no != model::k_no_seq_no; },
+      [](const model::kv_workload_operation &op, size_t) { return op.seq_no; },
+      [](const model::kv_workload_operation &op, size_t) {
+          /*
+           * Always include metadata operations in the workload, so that we don't produce a
+           * malformed workload at this stage due to a missing table.
+           */
+          return std::holds_alternative<model::operation::create_table>(op.operation);
+      });
 
-    size_t round = 0;
-    while (!ranges_to_remove.empty()) {
-        std::pair<size_t, size_t> range = ranges_to_remove.front();
-        ranges_to_remove.pop_front();
-        if (range.first >= range.second)
-            continue;
+    /* Reduce the workload based on tables. */
+    w = reduce_counterexample_by_aspect<model::table_id_t>(
+      context, w, "tables",
+      [](const model::kv_workload_operation &op, size_t) {
+          return model::operation::table_op(op.operation);
+      },
+      [](const model::kv_workload_operation &op, size_t) {
+          return model::operation::table_id(op.operation);
+      },
+      [](const model::kv_workload_operation &, size_t) { return false; });
 
-        round++;
-        std::cout << "Counterexample reduction: Round " << round << ", remove " << range.first
-                  << "-" << range.second << std::endl;
-
-        /* Create a workload with a subset of the operations. */
-        std::shared_ptr<model::kv_workload> w = std::make_shared<model::kv_workload>();
-        for (size_t i = 0; i < workload->size(); i++) {
-            const model::kv_workload_operation &op = (*workload)[i];
-
-            /*
-             * Keep only enabled operations, operations that are not in the removed range, and
-             * metadata operations (currently just "create table," so that the workload doesn't fail
-             * due to a missing table).
-             *
-             * We don't expect the first comparison to model::k_no_seq_no to evaluate to false, but
-             * this is a precaution against an out of bounds access for vector "enabled" below.
-             */
-            if (op.seq_no == model::k_no_seq_no ||
-              (enabled[op.seq_no] && !(op.seq_no >= range.first && op.seq_no < range.second)) ||
-              std::holds_alternative<model::operation::create_table>(op.operation))
-                *w << op;
-        }
-
-        /* Clean up the previous database directory, if it exists. */
-        testutil_remove(home.c_str());
-
-        /* Try the reduced workload. */
-        try {
-            run_and_verify(w, home, conn_config, table_config);
-
-            /* There was no error, so try removing only just the halves. */
-            if (range.first + 1 < range.second) {
-                size_t m = (range.first + range.second) / 2;
-                ranges_to_remove.push_back(std::pair<size_t, size_t>(range.first, m));
-                ranges_to_remove.push_back(std::pair<size_t, size_t>(m, range.second));
-            }
-        } catch (std::exception &e) {
-            std::cout << "Counterexample reduction: " << e.what() << std::endl;
-
-            /* There was an error, so we can remove the range from next iteration. */
-            for (size_t i = range.first; i < range.second; i++)
-                enabled[i] = false;
-
-            /* This is the best workload reduction so far, so save it. */
-            reduced = w;
-        }
-    }
+    /* Now try to remove individual operations within a transaction. */
+    w = reduce_counterexample_by_aspect<size_t>(
+      context, w, "operations",
+      [](const model::kv_workload_operation &op, size_t) {
+          return (model::operation::transactional(op.operation) &&
+                   model::operation::table_op(op.operation)) ||
+            std::holds_alternative<model::operation::set_commit_timestamp>(op.operation);
+      },
+      [](const model::kv_workload_operation &, size_t index) { return index; },
+      [](const model::kv_workload_operation &, size_t) { return false; });
 
     /* Save the reduced workload. */
-    if (reduced) {
-        std::string workload_file = home + DIR_DELIM_STR + "REDUCED-WORKLOAD";
+    if (w.get() != workload.get()) {
+        std::string workload_file = main_home + DIR_DELIM_STR + REDUCED_WORKLOAD_FILE;
         std::ofstream workload_out;
         workload_out.open(workload_file);
         if (!workload_out.is_open())
             throw std::runtime_error("Failed to create file: " + workload_file);
-        workload_out << *reduced.get();
+        workload_out << *w.get();
         workload_out.close();
         if (!workload_out.good())
             throw std::runtime_error("Failed to close file: " + workload_file);
@@ -477,8 +643,8 @@ main(int argc, char *argv[])
     bool reduce = true;
 
     std::vector<std::string> workload_files;
-    std::string conn_config = ENV_CONFIG_BASE;
-    std::string table_config = TABLE_CONFIG_BASE;
+    std::string conn_config;
+    std::string table_config;
 
     /*
      * Parse the command-line arguments.
@@ -491,8 +657,7 @@ main(int argc, char *argv[])
         while ((ch = __wt_getopt(progname, argc, argv, "C:G:h:I:i:l:M:npRS:T:t:w:?")) != EOF)
             switch (ch) {
             case 'C':
-                conn_config += ",";
-                conn_config += __wt_optarg;
+                conn_config = model::join(conn_config, __wt_optarg);
                 break;
             case 'G':
                 update_spec(spec, conn_config, table_config, __wt_optarg);
@@ -533,8 +698,7 @@ main(int argc, char *argv[])
                 base_seed = parse_uint64(__wt_optarg);
                 break;
             case 'T':
-                table_config += ",";
-                table_config += __wt_optarg;
+                table_config = model::join(table_config, __wt_optarg);
                 break;
             case 't':
                 min_runtime_s = parse_uint64(__wt_optarg);
@@ -587,13 +751,15 @@ main(int argc, char *argv[])
 
             /* Run and verify the workload. */
             try {
+                /* Use the connection and table config arguments as configuration overrides. */
                 run_and_verify(workload, home, conn_config, table_config);
             } catch (std::exception &e) {
                 std::cerr << e.what() << std::endl;
                 if (reduce)
                     try {
                         std::string reduce_home = home + DIR_DELIM_STR + REDUCTION_HOME;
-                        reduce_counterexample(workload, reduce_home, conn_config, table_config);
+                        reduce_counterexample(
+                          workload, home, reduce_home, conn_config, table_config);
                     } catch (std::exception &e) {
                         std::cerr << e.what() << std::endl;
                     }
@@ -601,6 +767,10 @@ main(int argc, char *argv[])
             }
         }
     else {
+        /* Incorporate default WiredTiger configurations. */
+        conn_config = model::join(DEFAULT_CONNECTION_CONFIG, conn_config);
+        table_config = model::join(DEFAULT_TABLE_CONFIG, table_config);
+
         /* Run the test, potentially many times. */
         uint64_t next_seed = base_seed;
         for (uint64_t iteration = 1;; iteration++) {
@@ -619,6 +789,13 @@ main(int argc, char *argv[])
                 return EXIT_FAILURE;
             }
 
+            /* Add the connection and table configurations to the workload. */
+            if (!table_config.empty())
+                workload->prepend(std::move(model::operation::wt_config("table", table_config)));
+            if (!conn_config.empty())
+                workload->prepend(
+                  std::move(model::operation::wt_config("connection", conn_config)));
+
             /* If we only want to print the workload, then do so. */
             if (print_only) {
                 std::cout << *workload.get();
@@ -630,13 +807,13 @@ main(int argc, char *argv[])
 
             /* Run and verify the workload. */
             try {
-                run_and_verify(workload, home, conn_config, table_config);
+                run_and_verify(workload, home);
             } catch (std::exception &e) {
                 std::cerr << e.what() << std::endl;
                 if (reduce)
                     try {
                         std::string reduce_home = home + DIR_DELIM_STR + REDUCTION_HOME;
-                        reduce_counterexample(workload, reduce_home, conn_config, table_config);
+                        reduce_counterexample(workload, home, reduce_home);
                     } catch (std::exception &e) {
                         std::cerr << e.what() << std::endl;
                     }

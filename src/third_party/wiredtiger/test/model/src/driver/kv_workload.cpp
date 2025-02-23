@@ -155,10 +155,18 @@ parse(const char *str)
         return create_table(
           parse_uint64(args[0]), args[1].c_str(), args[2].c_str(), args[3].c_str());
     }
+    if (name == "evict") {
+        CHECK_NUM_ARGS(2);
+        return evict(parse_uint64(args[0]), data_value(parse_uint64(args[1])));
+    }
     if (name == "insert") {
         CHECK_NUM_ARGS(4);
         return insert(parse_uint64(args[0]), parse_uint64(args[1]),
           data_value(parse_uint64(args[2])), data_value(parse_uint64(args[3])));
+    }
+    if (name == "nop") {
+        CHECK_NUM_ARGS(0);
+        return nop();
     }
     if (name == "prepare_transaction") {
         CHECK_NUM_ARGS(2);
@@ -198,6 +206,10 @@ parse(const char *str)
         return truncate(parse_uint64(args[0]), parse_uint64(args[1]),
           data_value(parse_uint64(args[2])), data_value(parse_uint64(args[3])));
     }
+    if (name == "wt_config") {
+        CHECK_NUM_ARGS(2);
+        return wt_config(args[0].c_str(), args[1].c_str());
+    }
 
 #undef CHECK_NUM_ARGS
 #undef CHECK_NUM_ARGS_RANGE
@@ -207,6 +219,112 @@ parse(const char *str)
 }
 
 } /* namespace operation */
+
+/*
+ * kv_workload_generator::assert_timestamps --
+ *     Assert that the timestamps are assigned correctly. Call this function one sequence at a time.
+ */
+void
+kv_workload::assert_timestamps(const operation::any &op, timestamp_t &oldest, timestamp_t &stable)
+{
+    if (std::holds_alternative<operation::set_stable_timestamp>(op)) {
+        timestamp_t t = std::get<operation::set_stable_timestamp>(op).stable_timestamp;
+        if (t < stable) {
+            std::ostringstream err;
+            err << "The stable timestamp went backwards: " << stable << " -> " << t;
+            throw model_exception(err.str());
+        }
+        if (t < oldest && oldest != k_timestamp_none) {
+            std::ostringstream err;
+            err << "The stable timestamp must not be smaller than the oldest timestamp: " << t
+                << " < " << oldest;
+            throw model_exception(err.str());
+        }
+        stable = t;
+    }
+
+    if (std::holds_alternative<operation::set_oldest_timestamp>(op)) {
+        timestamp_t t = std::get<operation::set_oldest_timestamp>(op).oldest_timestamp;
+        if (t < oldest) {
+            std::ostringstream err;
+            err << "The oldest timestamp went backwards: " << oldest << " -> " << t;
+            throw model_exception(err.str());
+        }
+        if (t > stable && stable != k_timestamp_none) {
+            std::ostringstream err;
+            err << "The oldest timestamp must not be later than the stable timestamp: " << t
+                << " > " << stable;
+            throw model_exception(err.str());
+        }
+        oldest = t;
+    }
+
+    if (std::holds_alternative<operation::prepare_transaction>(op)) {
+        timestamp_t t = std::get<operation::prepare_transaction>(op).prepare_timestamp;
+        if (t < stable) {
+            std::ostringstream err;
+            err << "Prepare timestamp is before the stable timestamp: " << t << " < " << stable;
+            throw model_exception(err.str());
+        }
+    }
+
+    if (std::holds_alternative<operation::set_commit_timestamp>(op)) {
+        timestamp_t t = std::get<operation::set_commit_timestamp>(op).commit_timestamp;
+        if (t < stable) {
+            std::ostringstream err;
+            err << "Commit timestamp is before the stable timestamp: " << t << " < " << stable;
+            throw model_exception(err.str());
+        }
+    }
+
+    if (std::holds_alternative<operation::commit_transaction>(op)) {
+        timestamp_t t = std::get<operation::commit_transaction>(op).commit_timestamp;
+        if (t < stable) {
+            std::ostringstream err;
+            err << "Commit timestamp is before the stable timestamp: " << t << " < " << stable;
+            throw model_exception(err.str());
+        }
+        t = std::get<operation::commit_transaction>(op).durable_timestamp;
+        if (t < stable && t != k_timestamp_none) {
+            std::ostringstream err;
+            err << "Durable timestamp is before the stable timestamp: " << t << " < " << stable;
+            throw model_exception(err.str());
+        }
+    }
+}
+
+/*
+ * kv_workload::assert_timestamps --
+ *     Assert that all timestamps in the entire workload are assigned correctly. Throw an exception
+ *     on error.
+ */
+void
+kv_workload::assert_timestamps()
+{
+    timestamp_t ckpt_oldest = k_timestamp_none;
+    timestamp_t ckpt_stable = k_timestamp_none;
+    timestamp_t oldest = k_timestamp_none;
+    timestamp_t stable = k_timestamp_none;
+
+    for (size_t i = 0; i < _operations.size(); i++) {
+        const operation::any &op = _operations[i].operation;
+        assert_timestamps(op, oldest, stable);
+
+        if (std::holds_alternative<operation::checkpoint>(op) ||
+          std::holds_alternative<operation::restart>(op) ||
+          std::holds_alternative<operation::rollback_to_stable>(op)) {
+            ckpt_oldest = oldest;
+            ckpt_stable = stable;
+            if (ckpt_stable == k_timestamp_none)
+                ckpt_oldest = k_timestamp_none;
+        }
+        if (std::holds_alternative<operation::crash>(op) ||
+          std::holds_alternative<operation::restart>(op)) {
+            oldest = ckpt_oldest;
+            stable = ckpt_stable;
+        }
+    }
+}
 
 /*
  * kv_workload::run --

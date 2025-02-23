@@ -32,6 +32,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
+#include <iconv.h>
 #include <iostream>
 #include <sstream>
 #include <vector>
@@ -284,6 +285,74 @@ shared_memory::~shared_memory()
 }
 
 /*
+ * decode_utf8 --
+ *     Decode a UTF-8 string into one-byte code points. Throw an exception on error.
+ */
+std::string
+decode_utf8(const std::string &str)
+{
+    /*
+     * The main use case for this function is to recover the exact byte sequence specified in a JSON
+     * document produced by "wt printlog -u", which uses the \u notation to encode non-printable
+     * bytes. For example, WiredTiger packs key 1 as byte 81 (hex), which results in the following
+     * line in the output of printlog:
+     *
+     *     "key": "\u0081"
+     *
+     * Our JSON parser encodes these Unicode characters using UTF-8, so reading this key results in
+     * a two-byte string C2 81. This function decodes this string back to 81, which the caller can
+     * then use in data_value::unpack to get the original integer 1.
+     *
+     * We do this in two steps:
+     *   1. Convert the UTF-8 string to a WCHAR_T array.
+     *   2. Convert the WCHAR_T array to a char array.
+     */
+
+    /* Initialize the conversion. */
+    iconv_t conv = iconv_open("WCHAR_T", "UTF-8");
+    if (conv == (iconv_t)-1)
+        throw std::runtime_error(
+          "Cannot initialize charset conversion: " + std::string(wiredtiger_strerror(errno)));
+    at_cleanup close_conv([conv] { (void)iconv_close(conv); });
+
+    /* Copy the input buffer, since the conversion library needs a mutable buffer. */
+    size_t src_size = str.size();
+    std::vector<char> src(str.begin(), str.end());
+
+    /* Allocate the output buffer. */
+    size_t dest_size = src_size + 4; /* Big enough because we're using 1-byte code points. */
+    std::vector<wchar_t> dest(dest_size, 0);
+
+    /* Now do the actual conversion. */
+    char *p_src = src.data();
+    char *p_dest = (char *)dest.data();
+    size_t src_bytes = src_size;
+    size_t dest_bytes = dest_size * sizeof(wchar_t);
+    size_t dest_bytes_start = dest_bytes;
+    size_t r = iconv(conv, &p_src, &src_bytes, &p_dest, &dest_bytes);
+    if (r == (size_t)-1)
+        throw std::runtime_error(
+          "Charset conversion failed: " + std::string(wiredtiger_strerror(errno)));
+    if (src_bytes != 0)
+        throw std::runtime_error(
+          "Charset conversion did not decode " + std::to_string(src_bytes) + " byte(s)");
+
+    /* Figure out how many code points were actually decoded. */
+    size_t decoded_size = (dest_bytes_start - dest_bytes) / sizeof(wchar_t);
+
+    /* Extract the byte-long code points from the WCHAR_T array into a char array. */
+    std::vector<char> decoded(decoded_size, 0);
+    for (size_t i = 0; i < decoded_size; i++) {
+        if (dest[i] > 0xFF)
+            throw std::runtime_error(
+              "Not byte-long code point: " + std::to_string((uint64_t)dest[i]));
+        decoded[i] = (char)dest[i];
+    }
+
+    return std::string(decoded.data(), decoded_size);
+}
+
+/*
  * parse_uint64 --
  *     Parse the string into a number. Throw an exception on error.
  */
@@ -302,6 +371,60 @@ parse_uint64(const char *str, const char **end)
         throw std::runtime_error("Cannot parse a number");
 
     return r;
+}
+
+/*
+ * quote --
+ *     Return a string in quotes, with appropriate escaping.
+ */
+std::string
+quote(const std::string &str)
+{
+    std::ostringstream out;
+    out << "\"";
+
+    for (char c : str) {
+        if (c == '"')
+            out << "\\\"";
+        else
+            out << c;
+    }
+
+    out << "\"";
+    return out.str();
+}
+
+/*
+ * wt_evict --
+ *     Evict a WiredTiger page with the given key.
+ */
+void
+wt_evict(WT_CONNECTION *conn, const char *uri, const data_value &key)
+{
+    WT_SESSION *session;
+    int ret = conn->open_session(conn, nullptr, nullptr, &session);
+    if (ret != 0)
+        throw wiredtiger_exception("Cannot open a session: ", ret);
+    wiredtiger_session_guard session_guard(session);
+
+    ret = session->begin_transaction(session, "ignore_prepare=true");
+    if (ret != 0)
+        throw wiredtiger_exception("Transaction begin failed: ", ret);
+
+    WT_CURSOR *cursor;
+    ret = session->open_cursor(session, uri, nullptr, "debug=(release_evict)", &cursor);
+    if (ret != 0)
+        throw wiredtiger_exception("Cannot open a cursor: ", ret);
+    wiredtiger_cursor_guard cursor_guard(cursor);
+
+    set_wt_cursor_key(cursor, key);
+    ret = cursor->search_near(cursor, nullptr);
+    if (ret != 0 && ret != WT_NOTFOUND)
+        throw wiredtiger_exception("Search failed: ", ret);
+
+    ret = cursor->reset(cursor);
+    if (ret != 0)
+        throw wiredtiger_exception("Cursor reset failed: ", ret);
 }
 
 /*

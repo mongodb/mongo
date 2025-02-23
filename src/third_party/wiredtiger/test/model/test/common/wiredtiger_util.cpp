@@ -446,13 +446,13 @@ wt_get_timestamp(WT_CONNECTION *conn, const char *kind)
  * wt_set_timestamp --
  *     Set the given timestamp in WiredTiger.
  */
-void
+int
 wt_set_timestamp(WT_CONNECTION *conn, const char *kind, model::timestamp_t timestamp)
 {
     char buf[64];
 
     testutil_snprintf(buf, sizeof(buf), "%s=%" PRIx64, kind, timestamp);
-    testutil_check(conn->set_timestamp(conn, buf));
+    return conn->set_timestamp(conn, buf);
 }
 
 /*

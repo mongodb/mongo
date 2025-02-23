@@ -1478,14 +1478,22 @@ retry:
             ret = __cursor_col_modify(cbt, NULL, WT_UPDATE_TOMBSTONE);
         } else if (__cursor_fix_implicit(btree, cbt)) {
             /*
-             * Creating a record past the end of the tree in a fixed-length column-store implicitly
-             * fills the gap with empty records, delete the record.
+             * We are deleting an implicitly created record, which exists because we have previously
+             * added a record with a higher recno, and FLCS fills the gap with implicit records.
+             * Deleting an implicit record doesn't make sense, and as such, this is a no-op. An
+             * implicit record returns 0 when searched for. If we were to add a tombstone here, it
+             * would mean that the search returns WT_NOTFOUND, which would be then translated back
+             * into 0. Since we would return 0 either way, we choose to not add a tombstone here.
+             *
+             * Not adding a tombstone (unlike what this code did previously) fixes reconciliation
+             * behavior with regards to prepared transactions. Prepared transactions must save
+             * updates when reconciling the update chain, but a single tombstone on the chain cannot
+             * be saved; doing so would cause an assertion to fire.
              *
              * Correct the btree cursor's location: the search will have pointed us at the
              * previous/next item, and that's not correct.
              */
             cbt->recno = cursor->recno;
-            ret = __cursor_col_modify(cbt, NULL, WT_UPDATE_TOMBSTONE);
         } else
             WT_ERR(WT_NOTFOUND);
     }

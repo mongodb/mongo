@@ -15,6 +15,7 @@ post:
   - func: "dump stacktraces"
   - func: "upload stacktraces"
   - func: "upload test/format config"
+  - func: "upload test/model workloads"
   - func: "dump stderr/stdout"
   - func: "upload artifact"
     vars:
@@ -416,6 +417,19 @@ functions:
       aws_key: ${aws_key}
       local_files_include_filter:
         - wiredtiger/cmake_build/test/format/RUNDIR*/CONFIG
+      bucket: build_external
+      permissions: public-read
+      content_type: text/plain
+      remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_name}_${build_id}/
+      preserve_path: true
+  "upload test/model workloads":
+    command: s3.put
+    type: setup
+    params:
+      aws_secret: ${aws_secret}
+      aws_key: ${aws_key}
+      local_files_include_filter:
+        - wiredtiger/cmake_build/test/model/tools/WT_TEST*/*.workload
       bucket: build_external
       permissions: public-read
       content_type: text/plain
@@ -3817,8 +3831,8 @@ tasks:
             set -o errexit
             set -o verbose
             ${PREPARE_TEST_ENV}
-            # Keep repeating the model test for 30 minutes
-            ./model_test -l 2000-3000 -t 1800
+            # Keep repeating the model test for 60 minutes
+            ./model_test -l 2000-3000 -t 3600
 
   - name: model-test-long-with-coverage
     tags: ["model_checking"]
@@ -3833,6 +3847,7 @@ tasks:
         vars:
           CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=Coverage
           CODE_COVERAGE_FLAGS: -DCODE_COVERAGE_MEASUREMENT=1 -DINLINE_FUNCTIONS_INSTEAD_OF_MACROS=1
+          HAVE_DIAGNOSTIC: -DHAVE_DIAGNOSTIC=0
       - command: shell.exec
         params:
           working_dir: "wiredtiger/cmake_build/test/model/tools"
@@ -3845,8 +3860,8 @@ tasks:
             # Record the start time, in seconds (needed by the code coverage analysis step below)
             date +%s > ../../../../time.txt
 
-            # Keep repeating the model test for 600 seconds
-            ./model_test -l 2000-3000 -t 600
+            # Keep repeating the model test for 60 minutes
+            ./model_test -l 2000-3000 -t 3600
 
             # Record the end time, in seconds
             date +%s >> ../../../../time.txt

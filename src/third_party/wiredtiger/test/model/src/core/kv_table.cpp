@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <cstring>
 #include <iostream>
+#include <iterator>
 
 #include "model/kv_database.h"
 #include "model/kv_table.h"
@@ -271,6 +272,28 @@ kv_table::truncate(kv_transaction_ptr txn, const data_value &start, const data_v
     auto stop_iter = stop == model::NONE ? _data.end() : _data.upper_bound(stop);
 
     try {
+        /* FIXME-WT-13232 Disable this check or make it FLCS only (depending on the fix). */
+        /*
+         * WiredTiger's implementation of truncate returns a prepare conflict if the key following
+         * (or, in some cases, preceding) the truncate range belongs to a prepared transaction. In
+         * the case of FLCS, skip all implicitly created items before and after the truncation
+         * range.
+         */
+        for (auto i = stop_iter; i != _data.end(); i++) {
+            if (i->second.has_prepared())
+                throw known_issue_exception("WT-13232");
+            if (!i->second.exists(txn) || i->second.implicit())
+                continue;
+            break;
+        }
+        for (auto i = std::reverse_iterator(start_iter); i != _data.rend(); i++) {
+            if (i->second.has_prepared())
+                throw known_issue_exception("WT-13232");
+            if (!i->second.exists(txn) || i->second.implicit())
+                continue;
+            break;
+        }
+
         for (auto i = start_iter; i != stop_iter; i++) {
             std::shared_ptr<kv_update> update = fix_timestamps(std::make_shared<kv_update>(
               _config.type == kv_table_type::column_fix ? ZERO : NONE, txn));

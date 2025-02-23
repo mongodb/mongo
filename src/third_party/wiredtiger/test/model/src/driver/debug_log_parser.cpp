@@ -48,9 +48,13 @@ namespace model {
 static void
 from_json(const json &j, debug_log_parser::col_put &out)
 {
+    std::string value;
+
     j.at("fileid").get_to(out.fileid);
     j.at("recno").get_to(out.recno);
-    j.at("value").get_to(out.value);
+    j.at("value").get_to(value);
+
+    out.value = decode_utf8(value);
 }
 
 /*
@@ -108,9 +112,14 @@ from_json(const json &j, debug_log_parser::prev_lsn &out)
 static void
 from_json(const json &j, debug_log_parser::row_put &out)
 {
+    std::string key, value;
+
     j.at("fileid").get_to(out.fileid);
-    j.at("key").get_to(out.key);
-    j.at("value").get_to(out.value);
+    j.at("key").get_to(key);
+    j.at("value").get_to(value);
+
+    out.key = decode_utf8(key);
+    out.value = decode_utf8(value);
 }
 
 /*
@@ -120,8 +129,12 @@ from_json(const json &j, debug_log_parser::row_put &out)
 static void
 from_json(const json &j, debug_log_parser::row_remove &out)
 {
+    std::string key;
+
     j.at("fileid").get_to(out.fileid);
-    j.at("key").get_to(out.key);
+    j.at("key").get_to(key);
+
+    out.key = decode_utf8(key);
 }
 
 /*
@@ -131,10 +144,15 @@ from_json(const json &j, debug_log_parser::row_remove &out)
 static void
 from_json(const json &j, debug_log_parser::row_truncate &out)
 {
+    std::string start, stop;
+
     j.at("fileid").get_to(out.fileid);
     j.at("mode").get_to(out.mode);
-    j.at("start").get_to(out.start);
-    j.at("stop").get_to(out.stop);
+    j.at("start").get_to(start);
+    j.at("stop").get_to(stop);
+
+    out.start = decode_utf8(start);
+    out.stop = decode_utf8(stop);
 }
 
 /*

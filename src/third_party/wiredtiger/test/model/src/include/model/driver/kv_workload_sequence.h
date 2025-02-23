@@ -44,6 +44,7 @@ enum class kv_workload_sequence_type {
     none,
     checkpoint,
     crash,
+    evict,
     restart,
     rollback_to_stable,
     set_oldest_timestamp,
