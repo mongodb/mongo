@@ -492,6 +492,11 @@ function runTest(fixture, {isShardedColl, shardKeyField, isHashed}) {
     // Wait for the write to be applied on the secondary node.
     fixture.waitForReplicationFn();
 
+    // Make sure that the shard executing $lookup operations has up-to-date routing information.
+    fixture.conn.getDB(dbName).getCollection(notSampledCollName).aggregate([
+        {$lookup: {from: sampledCollName, pipeline: [], as: "out"}}
+    ]);
+
     const sampledCollUuid =
         QuerySamplingUtil.getCollectionUuid(fixture.conn.getDB(dbName), sampledCollName);
 

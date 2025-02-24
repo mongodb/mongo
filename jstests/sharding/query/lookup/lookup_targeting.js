@@ -773,6 +773,13 @@ shardTargetingTest.assertShardTargeting({
     profileFilters: profileFilters,
 });
 
+// Make sure the shard that is going to execute the nested $lookup has up-to-date routing info.
+db.getCollection(kShardedColl1Name).aggregate([ 
+    {$lookup: {from: kShardedColl2Name, as: "out", pipeline: [
+        {$lookup: {from: kUnsplittable1CollName, as: "out", pipeline: []}},
+    ]}}
+]);
+
 // Issue an aggregate featuring nested $lookup stages where the innermost collection is
 // unsplittable, while the top level $lookup's 'from' collection is sharded.
 expectedResults = [

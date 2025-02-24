@@ -40,7 +40,8 @@ const originalShard1Metrics =
     assert.commandWorked(st.shard1.adminCommand({serverStatus: 1})).transactions;
 
 // Refresh the routing information for the foreign collection in shard0 before running the checks.
-assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: foreignNs}));
+st.s.getDB(dbName).getCollection(localColl).aggregate(
+    [{$lookup: {from: foreignColl, pipeline: [], as: "out"}}]);
 
 const session = st.s.startSession();
 const sessionDB = session.getDatabase(dbName);

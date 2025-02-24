@@ -158,13 +158,6 @@ public:
                 uassertStatusOK(
                     FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
                         opCtx, ns(), boost::none));
-
-                // TODO (SERVER-97511): Remove the refresh of the routing information.
-                if (feature_flags::gDualCatalogCache.isEnabled()) {
-                    const auto catalogCache = Grid::get(opCtx)->catalogCache();
-                    catalogCache->onStaleCollectionVersion(ns(), boost::none /* wantedVersion */);
-                    (void)catalogCache->getCollectionRoutingInfo(opCtx, ns());
-                }
             }
 
             // A config server could receive this command even if not in config shard mode if the CS
