@@ -28,12 +28,12 @@ const testDB = primary.getDB('test');
 const coll = testDB.getCollection('test');
 
 assert.commandWorked(coll.insert({_id: 'a'}));
+rst.awaitReplication();
 
 const secondary = rst.getSecondary();
 const secondaryDB = secondary.getDB(testDB.getName());
 const failPoint = configureFailPoint(secondaryDB, 'hangAfterCollectionInserts', {
     collectionNS: coll.getFullName(),
-    first_id: 'b',
 });
 
 try {
