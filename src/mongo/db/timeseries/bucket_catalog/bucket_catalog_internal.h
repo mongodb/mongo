@@ -583,10 +583,13 @@ std::shared_ptr<WriteBatch> addMeasurementToBatchAndBucket(
  * Given a bucket 'bucket', a measurement 'doc', and the 'writeBatch', updates the 'writeBatch'
  * corresponding to the inputted bucket as well as the bucket itself to reflect the addition of the
  * measurement. This includes updating the batch/bucket estimated sizes and the bucket's schema.
+ * We also store the index of the measurement in the original user batch, for retryability and
+ * error-handling.
  * TODO(SERVER-100294) Remove the new prefix after deleting legacy timeseries write path code.
  */
 void newAddMeasurementToBatchAndBucket(BucketCatalog& catalog,
                                        const BSONObj& measurement,
+                                       const UserBatchIndex& index,
                                        OperationId opId,
                                        const TimeseriesOptions& timeseriesOptions,
                                        const StripeNumber& stripeNumber,

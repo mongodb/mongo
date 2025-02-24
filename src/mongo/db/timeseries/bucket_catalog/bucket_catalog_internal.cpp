@@ -820,8 +820,7 @@ bool tryToInsertIntoBucketWithoutRollover(BucketCatalog& catalog,
     Bucket::NewFieldNames newFieldNamesToBeInserted;
     Sizes sizesToBeAdded;
 
-    auto measurement = std::get<BSONObj>(batchedInsertTuple);
-    auto date = std::get<Date_t>(batchedInsertTuple);
+    auto [measurement, date, index] = batchedInsertTuple;
 
     bool isNewlyOpenedBucket = (bucket.size == 0);
     bool openedDueToMetadata = true;
@@ -853,6 +852,7 @@ bool tryToInsertIntoBucketWithoutRollover(BucketCatalog& catalog,
     }
     newAddMeasurementToBatchAndBucket(catalog,
                                       measurement,
+                                      index,
                                       opId,
                                       timeseriesOptions,
                                       stripeNumber,
@@ -1744,6 +1744,7 @@ bool stageInsertBatchIntoEligibleBucket(BucketCatalog& catalog,
 
 void newAddMeasurementToBatchAndBucket(BucketCatalog& catalog,
                                        const BSONObj& measurement,
+                                       const UserBatchIndex& index,
                                        const OperationId opId,
                                        const TimeseriesOptions& timeseriesOptions,
                                        const StripeNumber& stripeNumber,
@@ -1756,6 +1757,7 @@ void newAddMeasurementToBatchAndBucket(BucketCatalog& catalog,
                                        Bucket& bucket,
                                        std::shared_ptr<WriteBatch>& writeBatch) {
     writeBatch->measurements.push_back(measurement);
+    writeBatch->userBatchIndices.push_back(index);
     for (auto&& field : newFieldNamesToBeInserted) {
         writeBatch->newFieldNamesToBeInserted[field] = field.hash();
         bucket.uncommittedFieldNames.emplace(tracking::StringMapHashedKey{

@@ -65,7 +65,7 @@ using StripeNumber = std::uint8_t;
 using ShouldClearFn = std::function<bool(const UUID&)>;
 // Tuple that stores a measurement, the time value for that measurement, and the index of the
 // measurement from the original insert request.
-using BatchedInsertTuple = std::tuple<BSONObj, Date_t, size_t>;
+using BatchedInsertTuple = std::tuple<BSONObj, Date_t, UserBatchIndex>;
 
 /**
  * Bundle of information that gets passed down into 'insert' and functions below it that may create

@@ -52,6 +52,8 @@ namespace mongo::timeseries::bucket_catalog {
 
 struct Bucket;
 
+using UserBatchIndex = size_t;
+
 struct Sizes {
     // Contains the verified size for:
     // - The meta, control, and field names for previously unaccounted fields in a Bucket.
@@ -125,6 +127,10 @@ struct WriteBatch {
     SharedPromise<void> promise;
 
     ExecutionStatsController stats;
+
+    // Indices for measurements in the original user batch. Used for retryability and
+    // error-handling.
+    std::vector<UserBatchIndex> userBatchIndices;
 
     // Marginal numbers for this batch only.
     // Sizes.uncommittedMeasurementEstimate is a rough estimate of data in this batch,
