@@ -9,13 +9,15 @@ export const $config = (function() {
     var states = {
         remove: function remove(db, collName) {
             // try removing a random document
-            var res = this.doRemove(db, collName, {rand: {$gte: Random.rand()}}, {justOne: true});
+            var res = assert.commandWorked(
+                this.doRemove(db, collName, {rand: {$gte: Random.rand()}}, {justOne: true}));
+
             assert.lte(res.nRemoved, 1, res);
             if (res.nRemoved === 0) {
                 // The above remove() can fail to remove a document when the random value
                 // in the query is greater than any of the random values in the collection.
                 // When that situation occurs, just remove an arbitrary document instead.
-                res = this.doRemove(db, collName, {}, {justOne: true});
+                res = assert.commandWorked(this.doRemove(db, collName, {}, {justOne: true}));
                 assert.lte(res.nRemoved, 1, res);
             }
             this.assertResult(res);
