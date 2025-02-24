@@ -7,6 +7,7 @@
     "include": [
         "jstests/**/*.js",
         "src/mongo/shell/*.js",
+        "src/mongo/shell/*.d.ts",
         "src/third_party/fast_check/**/*"
     ]
 }
