@@ -120,6 +120,9 @@ const BSONObj kOkReadOnlyFalseAdditionalParticipantsMissingReadOnly =
 const BSONObj kErrorWithAdditionalParticipantsResponse =
     BSON("ok" << 0 << "additionalParticipants"
               << BSONArray(BSON("0" << BSON("shardId" << ShardId("shard3")))));
+const BSONObj kOkReadOnlyTrueAdditionalParticipantsShard1 = BSON(
+    "ok" << 1 << "readOnly" << true << "additionalParticipants"
+         << BSONArray(BSON("0" << BSON("shardId" << ShardId("shard1") << "readOnly" << true))));
 
 const BSONObj kNoSuchTransactionResponse =
     BSON("ok" << 0 << "code" << ErrorCodes::NoSuchTransaction);
@@ -791,6 +794,72 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartOrContinueWithSnapshotRCSet
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
+       SubRouterReturnsAdditionalParticipantsOnSuccessSetsIsSubRouter) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+    repl::ReadConcernArgs readConcernArgs;
+    ASSERT_OK(
+        readConcernArgs.initialize(BSON("find"
+                                        << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+                                        << BSON(repl::ReadConcernArgs::kAtClusterTimeFieldName
+                                                << kInMemoryLogicalTime.asTimestamp()
+                                                << repl::ReadConcernArgs::kLevelFieldName
+                                                << "snapshot"))));
+    repl::ReadConcernArgs::get(operationContext()) = readConcernArgs;
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+
+    // Passing kStartOrContinue should cause the the sub-router flag to be set
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStartOrContinue);
+
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(),
+                                      shard1,
+                                      BSON("insert"
+                                           << "test"));
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(),
+                                      shard2,
+                                      BSON("find"
+                                           << "test"));
+    txnRouter.processParticipantResponse(
+        operationContext(), shard1, kOkReadOnlyFalseAdditionalParticipantsMissingReadOnly);
+    txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyFalseResponse);
+
+    ASSERT_TRUE(txnRouter.getParticipant(shard1)->isSubRouter);
+    ASSERT_FALSE(txnRouter.getParticipant(shard2)->isSubRouter);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
+       SubRouterReturnsAdditionalParticipantsOnErrorSetsIsSubRouter) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+    repl::ReadConcernArgs readConcernArgs;
+    ASSERT_OK(
+        readConcernArgs.initialize(BSON("find"
+                                        << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+                                        << BSON(repl::ReadConcernArgs::kAtClusterTimeFieldName
+                                                << kInMemoryLogicalTime.asTimestamp()
+                                                << repl::ReadConcernArgs::kLevelFieldName
+                                                << "snapshot"))));
+    repl::ReadConcernArgs::get(operationContext()) = readConcernArgs;
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+
+    // Passing kStartOrContinue should cause the the sub-router flag to be set
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStartOrContinue);
+
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(),
+                                      shard1,
+                                      BSON("insert"
+                                           << "test"));
+    txnRouter.processParticipantResponse(
+        operationContext(), shard1, kErrorWithAdditionalParticipantsResponse);
+
+    ASSERT_TRUE(txnRouter.getParticipant(shard1)->isSubRouter);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
        SubRouterReturnsMultipleAdditionalParticipantsOnSuccess) {
     TxnNumber txnNum{3};
     operationContext()->setTxnNumber(txnNum);
@@ -1262,16 +1331,16 @@ TEST_F(TransactionRouterTestWithDefaultSession, FirstParticipantIsCoordinator) {
 
     {
         txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
-        auto& participant = *txnRouter.getParticipant(shard1);
-        ASSERT(participant.isCoordinator);
+        auto participant = txnRouter.getParticipant(shard1);
+        ASSERT(participant->isCoordinator);
         ASSERT(txnRouter.getCoordinatorId());
         ASSERT_EQ(*txnRouter.getCoordinatorId(), shard1);
     }
 
     {
         txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
-        auto& participant = *txnRouter.getParticipant(shard2);
-        ASSERT(!participant.isCoordinator);
+        auto participant = txnRouter.getParticipant(shard2);
+        ASSERT(!participant->isCoordinator);
         ASSERT(txnRouter.getCoordinatorId());
         ASSERT_EQ(*txnRouter.getCoordinatorId(), shard1);
     }
@@ -1286,8 +1355,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, FirstParticipantIsCoordinator) {
 
     {
         txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
-        auto& participant = *txnRouter.getParticipant(shard2);
-        ASSERT(participant.isCoordinator);
+        auto participant = txnRouter.getParticipant(shard2);
+        ASSERT(participant->isCoordinator);
         ASSERT(txnRouter.getCoordinatorId());
         ASSERT_EQ(*txnRouter.getCoordinatorId(), shard2);
     }
@@ -1314,8 +1383,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, NoCoordinatorOnSubRouter) {
     ASSERT_FALSE(txnRouter.getCoordinatorId());
 
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
-    auto& participant = *txnRouter.getParticipant(shard1);
-    ASSERT(!participant.isCoordinator);
+    auto participant = txnRouter.getParticipant(shard1);
+    ASSERT(!participant->isCoordinator);
     ASSERT(!txnRouter.getCoordinatorId());
 }
 
@@ -1531,7 +1600,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.processParticipantResponse(
         operationContext(), shard1, kOkReadOnlyTrueAdditionalParticipantsReadOnlyTrueResponse);
     auto additionalParticipant = txnRouter.getParticipant(shard3);
-    ASSERT(additionalParticipant != nullptr);
+    ASSERT(additionalParticipant);
     ASSERT(additionalParticipant->readOnly == TransactionRouter::Participant::ReadOnly::kReadOnly);
     ASSERT_FALSE(txnRouter.getRecoveryShardId());
 }
@@ -1558,7 +1627,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, AdditionalParticipantDidWriteAnd
     txnRouter.processParticipantResponse(
         operationContext(), shard1, kOkReadOnlyTrueAdditionalParticipantsReadOnlyFalseResponse);
     auto additionalParticipant = txnRouter.getParticipant(shard3);
-    ASSERT(additionalParticipant != nullptr);
+    ASSERT(additionalParticipant);
     ASSERT(additionalParticipant->readOnly ==
            TransactionRouter::Participant::ReadOnly::kNotReadOnly);
     ASSERT(txnRouter.getRecoveryShardId());
@@ -1586,7 +1655,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, AdditionalParticipantNotRecovery
     txnRouter.processParticipantResponse(
         operationContext(), shard1, kOkReadOnlyFalseAdditionalParticipantsReadOnlyFalseResponse);
     auto additionalParticipant = txnRouter.getParticipant(shard3);
-    ASSERT(additionalParticipant != nullptr);
+    ASSERT(additionalParticipant);
     ASSERT(additionalParticipant->readOnly ==
            TransactionRouter::Participant::ReadOnly::kNotReadOnly);
     ASSERT(txnRouter.getRecoveryShardId());
@@ -1612,7 +1681,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.processParticipantResponse(
         operationContext(), shard1, kOkReadOnlyTrueAdditionalParticipantsReadOnlyTrueResponse);
     auto additionalParticipant = txnRouter.getParticipant(shard3);
-    ASSERT(additionalParticipant != nullptr);
+    ASSERT(additionalParticipant);
     ASSERT(additionalParticipant->readOnly == TransactionRouter::Participant::ReadOnly::kReadOnly);
     ASSERT_FALSE(txnRouter.getRecoveryShardId());
     auto additionalStmtIdCreatedAt = additionalParticipant->stmtIdCreatedAt;
@@ -1621,7 +1690,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard3, kDummyFindCmd);
     txnRouter.processParticipantResponse(operationContext(), shard3, kOkReadOnlyFalseResponse);
     auto shard3Participant = txnRouter.getParticipant(shard3);
-    ASSERT(shard3Participant != nullptr);
+    ASSERT(shard3Participant);
     ASSERT(shard3Participant->readOnly == TransactionRouter::Participant::ReadOnly::kNotReadOnly);
     ASSERT(txnRouter.getRecoveryShardId());
     ASSERT_EQ(*txnRouter.getRecoveryShardId(), shard3);
@@ -1645,7 +1714,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, AdditionalParticipantCreatedEven
     const auto participant = txnRouter.getParticipant(shard1);
     ASSERT(participant->readOnly == TransactionRouter::Participant::ReadOnly::kUnset);
     auto shard3Participant = txnRouter.getParticipant(shard3);
-    ASSERT(shard3Participant != nullptr);
+    ASSERT(shard3Participant);
     ASSERT(shard3Participant->readOnly == TransactionRouter::Participant::ReadOnly::kUnset);
 }
 
@@ -1666,7 +1735,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, AdditionalParticipantOnlyCreated
     txnRouter.processParticipantResponse(
         operationContext(), shard1, kOkReadOnlyTrueAdditionalParticipantsReadOnlyTrueResponse);
     auto additionalParticipant = txnRouter.getParticipant(shard3);
-    ASSERT(additionalParticipant != nullptr);
+    ASSERT(additionalParticipant);
     ASSERT(additionalParticipant->readOnly == TransactionRouter::Participant::ReadOnly::kReadOnly);
     auto stmtIdCreatedAt = additionalParticipant->stmtIdCreatedAt;
 
@@ -1676,7 +1745,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, AdditionalParticipantOnlyCreated
     txnRouter.processParticipantResponse(
         operationContext(), shard1, kOkReadOnlyTrueAdditionalParticipantsReadOnlyFalseResponse);
     additionalParticipant = txnRouter.getParticipant(shard3);
-    ASSERT(additionalParticipant != nullptr);
+    ASSERT(additionalParticipant);
     ASSERT(additionalParticipant->readOnly ==
            TransactionRouter::Participant::ReadOnly::kNotReadOnly);
     ASSERT(additionalParticipant->stmtIdCreatedAt == stmtIdCreatedAt);
@@ -4041,6 +4110,38 @@ TEST_F(TransactionRouterTestWithDefaultSession, AbortPropagatesWriteConcern) {
     });
 
     auto response = future.default_timed_get();
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession, ContinueOnlyOnStaleVersionOnFirstOpWithSubRouter) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+    repl::ReadConcernArgs readConcernArgs;
+    ASSERT_OK(
+        readConcernArgs.initialize(BSON("find"
+                                        << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+                                        << BSON(repl::ReadConcernArgs::kAtClusterTimeFieldName
+                                                << kInMemoryLogicalTime.asTimestamp()
+                                                << repl::ReadConcernArgs::kLevelFieldName
+                                                << "snapshot"))));
+    repl::ReadConcernArgs::get(operationContext()) = readConcernArgs;
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+
+    // Setting the action as kStart will indicate we are a top level router
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+
+    disableRouterRetriesFailPoint();
+
+    // This will add shard1 as the only participant to the txnRouter's participant list and shard1
+    // will be marked as a subrouter.
+    txnRouter.processParticipantResponse(
+        operationContext(), shard1, kOkReadOnlyTrueAdditionalParticipantsShard1);
+
+    // We cannot continue on StaleConfig when the only participant is also a subrouter.
+    ASSERT_FALSE(txnRouter.canContinueOnStaleShardOrDbError("find", kStaleConfigStatus));
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession, ContinueOnlyOnStaleVersionOnFirstOp) {

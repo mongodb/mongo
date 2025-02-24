@@ -127,7 +127,8 @@ public:
         Participant(bool isCoordinator,
                     StmtId stmtIdCreatedAt,
                     ReadOnly inReadOnly,
-                    SharedTransactionOptions sharedOptions);
+                    SharedTransactionOptions sharedOptions,
+                    bool isSubRouter = false);
 
         /**
          * Attaches necessary fields if this is participating in a multi statement transaction.
@@ -139,17 +140,20 @@ public:
                                         bool hasTxnCreatedAnyDatabase) const;
 
         // True if the participant has been chosen as the coordinator for its transaction
-        const bool isCoordinator{false};
+        bool isCoordinator{false};
 
         // Is updated to kReadOnly or kNotReadOnly based on the readOnly field in the participant's
         // responses to statements.
-        const ReadOnly readOnly{ReadOnly::kUnset};
+        ReadOnly readOnly{ReadOnly::kUnset};
 
         // Returns the shared transaction options this participant was created with
-        const SharedTransactionOptions sharedOptions;
+        SharedTransactionOptions sharedOptions;
 
         // The highest statement id of the request during which this participant was created.
-        const StmtId stmtIdCreatedAt;
+        StmtId stmtIdCreatedAt;
+
+        // True if this participant operates as a subrouter in the transaction.
+        bool isSubRouter{false};
     };
 
     // Container for timing stats for the current transaction. Includes helpers for calculating some
@@ -487,9 +491,10 @@ public:
 
         /**
          * If this router is a sub-router and the txnNumber and retryCounter match that on the
-         * opCtx, returns a map containing {participantShardId : readOnly} for each participant
-         * added by this router. It's possible that readOnly is not set if either an error occured
-         * before receiving a response from a particular shard, or a shard returned an error.
+         * opCtx, returns a map containing {participantShardId : readOnly} for each
+         * participant added by this router. It's possible that readOnly is not set if either an
+         * error occured before receiving a response from a particular shard, or a shard returned an
+         * error.
          *
          * Returns boost::none if this router is not a sub-router, or if the txnNumber or
          * retryCounter on this router do not match that on the opCtx.
@@ -545,7 +550,7 @@ public:
          * Returns the participant for this transaction or nullptr if the specified shard is not
          * participant of this transaction.
          */
-        const Participant* getParticipant(const ShardId& shard);
+        boost::optional<TransactionRouter::Participant> getParticipant(const ShardId& shard);
 
         /**
          * Returns the statement id of the latest received command for this transaction.
@@ -658,15 +663,17 @@ public:
         /**
          * Creates a new participant for the shard.
          */
-        TransactionRouter::Participant& _createParticipant(OperationContext* opCtx,
-                                                           const ShardId& shard);
+        TransactionRouter::Participant _createParticipant(OperationContext* opCtx,
+                                                          const ShardId& shard);
 
         /**
-         * Sets the new readOnly value for the current participant on the shard.
+         * Updates the participant in place by removing the old participant and adding a new updated
+         * one.
          */
-        void _setReadOnlyForParticipant(OperationContext* opCtx,
-                                        const ShardId& shard,
-                                        Participant::ReadOnly readOnly);
+        void _updateParticipant(OperationContext* opCtx,
+                                const ShardId& shard,
+                                boost::optional<Participant::ReadOnly> readOnly,
+                                boost::optional<bool> isSubRouter);
 
         /**
          * Updates relevant metrics when the router receives an explicit abort from the client.
