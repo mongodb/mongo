@@ -140,6 +140,7 @@ MongoRunner.validateCollectionsCallback = function(port, options) {
             const validateOptions = {
                 full: true,
                 enforceFastCount: true,
+                checkBSONConformance: true,
             };
             // TODO (SERVER-24266): Once fast counts are tolerant to unclean shutdowns, remove the
             // check for TestData.allowUncleanShutdowns.
