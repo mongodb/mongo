@@ -16,7 +16,7 @@ This page provides an overview of the source code architecture for MongoDB's Que
     - [Cardinality Estimation](#cardinality-estimation)
 - [IV. Explain](#explain)
 - [V. Plan Cache](#plan-cache)
-- [VI. Cluster Planning](#cluster-planning)
+- [VI. Cluster Planning](../../s/query/planner/README.md)
 - [VII. Testing](#testing)
   - [Golden Testing](#golden-testing)
   - [QueryTester](./query_tester/README.md)
