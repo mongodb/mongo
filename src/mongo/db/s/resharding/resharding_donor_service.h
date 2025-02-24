@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
+#include "mongo/db/s/resharding/resharding_change_streams_monitor.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/service_context.h"
@@ -140,6 +141,27 @@ public:
     SharedSemiFuture<void> awaitFinalOplogEntriesWritten();
 
     /**
+     * To be used by the _shardsvrReshardingDonorStartChangeStreamsMonitor command sent by the
+     * coordinator. Notifies the donor to start the change streams monitor, and then waits for the
+     * monitor to start. Throws an error if verification is not enabled.
+     */
+    SharedSemiFuture<void> createAndStartChangeStreamsMonitor(const Timestamp& cloneTimestamp);
+
+    /**
+     * To be used in testing only. Waits for the monitor to start. Throws an error if verification
+     * is not enabled.
+     */
+    SharedSemiFuture<void> awaitChangeStreamsMonitorStarted();
+
+    /**
+     * To be used by the _shardsvrReshardingDonorFetchFinalCollectionStats command sent by the
+     * coordinator. Waits for the monitor to complete and gets back the change in the number of
+     * documents between the start of the cloning phase and the start of the critical section on
+     * this donor. Throws an error if verification is not enabled.
+     */
+    SharedSemiFuture<int64_t> awaitChangeStreamsMonitorCompleted();
+
+    /**
      * Returns a Future fulfilled once the donor locally persists its final state before the
      * coordinator makes its decision to commit or abort (DonorStateEnum::kError or
      * DonorStateEnum::kBlockingWrites).
@@ -194,12 +216,21 @@ private:
      * The work inside this function must be run regardless of any work on _scopedExecutor ever
      * running.
      */
-    Status _runMandatoryCleanup(Status status, const CancellationToken& stepdownToken);
+    ExecutorFuture<void> _runMandatoryCleanup(Status status,
+                                              const CancellationToken& stepdownToken);
 
     // The following functions correspond to the actions to take at a particular donor state.
     void _transitionToPreparingToDonate();
 
     void _onPreparingToDonateCalculateTimestampThenTransitionToDonatingInitialData();
+
+    /**
+     * If verification is enabled, waits for the coordinator to notify this recipient to start the
+     * change streams monitor, and then initializes and start the change streams monitor.
+     */
+    ExecutorFuture<void> _createAndStartChangeStreamsMonitor(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& abortToken);
 
     ExecutorFuture<void> _awaitAllRecipientsDoneCloningThenTransitionToDonatingOplogEntries(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
@@ -210,6 +241,13 @@ private:
         const CancellationToken& abortToken);
 
     void _writeTransactionOplogEntryThenTransitionToBlockingWrites();
+
+    /**
+     * If verification is enabled, waits for the the change streams monitor to complete.
+     */
+    ExecutorFuture<void> _awaitChangeStreamsMonitorCompleted(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& abortToken);
 
     // Drops the original collection and throws if the returned status is not either Status::OK()
     // or NamespaceNotFound.
@@ -236,8 +274,12 @@ private:
     ExecutorFuture<void> _updateCoordinator(
         OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
-    // Updates the mutable portion of the on-disk and in-memory donor document with 'newDonorCtx'.
+    // Updates the mutable portion of the on-disk and in-memory donor document with 'newDonorCtx'
+    // and 'newChangeStreamsMonitorCtx'.
     void _updateDonorDocument(DonorShardContext&& newDonorCtx);
+    void _updateDonorDocument(OperationContext* opCtx,
+                              ChangeStreamsMonitorContext&& newChangeStreamsMonitorCtx);
+    void _updateDonorDocument(OperationContext* opCtx, const BSONObj& updateMod);
 
     // Removes the local donor document from disk.
     void _removeDonorDocument(const CancellationToken& stepdownToken, bool aborted);
@@ -264,11 +306,13 @@ private:
     // The in-memory representation of the mutable portion of the document in
     // config.localReshardingOperations.donor.
     DonorShardContext _donorCtx;
+    boost::optional<ChangeStreamsMonitorContext> _changeStreamsMonitorCtx;
 
     // This is only used to restore metrics on a stepup.
     const ReshardingDonorMetrics _donorMetricsToRestore;
 
     const std::unique_ptr<DonorStateMachineExternalState> _externalState;
+    std::shared_ptr<ReshardingChangeStreamsMonitor> _changeStreamsMonitor;
 
     // ThreadPool used by CancelableOperationContext.
     // CancelableOperationContext must have a thread that is always available to it to mark its
@@ -300,6 +344,11 @@ private:
     SharedPromise<void> _finalOplogEntriesWritten;
 
     SharedPromise<void> _inBlockingWritesOrError;
+
+    SharedPromise<Timestamp> _changeStreamMonitorStartTimeSelected;
+    SharedPromise<void> _changeStreamsMonitorStarted;
+    SharedPromise<int64_t> _changeStreamsMonitorCompleted;
+    SharedSemiFuture<void> _changeStreamsMonitorQuiesced;
 
     SharedPromise<void> _coordinatorHasDecisionPersisted;
 

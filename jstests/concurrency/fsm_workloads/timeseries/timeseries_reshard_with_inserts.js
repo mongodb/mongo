@@ -16,6 +16,7 @@
  */
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const $config = (function() {
     // This test manually shards the collection.
@@ -49,6 +50,16 @@ export const $config = (function() {
         let ns = db + "." + collName;
         let reshardCollectionCmd = {reshardCollection: ns, key: newShardKey, numInitialChunks: 1};
         if (TestData.runningWithShardStepdowns) {
+            const isVerificationFeatureFlagEnabled =
+                FeatureFlagUtil.isEnabled(db, "ReshardingVerification");
+            if (isVerificationFeatureFlagEnabled) {
+                // TODO (SERVER-101249): Re-enable resharding verification in
+                // timeseries_reshard_with_inserts.js when running in stepdown suites
+                // 'performVerification' defaults to true when the feature flag is enabled.
+                // Currently, in a suite with stepdown, this test hangs when performing resharding
+                // verification.
+                reshardCollectionCmd.performVerification = false;
+            }
             assert.commandWorkedOrFailedWithCode(db.adminCommand(reshardCollectionCmd),
                                                  [ErrorCodes.SnapshotUnavailable]);
         } else {

@@ -352,3 +352,17 @@ structs:
             shard:
                 type: shard_id
                 description: "Id of the shard for this shard key range."
+    ChangeStreamsMonitorContext:
+        description: "Contains information about the change stream monitor's progress"
+        strict: false
+        fields:
+            startAtOperationTime:
+                type: timestamp
+            resumeToken:
+                type: object_owned
+                optional: true
+            documentsDelta:
+                type: long
+            completed:
+                type: bool
+                default: false

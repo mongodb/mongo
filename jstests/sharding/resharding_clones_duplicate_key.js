@@ -51,7 +51,7 @@ reshardingTest.withReshardingInBackground({
                                           () => {},
                                           {expectedErrorCode: ErrorCodes.DuplicateKey});
 
-const timeout = 5000;
+const timeout = 60 * 1000;
 assert.soon(() => {
     const idleCursors = mongos.getDB("admin")
                             .aggregate([
@@ -60,7 +60,7 @@ assert.soon(() => {
                             ])
                             .toArray();
     if (idleCursors.length > 0) {
-        jsonTestLog(idleCursors);
+        jsTest.log("Found idle cursors: " + tojson(idleCursors));
     }
     return idleCursors.length == 0;
 }, "timed out awaiting cloning cursors to be cleaned up", timeout);

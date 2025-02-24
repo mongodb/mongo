@@ -258,11 +258,14 @@ SharedSemiFuture<void> ReshardingChangeStreamsMonitor::awaitCleanup() {
 AggregateCommandRequest ReshardingChangeStreamsMonitor::_makeAggregateCommandRequest() {
     DocumentSourceChangeStreamSpec changeStreamSpec;
     changeStreamSpec.setAllowToRunOnSystemNS(_monitorNss.isSystem());
-    // The events against the temporary resharding collection are only ouput when
-    // 'showMigrationEvents' is true.
-    changeStreamSpec.setShowMigrationEvents(true);
-    // The 'reshardBlockingWrites' event, which is the final event when monitoring on a donor, is
-    // only output when "showSystemEvents" is true.
+    // The monitor for a recipient needs to set 'showMigrationEvents' to true since the events
+    // against the temporary resharding collection are only output when 'showMigrationEvents'
+    // is true. The monitor for a donor needs to set 'showMigrationEvents' to false to avoid
+    // capturing range deletions.
+    changeStreamSpec.setShowMigrationEvents(_isRecipient);
+    // The monitor for a donor needs to set "showSystemEvents" to true since the
+    // 'reshardBlockingWrites' event, which is the final event on a donor, is only output when
+    // "showSystemEvents" is true.
     changeStreamSpec.setShowSystemEvents(!_isRecipient);
     if (_startAt) {
         changeStreamSpec.setStartAtOperationTime(*_startAt);
