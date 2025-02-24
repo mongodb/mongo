@@ -889,10 +889,12 @@ private:
     // The hash of the query's shape.
     boost::optional<query_shape::QueryShapeHash> _queryShapeHash{boost::none};
 
-    // These metrics are in CurOp instead of OpDebug because these memory tracking metrics need to
-    // be reported in $currentOp -- $currentOp only looks at CurOp. These memory tracking metrics
-    // are atomics because a non-atomic allows for a data race between acquiring the memory
-    // statistics from the operation context and curop::reportState.
+    // These memory tracking metrics need to be in CurOp instead of OpDebug because they are
+    // reported in $currentOp, and $currentOp only looks at CurOp. These memory tracking metrics are
+    // atomics because a non-atomic allows for a data race between acquiring the memory statistics
+    // from the operation context and curop::reportState.
+    // These metrics refer to local memory use, i.e. on a mongos process, as opposed to rolling up
+    // memory from shards.
     AtomicWord<int64_t> _inUseMemoryBytes{0};
     AtomicWord<int64_t> _maxUsedMemoryBytes{0};
 };

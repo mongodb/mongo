@@ -497,6 +497,10 @@ void OpDebug::append(OperationContext* opCtx,
     OPDEBUG_APPEND_OPTIONAL(b, "keysExamined", additiveMetrics.keysExamined);
     OPDEBUG_APPEND_OPTIONAL(b, "docsExamined", additiveMetrics.docsExamined);
 
+    if (int64_t maxUsedMemBytes = curop.getMaxUsedMemoryBytes()) {
+        b.append("maxUsedMemBytes", maxUsedMemBytes);
+    }
+
     OPDEBUG_APPEND_BOOL2(b, "hasSortStage", additiveMetrics.hasSortStage);
     OPDEBUG_APPEND_BOOL2(b, "usedDisk", additiveMetrics.usedDisk);
     OPDEBUG_APPEND_BOOL2(b, "fromMultiPlanner", additiveMetrics.fromMultiPlanner);

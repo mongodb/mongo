@@ -434,6 +434,39 @@ DEATH_TEST(CurOpTest, RequireFeatureFlagEnabledToUpdateMemoryStats, "tassert") {
     curop->setMemoryTrackingStats(10 /* inUseMemoryBytes */, 15 /* maxUsedMemoryBytes */);
 }
 
+/**
+ * When featureFlagQueryMemoryTracking is enabled, non-zero memory tracking stats should appear in
+ * the profiler.
+ */
+TEST(CurOpTest, MemoryStatsDisplayedIfNonZero) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
+                                                               true);
+
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+
+    auto curop = CurOp::get(*opCtx);
+    const OpDebug& opDebug = curop->debug();
+    SingleThreadedLockStats ls;
+
+    BSONObjBuilder bob;
+    opDebug.append(opCtx.get(), ls, {}, {}, true /*omitCommand*/, bob);
+
+    // If the memory tracker has not updated CurOp, the memory tracking stat should not appear in
+    // the profiler output.
+    auto res = bob.done();
+    ASSERT_EQ(0, curop->getMaxUsedMemoryBytes());
+    ASSERT_FALSE(res.hasField("maxUsedMemBytes"));
+
+    curop->setMemoryTrackingStats(10 /*inUseMemoryBytes*/, 15 /*maxUsedMemoryBytes*/);
+    BSONObjBuilder bobWithMemStats;
+    opDebug.append(opCtx.get(), ls, {}, {}, true /*omitCommand*/, bobWithMemStats);
+    res = bobWithMemStats.done();
+
+    ASSERT_EQ(15, curop->getMaxUsedMemoryBytes());
+    ASSERT_EQ(15, res.getIntField("maxUsedMemBytes"));
+}
+
 TEST(CurOpTest, ShouldNotReportFailpointMsgIfNotSet) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
