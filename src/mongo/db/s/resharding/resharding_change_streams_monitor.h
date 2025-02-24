@@ -52,30 +52,37 @@ namespace mongo {
 class ReshardingChangeStreamsMonitor
     : public std::enable_shared_from_this<ReshardingChangeStreamsMonitor> {
 public:
-    using BatchProcessedCallback = std::function<void(int documentDelta, BSONObj resumeToken)>;
+    using BatchProcessedCallback =
+        std::function<void(int documentsDelta, BSONObj resumeToken, bool completed)>;
 
-    ReshardingChangeStreamsMonitor(NamespaceString monitorNamespace,
+    ReshardingChangeStreamsMonitor(UUID reshardingUUID,
+                                   NamespaceString monitorNss,
                                    Timestamp startAtOperationTime,
-                                   bool isRecipient,
                                    BatchProcessedCallback callback);
 
-    ReshardingChangeStreamsMonitor(NamespaceString monitorNamespace,
+    ReshardingChangeStreamsMonitor(UUID reshardingUUID,
+                                   NamespaceString monitorNss,
                                    BSONObj startAfterToken,
-                                   bool isRecipient,
                                    BatchProcessedCallback callback);
 
     /**
      * Schedules work to open a local change streams and track the events.
      */
-    void startMonitoring(std::shared_ptr<executor::TaskExecutor> executor,
-                         CancelableOperationContextFactory factory);
+    SemiFuture<void> startMonitoring(std::shared_ptr<executor::TaskExecutor> executor,
+                                     std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
+                                     CancelableOperationContextFactory factory);
 
     /**
-     * Blocks on a future that becomes ready when either:
-     *   (a) final change event has been reached, or
-     *   (b) stepdown or abort.
+     * Waits until the monitor has consumed the final change event or the 'executor' has been
+     * shut down or the cancellation source for 'factory' has been cancelled.
      */
     SharedSemiFuture<void> awaitFinalChangeEvent();
+
+    /**
+     * Waits until the monitor has cleaned up the change stream cursor or the 'cleanupExecutor'
+     * has been shut down. This is the last step in the monitor.
+     */
+    SharedSemiFuture<void> awaitCleanup();
 
 private:
     /**
@@ -89,21 +96,22 @@ private:
     void _consumeChangeEvents(OperationContext* opCtx, const AggregateCommandRequest& aggRequest);
     void _processChangeEvent(BSONObj changeEvent);
 
-    const NamespaceString _monitorNS;
+    const UUID _reshardingUUID;
+    const NamespaceString _monitorNss;
     const boost::optional<Timestamp> _startAt;
     const boost::optional<BSONObj> _startAfter;
     const bool _isRecipient;
     const BatchProcessedCallback _batchProcessedCallback;
 
-    bool _recievedFinalEvent = false;
-
     // Records the change in documents as the events are observed.
-    int _documentDelta = 0;
+    int _documentsDelta = 0;
 
     // Records the number of events processed.
     int _numEventsProcessed = 0;
 
+    bool _receivedFinalEvent = false;
     std::unique_ptr<SharedPromise<void>> _finalEventPromise;
+    std::unique_ptr<SharedPromise<void>> _cleanupPromise;
 };
 
 }  // namespace mongo

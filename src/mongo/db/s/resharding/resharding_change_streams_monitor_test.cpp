@@ -51,6 +51,7 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -58,8 +59,25 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/uuid.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 namespace mongo {
 namespace {
+
+const StringData kDefaultExecutorDescriptionSuffix = "Default";
+const Milliseconds kAssertSoonTimeout{5 * 60};
+const Milliseconds kAssertSoonInterval{5};
+
+void assertSoon(OperationContext* opCtx, auto pred) {
+    auto startTime = Date_t::now();
+    while (Date_t::now() - startTime < kAssertSoonTimeout) {
+        if (pred()) {
+            return;
+        }
+        opCtx->sleepFor(kAssertSoonInterval);
+    }
+    ASSERT(false);
+}
 
 class ReshardingChangeStreamsMonitorTest : public ShardServerTestFixtureWithCatalogCacheMock {
 public:
@@ -68,18 +86,35 @@ public:
 
         opCtx = operationContext();
         executor = makeTaskExecutor();
+        cleanupExecutor = makeCleanupTaskExecutor();
+        markKilledExecutor = makeCleanupTaskExecutor();
+        factory.emplace(cancelSource.token(), markKilledExecutor);
     }
 
     void tearDown() override {
-        executor->shutdown();
-        executor->join();
+        tearDownExecutors({executor, cleanupExecutor, markKilledExecutor});
 
         ShardServerTestFixtureWithCatalogCacheMock::tearDown();
     }
 
-    // Create a collection on nss and inserts document with '_id' and 'x' ranging from minDocValue
-    // to maxDocValue(inclusive).
-    void createCollectionAndInsertDocuments(int minDocValue, int maxDocValue) {
+    /**
+     * Shuts down and joins the given task executors.
+     */
+    void tearDownExecutors(
+        std::vector<std::shared_ptr<executor::ThreadPoolTaskExecutor>> executors) {
+        for (auto& executor : executors) {
+            executor->shutdown();
+            executor->join();
+        }
+    }
+
+    /**
+     * Create a collection on 'nss' and inserts document with '_id' and 'x' ranging from minDocValue
+     * to maxDocValue (inclusive).
+     */
+    void createCollectionAndInsertDocuments(const NamespaceString& nss,
+                                            int minDocValue,
+                                            int maxDocValue) {
         AutoGetDb autoDb(opCtx, nss.dbName(), LockMode::MODE_X);
         autoDb.ensureDbExists(opCtx);
 
@@ -98,22 +133,6 @@ public:
                       BSON("$set" << BSON("y" << minDocValue)),
                       false /*upsert*/,
                       false /*multi*/);
-    }
-
-    void createInstanceAndStartMonitoring(Timestamp startAt) {
-        monitor = std::make_unique<ReshardingChangeStreamsMonitor>(
-            ReshardingChangeStreamsMonitor(nss, startAt, true /*isRecipient*/, callback));
-
-        auto factory = makeCancelableOpCtx();
-        monitor->startMonitoring(executor, factory);
-    }
-
-    void createInstanceAndStartMonitoring(BSONObj startAfter) {
-        monitor = std::make_unique<ReshardingChangeStreamsMonitor>(
-            ReshardingChangeStreamsMonitor(nss, startAfter, true /*isRecipient*/, callback));
-
-        auto factory = makeCancelableOpCtx();
-        monitor->startMonitoring(executor, factory);
     }
 
     template <typename Callable>
@@ -151,8 +170,8 @@ public:
         txnParticipant.stashTransactionResources(opCtx);
     }
 
-    void insertNoopFinalEvent(NamespaceString ns, BSONObj msg, BSONObj o2Field) {
-        AutoGetCollection coll(opCtx, ns, LockMode::MODE_IX);
+    void insertNoopOplogEntry(NamespaceString nss, BSONObj msg, BSONObj o2Field) {
+        AutoGetCollection coll(opCtx, nss, LockMode::MODE_IX);
         WriteUnitOfWork wuow(opCtx);
         opCtx->getServiceContext()->getOpObserver()->onInternalOpMessage(
             opCtx,
@@ -167,19 +186,82 @@ public:
         wuow.commit();
     }
 
-    void fulfillRecipientFinalEventPromise(NamespaceString ns, UUID reshardingUuid = UUID::gen()) {
+    /**
+     * Inserts the 'reshardingBlockingWrites' noop oplog entry.
+     */
+    void insertDonorFinalEventNoopOplogEntry(const NamespaceString& sourceNss) {
+        auto msg = BSON("msg"
+                        << "Writes to {} are temporarily blocked for resharding");
+        ReshardBlockingWritesChangeEventO2Field o2Field{
+            sourceNss, UUID::gen(), resharding::kReshardFinalOpLogType.toString()};
+        insertNoopOplogEntry(sourceNss, msg, o2Field.toBSON());
+    }
+
+    /**
+     * Inserting the 'reshardingDoneCatchUp' noop oplog entry.
+     */
+    void insertRecipientFinalEventNoopOplogEntry(const NamespaceString& tempNss) {
         auto msg = BSON("msg"
                         << "The temporary resharding collection now has a "
                            "strictly consistent view of the data");
-        ReshardDoneCatchUpChangeEventO2Field o2Field{ns, reshardingUuid};
-        insertNoopFinalEvent(ns, msg, o2Field.toBSON());
+        ReshardDoneCatchUpChangeEventO2Field o2Field{tempNss, reshardingUUID};
+        insertNoopOplogEntry(tempNss, msg, o2Field.toBSON());
     }
 
-    std::shared_ptr<executor::ThreadPoolTaskExecutor> makeTaskExecutor() {
+    /**
+     * Returns true if there is an idle cursor with the given namespace.
+     */
+    bool hasIdleCursor(const NamespaceString& nss) {
+        // Create an alternative client and opCtx since the original opCtx may have been used to
+        // run a transaction and $currentOp is not supported in a transaction.
+        auto client = opCtx->getServiceContext()->getService()->makeClient("AlternativeClient");
+        AlternativeClientRegion acr(client);
+        auto opCtx = cc().makeOperationContext();
+
+        std::vector<BSONObj> pipeline;
+        pipeline.push_back(BSON("$currentOp" << BSON("allUsers" << true << "idleCursors" << true)));
+        pipeline.push_back(
+            BSON("$match" << BSON("type"
+                                  << "idleCursor"
+                                  << "ns"
+                                  << NamespaceStringUtil::serialize(
+                                         nss, SerializationContext::stateDefault()))));
+
+        DBDirectClient dbclient(opCtx.get());
+        AggregateCommandRequest aggRequest(
+            NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin), pipeline);
+        auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
+            &dbclient, aggRequest, false /* secondaryOk */, false /* useExhaust*/));
+        if (cursor->more()) {
+            while (cursor->more()) {
+                LOGV2(10066810, "Found idle cursor", "doc"_attr = cursor->next());
+            }
+            return true;
+        }
+        return false;
+    }
+
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> makeTaskExecutor(
+        const StringData descSuffix = kDefaultExecutorDescriptionSuffix) {
+        return _makeTaskExecutor("ReshardingChangeStreamsMonitorTestExecutor" + descSuffix);
+    }
+
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> makeCleanupTaskExecutor(
+        const StringData descSuffix = kDefaultExecutorDescriptionSuffix) {
+        return _makeTaskExecutor("ReshardingChangeStreamsMonitorTestCleanupExecutor" + descSuffix);
+    }
+
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> makeMarkKilledTaskExecutor(
+        const StringData descSuffix = kDefaultExecutorDescriptionSuffix) {
+        return _makeTaskExecutor("ReshardingChangeStreamsMonitorTestMarkKilledExecutor" +
+                                 descSuffix);
+    }
+
+private:
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> _makeTaskExecutor(auto desc) {
         executor::ThreadPoolMock::Options threadPoolOptions;
-        threadPoolOptions.onCreateThread = [this] {
-            Client::initThread("ReshardingChangeStreamsMonitorThreadPool",
-                               getServiceContext()->getService());
+        threadPoolOptions.onCreateThread = [this, desc] {
+            Client::initThread(desc, getServiceContext()->getService());
         };
 
         auto executor = executor::makeThreadPoolTestExecutor(
@@ -189,24 +271,21 @@ public:
         return executor;
     }
 
-    CancelableOperationContextFactory makeCancelableOpCtx() {
-        auto cancelableOpCtxExecutor = std::make_shared<ThreadPool>([] {
-            ThreadPool::Options options;
-            options.poolName = "ReshardingChangeStreamsMonitorCancelableOpCtxPool";
-            options.minThreads = 1;
-            options.maxThreads = 1;
-            return options;
-        }());
-
-        return CancelableOperationContextFactory(opCtx->getCancellationToken(),
-                                                 cancelableOpCtxExecutor);
-    }
-
 protected:
-    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("db", "coll");
+    const UUID collUUID = UUID::gen();
+    const NamespaceString sourceNss = NamespaceString::createNamespaceString_forTest("db", "coll");
+    const NamespaceString tempNss =
+        resharding::constructTemporaryReshardingNss(sourceNss, collUUID);
+    const UUID reshardingUUID = UUID::gen();
+
     OperationContext* opCtx;
+
     std::shared_ptr<executor::ThreadPoolTaskExecutor> executor;
-    std::unique_ptr<ReshardingChangeStreamsMonitor> monitor;
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> cleanupExecutor;
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> markKilledExecutor;
+
+    CancellationSource cancelSource;
+    boost::optional<CancelableOperationContextFactory> factory;
 
     // Set the batch size 1 to test multi-batch processing in unit tests with multiple events.
     RAIIServerParameterControllerForTest batchSize{
@@ -214,266 +293,476 @@ protected:
 
     int delta = 0;
     BSONObj lastResume;
-    ReshardingChangeStreamsMonitor::BatchProcessedCallback callback = [&](int documentDelta,
-                                                                          BSONObj resumeToken) {
-        delta += documentDelta;
-        lastResume = resumeToken.getOwned();
-    };
+    ReshardingChangeStreamsMonitor::BatchProcessedCallback callback =
+        [&](int documentsDelta, BSONObj resumeToken, bool completed) {
+            delta += documentsDelta;
+            lastResume = resumeToken.getOwned();
+        };
 };
 
 TEST_F(ReshardingChangeStreamsMonitorTest, SuccessfullyInitializeMonitorWithStartAtTime) {
-    createCollectionAndInsertDocuments(0 /*minDocValue*/, 9 /*maxDocValue*/);
+    createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 
-    createInstanceAndStartMonitoring(startAtTime);
+    auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, tempNss, startAtTime, callback);
+    auto awaitCompletion = monitor->startMonitoring(executor, cleanupExecutor, *factory);
 
-    fulfillRecipientFinalEventPromise(nss);
+    insertRecipientFinalEventNoopOplogEntry(tempNss);
     monitor->awaitFinalChangeEvent().get();
 
-    ASSERT_TRUE(delta == 0);
+    ASSERT_EQ(delta, 0);
     ASSERT_FALSE(lastResume.isEmpty());
+
+    monitor->awaitCleanup().get();
+    awaitCompletion.get();
 }
 
 DEATH_TEST_REGEX_F(ReshardingChangeStreamsMonitorTest,
-                   FailIfAwaitEventCalledBeforeStartMonitoring,
+                   FailIfAwaitFinalEventBeforeStartMonitoring,
                    "Tripwire assertion.*1009073") {
-    createCollectionAndInsertDocuments(0 /*minDocValue*/, 9 /*maxDocValue*/);
+    createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 
-    monitor = std::make_unique<ReshardingChangeStreamsMonitor>(
-        ReshardingChangeStreamsMonitor(nss, startAtTime, true /*isRecipient*/, callback));
+    auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, tempNss, startAtTime, callback);
 
     monitor->awaitFinalChangeEvent().get();
 }
 
-TEST_F(ReshardingChangeStreamsMonitorTest, StartMonitoringCalledTwiceSuccessful) {
-    createCollectionAndInsertDocuments(0 /*minDocValue*/, 9 /*maxDocValue*/);
+DEATH_TEST_REGEX_F(ReshardingChangeStreamsMonitorTest,
+                   FailIfAwaitCleanupBeforeStartMonitoring,
+                   "Tripwire assertion.*1006686") {
+    createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 
-    monitor = std::make_unique<ReshardingChangeStreamsMonitor>(
-        ReshardingChangeStreamsMonitor(nss, startAtTime, true /*isRecipient*/, callback));
+    auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, tempNss, startAtTime, callback);
 
-    auto factory = makeCancelableOpCtx();
-    monitor->startMonitoring(executor, factory);
-    monitor->startMonitoring(executor, factory);
+    monitor->awaitCleanup().get();
 }
 
+TEST_F(ReshardingChangeStreamsMonitorTest, FailIfStartMonitoringMoreThanOnce) {
+    createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
+    Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
+
+    auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, tempNss, startAtTime, callback);
+    auto awaitCompletion0 = monitor->startMonitoring(executor, cleanupExecutor, *factory);
+    auto awaitCompletion1 = monitor->startMonitoring(executor, cleanupExecutor, *factory);
+
+    ASSERT_EQ(awaitCompletion1.getNoThrow().code(), 1006687);
+
+    insertRecipientFinalEventNoopOplogEntry(tempNss);
+    monitor->awaitFinalChangeEvent().get();
+    monitor->awaitCleanup().get();
+    awaitCompletion0.get();
+}
+
+TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorAfterCancellationAndExecutorShutDown) {
+    createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
+    Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
+
+    auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, tempNss, startAtTime, callback);
+    auto awaitCompletion = monitor->startMonitoring(executor, cleanupExecutor, *factory);
+
+    // Wait for the monitor to open a change stream cursor.
+    assertSoon(opCtx, [&] { return hasIdleCursor(tempNss); });
+
+    cancelSource.cancel();
+    executor->shutdown();
+
+    ASSERT_EQ(monitor->awaitFinalChangeEvent().getNoThrow(), ErrorCodes::ShutdownInProgress);
+    // The cleanup should still succeed.
+    monitor->awaitCleanup().get();
+    // Verify that the cursor got killed.
+    ASSERT_FALSE(hasIdleCursor(tempNss));
+    awaitCompletion.get();
+}
+
+TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorFromPreviousTry) {
+    createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
+    Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
+
+    // Start a monitor.
+    auto monitor0 = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, tempNss, startAtTime, callback);
+    auto awaitCompletion0 = monitor0->startMonitoring(executor, cleanupExecutor, *factory);
+
+    // Wait for the monitor to open a change stream cursor.
+    assertSoon(opCtx, [&] { return hasIdleCursor(tempNss); });
+
+    // Shut down the cleanup executor and verify that the cursor did not get killed.
+    cleanupExecutor->shutdown();
+    ASSERT(hasIdleCursor(tempNss));
+
+    // Start another monitor and make it run to completion successfully.
+    auto executor1 = makeTaskExecutor("New");
+    auto cleanupExecutor1 = makeCleanupTaskExecutor("New");
+    auto cancelSource1 = CancellationSource();
+    auto factory1 = CancelableOperationContextFactory(cancelSource.token(), markKilledExecutor);
+
+    auto monitor1 = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, tempNss, startAtTime, callback);
+    auto awaitCompletion1 = monitor1->startMonitoring(executor1, cleanupExecutor1, factory1);
+
+    insertRecipientFinalEventNoopOplogEntry(tempNss);
+    monitor1->awaitFinalChangeEvent().get();
+    monitor1->awaitCleanup().get();
+    awaitCompletion1.get();
+
+    // Verify that the cursor from the previous try got killed.
+    ASSERT_FALSE(hasIdleCursor(tempNss));
+
+    tearDownExecutors({executor1, cleanupExecutor1});
+}
+
+TEST_F(ReshardingChangeStreamsMonitorTest, DoNotKillCursorOpenedByOtherMonitor) {
+    createCollectionAndInsertDocuments(sourceNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
+    createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
+    Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
+
+    auto donorExecutor = makeTaskExecutor("Donor");
+    auto donorCleanupExecutor = makeCleanupTaskExecutor("Donor");
+    auto donorMarkKilledExecutor = makeCleanupTaskExecutor("Donor");
+    auto donorCancelSource = CancellationSource();
+    auto donorFactory =
+        CancelableOperationContextFactory(cancelSource.token(), donorMarkKilledExecutor);
+
+    int donorDelta = 0;
+    ReshardingChangeStreamsMonitor::BatchProcessedCallback donorCallback =
+        [&](int documentsDelta, BSONObj, bool) {
+            donorDelta += documentsDelta;
+        };
+    auto donorMonitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, sourceNss, startAtTime, donorCallback);
+    auto awaitDonorCompletion =
+        donorMonitor->startMonitoring(donorExecutor, donorCleanupExecutor, donorFactory);
+
+    auto recipientExecutor = makeTaskExecutor("Recipient");
+    auto recipientCleanupExecutor = makeCleanupTaskExecutor("Recipient");
+    auto recipientMarkKilledExecutor = makeCleanupTaskExecutor("Recipient");
+    auto recipientCancelSource = CancellationSource();
+    auto recipientFactory =
+        CancelableOperationContextFactory(cancelSource.token(), recipientMarkKilledExecutor);
+
+    int recipientDelta = 0;
+    ReshardingChangeStreamsMonitor::BatchProcessedCallback recipientCallback =
+        [&](int documentsDelta, BSONObj, bool) {
+            recipientDelta += documentsDelta;
+        };
+    auto recipientMonitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, tempNss, startAtTime, recipientCallback);
+    auto awaitRecipientCompletion = recipientMonitor->startMonitoring(
+        recipientExecutor, recipientCleanupExecutor, recipientFactory);
+
+    // Wait for both donor and recipient monitors to open a change stream cursor.
+    assertSoon(opCtx, [&] { return hasIdleCursor(sourceNss); });
+    assertSoon(opCtx, [&] { return hasIdleCursor(tempNss); });
+
+    DBDirectClient client(opCtx);
+    client.insert(sourceNss, BSON("_id" << 10));
+    client.insert(tempNss, BSON("_id" << 10));
+
+    // Make the donor monitor run to completion first.
+    insertDonorFinalEventNoopOplogEntry(sourceNss);
+    donorMonitor->awaitFinalChangeEvent().get();
+    ASSERT_EQ(donorDelta, 1);
+    donorMonitor->awaitCleanup().get();
+    awaitDonorCompletion.get();
+
+    // Verify that the donor monitor's cursor got killed but the recipient monitor's cursor did not.
+    ASSERT(!hasIdleCursor(sourceNss));
+    ASSERT(hasIdleCursor(tempNss));
+
+    client.insert(tempNss, BSON("_id" << 11));
+
+    // Make the recipient monitor run to completion.
+    insertRecipientFinalEventNoopOplogEntry(tempNss);
+    recipientMonitor->awaitFinalChangeEvent().get();
+    ASSERT_EQ(recipientDelta, 2);
+    recipientMonitor->awaitCleanup().get();
+    awaitRecipientCompletion.get();
+
+    ASSERT(!hasIdleCursor(sourceNss));
+    ASSERT(!hasIdleCursor(tempNss));
+
+    tearDownExecutors({donorExecutor, donorCleanupExecutor, donorMarkKilledExecutor});
+    tearDownExecutors({recipientExecutor, recipientCleanupExecutor, recipientMarkKilledExecutor});
+}
 
 TEST_F(ReshardingChangeStreamsMonitorTest, ProcessSingleInsert) {
-    createCollectionAndInsertDocuments(0 /*minDocValue*/, 9 /*maxDocValue*/);
+    createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 
     DBDirectClient client(opCtx);
-    client.insert(nss, BSON("_id" << 10));
+    client.insert(tempNss, BSON("_id" << 10));
 
-    createInstanceAndStartMonitoring(startAtTime);
+    auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, tempNss, startAtTime, callback);
+    auto awaitCompletion = monitor->startMonitoring(executor, cleanupExecutor, *factory);
 
-    fulfillRecipientFinalEventPromise(nss);
+    insertRecipientFinalEventNoopOplogEntry(tempNss);
     monitor->awaitFinalChangeEvent().get();
 
-    ASSERT_TRUE(delta == 1);
+    ASSERT_EQ(delta, 1);
+
+    monitor->awaitCleanup().get();
+    awaitCompletion.get();
 }
 
 TEST_F(ReshardingChangeStreamsMonitorTest, ProcessSingleInsertWithMultiDocs) {
-    createCollectionAndInsertDocuments(0 /*minDocValue*/, 9 /*maxDocValue*/);
+    createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 
     DBDirectClient client(opCtx);
-    write_ops::InsertCommandRequest insertOp(nss);
+    write_ops::InsertCommandRequest insertOp(tempNss);
     insertOp.setDocuments({BSON("_id" << 10), BSON("_id" << 11)});
     client.insert(insertOp);
 
-    createInstanceAndStartMonitoring(startAtTime);
+    auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, tempNss, startAtTime, callback);
+    auto awaitCompletion = monitor->startMonitoring(executor, cleanupExecutor, *factory);
 
-    fulfillRecipientFinalEventPromise(nss);
+    insertRecipientFinalEventNoopOplogEntry(tempNss);
     monitor->awaitFinalChangeEvent().get();
 
-    ASSERT_TRUE(delta == 2);
+    ASSERT_EQ(delta, 2);
+
+    monitor->awaitCleanup().get();
+    awaitCompletion.get();
 }
 
 TEST_F(ReshardingChangeStreamsMonitorTest, ProcessMultipleInserts) {
-    createCollectionAndInsertDocuments(0 /*minDocValue*/, 9 /*maxDocValue*/);
+    createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 
     DBDirectClient client(opCtx);
     for (int i = 10; i < 13; i++) {
-        client.insert(nss, BSON("_id" << i));
+        client.insert(tempNss, BSON("_id" << i));
     }
 
-    createInstanceAndStartMonitoring(startAtTime);
+    auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, tempNss, startAtTime, callback);
+    auto awaitCompletion = monitor->startMonitoring(executor, cleanupExecutor, *factory);
 
-    fulfillRecipientFinalEventPromise(nss);
+    insertRecipientFinalEventNoopOplogEntry(tempNss);
     monitor->awaitFinalChangeEvent().get();
 
-    ASSERT_TRUE(delta == 3);
+    ASSERT_EQ(delta, 3);
+
+    monitor->awaitCleanup().get();
+    awaitCompletion.get();
 }
 
 TEST_F(ReshardingChangeStreamsMonitorTest, ProcessSingleDelete) {
-    createCollectionAndInsertDocuments(0 /*minDocValue*/, 9 /*maxDocValue*/);
+    createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 
     DBDirectClient client(opCtx);
-    client.remove(nss, BSON("_id" << 0), false);
+    client.remove(tempNss, BSON("_id" << 0), false);
 
-    createInstanceAndStartMonitoring(startAtTime);
+    auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, tempNss, startAtTime, callback);
+    auto awaitCompletion = monitor->startMonitoring(executor, cleanupExecutor, *factory);
 
-    fulfillRecipientFinalEventPromise(nss);
+    insertRecipientFinalEventNoopOplogEntry(tempNss);
     monitor->awaitFinalChangeEvent().get();
 
-    ASSERT_TRUE(delta == -1);
+    ASSERT_EQ(delta, -1);
+
+    monitor->awaitCleanup().get();
+    awaitCompletion.get();
 }
 
 TEST_F(ReshardingChangeStreamsMonitorTest, ProcessSingleDeleteMany) {
-    createCollectionAndInsertDocuments(0 /*minDocValue*/, 9 /*maxDocValue*/);
+    createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 
     DBDirectClient client(opCtx);
     // Update doc {x:0} to {x:1} to ensure there are two documents matching the delete query.
     client.update(
-        nss, BSON("x" << 0), BSON("$set" << BSON("x" << 1)), false /*upsert*/, false /*multi*/);
-    client.remove(nss, BSON("x" << 1), true /*multi*/);
+        tempNss, BSON("x" << 0), BSON("$set" << BSON("x" << 1)), false /*upsert*/, false /*multi*/);
+    client.remove(tempNss, BSON("x" << 1), true /*multi*/);
 
-    createInstanceAndStartMonitoring(startAtTime);
+    auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, tempNss, startAtTime, callback);
+    auto awaitCompletion = monitor->startMonitoring(executor, cleanupExecutor, *factory);
 
-    fulfillRecipientFinalEventPromise(nss);
+    insertRecipientFinalEventNoopOplogEntry(tempNss);
     monitor->awaitFinalChangeEvent().get();
 
-    ASSERT_TRUE(delta == -2);
+    ASSERT_EQ(delta, -2);
+
+    monitor->awaitCleanup().get();
+    awaitCompletion.get();
 }
 
 TEST_F(ReshardingChangeStreamsMonitorTest, ProcessMultipleDeletes) {
-    createCollectionAndInsertDocuments(0 /*minDocValue*/, 9 /*maxDocValue*/);
+    createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 
     DBDirectClient client(opCtx);
     for (int i = 0; i < 3; i++) {
-        client.remove(nss, BSON("_id" << i), false);
+        client.remove(tempNss, BSON("_id" << i), false);
     }
 
-    createInstanceAndStartMonitoring(startAtTime);
+    auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, tempNss, startAtTime, callback);
+    auto awaitCompletion = monitor->startMonitoring(executor, cleanupExecutor, *factory);
 
-    fulfillRecipientFinalEventPromise(nss);
+    insertRecipientFinalEventNoopOplogEntry(tempNss);
     monitor->awaitFinalChangeEvent().get();
 
-    ASSERT_TRUE(delta == -3);
+    ASSERT_EQ(delta, -3);
+
+    monitor->awaitCleanup().get();
+    awaitCompletion.get();
 }
 
 TEST_F(ReshardingChangeStreamsMonitorTest, ProcessMultipleInsertsDeletes) {
-    createCollectionAndInsertDocuments(0 /*minDocValue*/, 9 /*maxDocValue*/);
+    createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 
     DBDirectClient client(opCtx);
     for (int i = 10; i < 15; i++) {
-        client.insert(nss, BSON("_id" << i));
-        client.remove(nss, BSON("_id" << i), false);
+        client.insert(tempNss, BSON("_id" << i));
+        if (i == 10) {
+            client.remove(tempNss, BSON("_id" << i), false);
+        }
     }
 
-    createInstanceAndStartMonitoring(startAtTime);
+    auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, tempNss, startAtTime, callback);
+    auto awaitCompletion = monitor->startMonitoring(executor, cleanupExecutor, *factory);
 
-    fulfillRecipientFinalEventPromise(nss);
+    insertRecipientFinalEventNoopOplogEntry(tempNss);
     monitor->awaitFinalChangeEvent().get();
 
-    ASSERT_TRUE(delta == 0);
+    ASSERT_EQ(delta, 4);
+
+    monitor->awaitCleanup().get();
+    ASSERT_FALSE(hasIdleCursor(tempNss));
+    awaitCompletion.get();
 }
 
 TEST_F(ReshardingChangeStreamsMonitorTest, DisregardUpdates) {
-    createCollectionAndInsertDocuments(0 /*minDocValue*/, 9 /*maxDocValue*/);
+    createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 
     DBDirectClient client(opCtx);
-    client.update(
-        nss, BSON("_id" << 0), BSON("$set" << BSON("x" << 5)), false /*upsert*/, true /*multi*/);
+    client.update(tempNss,
+                  BSON("_id" << 0),
+                  BSON("$set" << BSON("x" << 5)),
+                  false /*upsert*/,
+                  true /*multi*/);
 
-    createInstanceAndStartMonitoring(startAtTime);
+    auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, tempNss, startAtTime, callback);
+    auto awaitCompletion = monitor->startMonitoring(executor, cleanupExecutor, *factory);
 
-    fulfillRecipientFinalEventPromise(nss);
+    insertRecipientFinalEventNoopOplogEntry(tempNss);
     monitor->awaitFinalChangeEvent().get();
 
-    ASSERT_TRUE(delta == 0);
+    ASSERT_EQ(delta, 0);
+
+    monitor->awaitCleanup().get();
+    awaitCompletion.get();
 }
 
 TEST_F(ReshardingChangeStreamsMonitorTest, EnsurePromiseFulfilledOnReachingRecipientFinalEvent) {
-    createCollectionAndInsertDocuments(0 /*minDocValue*/, 9 /*maxDocValue*/);
+    createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 
-    fulfillRecipientFinalEventPromise(nss);
+    insertRecipientFinalEventNoopOplogEntry(tempNss);
 
-    createInstanceAndStartMonitoring(startAtTime);
+    auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, tempNss, startAtTime, callback);
+    auto awaitCompletion = monitor->startMonitoring(executor, cleanupExecutor, *factory);
     monitor->awaitFinalChangeEvent().get();
+    monitor->awaitCleanup().get();
+    awaitCompletion.get();
 }
 
 TEST_F(ReshardingChangeStreamsMonitorTest, EnsurePromiseFulfilledOnReachingDonorFinalEvent) {
-    AutoGetDb autoDb(opCtx, nss.dbName(), LockMode::MODE_X);
+    AutoGetDb autoDb(opCtx, sourceNss.dbName(), LockMode::MODE_X);
     autoDb.ensureDbExists(opCtx);
     OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
         opCtx);
-    uassertStatusOK(createCollection(opCtx, nss.dbName(), BSON("create" << nss.coll())));
+    uassertStatusOK(
+        createCollection(opCtx, sourceNss.dbName(), BSON("create" << sourceNss.coll())));
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 
-    auto msg = BSON("msg"
-                    << "Writes to {} are temporarily blocked for resharding");
-    ReshardBlockingWritesChangeEventO2Field o2Field{
-        nss, UUID::gen(), resharding::kReshardFinalOpLogType.toString()};
+    insertDonorFinalEventNoopOplogEntry(sourceNss);
 
-    insertNoopFinalEvent(nss, msg, o2Field.toBSON());
-
-    monitor = std::make_unique<ReshardingChangeStreamsMonitor>(
-        ReshardingChangeStreamsMonitor(nss, startAtTime, false /*isRecipient*/, callback));
-
-    auto factory = makeCancelableOpCtx();
-    monitor->startMonitoring(executor, factory);
+    auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, sourceNss, startAtTime, callback);
+    auto awaitCompletion = monitor->startMonitoring(executor, cleanupExecutor, *factory);
 
     monitor->awaitFinalChangeEvent().get();
+    monitor->awaitCleanup().get();
+    awaitCompletion.get();
 }
 
 TEST_F(ReshardingChangeStreamsMonitorTest, ProcessInsertsAndDeletesInTransaction) {
-    createCollectionAndInsertDocuments(0 /*minDocValue*/, 9 /*maxDocValue*/);
+    createCollectionAndInsertDocuments(sourceNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 
     runInTransaction(false /*abort*/, [&]() {
         DBDirectClient client(opCtx);
-        write_ops::InsertCommandRequest insertOp(nss);
+        write_ops::InsertCommandRequest insertOp(sourceNss);
         insertOp.setDocuments({BSON("_id" << 10), BSON("_id" << 11), BSON("_id" << 12)});
         client.insert(insertOp);
 
-        client.insert(nss, BSON("_id" << 13));
-        client.remove(nss, BSON("_id" << 0), false);
-        client.update(nss,
+        client.insert(sourceNss, BSON("_id" << 13));
+        client.remove(sourceNss, BSON("_id" << 0), false);
+        client.update(sourceNss,
                       BSON("x" << 13),
                       BSON("$set" << BSON("y" << 13)),
                       false /*upsert*/,
                       false /*multi*/);
     });
 
-    createInstanceAndStartMonitoring(startAtTime);
+    auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, sourceNss, startAtTime, callback);
+    auto awaitCompletion = monitor->startMonitoring(executor, cleanupExecutor, *factory);
 
-    fulfillRecipientFinalEventPromise(nss);
+    insertDonorFinalEventNoopOplogEntry(sourceNss);
     monitor->awaitFinalChangeEvent().get();
 
-    ASSERT_TRUE(delta == 3);
+    ASSERT_EQ(delta, 3);
+
+    monitor->awaitCleanup().get();
+    awaitCompletion.get();
 }
 
 TEST_F(ReshardingChangeStreamsMonitorTest, AbortedTxnShouldNotIncrementDelta) {
-    createCollectionAndInsertDocuments(0 /*minDocValue*/, 9 /*maxDocValue*/);
+    createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 
     runInTransaction(true /*abort*/, [&]() {
         DBDirectClient client(opCtx);
-        client.insert(nss, BSON("_id" << 10));
-        client.insert(nss, BSON("_id" << 11));
-        client.remove(nss, BSON("_id" << 0), false);
+        client.insert(tempNss, BSON("_id" << 10));
+        client.insert(tempNss, BSON("_id" << 11));
+        client.remove(tempNss, BSON("_id" << 0), false);
     });
 
-    createInstanceAndStartMonitoring(startAtTime);
+    auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, tempNss, startAtTime, callback);
+    auto awaitCompletion = monitor->startMonitoring(executor, cleanupExecutor, *factory);
 
-    fulfillRecipientFinalEventPromise(nss);
+    insertRecipientFinalEventNoopOplogEntry(tempNss);
     monitor->awaitFinalChangeEvent().get();
 
-    ASSERT_TRUE(delta == 0);
+    ASSERT_EQ(delta, 0);
+
+    monitor->awaitCleanup().get();
+    awaitCompletion.get();
 }
 
 TEST_F(ReshardingChangeStreamsMonitorTest, ResumeWithLastTokenAfterFailure) {
-    createCollectionAndInsertDocuments(0 /*minDocValue*/, 9 /*maxDocValue*/);
+    createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 
     auto monitorFp =
@@ -482,40 +771,53 @@ TEST_F(ReshardingChangeStreamsMonitorTest, ResumeWithLastTokenAfterFailure) {
 
     DBDirectClient client(opCtx);
     for (int i = 10; i < 15; i++) {
-        client.insert(nss, BSON("_id" << i));
+        client.insert(tempNss, BSON("_id" << i));
     }
 
     // Run the monitor in another thread.
     auto monitorThread = stdx::thread([&] {
         Client::initThread("monitorThread", getGlobalServiceContext()->getService());
 
-        createInstanceAndStartMonitoring(startAtTime);
+        auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+            reshardingUUID, tempNss, startAtTime, callback);
+        auto awaitCompletion = monitor->startMonitoring(executor, cleanupExecutor, *factory);
+
         ASSERT_EQ(monitor->awaitFinalChangeEvent().getNoThrow().code(), ErrorCodes::InternalError);
+        // The cleanup should still succeed.
+        monitor->awaitCleanup().get();
+        ASSERT_FALSE(hasIdleCursor(tempNss));
+        awaitCompletion.get();
     });
 
     monitorFp->waitForTimesEntered(timesEntered + 1);
     monitorFp->setMode(FailPoint::off);
     monitorThread.join();
 
-    ASSERT_TRUE(delta == 1);
+    ASSERT_EQ(delta, 1);
     ASSERT_FALSE(lastResume.isEmpty());
 
     // Resume monitor with the last resume token recorded.
-    createInstanceAndStartMonitoring(lastResume);
-    fulfillRecipientFinalEventPromise(nss);
+    auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        reshardingUUID, tempNss, lastResume, callback);
+    auto awaitCompletion = monitor->startMonitoring(executor, cleanupExecutor, *factory);
+    insertRecipientFinalEventNoopOplogEntry(tempNss);
     monitor->awaitFinalChangeEvent().get();
 
-    ASSERT_TRUE(delta == 5);
+    ASSERT_EQ(delta, 5);
     ASSERT_FALSE(lastResume.isEmpty());
+
+    monitor->awaitCleanup().get();
+    ASSERT_FALSE(hasIdleCursor(tempNss));
+    awaitCompletion.get();
 }
 
 TEST_F(ReshardingChangeStreamsMonitorTest, ChangeBatchSizeWhileChangeStreamOpen) {
-    createCollectionAndInsertDocuments(0 /*minDocValue*/, 9 /*maxDocValue*/);
+    createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 9 /*maxDocValue*/);
     Timestamp startAtTime = replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp();
 
     DBDirectClient client(opCtx);
     for (int i = 10; i < 30; i++) {
-        client.insert(nss, BSON("_id" << i));
+        client.insert(tempNss, BSON("_id" << i));
     }
 
     auto monitortHangFp = globalFailPointRegistry().find(
@@ -525,9 +827,13 @@ TEST_F(ReshardingChangeStreamsMonitorTest, ChangeBatchSizeWhileChangeStreamOpen)
     auto monitorThread = stdx::thread([&] {
         Client::initThread("monitorThread", getGlobalServiceContext()->getService());
 
-        createInstanceAndStartMonitoring(startAtTime);
-        fulfillRecipientFinalEventPromise(nss);
+        auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+            reshardingUUID, tempNss, startAtTime, callback);
+        auto awaitCompletion = monitor->startMonitoring(executor, cleanupExecutor, *factory);
+        insertRecipientFinalEventNoopOplogEntry(tempNss);
         monitor->awaitFinalChangeEvent().get();
+        monitor->awaitCleanup().get();
+        awaitCompletion.get();
     });
 
     monitortHangFp->waitForTimesEntered(timesEntered + 1);
@@ -546,7 +852,8 @@ TEST_F(ReshardingChangeStreamsMonitorTest, ChangeBatchSizeWhileChangeStreamOpen)
     monitorThread.join();
     monitorInternalErrorFp->setMode(FailPoint::off);
 
-    ASSERT_TRUE(delta == 20);
+    ASSERT_EQ(delta, 20);
+    ASSERT_FALSE(hasIdleCursor(tempNss));
 }
 
 }  // namespace

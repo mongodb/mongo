@@ -260,12 +260,26 @@ server_parameters:
 
     reshardingVerificationChangeStreamsEventsBatchSize:
         description: >-
-            Number of events to process during validation before updating the number of documents and the resume token for the change stream.
+            The number of events to process during verification before updating the change in the
+            number of documents and the resume token for the change stream.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: gReshardingVerificationChangeStreamsEventsBatchSize
         default:
             expr: 1000
+        validator:
+            gte: 0
+        redact: false
+
+    reshardingVerificationChangeStreamsSleepMS:
+        description: >-
+            The amount of time in milliseconds to wait before sending the next getMore command after
+            the previous one did not return any change events.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingVerificationChangeStreamsSleepMS
+        default:
+            expr: 50
         validator:
             gte: 0
         redact: false
