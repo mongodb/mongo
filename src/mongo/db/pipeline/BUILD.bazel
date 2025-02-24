@@ -1184,7 +1184,6 @@ mongo_cc_library(
     name = "pipeline_visitor",
     srcs = [
         "//src/mongo/db/pipeline/visitors:document_source_walker.cpp",
-        "//src/mongo/db/pipeline/visitors:transformer_interface_walker.cpp",
     ],
     hdrs = [
         "//src/mongo/db/pipeline:document_source_cursor.h",
@@ -1192,8 +1191,6 @@ mongo_cc_library(
         "//src/mongo/db/pipeline/visitors:document_source_visitor_registry.h",
         "//src/mongo/db/pipeline/visitors:document_source_visitor_registry_mongod.h",
         "//src/mongo/db/pipeline/visitors:document_source_walker.h",
-        "//src/mongo/db/pipeline/visitors:transformer_interface_visitor.h",
-        "//src/mongo/db/pipeline/visitors:transformer_interface_walker.h",
         "//src/mongo/db/s:analyze_shard_key_util.h",
         "//src/mongo/db/s:document_source_analyze_shard_key_read_write_distribution.h",
         "//src/mongo/db/s:document_source_analyze_shard_key_read_write_distribution_gen",
