@@ -182,7 +182,8 @@ public:
 
             auto response = [&] {
                 const auto nss = ns();
-                switch (metadata_consistency_util::getCommandLevel(nss)) {
+                const auto commandLevel = metadata_consistency_util::getCommandLevel(nss);
+                switch (commandLevel) {
                     case MetadataConsistencyCommandLevelEnum::kClusterLevel:
                         return _runClusterLevel(opCtx, nss);
                     case MetadataConsistencyCommandLevelEnum::kDatabaseLevel:
@@ -190,7 +191,14 @@ public:
                     case MetadataConsistencyCommandLevelEnum::kCollectionLevel:
                         return _runCollectionLevel(opCtx, nss);
                     default:
-                        MONGO_UNREACHABLE;
+                        tasserted(1011706,
+                                  str::stream()
+                                      << "Unexpected parameter during the internal execution of "
+                                         "checkMetadataConsistency command. The shard server was "
+                                         "expecting to receive a cluster, database or collection "
+                                         "level parameter, but received "
+                                      << MetadataConsistencyCommandLevel_serializer(commandLevel)
+                                      << " with namespace " << nss.toStringForErrorMsg());
                 }
             }();
 

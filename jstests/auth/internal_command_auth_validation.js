@@ -207,6 +207,7 @@ const internalCommandsMap = {
         },
     },
     _configsvrCheckMetadataConsistency: {
+        skip: true,  // This command doesn't accept to be run in the 'admin' database.
         testname: "_configsvrCheckMetadataConsistency",
         command: {
             _configsvrCheckMetadataConsistency: "x.y",
@@ -782,9 +783,10 @@ const internalCommandsMap = {
         },
     },
     _shardsvrCheckMetadataConsistencyParticipant: {
+        skip: true,  // This command doesn't accept to be run in the 'admin' database.
         testname: "_shardsvrCheckMetadataConsistencyParticipant",
         command: {
-            _shardsvrCheckMetadataConsistencyParticipant: "x.y",
+            _shardsvrCheckMetadataConsistencyParticipant: 1,
             primaryShardId: shard0name,
         },
     },
