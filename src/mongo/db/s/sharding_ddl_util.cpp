@@ -30,16 +30,10 @@
 
 #include "mongo/db/s/sharding_ddl_util.h"
 
-#include <algorithm>
-#include <array>
 #include <boost/cstdint.hpp>
 #include <boost/smart_ptr.hpp>
 #include <cstddef>
-#include <cstdint>
-#include <iterator>
-#include <ostream>
 #include <string>
-#include <tuple>
 
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
@@ -74,7 +68,6 @@
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/resource_yielder.h"
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/remove_tags_gen.h"
 #include "mongo/db/s/sharding_logging.h"
@@ -84,8 +77,6 @@
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_concern.h"
-#include "mongo/executor/async_rpc.h"
-#include "mongo/executor/async_rpc_util.h"
 #include "mongo/executor/inline_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -95,7 +86,6 @@
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
@@ -107,7 +97,6 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_cluster_parameters_gen.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
@@ -117,7 +106,6 @@
 #include "mongo/util/future_impl.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/out_of_line_executor.h"
-#include "mongo/util/read_through_cache.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
@@ -128,7 +116,7 @@
 
 namespace mongo {
 
-static const size_t kSerializedErrorStatusMaxSize = 1024 * 2;
+static const size_t kSerializedErrorStatusMaxSizeBytes = 2048ULL;
 
 void sharding_ddl_util_serializeErrorStatusToBSON(const Status& status,
                                                   StringData fieldName,
@@ -139,10 +127,10 @@ void sharding_ddl_util_serializeErrorStatusToBSON(const Status& status,
     status.serialize(&tmpBuilder);
 
     if (status != ErrorCodes::TruncatedSerialization &&
-        (size_t)tmpBuilder.asTempObj().objsize() > kSerializedErrorStatusMaxSize) {
+        (size_t)tmpBuilder.asTempObj().objsize() > kSerializedErrorStatusMaxSizeBytes) {
         const auto statusStr = status.toString();
         const auto truncatedStatusStr =
-            str::UTF8SafeTruncation(statusStr, kSerializedErrorStatusMaxSize);
+            str::UTF8SafeTruncation(statusStr, kSerializedErrorStatusMaxSizeBytes);
         const Status truncatedStatus{ErrorCodes::TruncatedSerialization, truncatedStatusStr};
 
         tmpBuilder.resetToEmpty();

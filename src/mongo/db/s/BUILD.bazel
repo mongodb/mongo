@@ -665,6 +665,7 @@ mongo_cc_library(
         "ddl_lock_manager.h",
         "periodic_sharded_index_consistency_checker.h",
         "sharding_ddl_util.h",
+        "sharding_ddl_util_detail.h",
         "sharding_index_catalog_util.h",
         "sharding_util.h",
         "split_chunk_request_type.h",

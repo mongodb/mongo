@@ -471,6 +471,7 @@ mongo_cc_library(
         # TODO(SERVER-9414): Clean this up.
         "//src/mongo/db/repl:primary_only_service.h",
         "//src/mongo/db/s:sharding_ddl_util.h",
+        "//src/mongo/db/s:sharding_ddl_util_detail.h",
         "//src/mongo/db/catalog:drop_collection.h",
         "//src/mongo/db/transaction:transaction_api.h",
         "//src/mongo/executor:inline_executor.h",
