@@ -222,4 +222,27 @@ TEST(ValidateResultsTest, TestingSizeOfIndexDetailsEntries) {
     ASSERT_LESS_THAN(index_warns.size(), 11);
 }
 
+TEST(ValidateResultsTest, SpecAppearsInOutput) {
+    ValidateResults vr;
+
+    IndexValidateResults& ivr = vr.getIndexValidateResult("index1");
+    ivr.setSpec(BSON("k"
+                     << "v"));
+
+    BSONObjBuilder bob;
+    vr.appendToResultObj(&bob, /*debugging=*/false);
+    auto obj = bob.done();
+
+    ASSERT_TRUE(obj.getObjectField("indexDetails").getObjectField("index1").hasField("spec"));
+    ASSERT_TRUE(obj.getObjectField("indexDetails")
+                    .getObjectField("index1")
+                    .getObjectField("spec")
+                    .hasField("k"));
+    ASSERT_EQ(obj.getObjectField("indexDetails")
+                  .getObjectField("index1")
+                  .getObjectField("spec")
+                  .getStringField("k"),
+              "v");
+}
+
 }  // namespace mongo

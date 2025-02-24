@@ -186,6 +186,7 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
     for (auto& [indexName, ivr] : getIndexResultsMap()) {
         BSONObjBuilder bob(indexDetails.subobjStart(indexName));
         bob.appendBool("valid", ivr.isValid());
+        bob.append("spec", ivr.getSpec());
 
         if (!ivr.getWarnings().empty()) {
             buildFixedSizedArray(bob, "warnings", ivr.getWarnings(), maxSizePerEntry);

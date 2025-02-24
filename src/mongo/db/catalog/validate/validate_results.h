@@ -125,9 +125,18 @@ public:
         _hasStructuralDamage = hasStructuralDamage;
     }
 
+    BSONObj getSpec() const {
+        return _spec;
+    }
+
+    void setSpec(BSONObj spec) {
+        _spec = std::move(spec);
+    }
+
 private:
     int64_t _keysTraversed = 0;
     int64_t _keysRemovedFromRecordStore = 0;
+    BSONObj _spec = {};
     bool _hasStructuralDamage = false;
 };
 

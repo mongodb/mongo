@@ -172,6 +172,12 @@ void _validateIndexes(OperationContext* opCtx,
 
         auto& curIndexResults = results->getIndexValidateResult(indexName);
         curIndexResults.addKeysTraversed(numTraversedKeys);
+
+        BSONObj infoObj = validateState->getCollection()
+                              ->getIndexCatalog()
+                              ->findIndexByIdent(opCtx, indexIdent)
+                              ->infoObj();
+        curIndexResults.setSpec(std::move(infoObj));
     }
 }
 
