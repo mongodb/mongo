@@ -2,25 +2,28 @@
 
 This page provides an overview of the source code architecture for MongoDB's Query Optimization system. It is designed for engineers working on the core server, with introductory sections offering low-level details particularly useful for new members of the QO team.
 
+_Disclaimer_: This guide (SPM-2301) is a work in progress.
+
 ## Table of Contents
 
-- [I. Parsing](#parsing)
-- [II. Logical Models](#logical-models)
-  - [Views](#views)
-  - [Heuristic Rewrites](#heuristic-rewrites)
-- [III. Index Selection](#iv-index-selection)
-  - [QueryPlanner and Plan Enumeration](#queryplanner-and-plan-enumeration)
-  - [Classic Runtime Planners](#classic-runtime-planners)
-  - [Cost Based Ranker](#cost-based-ranker)
-    - [Cost Model](#cost-model)
-    - [Cardinality Estimation](#cardinality-estimation)
-- [IV. Explain](#explain)
-- [V. Plan Cache](#plan-cache)
+- [I. Parsing](../commands/query_cmd/README.md)
+  - [Stable API](../STABLE_API_README.md)
+- [II. Logical Models](#)
+  - [Views](#)
+  - [Heuristic Rewrites](#)
+- [III. Index Selection](#)
+  - [QueryPlanner and Plan Enumeration](#)
+  - [Classic Runtime Planners](#)
+  - [Cost Based Ranker](#)
+    - [Cost Model](#)
+    - [Cardinality Estimation](#)
+- [IV. Explain](#)
+- [V. Plan Cache](#)
 - [VI. Cluster Planning](../../s/query/planner/README.md)
-- [VII. Testing](#testing)
-  - [Golden Testing](#golden-testing)
-  - [QueryTester](./query_tester/README.md)
-  - [Fuzzers](#fuzzers)
+- [VII. Testing](#)
+  - [Golden Testing](#)
+  - [QueryTester](query_tester/README.md)
+  - [Fuzzers](#)
 
 ## Glossary: QO Terminology and Acronyms
 
