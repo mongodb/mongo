@@ -133,10 +133,6 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
             "BSON field 'querySettings' is an unknown field",
             !distinctCommand->getQuerySettings().has_value());
 
-    uassert(ErrorCodes::InvalidOptions,
-            "rawData is not enabled",
-            !distinctCommand->getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
-
     auto expCtx = ExpressionContextBuilder{}
                       .fromRequest(opCtx, *distinctCommand, defaultCollator)
                       .ns(nss)
@@ -223,6 +219,10 @@ public:
                                                  repl::ReadConcernLevel level,
                                                  bool isImplicitDefault) const final {
         return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
+    }
+
+    bool supportsRawData() const override {
+        return true;
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,

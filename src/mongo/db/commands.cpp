@@ -1004,6 +1004,10 @@ private:
         return _command->supportsReadConcern(cmdObj(), level, isImplicitDefault);
     }
 
+    bool supportsRawData() const override {
+        return _command->supportsRawData();
+    }
+
     bool isSubjectToIngressAdmissionControl() const override {
         return _command->isSubjectToIngressAdmissionControl();
     }

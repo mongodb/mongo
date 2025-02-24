@@ -261,6 +261,12 @@ structs:
                 forward_to_shards: true
                 optional: true
                 stability: "internal"
+            rawData:
+                type: optionalBool
+                # Even though we do want this field to be forwarded to shards, we set
+                # forward_to_shards to false because it gets manually appended upon egress.
+                forward_to_shards: false
+                stability: "internal"
 
     GenericReplyFields:
         description: "Fields that may appear in any command reply."

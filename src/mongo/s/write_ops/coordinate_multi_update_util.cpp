@@ -75,9 +75,12 @@ auto getOpAsBson(const BatchItemRef& op) {
 // { w: 0 } write concern specified on the original request will not interfere with the router's
 // ability to receive responses from the shard(s).
 //
-// This currently just drops all of the generic arguments.
+// This currently just drops all of the generic arguments except for rawData. The rawData argument
+// needs to be passed along so that the inner command respects the user-provided option.
 void filterRequestGenericArguments(GenericArguments& args) {
+    auto rawData = args.getRawData();
     args = {};
+    args.setRawData(rawData);
 }
 
 // Serializes the batched request's underlying command request to BSON, dropping all generic

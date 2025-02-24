@@ -102,8 +102,6 @@ public:
 
     bool hasEncryptionInformation() const;
 
-    bool getRawData() const;
-
     const auto& getInsertRequest() const {
         invariant(_insertReq);
         return *_insertReq;

@@ -57,6 +57,12 @@ structs:
             mayBypassWriteBlocking:
                 type: optionalBool
                 description: "Whether this operation is allowed to bypass user write blocking."
+            rawData:
+                type: optionalBool
+                description: "Whether to use the raw underlying data format. When being run on a
+                              collection type that stores its data in a different format from that
+                              in which users interact with, this means that the command will operate
+                              directly on the format in which it is stored."
             validatedTenancyScopeToken:
                 type: string
                 description: "Token used to validate and create a new ValidatedTenancyScope."

@@ -48,6 +48,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_block_bypass.h"
@@ -128,6 +129,8 @@ void readRequestMetadata(OperationContext* opCtx,
     VectorClock::get(opCtx)->gossipIn(opCtx, components, !cmdRequiresAuth);
 
     WriteBlockBypass::get(opCtx).setFromMetadata(opCtx, requestArgs.getMayBypassWriteBlocking());
+
+    isRawDataOperation(opCtx) = requestArgs.getRawData();
 }
 
 namespace {

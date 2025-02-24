@@ -1819,6 +1819,13 @@ void ExecCommandDatabase::_initiateCommand() {
         }
     }
 
+    uassert(ErrorCodes::InvalidOptions,
+            "Command does not support the rawData option",
+            !genericArgs.getRawData() || _invocation->supportsRawData());
+    uassert(ErrorCodes::InvalidOptions,
+            "rawData is not enabled",
+            !genericArgs.getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
+
     if (opCtx->isStartingMultiDocumentTransaction()) {
         _setLockStateForTransaction(opCtx);
     }

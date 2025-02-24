@@ -57,6 +57,7 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -221,12 +222,8 @@ const size_t CollectionRoutingInfoTargeter::kMaxDatabaseCreationAttempts = 3;
 
 CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(OperationContext* opCtx,
                                                              const NamespaceString& nss,
-                                                             boost::optional<OID> targetEpoch,
-                                                             bool rawData)
-    : _nss(nss),
-      _targetEpoch(std::move(targetEpoch)),
-      _rawData(rawData),
-      _cri(_init(opCtx, false)) {}
+                                                             boost::optional<OID> targetEpoch)
+    : _nss(nss), _targetEpoch(std::move(targetEpoch)), _cri(_init(opCtx, false)) {}
 
 CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(const NamespaceString& nss,
                                                              const CollectionRoutingInfo& cri)
@@ -300,7 +297,7 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
             _nss = bucketsNs;
             cm = std::move(bucketsPlacementInfo);
             sii = std::move(bucketsIndexInfo);
-            if (!_rawData) {
+            if (!isRawDataOperation(opCtx)) {
                 _isRequestOnTimeseriesViewNamespace = true;
             }
         }

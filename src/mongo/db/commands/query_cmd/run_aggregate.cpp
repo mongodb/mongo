@@ -1189,11 +1189,6 @@ Status runAggregate(
     rpc::ReplyBuilderInterface* result,
     const std::vector<std::pair<NamespaceString, std::vector<ExternalDataSourceInfo>>>&
         usedExternalDataSources) {
-
-    if (request.getRawData() && !gFeatureFlagRawDataCrudOperations.isEnabled()) {
-        return {ErrorCodes::InvalidOptions, "rawData is not enabled"};
-    }
-
     AggExState aggExState(
         opCtx, request, liteParsedPipeline, cmdObj, privileges, usedExternalDataSources, verbosity);
 

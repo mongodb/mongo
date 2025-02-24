@@ -189,10 +189,6 @@ public:
                                   << "context",
                     !request().getNamespaceOrUUID().isUUID());
 
-            uassert(ErrorCodes::InvalidOptions,
-                    "rawData is not enabled",
-                    !request().getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
-
             if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
                 processFLECountD(opCtx, _ns, request());
             }
@@ -270,10 +266,6 @@ public:
 
         CountCommandReply typedRun(OperationContext* opCtx) final {
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-
-            uassert(ErrorCodes::InvalidOptions,
-                    "rawData is not enabled",
-                    !request().getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
 
             if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
                 processFLECountD(opCtx, _ns, request());
@@ -398,6 +390,10 @@ public:
                                                       "read concern snapshot not supported"};
             return {{level == repl::ReadConcernLevel::kSnapshotReadConcern, kSnapshotNotSupported},
                     Status::OK()};
+        }
+
+        bool supportsRawData() const override {
+            return true;
         }
 
         bool supportsReadMirroring() const override {

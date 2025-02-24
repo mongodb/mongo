@@ -45,6 +45,7 @@
 #include "mongo/db/auth/validated_tenancy_scope_factory.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/client.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/metadata/audit_client_attrs.h"
@@ -78,6 +79,8 @@ ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opC
     setValidatedTenancyScopeToken(originalSecurityToken);
 
     setMayBypassWriteBlocking(WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled());
+
+    setRawData(isRawDataOperation(opCtx));
 }
 
 void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
@@ -96,6 +99,9 @@ void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
     }
 
     WriteBlockBypass::get(opCtx).set(getMayBypassWriteBlocking());
+
+    isRawDataOperation(opCtx) = getRawData();
+
     boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope = boost::none;
     const auto originalToken = getValidatedTenancyScopeToken();
     if (originalToken != boost::none && !originalToken->empty()) {

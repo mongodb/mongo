@@ -91,8 +91,7 @@ public:
      */
     CollectionRoutingInfoTargeter(OperationContext* opCtx,
                                   const NamespaceString& nss,
-                                  boost::optional<OID> expectedEpoch = boost::none,
-                                  bool rawData = false);
+                                  boost::optional<OID> expectedEpoch = boost::none);
 
     /* Initializes the targeter with a custom CollectionRoutingInfo cri, in order to support
      * using a custom (synthetic) routing table */
@@ -265,8 +264,6 @@ private:
     // Set to the epoch of the namespace we are targeting. If we ever refresh the catalog cache
     // and find a new epoch, we immediately throw a StaleEpoch exception.
     boost::optional<OID> _targetEpoch;
-
-    bool _rawData = false;
 
     // The latest loaded routing cache entry
     CollectionRoutingInfo _cri;

@@ -169,6 +169,10 @@ public:
             return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
         }
 
+        bool supportsRawData() const override {
+            return true;
+        }
+
         NamespaceString ns() const override {
             return _ns;
         }
@@ -190,10 +194,6 @@ public:
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) override {
             Impl::checkCanExplainHere(opCtx);
-
-            uassert(ErrorCodes::InvalidOptions,
-                    "rawData is not enabled",
-                    !_cmdRequest->getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
 
             auto curOp = CurOp::get(opCtx);
             curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
@@ -310,10 +310,6 @@ public:
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
             Impl::checkCanRunHere(opCtx);
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-
-            uassert(ErrorCodes::InvalidOptions,
-                    "rawData is not enabled",
-                    !_cmdRequest->getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
 
             if (_cmdRequest->getRawData() &&
                 _cmdRequest->getNamespaceOrUUID().isNamespaceString() &&

@@ -87,6 +87,7 @@
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -265,7 +266,7 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
         appendSampleId(shardId, cmdBuilder);
         auto cmdObj = cmdBuilder.obj();
 
-        if (findCommandToForward->getRawData() &&
+        if (isRawDataOperation(opCtx) &&
             findCommandToForward->getNamespaceOrUUID().isNamespaceString() &&
             findCommandToForward->getNamespaceOrUUID().nss().isTimeseriesBucketsCollection()) {
             // Rewrite the command object to use the buckets namespace.

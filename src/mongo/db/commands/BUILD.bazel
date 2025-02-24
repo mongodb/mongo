@@ -1450,6 +1450,7 @@ mongo_cc_library(
         "//src/mongo/db:index_commands_idl",
         "//src/mongo/db:multitenancy",
         "//src/mongo/db:query_exec",
+        "//src/mongo/db:raw_data_operation",
         "//src/mongo/db:rw_concern_d",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",

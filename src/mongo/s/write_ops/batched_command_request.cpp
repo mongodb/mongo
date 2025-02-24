@@ -106,11 +106,6 @@ bool BatchedCommandRequest::hasEncryptionInformation() const {
         [](auto&& op) -> decltype(auto) { return op.getEncryptionInformation().has_value(); });
 }
 
-bool BatchedCommandRequest::getRawData() const {
-    return _visit(
-        [](auto&& op) -> decltype(auto) { return op.getWriteCommandRequestBase().getRawData(); });
-}
-
 std::size_t BatchedCommandRequest::sizeWriteOps() const {
     struct Visitor {
         auto operator()(const write_ops::InsertCommandRequest& op) const {

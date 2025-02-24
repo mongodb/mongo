@@ -108,6 +108,10 @@ public:
             return true;
         }
 
+        bool supportsRawData() const override {
+            return true;
+        }
+
         void doCheckAuthorization(OperationContext* opCtx) const override {
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",

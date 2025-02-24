@@ -266,6 +266,10 @@ public:
             return _liteParsedPipeline.supportsReadConcern(level, isImplicitDefault, isExplain);
         }
 
+        bool supportsRawData() const override {
+            return true;
+        }
+
         bool allowsSpeculativeMajorityReads() const override {
             // Currently only change stream aggregation queries are allowed to use speculative
             // majority. The aggregation command itself will check this internally and fail if

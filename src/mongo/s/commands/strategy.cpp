@@ -74,6 +74,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/replica_set_endpoint_util.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/stats/api_version_metrics.h"
@@ -917,6 +918,14 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
 
     if (opCtx->routedByReplicaSetEndpoint()) {
         replica_set_endpoint::checkIfCanRunCommand(opCtx, request);
+    }
+
+    if (genericArgs.getRawData() && !invocation->supportsRawData()) {
+        return {ErrorCodes::InvalidOptions, "Command does not support the rawData option"};
+    }
+
+    if (genericArgs.getRawData() && !gFeatureFlagRawDataCrudOperations.isEnabled()) {
+        return {ErrorCodes::InvalidOptions, "rawData is not enabled"};
     }
 
     return Status::OK();

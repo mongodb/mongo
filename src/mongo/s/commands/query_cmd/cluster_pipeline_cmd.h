@@ -123,6 +123,10 @@ public:
             return _liteParsedPipeline.supportsReadConcern(level, isImplicitDefault, isExplain);
         }
 
+        bool supportsRawData() const override {
+            return true;
+        }
+
         void _runAggCommand(OperationContext* opCtx,
                             const BSONObj& cmdObj,
                             BSONObjBuilder* result,

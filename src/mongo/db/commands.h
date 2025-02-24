@@ -897,6 +897,14 @@ public:
     }
 
     /**
+     * Returns whether this invocation supports the rawData command parameter. See
+     * raw_data_operation.h for more information.
+     */
+    virtual bool supportsRawData() const {
+        return false;
+    }
+
+    /**
      * Returns if this invocation can be mirrored to secondaries
      */
     virtual bool supportsReadMirroring() const {
@@ -1119,6 +1127,14 @@ public:
             ErrorCodes::InvalidOptions, "cluster wide default read concern not permitted"};
         return {{level != repl::ReadConcernLevel::kLocalReadConcern, kReadConcernNotSupported},
                 {kDefaultReadConcernNotPermitted}};
+    }
+
+    /**
+     * Returns whether this command supports the rawData parameter. See raw_data_operation.h for
+     * more information.
+     */
+    virtual bool supportsRawData() const {
+        return false;
     }
 
     /**

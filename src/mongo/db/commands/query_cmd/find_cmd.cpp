@@ -361,6 +361,10 @@ public:
             return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
         }
 
+        bool supportsRawData() const override {
+            return true;
+        }
+
         bool isSubjectToIngressAdmissionControl() const override {
             return !_cmdRequest->getTerm().has_value();
         }
@@ -423,10 +427,6 @@ public:
             if (!_cmdRequest) {
                 _cmdRequest = _parseCmdObjectToFindCommandRequest(opCtx, _request);
             }
-
-            uassert(ErrorCodes::InvalidOptions,
-                    "rawData is not enabled",
-                    !_cmdRequest->getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
 
             // Acquire locks. The RAII object is optional, because in the case of a view, the locks
             // need to be released.
@@ -582,10 +582,6 @@ public:
             }
             // Start the query planning timer right after parsing.
             CurOp::get(opCtx)->beginQueryPlanningTimer();
-
-            uassert(ErrorCodes::InvalidOptions,
-                    "rawData is not enabled",
-                    !_cmdRequest->getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
 
             _rewriteFLEPayloads(opCtx);
             auto respSc =

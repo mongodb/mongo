@@ -191,6 +191,7 @@ mongo_cc_library(
         "forwardable_operation_metadata.h",
     ],
     deps = [
+        "//src/mongo/db:raw_data_operation",
         "//src/mongo/db:server_base",
         "//src/mongo/db:write_block_bypass",
         "//src/mongo/db/auth",

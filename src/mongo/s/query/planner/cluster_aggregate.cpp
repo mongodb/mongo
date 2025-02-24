@@ -288,10 +288,6 @@ void performValidationChecks(const OperationContext* opCtx,
     aggregation_request_helper::validateRequestForAPIVersion(opCtx, request);
     aggregation_request_helper::validateRequestFromClusterQueryWithoutShardKey(request);
 
-    uassert(ErrorCodes::InvalidOptions,
-            "rawData is not enabled",
-            !request.getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
-
     uassert(51028, "Cannot specify exchange option to a router", !request.getExchange());
     uassert(51143,
             "Cannot specify runtime constants option to a router",

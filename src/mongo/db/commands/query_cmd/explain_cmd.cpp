@@ -50,6 +50,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/op_msg.h"
@@ -247,6 +248,16 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
     auto innerRequest = std::make_unique<OpMsgRequest>(
         OpMsgRequestBuilder::create(request.validatedTenancyScope, dbName, explainedObj));
     auto innerInvocation = explainedCommand->parseForExplain(opCtx, *innerRequest, verbosity);
+
+    uassert(ErrorCodes::InvalidOptions,
+            "Command does not support the rawData option",
+            !innerInvocation->getGenericArguments().getRawData() ||
+                innerInvocation->supportsRawData());
+    uassert(ErrorCodes::InvalidOptions,
+            "rawData is not enabled",
+            !innerInvocation->getGenericArguments().getRawData() ||
+                gFeatureFlagRawDataCrudOperations.isEnabled());
+
     return std::make_unique<Invocation>(
         this, request, std::move(verbosity), std::move(innerRequest), std::move(innerInvocation));
 }

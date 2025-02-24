@@ -146,10 +146,6 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
             query_settings::utils::allowQuerySettingsFromClient(opCtx->getClient()) ||
                 !distinctCommand->getQuerySettings().has_value());
 
-    uassert(ErrorCodes::InvalidOptions,
-            "rawData is not enabled",
-            !distinctCommand->getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
-
     auto expCtx = ExpressionContextBuilder{}
                       .fromRequest(opCtx, *distinctCommand, defaultCollator)
                       .ns(nss)
@@ -320,6 +316,10 @@ public:
                                                  repl::ReadConcernLevel level,
                                                  bool isImplicitDefault) const override {
         return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
+    }
+
+    bool supportsRawData() const override {
+        return true;
     }
 
     bool isSubjectToIngressAdmissionControl() const override {

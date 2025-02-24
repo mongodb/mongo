@@ -87,6 +87,7 @@ mongo_cc_library(
         "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
         "//src/mongo/client:read_preference",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:multitenancy",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:raw_data_operation",
         "//src/mongo/db:server_base",
         "//src/mongo/db:signed_logical_time",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:vector_clock",

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,53 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/s/client_metadata_propagation_egress_hook.h"
+#pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/raw_data_operation.h"
-#include "mongo/db/write_block_bypass.h"
-#include "mongo/rpc/metadata/audit_metadata.h"
-#include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
-namespace rpc {
 
-Status ClientMetadataPropagationEgressHook::writeRequestMetadata(OperationContext* opCtx,
-                                                                 BSONObjBuilder* metadataBob) {
-    if (!opCtx) {
-        return Status::OK();
-    }
+constexpr inline auto kRawDataFieldName = "rawData"_sd;
 
-    try {
-        writeAuditMetadata(opCtx, metadataBob);
+/**
+ * Returns a settable boolean indicating whether the given operation context is performing a "raw
+ * data" operation. When being run on a collection type that stores its data in a different format
+ * from that in which users interact with, a "raw data" operation will operate directly on the
+ * format in which it is stored.
+ */
+bool& isRawDataOperation(OperationContext*);
 
-        if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
-            metadata->writeToMetadata(metadataBob);
-        }
-
-        WriteBlockBypass::get(opCtx).writeAsMetadata(metadataBob);
-
-        if (isRawDataOperation(opCtx)) {
-            metadataBob->append(kRawDataFieldName, true);
-        }
-
-        // If the request is using the 'defaultMaxTimeMS' value, attaches the field so shards can
-        // record the metrics correctly.
-        if (opCtx->usesDefaultMaxTimeMS()) {
-            metadataBob->appendBool("usesDefaultMaxTimeMS", true);
-        }
-
-        return Status::OK();
-    } catch (...) {
-        return exceptionToStatus();
-    }
-}
-
-Status ClientMetadataPropagationEgressHook::readReplyMetadata(OperationContext* opCtx,
-                                                              const BSONObj& metadataObj) {
-    return Status::OK();
-}
-
-}  // namespace rpc
 }  // namespace mongo

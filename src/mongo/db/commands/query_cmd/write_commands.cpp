@@ -277,6 +277,10 @@ public:
             return true;
         }
 
+        bool supportsRawData() const final {
+            return true;
+        }
+
         bool isSubjectToIngressAdmissionControl() const override {
             return true;
         }
@@ -286,10 +290,6 @@ public:
         }
 
         write_ops::InsertCommandReply typedRun(OperationContext* opCtx) final try {
-            uassert(ErrorCodes::InvalidOptions,
-                    "rawData is not enabled",
-                    !request().getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
-
             // On debug builds, verify that the estimated size of the insert command is at least as
             // large as the size of the actual, serialized insert command. This ensures that the
             // logic which estimates the size of insert commands is correct.
@@ -419,6 +419,10 @@ public:
             return true;
         }
 
+        bool supportsRawData() const final {
+            return true;
+        }
+
         bool isSubjectToIngressAdmissionControl() const override {
             return true;
         }
@@ -481,10 +485,6 @@ public:
             // large as the size of the actual, serialized update command. This ensures that the
             // logic which estimates the size of update commands is correct.
             dassert(write_ops::verifySizeEstimate(request(), &unparsedRequest()));
-
-            uassert(ErrorCodes::InvalidOptions,
-                    "rawData is not enabled",
-                    !request().getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
 
             doTransactionValidationForWrites(opCtx, ns());
             write_ops::UpdateCommandReply updateReply;
@@ -600,10 +600,6 @@ public:
             // one sub-operation, so we won't create nested CurOps.
             CurOp::get(opCtx)->beginQueryPlanningTimer();
 
-            uassert(ErrorCodes::InvalidOptions,
-                    "rawData is not enabled",
-                    !request().getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
-
             uassert(ErrorCodes::InvalidLength,
                     "explained write batches must be of size 1",
                     request().getUpdates().size() == 1);
@@ -709,6 +705,10 @@ public:
             return true;
         }
 
+        bool supportsRawData() const final {
+            return true;
+        }
+
         bool isSubjectToIngressAdmissionControl() const override {
             return true;
         }
@@ -722,10 +722,6 @@ public:
             // as the actual, serialized size. This ensures that the logic that estimates the size
             // of deletes for batch writes is correct.
             dassert(write_ops::verifySizeEstimate(request(), &unparsedRequest()));
-
-            uassert(ErrorCodes::InvalidOptions,
-                    "rawData is not enabled",
-                    !request().getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
 
             doTransactionValidationForWrites(opCtx, ns());
             write_ops::DeleteCommandReply deleteReply;
@@ -771,10 +767,6 @@ public:
             // Start the query planning timer right after parsing. In explain, there's only ever
             // one sub-operation, so we won't create nested CurOps.
             CurOp::get(opCtx)->beginQueryPlanningTimer();
-
-            uassert(ErrorCodes::InvalidOptions,
-                    "rawData is not enabled",
-                    !request().getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
 
             uassert(ErrorCodes::InvalidLength,
                     "explained write batches must be of size 1",

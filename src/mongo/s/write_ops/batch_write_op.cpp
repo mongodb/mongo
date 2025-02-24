@@ -58,6 +58,7 @@
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/collection_uuid_mismatch.h"
@@ -714,14 +715,13 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
             _clientRequest.getWriteCommandRequestBase().getBypassDocumentValidation());
         wcb.setOrdered(_clientRequest.getWriteCommandRequestBase().getOrdered());
         wcb.setCollectionUUID(_clientRequest.getWriteCommandRequestBase().getCollectionUUID());
-        wcb.setRawData(_clientRequest.getWriteCommandRequestBase().getRawData());
 
         wcb.setEncryptionInformation(
             _clientRequest.getWriteCommandRequestBase().getEncryptionInformation());
 
         if (targeter.isTrackedTimeSeriesBucketsNamespace() &&
             !_clientRequest.getNS().isTimeseriesBucketsCollection() &&
-            !_clientRequest.getRawData()) {
+            !isRawDataOperation(_opCtx)) {
             wcb.setIsTimeseriesNamespace(true);
         }
 

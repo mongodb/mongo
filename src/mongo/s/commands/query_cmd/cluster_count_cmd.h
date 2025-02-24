@@ -111,6 +111,10 @@ public:
                 Status::OK()};
     }
 
+    bool supportsRawData() const override {
+        return true;
+    }
+
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const DatabaseName& dbName,
                                  const BSONObj& cmdObj) const override {
@@ -144,10 +148,6 @@ public:
         try {
             auto cmdObj = translateCmdObjForRawData(opCtx, originalCmdObj, nss);
             auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
-
-            uassert(ErrorCodes::InvalidOptions,
-                    "rawData is not enabled",
-                    !countRequest.getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
 
             if (prepareForFLERewrite(opCtx, countRequest.getEncryptionInformation())) {
                 processFLECountS(opCtx, nss, countRequest);
@@ -324,10 +324,6 @@ public:
         } catch (...) {
             return exceptionToStatus();
         }
-
-        uassert(ErrorCodes::InvalidOptions,
-                "rawData is not enabled",
-                !countRequest.getRawData() || gFeatureFlagRawDataCrudOperations.isEnabled());
 
         // If the command has encryptionInformation, rewrite the query as necessary.
         if (prepareForFLERewrite(opCtx, countRequest.getEncryptionInformation())) {
