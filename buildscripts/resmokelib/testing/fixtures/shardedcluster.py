@@ -307,7 +307,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         # Ensure that the sessions collection gets auto-sharded by the config server
         if self.configsvr is not None:
             primary_mongo_client = self.configsvr.get_primary().mongo_client()
-            refresh_logical_session_cache_with_retry(primary_mongo_client)
+            refresh_logical_session_cache_with_retry(primary_mongo_client, self.configsvr)
 
         for shard in self.shards:
             self.refresh_logical_session_cache(shard)
