@@ -209,7 +209,57 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         invariant(store.count(opCtx) == 0);
     }
 
-    // Snapshot the committed metadata from the time the migration starts
+    // Compute the max bound in case only `min` is set (moveRange)
+    if (!_args.getMax().has_value()) {
+
+        const auto metadata = [&]() {
+            AutoGetCollection autoColl(_opCtx, nss(), MODE_IS);
+            uassert(ErrorCodes::InvalidOptions,
+                    "cannot move chunks for a collection that doesn't exist",
+                    autoColl.getCollection());
+
+            auto* const csr = CollectionShardingRuntime::get(_opCtx, nss());
+            const auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
+
+            auto optMetadata = csr->getCurrentMetadataIfKnown();
+            uassert(StaleConfigInfo(nss(),
+                                    ChunkVersion::IGNORED() /* receivedVersion */,
+                                    boost::none /* wantedVersion */,
+                                    shardId,
+                                    boost::none),
+                    "The collection's sharding state was cleared by a concurrent operation",
+                    optMetadata);
+
+            auto& metadata = *optMetadata;
+            uassert(StaleConfigInfo(nss(),
+                                    ChunkVersion::IGNORED() /* receivedVersion */,
+                                    ChunkVersion::UNSHARDED() /* wantedVersion */,
+                                    shardId,
+                                    boost::none),
+                    "Cannot move chunks for an unsharded collection",
+                    metadata.isSharded());
+
+            return metadata;
+        }();
+
+        // TODO SERVER-64926 do not assume min always present
+        const auto& min = *_args.getMin();
+
+        const auto cm = metadata.getChunkManager();
+        const auto owningChunk = cm->findIntersectingChunkWithSimpleCollation(min);
+        const auto max = computeMaxBound(_opCtx,
+                                         nss(),
+                                         min,
+                                         owningChunk,
+                                         cm->getShardKeyPattern(),
+                                         _args.getMaxChunkSizeBytes());
+        stdx::lock_guard<Latch> lg(_mutex);
+        _args.getMoveRangeRequestBase().setMax(max);
+        _moveTimingHelper.setMax(max);
+    }
+
+    // Snapshot the committed metadata from the time the migration starts and register the
+    // MigrationSourceManager on the CSR.
     const auto [collectionMetadata, collectionUUID] = [&] {
         UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
         AutoGetCollection autoColl(_opCtx, nss(), MODE_IS);
@@ -275,23 +325,6 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
             str::stream() << "cannot move chunk " << _args.toBSON({})
                           << " because the shard doesn't contain any chunks",
             shardVersion.majorVersion() > 0);
-
-    // Compute the max bound in case only `min` is set (moveRange)
-    if (!_args.getMax().is_initialized()) {
-        // TODO SERVER-64926 do not assume min always present
-        const auto& min = *_args.getMin();
-
-        const auto cm = collectionMetadata.getChunkManager();
-        const auto owningChunk = cm->findIntersectingChunkWithSimpleCollation(min);
-        const auto max = computeMaxBound(_opCtx,
-                                         nss(),
-                                         min,
-                                         owningChunk,
-                                         cm->getShardKeyPattern(),
-                                         _args.getMaxChunkSizeBytes());
-        _args.getMoveRangeRequestBase().setMax(max);
-        _moveTimingHelper.setMax(max);
-    }
 
     const auto& keyPattern = collectionMetadata.getKeyPattern();
     const bool validBounds = [&]() {
@@ -411,8 +444,11 @@ void MigrationSourceManager::startClone() {
         // that a chunk on that collection is being migrated to the OpObservers. With an active
         // migration, write operations require the cloner to be present in order to track changes to
         // the chunk which needs to be transmitted to the recipient.
-        _cloneDriver = std::make_shared<MigrationChunkClonerSourceLegacy>(
-            _args, _writeConcern, metadata.getKeyPattern(), _donorConnStr, _recipientHost);
+        {
+            stdx::lock_guard<Latch> lg(_mutex);
+            _cloneDriver = std::make_shared<MigrationChunkClonerSourceLegacy>(
+                _args, _writeConcern, metadata.getKeyPattern(), _donorConnStr, _recipientHost);
+        }
 
         _coordinator.emplace(_cloneDriver->getSessionId(),
                              _args.getFromShard(),
@@ -897,6 +933,11 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
 }
 
 BSONObj MigrationSourceManager::getMigrationStatusReport() const {
+    // This method is being called from a thread other than the main one, therefore we have to
+    // protect with `_mutex` any write to the attributes read by getMigrationStatusReport() like
+    // `_args` or `_cloneDriver`
+    stdx::lock_guard<Latch> lg(_mutex);
+
     return migrationutil::makeMigrationStatusDocument(
         _args.getCommandParameter(),
         _args.getFromShard(),
