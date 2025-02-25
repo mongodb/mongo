@@ -26,7 +26,7 @@ import {arrayEq, assertErrorCode, orderedArrayEq} from "jstests/aggregation/extr
 import {
     FixtureHelpers
 } from "jstests/libs/fixture_helpers.js";  // For arrayEq, assertErrorCode, and
-import {getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
+import {getEngine, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const sbeEnabled = checkSbeFullyEnabled(db);
@@ -222,9 +222,15 @@ assert.commandWorked(viewsDB.runCommand({
     }
     assert.eq(explainPlan.queryPlanner.namespace, "views_aggregation.coll", explainPlan);
     assert(explainPlan.hasOwnProperty("executionStats"), explainPlan);
+    // In BF-36630, 'checkSbeFullyEnabled' reported SBE to be off, but the explain output included
+    // a slotBasedPlan. We were unable to reproduce the bug. If either of these 'getEngine'
+    // assertions fail, then checking the explain for a slotBasedPlan would suffice as a fix.
+    const engine = getEngine(explainPlan);
     if (sbeEnabled) {
+        assert.eq(engine, "sbe");
         assert.eq(explainPlan.executionStats.nReturned, 0, explainPlan);
     } else {
+        assert.eq(engine, "classic");
         assert.eq(explainPlan.executionStats.nReturned, 1, explainPlan);
     }
     assert(explainPlan.executionStats.hasOwnProperty("allPlansExecution"), explainPlan);
