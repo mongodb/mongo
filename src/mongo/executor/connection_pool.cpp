@@ -114,7 +114,7 @@ void ConnectionPool::ConnectionInterface::indicateUsed() {
     // It is illegal to attempt to use a connection after calling indicateFailure().
     invariant(_status.isOK() || _status == ConnectionPool::kConnectionStateUnknown);
     _lastUsed = now();
-    _timesUsed++;
+    _timesUsed.fetch_add(1, std::memory_order_relaxed);
 }
 
 void ConnectionPool::ConnectionInterface::indicateSuccess() {
@@ -130,7 +130,7 @@ Date_t ConnectionPool::ConnectionInterface::getLastUsed() const {
 }
 
 size_t ConnectionPool::ConnectionInterface::getTimesUsed() const {
-    return _timesUsed;
+    return _timesUsed.load(std::memory_order_relaxed);
 }
 
 const Status& ConnectionPool::ConnectionInterface::getStatus() const {
