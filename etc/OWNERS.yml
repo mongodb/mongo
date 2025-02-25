@@ -1,0 +1,5 @@
+version: 1.0.0
+filters:
+  - "performance_thresholds.yml":
+    approvers:
+      - 10gen/performance
