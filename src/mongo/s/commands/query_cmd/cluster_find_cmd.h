@@ -210,7 +210,7 @@ public:
             // Create an RAII object that prints useful information about the ExpressionContext in
             // the case of a tassert or crash.
             ScopedDebugInfo expCtxDiagnostics(
-                "ExpCtxDiagnostics", command_diagnostics::ExpressionContextPrinter{expCtx});
+                "ExpCtxDiagnostics", diagnostic_printers::ExpressionContextPrinter{expCtx});
 
             auto parsedFind = uassertStatusOK(parsed_find_command::parse(
                 expCtx,
@@ -330,7 +330,7 @@ public:
             // Create an RAII object that prints useful information about the ExpressionContext in
             // the case of a tassert or crash.
             ScopedDebugInfo expCtxDiagnostics(
-                "ExpCtxDiagnostics", command_diagnostics::ExpressionContextPrinter{expCtx});
+                "ExpCtxDiagnostics", diagnostic_printers::ExpressionContextPrinter{expCtx});
 
             auto parsedFind = uassertStatusOK(parsed_find_command::parse(
                 expCtx,

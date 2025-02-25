@@ -640,7 +640,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // Create an RAII object that prints useful information about the ExpressionContext in the case
     // of a tassert or crash.
     ScopedDebugInfo expCtxDiagnostics("ExpCtxDiagnostics",
-                                      command_diagnostics::ExpressionContextPrinter{expCtx});
+                                      diagnostic_printers::ExpressionContextPrinter{expCtx});
 
     auto targeter = cluster_aggregation_planner::AggregationTargeter::make(
         opCtx,

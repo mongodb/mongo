@@ -259,7 +259,7 @@ public:
         // case of a tassert or crash.
         ScopedDebugInfo expCtxDiagnostics(
             "ExpCtxDiagnostics",
-            command_diagnostics::ExpressionContextPrinter{canonicalQuery->getExpCtx()});
+            diagnostic_printers::ExpressionContextPrinter{canonicalQuery->getExpCtx()});
 
         auto targetingQuery = canonicalQuery->getQueryObj();
         auto targetingCollation = canonicalQuery->getFindCommandRequest().getCollation();
@@ -350,7 +350,7 @@ public:
         // case of a tassert or crash.
         ScopedDebugInfo expCtxDiagnostics(
             "ExpCtxDiagnostics",
-            command_diagnostics::ExpressionContextPrinter{canonicalQuery->getExpCtx()});
+            diagnostic_printers::ExpressionContextPrinter{canonicalQuery->getExpCtx()});
 
         auto swCri = getCollectionRoutingInfoForTxnCmd(opCtx, nss);
         if (swCri == ErrorCodes::NamespaceNotFound) {

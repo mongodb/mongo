@@ -169,7 +169,7 @@ public:
             // Create an RAII object that prints useful information about the ExpressionContext in
             // the case of a tassert or crash.
             ScopedDebugInfo expCtxDiagnostics(
-                "ExpCtxDiagnostics", command_diagnostics::ExpressionContextPrinter{expCtx});
+                "ExpCtxDiagnostics", diagnostic_printers::ExpressionContextPrinter{expCtx});
 
             const auto parsedFind = uassertStatusOK(parsed_find_command::parseFromCount(
                 expCtx, countRequest, ExtensionsCallbackNoop(), nss));

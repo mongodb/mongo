@@ -35,7 +35,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/logv2/redaction.h"
 
-namespace mongo::command_diagnostics {
+namespace mongo::diagnostic_printers {
 
 /**
  * Diagnostic printer for the ExpressionContext class. Take care when extending this to redact any
@@ -77,17 +77,17 @@ struct ExpressionContextPrinter {
     boost::intrusive_ptr<ExpressionContext> expCtx;
 };
 
-}  // namespace mongo::command_diagnostics
+}  // namespace mongo::diagnostic_printers
 
 namespace fmt {
 
 template <>
-struct formatter<mongo::command_diagnostics::ExpressionContextPrinter> {
+struct formatter<mongo::diagnostic_printers::ExpressionContextPrinter> {
     constexpr auto parse(auto& ctx) {
         return ctx.begin();
     }
 
-    auto format(const mongo::command_diagnostics::ExpressionContextPrinter& obj, auto& ctx) const {
+    auto format(const mongo::diagnostic_printers::ExpressionContextPrinter& obj, auto& ctx) const {
         return obj.format(ctx);
     }
 };

@@ -489,7 +489,7 @@ public:
             // Create an RAII object that prints useful information about the ExpressionContext in
             // the case of a tassert or crash.
             ScopedDebugInfo expCtxDiagnostics(
-                "ExpCtxDiagnostics", command_diagnostics::ExpressionContextPrinter{expCtx});
+                "ExpCtxDiagnostics", diagnostic_printers::ExpressionContextPrinter{expCtx});
 
             auto parsedRequest = uassertStatusOK(parsed_find_command::parse(
                 expCtx,
@@ -792,7 +792,7 @@ public:
             // the case of a tassert or crash.
             ScopedDebugInfo expCtxDiagnostics(
                 "ExpCtxDiagnostics",
-                command_diagnostics::ExpressionContextPrinter{cq->getExpCtx()});
+                diagnostic_printers::ExpressionContextPrinter{cq->getExpCtx()});
 
             tassert(7922501,
                     "CanonicalQuery namespace should match catalog namespace",

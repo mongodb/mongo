@@ -814,7 +814,7 @@ UpdateResult performUpdate(OperationContext* opCtx,
     // Create an RAII object that prints useful information about the ExpressionContext in the case
     // of a tassert or crash.
     ScopedDebugInfo expCtxDiagnostics(
-        "ExpCtxDiagnostics", command_diagnostics::ExpressionContextPrinter{parsedUpdate.expCtx()});
+        "ExpCtxDiagnostics", diagnostic_printers::ExpressionContextPrinter{parsedUpdate.expCtx()});
 
     if (auto scoped = failAllUpdates.scoped(); MONGO_unlikely(scoped.isActive())) {
         tassert(9276701,
@@ -938,7 +938,7 @@ long long performDelete(OperationContext* opCtx,
     // Create an RAII object that prints useful information about the ExpressionContext in the case
     // of a tassert or crash.
     ScopedDebugInfo expCtxDiagnostics(
-        "ExpCtxDiagnostics", command_diagnostics::ExpressionContextPrinter{parsedDelete.expCtx()});
+        "ExpCtxDiagnostics", diagnostic_printers::ExpressionContextPrinter{parsedDelete.expCtx()});
 
     if (auto scoped = failAllRemoves.scoped(); MONGO_unlikely(scoped.isActive())) {
         tassert(9276703,
@@ -1432,7 +1432,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     // Create an RAII object that prints useful information about the ExpressionContext in the case
     // of a tassert or crash.
     ScopedDebugInfo expCtxDiagnostics(
-        "ExpCtxDiagnostics", command_diagnostics::ExpressionContextPrinter{parsedUpdate.expCtx()});
+        "ExpCtxDiagnostics", diagnostic_printers::ExpressionContextPrinter{parsedUpdate.expCtx()});
 
     if (auto scoped = failAllUpdates.scoped(); MONGO_unlikely(scoped.isActive())) {
         tassert(9276702,
@@ -1893,7 +1893,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     // Create an RAII object that prints useful information about the ExpressionContext in the case
     // of a tassert or crash.
     ScopedDebugInfo expCtxDiagnostics(
-        "ExpCtxDiagnostics", command_diagnostics::ExpressionContextPrinter{parsedDelete.expCtx()});
+        "ExpCtxDiagnostics", diagnostic_printers::ExpressionContextPrinter{parsedDelete.expCtx()});
 
     if (auto scoped = failAllRemoves.scoped(); MONGO_unlikely(scoped.isActive())) {
         tassert(9276704,

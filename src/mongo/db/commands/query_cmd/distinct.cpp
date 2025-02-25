@@ -422,7 +422,7 @@ public:
         // case of a tassert or crash.
         ScopedDebugInfo expCtxDiagnostics(
             "ExpCtxDiagnostics",
-            command_diagnostics::ExpressionContextPrinter{canonicalQuery->getExpCtx()});
+            diagnostic_printers::ExpressionContextPrinter{canonicalQuery->getExpCtx()});
 
         if (collectionOrView->isView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
@@ -560,7 +560,7 @@ public:
         // case of a tassert or crash.
         ScopedDebugInfo expCtxDiagnostics(
             "ExpCtxDiagnostics",
-            command_diagnostics::ExpressionContextPrinter{canonicalQuery->getExpCtx()});
+            diagnostic_printers::ExpressionContextPrinter{canonicalQuery->getExpCtx()});
 
         if (canonicalDistinct.isMirrored()) {
             const auto& invocation = CommandInvocation::get(opCtx);

@@ -170,7 +170,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     // Create an RAII object that prints useful information about the ExpressionContext in the case
     // of a tassert or crash.
     ScopedDebugInfo expCtxDiagnostics("ExpCtxDiagnostics",
-                                      command_diagnostics::ExpressionContextPrinter{expCtx});
+                                      diagnostic_printers::ExpressionContextPrinter{expCtx});
     auto runnablePipeline = [&]() {
         auto pipeline = map_reduce_common::translateFromMR(parsedMr, expCtx);
         return expCtx->getMongoProcessInterface()->attachCursorSourceToPipelineForLocalRead(
