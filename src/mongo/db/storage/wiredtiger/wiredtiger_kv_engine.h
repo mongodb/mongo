@@ -514,11 +514,6 @@ private:
                                               Timestamp requestedTimestamp,
                                               bool roundUpIfTooOld);
 
-    Status _dropIdent(RecoveryUnit* ru,
-                      StringData ident,
-                      const char* config,
-                      const StorageEngine::DropIdentCallback& onDrop = nullptr);
-
 public:
     void unpinOldestTimestamp(const std::string& requestingServiceName) override;
 

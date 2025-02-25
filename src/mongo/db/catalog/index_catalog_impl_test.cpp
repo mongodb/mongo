@@ -44,69 +44,6 @@ using IndexCatalogImplTest = CatalogTestFixture;
 
 }  // namespace
 
-TEST_F(IndexCatalogImplTest, IndexRebuildHandlesTransientEbusy) {
-    const NamespaceString nss =
-        NamespaceString::createNamespaceString_forTest("IndexCatalogImplTest.RebuildForRecovery");
-    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, CollectionOptions()));
-
-    // Create an index which has not been built.
-    {
-        AutoGetCollection autoColl(operationContext(), nss, MODE_X);
-        WriteUnitOfWork wuow(operationContext());
-        CollectionWriter writer{operationContext(), autoColl};
-
-        auto writableColl = writer.getWritableCollection(operationContext());
-        IndexSpec spec;
-        spec.version(1).name("x_1").addKeys(BSON("x" << 1));
-        IndexDescriptor desc = IndexDescriptor(IndexNames::BTREE, spec.toBSON());
-        ASSERT_OK(writableColl->prepareForIndexBuild(operationContext(), &desc, boost::none));
-        writableColl->getIndexCatalog()->createIndexEntry(
-            operationContext(), writableColl, std::move(desc), CreateIndexEntryFlags::kNone);
-        wuow.commit();
-    }
-
-    // Make the index's underlying table busy.
-    //
-    // In production there may be transient operations that cause this. In tests we simulate
-    // that with an open cursor on a concurrent thread that we close with a delay.
-    mongo::Service* service = operationContext()->getService();
-    unittest::Barrier initBarrier(2);  // Main and concurrent.
-    stdx::thread async_close_cursor([service, &nss, &initBarrier] {
-        ServiceContext::UniqueClient newClient = service->makeClient("PretendClient");
-        ServiceContext::UniqueOperationContext newOpCtx = newClient->makeOperationContext();
-        std::shared_ptr<const CollectionCatalog> latestCatalog =
-            CollectionCatalog::latest(newOpCtx.get());
-        const IndexCatalog* newIdxCatalog =
-            latestCatalog->lookupCollectionByNamespace(newOpCtx.get(), nss)->getIndexCatalog();
-        const IndexDescriptor* desc = newIdxCatalog->findIndexByName(
-            newOpCtx.get(), "x_1", IndexCatalog::InclusionPolicy::kUnfinished);
-        const IndexCatalogEntry* entry = newIdxCatalog->getEntry(desc);
-        std::unique_ptr<SortedDataInterface::Cursor> cursor =
-            entry->accessMethod()->asSortedData()->newCursor(newOpCtx.get());
-        initBarrier.countDownAndWait();
-        sleepmillis(3);
-        // The cursor goes out-of-scope here, allowing the retry to succeed.
-    });
-
-    // Start rebuilding the index while the underlying table is busy. It will become
-    // not-busy asynchronously.
-    {
-        AutoGetCollection autoColl(operationContext(), nss, MODE_X);
-        WriteUnitOfWork wuow(operationContext());
-        CollectionWriter writer{operationContext(), autoColl};
-
-        auto writableColl = writer.getWritableCollection(operationContext());
-        IndexCatalogEntry* entry = writableColl->getIndexCatalog()->getWritableEntryByName(
-            operationContext(), "x_1", IndexCatalog::InclusionPolicy::kUnfinished);
-        ASSERT_FALSE(entry->isReady());
-        initBarrier.countDownAndWait();
-        ASSERT_OK(writableColl->getIndexCatalog()->resetUnfinishedIndexForRecovery(
-            operationContext(), writableColl, entry));
-    }
-
-    async_close_cursor.join();
-}
-
 TEST_F(IndexCatalogImplTest, WithInvalidIndexSpec) {
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("IndexCatalogImplTest.WithInvalidIndexSpec");
