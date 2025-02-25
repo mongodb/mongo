@@ -602,19 +602,6 @@ tasks:
       - func: "run tests"
 
   - <<: *task_template
-    name: change_streams_multi_stmt_txn_passthrough_with_replica_set_endpoint
-    tags:
-      [
-        "assigned_to_jira_team_server_cluster_scalability",
-        "experimental",
-        "replica_set_endpoint",
-        "requires_all_feature_flags",
-      ]
-    commands:
-      - func: "do setup"
-      - func: "run tests"
-
-  - <<: *task_template
     name: change_streams_multi_stmt_txn_sharded_collections_passthrough
     tags:
       [
@@ -732,19 +719,6 @@ tasks:
       - func: "run tests"
 
   - <<: *task_template
-    name: change_streams_whole_cluster_passthrough_with_replica_set_endpoint
-    tags:
-      [
-        "assigned_to_jira_team_server_cluster_scalability",
-        "experimental",
-        "replica_set_endpoint",
-        "requires_all_feature_flags",
-      ]
-    commands:
-      - func: "do setup"
-      - func: "run tests"
-
-  - <<: *task_template
     name: change_streams_whole_cluster_secondary_reads_sharded_collections
     tags:
       [
@@ -770,19 +744,6 @@ tasks:
       - func: "run tests"
 
   - <<: *task_template
-    name: change_streams_whole_db_passthrough_with_replica_set_endpoint
-    tags:
-      [
-        "assigned_to_jira_team_server_cluster_scalability",
-        "experimental",
-        "replica_set_endpoint",
-        "requires_all_feature_flags",
-      ]
-    commands:
-      - func: "do setup"
-      - func: "run tests"
-
-  - <<: *task_template
     name: change_streams_whole_db_secondary_reads_sharded_collections
     tags:
       [
@@ -790,19 +751,6 @@ tasks:
         "default",
         "change_streams",
         "secondary_reads",
-      ]
-    commands:
-      - func: "do setup"
-      - func: "run tests"
-
-  - <<: *task_template
-    name: change_streams_with_replica_set_endpoint
-    tags:
-      [
-        "assigned_to_jira_team_server_cluster_scalability",
-        "experimental",
-        "replica_set_endpoint",
-        "requires_all_feature_flags",
       ]
     commands:
       - func: "do setup"

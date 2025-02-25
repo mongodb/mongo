@@ -1983,18 +1983,6 @@ tasks:
     commands:
       - func: "generate resmoke tasks"
 
-  - <<: *gen_task_template
-    name: sharded_collections_jscore_passthrough_with_replica_set_endpoint_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_cluster_scalability",
-        "experimental",
-        "replica_set_endpoint",
-        "requires_all_feature_flags",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-
   - <<: *task_template
     name: sharded_jscore_txns
     tags:
@@ -2010,18 +1998,6 @@ tasks:
       - func: "do setup"
       - func: "run tests"
 
-  - <<: *gen_task_template
-    name: sharded_jscore_txns_with_replica_set_endpoint_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_cluster_scalability",
-        "experimental",
-        "replica_set_endpoint",
-        "requires_all_feature_flags",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-
   - <<: *task_template
     name: sharded_jscore_txns_sharded_collections
     tags:
@@ -2036,18 +2012,6 @@ tasks:
     commands:
       - func: "do setup"
       - func: "run tests"
-
-  - <<: *gen_task_template
-    name: sharded_jscore_txns_sharded_collections_with_replica_set_endpoint_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_cluster_scalability",
-        "experimental",
-        "replica_set_endpoint",
-        "requires_all_feature_flags",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
 
   - <<: *task_template
     name: sharded_jscore_txns_without_snapshot
@@ -2255,20 +2219,6 @@ tasks:
         "sharding",
         "jscore",
         "common",
-        "cluster_scalability_only",
-        "suggested_excluding_required__for_devprod_mitigation_only",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-
-  - <<: *gen_task_template
-    name: sharding_jscore_passthrough_with_replica_set_endpoint_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_cluster_scalability",
-        "default",
-        "replica_set_endpoint",
-        "requires_all_feature_flags",
         "cluster_scalability_only",
         "suggested_excluding_required__for_devprod_mitigation_only",
       ]
@@ -3013,24 +2963,6 @@ tasks:
           <<: *jstestfuzz_config_vars
           jstestfuzz_vars: --jsTestsDir ../jstests
           suite: jstestfuzz_sharded_notablescan
-          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
-  ## jstestfuzz sharded cluster with replica set endpoint ##
-  - <<: *jstestfuzz_template
-    name: jstestfuzz_sharded_with_replica_set_endpoint_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_cluster_scalability",
-        "experimental",
-        "replica_set_endpoint",
-        "requires_all_feature_flags",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          <<: *jstestfuzz_config_vars
-          jstestfuzz_vars: --jsTestsDir ../jstests
-          suite: jstestfuzz_sharded_with_replica_set_endpoint
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
   ## jstestfuzz sharded cluster with config transitions ##
