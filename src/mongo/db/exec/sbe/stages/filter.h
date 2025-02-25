@@ -202,10 +202,6 @@ protected:
         return true;
     }
 
-    void doAttachCollectionAcquisition(MultipleCollectionAccessor mca) override {
-        return;
-    }
-
 private:
     const std::unique_ptr<EExpression> _filter;
     std::unique_ptr<vm::CodeFragment> _filterCode;

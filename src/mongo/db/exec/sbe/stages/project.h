@@ -79,10 +79,6 @@ protected:
         return true;
     }
 
-    void doAttachCollectionAcquisition(MultipleCollectionAccessor mca) override {
-        return;
-    }
-
 private:
     const SlotExprPairVector _projects;
     value::SlotMap<std::pair<std::unique_ptr<vm::CodeFragment>, value::OwnedValueAccessor>> _fields;

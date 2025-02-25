@@ -84,10 +84,6 @@ protected:
         return _activeBranch && (static_cast<size_t>(*_activeBranch) == idx);
     }
 
-    void doAttachCollectionAcquisition(MultipleCollectionAccessor mca) override {
-        return;
-    }
-
 private:
     const std::unique_ptr<EExpression> _filter;
     const value::SlotVector _inputThenVals;

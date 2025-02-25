@@ -87,10 +87,6 @@ protected:
         return true;
     }
 
-    void doAttachCollectionAcquisition(MultipleCollectionAccessor mca) override {
-        return;
-    }
-
 private:
     const value::SlotVector _keySlots;
 
@@ -135,10 +131,6 @@ public:
 protected:
     bool shouldOptimizeSaveState(size_t) const final {
         return true;
-    }
-
-    void doAttachCollectionAcquisition(MultipleCollectionAccessor mca) override {
-        return;
     }
 
 private:

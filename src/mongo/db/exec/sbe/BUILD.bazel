@@ -65,7 +65,6 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe/vm:vm_datetime.cpp",
         "//src/mongo/db/exec/sbe/vm:vm_instruction.cpp",
         "//src/mongo/db/exec/sbe/vm:vm_printer.cpp",
-        "//src/mongo/db/query:multiple_collection_accessor.h",
     ],
     hdrs = [
         "sbe_pattern_value_cmp.h",

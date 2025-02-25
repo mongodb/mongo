@@ -67,7 +67,6 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
                                                        std::move(canonicalQuery),
                                                        std::move(solution),
                                                        std::move(sbePlanAndData),
-                                                       collections(),
                                                        plannerOptions(),
                                                        std::move(nss),
                                                        extractSbeYieldPolicy(),

@@ -77,10 +77,6 @@ public:
 protected:
     void doSaveState(bool relinquishCursor) override;
 
-    void doAttachCollectionAcquisition(MultipleCollectionAccessor mca) override {
-        return;
-    }
-
 private:
     PlanState getNextFromDeblockedValues();
     void freeDeblockedValueRuns();

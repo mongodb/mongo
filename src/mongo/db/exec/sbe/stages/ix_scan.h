@@ -135,7 +135,6 @@ protected:
     void doRestoreState(bool relinquishCursor) final;
     void doDetachFromOperationContext() final;
     void doAttachToOperationContext(OperationContext* opCtx) final;
-    void doAttachCollectionAcquisition(MultipleCollectionAccessor mca) override;
 
     /**
      * When this stage is re-opened after being closed, or during yield recovery, called to verify

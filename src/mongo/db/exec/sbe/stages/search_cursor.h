@@ -115,11 +115,6 @@ public:
      */
     boost::optional<long long> calcDocsNeeded();
 
-protected:
-    void doAttachCollectionAcquisition(MultipleCollectionAccessor mca) override {
-        return;
-    }
-
 private:
     SearchCursorStage(NamespaceString nss,
                       boost::optional<UUID> collUuid,

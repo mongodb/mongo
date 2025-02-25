@@ -93,11 +93,6 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
-protected:
-    void doAttachCollectionAcquisition(MultipleCollectionAccessor mca) override {
-        return;
-    }
-
 private:
     std::shared_ptr<SpoolBuffer> _buffer{nullptr};
     size_t _bufferIt{0};
@@ -156,10 +151,6 @@ protected:
     void doSaveState(bool relinquishCursor) final;
     bool shouldOptimizeSaveState(size_t) const final {
         return true;
-    }
-
-    void doAttachCollectionAcquisition(MultipleCollectionAccessor mca) override {
-        return;
     }
 
 private:
@@ -322,11 +313,6 @@ public:
         size_t size = sizeof(*this);
         size += size_estimator::estimate(_vals);
         return size;
-    }
-
-protected:
-    void doAttachCollectionAcquisition(MultipleCollectionAccessor mca) override {
-        return;
     }
 
 private:

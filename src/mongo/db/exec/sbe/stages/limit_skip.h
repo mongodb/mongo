@@ -84,10 +84,6 @@ protected:
         return true;
     }
 
-    void doAttachCollectionAcquisition(MultipleCollectionAccessor mca) override {
-        return;
-    }
-
 private:
     boost::optional<int64_t> _runLimitOrSkipCode(const vm::CodeFragment* code);
 

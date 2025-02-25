@@ -73,10 +73,6 @@ protected:
         return true;
     }
 
-    void doAttachCollectionAcquisition(MultipleCollectionAccessor mca) override {
-        return;
-    }
-
 private:
     const AggExprVector _projects;
 

@@ -106,14 +106,9 @@ public:
     const SpecificStats* getSpecificStats() const final;
     size_t estimateCompileTimeSize() const final;
 
-
 protected:
     void doSaveState(bool relinquishCursor) override;
     void doRestoreState(bool relinquishCursor) override;
-
-    void doAttachCollectionAcquisition(MultipleCollectionAccessor mca) override {
-        return;
-    }
 
 private:
     /**
