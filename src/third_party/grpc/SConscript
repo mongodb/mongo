@@ -133,7 +133,7 @@ grpc_unittest_env.Append(CPPPATH=[
 ], )
 
 grpc_unittest_env.CppUnitTest(
-    target='grpc_lib_test',
+    target="grpc_lib_test",
     source=[],
 )
 

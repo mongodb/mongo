@@ -9,6 +9,54 @@ REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
 sys.path.append(str(REPO_ROOT))
 
 
+def check_for_missing_test_stubs():
+    bazel_tests = (
+        subprocess.check_output(
+            [
+                "bazel",
+                "query",
+                "attr(tags, 'mongo_unittest', //...) intersect attr(tags, 'final_target', //...)",
+            ],
+            stderr=subprocess.DEVNULL,
+        )
+        .decode("utf-8")
+        .splitlines()
+    )
+    bazel_tests = [bazel_test.split(":")[1] for bazel_test in bazel_tests]
+
+    scons_targets = (
+        subprocess.check_output(
+            ["grep -rPo 'target\s*=\s*\"\K\w*' ./src  | awk -F: '{print $2}'"],
+            stderr=subprocess.STDOUT,
+            shell=True,
+        )
+        .decode("utf-8")
+        .splitlines()
+    )
+
+    missing_tests = []
+    for bazel_test in bazel_tests:
+        if bazel_test not in scons_targets:
+            missing_tests += [bazel_test]
+
+    if len(missing_tests) == 0:
+        print("All bazel tests have SConscript stubs")
+        return True
+
+    print("Tests found without SConscript stubs:")
+    for missing_test in missing_tests:
+        print(missing_test)
+    print("\nPlease add a stub in the SConscript file in the directory of each test similar to:")
+    print("""
+env.CppUnitTest(
+    target="test_name",
+    source=[],
+)
+
+""")
+    return False
+
+
 def create_build_files_in_new_js_dirs():
     base_dirs = ["src/mongo/db/modules/enterprise/jstests", "jstests"]
     for base_dir in base_dirs:
@@ -106,6 +154,9 @@ def run_rules_lint(bazel_bin, args):
 
     if not list_files_without_targets(bazel_bin):
         sys.exit(1)
+
+    if not check_for_missing_test_stubs():
+        exit(1)
 
     # Default to linting everything if no path was passed in
     if len([arg for arg in args if not arg.startswith("--")]) == 0:
