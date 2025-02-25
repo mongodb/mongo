@@ -4,6 +4,7 @@ import platform
 import subprocess
 import sys
 import tempfile
+from typing import List
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
 sys.path.append(str(REPO_ROOT))
@@ -85,62 +86,114 @@ js_library(
                         print(f"Created BUILD.bazel in {full_dir}")
 
 
-def list_files_without_targets(bazel_bin: str):
+def list_files_with_targets(bazel_bin: str):
+    return [
+        line.strip()
+        for line in subprocess.run(
+            [bazel_bin, "query", 'kind("source file", deps(//...))', "--keep_going"],
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout.splitlines()
+    ]
+
+
+def list_files_without_targets(
+    files_with_targets: List[str],
+    type_name: str,
+    ext: str,
+    dirs: List[str],
+):
     # rules_lint only checks files that are in targets, verify that all files in the source tree
     # are contained within targets.
 
-    try:
-        proc = subprocess.check_output(
-            [bazel_bin, "cquery", 'kind("source file", deps(//...))', "--output", "files"],
-            stderr=subprocess.STDOUT,
-        )
-    except subprocess.CalledProcessError as ex:
-        print("ERROR: bazel query failed:")
-        print(ex.cmd)
-        print(ex.stdout)
-        print(ex.stderr)
-        sys.exit(1)
+    exempt_list = {
+        # TODO(SERVER-101365): Remove the exemptions below once resolved.
+        "src/mongo/crypto/fle_options.cpp",
+        # TODO(SERVER-101361): Remove the exemptions below once resolved.
+        "src/mongo/db/auth/authz_manager_external_state_local.cpp",
+        "src/mongo/db/auth/authz_manager_external_state_s.cpp",
+        # TODO(SERVER-101362): Remove the exemptions below once resolved.
+        "src/mongo/db/exec/expression/evaluate_index_test.cpp",
+        # TODO(SERVER-101364): Remove the exemptions below once resolved.
+        "src/mongo/db/ftdc/ftdc_system_stats_freebsd.cpp",
+        "src/mongo/db/ftdc/ftdc_system_stats_macOS.cpp",
+        "src/mongo/db/ftdc/ftdc_system_stats_openbsd.cpp",
+        "src/mongo/db/ftdc/ftdc_system_stats_solaris.cpp",
+        # TODO(SERVER-101365): Remove the exemptions below once resolved.
+        "src/mongo/db/service_entry_point_test_fixture.cpp",
+        # TODO(SERVER-101366): Remove the exemptions below once resolved.
+        "src/mongo/db/read_concern_test.cpp",
+        # TODO(SERVER-101367): Remove the exemptions below once resolved.
+        "src/mongo/db/timeseries/timeseries_collmod_test.cpp",
+        # TODO(SERVER-101368): Remove the exemptions below once resolved.
+        "src/mongo/db/modules/enterprise/src/streams/commands/update_connection.cpp",
+        # TODO(SERVER-101370): Remove the exemptions below once resolved.
+        "src/mongo/db/modules/enterprise/src/streams/third_party/mongocxx/dist/mongocxx/test_util/client_helpers.cpp",
+        # TODO(SERVER-101371): Remove the exemptions below once resolved.
+        "src/mongo/db/modules/enterprise/src/streams/util/tests/concurrent_memory_aggregator_test.cpp",
+        # TODO(SERVER-101372): Remove the exemptions below once resolved.
+        "src/mongo/executor/network_interface_perf_test.cpp",
+        # TODO(SERVER-101373): Remove the exemptions below once resolved.
+        "src/mongo/executor/network_interface_thread_pool_test.cpp",
+        # TODO(SERVER-101375): Remove the exemptions below once resolved.
+        "src/mongo/platform/decimal128_dummy.cpp",
+        # TODO(SERVER-101376): Remove the exemptions below once resolved.
+        "src/mongo/platform/stack_locator_emscripten.cpp",
+        "src/mongo/platform/stack_locator_freebsd.cpp",
+        "src/mongo/platform/stack_locator_macOS.cpp",
+        "src/mongo/platform/stack_locator_openbsd.cpp",
+        "src/mongo/platform/stack_locator_solaris.cpp",
+        "src/mongo/platform/stack_locator_unknown.cpp",
+        # TODO(SERVER-101377): Remove the exemptions below once resolved.
+        "src/mongo/util/icu_init_stub.cpp",
+        # TODO(SERVER-101378): Remove the exemptions below once resolved.
+        "src/mongo/util/regex_util.cpp",
+        # TODO(SERVER-101377): Remove the exemptions below once resolved.
+        "src/mongo/util/processinfo_emscripten.cpp",
+        "src/mongo/util/processinfo_macOS.cpp",
+        "src/mongo/util/processinfo_solaris.cpp",
+    }
 
-    js_files_in_targets = [
-        line.strip() for line in proc.decode("utf-8").splitlines() if line.strip().endswith("js")
-    ]
+    typed_files_in_targets = [line for line in files_with_targets if line.endswith(f".{ext}")]
 
-    print("Checking that all javascript files have BUILD.bazel targets...")
+    print(f"Checking that all {type_name} files have BUILD.bazel targets...")
 
-    # Find all .js files in src/mongo and jstests
-    js_files = (
+    all_typed_files = (
         subprocess.check_output(
-            ["find", "src/mongo", "jstests", "-name", "*.js"],
+            ["find", *dirs, "-name", f"*.{ext}"],
             stderr=subprocess.STDOUT,
         )
         .decode("utf-8")
         .splitlines()
     )
 
-    # Convert js_files_in_targets to a set for easy comparison
-    js_files_in_targets_set = set()
-    for file in js_files_in_targets:
+    # Convert typed_files_in_targets to a set for easy comparison
+    typed_files_in_targets_set = set()
+    for file in typed_files_in_targets:
         # Remove the leading "//" and replace ":" with "/"
         clean_file = file.lstrip("//").replace(":", "/")
-        js_files_in_targets_set.add(clean_file)
+        typed_files_in_targets_set.add(clean_file)
 
-    # Create a new list of files that are in js_files but not in js_files_in_targets
+    # Create a new list of files that are in all_typed_files but not in typed_files_in_targets
     new_list = []
-    for file in js_files:
-        if file not in js_files_in_targets_set:
+    for file in all_typed_files:
+        if file not in typed_files_in_targets_set and file not in exempt_list:
             new_list.append(file)
 
     if len(new_list) != 0:
-        print("Found javascript files without BUILD.bazel definitions:")
+        print(f"Found {type_name} files without BUILD.bazel definitions:")
         for file in new_list:
             print(f"\t{file}")
         print("")
-        print("Please add these to a js_library target in a BUILD.bazel file in their directory")
+        print(
+            f"Please add these to a {ext}_library target in a BUILD.bazel file in their directory"
+        )
         print("Run the following to attempt to fix the issue automatically:")
         print("\tbazel run lint --fix")
         return False
 
-    print("All javascript files have BUILD.bazel targets!")
+    print(f"All {type_name} files have BUILD.bazel targets!")
     return True
 
 
@@ -152,7 +205,13 @@ def run_rules_lint(bazel_bin, args):
     if "--fix" in args:
         create_build_files_in_new_js_dirs()
 
-    if not list_files_without_targets(bazel_bin):
+    files_with_targets = list_files_with_targets(bazel_bin)
+    if not list_files_without_targets(files_with_targets, "C++", "cpp", ["src/mongo"]):
+        sys.exit(1)
+
+    if not list_files_without_targets(
+        files_with_targets, "javascript", "js", ["src/mongo", "jstests"]
+    ):
         sys.exit(1)
 
     if not check_for_missing_test_stubs():
