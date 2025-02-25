@@ -17,13 +17,20 @@ except ImportError:
 
 def main(
     uri: str,
-    drop: bool = typer.Option(False, help="drop collections before inserts"),
+    dropColls: bool = typer.Option(False, help="drop collections before inserts"),
+    dropTs: bool = typer.Option(False, help="drop git commit base timestamps before inserts"),
 ):
-    if drop:
-        print("--drop was specified. This will drop the collections before inserting.")
-        if input("Type Y to confirm: ").lower().strip() not in ("y", "yes"):
-            print("aborting")
-            raise typer.Exit(1)
+    if dropColls:
+        print("--dropColls was specified. This will drop the collections before inserting.")
+
+    if dropTs:
+        print(
+            "--dropTs was specified. This will delete all documents at the commit base timestamp before inserting."
+        )
+
+    if (dropColls or dropTs) and (input("Type Y to confirm: ").lower().strip() not in ("y", "yes")):
+        print("aborting")
+        raise typer.Exit(1)
 
     try:
         print("Connecting to mongodb...")
@@ -53,16 +60,21 @@ def main(
         decls = json.load(f)
         timestamp(decls)
 
-    if drop:
+    if dropColls:
         conn["modules"]["decls"].drop()
+    elif dropTs:
+        conn["modules"]["decls"].delete_many({"ts": commit_date})
     conn["modules"]["decls"].insert_many(decls)
     print("uploaded decls")
 
     with open("unowned.yaml") as f:
         decls = yaml.load(f, Loader=Loader)
         timestamp(decls)
-    if drop:
+
+    if dropColls:
         conn["modules"]["unowned"].drop()
+    elif dropTs:
+        conn["modules"]["unowned"].delete_many({"ts": commit_date})
     conn["modules"]["unowned"].insert_many(decls)
     print("uploaded unowned")
 
