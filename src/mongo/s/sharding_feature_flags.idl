@@ -169,6 +169,13 @@ feature_flags:
     cpp_varname: feature_flags::gShardAuthoritativeDbMetadata
     default: false
     shouldBeFCVGated: false
+  # TODO (SERVER-89169): remove once 9.0 becomes last LTS.
+  featureFlagShardAuthoritativeCollMetadata:
+    description: "Feature flag to enable the authoritative model for storing shard-local information 
+                  for collections and chunks metadata."
+    cpp_varname: feature_flags::gShardAuthoritativeCollMetadata
+    default: false
+    shouldBeFCVGated: false
   # TODO (SERVER-100309): remove once 9.0 becomes last LTS.
   featureFlagSessionsCollectionCoordinatorOnConfigServer:
     description: Feature flag for running the shard collection coordinator on the config server for
