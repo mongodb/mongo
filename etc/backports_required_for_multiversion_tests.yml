@@ -383,8 +383,6 @@ last-continuous:
     ticket: SERVER-92193
   - test_file: jstests/core/query/find_all_values_at_path_expression.js
     ticket: SERVER-95670
-  - test_file: jstests/core/write/update/upsert_duplicate_key_retry_collation.js
-    ticket: SERVER-84089
   suites: null
 last-lts:
   all:
@@ -816,6 +814,4 @@ last-lts:
     ticket: SERVER-92193
   - test_file: jstests/core/query/find_all_values_at_path_expression.js
     ticket: SERVER-95670
-  - test_file: jstests/core/write/update/upsert_duplicate_key_retry_collation.js
-    ticket: SERVER-84089
   suites: null
