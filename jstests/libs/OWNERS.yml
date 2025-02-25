@@ -1,6 +1,6 @@
 version: 1.0.0
 filters:
-  - "write_commands.js":
+  - "write_concern_all_commands.js":
     approvers:
       - 10gen/query-execution-write-exec
   - "replsettest.js":

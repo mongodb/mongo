@@ -983,6 +983,13 @@ export class ShardingTest {
     }
 
     /**
+     * Returns all shards in the cluster.
+     */
+    getAllShards() {
+        return this._rs.map(obj => obj.test);
+    }
+
+    /**
      * @typedef {Object} ShardingTestOtherParams
      * @property {Object} [rs] Same `rs` parameter to ShardingTest constructor
      * @property {number} [chunkSize] Same as chunkSize parameter to ShardingTest constructor
