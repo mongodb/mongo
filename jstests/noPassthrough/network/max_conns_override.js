@@ -93,7 +93,7 @@ function verifyStats(conn, {exemptCount, normalCount}) {
 // Can't run the proxy on Windows.
 // If we're on POSIX, then determine doing the proxy test based on checking FF enable.
 // (deferred until first run without proxy)
-let featureFlagMongodProxyProcolSupportEnabled = _isWindows() ? false : undefined;
+let featureFlagMongodProxyProtocolSupportEnabled = _isWindows() ? false : undefined;
 
 function runTest(useProxy, useMongos) {
     jsTest.log(`runTest(useProxy: ${tojson(useProxy)}, useMongos: ${tojson(useMongos)})`);
@@ -162,11 +162,11 @@ function runTest(useProxy, useMongos) {
     }();
 
     try {
-        if (featureFlagMongodProxyProcolSupportEnabled === undefined) {
+        if (featureFlagMongodProxyProtocolSupportEnabled === undefined) {
             // Test for featureFlag while in normal mode,
             // so that we know if we can run with proxy mode later.
-            featureFlagMongodProxyProcolSupportEnabled =
-                FeatureFlagUtil.isEnabled(conn, 'MongodProxyProcolSupport');
+            featureFlagMongodProxyProtocolSupportEnabled =
+                FeatureFlagUtil.isEnabled(conn, 'MongodProxyProtocolSupport');
         }
 
         let adminConns = [];
@@ -234,6 +234,6 @@ function runTestSet(useProxy) {
 
 // Ordering of false->true requied for identifying if we have ff enabled.
 runTestSet(false);
-if (featureFlagMongodProxyProcolSupportEnabled) {
+if (featureFlagMongodProxyProtocolSupportEnabled) {
     runTestSet(true);
 }

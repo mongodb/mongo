@@ -331,7 +331,7 @@ auto makeTransportLayer(ServiceContext* svcCtx) {
     }
 
     // (Ignore FCV check): The proxy port needs to be open before the FCV is set.
-    if (gFeatureFlagMongodProxyProcolSupport.isEnabledAndIgnoreFCVUnsafe()) {
+    if (gFeatureFlagMongodProxyProtocolSupport.isEnabledAndIgnoreFCVUnsafe()) {
         if (serverGlobalParams.proxyPort) {
             proxyPort = *serverGlobalParams.proxyPort;
             if (*proxyPort == serverGlobalParams.port) {

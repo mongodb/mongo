@@ -45,7 +45,7 @@ function testProxyProtocolReplicaSet(ingressPort, egressPort, version) {
     proxy_server.start();
 
     let rs = new ReplSetTest({nodes: 1, nodeOptions: {"proxyPort": egressPort}});
-    rs.startSet({setParameter: {featureFlagMongodProxyProcolSupport: true}});
+    rs.startSet({setParameter: {featureFlagMongodProxyProtocolSupport: true}});
     rs.initiate();
 
     // Connecting to the to the proxy port succeeds.
