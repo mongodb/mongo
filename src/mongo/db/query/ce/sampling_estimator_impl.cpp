@@ -327,6 +327,7 @@ void SamplingEstimatorImpl::executeSamplingQueryAndSample(
                                                              std::move(cq),
                                                              nullptr /*solution*/,
                                                              std::move(plan),
+                                                             _collections,
                                                              QueryPlannerParams::DEFAULT,
                                                              _collections.getMainCollection()->ns(),
                                                              std::move(sbeYieldPolicy),

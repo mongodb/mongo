@@ -91,6 +91,10 @@ public:
 protected:
     void doSaveState(bool relinquishCursor) final;
 
+    void doAttachCollectionAcquisition(MultipleCollectionAccessor mca) override {
+        return;
+    }
+
 private:
     using MergeJoinBuffer = std::vector<value::MaterializedRow>;
     using MergeJoinBufferAccessor = value::MaterializedRowAccessor<MergeJoinBuffer>;

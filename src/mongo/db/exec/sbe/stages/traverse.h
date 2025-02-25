@@ -110,6 +110,10 @@ protected:
         return true;
     }
 
+    void doAttachCollectionAcquisition(MultipleCollectionAccessor mca) override {
+        return;
+    }
+
 private:
     void openInner(value::TypeTags tag, value::Value val);
     bool traverse(value::SlotAccessor* inFieldAccessor,

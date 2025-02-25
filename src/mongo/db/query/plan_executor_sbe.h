@@ -92,7 +92,8 @@ public:
                     boost::optional<size_t> cachedPlanHash,
                     std::unique_ptr<RemoteCursorMap> remoteCursors,
                     std::unique_ptr<RemoteExplainVector> remoteExplains,
-                    std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage);
+                    std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage,
+                    const MultipleCollectionAccessor& mca);
 
     CanonicalQuery* getCanonicalQuery() const override {
         return _cq.get();

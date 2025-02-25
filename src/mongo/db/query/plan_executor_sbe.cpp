@@ -89,7 +89,8 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                  boost::optional<size_t> cachedPlanHash,
                                  std::unique_ptr<RemoteCursorMap> remoteCursors,
                                  std::unique_ptr<RemoteExplainVector> remoteExplains,
-                                 std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage)
+                                 std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage,
+                                 const MultipleCollectionAccessor& mca)
     : _state{isOpen ? State::kOpened : State::kClosed},
       _opCtx(opCtx),
       _nss(std::move(nss)),
@@ -104,7 +105,9 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
       _remoteExplains(std::move(remoteExplains)) {
     invariant(!_nss.isEmpty());
     invariant(_root);
-
+    if (mca.isAcquisition()) {
+        _root->attachCollectionAcquisition(mca);
+    }
     auto& env = _rootData.env;
     if (auto slot = _rootData.staticData->resultSlot) {
         _result = _root->getAccessor(env.ctx, *slot);

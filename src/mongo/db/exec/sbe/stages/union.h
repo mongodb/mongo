@@ -82,6 +82,10 @@ protected:
         return _currentStageIndex == idx;
     }
 
+    void doAttachCollectionAcquisition(MultipleCollectionAccessor mca) override {
+        return;
+    }
+
 private:
     struct UnionBranch {
         PlanStage* const stage{nullptr};

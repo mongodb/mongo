@@ -108,6 +108,10 @@ protected:
         return idx == 1;
     }
 
+    void doAttachCollectionAcquisition(MultipleCollectionAccessor mca) override {
+        return;
+    }
+
 private:
     PlanState getNextOuterSide() {
         _isReadingLeftSide = true;

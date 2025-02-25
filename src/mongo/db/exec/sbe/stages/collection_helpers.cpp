@@ -57,12 +57,17 @@ void CollectionRef::acquireCollection(OperationContext* opCtx,
     // with the storage engine snapshot from which we are reading) has been stashed on the
     // 'OperationContext'. Either way, this means that the UUID must still exist in our view of the
     // collection catalog.
-    getConsistentCollection(opCtx, dbName, collUuid);
-    tassert(
-        5071000, str::stream() << "Collection uuid " << collUuid << " does not exist", getPtr());
+    if (!isAcquisition()) {
+        tassert(
+            9367600, "'_coll' should not be initialized prior to 'acquireCollection()'", !(*this));
+        getConsistentCollection(opCtx, dbName, collUuid);
+        tassert(5071000,
+                str::stream() << "Collection uuid " << collUuid << " does not exist",
+                getPtr());
 
-    _collName = getPtr()->ns();
-    _catalogEpoch = CollectionCatalog::get(opCtx)->getEpoch();
+        _collName = getPtr()->ns();
+        _catalogEpoch = CollectionCatalog::get(opCtx)->getEpoch();
+    }
 }
 
 void CollectionRef::restoreCollection(OperationContext* opCtx,
