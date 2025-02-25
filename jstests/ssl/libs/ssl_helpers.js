@@ -139,6 +139,7 @@ export function mixedShardTest(options1, options2, shouldSucceed) {
             mongos: [options1],
             config: 1,
             shards: [options1, options2],
+            shouldFailInit: !shouldSucceed,
             other: {
                 enableBalancer: true,
                 configOptions: options1,
