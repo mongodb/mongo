@@ -47,13 +47,13 @@ public:
 
     static VersionContext& getDecoration(OperationContext*);
 
-    VersionContext();
+    VersionContext() = default;
 
     explicit VersionContext(FCV fcv);
 
     explicit VersionContext(FCVSnapshot fcv);
 
-    explicit VersionContext(const BSONObj& obj);
+    explicit VersionContext(const BSONObj& bsonObject);
 
     VersionContext(const VersionContext& other) = default;
 
@@ -63,12 +63,14 @@ public:
 
     void setOperationFCV(FCVSnapshot fcv);
 
-    FCVSnapshot getOperationFCV() const;
+    boost::optional<FCVSnapshot> getOperationFCV() const;
 
     BSONObj toBSON() const;
 
 private:
-    VersionContextMetadata _metadata;
+    void _assertOFCVNotInitialized() const;
+
+    boost::optional<VersionContextMetadata> _metadata;
 };
 
 }  // namespace mongo

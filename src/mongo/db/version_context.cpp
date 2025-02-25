@@ -33,57 +33,48 @@ namespace mongo {
 
 using FCVSnapshot = ServerGlobalParams::FCVSnapshot;
 
-VersionContext::VersionContext() {
-    _metadata.setOFCV(FCV::kUnsetDefaultLastLTSBehavior);
-}
-
 VersionContext::VersionContext(FCV fcv) {
-    _metadata.setOFCV(fcv);
+    _metadata.emplace(fcv);
 }
 
 VersionContext::VersionContext(FCVSnapshot fcv) {
-    if (!fcv.isVersionInitialized()) {
-        _metadata.setOFCV(FCV::kUnsetDefaultLastLTSBehavior);
-        return;
-    }
-    _metadata.setOFCV(fcv.getVersion());
+    _metadata.emplace(fcv.getVersion());
 }
 
-VersionContext::VersionContext(const BSONObj& obj) {
-    _metadata = VersionContextMetadata::parse(IDLParserContext("VersionContextMetadata"), obj);
+VersionContext::VersionContext(const BSONObj& bsonObject) {
+    if (bsonObject.isEmpty()) {
+        return;
+    }
+    _metadata =
+        VersionContextMetadata::parse(IDLParserContext("VersionContextMetadata"), bsonObject);
 }
 
 VersionContext& VersionContext::operator=(const VersionContext& other) {
-    if (_metadata.getOFCV() != FCV::kUnsetDefaultLastLTSBehavior) {
-        uasserted(ErrorCodes::AlreadyInitialized, "The operation FCV can be set only once.");
-    }
-    _metadata.setOFCV(other._metadata.getOFCV());
+    _assertOFCVNotInitialized();
+    _metadata = other._metadata;
     return *this;
 }
 
 void VersionContext::setOperationFCV(FCV fcv) {
-    if (_metadata.getOFCV() != FCV::kUnsetDefaultLastLTSBehavior) {
-        uasserted(ErrorCodes::AlreadyInitialized, "The operation FCV can be set only once.");
-    }
-    _metadata.setOFCV(fcv);
+    _assertOFCVNotInitialized();
+    _metadata.emplace(fcv);
 }
 
 void VersionContext::setOperationFCV(FCVSnapshot fcv) {
-    if (_metadata.getOFCV() != FCV::kUnsetDefaultLastLTSBehavior) {
-        uasserted(ErrorCodes::AlreadyInitialized, "The operation FCV can be set only once.");
-    }
-    if (!fcv.isVersionInitialized()) {
-        return;
-    }
-    _metadata.setOFCV(fcv.getVersion());
+    _assertOFCVNotInitialized();
+    _metadata.emplace(fcv.getVersion());
 }
 
-FCVSnapshot VersionContext::getOperationFCV() const {
-    return ServerGlobalParams::FCVSnapshot{_metadata.getOFCV()};
+boost::optional<FCVSnapshot> VersionContext::getOperationFCV() const {
+    return _metadata ? boost::optional<FCVSnapshot>{_metadata->getOFCV()} : boost::none;
 }
 
 BSONObj VersionContext::toBSON() const {
-    return _metadata.toBSON();
+    return _metadata ? _metadata->toBSON() : BSONObj();
+}
+
+void VersionContext::_assertOFCVNotInitialized() const {
+    uassert(ErrorCodes::AlreadyInitialized, "The operation FCV has already been set.", !_metadata);
 }
 
 }  // namespace mongo
