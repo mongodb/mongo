@@ -874,12 +874,11 @@ mongo_cc_unit_test(
         "//conditions:default": [],
     }),
     data = [
-        "//jstests/libs:server.pem",
+        "//jstests/libs:test_pem_files",
     ],
     tags = [
         # Segfaults in sandbox
         "code_coverage_quarantine",
-        "code_coverage_quarantine_SERVER-98844",
         "mongo_unittest_fifth_group",
     ],
     deps = [
