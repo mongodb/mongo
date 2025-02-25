@@ -60,14 +60,28 @@ public:
                  boost::optional<TimeseriesOptions> timeseriesOptions = boost::none,
                  boost::optional<bool> timeseriesMayContainMixedData = boost::none,
                  boost::optional<bool> timeseriesUsesExtendedRange = boost::none,
-                 boost::optional<bool> timeseriesfixedBuckets = boost::none)
+                 boost::optional<bool> timeseriesfixedBuckets = boost::none,
+                 const bool isNewTimeseriesWithoutView = false)
         : _namespace(collectionNs),
           _pipeline(std::move(pipeline)),
           _defaultCollation(std::move(defaultCollation)),
           _timeseriesOptions(timeseriesOptions),
           _timeseriesMayContainMixedData(timeseriesMayContainMixedData),
           _timeseriesUsesExtendedRange(timeseriesUsesExtendedRange),
-          _timeseriesfixedBuckets(timeseriesfixedBuckets) {}
+          _timeseriesfixedBuckets(timeseriesfixedBuckets) {
+        // If we reach here with a timeseries query, it will be because we're working with a
+        // view-based timeseries collection. Viewless timeseries collections should be defined
+        // already and should not trigger this kickback at all.
+        //
+        // TODO(SERVER-100862): This check should be removed once the isNewTimeseriesWithoutView
+        // parameter has been removed.
+        tassert(9950300,
+                (std::stringstream{}
+                 << "Should not be performing view resolution on viewless timeseries collection: "
+                 << collectionNs.toStringForErrorMsg())
+                    .str(),
+                !isNewTimeseriesWithoutView);
+    }
 
     static ResolvedView fromBSON(const BSONObj& commandResponseObj);
 

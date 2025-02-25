@@ -202,6 +202,11 @@ StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
     boost::optional<bool> hasExtendedRange = boost::none;
     boost::optional<bool> fixedBuckets = boost::none;
 
+    // Whether we are working with a new, viewless timeseries collection. In general, we expect this
+    // to be false, but this is present so that we can enforce this invariant in ResolvedView. Once
+    // this parameter is removed from the catalog cache, this variable should be removed as well.
+    bool isNewTimeseriesWithoutView = false;
+
     for (; depth < ViewGraph::kMaxViewDepth; depth++) {
         auto view = catalog->lookupView(opCtx, *resolvedNss);
         if (!view) {
@@ -226,7 +231,8 @@ StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
                  tsOptions,
                  mixedData,
                  hasExtendedRange,
-                 fixedBuckets});
+                 fixedBuckets,
+                 isNewTimeseriesWithoutView});
         }
 
         resolvedNss = &view->viewOn();
@@ -247,6 +253,7 @@ StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
             tsOptions = tsCollection->getTimeseriesOptions();
             hasExtendedRange = tsCollection->getRequiresTimeseriesExtendedRangeSupport();
             fixedBuckets = tsCollection->areTimeseriesBucketsFixed();
+            isNewTimeseriesWithoutView = tsCollection->isNewTimeseriesWithoutView();
         }
 
         dependencyChain.push_back(*resolvedNss);
