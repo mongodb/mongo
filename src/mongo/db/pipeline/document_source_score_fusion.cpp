@@ -310,17 +310,47 @@ BSONObj groupEachScore(
  */
 boost::intrusive_ptr<DocumentSource> buildSetScoreStage(
     const auto& expCtx,
-    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputs) {
+    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputs,
+    const ScoreFusionCombinationMethodEnum combinationMethod) {
     Expression::ExpressionVector allInputScores;
     for (auto it = inputs.begin(); it != inputs.end(); it++) {
+        std::string fieldScoreName = fmt::format("{}_score", it->first);
         allInputScores.push_back(ExpressionFieldPath::createPathFromString(
-            expCtx.get(), it->first + "_score", expCtx->variablesParseState));
+            expCtx.get(), fieldScoreName, expCtx->variablesParseState));
     }
 
+    // Default is to sum the scores.
+    boost::intrusive_ptr<Expression> metadataExpression;
+    switch (combinationMethod) {
+        case ScoreFusionCombinationMethodEnum::kExpression:
+            // TODO SERVER-100173: Handle combination.expression behavior.
+            uasserted(ErrorCodes::NotImplemented,
+                      "$scoreFusion.combination.expression is not yet supported");
+            break;
+        case ScoreFusionCombinationMethodEnum::kAvg: {
+            // Construct an array of the score field path names for AccumulatorAvg.
+            BSONArrayBuilder expressionFieldPaths;
+            for (auto it = inputs.begin(); it != inputs.end(); it++) {
+                std::string fieldScoreName = fmt::format("${}_score", it->first);
+                expressionFieldPaths.append(fieldScoreName);
+            }
+            expressionFieldPaths.done();
+            metadataExpression = ExpressionFromAccumulator<AccumulatorAvg>::parse(
+                expCtx.get(),
+                BSON("$avg" << expressionFieldPaths.arr()).firstElement(),
+                expCtx->variablesParseState);
+            break;
+        }
+        case mongo::ScoreFusionCombinationMethodEnum::kSum:
+            metadataExpression =
+                make_intrusive<ExpressionAdd>(expCtx.get(), std::move(allInputScores));
+            break;
+        default:
+            // Only one of the above options can be specified for combination.method.
+            MONGO_UNREACHABLE_TASSERT(10016700);
+    }
     return DocumentSourceSetMetadata::create(
-        expCtx,
-        make_intrusive<ExpressionAdd>(expCtx.get(), std::move(allInputScores)),
-        DocumentMetadataFields::MetaType::kScore);
+        expCtx, metadataExpression, DocumentMetadataFields::MetaType::kScore);
 }
 
 /**
@@ -362,10 +392,11 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipelineStage(
  */
 std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
     const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputPipelines,
+    const ScoreFusionCombinationMethodEnum combinationMethod,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto group =
         DocumentSourceGroup::createFromBson(groupEachScore(inputPipelines).firstElement(), expCtx);
-    auto setScoreMeta = buildSetScoreStage(expCtx, inputPipelines);
+    auto setScoreMeta = buildSetScoreStage(expCtx, inputPipelines, combinationMethod);
 
     const SortPattern sortingPattern{BSON("score" << BSON("$meta"
                                                           << "score")
@@ -479,7 +510,13 @@ std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
         }
     }
     // Build all remaining stages to perform the fusion.
-    auto finalStages = buildScoreAndMergeStages(inputPipelines, pExpCtx);
+    // Sum is the default combination method if no other method is specified.
+    ScoreFusionCombinationMethodEnum combinationMethod = ScoreFusionCombinationMethodEnum::kSum;
+    if (spec.getCombination().is_initialized() &&
+        spec.getCombination()->getMethod().is_initialized()) {
+        combinationMethod = spec.getCombination()->getMethod().get();
+    }
+    auto finalStages = buildScoreAndMergeStages(inputPipelines, combinationMethod, pExpCtx);
     for (auto&& stage : finalStages) {
         outputStages.emplace_back(stage);
     }

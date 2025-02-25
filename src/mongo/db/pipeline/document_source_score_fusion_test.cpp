@@ -526,9 +526,9 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfEmptyPipeline) {
 }
 
 TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowed) {
-    auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
-        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
+    getExpCtx()->setResolvedNamespaces(
+        ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
     auto spec = fromjson(R"({
         $scoreFusion: {
             input: {
@@ -690,12 +690,9 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowed) {
 }
 
 TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedSigmoid) {
-    // Feature flag needed to use 'score' meta field
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
-    RAIIServerParameterControllerForTest controller("featureFlagSearchHybridScoringFull", true);
-    auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
-        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    auto fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
+    getExpCtx()->setResolvedNamespaces(
+        ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
     auto spec = fromjson(R"({
         $scoreFusion: {
             input: {
@@ -1045,9 +1042,9 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultipleStagesInPipelineAllowed) {
 }
 
 TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArgumentsAllowed) {
-    auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
-        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    auto fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
+    getExpCtx()->setResolvedNamespaces(
+        ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
     auto spec = fromjson(R"({
         $scoreFusion: {
             input: {
@@ -1370,116 +1367,6 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNormalizationInvalidValue) {
                        ErrorCodes::BadValue);
 }
 
-TEST_F(DocumentSourceScoreFusionTest, CheckAnyTypeAllowedForScore) {
-    auto spec = fromjson(R"({
-        $scoreFusion: {
-            input: {
-                pipelines: {
-                    name1: [
-                        {
-                            $search: {
-                                index: "search_index",
-                                text: {
-                                    query: "mystery",
-                                    path: "genres"
-                                }
-                            }
-                        },
-                        { $match : { author : "dave" } }
-                    ]
-                },
-                normalization: "none"
-            },
-            score: "expression"
-        }
-    })");
-
-    const auto desugaredList =
-        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
-    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
-    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
-
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "expectedStages": [
-                {
-                    $search: {
-                        index: "search_index",
-                        text: {
-                            query: "mystery",
-                            path: "genres"
-                        }
-                    }
-                },
-                {
-                    $match: {
-                        author: "dave"
-                    }
-                },
-                {
-                    "$replaceRoot": {
-                        "newRoot": {
-                            "docs": "$$ROOT"
-                        }
-                    }
-                },
-                {
-                    "$addFields": {
-                        "name1_score": {
-                            "$multiply": [
-                                {
-                                    $meta: "score"
-                                },
-                                {
-                                    "$const": 1.0
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "$group": {
-                        "_id": "$docs._id",
-                        "docs": {
-                            "$first": "$docs"
-                        },
-                        "name1_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$name1_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        }
-                    }
-                },
-                {
-                    "$setMetadata": {
-                        "score": {
-                            "$add": [
-                                "$name1_score"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "$sort": {
-                        "$computed0": {$meta: "score"},
-                        "_id": 1
-                    }
-                },
-                {
-                    "$replaceRoot": {
-                        "newRoot": "$docs"
-                    }
-                }
-            ]
-        })",
-        asOneObj);
-}
-
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfWeightsIsNotObject) {
     auto spec = fromjson(R"({
         $scoreFusion: {
@@ -1500,9 +1387,9 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfWeightsIsNotObject) {
                 },
                 normalization: "none"
             },
-            score: "expression",
             combination:  {
-                weights: "my bad"
+                weights: "my bad",
+                method: "sum"
             }
         }
     })");
@@ -1532,9 +1419,9 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfEmptyWeights) {
                 },
                 normalization: "none"
             },
-            score: "expression",
             combination: {
-                weights: {}
+                weights: {},
+                method: "sum"
             }
         }
     })");
@@ -1545,9 +1432,9 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfEmptyWeights) {
 }
 
 TEST_F(DocumentSourceScoreFusionTest, CheckIfWeightsArrayMixedIntsDecimals) {
-    auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
-        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    auto fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
+    getExpCtx()->setResolvedNamespaces(
+        ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
     auto spec = fromjson(R"({
         $scoreFusion: {
             input: {
@@ -1578,12 +1465,12 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfWeightsArrayMixedIntsDecimals) {
                 },
                 normalization: "none"
             },
-            score: "expression",
             combination: {
                 weights: {
                     name1: 5,
                     name2: 3.2
-                }
+                },
+                method: "sum"
             }
         }
     })");
@@ -1743,11 +1630,11 @@ TEST_F(DocumentSourceScoreFusionTest, ScoreNullsIsRejected) {
                 },
                 normalization: "none"
             },
-            score: "expression",
             combination: {
                 weights: {
                     name1: 5
-                }
+                },
+                method: "sum"
             },
             scoreNulls: 0
         }
@@ -1778,12 +1665,12 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorIfOptionalFieldsIncludedMoreThanOnce)
                 },
                 normalization: "none"
             },
-            score: "expression",
-            score: "duplicate",
             combination: {
                 weights: {
                     name1: 5
-                }
+                },
+                method: "sum",
+                method: "duplicate"
             }
         }
     })");
@@ -1892,8 +1779,9 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
 
 TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionwithAllowed) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
-        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    auto fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
+    getExpCtx()->setResolvedNamespaces(
+        ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
     auto nsToUnionWith1 = NamespaceString::createNamespaceString_forTest(
         expCtx->getNamespaceString().dbName(), "novels");
     expCtx->addResolvedNamespaces({nsToUnionWith1});
@@ -2133,8 +2021,9 @@ TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionwithAllowed) {
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNestedUnionWithModifiesFields) {
     auto expCtx = getExpCtx();
-    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
-        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    auto fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
+    getExpCtx()->setResolvedNamespaces(
+        ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
     auto nsToUnionWith1 = NamespaceString::createNamespaceString_forTest(
         expCtx->getNamespaceString().dbName(), "novels");
     expCtx->addResolvedNamespaces({nsToUnionWith1});
@@ -2451,6 +2340,214 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfScoreWithGeoNearDistanceMetadataPip
                 {
                     "$sort": {
                         "$computed0": {$meta: "score"},
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+}
+
+// Note: avg is the expected expression spelling, not 'average.'
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInvalidCombinationMethodValue) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    name1: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        },
+                        { $match : { author : "dave" } }
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                method: "average"
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::BadValue);
+}
+
+// The 'sum' option for combination.method is tested in CheckIfWeightsArrayMixedIntsDecimals. The
+// remaining tests that specify "none" for combination.method desugar into the "sum" operation by
+// default.
+TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedAvgMethod) {
+    auto fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
+    getExpCtx()->setResolvedNamespaces(
+        ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    name1: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ],
+                    name2: [
+                        {
+                            $vectorSearch: {
+                                queryVector: [1.0, 2.0, 3.0],
+                                path: "plot_embedding",
+                                numCandidates: 300,
+                                index: "vector_index",
+                                limit: 10
+                            }
+                        }
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                method: "avg"
+            }
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$search": {
+                        "index": "search_index",
+                        "text": {
+                            "query": "mystery",
+                            "path": "genres"
+                        }
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "name1_score": {
+                            "$multiply": [
+                                {
+                                    "$meta": "score"
+                                },
+                                {
+                                    "$const": 1
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$vectorSearch": {
+                                    "queryVector": [
+                                        1,
+                                        2,
+                                        3
+                                    ],
+                                    "path": "plot_embedding",
+                                    "numCandidates": 300,
+                                    "index": "vector_index",
+                                    "limit": 10
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "name2_score": {
+                                        "$multiply": [
+                                            {
+                                                "$meta": "score"
+                                            },
+                                            {
+                                                "$const": 1
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "name1_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$name1_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "name2_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$name2_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [ 
+                                "$name1_score",
+                                "$name2_score" 
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
                         "_id": 1
                     }
                 },

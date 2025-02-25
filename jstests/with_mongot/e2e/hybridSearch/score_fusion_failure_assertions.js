@@ -56,7 +56,6 @@ assert.commandWorked(runPipeline([{
 assert.commandFailedWithCode(runPipeline([{
                                  $scoreFusion: {
                                      input: {pipelines: searchMatchAsClause, normalization: "none"},
-                                     score: "expression",
                                      combination: {weights: {score2: "hi"}}
                                  }
                              }]),
@@ -66,7 +65,6 @@ assert.commandFailedWithCode(runPipeline([{
 assert.commandWorked(runPipeline([{
     $scoreFusion: {
         input: {pipelines: vectorSearchClauseAndSearchClause, normalization: "none"},
-        score: "expression",
         combination: {weights: {score1: 5, search1: 100}}
     }
 }]));
@@ -75,7 +73,6 @@ assert.commandWorked(runPipeline([{
 assert.commandWorked(runPipeline([{
     $scoreFusion: {
         input: {pipelines: vectorSearchClauseAndSearchClause, normalization: "none"},
-        score: "expression",
         combination: {weights: {score1: 5, search1: 100.2}}
     }
 }]));
@@ -84,7 +81,6 @@ assert.commandWorked(runPipeline([{
 assert.commandWorked(runPipeline([{
     $scoreFusion: {
         input: {pipelines: searchMatchAsClause, normalization: "none"},
-        score: "expression",
         combination: {weights: {score2: 5}}
     }
 }]));
@@ -95,7 +91,6 @@ assert.commandFailedWithCode(
     runPipeline([{
         $scoreFusion: {
             input: {pipelines: scoreInputPipelines, normalization: "minMaxScalar"},
-            score: "expression",
             combination: {weights: {score3: 5, score4: 10}}
         }
     }]),
@@ -105,7 +100,6 @@ assert.commandFailedWithCode(
 assert.commandWorked(runPipeline([{
     $scoreFusion: {
         input: {pipelines: scoreInputPipelines, normalization: "sigmoid"},
-        score: "expression",
         combination: {weights: {score3: 5, score4: 10}}
     }
 }]));
