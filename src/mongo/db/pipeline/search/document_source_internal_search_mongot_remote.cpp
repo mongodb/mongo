@@ -217,6 +217,21 @@ Value DocumentSourceInternalSearchMongotRemote::serialize(const SerializationOpt
         Document{{getSourceName(), addMergePipelineIfNeeded(std::move(innerSpecVal), opts)}});
 }
 
+DepsTracker::State DocumentSourceInternalSearchMongotRemote::getDependencies(
+    DepsTracker* deps) const {
+    // This stage doesn't currently support tracking field dependencies since mongot is
+    // responsible for determining what fields to return. We do need to track metadata
+    // dependencies though, so downstream stages know they are allowed to access "searchScore"
+    // metadata.
+    // TODO SERVER-101100 Implement logic for dependency analysis.
+
+    deps->setMetadataAvailable(DocumentMetadataFields::kSearchScore);
+    if (hasScoreDetails()) {
+        deps->setMetadataAvailable(DocumentMetadataFields::kSearchScoreDetails);
+    }
+    return DepsTracker::State::NOT_SUPPORTED;
+}
+
 boost::optional<BSONObj> DocumentSourceInternalSearchMongotRemote::_getNext() {
     try {
         return _cursor->getNext(pExpCtx->getOperationContext());

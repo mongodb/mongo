@@ -528,8 +528,16 @@ DepsTracker::State DocumentSourceGeoNear::getDependencies(DepsTracker* deps) con
     // produced by this stage, and we could inform the query system that it need not include it in
     // its response. For now, assume that we require the entire document as well as the appropriate
     // geoNear metadata.
+
+    // This may look confusing, but we must call two setters on the DepsTracker for different
+    // purposes. We mark the fields as available metadata that can be consumed by any
+    // downstream stage for $meta field validation. We also also mark that this stage does
+    // require the meta fields so that the executor knows to produce the metadata.
+    // TODO SERVER-100902 Split $meta validation out of dependency tracking.
+    deps->setMetadataAvailable(DocumentMetadataFields::kGeoNearDist);
     deps->setNeedsMetadata(DocumentMetadataFields::kGeoNearDist);
     if (needsGeoNearPoint()) {
+        deps->setMetadataAvailable(DocumentMetadataFields::kGeoNearPoint);
         deps->setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint);
     }
 

@@ -30,7 +30,8 @@ const validatedMetaFields = [
     {fieldName: "textScore", debugName: "text score", validSortKey: true},
     {fieldName: "geoNearDistance", debugName: "$geoNear distance", validSortKey: true},
     {fieldName: "geoNearPoint", debugName: "$geoNear point", validSortKey: false},
-    {fieldName: "score", debugName: "score", validSortKey: true}
+    {fieldName: "score", debugName: "score", validSortKey: true},
+    {fieldName: "scoreDetails", debugName: "scoreDetails", validSortKey: false},
 ];
 
 // Test that each of the meta fields throws an error if referenced under a $facet without a
@@ -96,6 +97,31 @@ validatedMetaFields.forEach(metaField => {
     ];
     res = coll.aggregate(pipeline).toArray();
     assert.eq(res, [{pipe1: [{_id: 1}, {_id: 2}, {_id: 0}]}]);
+}
+
+// Test that {$meta: "scoreDetails"} works within $facet when it is a $rankFusion query with
+// scoreDetails enabled.
+{
+    let pipeline = [
+        {$rankFusion: {input: {pipelines: {pipe: [{$sort: {textField: -1}}]}}, scoreDetails: true}},
+        {
+            $facet: {
+                pipe1: [
+                    {$project: {scoreDetails: {$meta: "scoreDetails"}}},
+                    {$project: {scoreDetailsVal: "$scoreDetails.value"}},
+                    {$sort: {_id: 1}}
+                ]
+            }
+        }
+    ];
+    let res = coll.aggregate(pipeline).toArray();
+    assert.eq(res, [{
+                  pipe1: [
+                      {_id: 0, scoreDetailsVal: 0.016129032258064516},
+                      {_id: 1, scoreDetailsVal: 0.015873015873015872},
+                      {_id: 2, scoreDetailsVal: 0.01639344262295082}
+                  ]
+              }]);
 }
 
 // Test that {$meta: "geoNearDistance"} and {$meta: "geoNearPoint"} work within $facet when it is a

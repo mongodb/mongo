@@ -81,6 +81,12 @@ TEST(DependenciesNeedsMetadataTest, ShouldThrowIfGeoMetadataUnavailableButNeeded
     ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint), AssertionException);
 }
 
+
+TEST(DependenciesNeedsMetadataTest, ShouldThrowIfScoreDetailsUnavailableButNeeded) {
+    DepsTracker deps(DepsTracker::kOnlyTextScore);
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kScoreDetails), AssertionException);
+}
+
 TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfNotTrackingAvailableMetadataAndIsNeeded) {
     DepsTracker deps((DepsTracker::NoMetadataValidation()));
     deps.setNeedsMetadata(DocumentMetadataFields::kTextScore);
@@ -108,16 +114,38 @@ TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfAllMetadataAvailableAndNeeded
     ASSERT_TRUE(deps.getNeedsAnyMetadata());
 }
 
-TEST(DependenciesNeedsMetadataTest, ShouldThrowIfNoMetadataAvailableButNeeded) {
+// Tests that any field chosen to be validated should throw if unavailable when requested, and that
+// no other meta fields throw in that case.
+TEST(DependenciesNeedsMetadataTest, OnlyChosenMetadataFieldsShouldThrowIfUnavailable) {
+    static const std::set<DocumentMetadataFields::MetaType> kMetadataFieldsToBeValidated = {
+        DocumentMetadataFields::MetaType::kTextScore,
+        DocumentMetadataFields::MetaType::kGeoNearDist,
+        DocumentMetadataFields::MetaType::kGeoNearPoint,
+        DocumentMetadataFields::MetaType::kScore,
+        DocumentMetadataFields::MetaType::kScoreDetails,
+    };
+
     DepsTracker deps(DepsTracker::kNoMetadata);
-    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kTextScore), AssertionException);
-    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint), AssertionException);
-    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearDist), AssertionException);
-    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kScore), AssertionException);
+
+    for (int i = 1; i < DocumentMetadataFields::kNumFields; i++) {
+        DocumentMetadataFields::MetaType type = static_cast<DocumentMetadataFields::MetaType>(i);
+        if (kMetadataFieldsToBeValidated.contains(type)) {
+            ASSERT_THROWS(deps.setNeedsMetadata(type), AssertionException);
+        } else {
+            ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(type));
+        }
+    }
 }
 
-TEST(DependenciesNeedsMetadataTest, ShouldSucceedTextScoreWithScoreAlias) {
+TEST(DependenciesNeedsMetadataTest, ShouldSucceedScorePopulatedByTextScore) {
     DepsTracker deps(DepsTracker::kOnlyTextScore);
+    deps.setNeedsMetadata(DocumentMetadataFields::kScore);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kScore));
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldSucceedScoreDetailsPopulatedBySearchScoreDetails) {
+    DepsTracker deps(DepsTracker::kOnlyTextScore);
+    deps.setMetadataAvailable(DocumentMetadataFields::kSearchScoreDetails);
     deps.setNeedsMetadata(DocumentMetadataFields::kScore);
     ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kScore));
 }
@@ -188,6 +216,25 @@ TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfSetGeoMetadataAvailableThenIs
 
     deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint);
     ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kGeoNearPoint));
+    ASSERT_TRUE(deps.getNeedsAnyMetadata());
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfSetScoreDetailsMetadataAvailableThenIsNeeded) {
+    DepsTracker deps(DepsTracker::kNoMetadata);
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+
+    // Set search score details metadata available, even though no metadata was originally
+    // available.
+    deps.setMetadataAvailable(DocumentMetadataFields::kSearchScoreDetails);
+
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+
+    deps.setNeedsMetadata(DocumentMetadataFields::kSearchScoreDetails);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kSearchScoreDetails));
+    ASSERT_TRUE(deps.getNeedsAnyMetadata());
+
+    deps.setNeedsMetadata(DocumentMetadataFields::kScoreDetails);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kScoreDetails));
     ASSERT_TRUE(deps.getNeedsAnyMetadata());
 }
 

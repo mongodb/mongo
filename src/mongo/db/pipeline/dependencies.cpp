@@ -105,12 +105,12 @@ BSONObj DepsTracker::toProjectionWithoutMetadata(
 }
 
 void DepsTracker::setNeedsMetadata(DocumentMetadataFields::MetaType type) {
-    // TODO SERVER-100678 Validate 'scoreDetails' too.
     static const std::set<DocumentMetadataFields::MetaType> kMetadataFieldsToBeValidated = {
         DocumentMetadataFields::MetaType::kTextScore,
         DocumentMetadataFields::MetaType::kGeoNearDist,
         DocumentMetadataFields::MetaType::kGeoNearPoint,
         DocumentMetadataFields::MetaType::kScore,
+        DocumentMetadataFields::MetaType::kScoreDetails,
     };
 
     // Perform validation if necessary.

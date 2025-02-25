@@ -2523,14 +2523,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
                 {
                     "$addFields": {
                         "agatha_scoreDetails": {
-                            "$ifNull": [
-                                {
-                                    "$meta": "scoreDetails"
-                                },
-                                {
-                                    "details": []
-                                }
-                            ]
+                            "details": []
                         }
                     }
                 },
@@ -2723,14 +2716,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                 {
                     "$addFields": {
                         "agatha_scoreDetails": {
-                            "$ifNull": [
-                                {
-                                    "$meta": "scoreDetails"
-                                },
-                                {
-                                    "details": []
-                                }
-                            ]
+                            "details": []
                         }
                     }
                 },
@@ -2796,17 +2782,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
                             {
                                 "$addFields": {
                                     "searchPipe_scoreDetails": {
-                                        "$ifNull": [
-                                            {
-                                                "$meta": "scoreDetails"
-                                            },
-                                            {
-                                                "value": {
-                                                    "$meta": "score"
-                                                },
-                                                "details": []
-                                            }
-                                        ]
+                                        "$meta": "scoreDetails"
                                     }
                                 }
                             }

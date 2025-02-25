@@ -272,6 +272,20 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSearch::dist
     return logic;
 }
 
+DepsTracker::State DocumentSourceSearch::getDependencies(DepsTracker* deps) const {
+    // This stage doesn't currently support tracking field dependencies since mongot is
+    // responsible for determining what fields to return. We do need to track metadata
+    // dependencies though, so downstream stages know they are allowed to access "searchScore"
+    // metadata.
+    // TODO SERVER-101100 Implement logic for dependency analysis.
+
+    deps->setMetadataAvailable(DocumentMetadataFields::kSearchScore);
+    if (hasScoreDetails()) {
+        deps->setMetadataAvailable(DocumentMetadataFields::kSearchScoreDetails);
+    }
+    return DepsTracker::State::NOT_SUPPORTED;
+}
+
 bool DocumentSourceSearch::canMovePastDuringSplit(const DocumentSource& ds) {
     // Check if next stage uses the variable.
     return !search_helpers::hasReferenceToSearchMeta(ds) &&

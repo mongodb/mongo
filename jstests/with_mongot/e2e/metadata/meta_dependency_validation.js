@@ -65,12 +65,18 @@ assert.commandWorked(createSearchIndex(coll, {
 
 const kUnavailableMetadataErrCode = 40218;
 
+const searchStage = {
+    $search: {index: "search-index", exists: {path: "textField"}}
+};
+
 // The set of stages that may be generated as the initial stage of the pipeline.
 const FirstStageOptions = Object.freeze({
     GEO_NEAR: {$geoNear: {near: [25, 25]}},
     FTS_MATCH: {$match: {$text: {$search: "three"}}},
     NON_FTS_MATCH: {$match: {a: {$gt: 3}}},
-    SEARCH: {$search: {index: "search-index", exists: {path: "textField"}}},
+    SEARCH: searchStage,
+    SEARCH_W_DETAILS:
+        {$search: {index: "search-index", exists: {path: "textField"}, scoreDetails: true}},
     VECTOR_SEARCH: {
         $vectorSearch: {
             queryVector: [-0.012674698, 0.013308106, -0.005494981, -0.008286549, -0.00289768],
@@ -80,6 +86,9 @@ const FirstStageOptions = Object.freeze({
             limit: 10
         }
     },
+    RANK_FUSION: {$rankFusion: {input: {pipelines: {search: [searchStage]}}}},
+    RANK_FUSION_W_DETAILS:
+        {$rankFusion: {input: {pipelines: {search: [searchStage]}}, scoreDetails: true}},
     SORT: {$sort: {a: -1}},
     SCORE: {$score: {score: {$divide: [1, "$a"]}}}
 });
@@ -87,7 +96,6 @@ const FirstStageOptions = Object.freeze({
 // The set of metadata fields that can be referenced inside $meta, alongside information used to
 // dictate if the queries should succeed or not.
 // TODO SERVER-93521: Change "searchScore" and "vectorSearchScore" to be validated.
-// TODO SERVER-100678: Change "scoreDetails" to be validated.
 const MetaFields = Object.freeze({
     TEXT_SCORE: {
         name: "textScore",
@@ -138,7 +146,10 @@ const MetaFields = Object.freeze({
             FirstStageOptions.GEO_NEAR,
             FirstStageOptions.SCORE,
             FirstStageOptions.SEARCH,
-            FirstStageOptions.VECTOR_SEARCH
+            FirstStageOptions.SEARCH_W_DETAILS,
+            FirstStageOptions.RANK_FUSION,
+            FirstStageOptions.RANK_FUSION_W_DETAILS,
+            FirstStageOptions.VECTOR_SEARCH,
         ]
     },
     SEARCH_SCORE_DETAIS: {
@@ -178,16 +189,24 @@ const MetaFields = Object.freeze({
         validSortKey: true,
         firstStageRequired: [
             FirstStageOptions.FTS_MATCH,
-            FirstStageOptions.SEARCH,
             FirstStageOptions.SCORE,
             FirstStageOptions.VECTOR_SEARCH,
+            // $search and $rankFusion should always populate "score" regardless of "scoreDetails".
+            FirstStageOptions.SEARCH,
+            FirstStageOptions.SEARCH_W_DETAILS,
+            FirstStageOptions.RANK_FUSION,
+            FirstStageOptions.RANK_FUSION_W_DETAILS,
         ]
     },
     SCORE_DETAILS: {
         name: "scoreDetails",
-        shouldBeValidated: false,
+        shouldBeValidated: true,
         debugName: "scoreDetails",
-        validSortKey: false
+        validSortKey: false,
+        firstStageRequired: [
+            FirstStageOptions.SEARCH_W_DETAILS,
+            FirstStageOptions.RANK_FUSION_W_DETAILS,
+        ]
     }
 });
 
@@ -240,7 +259,10 @@ function shouldQuerySucceed(metaField, firstStage, metaReferencingStageName) {
 
         // TODO SERVER-99965 Mongot queries skip validation for "geoNearDist" and "geoNearPoint".
         if (firstStage === FirstStageOptions.SEARCH ||
-            firstStage === FirstStageOptions.VECTOR_SEARCH) {
+            firstStage === FirstStageOptions.SEARCH_W_DETAILS ||
+            firstStage === FirstStageOptions.VECTOR_SEARCH ||
+            firstStage == FirstStageOptions.RANK_FUSION ||
+            firstStage == FirstStageOptions.RANK_FUSION_W_DETAILS) {
             return true;
         }
     }

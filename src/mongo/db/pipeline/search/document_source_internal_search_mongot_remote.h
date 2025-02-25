@@ -90,18 +90,7 @@ public:
         MONGO_UNREACHABLE_TASSERT(7815902);
     }
 
-    DepsTracker::State getDependencies(DepsTracker* deps) const override {
-        // This stage doesn't currently support tracking field dependencies since mongot is
-        // responsible for determining what fields to return. We do need to track metadata
-        // dependencies though, so downstream stages know they are allowed to access "searchScore"
-        // metadata.
-        // TODO SERVER-101100 Implement logic for dependency analysis.
-
-        deps->setMetadataAvailable(DocumentMetadataFields::kSearchScore);
-
-        return DepsTracker::State::NOT_SUPPORTED;
-    }
-
+    DepsTracker::State getDependencies(DepsTracker* deps) const override;
 
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
@@ -170,6 +159,11 @@ public:
     auto isStoredSource() const {
         auto storedSourceElem = _spec.getMongotQuery()[mongot_cursor::kReturnStoredSourceArg];
         return !storedSourceElem.eoo() && storedSourceElem.Bool();
+    }
+
+    auto hasScoreDetails() const {
+        auto scoreDetailsElem = _spec.getMongotQuery()[mongot_cursor::kScoreDetailsFieldName];
+        return !scoreDetailsElem.eoo() && scoreDetailsElem.Bool();
     }
 
     void setDocsNeededBounds(DocsNeededBounds bounds) {

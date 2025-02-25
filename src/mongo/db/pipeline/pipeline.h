@@ -452,6 +452,20 @@ public:
     void validateMetaDependencies(
         QueryMetadataBitSet availableMetadata = DepsTracker::kNoMetadata) const;
 
+
+    /**
+     * Returns a boolean that indicates whether or not a pipeline generates the provided metadata
+     * 'type'.
+     *
+     * WARNING: Calling this function will also validate that the metadata dependencies in the
+     * pipeline are valid, since tracking "available metadata" is currently tied to validating
+     * dependencies as well. This function could throw a uassert if there are invalid $meta
+     * references to unavailable metadata fields.
+     * TODO SERVER-100902: Consider separating these concerns so that this function can be called
+     * without risk of throwing a uassert.
+     */
+    bool generatesMetadataType(DocumentMetadataFields::MetaType type) const;
+
     const SourceContainer& getSources() const {
         return _sources;
     }

@@ -796,6 +796,11 @@ void Pipeline::validateMetaDependencies(QueryMetadataBitSet availableMetadata) c
     (void)getDependenciesForContainer(getContext(), _sources, availableMetadata);
 }
 
+bool Pipeline::generatesMetadataType(DocumentMetadataFields::MetaType type) const {
+    DepsTracker deps = getDependencies(DepsTracker::kNoMetadata);
+    return deps.getAvailableMetadata()[type];
+}
+
 Status Pipeline::canRunOnRouter() const {
     for (auto&& stage : _sources) {
         auto constraints = stage->constraints(_splitState);

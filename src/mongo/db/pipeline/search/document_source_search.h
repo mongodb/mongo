@@ -76,18 +76,7 @@ public:
     StageConstraints constraints(Pipeline::SplitState pipeState) const override;
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
-
-    DepsTracker::State getDependencies(DepsTracker* deps) const override {
-        // This stage doesn't currently support tracking field dependencies since mongot is
-        // responsible for determining what fields to return. We do need to track metadata
-        // dependencies though, so downstream stages know they are allowed to access "searchScore"
-        // metadata.
-        // TODO SERVER-101100 Implement logic for dependency analysis.
-
-        deps->setMetadataAvailable(DocumentMetadataFields::kSearchScore);
-
-        return DepsTracker::State::NOT_SUPPORTED;
-    }
+    DepsTracker::State getDependencies(DepsTracker* deps) const override;
 
     static const Id& id;
 
@@ -98,6 +87,11 @@ public:
     auto isStoredSource() const {
         auto storedSourceElem = _spec.getMongotQuery()[mongot_cursor::kReturnStoredSourceArg];
         return !storedSourceElem.eoo() && storedSourceElem.Bool();
+    }
+
+    auto hasScoreDetails() const {
+        auto scoreDetailsElem = _spec.getMongotQuery()[mongot_cursor::kScoreDetailsFieldName];
+        return !scoreDetailsElem.eoo() && scoreDetailsElem.Bool();
     }
 
     std::list<boost::intrusive_ptr<DocumentSource>> desugar();
