@@ -50,6 +50,7 @@
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
@@ -127,7 +128,7 @@ void produceDocumentForUpsert(OperationContext* opCtx,
         uassertStatusOK(driver->populateDocumentWithQueryFields(
             *cq->getPrimaryMatchExpression(), immutablePaths, doc));
     } else {
-        fassert(17354, CanonicalQuery::isSimpleIdQuery(request->getQuery()));
+        fassert(17354, isSimpleIdQuery(request->getQuery()));
         // IDHACK path allows for queries of the shape {_id: 123} and {_id: {$eq: 123}}. Neither
         // case will have generated a CanonicalQuery earlier, so we have to figure out which value
         // should be in the created document here, since we cannot insert a document that looks like

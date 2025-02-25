@@ -90,7 +90,9 @@ public:
         auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
         fcr->setFilter(filter.getOwned());
         auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
-        return std::make_unique<FindKey>(expCtx, *parsedFind, collectionType);
+        auto findShape = std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx);
+        return std::make_unique<FindKey>(
+            expCtx, *parsedFind->findCommandRequest, std::move(findShape), collectionType);
     }
 
     static constexpr auto collectionType = query_shape::CollectionType::kCollection;
@@ -99,7 +101,9 @@ public:
                                          bool applyHmac) {
         auto fcrCopy = std::make_unique<FindCommandRequest>(fcr);
         auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcrCopy)}));
-        FindKey findKey(expCtx, *parsedFind, collectionType);
+        auto findShape = std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx);
+        FindKey findKey(
+            expCtx, *parsedFind->findCommandRequest, std::move(findShape), collectionType);
         SerializationOptions opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
         if (!applyHmac) {
             opts.transformIdentifiers = false;
@@ -114,13 +118,10 @@ public:
                                               const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               LiteralSerializationPolicy literalPolicy,
                                               bool applyHmac = false) {
-
-        auto aggKey = std::make_unique<AggKey>(acr,
-                                               pipeline,
-                                               expCtx,
-                                               pipeline.getInvolvedCollections(),
-                                               acr.getNamespace(),
-                                               collectionType);
+        auto aggShape = std::make_unique<query_shape::AggCmdShape>(
+            acr, acr.getNamespace(), pipeline.getInvolvedCollections(), pipeline, expCtx);
+        auto aggKey = std::make_unique<AggKey>(
+            expCtx, acr, std::move(aggShape), pipeline.getInvolvedCollections(), collectionType);
 
         // SerializationOptions opts{.literalPolicy = literalPolicy};
         SerializationOptions opts = SerializationOptions::kMarkIdentifiers_FOR_TEST;
@@ -214,8 +215,7 @@ TEST_F(QueryStatsStoreTest, EvictionTest) {
         // evicted first but the partition will still be over budget so the final, too large entry
         // will also be evicted.
         auto opCtx = makeOperationContext();
-        auto fcr = std::make_unique<FindCommandRequest>(NamespaceStringOrUUID(
-            NamespaceString::createNamespaceString_forTest("testDB.testColl")));
+        auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
         fcr->setLet(BSON("var" << 2));
         fcr->setFilter(fromjson("{$expr: [{$eq: ['$a', '$$var']}]}"));
         fcr->setProjection(fromjson("{varIs: '$$var'}"));
@@ -238,8 +238,10 @@ TEST_F(QueryStatsStoreTest, EvictionTest) {
         fcr->setSort(BSON("sortVal" << 1 << "otherSort" << -1));
         auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *fcr).build();
         auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
+        auto findShape = std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx);
 
-        key = std::make_unique<query_stats::FindKey>(expCtx, *parsedFind, collectionType);
+        key = std::make_unique<query_stats::FindKey>(
+            expCtx, *parsedFind->findCommandRequest, std::move(findShape), collectionType);
         auto lookupHash = absl::HashOf(key);
         QueryStatsEntry testMetrics{std::move(key)};
         queryStatsStore.put(lookupHash, testMetrics);
@@ -283,10 +285,18 @@ TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
     // The shapification process will bloat the input query over the 16 MB memory limit. Assert
     // that calling registerRequest() doesn't throw and that the opDebug isn't registered with a
     // key hash (thus metrics won't be tracked for this query).
-    ASSERT_DOES_NOT_THROW(query_stats::registerRequest(opCtx.get(), nss, [&]() {
-        return std::make_unique<query_stats::FindKey>(
-            expCtx, *parsedFind, query_shape::CollectionType::kCollection);
-    }));
+    ASSERT_DOES_NOT_THROW(([&]() {
+        if (auto findShape =
+                shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedFind, expCtx)) {
+            query_stats::registerRequest(opCtx.get(), nss, [&]() {
+                return std::make_unique<query_stats::FindKey>(
+                    expCtx,
+                    *parsedFind->findCommandRequest,
+                    std::move(findShape),
+                    query_shape::CollectionType::kCollection);
+            });
+        }
+    })());
     auto& opDebug = CurOp::get(*opCtx)->debug();
     ASSERT_EQ(opDebug.queryStatsInfo.keyHash, boost::none);
 }

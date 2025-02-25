@@ -37,8 +37,14 @@
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/query/util/deferred.h"
 
 namespace mongo::query_shape {
+
+class Shape;
+
+using DeferredQueryShape = DeferredFn<std::unique_ptr<Shape>>;
+using QueryShapeHash = SHA256Block;
 
 /**
  * Each type of "query" command likely has different fields/options that are considered important
@@ -80,8 +86,6 @@ struct CmdSpecificShapeComponents {
         return std::move(state);
     }
 };
-
-using QueryShapeHash = SHA256Block;
 
 /**
  * A query "shape" is a version of a command with literal values abstracted so that two instances of
@@ -169,5 +173,4 @@ private:
                            const SerializationContext& serializationContext) const;
     void appendCmdNs(BSONObjBuilder&, const NamespaceString&, const SerializationOptions&) const;
 };
-
 }  // namespace mongo::query_shape

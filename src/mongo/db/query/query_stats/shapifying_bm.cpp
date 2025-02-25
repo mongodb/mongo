@@ -90,7 +90,11 @@ BSONObj buildSortSpec(size_t count) {
 
 auto makeFindKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                  const ParsedFindCommand& parsedFind) {
-    return std::make_unique<const query_stats::FindKey>(expCtx, parsedFind, kCollectionType);
+    return std::make_unique<const query_stats::FindKey>(
+        expCtx,
+        *parsedFind.findCommandRequest,
+        std::make_unique<query_shape::FindCmdShape>(parsedFind, expCtx),
+        kCollectionType);
 }
 
 int shapifyAndHashRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,

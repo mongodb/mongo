@@ -57,6 +57,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/write_ops/parsed_update.h"
 #include "mongo/db/query/write_ops/parsed_update_array_filters.h"
 #include "mongo/db/query/write_ops/parsed_writes_common.h"
@@ -224,7 +225,7 @@ Status ParsedUpdateBase::parseQuery() {
     dassert(!_canonicalQuery.get());
 
     if (!_timeseriesUpdateQueryExprs && !_driver.needMatchDetails() &&
-        CanonicalQuery::isSimpleIdQuery(_request->getQuery())) {
+        isSimpleIdQuery(_request->getQuery())) {
         return Status::OK();
     }
 

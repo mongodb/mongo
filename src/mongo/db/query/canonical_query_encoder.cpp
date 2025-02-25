@@ -1355,11 +1355,7 @@ std::string encodeSBE(const CanonicalQuery& cq, const bool requiresSbeCompatibil
     const auto& filter = cq.getQueryObj();
     const auto& proj = cq.getFindCommandRequest().getProjection();
     const auto& sort = cq.getFindCommandRequest().getSort();
-
-    // Do not encode query's hint if query settings already has index hints.
-    const auto& hint = cq.getExpCtx()->getQuerySettings().getIndexHints()
-        ? BSONObj()
-        : cq.getFindCommandRequest().getHint();
+    const auto& hint = cq.getFindCommandRequest().getHint();
 
     StringBuilder strBuilder;
     encodeKeyForSort(sort, &strBuilder);

@@ -47,4 +47,4 @@ assert.contains(3, a);
 assert.commandWorked(t.runCommand("distinct", {"key": "a"}));
 
 // embedded nulls are prohibited in the key field
-assert.commandFailedWithCode(t.runCommand("distinct", {"key": "a\0b"}), 31032);
+assert.commandFailedWithCode(t.runCommand("distinct", {"key": "a\0b"}), [31032, 9527900]);

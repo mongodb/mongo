@@ -49,7 +49,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/query_shape/query_shape.h"
+#include "mongo/db/query/query_shape/agg_cmd_shape.h"
 #include "mongo/db/query/query_stats/key.h"
 
 namespace mongo::query_stats {
@@ -92,11 +92,10 @@ struct AggCmdComponents : public SpecificKeyComponents {
  */
 class AggKey final : public Key {
 public:
-    AggKey(AggregateCommandRequest request,
-           const Pipeline& pipeline,
-           const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    AggKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+           const AggregateCommandRequest& request,
+           std::unique_ptr<query_shape::Shape> aggShape,
            stdx::unordered_set<NamespaceString> involvedNamespaces,
-           const NamespaceString& origNss,
            query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown);
 
     const SpecificKeyComponents& specificComponents() const final {

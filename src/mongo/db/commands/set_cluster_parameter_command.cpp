@@ -53,7 +53,7 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/query_settings/query_settings_manager.h"
+#include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -110,13 +110,11 @@ public:
                                 Request::kCommandName),
                     request().getCommandParameter().nFields() == 1);
 
-            uassert(
-                ErrorCodes::NoSuchKey,
-                fmt::format(
-                    "Unknown server parameter: {}",
-                    query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName),
-                !request().getCommandParameter()
-                     [query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName]);
+            uassert(ErrorCodes::NoSuchKey,
+                    fmt::format("Unknown server parameter: {}",
+                                query_settings::getQuerySettingsClusterParameterName()),
+                    !request().getCommandParameter()
+                         [query_settings::getQuerySettingsClusterParameterName()]);
 
             static auto impl = getSetClusterParameterImpl(service);
             impl(opCtx,

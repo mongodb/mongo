@@ -97,7 +97,9 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_settings/query_settings_utils.h"
+#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_settings/query_settings_service.h"
+#include "mongo/db/query/query_shape/agg_cmd_shape.h"
 #include "mongo/db/query/query_stats/agg_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/timeseries/timeseries_rewrites.h"
@@ -619,6 +621,8 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
                          .resolvedNamespace(uassertStatusOK(aggExState.resolveInvolvedNamespaces()))
                          .tmpDir(storageGlobalParams.dbpath + "/_tmp")
                          .collationMatchesDefault(expCtx->getCollationMatchesDefault())
+                         .canBeRejected(query_settings::canPipelineBeRejected(
+                             aggExState.getRequest().getPipeline()))
                          .build();
             // Create a new pipeline for the consumer consisting of a single
             // DocumentSourceExchange.
@@ -917,6 +921,23 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     bool hasEncryptedFields = aggCatalogState.lockAcquired() &&
         aggCatalogState.getPrimaryCollection() &&
         aggCatalogState.getPrimaryCollection()->getCollectionOptions().encryptedFieldConfig;
+
+    // Perform the query settings lookup and attach it to 'expCtx'.
+    query_shape::DeferredQueryShape deferredShape{[&]() {
+        return shape_helpers::tryMakeShape<query_shape::AggCmdShape>(
+            requestForQueryStats,
+            aggExState.getOriginalNss(),
+            aggExState.getInvolvedNamespaces(),
+            *pipeline,
+            expCtx);
+    }};
+    expCtx->setQuerySettingsIfNotPresent(
+        query_settings::lookupQuerySettingsWithRejectionCheckOnShard(
+            expCtx,
+            deferredShape,
+            aggExState.getOriginalNss(),
+            requestForQueryStats.getQuerySettings()));
+
     if (!hasEncryptedFields) {
         // If this is a query over a resolved view, we want to register query stats with the
         // original user-given request and pipeline, rather than the new request generated when
@@ -927,11 +948,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
             aggExState.getOpCtx(),
             aggExState.getOriginalNss(),
             [&]() {
-                return std::make_unique<query_stats::AggKey>(requestForQueryStats,
-                                                             *pipeline,
-                                                             expCtx,
+                uassert(8472502, "Failed computing query shape", deferredShape());
+                return std::make_unique<query_stats::AggKey>(expCtx,
+                                                             requestForQueryStats,
+                                                             std::move(*deferredShape),
                                                              std::move(pipelineInvolvedNamespaces),
-                                                             aggExState.getOriginalNss(),
                                                              collectionType);
             },
             aggExState.hasChangeStream());
@@ -942,17 +963,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
             CurOp::get(aggExState.getOpCtx())->debug().queryStatsInfo.metricsRequested = true;
         }
     }
-
-    // Lookup the query settings and attach it to the 'expCtx'.
-    // TODO: SERVER-73632 Remove feature flag for PM-635.
-    // Query settings will only be looked up on mongos and therefore should be part of command
-    // body on mongod if present.
-    expCtx->setQuerySettingsIfNotPresent(
-        query_settings::lookupQuerySettingsForAgg(expCtx,
-                                                  requestForQueryStats,
-                                                  *pipeline,
-                                                  aggExState.getInvolvedNamespaces(),
-                                                  aggExState.getOriginalNss()));
 
     if (aggExState.getResolvedView().has_value()) {
         expCtx->startExpressionCounters();

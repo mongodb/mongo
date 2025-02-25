@@ -38,9 +38,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
 #include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
-#include "mongo/db/query/query_settings/query_settings_gen.h"
-#include "mongo/db/query/query_settings/query_settings_manager.h"
-#include "mongo/db/query/query_settings/query_settings_utils.h"
+#include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
@@ -54,8 +52,6 @@ using namespace query_settings;
 MONGO_FAIL_POINT_DEFINE(querySettingsPlanCacheInvalidation);
 MONGO_FAIL_POINT_DEFINE(pauseAfterReadingQuerySettingsConfigurationParameter);
 
-static constexpr auto kQuerySettingsClusterParameterName = "querySettings"_sd;
-
 SetClusterParameter makeSetClusterParameterRequest(
     const std::vector<QueryShapeConfiguration>& settingsArray,
     const mongo::DatabaseName& dbName) try {
@@ -67,7 +63,7 @@ SetClusterParameter makeSetClusterParameterRequest(
     }
     arrayBuilder.done();
     SetClusterParameter setClusterParameterRequest(
-        BSON(QuerySettingsManager::kQuerySettingsClusterParameterName << bob.done()));
+        BSON(getQuerySettingsClusterParameterName() << bob.done()));
     setClusterParameterRequest.setDbName(dbName);
     return setClusterParameterRequest;
 } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
@@ -146,17 +142,14 @@ void readModifyWriteQuerySettingsConfigOption(
     const mongo::DatabaseName& dbName,
     const boost::optional<QueryInstance>& representativeQuery,
     std::function<void(std::vector<QueryShapeConfiguration>&)> modify) {
-    auto& querySettingsManager = QuerySettingsManager::get(opCtx);
-
     // The local copy of the query settings cluster-wide configuration option might not have the
     // latest value on mongos, therefore we trigger the update of the local copy before reading from
     // it in order to reduce the probability of update conflicts.
-    querySettingsManager.refreshQueryShapeConfigurations(opCtx);
+    refreshQueryShapeConfigurations(opCtx);
 
     // Read the query shape configurations for the tenant from the local copy of the query settings
     // cluster-wide configuration option.
-    auto queryShapeConfigurations =
-        querySettingsManager.getAllQueryShapeConfigurations(dbName.tenantId());
+    auto queryShapeConfigurations = getAllQueryShapeConfigurations(opCtx, dbName.tenantId());
 
     // Block if the operation is on the 'representativeQuery' that matches the
     // "representativeQueryToBlock" field of the fail-point configuration.
@@ -190,7 +183,7 @@ void readModifyWriteQuerySettingsConfigOption(
 
     // Refresh the local copy of the query settings cluster-wide configuration option so the results
     // of the update step above are visible.
-    querySettingsManager.refreshQueryShapeConfigurations(opCtx);
+    refreshQueryShapeConfigurations(opCtx);
 
     // Clears the SBE plan cache if 'querySettingsPlanCacheInvalidation' fail-point is set. Used in
     // tests when setting index filters via query settings interface.
@@ -223,14 +216,14 @@ void validateAndSimplifyQuerySettings(
     // In case the representative query was not provided but the previous representative query is
     // available, assert that query settings will be set on a valid query.
     if (!representativeQueryInfo && previousRepresentativeQuery) {
-        utils::validateRepresentativeQuery(
+        validateQueryCompatibleWithAnyQuerySettings(
             createRepresentativeInfo(opCtx, *previousRepresentativeQuery, tenantId));
     }
     if (representativeQueryInfo) {
-        utils::verifyQueryCompatibleWithSettings(*representativeQueryInfo, querySettings);
+        validateQueryCompatibleWithQuerySettings(*representativeQueryInfo, querySettings);
     }
-    utils::simplifyQuerySettings(querySettings);
-    utils::validateQuerySettings(querySettings);
+    simplifyQuerySettings(querySettings);
+    validateQuerySettings(querySettings);
 }
 
 class SetQuerySettingsCommand final : public TypedCommand<SetQuerySettingsCommand> {
@@ -319,7 +312,7 @@ public:
 
             // Assert that query settings will be set on a valid query.
             if (representativeQuery) {
-                utils::validateRepresentativeQuery(*representativeQueryInfo);
+                validateQueryCompatibleWithAnyQuerySettings(*representativeQueryInfo);
             }
 
             SetQuerySettingsCommandReply reply;

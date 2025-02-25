@@ -1392,7 +1392,7 @@ mongo_cc_library(
         "//src/mongo/db/index_builds:index_builds_coordinator",
         "//src/mongo/db/pipeline/process_interface:shardsvr_process_interface",
         "//src/mongo/db/query/bson:dotted_path_support",
-        "//src/mongo/db/query/query_settings:utils",
+        "//src/mongo/db/query/query_settings:query_settings_service",
         "//src/mongo/db/repl:change_stream_oplog_notification",
         "//src/mongo/db/repl:primary_only_service",
         "//src/mongo/db/repl:repl_coordinator_interface",

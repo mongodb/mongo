@@ -59,6 +59,10 @@ struct ParsedDistinctCommand {
     // they will be useful other than to keep the original BSON values around in-memory to avoid
     // copying large strings and such.
     std::unique_ptr<DistinctCommandRequest> distinctCommandRequest;
+
+    inline BSONObj toBSON() const {
+        return distinctCommandRequest->toBSON();
+    }
 };
 
 namespace parsed_distinct_command {

@@ -31,8 +31,7 @@
 #include <benchmark/benchmark.h>
 
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/query_settings/query_settings_manager.h"
-#include "mongo/db/query/query_settings/query_settings_utils.h"
+#include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_test_service_context.h"
@@ -225,7 +224,7 @@ public:
         setGlobalServiceContext({});
     }
 
-    // Populates the query settings manager with dummy query shape configurations.
+    // Populates the system with dummy query shape configurations.
     void populateQueryShapeConfigurations(benchmark::State& state,
                                           const boost::optional<TenantId>& tenantId,
                                           int dummyQuerySettingsCount) {
@@ -264,10 +263,12 @@ public:
                                benchmark::Counter::Flags::kDefaults,
                                benchmark::Counter::OneK::kIs1024);
 
-        // Update the QuerySettingsManager with the 'queryShapeConfigs'.
-        auto& manager = QuerySettingsManager::get(opCtx.get());
-        manager.setQueryShapeConfigurations(
-            std::move(queryShapeConfigs), LogicalTime(Timestamp(1)), tenantId);
+        // Update the qurey shape configurations present in the system.
+        query_settings::setAllQueryShapeConfigurations(
+            opCtx.get(),
+            QueryShapeConfigurationsWithTimestamp{std::move(queryShapeConfigs),
+                                                  LogicalTime(Timestamp(1))},
+            tenantId);
         benchmark::ClobberMemory();
     }
 
@@ -305,14 +306,16 @@ public:
 
                 // Update the query shape configurations by adding a new one, which will be used for
                 // the lookup.
-                auto& manager = QuerySettingsManager::get(opCtx.get());
                 auto queryShapeConfigurationsWithTimestamp =
-                    manager.getAllQueryShapeConfigurations(tid);
-                auto& queryShapeConfigurations =
+                    query_settings::getAllQueryShapeConfigurations(opCtx.get(), tid);
+                auto&& queryShapeConfigurations =
                     queryShapeConfigurationsWithTimestamp.queryShapeConfigurations;
                 queryShapeConfigurations.push_back(hitQueryShapeConfiguration);
-                manager.setQueryShapeConfigurations(
-                    std::move(queryShapeConfigurations), LogicalTime(Timestamp(2)), tid);
+                query_settings::setAllQueryShapeConfigurations(
+                    opCtx.get(),
+                    QueryShapeConfigurationsWithTimestamp{std::move(queryShapeConfigurations),
+                                                          LogicalTime(Timestamp(2))},
+                    tid);
             }
 
             return parsedFindRequest;
@@ -325,8 +328,11 @@ public:
                        << state.threads << " HitOrMiss=" << (isTestingHitCase ? "Hit" : "Miss"));
 
         while (state.KeepRunning()) {
-            benchmark::DoNotOptimize(
-                query_settings::lookupQuerySettingsForFind(expCtx, *parsedFind, ns));
+            query_shape::DeferredQueryShape deferredShape{[&]() {
+                return shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedFind, expCtx);
+            }};
+            benchmark::DoNotOptimize(query_settings::lookupQuerySettingsWithRejectionCheckOnRouter(
+                expCtx, deferredShape, ns));
         }
     }
 
@@ -350,9 +356,10 @@ class QuerySettingsNotMultitenantLookupBenchmark : public QuerySettingsLookupBen
             // (Generic FCV reference): required for enabling the feature flag.
             serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
 
-            // On the first launch, initialize global service context and the QuerySettingsManager.
+            // On the first launch, initialize global service context and initialize the query
+            // settings.
             setGlobalServiceContext(ServiceContext::make());
-            QuerySettingsManager::create(getGlobalServiceContext(), {}, {});
+            query_settings::initializeForTest(getGlobalServiceContext());
 
             // Initialize the feature flag.
             _querySettingsFeatureFlag.emplace("featureFlagQuerySettings", true);
@@ -377,10 +384,10 @@ class QuerySettingsMultiTenantLookupBenchmark : public QuerySettingsLookupBenchm
             // (Generic FCV reference): required for enabling the feature flag.
             serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
 
-            // On the first launched thread, initialize global service context and the
-            // QuerySettingsManager.
+            // On the first launch, initialize global service context and initialize the query
+            // settings.
             setGlobalServiceContext(ServiceContext::make());
-            QuerySettingsManager::create(getGlobalServiceContext(), {}, {});
+            query_settings::initializeForTest(getGlobalServiceContext());
 
             // Initialize the feature flags.
             _querySettingsFeatureFlag.emplace("featureFlagQuerySettings", true);

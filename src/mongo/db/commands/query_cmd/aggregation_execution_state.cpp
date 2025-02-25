@@ -36,6 +36,7 @@
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/views/view_catalog_helpers.h"
@@ -866,6 +867,8 @@ std::unique_ptr<AggCatalogState> AggExState::createAggCatalogState(bool useAcqui
 
 boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext() {
     auto [collator, collationMatchesDefault] = resolveCollator();
+    const bool canPipelineBeRejected =
+        query_settings::canPipelineBeRejected(_aggExState.getRequest().getPipeline());
     auto expCtx = ExpressionContextBuilder{}
                       .fromRequest(_aggExState.getOpCtx(),
                                    _aggExState.getRequest(),
@@ -877,8 +880,10 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
                       .resolvedNamespace(uassertStatusOK(_aggExState.resolveInvolvedNamespaces()))
                       .tmpDir(storageGlobalParams.dbpath + "/_tmp")
                       .collationMatchesDefault(collationMatchesDefault)
+                      .canBeRejected(canPipelineBeRejected)
                       .explain(_aggExState.getVerbosity())
                       .build();
+
     // If any involved collection contains extended-range data, set a flag which individual
     // DocumentSource parsers can check.
     getCollections().forEach([&](const CollectionPtr& coll) {

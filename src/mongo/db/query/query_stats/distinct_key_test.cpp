@@ -61,7 +61,12 @@ public:
 
         auto parsedDistinct =
             parsed_distinct_command::parse(expCtx, std::move(dcr), ExtensionsCallbackNoop(), {});
-        return std::make_unique<DistinctKey>(expCtx, *parsedDistinct, collectionType);
+        auto distinctShape =
+            std::make_unique<query_shape::DistinctCmdShape>(*parsedDistinct, expCtx);
+        return std::make_unique<DistinctKey>(expCtx,
+                                             *parsedDistinct->distinctCommandRequest,
+                                             std::move(distinctShape),
+                                             collectionType);
     }
 };
 

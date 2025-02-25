@@ -41,7 +41,7 @@
 #include "mongo/db/commands/get_cluster_parameter_invocation.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/query_settings/query_settings_manager.h"
+#include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
@@ -83,8 +83,7 @@ GetClusterParameterInvocation::retrieveRequestedParameters(
 
         // The persistent query settings are stored in a cluster parameter, however, since this is
         // an implementation detail, we don't want to expose it to our users.
-        if (requestedParameter->name() ==
-            query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName) {
+        if (requestedParameter->name() == query_settings::getQuerySettingsClusterParameterName()) {
             uassert(ErrorCodes::NoSuchKey,
                     str::stream() << "Unknown server parameter: " << requestedParameter->name(),
                     skipOnError);

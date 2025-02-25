@@ -50,6 +50,11 @@ bool sortPatternHasPartsWithCommonPrefix(const SortPattern& sortPattern);
 bool isMatchIdHackEligible(MatchExpression* me);
 
 /**
+ * Returns true if 'query' describes an exact-match query on _id.
+ */
+bool isSimpleIdQuery(const BSONObj& query);
+
+/**
  * Returns 'true' if 'query' on the given 'collection' can be answered using a special IDHACK plan,
  * without taking into account the collators.
  */
@@ -58,12 +63,13 @@ inline bool isIdHackEligibleQueryWithoutCollator(const FindCommandRequest& findC
     return !findCommand.getShowRecordId() && findCommand.getHint().isEmpty() &&
         findCommand.getMin().isEmpty() && findCommand.getMax().isEmpty() &&
         !findCommand.getSkip() &&
-        (CanonicalQuery::isSimpleIdQuery(findCommand.getFilter()) || isMatchIdHackEligible(me)) &&
+        (isSimpleIdQuery(findCommand.getFilter()) || isMatchIdHackEligible(me)) &&
         !findCommand.getTailable();
 }
 
 /**
  * Returns 'true' if 'query' on the given 'collection' can be answered using a special IDHACK plan.
+ * TODO: remove this method in favor of ExpCtx::isIdHackQuery() checks.
  */
 inline bool isIdHackEligibleQuery(const CollectionPtr& collection, const CanonicalQuery& cq) {
     return isIdHackEligibleQueryWithoutCollator(cq.getFindCommandRequest(),

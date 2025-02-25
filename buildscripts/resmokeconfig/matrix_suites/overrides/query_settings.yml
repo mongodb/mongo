@@ -103,6 +103,8 @@
       - jstests/core/query/api/api_version_new_50_language_features.js
       - jstests/core/query/api/api_version_new_51_language_features.js
       - jstests/core/query/api/api_version_new_52_language_features.js
+      # QueryShapeHash is computed only on the router, but not on the shards due to lack of collection collation information.
+      - jstests/core/index/express_id_eq.js
 
 - name: fallback_core_excludes
   value:

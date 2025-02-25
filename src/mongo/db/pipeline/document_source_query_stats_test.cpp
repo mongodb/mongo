@@ -72,8 +72,12 @@ public:
         fcr->setFilter(filter.getOwned());
         auto parsedFind =
             uassertStatusOK(parsed_find_command::parse(getExpCtx(), {std::move(fcr)}));
-        return std::make_unique<query_stats::FindKey>(
-            getExpCtx(), *parsedFind, query_shape::CollectionType::kCollection);
+        auto findShape =
+            shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedFind, getExpCtx());
+        return std::make_unique<query_stats::FindKey>(getExpCtx(),
+                                                      *parsedFind->findCommandRequest,
+                                                      std::move(findShape),
+                                                      query_shape::CollectionType::kCollection);
     }
 
     QueryStatsStore& setUpQueryStatsStore(unsigned numPartitions = 1) {
@@ -314,8 +318,12 @@ DEATH_TEST_REGEX_F(DocumentSourceQueryStatsTest,
     auto parsedFind = uassertStatusOK(parsed_find_command::parse(
         getExpCtx(), {std::make_unique<FindCommandRequest>(kDefaultTestNss)}));
     parsedFind->filter = std::make_unique<LTEMatchExpression>("a"_sd, Value(BSONRegEx(".*")));
-    auto findKey = std::make_unique<query_stats::FindKey>(
-        getExpCtx(), *parsedFind, query_shape::CollectionType::kCollection);
+    auto findShape =
+        shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedFind, getExpCtx());
+    auto findKey = std::make_unique<query_stats::FindKey>(getExpCtx(),
+                                                          *parsedFind->findCommandRequest,
+                                                          std::move(findShape),
+                                                          query_shape::CollectionType::kCollection);
 
     // Populate the query stats store with an entry that fails to re-parse.
     auto& queryStatsStore = setUpQueryStatsStore();

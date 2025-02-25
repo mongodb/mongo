@@ -152,15 +152,13 @@ void AggKey::appendCommandSpecificComponents(BSONObjBuilder& bob,
     return _components.appendTo(bob, opts);
 }
 
-AggKey::AggKey(AggregateCommandRequest request,
-               const Pipeline& pipeline,
-               const boost::intrusive_ptr<ExpressionContext>& expCtx,
+AggKey::AggKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+               const AggregateCommandRequest& request,
+               std::unique_ptr<query_shape::Shape> aggShape,
                stdx::unordered_set<NamespaceString> involvedNamespaces,
-               const NamespaceString& origNss,
                query_shape::CollectionType collectionType)
     : Key(expCtx->getOperationContext(),
-          std::make_unique<query_shape::AggCmdShape>(
-              request, origNss, involvedNamespaces, pipeline, expCtx),
+          std::move(aggShape),
           request.getHint(),
           request.getReadConcern(),
           request.getMaxTimeMS().has_value(),

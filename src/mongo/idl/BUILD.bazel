@@ -280,7 +280,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/op_observer",
         "//src/mongo/db/op_observer:op_observer_util",
         "//src/mongo/db/query/client_cursor:cursor_response_idl",
-        "//src/mongo/db/query/query_settings:manager",
+        "//src/mongo/db/query/query_settings:query_settings_service",
         "//src/mongo/db/repl:oplog",
         "//src/mongo/db/repl:oplog_interface_local",
         "//src/mongo/db/repl:replmocks",

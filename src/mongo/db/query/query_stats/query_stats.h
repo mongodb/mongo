@@ -195,7 +195,7 @@ QueryStatsStore& getQueryStatsStore(OperationContext* opCtx);
  */
 void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
-                     std::function<std::unique_ptr<Key>(void)> makeKey,
+                     const std::function<std::unique_ptr<Key>(void)>& makeKey,
                      bool willNeverExhaust = false);
 
 

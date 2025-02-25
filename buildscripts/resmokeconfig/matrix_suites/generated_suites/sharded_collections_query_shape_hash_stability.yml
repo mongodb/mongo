@@ -107,6 +107,8 @@ selector:
     - jstests/core/query/api/api_version_new_50_language_features.js
     - jstests/core/query/api/api_version_new_51_language_features.js
     - jstests/core/query/api/api_version_new_52_language_features.js
+    - jstests/core/index/express_id_eq.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos

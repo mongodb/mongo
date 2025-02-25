@@ -70,7 +70,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/query_settings/query_settings_utils.h"
+#include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_shape/distinct_cmd_shape.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/distinct_key.h"
@@ -144,17 +144,22 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
                                        extensionsCallback,
                                        MatchExpressionParser::kAllowAllSpecialFeatures);
 
+    query_shape::DeferredQueryShape deferredShape{[&]() {
+        return shape_helpers::tryMakeShape<query_shape::DistinctCmdShape>(*parsedDistinct, expCtx);
+    }};
+    expCtx->setQuerySettingsIfNotPresent(
+        query_settings::lookupQuerySettingsWithRejectionCheckOnRouter(expCtx, deferredShape, nss));
+
     // We do not collect queryStats on explain for distinct.
     if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         !verbosity.has_value()) {
         query_stats::registerRequest(opCtx, nss, [&]() {
-            return std::make_unique<query_stats::DistinctKey>(expCtx, *parsedDistinct);
+            uassert(8472506, "Failed computing query shape", deferredShape());
+            return std::make_unique<query_stats::DistinctKey>(
+                expCtx, *parsedDistinct->distinctCommandRequest, std::move(*deferredShape));
         });
     }
-
-    expCtx->setQuerySettingsIfNotPresent(
-        query_settings::lookupQuerySettingsForDistinct(expCtx, *parsedDistinct, nss));
 
     return parsed_distinct_command::parseCanonicalQuery(std::move(expCtx),
                                                         std::move(parsedDistinct));
@@ -476,7 +481,7 @@ public:
 
         // Propagate the query settings with the request to the shards if present.
         const auto& querySettings = canonicalQuery->getExpCtx()->getQuerySettings();
-        if (!query_settings::utils::isDefault(querySettings)) {
+        if (!query_settings::isDefault(querySettings)) {
             viewAggRequest.setQuerySettings(querySettings);
         }
 

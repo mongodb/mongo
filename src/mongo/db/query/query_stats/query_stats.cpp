@@ -294,7 +294,7 @@ void insertQueryStatsEntry(
 
 void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
-                     std::function<std::unique_ptr<Key>(void)> makeKey,
+                     const std::function<std::unique_ptr<Key>(void)>& makeKey,
                      bool willNeverExhaust) {
     if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
         LOGV2_DEBUG(8473000,
@@ -348,6 +348,7 @@ void registerRequest(OperationContext* opCtx,
     // original query from queryStats metrics collection and let it execute normally.
     try {
         opDebug.queryStatsInfo.key = makeKey();
+        opDebug.queryStatsInfo.keyHash = absl::HashOf(*opDebug.queryStatsInfo.key);
     } catch (const DBException& ex) {
         queryStatsStoreWriteErrorsMetric.increment();
 
@@ -382,14 +383,7 @@ void registerRequest(OperationContext* opCtx,
                                  cmdObj, status, getBuildInfoVersionOnly().getVersion()),
                              "Failed to create query stats store key"});
         }
-
-        return;
     }
-    opDebug.queryStatsInfo.keyHash = absl::HashOf(*opDebug.queryStatsInfo.key);
-    // TODO look up this query shape (sub-component of query stats store key) in some new shared
-    // data structure that the query settings component could share. See if the query SHAPE hash has
-    // been computed before. If so, record the query shape hash on the opDebug. If not, compute the
-    // hash and store it there so we can avoid re-doing this for each request.
 }
 
 bool shouldRequestRemoteMetrics(const OpDebug& opDebug) {

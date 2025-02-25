@@ -36,9 +36,7 @@
 #include "mongo/db/pipeline/document_source_query_settings_gen.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/query/bson/bson_helper.h"
-#include "mongo/db/query/query_settings/query_settings_manager.h"
-#include "mongo/db/query/query_settings/query_settings_utils.h"
+#include "mongo/db/query/query_settings/query_settings_service.h"
 
 namespace mongo {
 
@@ -103,9 +101,9 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQuerySettings::createFromBson
         // Get all query shape configurations owned by 'tenantId' and map them over a queue of
         // results.
         auto tenantId = expCtx->getNamespaceString().tenantId();
-        auto& manager = QuerySettingsManager::get(expCtx->getOperationContext());
         auto settingsArray =
-            std::move(manager.getAllQueryShapeConfigurations(tenantId).queryShapeConfigurations);
+            query_settings::getAllQueryShapeConfigurations(expCtx->getOperationContext(), tenantId)
+                .queryShapeConfigurations;
         std::deque<DocumentSource::GetNextResult> queue;
         std::transform(std::make_move_iterator(settingsArray.begin()),
                        std::make_move_iterator(settingsArray.end()),

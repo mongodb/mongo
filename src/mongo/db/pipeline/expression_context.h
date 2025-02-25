@@ -914,6 +914,27 @@ public:
         return _featureFlagShardFilteringDistinctScan.get();
     }
 
+    /**
+     * Returns if the query is IDHACK query.
+     */
+    inline bool isIdHackQuery() const {
+        return _params.isIdHackQuery;
+    }
+
+    /**
+     * Returns if query contains encryption information as part of the request.
+     */
+    inline bool isFleQuery() const {
+        return _params.isFleQuery;
+    }
+
+    /**
+     * Returns if query can be rejected via query settings.
+     */
+    inline bool canBeRejected() const {
+        return _params.canBeRejected;
+    }
+
     bool isBasicRankFusionEnabled() const {
         return _featureFlagRankFusionBasic.get();
     }
@@ -1015,8 +1036,7 @@ protected:
         // True if this ExpressionContext is used to parse a collection validator expression.
         bool isParsingCollectionValidator = false;
         // These fields can be used in a context when API version validations were not enforced
-        // during
-        // parse time (Example creating a view or validator), but needs to be enforce while
+        // during parse time (Example creating a view or validator), but needs to be enforce while
         // querying later.
         bool exprUnstableForApiV1 = false;
         bool exprDeprecatedForApiV1 = false;
@@ -1027,6 +1047,16 @@ protected:
         // Forces the plan cache to be used even if there's only one solution available. Queries
         // that are ineligible will still not be cached.
         bool forcePlanCache = false;
+
+        // Indicates if query is IDHACK query.
+        bool isIdHackQuery = false;
+
+        // Indicates if query contains encryption information as part of the request.
+        bool isFleQuery = false;
+
+        // Indicates if query can be rejected via query settings.
+        bool canBeRejected = true;
+
         // Allows the foreign collection of a lookup to be in a different database than the local
         // collection using "from: {db: ..., coll: ...}" syntax. Currently, this should only be used
         // for streams since this isn't allowed in MQL beyond some exemptions for internal
@@ -1118,8 +1148,6 @@ private:
     // is being executed (if the variable was referenced, it is an element of this set).
     stdx::unordered_set<Variables::Id> _systemVarsReferencedInQuery;
 
-    std::once_flag _querySettingsAttached;
-
     boost::optional<query_settings::QuerySettings> _querySettings = boost::none;
 
     DeferredFn<QueryKnobConfiguration, const query_settings::QuerySettings&>
@@ -1181,6 +1209,9 @@ public:
     ExpressionContextBuilder& isParsingViewDefinition(bool);
     ExpressionContextBuilder& isParsingPipelineUpdate(bool);
     ExpressionContextBuilder& isParsingCollectionValidator(bool);
+    ExpressionContextBuilder& isIdHackQuery(bool);
+    ExpressionContextBuilder& isFleQuery(bool);
+    ExpressionContextBuilder& canBeRejected(bool);
     ExpressionContextBuilder& exprUnstableForApiV1(bool);
     ExpressionContextBuilder& exprDeprecatedForApiV1(bool);
     ExpressionContextBuilder& enabledCounters(bool);

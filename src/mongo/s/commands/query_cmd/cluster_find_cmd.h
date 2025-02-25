@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/query/find_command.h"
-#include "mongo/db/query/parsed_find_command.h"
 #include <boost/optional.hpp>
 
 #include "mongo/client/read_preference.h"
@@ -41,8 +39,11 @@
 #include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/query/query_settings/query_settings_utils.h"
+#include "mongo/db/query/query_settings/query_settings_service.h"
+#include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -216,10 +217,12 @@ public:
                 {.findCommand = std::move(_cmdRequest),
                  .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
 
-            // Update 'findCommand' by setting the looked up query settings, such that they can be
-            // applied on the shards.
-            auto querySettings =
-                query_settings::lookupQuerySettingsForFind(expCtx, *parsedFind, ns());
+            // Perform the query settings lookup and attach it to 'expCtx'.
+            query_shape::DeferredQueryShape deferredShape{[&]() {
+                return shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedFind, expCtx);
+            }};
+            auto querySettings = query_settings::lookupQuerySettingsWithRejectionCheckOnRouter(
+                expCtx, deferredShape, ns());
             expCtx->setQuerySettingsIfNotPresent(querySettings);
 
             auto cq = CanonicalQuery(CanonicalQueryParams{
@@ -334,12 +337,24 @@ public:
                 {.findCommand = std::move(_cmdRequest),
                  .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
 
-            registerRequestForQueryStats(expCtx, *parsedFind);
-
             // Perform the query settings lookup and attach it to 'expCtx'.
-            auto querySettings =
-                query_settings::lookupQuerySettingsForFind(expCtx, *parsedFind, ns());
+            query_shape::DeferredQueryShape deferredShape{[&]() {
+                return shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedFind, expCtx);
+            }};
+            auto querySettings = query_settings::lookupQuerySettingsWithRejectionCheckOnRouter(
+                expCtx, deferredShape, ns());
             expCtx->setQuerySettingsIfNotPresent(querySettings);
+
+            if (!_didDoFLERewrite) {
+                query_stats::registerRequest(
+                    expCtx->getOperationContext(), expCtx->getNamespaceString(), [&]() {
+                        // This callback is either never invoked or invoked immediately within
+                        // registerRequest, so use-after-move of parsedFind isn't an issue.
+                        uassert(8472504, "Failed computing query shape", deferredShape());
+                        return std::make_unique<query_stats::FindKey>(
+                            expCtx, *parsedFind->findCommandRequest, std::move(*deferredShape));
+                    });
+            }
 
             auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
                 .expCtx = std::move(expCtx), .parsedFind = std::move(parsedFind)});
@@ -380,19 +395,6 @@ public:
             return _genericArgs;
         }
 
-        void registerRequestForQueryStats(const boost::intrusive_ptr<ExpressionContext> expCtx,
-                                          const ParsedFindCommand& parsedFind) {
-            if (_didDoFLERewrite) {
-                return;
-            }
-            query_stats::registerRequest(
-                expCtx->getOperationContext(), expCtx->getNamespaceString(), [&]() {
-                    // This callback is either never invoked or invoked immediately within
-                    // registerRequest, so use-after-move of parsedFind isn't an issue.
-                    return std::make_unique<query_stats::FindKey>(expCtx, parsedFind);
-                });
-        }
-
         void retryOnViewError(
             OperationContext* opCtx,
             rpc::ReplyBuilderInterface* result,
@@ -407,7 +409,7 @@ public:
             auto aggRequestOnView =
                 query_request_conversion::asAggregateCommandRequest(findCommand, hasExplain);
 
-            if (!query_settings::utils::isDefault(querySettings)) {
+            if (!query_settings::isDefault(querySettings)) {
                 aggRequestOnView.setQuerySettings(querySettings);
             }
 

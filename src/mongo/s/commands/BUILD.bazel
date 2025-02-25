@@ -268,7 +268,7 @@ mongo_cc_library(
         "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/query:map_reduce_output_format",
         "//src/mongo/db/query/client_cursor:cursor_response_idl",
-        "//src/mongo/db/query/query_settings:utils",
+        "//src/mongo/db/query/query_settings:query_settings_service",
         "//src/mongo/db/query/query_shape",
         "//src/mongo/db/query/search:search_index_process_router",
         "//src/mongo/db/query/write_ops:parsed_update",

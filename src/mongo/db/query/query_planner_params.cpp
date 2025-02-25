@@ -38,7 +38,6 @@
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
-#include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/stats/collection_statistics_impl.h"

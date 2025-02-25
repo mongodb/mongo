@@ -46,6 +46,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
+#include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
@@ -85,18 +86,6 @@ struct VersionedQueryShapeConfigurations {
      * 'QueryShapeHash' -> 'QueryShapeConfiguration' mapping.
      */
     QueryShapeConfigurationsMap queryShapeHashToQueryShapeConfigurationsMap;
-
-    /**
-     * Cluster time of the current version of the QuerySettingsClusterParameter.
-     */
-    LogicalTime clusterParameterTime;
-};
-
-/**
- * All query shape configurations and an associated timestamp.
- */
-struct QueryShapeConfigurationsWithTimestamp {
-    std::vector<QueryShapeConfiguration> queryShapeConfigurations;
 
     /**
      * Cluster time of the current version of the QuerySettingsClusterParameter.

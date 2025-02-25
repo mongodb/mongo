@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/query/query_utils.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/stats/counters.h"
 
@@ -159,6 +160,21 @@ ExpressionContextBuilder& ExpressionContextBuilder::isParsingPipelineUpdate(
 ExpressionContextBuilder& ExpressionContextBuilder::isParsingCollectionValidator(
     bool isParsingCollectionValidator) {
     params.isParsingCollectionValidator = isParsingCollectionValidator;
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::isIdHackQuery(bool isIdHackQuery) {
+    params.isIdHackQuery = isIdHackQuery;
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::isFleQuery(bool isFleQuery) {
+    params.isFleQuery = isFleQuery;
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::canBeRejected(bool canBeRejected) {
+    params.canBeRejected = canBeRejected;
     return *this;
 }
 
@@ -329,7 +345,7 @@ ExpressionContextBuilder& ExpressionContextBuilder::tailableMode(TailableModeEnu
 ExpressionContextBuilder& ExpressionContextBuilder::fromRequest(
     OperationContext* operationContext,
     const FindCommandRequest& request,
-    const CollatorInterface* collatorInterface,
+    const CollatorInterface* collectionCollator,
     bool useDisk) {
 
     opCtx(operationContext);
@@ -345,13 +361,30 @@ ExpressionContextBuilder& ExpressionContextBuilder::fromRequest(
     serializationContext(request.getSerializationContext());
 
     if (!request.getCollation().isEmpty()) {
-        collator(
+        auto requestCollator =
             uassertStatusOK(CollatorFactoryInterface::get(operationContext->getServiceContext())
-                                ->makeFromBSON(request.getCollation())));
-    } else if (collatorInterface) {
-        collator(collatorInterface->clone());
+                                ->makeFromBSON(request.getCollation()));
+
+        // If request collator equals to collection collator then check for IDHACK eligibility.
+        const bool haveMatchingCollators =
+            CollatorInterface::collatorsMatch(requestCollator.get(), collectionCollator);
+        if (haveMatchingCollators) {
+            isIdHackQuery(isIdHackEligibleQueryWithoutCollator(request));
+        }
+
+        collator(std::move(requestCollator));
+    } else {
+        if (collectionCollator) {
+            collator(collectionCollator->clone());
+        } else {
+            // If there is no collection or request collator we call
+            // isIdHackEligibleQueryWithoutCollator() in order to evaluate if 'request' is an
+            // IDHACK query.
+            isIdHackQuery(isIdHackEligibleQueryWithoutCollator(request));
+        }
     }
 
+    isFleQuery(request.getEncryptionInformation().has_value());
     return *this;
 }
 
@@ -398,6 +431,7 @@ ExpressionContextBuilder& ExpressionContextBuilder::fromRequest(
     runtimeConstants(request.getLegacyRuntimeConstants());
     letParameters(request.getLet());
     serializationContext(request.getSerializationContext());
+    isFleQuery(request.getEncryptionInformation().has_value());
     return *this;
 }
 

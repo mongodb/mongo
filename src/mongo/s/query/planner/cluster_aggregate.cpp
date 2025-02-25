@@ -75,7 +75,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/query_settings/query_settings_utils.h"
+#include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
 #include "mongo/db/query/query_stats/agg_key.h"
 #include "mongo/db/query/query_stats/key.h"
@@ -191,6 +191,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
 
     // Create the expression context, and set 'inRouter' to true. We explicitly do *not* set
     // mergeCtx->tempDir.
+    const bool canBeRejected = query_settings::canPipelineBeRejected(request.getPipeline());
     auto mergeCtx = ExpressionContextBuilder{}
                         .fromRequest(opCtx, request)
                         .explain(verbosity)
@@ -201,6 +202,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                         .mayDbProfile(true)
                         .inRouter(true)
                         .collUUID(uuid)
+                        .canBeRejected(canBeRejected)
                         .build();
 
     if ((!cri || !cri->cm.hasRoutingTable()) && collationObj.isEmpty()) {
@@ -423,22 +425,31 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
                               hasChangeStream,
                               verbosity);
     auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
+
+    // Perform the query settings lookup and attach it to 'expCtx'.
+    // In case query settings have already been looked up (in case the agg request is
+    // running over a view) we avoid performing query settings lookup.
+    query_shape::DeferredQueryShape deferredShape{[&]() {
+        return shape_helpers::tryMakeShape<query_shape::AggCmdShape>(
+            request, executionNss, involvedNamespaces, *pipeline, expCtx);
+    }};
+    expCtx->setQuerySettingsIfNotPresent(std::move(request.getQuerySettings()).value_or_eval([&] {
+        return query_settings::lookupQuerySettingsWithRejectionCheckOnRouter(
+            expCtx, deferredShape, executionNss);
+    }));
+
     // Skip query stats recording for queryable encryption queries.
     if (!shouldDoFLERewrite) {
         query_stats::registerRequest(
             opCtx,
             executionNss,
             [&]() {
+                uassert(8472505, "Failed computing query shape", deferredShape());
                 return std::make_unique<query_stats::AggKey>(
-                    request, *pipeline, expCtx, involvedNamespaces, executionNss);
+                    expCtx, request, std::move(*deferredShape), std::move(involvedNamespaces));
             },
             hasChangeStream);
     }
-
-    // Perform the query settings lookup and attach it to the ExpressionContext.
-    expCtx->setQuerySettingsIfNotPresent(query_settings::lookupQuerySettingsForAgg(
-        expCtx, request, *pipeline, involvedNamespaces, executionNss));
-
     return pipeline;
 }
 
@@ -661,7 +672,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // By attaching the query settings to the original request object we can re-use the query
     // settings even though the original 'expCtx' object has been already destroyed.
     const auto& querySettings = expCtx->getQuerySettings();
-    if (!query_settings::utils::isDefault(querySettings)) {
+    if (!query_settings::isDefault(querySettings)) {
         request.setQuerySettings(querySettings);
     }
 

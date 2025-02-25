@@ -85,6 +85,7 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/raw_data_operation.h"
@@ -186,9 +187,9 @@ std::unique_ptr<FindCommandRequest> makeFindCommandForShards(OperationContext* o
         findCommand->setLet(vars.toBSON(vps, *letParams));
     }
 
-    // ExpressionContext may contain query settings that were looked up in QuerySettingsManager.
-    // Propagate it to the shards.
-    if (!query.getExpCtx()->getQuerySettings().toBSON().isEmpty()) {
+    // ExpressionContext may contain previously looked up query settings. Propagate it to the
+    // shards.
+    if (!query_settings::isDefault(query.getExpCtx()->getQuerySettings())) {
         findCommand->setQuerySettings(query.getExpCtx()->getQuerySettings());
     }
 

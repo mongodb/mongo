@@ -48,7 +48,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/query_settings/query_settings_manager.h"
+#include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/update/storage_validation.h"
 #include "mongo/rpc/op_msg.h"
@@ -97,13 +97,11 @@ public:
                                 Request::kCommandName),
                     request().getCommandParameter().nFields() == 1);
 
-            uassert(
-                ErrorCodes::NoSuchKey,
-                fmt::format(
-                    "Unknown server parameter: {}",
-                    query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName),
-                !request().getCommandParameter()
-                     [query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName]);
+            uassert(ErrorCodes::NoSuchKey,
+                    fmt::format("Unknown server parameter: {}",
+                                query_settings::getQuerySettingsClusterParameterName()),
+                    !request().getCommandParameter()
+                         [query_settings::getQuerySettingsClusterParameterName()]);
 
             {
                 bool ignore;

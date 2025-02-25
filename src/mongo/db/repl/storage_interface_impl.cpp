@@ -75,6 +75,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
 #include "mongo/db/query/write_ops/parsed_delete.h"
@@ -994,7 +995,7 @@ StatusWith<BSONObj> makeUpsertQuery(const BSONElement& idKey) {
 
     // With the ID hack, only simple _id queries are allowed. Otherwise, UpdateStage will fail with
     // a fatal assertion.
-    if (!CanonicalQuery::isSimpleIdQuery(query)) {
+    if (!isSimpleIdQuery(query)) {
         return {ErrorCodes::InvalidIdField,
                 str::stream() << "Unable to update document with a non-simple _id query: "
                               << query};

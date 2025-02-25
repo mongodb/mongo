@@ -98,6 +98,10 @@ struct ParsedFindCommand {
     // will be useful other than to keep the original BSON values around in-memory to avoid copying
     // large strings and such.
     std::unique_ptr<FindCommandRequest> findCommandRequest;
+
+    inline BSONObj toBSON() const {
+        return findCommandRequest->toBSON();
+    }
 };
 
 namespace parsed_find_command {

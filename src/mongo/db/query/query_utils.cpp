@@ -80,6 +80,41 @@ bool isMatchIdHackEligible(MatchExpression* me) {
     return false;
 }
 
+bool isSimpleIdQuery(const BSONObj& query) {
+    bool hasID = false;
+
+    BSONObjIterator it(query);
+    while (it.more()) {
+        BSONElement elt = it.next();
+        if (elt.fieldNameStringData() == "_id") {
+            // Verify that the query on _id is a simple equality.
+            hasID = true;
+
+            if (elt.type() == Object) {
+                // If the value is an object, it can only have one field and that field can only be
+                // a query operator if the operator is $eq.
+                if (elt.Obj().firstElementFieldNameStringData().starts_with('$')) {
+                    if (elt.Obj().nFields() > 1 ||
+                        std::strcmp(elt.Obj().firstElementFieldName(), "$eq") != 0) {
+                        return false;
+                    }
+                    if (!Indexability::isExactBoundsGenerating(elt["$eq"])) {
+                        return false;
+                    }
+                }
+            } else if (!Indexability::isExactBoundsGenerating(elt)) {
+                // In addition to objects, some other BSON elements are not suitable for exact index
+                // lookup.
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    return hasID;
+}
+
 bool isSortSbeCompatible(const SortPattern& sortPattern) {
     // If the sort has meta or numeric path components, we cannot use SBE.
     return std::all_of(sortPattern.begin(), sortPattern.end(), [](auto&& part) {

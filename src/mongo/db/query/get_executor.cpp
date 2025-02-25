@@ -1507,8 +1507,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
                 CollatorInterface::collatorsMatch(collator.get(),
                                                   collectionPtr->getDefaultCollator());
 
-            if (hasIdIndex && CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
-                request->getProj().isEmpty() && hasCollectionDefaultCollation) {
+            if (hasIdIndex && isSimpleIdQuery(unparsedQuery) && request->getProj().isEmpty() &&
+                hasCollectionDefaultCollation) {
 
                 LOGV2_DEBUG(8376000, 2, "Using express", "query"_attr = redact(unparsedQuery));
 
@@ -1670,7 +1670,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
             const bool hasCollectionDefaultCollation = CollatorInterface::collatorsMatch(
                 expCtx->getCollator(), collectionPtr->getDefaultCollator());
 
-            if (CanonicalQuery::isSimpleIdQuery(unparsedQuery) && request->getProj().isEmpty() &&
+            if (isSimpleIdQuery(unparsedQuery) && request->getProj().isEmpty() &&
                 hasCollectionDefaultCollation) {
 
                 const auto idIndexDesc = collectionPtr->getIndexCatalog()->findIdIndex(opCtx);

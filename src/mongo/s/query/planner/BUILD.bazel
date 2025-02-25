@@ -27,7 +27,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:docs_needed_bounds_visitor",
         "//src/mongo/db/pipeline:sharded_agg_helpers",
         "//src/mongo/db/pipeline/process_interface:mongos_process_interface",
-        "//src/mongo/db/query/query_settings:utils",
+        "//src/mongo/db/query/query_settings:query_settings_service",
         "//src/mongo/db/query/query_shape",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/db/views",

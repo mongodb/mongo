@@ -39,13 +39,13 @@
 namespace mongo::query_stats {
 
 struct FindCmdComponents : public SpecificKeyComponents {
-    FindCmdComponents(const FindCommandRequest* findCmd)
-        : _allowPartialResults(findCmd->getAllowPartialResults().value_or(false)),
-          _noCursorTimeout(findCmd->getNoCursorTimeout().value_or(false)),
+    FindCmdComponents(const FindCommandRequest& request)
+        : _allowPartialResults(request.getAllowPartialResults().value_or(false)),
+          _noCursorTimeout(request.getNoCursorTimeout().value_or(false)),
           _hasField{
-              .batchSize = findCmd->getBatchSize().has_value(),
-              .allowPartialResults = findCmd->getAllowPartialResults().has_value(),
-              .noCursorTimeout = findCmd->getNoCursorTimeout().has_value(),
+              .batchSize = request.getBatchSize().has_value(),
+              .allowPartialResults = request.getAllowPartialResults().has_value(),
+              .noCursorTimeout = request.getNoCursorTimeout().has_value(),
           } {}
 
 
@@ -102,15 +102,16 @@ static_assert(
 class FindKey final : public Key {
 public:
     FindKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-            const ParsedFindCommand& request,
+            const FindCommandRequest& request,
+            std::unique_ptr<query_shape::Shape> findShape,
             query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown)
         : Key(expCtx->getOperationContext(),
-              std::make_unique<query_shape::FindCmdShape>(request, expCtx),
-              request.findCommandRequest->getHint(),
-              request.findCommandRequest->getReadConcern(),
-              request.findCommandRequest->getMaxTimeMS().has_value(),
+              std::move(findShape),
+              request.getHint(),
+              request.getReadConcern(),
+              request.getMaxTimeMS().has_value(),
               collectionType),
-          _components(request.findCommandRequest.get()) {}
+          _components(request) {}
 
     // The default implementation of hashing for smart pointers is not a good one for our purposes.
     // Here we overload them to actually take the hash of the object, rather than hashing the

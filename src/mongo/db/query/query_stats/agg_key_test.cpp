@@ -57,13 +57,13 @@ public:
         AggregateCommandRequest acr(kDefaultTestNss.nss());
         acr.setPipeline(rawPipeline);
         auto pipeline = Pipeline::parse(rawPipeline, expCtx);
-        return std::make_unique<AggKey>(acr,
-                                        *pipeline,
-                                        expCtx,
-                                        pipeline->getInvolvedCollections(),
-                                        acr.getNamespace(),
-                                        collectionType);
+
+        auto aggShape = std::make_unique<query_shape::AggCmdShape>(
+            acr, kDefaultTestNss.nss(), pipeline->getInvolvedCollections(), *pipeline, expCtx);
+        return std::make_unique<AggKey>(
+            expCtx, acr, std::move(aggShape), pipeline->getInvolvedCollections(), collectionType);
     }
+
     size_t namespaceSize(stdx::unordered_set<NamespaceString> involvedNamespaces) {
         return std::accumulate(involvedNamespaces.begin(),
                                involvedNamespaces.end(),
@@ -188,11 +188,16 @@ TEST_F(AggKeyTest, SizeOfAggKeyWithAndWithoutComment) {
     expCtx->getOperationContext()->setComment(BSON("comment"
                                                    << " foo"));
     auto pipelineWithComment = Pipeline::parse(rawPipeline, expCtx);
-    auto keyWithComment = std::make_unique<AggKey>(acrWithComment,
-                                                   *pipelineWithComment,
-                                                   expCtx,
+    auto aggShape =
+        std::make_unique<query_shape::AggCmdShape>(acrWithComment,
+                                                   kDefaultTestNss.nss(),
                                                    pipelineWithComment->getInvolvedCollections(),
-                                                   acrWithComment.getNamespace(),
+                                                   *pipelineWithComment,
+                                                   expCtx);
+    auto keyWithComment = std::make_unique<AggKey>(expCtx,
+                                                   acrWithComment,
+                                                   std::move(aggShape),
+                                                   pipelineWithComment->getInvolvedCollections(),
                                                    collectionType);
 
     ASSERT_LT(keyWithoutComment->size(), keyWithComment->size());
@@ -214,12 +219,17 @@ TEST_F(AggKeyTest, SizeOfAggKeyWithAndWithoutReadConcern) {
     acrWithReadConcern.setPipeline(rawPipeline);
     acrWithReadConcern.setReadConcern(repl::ReadConcernArgs::kLocal);
     auto pipelineWithReadConcern = Pipeline::parse(rawPipeline, expCtx);
+    auto aggShape = std::make_unique<query_shape::AggCmdShape>(
+        acrWithReadConcern,
+        kDefaultTestNss.nss(),
+        pipelineWithReadConcern->getInvolvedCollections(),
+        *pipelineWithReadConcern,
+        expCtx);
     auto keyWithReadConcern =
-        std::make_unique<AggKey>(acrWithReadConcern,
-                                 *pipelineWithReadConcern,
-                                 expCtx,
+        std::make_unique<AggKey>(expCtx,
+                                 acrWithReadConcern,
+                                 std::move(aggShape),
                                  pipelineWithReadConcern->getInvolvedCollections(),
-                                 acrWithReadConcern.getNamespace(),
                                  collectionType);
 
     ASSERT_LT(keyWithoutReadConcern->size(), keyWithReadConcern->size());

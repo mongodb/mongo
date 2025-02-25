@@ -85,7 +85,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/query_settings/query_settings_utils.h"
+#include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_shape/distinct_cmd_shape.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/distinct_key.h"
@@ -143,7 +143,7 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
     // Forbid users from passing 'querySettings' explicitly.
     uassert(7923000,
             "BSON field 'querySettings' is an unknown field",
-            query_settings::utils::allowQuerySettingsFromClient(opCtx->getClient()) ||
+            query_settings::allowQuerySettingsFromClient(opCtx->getClient()) ||
                 !distinctCommand->getQuerySettings().has_value());
 
     auto expCtx = ExpressionContextBuilder{}
@@ -157,13 +157,28 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
                                        extensionsCallback,
                                        MatchExpressionParser::kAllowAllSpecialFeatures);
 
+    // Perform the query settings lookup and attach it to 'expCtx'.
+    query_shape::DeferredQueryShape deferredShape{[&]() {
+        return shape_helpers::tryMakeShape<query_shape::DistinctCmdShape>(*parsedDistinct, expCtx);
+    }};
+    expCtx->setQuerySettingsIfNotPresent(
+        query_settings::lookupQuerySettingsWithRejectionCheckOnShard(
+            expCtx,
+            deferredShape,
+            nss,
+            parsedDistinct->distinctCommandRequest->getQuerySettings()));
+
     // We do not collect queryStats on explain for distinct.
     if (feature_flags::gFeatureFlagQueryStatsCountDistinct.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         !verbosity.has_value()) {
         query_stats::registerRequest(opCtx, nss, [&]() {
+            uassert(8472503, "Failed computing query shape", deferredShape());
             return std::make_unique<query_stats::DistinctKey>(
-                expCtx, *parsedDistinct, collOrViewAcquisition.getCollectionType());
+                expCtx,
+                *parsedDistinct->distinctCommandRequest,
+                std::move(*deferredShape),
+                collOrViewAcquisition.getCollectionType());
         });
 
         if (parsedDistinct->distinctCommandRequest->getIncludeQueryStatsMetrics() &&
@@ -173,11 +188,6 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
         }
     }
 
-    // TODO: SERVER-73632 Remove feature flag for PM-635.
-    // Query settings will only be looked up on mongos and therefore should be part of command body
-    // on mongod if present.
-    expCtx->setQuerySettingsIfNotPresent(
-        query_settings::lookupQuerySettingsForDistinct(expCtx, *parsedDistinct, nss));
     return parsed_distinct_command::parseCanonicalQuery(
         std::move(expCtx), std::move(parsedDistinct), nullptr);
 }

@@ -32,8 +32,24 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo::shape_helpers {
+
+template <typename T, typename Request, typename... Args>
+std::unique_ptr<T> tryMakeShape(Request&& request, Args&&... args) {
+    try {
+        return std::make_unique<T>(std::forward<Request>(request), std::forward<Args>(args)...);
+    } catch (const DBException& ex) {
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+        LOGV2_WARNING(8472507,
+                      "Failed to compute query shape",
+                      "command"_attr = redact(request.toBSON()).toString(),
+                      "error"_attr = ex.toString());
+#undef MONGO_LOGV2_DEFAULT_COMPONENT
+        return nullptr;
+    }
+}
 
 int64_t inline optionalObjSize(boost::optional<BSONObj> optionalObj) {
     if (!optionalObj)

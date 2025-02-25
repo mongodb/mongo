@@ -50,7 +50,11 @@ public:
         auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
         fcr->setFilter(filter.getOwned());
         auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
-        return std::make_unique<FindKey>(expCtx, *parsedFind, collectionType);
+        return std::make_unique<FindKey>(
+            expCtx,
+            *parsedFind->findCommandRequest,
+            std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx),
+            collectionType);
     }
 };
 
@@ -61,7 +65,7 @@ TEST_F(FindKeyTest, SizeOfFindCmdComponents) {
     auto query = BSON("query" << 1 << "xEquals" << 42);
     fcr->setFilter(query.getOwned());
     auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
-    auto findComponents = std::make_unique<FindCmdComponents>(parsedFind->findCommandRequest.get());
+    auto findComponents = std::make_unique<FindCmdComponents>(*parsedFind->findCommandRequest);
 
     ASSERT_GTE(findComponents->size(), sizeof(SpecificKeyComponents) + 3 /*bools and HasField*/);
     ASSERT_LTE(findComponents->size(),
@@ -79,7 +83,7 @@ TEST_F(FindKeyTest, EquivalentFindCmdComponentsSizes) {
     auto parsedFindCursorTimeout =
         uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcrCursorTimeout)}));
     auto findComponentsCursorTimeout =
-        std::make_unique<FindCmdComponents>(parsedFindCursorTimeout->findCommandRequest.get());
+        std::make_unique<FindCmdComponents>(*parsedFindCursorTimeout->findCommandRequest);
 
     auto fcrAllowPartial = std::make_unique<FindCommandRequest>(kDefaultTestNss);
     fcrAllowPartial->setFilter(query.getOwned());
@@ -87,7 +91,7 @@ TEST_F(FindKeyTest, EquivalentFindCmdComponentsSizes) {
     auto parsedFindAllowPartial =
         uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcrAllowPartial)}));
     auto findComponentsAllowPartial =
-        std::make_unique<FindCmdComponents>(parsedFindAllowPartial->findCommandRequest.get());
+        std::make_unique<FindCmdComponents>(*parsedFindAllowPartial->findCommandRequest);
 
     ASSERT_EQ(findComponentsCursorTimeout->size(), findComponentsAllowPartial->size());
 }
@@ -107,8 +111,13 @@ TEST_F(FindKeyTest, SizeOfFindKeyWithAndWithoutComment) {
         ExpressionContextBuilder{}.fromRequest(opCtx.get(), *fcrWithComment).build();
     auto parsedFindWithComment =
         uassertStatusOK(parsed_find_command::parse(expCtxWithComment, {std::move(fcrWithComment)}));
-    auto keyWithComment = std::make_unique<query_stats::FindKey>(
-        expCtxWithComment, *parsedFindWithComment, collectionType);
+    auto findShape =
+        std::make_unique<query_shape::FindCmdShape>(*parsedFindWithComment, expCtxWithComment);
+    auto keyWithComment =
+        std::make_unique<query_stats::FindKey>(expCtxWithComment,
+                                               *parsedFindWithComment->findCommandRequest,
+                                               std::move(findShape),
+                                               collectionType);
 
     ASSERT_LT(keyWithoutComment->size(), keyWithComment->size());
 }
@@ -125,8 +134,13 @@ TEST_F(FindKeyTest, SizeOfFindKeyWithAndWithoutReadConcern) {
     fcrWithReadConcern->setReadConcern(repl::ReadConcernArgs::kLocal);
     auto parsedFindWithReadConcern = uassertStatusOK(
         parsed_find_command::parse(expCtxWithReadConcern, {std::move(fcrWithReadConcern)}));
-    auto keyWithReadConcern = std::make_unique<query_stats::FindKey>(
-        expCtxWithReadConcern, *parsedFindWithReadConcern, collectionType);
+    auto findShape = std::make_unique<query_shape::FindCmdShape>(*parsedFindWithReadConcern,
+                                                                 expCtxWithReadConcern);
+    auto keyWithReadConcern =
+        std::make_unique<query_stats::FindKey>(expCtxWithReadConcern,
+                                               *parsedFindWithReadConcern->findCommandRequest,
+                                               std::move(findShape),
+                                               collectionType);
 
     ASSERT_LT(keyWithoutReadConcern->size(), keyWithReadConcern->size());
 }

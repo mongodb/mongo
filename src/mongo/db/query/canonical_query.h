@@ -111,11 +111,6 @@ public:
         OperationContext* opCtx, const CanonicalQuery& baseQuery, size_t i);
 
     /**
-     * Returns true if "query" describes an exact-match query on _id.
-     */
-    static bool isSimpleIdQuery(const BSONObj& query);
-
-    /**
      * Perform validation checks on the normalized 'root' which could not be checked before
      * normalization - those should happen in
      * parsed_find_command::validateAndGetAvailableMetadata().
