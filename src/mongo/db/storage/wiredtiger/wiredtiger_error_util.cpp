@@ -39,6 +39,8 @@
 namespace mongo {
 
 namespace {
+static constexpr auto kTransactionTooLargeForCache =
+    "transaction is too large and will not fit in the storage engine cache"_sd;
 /**
  * Configured WT cache is deemed insufficient for a transaction when its dirty bytes in cache
  * exceed a certain threshold on the proportion of total cache which is used by transaction.
@@ -103,7 +105,7 @@ void throwCachePressureExceptionIfAppropriate(bool txnTooLargeEnabled,
                                               int retCode) {
     if (txnTooLargeEnabled && cacheIsInsufficientForTransaction) {
         throwTransactionTooLargeForCache(
-            generateContextStrStream(prefix, WT_TXN_ROLLBACK_REASON_TOO_LARGE_FOR_CACHE, retCode)
+            generateContextStrStream(prefix, kTransactionTooLargeForCache, retCode)
             << " (" << reason << ")");
     }
 

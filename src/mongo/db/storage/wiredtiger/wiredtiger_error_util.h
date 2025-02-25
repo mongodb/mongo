@@ -34,10 +34,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
 
-// From src/third_party/wiredtiger/src/include/txn.h
-#define WT_TXN_ROLLBACK_REASON_TOO_LARGE_FOR_CACHE \
-    "transaction is too large and will not fit in the storage engine cache"
-
 namespace mongo {
 
 class WiredTigerSession;
