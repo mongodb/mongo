@@ -12,7 +12,9 @@
  * does_not_support_stepdowns,
  * # Change in read concern can slow down queries enough to hit a timeout.
  * assumes_read_concern_unchanged,
- * does_not_support_causal_consistency
+ * does_not_support_causal_consistency,
+ * # Runs queries that may return many results, requiring getmores
+ * requires_getmore,
  * ]
  */
 import {
@@ -83,12 +85,13 @@ testProperty(queriesUsingCacheHaveSameResultsAsControl,
              experimentColl,
              {aggModel, indexModel: indexModel, numRuns, numQueriesPerRun});
 
+// TODO SERVER-101271 re-enable PBT testing for time-series
 // Run the property with a TS collection.
-assert(experimentColl.drop());
-assert.commandWorked(db.createCollection(experimentColl.getName(), {
-    timeseries: {timeField: 't', metaField: 'm'},
-}));
-assert.commandWorked(experimentColl.insert(defaultPbtDocuments()));
-testProperty(queriesUsingCacheHaveSameResultsAsControl,
-             experimentColl,
-             {aggModel, indexModel: timeseriesIndexModel, numRuns, numQueriesPerRun});
+// assert(experimentColl.drop());
+// assert.commandWorked(db.createCollection(experimentColl.getName(), {
+//     timeseries: {timeField: 't', metaField: 'm'},
+// }));
+// assert.commandWorked(experimentColl.insert(defaultPbtDocuments()));
+// testProperty(queriesUsingCacheHaveSameResultsAsControl,
+//              experimentColl,
+//              {aggModel, indexModel: timeseriesIndexModel, numRuns, numQueriesPerRun});
