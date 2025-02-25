@@ -365,6 +365,10 @@ struct TransactionResources {
      */
     void assertNoAcquiredCollections() const;
 
+    bool isEmpty() const {
+        return state == State::EMPTY;
+    }
+
     /**
      * Transaction resources can only be in one of 4 states:
      * - EMPTY: This state is equivalent to a brand new constructed transaction resources which have
@@ -379,8 +383,8 @@ struct TransactionResources {
      * The set of valid transitions are:
      * - EMPTY <-> ACTIVE <-> YIELDED
      * - EMPTY <-> ACTIVE <-> STASHED
-     * - STASHED -> FAILED -> EMPTY
-     * - YIELDED -> FAILED -> EMPTY
+     * - STASHED <-> FAILED -> EMPTY
+     * - YIELDED <-> FAILED -> EMPTY
      */
     enum class State { EMPTY, ACTIVE, STASHED, YIELDED, FAILED };
 

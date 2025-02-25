@@ -623,6 +623,7 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
                                                           expCtx->getNamespaceString(),
                                                           resolvedAggRequest,
                                                           pipeline.get(),
+                                                          nullptr /* transactionResourcesStasher */,
                                                           shardFilterPolicy);
 
     return pipeline;

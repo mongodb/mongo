@@ -79,6 +79,7 @@
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/search/search_helper.h"
+#include "mongo/db/pipeline/shard_role_transaction_resources_stasher_for_pipeline.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_docs_needed_bounds.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/client_cursor/clientcursor.h"
@@ -515,7 +516,7 @@ boost::optional<ClientCursorPin> executeSingleExecUntilFirstBatch(
  * getMore() if necessary.
  */
 void executeUntilFirstBatch(const AggExState& aggExState,
-                            const AggCatalogState& aggCatalogState,
+                            AggCatalogState& aggCatalogState,
                             boost::intrusive_ptr<ExpressionContext> expCtx,
                             std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>>& execs,
                             rpc::ReplyBuilderInterface* result) {
@@ -573,6 +574,13 @@ void executeUntilFirstBatch(const AggExState& aggExState,
                                                 secondaryStats.indexesUsed);
             }
         }
+    }
+
+    // For optimized away pipelines, which use LockPolicy::kLockExternally, stash the ShardRole
+    // TransactionResources on the cursor.
+    if (aggCatalogState.lockAcquired() && maybePinnedCursor) {
+        invariant(maybePinnedCursor->getCursor());
+        aggCatalogState.stashResources(maybePinnedCursor->getCursor());
     }
 }
 
@@ -636,6 +644,7 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecuto
     AggCatalogState& aggCatalogState,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline) {
     const auto expCtx = pipeline->getContext();
+    const auto mainCollectionUUID = aggCatalogState.getUUID();
     // Check if the pipeline has a $geoNear stage, as it will be ripped away during the build query
     // executor phase below (to be replaced with a $geoNearCursorStage later during the executor
     // attach phase).
@@ -661,8 +670,12 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecuto
         execs.emplace_back(std::move(executor));
     } else {
         // Complete creation of the initial $cursor stage, if needed.
-        PipelineD::attachInnerQueryExecutorToPipeline(
-            aggCatalogState.getCollections(), attachCallback, std::move(executor), pipeline.get());
+        auto sharedStasher = make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
+        PipelineD::attachInnerQueryExecutorToPipeline(aggCatalogState.getCollections(),
+                                                      attachCallback,
+                                                      std::move(executor),
+                                                      pipeline.get(),
+                                                      sharedStasher);
 
         std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> pipelines;
         // Any pipeline that relies on calls to mongot requires additional setup.
@@ -670,7 +683,10 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecuto
             // Release locks early, before we generate the search pipeline, so that we don't hold
             // them during network calls to mongot. This is fine for search pipelines since they are
             // not reading any local (lock-protected) data in the main pipeline.
-            aggCatalogState.relinquishLocks();
+            // Stash the ShardRole TransactionResources on the 'sharedStasher' we shared with the
+            // pipeline stages.
+            aggCatalogState.stashResources(sharedStasher.get());
+
             pipelines.push_back(std::move(pipeline));
 
             // TODO SERVER-89546 extractDocsNeededBounds should be called internally within
@@ -701,12 +717,16 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecuto
                                                                  aggExState.hasChangeStream())));
         }
 
-        // With the pipelines created, we can relinquish locks as they will manage the locks
-        // internally further on. We still need to keep the lock for an optimized away pipeline
-        // though, as we will be changing its lock policy to 'kLockExternally' (see details
-        // below), and in order to execute the initial getNext() call in 'handleCursorCommand',
-        // we need to hold the collection lock.
-        aggCatalogState.relinquishLocks();
+        if (aggCatalogState.lockAcquired()) {
+            // With the pipelines created, we can relinquish locks as they will manage the locks
+            // internally further on. We still need to keep the lock for an optimized away pipeline
+            // though, as we will be changing its lock policy to 'kLockExternally' (see details
+            // below), and in order to execute the initial getNext() call in 'handleCursorCommand',
+            // we need to hold the collection lock.
+            // Stash the ShardRole TransactionResources on the 'sharedStasher' we shared with the
+            // pipeline stages.
+            aggCatalogState.stashResources(sharedStasher.get());
+        }
     }
 
     for (auto& exec : additionalExecutors) {
@@ -725,8 +745,7 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecuto
     hangAfterCreatingAggregationPlan.executeIf(
         [](const auto&) { hangAfterCreatingAggregationPlan.pauseWhileSet(); },
         [&](const BSONObj& data) {
-            boost::optional<UUID> uuid{aggCatalogState.getUUID()};
-            return uuid && UUID::parse(data["uuid"]) == *uuid;
+            return mainCollectionUUID && UUID::parse(data["uuid"]) == *mainCollectionUUID;
         });
 
     return execs;
@@ -812,7 +831,7 @@ Status runAggregateOnView(AggExState& aggExState,
     auto resolvedView = aggExState.getResolvedView().value();
 
     // With the view & collation resolved, we can relinquish locks.
-    aggCatalogState->relinquishLocks();
+    aggCatalogState->relinquishResources();
 
     auto status{Status::OK()};
     if (!OperationShardingState::get(aggExState.getOpCtx())

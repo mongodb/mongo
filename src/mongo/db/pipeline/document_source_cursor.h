@@ -55,6 +55,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/shard_role_transaction_resources_stasher_for_pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/explain_options.h"
@@ -99,6 +100,8 @@ public:
     static boost::intrusive_ptr<DocumentSourceCursor> create(
         const MultipleCollectionAccessor& collections,
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+        const boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>&
+            transactionResourcesStasher,
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         CursorType cursorType,
         ResumeTrackingType resumeTrackingType = ResumeTrackingType::kNone);
@@ -189,11 +192,14 @@ public:
     }
 
 protected:
-    DocumentSourceCursor(const MultipleCollectionAccessor& collections,
-                         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                         CursorType cursorType,
-                         ResumeTrackingType resumeTrackingType = ResumeTrackingType::kNone);
+    DocumentSourceCursor(
+        const MultipleCollectionAccessor& collections,
+        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+        const boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>&
+            transactionResourcesStasher,
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+        CursorType cursorType,
+        ResumeTrackingType resumeTrackingType = ResumeTrackingType::kNone);
 
     GetNextResult doGetNext() final;
 
@@ -329,6 +335,12 @@ private:
 
     // Batches results returned from the underlying PlanExecutor.
     Batch _currentBatch;
+
+    // The stasher for the ShardRole::TransactionResources associated with the _exec. Must be
+    // unstashed before executing _exec, and stashed back before returning control to the next
+    // stage.
+    boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>
+        _transactionResourcesStasher;
 
     // The underlying query plan which feeds this pipeline. Must be destroyed while holding the
     // collection lock.

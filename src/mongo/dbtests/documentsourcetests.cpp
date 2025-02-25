@@ -146,6 +146,7 @@ protected:
 
         _source = DocumentSourceCursor::create(MultipleCollectionAccessor(_coll),
                                                std::move(exec),
+                                               nullptr /* transactionResourcesStasher */,
                                                _ctx,
                                                DocumentSourceCursor::CursorType::kRegular);
     }
@@ -381,6 +382,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
     planExecutor->saveState();
     auto cursor = DocumentSourceCursor::create(MultipleCollectionAccessor(readLock.getCollection()),
                                                std::move(planExecutor),
+                                               nullptr /* transactionResourcesStasher */,
                                                ctx(),
                                                DocumentSourceCursor::CursorType::kRegular);
 
@@ -426,6 +428,7 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
     planExecutor->saveState();
     auto cursor = DocumentSourceCursor::create(MultipleCollectionAccessor(readLock.getCollection()),
                                                std::move(planExecutor),
+                                               nullptr /* transactionResourcesStasher */,
                                                ctx(),
                                                DocumentSourceCursor::CursorType::kRegular);
 
@@ -482,6 +485,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
     planExecutor->saveState();
     auto cursor = DocumentSourceCursor::create(MultipleCollectionAccessor(readLock.getCollection()),
                                                std::move(planExecutor),
+                                               nullptr /* transactionResourcesStasher */,
                                                ctx(),
                                                DocumentSourceCursor::CursorType::kRegular);
 
@@ -524,6 +528,7 @@ TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
     planExecutor->saveState();
     auto cursor = DocumentSourceCursor::create(MultipleCollectionAccessor(readLock.getCollection()),
                                                std::move(planExecutor),
+                                               nullptr /* transactionResourcesStasher */,
                                                ctx(),
                                                DocumentSourceCursor::CursorType::kRegular);
 

@@ -161,9 +161,10 @@ void DocumentSourceCursor::loadBatch() {
         return;
     }
 
+    auto opCtx = pExpCtx->getOperationContext();
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangBeforeDocumentSourceCursorLoadBatch,
-        pExpCtx->getOperationContext(),
+        opCtx,
         "hangBeforeDocumentSourceCursorLoadBatch",
         []() {
             LOGV2(20895,
@@ -174,20 +175,54 @@ void DocumentSourceCursor::loadBatch() {
     PlanExecutor::ExecState state;
     Document resultObj;
 
-    boost::optional<AutoGetCollectionForReadMaybeLockFree> autoColl;
     tassert(5565800,
             "Expected PlanExecutor to use an external lock policy",
             _exec->lockPolicy() == PlanExecutor::LockPolicy::kLockExternally);
-    autoColl.emplace(
-        pExpCtx->getOperationContext(),
-        _exec->nss(),
-        AutoGetCollection::Options{}.secondaryNssOrUUIDs(_exec->getSecondaryNamespaces().cbegin(),
-                                                         _exec->getSecondaryNamespaces().cend()));
-    uassertStatusOK(
-        repl::ReplicationCoordinator::get(pExpCtx->getOperationContext())
-            ->checkCanServeReadsFor(pExpCtx->getOperationContext(), _exec->nss(), true));
 
-    _exec->restoreState(autoColl ? &autoColl->getCollection() : nullptr);
+    auto catalogResources = [&]() -> std::variant<AutoGetCollectionForReadMaybeLockFree,
+                                                  HandleTransactionResourcesFromStasher> {
+        if (_exec->usesCollectionAcquisitions()) {
+            tassert(10096100,
+                    "Expected _transactionResourcesStasher to exist",
+                    _transactionResourcesStasher);
+            // Restore the TransactionResources for this ShardRole collection acquisition. On
+            // destruction of this object, the TransactionResources will be stashed back.
+            return std::variant<AutoGetCollectionForReadMaybeLockFree,
+                                HandleTransactionResourcesFromStasher>(
+                std::in_place_type<HandleTransactionResourcesFromStasher>,
+                opCtx,
+                _transactionResourcesStasher.get());
+        } else {
+            return std::variant<AutoGetCollectionForReadMaybeLockFree,
+                                HandleTransactionResourcesFromStasher>(
+                std::in_place_type<AutoGetCollectionForReadMaybeLockFree>,
+                opCtx,
+                _exec->nss(),
+                AutoGetCollection::Options{}.secondaryNssOrUUIDs(
+                    _exec->getSecondaryNamespaces().cbegin(),
+                    _exec->getSecondaryNamespaces().cend()));
+        }
+    }();
+
+    RestoreContext restoreContext = [&]() {
+        return std::visit(OverloadedVisitor{
+                              [&](const AutoGetCollectionForReadMaybeLockFree& autoColl) {
+                                  return RestoreContext(&autoColl.getCollection());
+                              },
+                              [&](const HandleTransactionResourcesFromStasher& autoColl) {
+                                  return RestoreContext(nullptr);
+                              },
+                          },
+                          catalogResources);
+    }();
+
+    if (!_exec->usesCollectionAcquisitions() ||
+        !shard_role_details::TransactionResources::get(opCtx).isEmpty()) {
+        uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(
+            opCtx, _exec->nss(), true));
+    }
+
+    _exec->restoreState(restoreContext);
 
     try {
         ON_BLOCK_EXIT([&] {
@@ -221,7 +256,7 @@ void DocumentSourceCursor::loadBatch() {
             // need the whole pipeline to see each document to see if we should stop waiting.
             bool batchCountFull = _batchSizeCount != 0 && _currentBatch.count() >= _batchSizeCount;
             if (batchCountFull || _currentBatch.memUsageBytes() > _batchSizeBytes ||
-                awaitDataState(pExpCtx->getOperationContext()).shouldWaitForInserts) {
+                awaitDataState(opCtx).shouldWaitForInserts) {
                 // Double the size for next batch when batch is full.
                 if (batchCountFull && overflow::mul(_batchSizeCount, 2, &_batchSizeCount)) {
                     _batchSizeCount = 0;  // Go unlimited if we overflow.
@@ -394,11 +429,14 @@ DocumentSourceCursor::~DocumentSourceCursor() {
 DocumentSourceCursor::DocumentSourceCursor(
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+    const boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>&
+        transactionResourcesStasher,
     const intrusive_ptr<ExpressionContext>& pCtx,
     CursorType cursorType,
     ResumeTrackingType resumeTrackingType)
     : DocumentSource(kStageName, pCtx),
       _currentBatch(cursorType),
+      _transactionResourcesStasher(transactionResourcesStasher),
       _exec(std::move(exec)),
       _resumeTrackingType(resumeTrackingType),
       _queryFramework(_exec->getQueryFramework()) {
@@ -408,6 +446,12 @@ DocumentSourceCursor::DocumentSourceCursor(
             "The resumeToken is not compatible with this query",
             cursorType != CursorType::kEmptyDocuments ||
                 resumeTrackingType == ResumeTrackingType::kNone);
+
+    if (_exec->usesCollectionAcquisitions()) {
+        tassert(10096101,
+                "Expected _transactionResourcesStasher to exist",
+                _transactionResourcesStasher);
+    }
 
     // Later code in the DocumentSourceCursor lifecycle expects that '_exec' is in a saved state.
     _exec->saveState();
@@ -465,11 +509,17 @@ void DocumentSourceCursor::initializeBatchSizeCounts() {
 intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+    const intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>&
+        transactionResourcesStasher,
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     CursorType cursorType,
     ResumeTrackingType resumeTrackingType) {
-    intrusive_ptr<DocumentSourceCursor> source(new DocumentSourceCursor(
-        collections, std::move(exec), pExpCtx, cursorType, resumeTrackingType));
+    intrusive_ptr<DocumentSourceCursor> source(new DocumentSourceCursor(collections,
+                                                                        std::move(exec),
+                                                                        transactionResourcesStasher,
+                                                                        pExpCtx,
+                                                                        cursorType,
+                                                                        resumeTrackingType));
     return source;
 }
 }  // namespace mongo

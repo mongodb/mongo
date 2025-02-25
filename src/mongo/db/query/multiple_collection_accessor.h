@@ -178,7 +178,11 @@ private:
         } else if (auto itr = _secondaryAcq.find(nss); itr != _secondaryAcq.end()) {
             return CollectionPtr{itr->second.getCollectionPtr().get()};
         }
-        return CollectionPtr{nullptr};
+        tasserted(
+            10096102,
+            str::stream() << "MultipleCollectionAccessor::_lookupCollectionAcquisition: requested "
+                             "unexpected collection nss: "
+                          << nss.toStringForErrorMsg());
     }
 
     inline CollectionPtr _lookupCollectionAutoGetters(const NamespaceString& nss) const {

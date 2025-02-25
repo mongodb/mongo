@@ -243,8 +243,11 @@ TEST_F(PlanExecutorTest, DropIndexScanAgg) {
     // in the pipeline.
     innerExec->saveState();
     MultipleCollectionAccessor collections(collection);
-    auto cursorSource = DocumentSourceCursor::create(
-        collections, std::move(innerExec), _expCtx, DocumentSourceCursor::CursorType::kRegular);
+    auto cursorSource = DocumentSourceCursor::create(collections,
+                                                     std::move(innerExec),
+                                                     nullptr /* transactionResourcesStasher */,
+                                                     _expCtx,
+                                                     DocumentSourceCursor::CursorType::kRegular);
     auto pipeline = Pipeline::create({cursorSource}, _expCtx);
 
     auto outerExec = plan_executor_factory::make(_expCtx, std::move(pipeline));

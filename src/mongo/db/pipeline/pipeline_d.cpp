@@ -673,9 +673,14 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSample(
         attachExecutorCallback =
             [cursorType](const MultipleCollectionAccessor& collections,
                          std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-                         Pipeline* pipeline) {
-                auto cursor = DocumentSourceCursor::create(
-                    collections, std::move(exec), pipeline->getContext(), cursorType);
+                         Pipeline* pipeline,
+                         boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>
+                             transactionResourcesStasher) {
+                auto cursor = DocumentSourceCursor::create(collections,
+                                                           std::move(exec),
+                                                           transactionResourcesStasher,
+                                                           pipeline->getContext(),
+                                                           cursorType);
                 pipeline->addInitialSource(std::move(cursor));
             };
         return {std::move(exec), std::move(attachExecutorCallback), {}};
@@ -740,12 +745,14 @@ void PipelineD::attachInnerQueryExecutorToPipeline(
     const MultipleCollectionAccessor& collections,
     PipelineD::AttachExecutorCallback attachExecutorCallback,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-    Pipeline* pipeline) {
+    Pipeline* pipeline,
+    const boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>&
+        transactionResourcesStasher) {
     // If the pipeline doesn't need a $cursor stage, there will be no callback function and
     // PlanExecutor provided in the 'attachExecutorCallback' object, so we don't need to do
     // anything.
     if (attachExecutorCallback && exec) {
-        attachExecutorCallback(collections, std::move(exec), pipeline);
+        attachExecutorCallback(collections, std::move(exec), pipeline, transactionResourcesStasher);
     }
 }
 
@@ -754,12 +761,15 @@ void PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
     const NamespaceString& nss,
     const AggregateCommandRequest* aggRequest,
     Pipeline* pipeline,
+    const boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>&
+        transactionResourcesStasher,
     ExecShardFilterPolicy shardFilterPolicy) {
 
     auto [executor, callback, additionalExec] =
         buildInnerQueryExecutor(collections, nss, aggRequest, pipeline, shardFilterPolicy);
     tassert(7856010, "Unexpected additional executors", additionalExec.empty());
-    attachInnerQueryExecutorToPipeline(collections, callback, std::move(executor), pipeline);
+    attachInnerQueryExecutorToPipeline(
+        collections, callback, std::move(executor), pipeline, transactionResourcesStasher);
 }
 
 namespace {
@@ -1832,9 +1842,15 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
     auto attachExecutorCallback = [cursorType, resumeTrackingType](
                                       const MultipleCollectionAccessor& collections,
                                       std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-                                      Pipeline* pipeline) {
-        auto cursor = DocumentSourceCursor::create(
-            collections, std::move(exec), pipeline->getContext(), cursorType, resumeTrackingType);
+                                      Pipeline* pipeline,
+                                      intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>
+                                          transactionResourcesStasher) {
+        auto cursor = DocumentSourceCursor::create(collections,
+                                                   std::move(exec),
+                                                   transactionResourcesStasher,
+                                                   pipeline->getContext(),
+                                                   cursorType,
+                                                   resumeTrackingType);
         pipeline->addInitialSource(std::move(cursor));
     };
     return {std::move(exec), std::move(attachExecutorCallback), {}};
@@ -1882,21 +1898,24 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeoNear(
                                                 &shouldProduceEmptyDocs,
                                                 false /* timeseriesBoundedSortOptimization */));
 
-    auto attachExecutorCallback = [distanceField = geoNearStage->getDistanceField(),
-                                   locationField = geoNearStage->getLocationField(),
-                                   distanceMultiplier =
-                                       geoNearStage->getDistanceMultiplier().value_or(1.0)](
-                                      const MultipleCollectionAccessor& collections,
-                                      std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-                                      Pipeline* pipeline) {
-        auto cursor = DocumentSourceGeoNearCursor::create(collections,
-                                                          std::move(exec),
-                                                          pipeline->getContext(),
-                                                          distanceField,
-                                                          locationField,
-                                                          distanceMultiplier);
-        pipeline->addInitialSource(std::move(cursor));
-    };
+    auto attachExecutorCallback =
+        [distanceField = geoNearStage->getDistanceField(),
+         locationField = geoNearStage->getLocationField(),
+         distanceMultiplier = geoNearStage->getDistanceMultiplier().value_or(1.0)](
+            const MultipleCollectionAccessor& collections,
+            std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+            Pipeline* pipeline,
+            boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>
+                transactionResourcesStasher) {
+            auto cursor = DocumentSourceGeoNearCursor::create(collections,
+                                                              std::move(exec),
+                                                              transactionResourcesStasher,
+                                                              pipeline->getContext(),
+                                                              distanceField,
+                                                              locationField,
+                                                              distanceMultiplier);
+            pipeline->addInitialSource(std::move(cursor));
+        };
     // Remove the initial $geoNear; it will be replaced by $geoNearCursor.
     sources.pop_front();
     return {std::move(exec), std::move(attachExecutorCallback), {}};

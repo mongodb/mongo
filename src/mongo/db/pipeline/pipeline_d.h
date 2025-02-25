@@ -92,10 +92,11 @@ public:
      * creating a specific DocumentSourceCursor stage using the provided PlanExecutor, and adding
      * the new stage to the pipeline.
      */
-    using AttachExecutorCallback =
-        std::function<void(const MultipleCollectionAccessor&,
-                           std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>,
-                           Pipeline*)>;
+    using AttachExecutorCallback = std::function<void(
+        const MultipleCollectionAccessor&,
+        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>,
+        Pipeline*,
+        const boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>&)>;
 
     /**
      * A tuple to represent the result of query executors, includes a main executor, its pipeline
@@ -139,25 +140,34 @@ public:
      * 'buildInnerQueryExecutor()' method. If the callback doesn't hold a valid PlanExecutor, the
      * method does nothing. Otherwise, a new $cursor stage is created using the given PlanExecutor,
      * and added to the pipeline. The 'collections' parameter can reference any number of
-     * collections.
+     * collections. 'transactionResourcesStasher' must point to a
+     ShardRole::TransactionResourcesStasher that will hold the ShardRole::TransactionResources
+     associated with 'collections' and 'exec'.
+
      */
     static void attachInnerQueryExecutorToPipeline(
         const MultipleCollectionAccessor& collection,
         AttachExecutorCallback attachExecutorCallback,
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-        Pipeline* pipeline);
+        Pipeline* pipeline,
+        const boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>&
+            transactionResourcesStasher);
 
     /**
      * This method combines 'buildInnerQueryExecutor()' and 'attachInnerQueryExecutorToPipeline()'
      * into a single call to support auto completion of the cursor stage creation process. Can be
      * used when the executor attachment phase doesn't need to be deferred and the $cursor stage
-     * can be created right after building the executor.
+     * can be created right after building the executor. 'transactionResourcesStasher' must point to
+     a ShardRole::TransactionResourcesStasher that will hold the ShardRole::TransactionResources
+     associated with 'collections'.
      */
     static void buildAndAttachInnerQueryExecutorToPipeline(
         const MultipleCollectionAccessor& collections,
         const NamespaceString& nss,
         const AggregateCommandRequest* aggRequest,
         Pipeline* pipeline,
+        const boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>&
+            transactionResourcesStasher,
         ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{});
 
     static Timestamp getLatestOplogTimestamp(const Pipeline* pipeline);

@@ -53,12 +53,15 @@ namespace mongo {
 boost::intrusive_ptr<DocumentSourceGeoNearCursor> DocumentSourceGeoNearCursor::create(
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+    const boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>&
+        transactionResourcesStasher,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<FieldPath> distanceField,
     boost::optional<FieldPath> locationField,
     double distanceMultiplier) {
     return {new DocumentSourceGeoNearCursor(collections,
                                             std::move(exec),
+                                            transactionResourcesStasher,
                                             expCtx,
                                             std::move(distanceField),
                                             std::move(locationField),
@@ -68,12 +71,17 @@ boost::intrusive_ptr<DocumentSourceGeoNearCursor> DocumentSourceGeoNearCursor::c
 DocumentSourceGeoNearCursor::DocumentSourceGeoNearCursor(
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+    const boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>&
+        transactionResourcesStasher,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<FieldPath> distanceField,
     boost::optional<FieldPath> locationField,
     double distanceMultiplier)
-    : DocumentSourceCursor(
-          collections, std::move(exec), expCtx, DocumentSourceCursor::CursorType::kRegular),
+    : DocumentSourceCursor(collections,
+                           std::move(exec),
+                           transactionResourcesStasher,
+                           expCtx,
+                           DocumentSourceCursor::CursorType::kRegular),
       _distanceField(std::move(distanceField)),
       _locationField(std::move(locationField)),
       _distanceMultiplier(distanceMultiplier) {

@@ -172,7 +172,7 @@ protected:
             }
 
             PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
-                colls, kNss, &request, pipeline.get());
+                colls, kNss, &request, pipeline.get(), nullptr /* transactionResourcesStasher */);
         }
 
         auto exec = plan_executor_factory::make(expCtx, std::move(pipeline));

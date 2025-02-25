@@ -693,8 +693,14 @@ public:
                                          .getDatabaseProfileLevel(nss.dbName()));
 
                 // Check whether we are allowed to read from this node after acquiring our locks.
-                uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(
-                    opCtx, nss, true));
+                // When using ShardRole, only check when there is at least one acquired
+                // collection/view – it is possible that a ShardRole acquisition is empty when the
+                // enclosed executor is a trivial EOF plan.
+                if (!cursorPin->getExecutor()->usesCollectionAcquisitions() ||
+                    !shard_role_details::TransactionResources::get(opCtx).isEmpty()) {
+                    uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(
+                        opCtx, nss, true));
+                }
             }
 
             if (MONGO_unlikely(waitAfterPinningCursorBeforeGetMoreBatch.shouldFail())) {

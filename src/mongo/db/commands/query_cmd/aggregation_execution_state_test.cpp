@@ -331,7 +331,7 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogState) {
         ASSERT_TRUE(aggCatalogState->getUUID().has_value());
 
         // This call should not throw.
-        aggCatalogState->relinquishLocks();
+        aggCatalogState->relinquishResources();
     }
 }
 
@@ -372,7 +372,7 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryC
         ASSERT_TRUE(aggCatalogState->getUUID().has_value());
 
         // This call should not throw.
-        aggCatalogState->relinquishLocks();
+        aggCatalogState->relinquishResources();
     }
 }
 
@@ -417,7 +417,7 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryS
         ASSERT_TRUE(aggCatalogState->getUUID().has_value());
 
         // This call should not throw.
-        aggCatalogState->relinquishLocks();
+        aggCatalogState->relinquishResources();
     }
 }
 
@@ -462,7 +462,7 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryV
         ASSERT_TRUE(aggCatalogState->getUUID().has_value());
 
         // This call should not throw.
-        aggCatalogState->relinquishLocks();
+        aggCatalogState->relinquishResources();
     }
 }
 
@@ -507,7 +507,7 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateView) {
         ASSERT_FALSE(aggCatalogState->getUUID().has_value());
 
         // This call should not throw.
-        aggCatalogState->relinquishLocks();
+        aggCatalogState->relinquishResources();
     }
 }
 
@@ -539,7 +539,7 @@ TEST_F(AggregationExecutionStateTest, CreateOplogAggCatalogState) {
         ASSERT_FALSE(aggCatalogState->getUUID().has_value());
 
         // This call should not throw.
-        aggCatalogState->relinquishLocks();
+        aggCatalogState->relinquishResources();
     }
 }
 

@@ -433,9 +433,21 @@ public:
     virtual boost::optional<UUID> getUUID() const = 0;
 
     /**
-     * Free any catalog locks acquired by the constructor.
+     * Free any catalog resources acquired by the constructor.
      */
-    virtual void relinquishLocks() = 0;
+    virtual void relinquishResources() = 0;
+
+    /**
+     * Stash any catalog resources acquired by the constructor.
+     * 'transactionResourcesStasher' must not be nullptr.
+     */
+    virtual void stashResources(TransactionResourcesStasher* transactionResourcesStasher) = 0;
+
+    /**
+     * Returns true if the catalog acquisitions were done through ShardRole API. Returns false if
+     * not.
+     */
+    virtual bool usesCollectionAcquisitions() const = 0;
 
     query_shape::CollectionType determineCollectionType() const;
 

@@ -621,6 +621,40 @@ bool supportsLockFreeRead(OperationContext* opCtx) {
         !(shard_role_details::getRecoveryUnit(opCtx)->isActive() && !opCtx->isLockFreeReadsOp());
 }
 
+void stashTransactionResourcesFromOperationContextAndDontAttachNewOnes(
+    OperationContext* opCtx, TransactionResourcesStasher* stasher) {
+    auto& transactionResources = TransactionResources::get(opCtx);
+
+    (void)prepareForYieldingTransactionResources(opCtx);
+
+    // TODO SERVER-77213: This should mostly go away once the Locker resides inside
+    // TransactionResources and the underlying locks point to it instead of the opCtx.
+    //
+    // Release all locks acquired since we are going to yield externally and our opCtx is going to
+    // be destroyed.
+    auto resetAcquisitionLocks = [](shard_role_details::AcquiredBase& acquisition) {
+        acquisition.collectionLock.reset();
+        acquisition.dbLock.reset();
+        acquisition.globalLock.reset();
+        acquisition.lockFreeReadsBlock.reset();
+    };
+
+    for (auto& acquisition : transactionResources.acquiredCollections) {
+        resetAcquisitionLocks(acquisition);
+    }
+
+    for (auto& acquisition : transactionResources.acquiredViews) {
+        resetAcquisitionLocks(acquisition);
+    }
+
+    auto originalState =
+        std::exchange(transactionResources.state, TransactionResources::State::STASHED);
+
+    auto stashedResources =
+        StashedTransactionResources{TransactionResources::detachFromOpCtx(opCtx), originalState};
+
+    stasher->stashTransactionResources(std::move(stashedResources));
+}
 }  // namespace
 
 CollectionOrViewAcquisitionRequest CollectionOrViewAcquisitionRequest::fromOpCtx(
@@ -1414,9 +1448,10 @@ PreparedForYieldToken prepareForYieldingTransactionResources(OperationContext* o
     invariant(
         !(transactionResources.yielded ||
           transactionResources.state == shard_role_details::TransactionResources::State::YIELDED));
-    invariant(transactionResources.state ==
-                  shard_role_details::TransactionResources::State::ACTIVE ||
-              transactionResources.state == shard_role_details::TransactionResources::State::EMPTY);
+    invariant(
+        transactionResources.state == shard_role_details::TransactionResources::State::ACTIVE ||
+        transactionResources.state == shard_role_details::TransactionResources::State::EMPTY ||
+        transactionResources.state == shard_role_details::TransactionResources::State::FAILED);
     for (auto& acquisition : transactionResources.acquiredCollections) {
         // Yielding kLocalCatalogOnlyWithPotentialDataLoss acquisitions is not allowed.
         invariant(
@@ -1442,10 +1477,14 @@ YieldedTransactionResources yieldTransactionResourcesFromOperationContext(Operat
                                                                           PreparedForYieldToken) {
     auto& transactionResources = TransactionResources::get(opCtx);
 
-    Locker::LockSnapshot lockSnapshot;
-    shard_role_details::getLocker(opCtx)->saveLockStateAndUnlock(&lockSnapshot);
-    transactionResources.yielded.emplace(
-        TransactionResources::YieldedStateHolder{std::move(lockSnapshot)});
+    // Stash the locker state, only if we have any active acquisition. Don't do it when we don't, as
+    // it is illegal to call saveLockStateAndUnlock without actually holding any locks.
+    if (transactionResources.state == shard_role_details::TransactionResources::State::ACTIVE) {
+        Locker::LockSnapshot lockSnapshot;
+        shard_role_details::getLocker(opCtx)->saveLockStateAndUnlock(&lockSnapshot);
+        transactionResources.yielded.emplace(
+            TransactionResources::YieldedStateHolder{std::move(lockSnapshot)});
+    }
 
     auto originalState = std::exchange(transactionResources.state,
                                        shard_role_details::TransactionResources::State::YIELDED);
@@ -1455,37 +1494,9 @@ YieldedTransactionResources yieldTransactionResourcesFromOperationContext(Operat
 
 void stashTransactionResourcesFromOperationContext(OperationContext* opCtx,
                                                    TransactionResourcesStasher* stasher) {
-    auto& transactionResources = TransactionResources::get(opCtx);
-
-    (void)prepareForYieldingTransactionResources(opCtx);
-
-    // TODO SERVER-77213: This should mostly go away once the Locker resides inside
-    // TransactionResources and the underlying locks point to it instead of the opCtx.
-    //
-    // Release all locks acquired since we are going to yield externally and our opCtx is going to
-    // be destroyed.
-    auto resetAcquisitionLocks = [](shard_role_details::AcquiredBase& acquisition) {
-        acquisition.collectionLock.reset();
-        acquisition.dbLock.reset();
-        acquisition.globalLock.reset();
-        acquisition.lockFreeReadsBlock.reset();
-    };
-
-    for (auto& acquisition : transactionResources.acquiredCollections) {
-        resetAcquisitionLocks(acquisition);
-    }
-
-    for (auto& acquisition : transactionResources.acquiredViews) {
-        resetAcquisitionLocks(acquisition);
-    }
-
-    auto originalState =
-        std::exchange(transactionResources.state, TransactionResources::State::STASHED);
-
-    auto stashedResources =
-        StashedTransactionResources{TransactionResources::detachFromOpCtx(opCtx), originalState};
-
-    stasher->stashTransactionResources(std::move(stashedResources));
+    stashTransactionResourcesFromOperationContextAndDontAttachNewOnes(opCtx, stasher);
+    shard_role_details::TransactionResources::attachToOpCtx(
+        opCtx, std::make_unique<shard_role_details::TransactionResources>());
 }
 
 void restoreTransactionResourcesToOperationContext(
@@ -1636,7 +1647,16 @@ void restoreTransactionResourcesToOperationContext(
         return catalog;
     };
 
-    auto catalog = [&]() {
+    // If the yielded TransactionResources do not have any acquired collection/view, then trivially
+    // restore to an EMPTY state.
+    if (transactionResources.acquiredCollections.empty() &&
+        transactionResources.acquiredViews.empty()) {
+        transactionResources.state = shard_role_details::TransactionResources::State::EMPTY;
+        scopeGuard.dismiss();
+        return;
+    }
+
+    auto catalog = [&]() -> std::shared_ptr<const CollectionCatalog> {
         while (true) {
             try {
                 return restoreFn();
@@ -1708,6 +1728,8 @@ HandleTransactionResourcesFromStasher::HandleTransactionResourcesFromStasher(
     if (TransactionResources::isPresent(opCtx)) {
         _originalTransactionResources = TransactionResources::detachFromOpCtx(opCtx);
     }
+
+    invariant(stashedResources._yieldedResources);
 
     ScopeGuard restoreFailedGuard([&] {
         if (TransactionResources::isPresent(opCtx)) {
@@ -1813,11 +1835,9 @@ HandleTransactionResourcesFromStasher::HandleTransactionResourcesFromStasher(
 
 HandleTransactionResourcesFromStasher::~HandleTransactionResourcesFromStasher() {
     if (TransactionResources::isPresent(_opCtx)) {
-        auto& txnResources = TransactionResources::get(_opCtx);
-        if (_stasher && txnResources.state != TransactionResources::State::FAILED) {
-            // If the resources for the entire transaction are still valid and we haven't dismissed
-            // the resources due to a failure, we yield and stash them.
-            stashTransactionResourcesFromOperationContext(_opCtx, _stasher);
+        if (_stasher) {
+            // If we haven't dismissed the resources, we yield and stash them.
+            stashTransactionResourcesFromOperationContextAndDontAttachNewOnes(_opCtx, _stasher);
         } else {
             // Otherwise, the transaction resources for this operation have to be destroyed since
             // the operation has failed.
