@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/timeseries/bucket_catalog/rollover.h"
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
 #include <initializer_list>
@@ -459,8 +460,14 @@ StatusWith<tracking::unique_ptr<Bucket>> BucketCatalogTest::_testRehydrateBucket
     };
     auto era = getCurrentEra(_bucketCatalog->bucketStateRegistry);
 
-    return internal::rehydrateBucket(
-        *_bucketCatalog, bucketDoc, era, coll->getDefaultCollator(), validator, insertContext);
+    return internal::rehydrateBucket(*_bucketCatalog,
+                                     bucketDoc,
+                                     insertContext.key,
+                                     insertContext.options,
+                                     era,
+                                     coll->getDefaultCollator(),
+                                     validator,
+                                     insertContext.stats);
 }
 
 Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj& bucketDoc) {
@@ -491,8 +498,14 @@ Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj
     };
     auto era = getCurrentEra(_bucketCatalog->bucketStateRegistry);
 
-    auto res = internal::rehydrateBucket(
-        *_bucketCatalog, bucketDoc, era, coll->getDefaultCollator(), validator, insertContext);
+    auto res = internal::rehydrateBucket(*_bucketCatalog,
+                                         bucketDoc,
+                                         insertContext.key,
+                                         insertContext.options,
+                                         era,
+                                         coll->getDefaultCollator(),
+                                         validator,
+                                         insertContext.stats);
     if (!res.isOK()) {
         return res.getStatus();
     }
@@ -2847,6 +2860,90 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOrder) {
     ASSERT_EQ(2, potentialBuckets.size());
     ASSERT_EQ(&bucket1, potentialBuckets[0]);
     ASSERT_EQ(&bucket2, potentialBuckets[1]);
+}
+
+TEST_F(BucketCatalogTest, GetEligibleBucketAllocateBucket) {
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    const auto& bucketsColl = autoColl.getCollection();
+    auto measurement = BSON(_timeField << Date_t::now() << _metaField << _metaValue);
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = write_ops::internal::buildBatchedInsertContexts(
+        *_bucketCatalog, _uuid1, timeseriesOptions, {measurement}, errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+
+    auto batchedInsertCtx = batchedInsertContexts[0];
+    auto measurementTimestamp = std::get<1>(batchedInsertCtx.measurementsTimesAndIndices[0]);
+    auto era = getCurrentEra(_bucketCatalog->bucketStateRegistry);
+
+    ASSERT(_bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsByKey.empty());
+    ASSERT(_bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsById.empty());
+
+    auto& bucket = getEligibleBucket(_opCtx,
+                                     *_bucketCatalog,
+                                     *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
+                                     WithLock::withoutLock(),
+                                     bucketsColl,
+                                     measurement,
+                                     batchedInsertCtx.key,
+                                     measurementTimestamp,
+                                     batchedInsertCtx.options,
+                                     bucketsColl->getDefaultCollator(),
+                                     era,
+                                     kStorageCacheSizeBytes,
+                                     /* compressAndWriteBucketFunc =*/nullptr,
+                                     batchedInsertCtx.stats);
+    ASSERT_EQ(0, bucket.size);
+    ASSERT_EQ(RolloverAction::kNone, bucket.rolloverAction);
+    ASSERT_EQ(1, _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsByKey.size());
+    ASSERT_EQ(1, _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsById.size());
+}
+
+TEST_F(BucketCatalogTest, GetEligibleBucketOpenBucket) {
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    const auto& bucketsColl = autoColl.getCollection();
+    auto measurement = BSON(_timeField << Date_t::now() << _metaField << _metaValue);
+    auto timeseriesOptions = _getTimeseriesOptions(_ns1);
+    std::vector<timeseries::write_ops::internal::WriteStageErrorAndIndex> errorsAndIndices;
+    auto batchedInsertContexts = write_ops::internal::buildBatchedInsertContexts(
+        *_bucketCatalog, _uuid1, timeseriesOptions, {measurement}, errorsAndIndices);
+    ASSERT(errorsAndIndices.empty());
+
+    auto batchedInsertCtx = batchedInsertContexts[0];
+    auto measurementTimestamp = std::get<1>(batchedInsertCtx.measurementsTimesAndIndices[0]);
+    auto era = getCurrentEra(_bucketCatalog->bucketStateRegistry);
+
+    Bucket& bucketAllocated =
+        internal::allocateBucket(*_bucketCatalog,
+                                 *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
+                                 WithLock::withoutLock(),
+                                 batchedInsertCtx.key,
+                                 batchedInsertCtx.options,
+                                 measurementTimestamp,
+                                 /* comparator= */ nullptr,
+                                 batchedInsertCtx.stats);
+
+    ASSERT_EQ(1, _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsByKey.size());
+    ASSERT_EQ(1, _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsById.size());
+
+    auto& bucketFound = getEligibleBucket(_opCtx,
+                                          *_bucketCatalog,
+                                          *_bucketCatalog->stripes[batchedInsertCtx.stripeNumber],
+                                          WithLock::withoutLock(),
+                                          bucketsColl,
+                                          measurement,
+                                          batchedInsertCtx.key,
+                                          measurementTimestamp,
+                                          batchedInsertCtx.options,
+                                          bucketsColl->getDefaultCollator(),
+                                          era,
+                                          kStorageCacheSizeBytes,
+                                          /* compressAndWriteBucketFunc =*/nullptr,
+                                          batchedInsertCtx.stats);
+    ASSERT_EQ(&bucketAllocated, &bucketFound);
+    ASSERT_EQ(RolloverAction::kNone, bucketFound.rolloverAction);
+    ASSERT_EQ(1, _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsByKey.size());
+    ASSERT_EQ(1, _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsById.size());
 }
 
 TEST_F(BucketCatalogTest, UseAlternateBucketSkipsBucketWithDirectWrite) {

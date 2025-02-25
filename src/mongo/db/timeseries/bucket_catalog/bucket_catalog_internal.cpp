@@ -520,15 +520,15 @@ BSONObj reopenQueriedBucket(OperationContext* opCtx,
     return BSONObj{};
 }
 
-StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(
-    BucketCatalog& catalog,
-    const BSONObj& bucketDoc,
-    uint64_t catalogEra,
-    const StringDataComparator* comparator,
-    const BucketDocumentValidator& validator,
-    bucket_catalog::InsertContext& insertContext) {
-    ScopeGuard updateStatsOnError(
-        [&insertContext] { insertContext.stats.incNumBucketReopeningsFailed(); });
+StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
+                                                         const BSONObj& bucketDoc,
+                                                         const BucketKey& bucketKey,
+                                                         const TimeseriesOptions& options,
+                                                         uint64_t catalogEra,
+                                                         const StringDataComparator* comparator,
+                                                         const BucketDocumentValidator& validator,
+                                                         ExecutionStatsController& stats) {
+    ScopeGuard updateStatsOnError([&stats] { stats.incNumBucketReopeningsFailed(); });
 
     if (catalogEra < getCurrentEra(catalog.bucketStateRegistry)) {
         return {ErrorCodes::WriteConflict, "Bucket is from an earlier era, may be outdated"};
@@ -554,7 +554,6 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(
     }
 
     BSONElement metadata;
-    const auto& options = insertContext.options;
     auto metaFieldName = options.getMetaField();
     if (metaFieldName) {
         metadata = bucketDoc.getField(kBucketMetaFieldName);
@@ -562,12 +561,12 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(
 
     // Buckets are spread across independently-lockable stripes to improve parallelism. We map a
     // bucket to a stripe by hashing the BucketKey.
-    auto key = BucketKey{insertContext.key.collectionUUID,
+    auto key = BucketKey{bucketKey.collectionUUID,
                          BucketMetadata{getTrackingContext(catalog.trackingContexts,
                                                            TrackingScope::kOpenBucketsById),
                                         metadata,
                                         options.getMetaField()}};
-    if (key != insertContext.key) {
+    if (key != bucketKey) {
         return {ErrorCodes::BadValue, "Bucket metadata does not match (hash collision)"};
     }
 
@@ -649,9 +648,9 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(
 
         invariant(!TestingProctor::instance().isEnabled());
         timeseries::bucket_catalog::freeze(catalog, bucketId);
-        return Status(BucketCompressionFailure(
-                          insertContext.key.collectionUUID, bucketId.oid, bucketId.keySignature),
-                      ex.reason());
+        return Status(
+            BucketCompressionFailure(bucketKey.collectionUUID, bucketId.oid, bucketId.keySignature),
+            ex.reason());
     }
 
     updateStatsOnError.dismiss();
@@ -834,14 +833,14 @@ bool tryToInsertIntoBucketWithoutRollover(BucketCatalog& catalog,
     if (!isNewlyOpenedBucket) {
         auto reason =
             determineRolloverReason(measurement,
-                                    stats,
                                     timeseriesOptions,
                                     bucket,
                                     catalog.globalExecutionStats.numActiveBuckets.loadRelaxed(),
                                     sizesToBeAdded,
                                     date,
                                     storageCacheSizeBytes,
-                                    comparator);
+                                    comparator,
+                                    stats);
         if (reason != RolloverReason::kNone) {
             // We cannot insert this measurement without rolling over the bucket.
             // Mark the bucket's RolloverAction so this bucket won't be eligible for staging the
@@ -995,7 +994,8 @@ void archiveBucket(BucketCatalog& catalog,
 boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
                                            Stripe& stripe,
                                            WithLock stripeLock,
-                                           const InsertContext& info,
+                                           const BucketKey& bucketKey,
+                                           const TimeseriesOptions& options,
                                            const Date_t& time) {
 
     // We want to find the largest time that is not greater than info.time. Generally
@@ -1003,7 +1003,7 @@ boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
     // using std::greater instead of std::less for the map's comparisons. This means the order
     // of keys will be reversed, and lower_bound will return what we want.
     auto it = stripe.archivedBuckets.lower_bound(
-        std::make_tuple(info.key.collectionUUID, info.key.hash, time));
+        std::make_tuple(bucketKey.collectionUUID, bucketKey.hash, time));
     if (it == stripe.archivedBuckets.end()) {
         return boost::none;
     }
@@ -1011,7 +1011,7 @@ boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
     // Ensure we have an exact match on UUID and BucketKey::Hash
     const auto& uuid = std::get<UUID>(it->first);
     const auto& hash = std::get<BucketKey::Hash>(it->first);
-    if (uuid != info.key.collectionUUID || hash != info.key.hash) {
+    if (uuid != bucketKey.collectionUUID || hash != bucketKey.hash) {
         return boost::none;
     }
 
@@ -1019,7 +1019,7 @@ boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
     invariant(candidateTime <= time);
     // We need to make sure our measurement can fit without violating max span. If not, we
     // can't use this bucket.
-    if (time - candidateTime >= Seconds(*info.options.getBucketMaxSpanSeconds())) {
+    if (time - candidateTime >= Seconds(*options.getBucketMaxSpanSeconds())) {
         return boost::none;
     }
 
@@ -1047,7 +1047,8 @@ InsertResult getReopeningContext(BucketCatalog& catalog,
                                  AllowQueryBasedReopening allowQueryBasedReopening,
                                  const Date_t& time,
                                  uint64_t storageCacheSizeBytes) {
-    if (auto archived = findArchivedCandidate(catalog, stripe, stripeLock, info, time)) {
+    if (auto archived =
+            findArchivedCandidate(catalog, stripe, stripeLock, info.key, info.options, time)) {
         // Synchronize concurrent disk accesses. An outstanding query-based reopening request for
         // this series or an outstanding archived-based reopening request or prepared batch for this
         // bucket would potentially conflict with our choice to reopen here, so we must wait for any
@@ -1101,25 +1102,27 @@ InsertResult getReopeningContext(BucketCatalog& catalog,
 boost::optional<OID> getArchiveReopeningCandidate(BucketCatalog& catalog,
                                                   Stripe& stripe,
                                                   WithLock stripeLock,
-                                                  const InsertContext& info,
+                                                  const BucketKey& bucketKey,
+                                                  const TimeseriesOptions& options,
                                                   const Date_t& time) {
-    return findArchivedCandidate(catalog, stripe, stripeLock, info, time);
+    return findArchivedCandidate(catalog, stripe, stripeLock, bucketKey, options, time);
 }
 
 std::vector<BSONObj> getQueryReopeningCandidate(BucketCatalog& catalog,
                                                 Stripe& stripe,
                                                 WithLock stripeLock,
-                                                const InsertContext& info,
+                                                const BucketKey& bucketKey,
+                                                const TimeseriesOptions& options,
                                                 uint64_t storageCacheSizeBytes,
                                                 const Date_t& time) {
     boost::optional<BSONElement> metaElement;
-    if (info.options.getMetaField().has_value()) {
-        metaElement = info.key.metadata.element();
+    if (options.getMetaField().has_value()) {
+        metaElement = bucketKey.metadata.element();
     }
 
-    auto controlMinTimePath = kControlMinFieldNamePrefix.toString() + info.options.getTimeField();
-    auto maxDataTimeFieldPath = kDataFieldNamePrefix.toString() + info.options.getTimeField() +
-        "." + std::to_string(gTimeseriesBucketMaxCount - 1);
+    auto controlMinTimePath = kControlMinFieldNamePrefix.toString() + options.getTimeField();
+    auto maxDataTimeFieldPath = kDataFieldNamePrefix.toString() + options.getTimeField() + "." +
+        std::to_string(gTimeseriesBucketMaxCount - 1);
 
     // Derive the maximum bucket size.
     auto [bucketMaxSize, _] = getCacheDerivedBucketMaxSize(
@@ -1129,7 +1132,7 @@ std::vector<BSONObj> getQueryReopeningCandidate(BucketCatalog& catalog,
                                      metaElement,
                                      controlMinTimePath,
                                      maxDataTimeFieldPath,
-                                     *info.options.getBucketMaxSpanSeconds(),
+                                     *options.getBucketMaxSpanSeconds(),
                                      bucketMaxSize);
 }
 
@@ -1554,14 +1557,14 @@ void updateRolloverStats(ExecutionStatsController stats, RolloverReason reason) 
 }
 
 RolloverReason determineRolloverReason(const BSONObj& doc,
-                                       ExecutionStatsController stats,
                                        const TimeseriesOptions& timeseriesOptions,
                                        Bucket& bucket,
                                        uint32_t numberOfActiveBuckets,
                                        const Sizes& sizesToBeAdded,
                                        const Date_t& time,
                                        uint64_t storageCacheSizeBytes,
-                                       const StringDataComparator* comparator) {
+                                       const StringDataComparator* comparator,
+                                       ExecutionStatsController& stats) {
     auto bucketTime = bucket.minTime;
     if (time - bucketTime >= Seconds(*timeseriesOptions.getBucketMaxSpanSeconds())) {
         return RolloverReason::kTimeForward;
