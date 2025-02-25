@@ -221,6 +221,7 @@ public:
                             ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(zone.getMin()));
                         uassertStatusOK(
                             ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(zone.getMax()));
+                        uassertStatusOK(ChunkRange::validate(zone.getMin(), zone.getMax()));
                     }
                 }
 

@@ -34,6 +34,7 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
+#include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -76,7 +77,7 @@ void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
                                            ReshardingMetrics* metrics,
                                            const ReshardingCoordinatorDocument& coordinatorDoc,
                                            std::vector<ChunkType> initialChunks,
-                                           std::vector<BSONObj> zones,
+                                           std::vector<ReshardingZoneType> zones,
                                            boost::optional<CollectionIndexes> indexVersion,
                                            boost::optional<bool> isUnsplittable);
 

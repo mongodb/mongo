@@ -104,6 +104,7 @@
 #include "mongo/s/request_types/drop_collection_if_uuid_not_matching_gen.h"
 #include "mongo/s/request_types/flush_resharding_state_change_gen.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
+#include "mongo/s/request_types/update_zone_key_range_gen.h"
 #include "mongo/s/resharding/resharding_coordinator_service_conflicting_op_in_progress_info.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
@@ -130,6 +131,16 @@
 namespace mongo {
 
 namespace {
+
+const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOnly};
+const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
+                                                // Note: Even though we're setting UNSET here,
+                                                // kMajority implies JOURNAL if journaling is
+                                                // supported by mongod and
+                                                // writeConcernMajorityJournalDefault is set to true
+                                                // in the ReplSetConfig.
+                                                WriteConcernOptions::SyncMode::UNSET,
+                                                WriteConcernOptions::kWriteConcernTimeoutSharding);
 
 void assertNumDocsMatchedEqualsExpected(const BatchedCommandRequest& request,
                                         const BSONObj& response,
@@ -605,9 +616,7 @@ void writeToConfigPlacementHistoryForOriginalNss(
     assertNumDocsMatchedEqualsExpected(request, response, 1);
 }
 
-void insertChunkAndTagDocsForTempNss(OperationContext* opCtx,
-                                     const std::vector<ChunkType>& initialChunks,
-                                     std::vector<BSONObj> newZones) {
+void insertChunksForTempNss(OperationContext* opCtx, const std::vector<ChunkType>& initialChunks) {
     // Insert new initial chunk documents for temp nss
     std::vector<BSONObj> initialChunksBSON(initialChunks.size());
     std::transform(initialChunks.begin(),
@@ -617,9 +626,27 @@ void insertChunkAndTagDocsForTempNss(OperationContext* opCtx,
 
     ShardingCatalogManager::get(opCtx)->insertConfigDocuments(
         opCtx, NamespaceString::kConfigsvrChunksNamespace, std::move(initialChunksBSON));
+}
 
+void setupZonesForTempNss(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          std::vector<ReshardingZoneType> newZones) {
+    for (const auto& zone : newZones) {
+        BSONObjBuilder cmdBuilder;
+        ConfigsvrUpdateZoneKeyRange cmd(
+            nss, zone.getMin(), zone.getMax(), zone.getZone().toString());
+        cmd.serialize(&cmdBuilder);
+        cmdBuilder.append("writeConcern", kMajorityWriteConcern.toBSON());
 
-    ShardingCatalogManager::get(opCtx)->insertConfigDocuments(opCtx, TagsType::ConfigNS, newZones);
+        auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+        auto cmdResponseStatus = uassertStatusOK(
+            configShard->runCommandWithFixedRetryAttempts(opCtx,
+                                                          kPrimaryOnlyReadPreference,
+                                                          DatabaseName::kAdmin,
+                                                          cmdBuilder.obj(),
+                                                          Shard::RetryPolicy::kIdempotent));
+        uassertStatusOK(cmdResponseStatus.commandStatus);
+    }
 }
 
 void removeTagsDocs(OperationContext* opCtx, const BSONObj& tagsQuery, TxnNumber txnNumber) {
@@ -863,14 +890,14 @@ void writeParticipantShardsAndTempCollInfo(
     ReshardingMetrics* metrics,
     const ReshardingCoordinatorDocument& updatedCoordinatorDoc,
     std::vector<ChunkType> initialChunks,
-    std::vector<BSONObj> zones,
+    std::vector<ReshardingZoneType> zones,
     boost::optional<CollectionIndexes> indexVersion,
     boost::optional<bool> isUnsplittable) {
     const auto tagsQuery = BSON(TagsType::ns(NamespaceStringUtil::serialize(
         updatedCoordinatorDoc.getTempReshardingNss(), SerializationContext::stateDefault())));
 
     removeChunkAndTagsDocs(opCtx, tagsQuery, updatedCoordinatorDoc.getReshardingUUID());
-    insertChunkAndTagDocsForTempNss(opCtx, initialChunks, zones);
+    insertChunksForTempNss(opCtx, initialChunks);
 
     ShardingCatalogManager::get(opCtx)->bumpCollectionPlacementVersionAndChangeMetadataInTxn(
         opCtx,
@@ -895,6 +922,8 @@ void writeParticipantShardsAndTempCollInfo(
                 opCtx, updatedCoordinatorDoc, boost::none, boost::none, boost::none, txnNumber);
         },
         ShardingCatalogClient::kLocalWriteConcern);
+
+    setupZonesForTempNss(opCtx, updatedCoordinatorDoc.getTempReshardingNss(), zones);
 }
 
 void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(

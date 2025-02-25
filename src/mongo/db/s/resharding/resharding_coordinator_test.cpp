@@ -98,6 +98,9 @@ namespace {
 using namespace resharding;
 using unittest::assertGet;
 
+const std::string kZone1 = "zone1";
+const std::string kZone2 = "zone2";
+
 class ReshardingCoordinatorPersistenceTest : public ConfigServerTestFixture {
 protected:
     void setUp() override {
@@ -106,9 +109,11 @@ protected:
         ShardType shard0;
         shard0.setName("shard0000");
         shard0.setHost("shard0000:1234");
+        shard0.setTags({kZone1});
         ShardType shard1;
         shard1.setName("shard0001");
         shard1.setHost("shard0001:1234");
+        shard1.setTags({kZone2});
         setupShards({shard0, shard1});
         setClusterHasTwoShards();
 
@@ -253,8 +258,8 @@ protected:
             _newShardKey.isShardKey(shardKey.toBSON()) ? _newChunkRanges : _oldChunkRanges;
 
         // Create two zones for the given namespace
-        TagsType tag1(nss, "zone1", chunkRanges[0]);
-        TagsType tag2(nss, "zone2", chunkRanges[1]);
+        TagsType tag1(nss, kZone1, chunkRanges[0]);
+        TagsType tag2(nss, kZone2, chunkRanges[1]);
 
         return std::vector<TagsType>{tag1, tag2};
     }
@@ -632,44 +637,42 @@ protected:
         }
     }
 
+    void setupSourceCollection(OperationContext* opCtx,
+                               ReshardingCoordinatorDocument coordinatorDoc) {
+        setupDatabase(DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                      ShardId("shard0000"));
+        DBDirectClient client(opCtx);
+
+        TypeCollectionReshardingFields reshardingFields(coordinatorDoc.getReshardingUUID());
+        reshardingFields.setState(coordinatorDoc.getState());
+        reshardingFields.setDonorFields(TypeCollectionDonorFields(
+            coordinatorDoc.getTempReshardingNss(),
+            coordinatorDoc.getReshardingKey(),
+            extractShardIdsFromParticipantEntries(coordinatorDoc.getRecipientShards())));
+
+        auto originalNssCatalogEntry = makeOriginalCollectionCatalogEntry(
+            coordinatorDoc,
+            reshardingFields,
+            _originalEpoch,
+            opCtx->getServiceContext()->getPreciseClockSource()->now());
+        client.insert(CollectionType::ConfigNS, originalNssCatalogEntry.toBSON());
+
+        client.createCollection(NamespaceString::kConfigsvrChunksNamespace);
+        client.createCollection(TagsType::ConfigNS);
+
+        ASSERT_OK(createIndexOnConfigCollection(
+            opCtx,
+            NamespaceString::kConfigsvrChunksNamespace,
+            BSON(ChunkType::collectionUUID() << 1 << ChunkType::lastmod() << 1),
+            true));
+    }
+
     void writeInitialStateAndCatalogUpdatesExpectSuccess(
         OperationContext* opCtx,
         ReshardingCoordinatorDocument expectedCoordinatorDoc,
         std::vector<ChunkType> initialChunks,
         std::vector<TagsType> newZones) {
-        // Create original collection's catalog entry as well as both config.chunks and config.tags
-        // collections.
-        {
-            setupDatabase(DatabaseName::createDatabaseName_forTest(boost::none, "db"),
-                          ShardId("shard0000"));
-            auto opCtx = operationContext();
-            DBDirectClient client(opCtx);
-
-            TypeCollectionReshardingFields reshardingFields(
-                expectedCoordinatorDoc.getReshardingUUID());
-            reshardingFields.setState(expectedCoordinatorDoc.getState());
-            reshardingFields.setDonorFields(
-                TypeCollectionDonorFields(expectedCoordinatorDoc.getTempReshardingNss(),
-                                          expectedCoordinatorDoc.getReshardingKey(),
-                                          extractShardIdsFromParticipantEntries(
-                                              expectedCoordinatorDoc.getRecipientShards())));
-
-            auto originalNssCatalogEntry = makeOriginalCollectionCatalogEntry(
-                expectedCoordinatorDoc,
-                reshardingFields,
-                _originalEpoch,
-                opCtx->getServiceContext()->getPreciseClockSource()->now());
-            client.insert(CollectionType::ConfigNS, originalNssCatalogEntry.toBSON());
-
-            client.createCollection(NamespaceString::kConfigsvrChunksNamespace);
-            client.createCollection(TagsType::ConfigNS);
-
-            ASSERT_OK(createIndexOnConfigCollection(
-                opCtx,
-                NamespaceString::kConfigsvrChunksNamespace,
-                BSON(ChunkType::collectionUUID() << 1 << ChunkType::lastmod() << 1),
-                true));
-        }
+        setupSourceCollection(opCtx, expectedCoordinatorDoc);
 
         auto reshardingCoordinatorExternalState = ReshardingCoordinatorExternalStateImpl();
 
@@ -684,12 +687,7 @@ protected:
 
         expectedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
 
-        std::vector<BSONObj> zones;
-        if (expectedCoordinatorDoc.getZones()) {
-            zones = buildTagsDocsFromZones(expectedCoordinatorDoc.getTempReshardingNss(),
-                                           *expectedCoordinatorDoc.getZones(),
-                                           _newShardKey);
-        }
+        auto zones = *expectedCoordinatorDoc.getZones();
         expectedCoordinatorDoc.setZones(boost::none);
         expectedCoordinatorDoc.setPresetReshardedChunks(boost::none);
 
@@ -920,6 +918,67 @@ TEST_F(ReshardingCoordinatorPersistenceTest, WriteInitialInfoSucceeds) {
     const auto postTransitionCollectionPlacementVersion =
         assertGet(getCollectionPlacementVersion(operationContext(), _originalNss));
     ASSERT_TRUE(collectionPlacementVersion.isOlderThan(postTransitionCollectionPlacementVersion));
+}
+
+TEST_F(ReshardingCoordinatorPersistenceTest, ThrowsWhenZoneSpecifiedDoesNotExist) {
+    auto coordinatorDoc = makeCoordinatorDoc(CoordinatorStateEnum::kInitializing);
+
+    // Ensure the chunks for the original namespace exist since they will be bumped as a product of
+    // the state transition to kPreparingToDonate.
+    auto donorChunk = makeAndInsertChunksForDonorShard(
+        _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
+
+    auto initialChunks =
+        makeChunks(_reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+
+    auto newZones = makeZones(_tempNss, _newShardKey);
+    std::vector<BSONObj> zonesBSON;
+    std::vector<ReshardingZoneType> reshardingZoneTypes;
+    for (const auto& zone : newZones) {
+        zonesBSON.push_back(zone.toBSON());
+
+        ReshardingZoneType zoneType("badZone", zone.getMinKey(), zone.getMaxKey());
+        reshardingZoneTypes.push_back(zoneType);
+    }
+
+    std::vector<ReshardedChunk> presetBSONChunks;
+    for (const auto& chunk : initialChunks) {
+        presetBSONChunks.emplace_back(chunk.getShard(), chunk.getMin(), chunk.getMax());
+    }
+
+    // Persist the updates on disk
+    auto expectedCoordinatorDoc = coordinatorDoc;
+    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kInitializing);
+    expectedCoordinatorDoc.setZones(std::move(reshardingZoneTypes));
+    expectedCoordinatorDoc.setPresetReshardedChunks(presetBSONChunks);
+
+    setupSourceCollection(operationContext(), expectedCoordinatorDoc);
+
+    auto reshardingCoordinatorExternalState = ReshardingCoordinatorExternalStateImpl();
+
+    insertCoordDocAndChangeOrigCollEntry(
+        operationContext(), _metrics.get(), expectedCoordinatorDoc);
+
+    auto shardsAndChunks = reshardingCoordinatorExternalState.calculateParticipantShardsAndChunks(
+        operationContext(), expectedCoordinatorDoc);
+
+    expectedCoordinatorDoc.setDonorShards(std::move(shardsAndChunks.donorShards));
+    expectedCoordinatorDoc.setRecipientShards(std::move(shardsAndChunks.recipientShards));
+    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
+
+    auto zones = *expectedCoordinatorDoc.getZones();
+    expectedCoordinatorDoc.setZones(boost::none);
+    expectedCoordinatorDoc.setPresetReshardedChunks(boost::none);
+
+    ASSERT_THROWS_CODE(writeParticipantShardsAndTempCollInfo(operationContext(),
+                                                             _metrics.get(),
+                                                             expectedCoordinatorDoc,
+                                                             initialChunks,
+                                                             zones,
+                                                             boost::none,
+                                                             boost::none),
+                       DBException,
+                       ErrorCodes::ZoneNotFound);
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest, BasicStateTransitionSucceeds) {

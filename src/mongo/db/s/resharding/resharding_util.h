@@ -310,13 +310,6 @@ Timestamp getHighestMinFetchTimestamp(const std::vector<DonorShardEntry>& donorS
 void checkForOverlappingZones(std::vector<ReshardingZoneType>& zones);
 
 /**
- * Builds documents to insert into config.tags from zones provided to reshardCollection cmd.
- */
-std::vector<BSONObj> buildTagsDocsFromZones(const NamespaceString& tempNss,
-                                            std::vector<ReshardingZoneType>& zones,
-                                            const ShardKeyPattern& shardKey);
-
-/**
  * Create an array of resharding zones from the existing collection. This is used for forced
  * same-key resharding.
  */
