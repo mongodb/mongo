@@ -1106,11 +1106,8 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         BSONElement isAdditionElt = projObj["isAddition"];
         const bool isAddition = isAdditionElt.trueValue();
 
-        // Create an empty/dummy expression context without access to the operation context and
-        // collator. This should be sufficient to parse a projection.
-        auto expCtx = ExpressionContextBuilder{}
-                          .ns(NamespaceString::createNamespaceString_forTest("test.dummy"))
-                          .build();
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(
+            NamespaceString::createNamespaceString_forTest("test.dummy")));
         auto projection = projection_ast::parseAndAnalyze(
             expCtx,
             spec.Obj(),
