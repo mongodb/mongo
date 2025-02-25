@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/views/resolved_view.h"
+#include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
 
 namespace mongo {
@@ -134,14 +135,19 @@ public:
             const auto& nss = _aggregationRequest.getNamespace();
 
             try {
-                uassertStatusOK(
-                    ClusterAggregate::runAggregate(opCtx,
-                                                   ClusterAggregate::Namespaces{nss, nss},
-                                                   _aggregationRequest,
-                                                   _liteParsedPipeline,
-                                                   _privileges,
-                                                   verbosity,
-                                                   result));
+                uassertStatusOK(ClusterAggregate::runAggregate(
+                    opCtx,
+                    ClusterAggregate::Namespaces{nss,
+                                                 _aggregationRequest.getRawData() &&
+                                                         CollectionRoutingInfoTargeter{opCtx, nss}
+                                                             .timeseriesNamespaceNeedsRewrite(nss)
+                                                     ? nss.makeTimeseriesBucketsNamespace()
+                                                     : nss},
+                    _aggregationRequest,
+                    _liteParsedPipeline,
+                    _privileges,
+                    verbosity,
+                    result));
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
                 // If the aggregation failed because the namespace is a view, re-run the command
                 // with the resolved view pipeline and namespace.

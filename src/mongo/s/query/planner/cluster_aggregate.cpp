@@ -134,7 +134,8 @@ auto resolveInvolvedNamespaces(const stdx::unordered_set<NamespaceString>& invol
 }
 
 Document serializeForPassthrough(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                 const AggregateCommandRequest& request) {
+                                 const AggregateCommandRequest& request,
+                                 const NamespaceString& executionNs) {
     auto req = request;
 
     // Reset all generic arguments besides those needed for the aggregation itself.
@@ -149,7 +150,22 @@ Document serializeForPassthrough(const boost::intrusive_ptr<ExpressionContext>& 
     req.setReadConcern(std::move(readConcern));
     req.setWriteConcern(std::move(writeConcern));
     aggregation_request_helper::addQuerySettingsToRequest(req, expCtx);
-    return Document(req.toBSON());
+
+    auto reqObj = req.toBSON();
+    if (request.getRawData() && req.getNamespace() != executionNs) {
+        // Rewrite the command object to use the execution namespace.
+        BSONObjBuilder builder{reqObj.objsize()};
+        for (auto&& [fieldName, elem] : reqObj) {
+            if (fieldName == AggregateCommandRequest::kCommandName) {
+                builder.append(fieldName, executionNs.coll());
+            } else {
+                builder.append(elem);
+            }
+        }
+        reqObj = builder.obj();
+    }
+
+    return Document(reqObj);
 }
 
 // Build an appropriate ExpressionContext for the pipeline. This helper instantiates an appropriate
@@ -159,6 +175,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     OperationContext* opCtx,
     const AggregateCommandRequest& request,
     const boost::optional<CollectionRoutingInfo>& cri,
+    const NamespaceString& executionNs,
     BSONObj collationObj,
     boost::optional<UUID> uuid,
     ResolvedNamespaceMap resolvedNamespaces,
@@ -194,7 +211,8 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     // reconstructed for dispatch to a new shard, which is sometimes necessary for change streams
     // pipelines.
     if (hasChangeStream) {
-        mergeCtx->setOriginalAggregateCommand(serializeForPassthrough(mergeCtx, request).toBson());
+        mergeCtx->setOriginalAggregateCommand(
+            serializeForPassthrough(mergeCtx, request, executionNs).toBson());
     }
 
     return mergeCtx;
@@ -398,6 +416,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
         makeExpressionContext(opCtx,
                               request,
                               cri,
+                              executionNss,
                               collationObj,
                               boost::none /* uuid */,
                               resolveInvolvedNamespaces(involvedNamespaces),
@@ -683,7 +702,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                     return cluster_aggregation_planner::dispatchPipelineAndMerge(
                         opCtx,
                         std::move(targeter),
-                        serializeForPassthrough(expCtx, request),
+                        serializeForPassthrough(expCtx, request, namespaces.executionNss),
                         request.getCursor().getBatchSize().value_or(
                             aggregation_request_helper::kDefaultBatchSize),
                         namespaces,
@@ -709,7 +728,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                         expCtx,
                         namespaces,
                         expCtx->getExplain(),
-                        serializeForPassthrough(expCtx, request),
+                        serializeForPassthrough(expCtx, request, namespaces.executionNss),
                         privileges,
                         shardId,
                         result,
@@ -758,7 +777,9 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             if (targeter.policy !=
                 cluster_aggregation_planner::AggregationTargeter::kSpecificShardOnly) {
                 explain_common::appendIfRoom(
-                    serializeForPassthrough(expCtx, request).toBson(), "command", result);
+                    serializeForPassthrough(expCtx, request, namespaces.executionNss).toBson(),
+                    "command",
+                    result);
             }
             collectQueryStatsMongos(opCtx,
                                     std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));

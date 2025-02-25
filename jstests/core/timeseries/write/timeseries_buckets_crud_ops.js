@@ -5,6 +5,8 @@
  *   does_not_support_transactions,
  *   featureFlagRawDataCrudOperations,
  *   requires_non_retryable_writes,
+ *   # TODO (SERVER-101293): Remove this tag.
+ *   known_query_shape_computation_problem,
  * ]
  */
 
@@ -46,12 +48,6 @@ function crudTest(fn, addStartingMeasurements = true) {
 
 // aggregate()
 crudTest(() => {
-    // TODO (SERVER-100413): Run this test case when going through a mongos or the collection is
-    // sharded/unsplittable.
-    if (FixtureHelpers.isMongos(db) || FixtureHelpers.isSharded(bucketsColl) ||
-        FixtureHelpers.isUnsplittable(bucketsColl)) {
-        return;
-    }
     const agg = coll.aggregate(
         [
             {$match: {"control.count": 2}},
