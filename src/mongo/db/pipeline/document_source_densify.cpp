@@ -298,7 +298,6 @@ DocumentSourceInternalDensify::DocGenerator::DocGenerator(DensifyValue min,
                 _includeFields.getNestedField(_path).missing());
     }
 
-
     // Traverse the preserved fields document to make sure we're not going through an array.
     auto traverseDoc = _includeFields;
     auto pathLength = _path.getPathLength();
@@ -447,6 +446,13 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::finishDensifyingPar
         // If the partition never hit the bottom of the range, use that instead.
         if (minOverride && minOverride > firstPartitionVal) {
             valToGenerate = *minOverride;
+            // In the case that the range was [x, x], we need to make sure we actually generate a
+            // document on 'x'.
+            if (valToGenerate == max) {
+                // We have to generate something on both bounds. For the purposes of this function,
+                // that makes 'maxInclusive' true.
+                maxInclusive = true;
+            }
         }
 
         // If the valToGenerate is > max seen, skip this partition. It is done.
