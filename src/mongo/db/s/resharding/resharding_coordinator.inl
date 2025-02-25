@@ -53,11 +53,47 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
+/**
+ * Compiling this file requires an extremely large amount of compiler memory
+ * and time. Therefore, we compile it in smaller parts, and these parts are
+ * selected by ifdefs.
+ */
+
+// If no part-specifying macro is defined, then nothing is hidden, so
+// that code editors don't gray everything out.
+#if !defined(RESHARDING_COORDINATOR_PART_0) && !defined(RESHARDING_COORDINATOR_PART_1) && \
+    !defined(RESHARDING_COORDINATOR_PART_2) && !defined(RESHARDING_COORDINATOR_PART_3) && \
+    !defined(RESHARDING_COORDINATOR_PART_4)
+#define RESHARDING_COORDINATOR_PART_0
+#define RESHARDING_COORDINATOR_PART_1
+#define RESHARDING_COORDINATOR_PART_2
+#define RESHARDING_COORDINATOR_PART_3
+#define RESHARDING_COORDINATOR_PART_4
+#endif
+
 namespace mongo {
-namespace {
+inline namespace resharding_coordinator_detail {
 
-const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
+inline const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
+extern FailPoint reshardingPauseCoordinatorAfterPreparingToDonate;
+extern FailPoint reshardingPauseCoordinatorBeforeInitializing;
+extern FailPoint reshardingPauseCoordinatorBeforeCloning;
+extern FailPoint reshardingPauseCoordinatorBeforeBlockingWrites;
+extern FailPoint reshardingPauseCoordinatorBeforeDecisionPersisted;
+extern FailPoint reshardingPauseBeforeTellingParticipantsToCommit;
+extern FailPoint reshardingPauseCoordinatorBeforeRemovingStateDoc;
+extern FailPoint reshardingPauseCoordinatorBeforeCompletion;
+extern FailPoint reshardingPauseCoordinatorBeforeStartingErrorFlow;
+extern FailPoint reshardingPauseCoordinatorBeforePersistingStateTransition;
+extern FailPoint reshardingPerformValidationAfterApplying;
+extern FailPoint pauseBeforeTellDonorToRefresh;
+extern FailPoint pauseAfterInsertCoordinatorDoc;
+extern FailPoint pauseBeforeCTHolderInitialization;
+extern FailPoint pauseAfterEngagingCriticalSection;
+
+// These failpoints are declared in all parts, but only defined in part 0.
+#ifdef RESHARDING_COORDINATOR_PART_0
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorAfterPreparingToDonate);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeInitializing);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCloning);
@@ -73,10 +109,11 @@ MONGO_FAIL_POINT_DEFINE(pauseBeforeTellDonorToRefresh);
 MONGO_FAIL_POINT_DEFINE(pauseAfterInsertCoordinatorDoc);
 MONGO_FAIL_POINT_DEFINE(pauseBeforeCTHolderInitialization);
 MONGO_FAIL_POINT_DEFINE(pauseAfterEngagingCriticalSection);
+#endif  // RESHARDING_COORDINATOR_PART_0
 
+}  // namespace resharding_coordinator_detail
 
-}  // namespace
-
+#ifdef RESHARDING_COORDINATOR_PART_0
 ReshardingCoordinator::ReshardingCoordinator(
     ReshardingCoordinatorService* coordinatorService,
     const ReshardingCoordinatorDocument& coordinatorDoc,
@@ -160,7 +197,12 @@ void ReshardingCoordinator::installCoordinatorDocOnStateTransition(
                                            bob.obj(),
                                            resharding::kMajorityWriteConcern);
 }
+#endif  // RESHARDING_COORDINATOR_PART_0
 
+inline namespace resharding_coordinator_detail {
+// Declared in all parts and defined in part 0.
+void markCompleted(const Status& status, ReshardingMetrics* metrics);
+#ifdef RESHARDING_COORDINATOR_PART_0
 void markCompleted(const Status& status, ReshardingMetrics* metrics) {
     if (status.isOK()) {
         metrics->onSuccess();
@@ -170,34 +212,10 @@ void markCompleted(const Status& status, ReshardingMetrics* metrics) {
         metrics->onFailure();
     }
 }
+#endif  // RESHARDING_COORDINATOR_PART_0
+}  // namespace resharding_coordinator_detail
 
-std::shared_ptr<async_rpc::AsyncRPCOptions<_flushReshardingStateChange>>
-createFlushReshardingStateChangeOptions(const NamespaceString& nss,
-                                        const UUID& reshardingUUID,
-                                        const std::shared_ptr<executor::TaskExecutor>& exec,
-                                        CancellationToken token) {
-    _flushReshardingStateChange cmd(nss);
-    cmd.setDbName(DatabaseName::kAdmin);
-    cmd.setReshardingUUID(reshardingUUID);
-    auto opts =
-        std::make_shared<async_rpc::AsyncRPCOptions<_flushReshardingStateChange>>(exec, token, cmd);
-    return opts;
-}
-
-std::shared_ptr<async_rpc::AsyncRPCOptions<ShardsvrCommitReshardCollection>>
-createShardsvrCommitReshardCollectionOptions(const NamespaceString& nss,
-                                             const UUID& reshardingUUID,
-                                             const std::shared_ptr<executor::TaskExecutor>& exec,
-                                             CancellationToken token) {
-    ShardsvrCommitReshardCollection cmd(nss);
-    cmd.setDbName(DatabaseName::kAdmin);
-    cmd.setReshardingUUID(reshardingUUID);
-    generic_argument_util::setMajorityWriteConcern(cmd, &resharding::kMajorityWriteConcern);
-    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCommitReshardCollection>>(
-        exec, token, cmd);
-    return opts;
-}
-
+#ifdef RESHARDING_COORDINATOR_PART_1
 ExecutorFuture<void> ReshardingCoordinator::_tellAllParticipantsReshardingStarted(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kPreparingToDonate) {
@@ -965,6 +983,10 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
         opCtx.get(), _ctHolder->getAbortToken());
 }
 
+#endif  // RESHARDING_COORDINATOR_PART_1
+#ifdef RESHARDING_COORDINATOR_PART_2
+
+namespace {
 ReshardingApproxCopySize computeApproxCopySize(OperationContext* opCtx,
                                                ReshardingCoordinatorDocument& coordinatorDoc) {
     const auto cm =
@@ -993,6 +1015,7 @@ ReshardingApproxCopySize computeApproxCopySize(OperationContext* opCtx,
     approxCopySize.setApproxDocumentsToCopy(aggDocumentsToCopy / numRecipientsToCopy);
     return approxCopySize;
 }
+}  // namespace
 
 ExecutorFuture<void> ReshardingCoordinator::_awaitAllDonorsReadyToDonate(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
@@ -1189,6 +1212,9 @@ void ReshardingCoordinator::_startCommitMonitor(
                                  })
                                  .share();
 }
+
+#endif  // RESHARDING_COORDINATOR_PART_2
+#ifdef RESHARDING_COORDINATOR_PART_3
 
 ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedApplying(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
@@ -1574,6 +1600,9 @@ void ReshardingCoordinator::_removeOrQuiesceCoordinatorDocAndRemoveReshardingFie
     installCoordinatorDocOnStateTransition(opCtx, updatedCoordinatorDoc);
 }
 
+#endif  // RESHARDING_COORDINATOR_PART_3
+#ifdef RESHARDING_COORDINATOR_PART_4
+
 template <typename CommandType>
 void ReshardingCoordinator::_sendCommandToAllParticipants(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
@@ -1634,6 +1663,21 @@ void ReshardingCoordinator::_establishAllRecipientsAsParticipants(
     _sendCommandToAllRecipients(executor, opts);
 }
 
+namespace {
+std::shared_ptr<async_rpc::AsyncRPCOptions<_flushReshardingStateChange>>
+createFlushReshardingStateChangeOptions(const NamespaceString& nss,
+                                        const UUID& reshardingUUID,
+                                        const std::shared_ptr<executor::TaskExecutor>& exec,
+                                        CancellationToken token) {
+    _flushReshardingStateChange cmd(nss);
+    cmd.setDbName(DatabaseName::kAdmin);
+    cmd.setReshardingUUID(reshardingUUID);
+    auto opts =
+        std::make_shared<async_rpc::AsyncRPCOptions<_flushReshardingStateChange>>(exec, token, cmd);
+    return opts;
+}
+}  // namespace
+
 void ReshardingCoordinator::_tellAllRecipientsToRefresh(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     NamespaceString nssToRefresh;
@@ -1683,6 +1727,22 @@ void ReshardingCoordinator::_tellAllDonorsToStartChangeStreamsMonitor(
     opts->cmd.setDbName(DatabaseName::kAdmin);
     _sendCommandToAllDonors(executor, opts);
 }
+
+namespace {
+std::shared_ptr<async_rpc::AsyncRPCOptions<ShardsvrCommitReshardCollection>>
+createShardsvrCommitReshardCollectionOptions(const NamespaceString& nss,
+                                             const UUID& reshardingUUID,
+                                             const std::shared_ptr<executor::TaskExecutor>& exec,
+                                             CancellationToken token) {
+    ShardsvrCommitReshardCollection cmd(nss);
+    cmd.setDbName(DatabaseName::kAdmin);
+    cmd.setReshardingUUID(reshardingUUID);
+    generic_argument_util::setMajorityWriteConcern(cmd, &resharding::kMajorityWriteConcern);
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCommitReshardCollection>>(
+        exec, token, cmd);
+    return opts;
+}
+}  // namespace
 
 void ReshardingCoordinator::_tellAllParticipantsToCommit(
     const NamespaceString& nss, const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
@@ -1817,5 +1877,6 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
     builder.append("statistics", statsBuilder.obj());
     LOGV2(7763800, "Resharding complete", "info"_attr = builder.obj());
 }
+#endif  // RESHARDING_COORDINATOR_PART_4
 
 }  // namespace mongo
