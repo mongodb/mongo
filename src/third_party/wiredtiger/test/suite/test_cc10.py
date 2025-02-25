@@ -25,30 +25,23 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# [TEST_TAGS]
-# checkpoint:checkpoint_cleanup
-# [END_TAGS]
 
+import time
 from test_cc01 import test_cc_base
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
-# test_cc02.py
-# Test that in-memory or on-disk obsolete content is removed from the HS.
-class test_cc02(test_cc_base):
-    # Useful for debugging:
-    # conn_config = "verbose=[checkpoint_cleanup:4]"
-    cleanup_flows = [
-        # Keep everything in memory, obsolete cleanup should mark obsolete data dirty so it is evicted.
-        ('eviction', dict(in_memory=True)),
-        # Move everything to disk, obsolete content should mark the ref as obsolete.
-        ('disk', dict(in_memory=False)),
+# test_cc10.py
+# Test that the obsolete cleanup thread can be configured to run at different intervals.
+class test_cc10(test_cc_base):
+    waiting_time = [
+        ('1sec', dict(conn_config=f'checkpoint_cleanup=[wait=1]')),
+        ('2sec', dict(conn_config=f'checkpoint_cleanup=[wait=2]')),
+        ('3sec', dict(conn_config=f'checkpoint_cleanup=[wait=3]')),
     ]
+    scenarios = make_scenarios(waiting_time)
 
-    scenarios = make_scenarios(cleanup_flows)
-
-    def test_cc(self):
+    def test_cc10(self):
         # Create a table.
         create_params = 'key_format=i,value_format=S'
         nrows = 1000
@@ -75,27 +68,15 @@ class test_cc02(test_cc_base):
         self.conn.set_timestamp(f'stable_timestamp={new_ts}')
         self.session.checkpoint()
 
-        if not self.in_memory:
-            # Evict everything from the HS.
-            session_evict = self.conn.open_session("debug=(release_evict_page=true)")
-            session_evict.begin_transaction(f'read_timestamp={self.timestamp_str(old_ts)}')
-            evict_cursor = session_evict.open_cursor(uri, None, None)
-            for i in range(0, nrows):
-                evict_cursor.set_key(i)
-                evict_cursor.search()
-                # Check we are getting the value from the HS.
-                self.assertEqual(evict_cursor.get_value(), old_value)
-                evict_cursor.reset()
-            session_evict.rollback_transaction()
-            evict_cursor.close()
-
         # Make the updates in the HS obsolete.
         self.conn.set_timestamp(f'oldest_timestamp={new_ts}')
 
-        # Trigger obsolete cleanup.
-        # Depending whether the obsolete pages are on disk or in-memory, they should be flagged and
-        # discarded.
+        # Wait for obsolete cleanup to occur, this should clean the history store.
+        # We don't use the debug option to force cleanup as the thread should be running in the
+        # background.
+        time.sleep(5)
         self.wait_for_cc_to_run()
+
         c = self.session.open_cursor('statistics:')
         visited = c[stat.conn.checkpoint_cleanup_pages_visited][2]
         obsolete_evicted = c[stat.conn.checkpoint_cleanup_pages_evict][2]
@@ -105,10 +86,5 @@ class test_cc02(test_cc_base):
         # We should always visit pages for cleanup.
         self.assertGreater(visited, 0)
 
-        # Depending on the scenario, cleanup will be triggered differently.
-        if self.in_memory:
-            self.assertGreater(obsolete_evicted, 0)
-            self.assertEqual(obsolete_on_disk, 0)
-        else:
-            self.assertEqual(obsolete_evicted, 0)
-            self.assertGreater(obsolete_on_disk, 0)
+        # We should have performed some cleanup.
+        self.assertGreater(obsolete_evicted + obsolete_on_disk, 0)

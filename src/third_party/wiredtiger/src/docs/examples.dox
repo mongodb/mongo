@@ -28,6 +28,9 @@ This is an example demonstrating how to enable and update extra diagnostic code 
 @example ex_file_system.c
 Shows how to extend WiredTiger with a custom file-system implementation.
 
+@example ex_get_last_error.c
+Demonstrates how to get more verbose information about the last session error in WiredTiger.
+
 @example ex_hello.c
 This is an example of how to create and open a database.
 

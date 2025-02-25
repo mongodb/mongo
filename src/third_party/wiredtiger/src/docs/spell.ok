@@ -608,6 +608,7 @@ priv
 proc
 profdata
 profraw
+programmatically
 pseudocode
 pthread
 pthreads

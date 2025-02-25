@@ -25,16 +25,10 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# [TEST_TAGS]
-# checkpoint:checkpoint_cleanup
-# [END_TAGS]
 
 import time, wiredtiger, wttest
-from wtdataset import SimpleDataSet
 from wiredtiger import stat
 
-# test_cc01.py
 # Shared base class used by cc tests.
 class test_cc_base(wttest.WiredTigerTestCase):
 
@@ -77,12 +71,12 @@ class test_cc_base(wttest.WiredTigerTestCase):
         session.rollback_transaction()
         self.assertEqual(count, nrows)
 
-    def populate(self, uri, start_key, num_keys, value):
+    def populate(self, uri, start_key, num_keys, value, ts = None):
         c = self.session.open_cursor(uri, None)
         for k in range(start_key, num_keys):
             self.session.begin_transaction()
             c[k] = value
-            self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(k + 1))
+            self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(ts if ts else k + 1))
         c.close()
 
     # Trigger checkpoint cleanup. The function waits for checkpoint cleanup to make progress before
@@ -105,113 +99,6 @@ class test_cc_base(wttest.WiredTigerTestCase):
     def check_cc_stats(self, ckpt_name = ""):
         self.wait_for_cc_to_run(ckpt_name=ckpt_name)
         c = self.session.open_cursor('statistics:')
-        self.assertGreaterEqual(c[stat.conn.checkpoint_cleanup_pages_visited][2], 0)
-        self.assertGreaterEqual(c[stat.conn.checkpoint_cleanup_pages_removed][2], 0)
+        self.assertGreater(c[stat.conn.checkpoint_cleanup_pages_visited][2], 0)
+        self.assertGreater(c[stat.conn.checkpoint_cleanup_pages_removed][2], 0)
         c.close()
-
-# Test that checkpoint cleans the obsolete history store pages.
-class test_cc01(test_cc_base):
-    # Force a small cache.
-    conn_config = ('cache_size=50MB,eviction_updates_trigger=95,eviction_updates_target=80,'
-                   'statistics=(all)')
-
-    def test_cc(self):
-        nrows = 10000
-
-        # Create a table without logging.
-        uri = "table:cc01"
-        ds = SimpleDataSet(self, uri, 0, key_format="i", value_format="S")
-        ds.populate()
-
-        # Pin oldest and stable to timestamp 1.
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
-            ',stable_timestamp=' + self.timestamp_str(1))
-
-        bigvalue = "aaaaa" * 100
-        bigvalue2 = "ddddd" * 100
-        self.large_updates(uri, bigvalue, ds, nrows, 10)
-
-        # Check that all updates are seen.
-        self.check(bigvalue, uri, nrows, 10)
-
-        self.large_updates(uri, bigvalue2, ds, nrows, 100)
-
-        # Check that the new updates are only seen after the update timestamp.
-        self.check(bigvalue2, uri, nrows, 100)
-
-        # Check that old updates are seen.
-        self.check(bigvalue, uri, nrows, 10)
-
-        # Pin oldest and stable to timestamp 100.
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(100) +
-            ',stable_timestamp=' + self.timestamp_str(100))
-
-        # Trigger checkpoint cleanup and wait until it is done. This should clean the history store.
-        self.check_cc_stats()
-
-        # Check that the new updates are only seen after the update timestamp.
-        self.check(bigvalue2, uri, nrows, 100)
-
-        # Load a slight modification with a later timestamp.
-        self.large_modifies(uri, 'A', ds, 10, 1, nrows, 110)
-        self.large_modifies(uri, 'B', ds, 20, 1, nrows, 120)
-        self.large_modifies(uri, 'C', ds, 30, 1, nrows, 130)
-
-        # Second set of update operations with increased timestamp.
-        self.large_updates(uri, bigvalue, ds, nrows, 200)
-
-        # Check that the new updates are only seen after the update timestamp.
-        self.check(bigvalue, uri, nrows, 200)
-
-        # Check that the modifies are seen.
-        bigvalue_modA = bigvalue2[0:10] + 'A' + bigvalue2[11:]
-        bigvalue_modB = bigvalue_modA[0:20] + 'B' + bigvalue_modA[21:]
-        bigvalue_modC = bigvalue_modB[0:30] + 'C' + bigvalue_modB[31:]
-        self.check(bigvalue_modA, uri, nrows, 110)
-        self.check(bigvalue_modB, uri, nrows, 120)
-        self.check(bigvalue_modC, uri, nrows, 130)
-
-        # Check that old updates are seen.
-        self.check(bigvalue2, uri, nrows, 100)
-
-        # Pin oldest and stable to timestamp 200.
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(200) +
-            ',stable_timestamp=' + self.timestamp_str(200))
-
-        # Trigger checkpoint cleanup and wait until it is done. This should clean the history store.
-        self.check_cc_stats()
-
-        # Check that the new updates are only seen after the update timestamp.
-        self.check(bigvalue, uri, nrows, 200)
-
-        # Load a slight modification with a later timestamp.
-        self.large_modifies(uri, 'A', ds, 10, 1, nrows, 210)
-        self.large_modifies(uri, 'B', ds, 20, 1, nrows, 220)
-        self.large_modifies(uri, 'C', ds, 30, 1, nrows, 230)
-
-        # Third set of update operations with increased timestamp.
-        self.large_updates(uri, bigvalue2, ds, nrows, 300)
-
-        # Check that the new updates are only seen after the update timestamp.
-        self.check(bigvalue2, uri, nrows, 300)
-
-        # Check that the modifies are seen.
-        bigvalue_modA = bigvalue[0:10] + 'A' + bigvalue[11:]
-        bigvalue_modB = bigvalue_modA[0:20] + 'B' + bigvalue_modA[21:]
-        bigvalue_modC = bigvalue_modB[0:30] + 'C' + bigvalue_modB[31:]
-        self.check(bigvalue_modA, uri, nrows, 210)
-        self.check(bigvalue_modB, uri, nrows, 220)
-        self.check(bigvalue_modC, uri, nrows, 230)
-
-        # Check that old updates are seen.
-        self.check(bigvalue, uri, nrows, 200)
-
-        # Pin oldest and stable to timestamp 300.
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(300) +
-            ',stable_timestamp=' + self.timestamp_str(300))
-
-        # Trigger checkpoint cleanup and wait until it is done. This should clean the history store.
-        self.check_cc_stats()
-
-        # Check that the new updates are only seen after the update timestamp.
-        self.check(bigvalue2, uri, nrows, 300)

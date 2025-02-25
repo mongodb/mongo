@@ -1936,12 +1936,14 @@ struct __wt_session {
      * @{
      */
     /*!
-     * Return verbose information about the last error that occurred during a session API call.
+     * Return verbose information about the last session API call.
+     * After every session API call (excluding this one), the error, sub-level error and error
+     * message is reset. See @ref error_handling for more details.
      *
      * @param session the session handle
-     * @param[out] err the error code
-     * @param[out] sub_level_err the sub-level error code
-     * @param[out] err_msg the error message
+     * @param[out] err The return value of the last session API call.
+     * @param[out] sub_level_err An optional sub-level error code to provide contextual information.
+     * @param[out] err_msg An optional error message to provide contextual information.
      */
     void __F(get_last_error)(WT_SESSION *session,
         int *err, int *sub_level_err, const char **err_msg);
@@ -2105,7 +2107,7 @@ struct __wt_connection {
      * to none\, which means no additional work is done to find obsolete content., a string\, chosen
      * from the following options: \c "none"\, \c "reclaim_space"; default \c none.}
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each checkpoint cleanup., an
-     * integer between \c 60 and \c 100000; default \c 300.}
+     * integer between \c 1 and \c 100000; default \c 300.}
      * @config{ ),,}
      * @config{chunk_cache = (, chunk cache reconfiguration options., a set of related configuration
      * options defined as follows.}
@@ -2892,7 +2894,7 @@ struct __wt_connection {
  * means no additional work is done to find obsolete content., a string\, chosen from the following
  * options: \c "none"\, \c "reclaim_space"; default \c none.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait,
- * seconds to wait between each checkpoint cleanup., an integer between \c 60 and \c 100000; default
+ * seconds to wait between each checkpoint cleanup., an integer between \c 1 and \c 100000; default
  * \c 300.}
  * @config{ ),,}
  * @config{checkpoint_sync, flush files to stable storage when closing or writing checkpoints., a

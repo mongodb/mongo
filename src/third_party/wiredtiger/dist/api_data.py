@@ -485,7 +485,7 @@ connection_runtime_config = [
             ''', choices=['none', 'reclaim_space']),
         Config('wait', '300', r'''
             seconds to wait between each checkpoint cleanup''',
-            min='60', max='100000'),
+            min='1', max='100000'),
         ]),
     Config('debug_mode', '', r'''
         control the settings of various extended debugging features''',

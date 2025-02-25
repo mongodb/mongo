@@ -66,11 +66,13 @@ class test_cc08(test_cc_base):
         _ = self.session.open_cursor(uri, None, None)
 
         # Force checkpoint cleanup and wait for it to make progress.
-        self.check_cc_stats()
+        self.wait_for_cc_to_run()
 
-        # Check stats.
+        # Check that we have selected the logged table for cleanup.
         selected_pages = self.get_stat(stat.conn.checkpoint_cleanup_pages_read_reclaim_space)
+        visited_pages = self.get_stat(stat.conn.checkpoint_cleanup_pages_visited)
         if self.cc_aggressive:
             self.assertGreater(selected_pages, 0)
+            self.assertGreater(visited_pages, 0)
         else:
             self.assertEqual(selected_pages, 0)

@@ -361,8 +361,8 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
                 return (WT_NOTFOUND);
 read:
             /*
-             * The page isn't in memory, read it. If this thread respects the cache size, check for
-             * space in the cache.
+             * The page isn't in memory, read it. If this thread respects the cache size, check if
+             * the cache needs help evicting clean pages (don't force a read to do dirty eviction).
              */
             if (!LF_ISSET(WT_READ_IGNORE_CACHE_SIZE))
                 WT_RET(__wt_evict_app_assist_worker_check(

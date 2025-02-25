@@ -29,6 +29,17 @@ and it's unspecified when or even if exclusive access to the object will be
 granted. Generally, applications will not call WiredTiger methods requiring
 exclusive access when the objects might be in active use by other threads.
 
+@section error_sub_level Sub-level errors
+
+From the addition of WT_SESSION::get_last_error function and sub-level error codes, users
+can get more detailed information about the last session API call. The information includes an
+error code, a sub-level error code and message. The intended usage of the sub-level error code
+is to allow users to programmatically make decisions on the application level.
+
+The sub-level error code and error messages are optional and default to WT_NONE and an empty
+string respectively. The error message string is owned by the session, and is invalidated after
+each session API call.
+
 @section error_list WiredTiger-specific errors
 
 WiredTiger-specific error codes are allocated from -31,800 to -31,999,
@@ -85,8 +96,9 @@ salvage the file or retry wiredtiger_open with the 'salvage=true' configuration 
 
 @section sub_error_list WiredTiger-specific sub-level errors
 
-WiredTiger-specific error codes are allocated from -32,000 to -32,199,
-inclusive. The following is a list of the WiredTiger-specific return values:
+WiredTiger-specific sub-level error codes are allocated from -32,000 to -32,199,
+inclusive. These are used in the session level API. The following is a list of the
+WiredTiger-specific return values:
 
 @if IGNORE_BUILT_BY_API_SUB_ERR_BEGIN
 @endif

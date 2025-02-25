@@ -510,6 +510,21 @@ get_all_committed_ts(void)
 }
 
 /*
+ * is_set_timestamp_required --
+ *     Return True if set_timestamp is required.
+ */
+static bool
+is_set_timestamp_required(uint64_t last_ts, uint64_t oldest_ts)
+{
+    /*
+     * The set_timestamp should be invoked only when current oldest timestamp is greater than last
+     * oldest timestamp and the difference is greater than the STABLE_PERIOD.
+     */
+    return ((oldest_ts == stop_timestamp && oldest_ts != last_ts) ||
+      (oldest_ts != UINT64_MAX && oldest_ts > last_ts && oldest_ts - last_ts > STABLE_PERIOD));
+}
+
+/*
  * thread_ts_run --
  *     Runner function for a timestamp thread.
  */
@@ -536,8 +551,7 @@ thread_ts_run(void *arg)
         if (oldest_ts != UINT64_MAX && stop_timestamp != 0 && oldest_ts > stop_timestamp)
             oldest_ts = stop_timestamp;
 
-        if ((oldest_ts == stop_timestamp && oldest_ts != last_ts) ||
-          (oldest_ts != UINT64_MAX && oldest_ts - last_ts > STABLE_PERIOD)) {
+        if (is_set_timestamp_required(last_ts, oldest_ts)) {
             /*
              * Set both the oldest and stable timestamp so that we don't need to maintain read
              * availability at older timestamps.
