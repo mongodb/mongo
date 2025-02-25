@@ -308,6 +308,15 @@ public:
                         const std::vector<IndexCatalogType>& indexes,
                         const CollectionIndexes& collectionIndexes);
 
+    /**
+     * It provides a mechanism to invalidate RangePreservers that can no longer be fulfilled because
+     * of an incoming RangeDeletion for a specified shard version. It invalidates all metadata
+     * trackers when shardVersion is lower than or equal to the given version. This method ensures
+     * that metadata operation is performed in a thread-safe manner.
+     */
+    void invalidateRangePreserversOlderThanShardVersion(OperationContext* opCtx,
+                                                        const ChunkVersion& shardVersion);
+
 private:
     struct PlacementVersionRecoverOrRefresh {
     public:

@@ -183,6 +183,17 @@ CollectionShardingRuntime::acquireExclusive(OperationContext* opCtx, const Names
         ScopedCollectionShardingState::acquireScopedCollectionShardingState(opCtx, nss, MODE_X));
 }
 
+void CollectionShardingRuntime::invalidateRangePreserversOlderThanShardVersion(
+    OperationContext* opCtx, const ChunkVersion& shardVersion) {
+    if (shardVersion == ChunkVersion::IGNORED()) {
+        return;
+    }
+    stdx::lock_guard lk(_metadataManagerLock);
+    if (_metadataManager) {
+        _metadataManager->invalidateRangePreserversOlderThanShardVersion(opCtx, shardVersion);
+    }
+}
+
 ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
     OperationContext* opCtx,
     OrphanCleanupPolicy orphanCleanupPolicy,

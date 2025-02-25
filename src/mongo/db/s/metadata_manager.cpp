@@ -99,6 +99,13 @@ public:
         return _metadataTracker->metadata.value();
     }
 
+    // This determines whether the metadata currently held by the _metadataTracker is still
+    // considered valid.
+    bool isMetadataStillValid() const override {
+        stdx::lock_guard<stdx::mutex> managerLock(_metadataManager->_managerLock);
+        return _metadataTracker->valid;
+    }
+
 private:
     std::shared_ptr<MetadataManager> _metadataManager;
     std::shared_ptr<MetadataManager::CollectionMetadataTracker> _metadataTracker;
@@ -234,6 +241,31 @@ SharedSemiFuture<void> MetadataManager::getOngoingQueriesCompletionFuture(ChunkR
         return SemiFuture<void>::makeReady().share();
     }
     return overlapMetadata->onDestructionPromise.getFuture();
+}
+
+void MetadataManager::invalidateRangePreserversOlderThanShardVersion(
+    OperationContext* opCtx, const ChunkVersion& shardVersion) {
+    if (shardVersion == ChunkVersion::IGNORED()) {
+        return;
+    }
+    stdx::lock_guard<stdx::mutex> lg(_managerLock);
+
+    // Invalidate all metadata trackers when shardPlacementVersion is lower than or equal
+    // to the given version.
+    // The _metadata is sorted from the oldest to the newest versions. The 'for' loop can be
+    // exited if the current metadataTracker is newer, as it means there's no need to check the
+    // rest of the items.
+    for (const auto& metadataTracker : _metadata) {
+        if (metadataTracker->metadata) {
+            auto placementVersion = metadataTracker->metadata->getShardPlacementVersion();
+            if (placementVersion.isNotComparableWith(shardVersion) ||
+                placementVersion.isOlderOrEqualThan(shardVersion)) {
+                metadataTracker->valid = false;
+            } else {
+                break;
+            }
+        }
+    }
 }
 
 auto MetadataManager::_findNewestOverlappingMetadata(WithLock, ChunkRange const& range)

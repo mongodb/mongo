@@ -304,6 +304,56 @@ TEST_F(CollectionShardingRuntimeTest, ShardVersionCheckDetectsClusterTimeConflic
     }
 }
 
+TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversOlderThanShardVersion) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+    auto metadataInThePast = makeShardedMetadata(opCtx);
+    auto metadata = makeShardedMetadata(opCtx);
+    csr.setFilteringMetadata(opCtx, metadata);
+    const auto optCurrMetadata = csr.getCurrentMetadataIfKnown();
+    ASSERT_TRUE(optCurrMetadata);
+    ASSERT_TRUE(optCurrMetadata->isSharded());
+    ASSERT_EQ(optCurrMetadata->getShardPlacementVersion(), metadata.getShardPlacementVersion());
+
+    auto ownershipFilter = csr.getOwnershipFilter(
+        opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup, true);
+
+    ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
+
+    // Test that the trackers will not be invalidated with version ChunkVersion::IGNORED()
+    csr.invalidateRangePreserversOlderThanShardVersion(opCtx, ChunkVersion::IGNORED());
+    ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
+
+    // Test that the trackers will not be invalidated with version which is older
+    csr.invalidateRangePreserversOlderThanShardVersion(
+        opCtx, metadataInThePast.getShardPlacementVersion());
+    ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
+
+    // Test that the trackers will be invalidated with current version
+    csr.invalidateRangePreserversOlderThanShardVersion(opCtx, metadata.getShardPlacementVersion());
+    ASSERT_FALSE(ownershipFilter.isRangePreserverStillValid());
+}
+
+TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversUnshardedVersion) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+    auto metadata = makeShardedMetadata(opCtx);
+    csr.setFilteringMetadata(opCtx, metadata);
+
+    auto ownershipFilter = csr.getOwnershipFilter(
+        opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup, true);
+
+    ASSERT_TRUE(ownershipFilter.isRangePreserverStillValid());
+
+    // Test that the trackers will be invalidated with version ChunkVersion::UNSHARDED().
+    // Test is prepared for the case when UNSHARDED metadata will be started to be tracked. In this
+    // case ownershipFilter::shardPlacementVersion = UNSHARDED. Currently it's not possible to test
+    // as in this case metadataManager is not created for unsharded collection. When it will be
+    // changed it will be possible to test against a current version.
+    csr.invalidateRangePreserversOlderThanShardVersion(opCtx, ChunkVersion::UNSHARDED());
+    ASSERT_FALSE(ownershipFilter.isRangePreserverStillValid());
+}
+
 class CollectionShardingRuntimeTestWithMockedLoader
     : public ShardServerTestFixtureWithCatalogCacheLoaderMock {
 public:

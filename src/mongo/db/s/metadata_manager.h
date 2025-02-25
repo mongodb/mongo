@@ -119,6 +119,9 @@ public:
      */
     SharedSemiFuture<void> getOngoingQueriesCompletionFuture(ChunkRange const& range);
 
+    void invalidateRangePreserversOlderThanShardVersion(OperationContext* opCtx,
+                                                        const ChunkVersion& shardVersion);
+
 private:
     // Management of the _metadata list is implemented in RangePreserver
     friend class RangePreserver;
@@ -153,6 +156,12 @@ private:
         SharedPromise<void> onDestructionPromise;
 
         uint32_t usageCounter{0};
+
+        /**
+         * This flag indicates whether the MetadataTracker is still valid or if it has already been
+         * invalidated during a range deletion process.
+         */
+        bool valid{true};
     };
 
     /**

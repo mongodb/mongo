@@ -48,6 +48,10 @@ public:
 
         virtual const CollectionMetadata& get() = 0;
 
+        virtual bool isMetadataStillValid() const {
+            return true;
+        }
+
     protected:
         Impl() = default;
     };
@@ -147,6 +151,15 @@ public:
     bool isRangeEntirelyOwned(const BSONObj& min,
                               const BSONObj& max,
                               bool includeMaxBound = true) const;
+
+    /*
+     * Returns true if this filter/RangePreserver is still valid.
+     * Note that this answer is unstable – it might change immediately after returning. However, the
+     * answer is valid for read snapshots opened before calling this method.
+     */
+    bool isRangePreserverStillValid() const {
+        return _impl->isMetadataStillValid();
+    }
 };
 
 }  // namespace mongo
