@@ -579,7 +579,7 @@ buildvariants:
       repo_edition: enterprise
       scons_cache_scope: shared
       large_distro_name: ubuntu2404-large
-      compile_variant: enterprise-ubuntu2404-64
+      compile_variant: enterprise-ubuntu2404
     tasks:
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:

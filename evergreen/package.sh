@@ -37,7 +37,6 @@ valid_mongocryptd_variants=(
   "enterprise-ubuntu2404-arm64"
   "enterprise-ubuntu2004-64"
   "enterprise-ubuntu2204-64"
-  "enterprise-ubuntu2404-64"
   "enterprise-windows"
   "enterprise-windows-debug-unoptimized"
   "enterprise-windows-inmem"
