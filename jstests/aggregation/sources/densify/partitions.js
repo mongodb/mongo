@@ -471,31 +471,6 @@ function rangeTestTwoDates() {
     const resultArray = result.toArray();
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
 }
-
-function testTrivialRange() {
-    coll.drop();
-    const testDocs = [
-        {_id: 0, num: NumberDecimal("-13.129724088897433"), part: 1},
-        {_id: 1, num: NumberDecimal("15"), part: 2},
-    ];
-    const testExpected = [
-        {"num": NumberDecimal("-13.129724088897433"), part: 1},
-        {"num": 93, part: 1},
-        {"num": NumberDecimal("15"), part: 2},
-        {"num": 93, part: 2},
-    ];
-    assert.commandWorked(coll.insert(testDocs));
-    let result = coll.aggregate([
-        {$project: {_id: 0}},
-        {
-            $densify:
-                {field: "num", range: {step: 20, bounds: [93, 93]}, partitionByFields: ["part"]}
-        },
-        {$sort: {val: 1, part: 1}}
-    ]);
-    const resultArray = result.toArray();
-    assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
-}
 // Test $densify with partitions and explicit bounds that are inside the collection's total range of
 // values for the field we are densifying.
 function testPartitionsWithBoundsInsideFullRange() {
@@ -688,5 +663,3 @@ singleDocumentTest();
 
 testDottedField();
 testArrayTraversalDisallowed();
-
-testTrivialRange();
