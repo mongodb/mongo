@@ -51,12 +51,18 @@ const st = new ShardingTest({mongos: 1, shards: 2});
 
     // Trying to read coll2 will result in an error. Note that this is not retryable even with
     // enableStaleVersionAndSnapshotRetriesWithinTransactions enabled because the first statement
-    // aleady had an active snapshot open on the same shard this request is trying to contact.
+    // always had an active snapshot open on the same shard this request is trying to contact.
     let err = assert.throwsWithCode(() => {
         sessionColl2.find().itcount();
     }, ErrorCodes.MigrationConflict);
 
     assert.contains("TransientTransactionError", err.errorLabels, tojson(err));
+
+    // Transaction abort can race 'abort' before 'new transaction' command on participants, so
+    // ensure there are no orphan transactions on participant.
+    for (let db of [st.shard0.getDB('config'), st.shard1.getDB('config')]) {
+        assert.commandWorked(db.runCommand({killSessions: [session.id]}));
+    }
 }
 
 // Test transaction with concurrent move primary.
@@ -98,6 +104,12 @@ const st = new ShardingTest({mongos: 1, shards: 2});
         }, ErrorCodes.MigrationConflict);
 
         assert.contains("TransientTransactionError", err.errorLabels, tojson(err));
+
+        // Transaction abort can race 'abort' before 'new transaction' command on participants, so
+        // ensure there are no orphan transactions on participant.
+        for (let db of [st.shard0.getDB('config'), st.shard1.getDB('config')]) {
+            assert.commandWorked(db.runCommand({killSessions: [session.id]}));
+        }
     }
 
     // These tests only make sense with untracked collections since movePrimary does not affect
@@ -155,6 +167,12 @@ const st = new ShardingTest({mongos: 1, shards: 2});
         }, expectedError);
 
         assert.contains("TransientTransactionError", err.errorLabels, tojson(err));
+
+        // Transaction abort can race 'abort' before 'new transaction' command on participants, so
+        // ensure there are no orphan transactions on participant.
+        for (let db of [st.shard0.getDB('config'), st.shard1.getDB('config')]) {
+            assert.commandWorked(db.runCommand({killSessions: [session.id]}));
+        }
     }
 
     // These tests only make sense with tracked, unsharded collections since moveCollection does not
@@ -240,6 +258,12 @@ const st = new ShardingTest({mongos: 1, shards: 2});
                 }
             }, [ErrorCodes.WriteConflict, ErrorCodes.SnapshotUnavailable]);
             assert.contains("TransientTransactionError", err.errorLabels, tojson(err));
+
+            // Transaction abort can race 'abort' before 'new transaction' command on participants,
+            // so ensure there are no orphan transactions on participant.
+            for (let db of [st.shard0.getDB('config'), st.shard1.getDB('config')]) {
+                assert.commandWorked(db.runCommand({killSessions: [session.id]}));
+            }
         }
 
         readConcerns.forEach((readConcern) => commands.forEach((command) => {
@@ -306,6 +330,12 @@ const st = new ShardingTest({mongos: 1, shards: 2});
                 }
             }, isWriteCommand ? ErrorCodes.WriteConflict : ErrorCodes.SnapshotUnavailable);
             assert.contains("TransientTransactionError", err.errorLabels, tojson(err));
+
+            // Transaction abort can race 'abort' before 'new transaction' command on participants,
+            // so ensure there are no orphan transactions on participant.
+            for (let db of [st.shard0.getDB('config'), st.shard1.getDB('config')]) {
+                assert.commandWorked(db.runCommand({killSessions: [session.id]}));
+            }
         }
 
         readConcerns.forEach((readConcern) => commands.forEach((command) => {
@@ -386,10 +416,11 @@ const st = new ShardingTest({mongos: 1, shards: 2});
             }, [ErrorCodes.WriteConflict, ErrorCodes.SnapshotUnavailable]);
             assert.contains("TransientTransactionError", err.errorLabels, tojson(err));
 
-            session.abortTransaction();
-            // Transaction abort can race 'abort' before 'new transaction' command
-            // on participant, so ensure there are no orphan transactions on participant.
-            st.shard1.getDB('config').runCommand({killSessions: [session.id]});
+            // Transaction abort can race 'abort' before 'new transaction' command on participants,
+            // so ensure there are no orphan transactions on participant.
+            for (let db of [st.shard0.getDB('config'), st.shard1.getDB('config')]) {
+                assert.commandWorked(db.runCommand({killSessions: [session.id]}));
+            }
         }
 
         readConcerns.forEach((readConcern) => commands.forEach((command) => {
