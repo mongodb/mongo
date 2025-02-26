@@ -853,13 +853,13 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         // Unblock ShardingDDLCoordinators on the cluster.
         if (feature_flags::gStopDDLCoordinatorsDuringTopologyChanges.isEnabled(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            // TODO SERVER-99708: Investigate if we can remove this. unblockDDLCoordinators ends up
-            // calling the configSvrSetClusterParameter command which takes the FCV lock. At this
-            // point we are still holding the clusterCardinalityParameterLock. Other operations
-            // proceed to take the locks in the inverse order, that is, they first take the FCV lock
-            // followed by the clusterCardinalityParameterLock. We should review if we must unlock
-            // the clusterCardinalityParameterLock here to prevent a lock cycle or see if this can
-            // be refactored to prevent it.
+            // TODO (SERVER-99433) remove this once the _kClusterCardinalityParameterLock is removed
+            // alongside the RSEndpoint.
+            // Some paths of add/remove shard take the _kClusterCardinalityParameterLock before
+            // the FixedFCVRegion and others take the FixedFCVRegion before the
+            // _kClusterCardinalityParameterLock lock. However, all paths take the
+            // _kAddRemoveShardLock before either, so we do not actually have a lock ordering
+            // problem. See SERVER-99708 for more information.
             DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
             topology_change_helpers::unblockDDLCoordinators(opCtx);
         }
@@ -1131,13 +1131,13 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         // _removeShardInTransaction has already waited for the commit to be majority-acknowledged.
         if (feature_flags::gStopDDLCoordinatorsDuringTopologyChanges.isEnabled(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            // TODO SERVER-99708: Investigate if we can remove this. unblockDDLCoordinators ends up
-            // calling the configSvrSetClusterParameter command which takes the FCV lock. At this
-            // point we are still holding the clusterCardinalityParameterLock. Other operations
-            // proceed to take the locks in the inverse order, that is, they first take the FCV lock
-            // followed by the clusterCardinalityParameterLock. We should review if we must unlock
-            // the clusterCardinalityParameterLock here to prevent a lock cycle or see if this can
-            // be refactored to prevent it.
+            // TODO (SERVER-99433) remove this once the _kClusterCardinalityParameterLock is removed
+            // alongside the RSEndpoint.
+            // Some paths of add/remove shard take the _kClusterCardinalityParameterLock before
+            // the FixedFCVRegion and others take the FixedFCVRegion before the
+            // _kClusterCardinalityParameterLock lock. However, all paths take the
+            // _kAddRemoveShardLock before either, so we do not actually have a lock ordering
+            // problem. See SERVER-99708 for more information.
             DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
             topology_change_helpers::unblockDDLCoordinators(opCtx);
         }
