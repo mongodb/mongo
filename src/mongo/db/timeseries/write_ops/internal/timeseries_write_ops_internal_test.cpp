@@ -39,7 +39,9 @@
 
 namespace mongo::timeseries::write_ops::internal {
 namespace {
-static constexpr uint64_t kStorageCacheSizeBytes = 1024 * 1024 * 1024;
+static constexpr uint64_t kDefaultStorageCacheSizeBytes = 1024 * 1024 * 1024;
+static constexpr uint64_t kLimitedStorageCacheSizeBytes = 1024;
+
 class TimeseriesWriteOpsInternalTest : public CatalogTestFixture {
 public:
     explicit TimeseriesWriteOpsInternalTest(Options options = {})
@@ -81,6 +83,8 @@ protected:
     StringData _metaField = "meta";
     StringData _metaValue = "a";
     StringData _metaValue2 = "b";
+    uint64_t _storageCacheSizeBytes = kDefaultStorageCacheSizeBytes;
+
     UUID _uuid = UUID::gen();
 
     // Strings used to simulate kSize/kCachePressure rollover reason.
@@ -127,8 +131,15 @@ uint64_t TimeseriesWriteOpsInternalTest::_getStorageCacheSizeBytes() const {
 
 // _generateMeasurementsWithRolloverReason enables us to easily get measurement vectors that have
 // the input RolloverReason.
+// We require that when we call with kCachePressure, _storageCacheSizeBytes =
+// kLimitedStorageCacheSizeBytes (must be set in the unit test) so that we properly trigger
+// kCachePressure. Otherwise, _storageCacheSizeBytes = kDefaultStorageCacheSizeBytes.
 std::vector<BSONObj> TimeseriesWriteOpsInternalTest::_generateMeasurementsWithRolloverReason(
     const bucket_catalog::RolloverReason reason) const {
+    invariant((_storageCacheSizeBytes == kDefaultStorageCacheSizeBytes &&
+               reason != bucket_catalog::RolloverReason::kCachePressure) ||
+              (_storageCacheSizeBytes == kLimitedStorageCacheSizeBytes &&
+               reason == bucket_catalog::RolloverReason::kCachePressure));
     std::vector<BSONObj> batchOfMeasurements;
     switch (reason) {
         case bucket_catalog::RolloverReason::kNone:
@@ -172,12 +183,21 @@ std::vector<BSONObj> TimeseriesWriteOpsInternalTest::_generateMeasurementsWithRo
             batchOfMeasurements.emplace_back(
                 BSON(_timeField << Date_t::now() - Hours(1) << _metaField << _metaValue));
             return batchOfMeasurements;
-        // In this layer, it is hard to simulate kCachePressure because we would need to decrease
-        // the storageCacheSizeBytes or increase the number of active buckets to > 50.
+        // kCachePressure and kSize are caused by the same measurements, but we have kCachePressure
+        // when the cacheDerivedBucketSize < kLargeMeasurementsMaxBucketSize.
+        // We can simulate this by lowering the _storageCacheSizeBytes or increasing the number of
+        // active buckets.
         //
-        // kCachePressure and kSize are similar issues, the difference is that for kCachePressure,
-        // we must have that cacheDerivedBucketMaxSize < kLargeMeasurementsMaxBucketSize.
+        // Note that we will need less large measurements to trigger kCachePressure because we use
+        // _storageCacheSizeBytes to determine if we want to keep the bucket open due to large
+        // measurements.
         case bucket_catalog::RolloverReason::kCachePressure:
+            for (auto i = 0; i < 4; i++) {
+                batchOfMeasurements.emplace_back(BSON(_timeField << Date_t::now() << _metaField
+                                                                 << _metaValue << "big_field"
+                                                                 << _bigStr));
+            }
+            return batchOfMeasurements;
         case bucket_catalog::RolloverReason::kSize:
             for (auto i = 0; i < 125; i++) {
                 batchOfMeasurements.emplace_back(BSON(_timeField << Date_t::now() << _metaField
@@ -345,6 +365,10 @@ void TimeseriesWriteOpsInternalTest::_testBuildBatchedInsertContextWithoutMetaFi
 // "b"} in batchedInsertContexts[1] (that doesn't hash to the same stripe).
 // This means for {_metaField: "b"}/batchedInsertContexts[1], we have one distinct write batch
 // (numWriteBatches[1]).
+
+// If we are attempting to trigger kCachePressure, we must call this function with
+// _storageCacheSizeBytes = kLimitedStorageCacheSizeBytes. Otherwise, _storageCacheSizeBytes
+// = kDefaultStorageCacheSizeBytes.
 void TimeseriesWriteOpsInternalTest::_testStageInsertBatch(
     std::vector<BSONObj> batchOfMeasurements, std::vector<size_t> numWriteBatches) const {
     AutoGetCollection autoColl(_opCtx, _ns.makeTimeseriesBucketsNamespace(), MODE_IS);
@@ -370,7 +394,7 @@ void TimeseriesWriteOpsInternalTest::_testStageInsertBatch(
                                                   bucketsColl,
                                                   _opCtx->getOpID(),
                                                   nullptr /*comparator*/,
-                                                  kStorageCacheSizeBytes,
+                                                  _storageCacheSizeBytes,
                                                   nullptr /*compressAndWriteBucketFunc*/,
                                                   batchedInsertContexts[i]);
         ASSERT_EQ(writeBatches.size(), numWriteBatches[i]);
@@ -528,6 +552,22 @@ TEST_F(TimeseriesWriteOpsInternalTest, InsertBatchHandlesRolloverReasonkSize) {
     // should be in a different bucket.
     std::vector<size_t> numWriteBatches{2};
     _testStageInsertBatch(batchOfMeasurementsWithSize, numWriteBatches);
+}
+
+TEST_F(TimeseriesWriteOpsInternalTest, InsertBatchHandlesRolloverReasonkCachePressure) {
+    // Artificially lower _storageCacheSizeBytes so we can simulate kCachePressure.
+    _storageCacheSizeBytes = kLimitedStorageCacheSizeBytes;
+
+    auto batchOfMeasurementsWithSize =
+        _generateMeasurementsWithRolloverReason(bucket_catalog::RolloverReason::kCachePressure);
+
+    // The last measurement will exceed the size that the bucket can store. Coupled with the lowered
+    // cache size, we will trigger kCachePressure, so the measurement will be in a different bucket.
+    std::vector<size_t> numWriteBatches{2};
+    _testStageInsertBatch(batchOfMeasurementsWithSize, numWriteBatches);
+
+    // Reset _storageCacheSizeBytes back to a representative value.
+    _storageCacheSizeBytes = kDefaultStorageCacheSizeBytes;
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, PrepareInsertsToBucketsSimpleOneFullBucket) {
