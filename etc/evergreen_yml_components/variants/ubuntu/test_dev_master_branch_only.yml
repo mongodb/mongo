@@ -18,7 +18,6 @@ buildvariants:
     tasks:
       - name: compile_bazel_TG
       - name: run_bazel_TG
-      - name: compile_bazel_ninja_TG
       - name: bazel_workstation_TG
         distros:
           - ubuntu2204-arm64-large
@@ -35,7 +34,6 @@ buildvariants:
     tasks:
       - name: compile_bazel_TG
       - name: run_bazel_TG
-      - name: compile_bazel_ninja_TG
 
   - name: &workstation_bazel_cache_hydration_arm64 workstation_bazel_cache_hydration_arm64
     display_name: "~ Workstation Bazel Cache Hydration arm64"
@@ -81,7 +79,6 @@ buildvariants:
     tasks:
       - name: compile_bazel_TG
       - name: run_bazel_TG
-      - name: compile_bazel_ninja_TG
       - name: bazel_workstation_TG
         distros:
           - ubuntu2204-arm64-large
@@ -100,7 +97,6 @@ buildvariants:
     tasks:
       - name: compile_bazel_TG
       - name: run_bazel_TG
-      - name: compile_bazel_ninja_TG
       - name: bazel_workstation_TG
         distros:
           - ubuntu2204-arm64-large

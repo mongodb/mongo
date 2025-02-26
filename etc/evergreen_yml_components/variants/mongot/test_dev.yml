@@ -288,7 +288,6 @@ buildvariants:
       compile_variant: *al2023-arm64-search-with-grpc
       build_mongot: true
     tasks:
-      - name: compile_ninja_quick_TG
       - name: compile_test_parallel_core_stream_TG
       - name: generate_buildid_to_debug_symbols_mapping
       - name: .search_community_mongotmock
@@ -314,7 +313,6 @@ buildvariants:
       compile_variant: *al2023-x86-search-with-grpc
       build_mongot: true
     tasks:
-      - name: compile_ninja_quick_TG
       - name: compile_test_parallel_core_stream_TG
       - name: generate_buildid_to_debug_symbols_mapping
       - name: .search_community_mongotmock

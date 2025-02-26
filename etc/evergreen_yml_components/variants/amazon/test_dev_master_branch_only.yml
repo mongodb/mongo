@@ -113,7 +113,6 @@ buildvariants:
     tasks:
       - name: compile_bazel_TG
       - name: run_bazel_TG
-      - name: compile_bazel_ninja_TG
 
   # Note that this task is currently optional;
   # This will eventually become suggested, then required.
@@ -702,7 +701,6 @@ buildvariants:
       compile_variant: *amazon-linux2-arm64-static-compile-toolchain-v5
       evergreen_remote_exec: on
     tasks:
-      - name: compile_ninja_quick_TG
       - name: compile_test_parallel_unittest_stream_TG
       # TODO SERVER-99531 reenable when pretty printer tests work.
       # - name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG

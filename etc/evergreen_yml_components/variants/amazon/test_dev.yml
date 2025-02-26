@@ -103,7 +103,6 @@ buildvariants:
       compile_variant: *amazon-linux2-arm64-static-compile
       evergreen_remote_exec: on
     tasks:
-      - name: compile_ninja_quick_TG
       - name: compile_test_parallel_unittest_stream_TG
       - name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG
         distros:
@@ -207,7 +206,6 @@ buildvariants:
       compile_variant: *commit-queue
     depends_on: []
     tasks:
-      - name: compile_ninja_quick_TG
       - name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG
         distros:
           - amazon2-arm64-xlarge-commitqueue
@@ -265,7 +263,6 @@ buildvariants:
       compile_variant: *commit-queue-toolchain-v5
     depends_on: []
     tasks:
-      - name: compile_ninja_quick_TG
       # TODO SERVER-99531 Replace compile_test_parallel_core_stream_TG with
       # compile_test_parallel_core_stream_and_pretty_printer_tests_TG and compile_all_but_not_unittests_TG
       # when pretty printer tests are supported on v5.

@@ -270,7 +270,6 @@ buildvariants:
         --mongodTlsCertificateKeyFile jstests/libs/server.pem
         --shellGRPC
     tasks:
-      - name: compile_ninja_quick_TG
       - name: compile_test_parallel_unittest_stream_TG
       - name: compile_test_parallel_core_stream_TG
       - name: compile_test_parallel_dbtest_stream_TG

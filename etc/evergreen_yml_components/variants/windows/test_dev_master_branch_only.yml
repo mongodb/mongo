@@ -68,7 +68,6 @@ buildvariants:
       compile_variant: *windows-bazel-compile
     tasks:
       - name: compile_bazel_windows_TG
-      - name: compile_bazel_ninja_TG
 
   ### QO & QE Patch-Specific Build Variants ###
   - name: &windows-compile-query-patch-only windows-compile-query-patch-only

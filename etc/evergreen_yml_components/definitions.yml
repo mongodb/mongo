@@ -1534,19 +1534,6 @@ functions:
     - *f_expansions_write
     - *bazel_coverage_sh
 
-  "ninja compile sh": &ninja_compile_sh
-    command: subprocess.exec
-    display_name: "ninja compile sh"
-    type: test
-    params:
-      binary: bash
-      args:
-        - "./src/evergreen/ninja_compile.sh"
-
-  "ninja compile":
-    - *f_expansions_write
-    - *ninja_compile_sh
-
   "generate version expansions": &generate_version_expansions
     command: subprocess.exec
     display_name: "generate version expansions"
