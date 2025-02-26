@@ -162,11 +162,17 @@ config_fuzzer_params = {
         # DEBUG seems to be because it would wait for the batch to fill up to the batch limit
         # operations, but when that number is too high it would just time out before reaching the
         # batch limit operations.
-        "replBatchLimitOperations": {"min": 1, "max": 0.2 * 1000 * 1000, "fuzz_at": ["startup"]},
+        "replBatchLimitOperations": {
+            "min": 1,
+            "max": 0.2 * 1000 * 1000,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
         "replBatchLimitBytes": {
             "min": 16 * 1024 * 1024,
             "max": 100 * 1024 * 1024,
-            "fuzz_at": ["startup"],
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
         },
         "replWriterThreadCount": {"min": 1, "max": 256, "fuzz_at": ["startup"]},
         "storageEngineConcurrencyAdjustmentAlgorithm": {
@@ -383,6 +389,41 @@ config_fuzzer_params = {
         "diagnosticDataCollectionEnableLatencyHistograms": {
             "choices": [True, False],
             "period": 10,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "rollbackRemoteOplogQueryBatchSize": {
+            "min": 1500,
+            "max": 2500,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "writePeriodicNoops": {
+            "choices": [True, False],
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "changeSyncSourceThresholdMillis": {
+            "min": 0,
+            "max": 20,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "maxNumSyncSourceChangesPerHour": {
+            "min": 1,
+            "max": 10,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "dbCheckMaxTotalIndexKeysPerSnapshot": {
+            "min": 1,
+            "max": 2000,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "writeConflictRetryLimit": {
+            "min": 1,
+            "max": 20000,
+            "period": 5,
             "fuzz_at": ["startup", "runtime"],
         },
     },
