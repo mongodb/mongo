@@ -6,7 +6,7 @@
  *   assumes_no_track_upon_creation,
  *   assumes_unsharded_collection,
  *   assumes_balancer_off,
- *   # TODO SERVER-99707 remove the following exclusion tag.
+ *   # $shardedDataDistribution is incompatible with causally consistent majority reads.
  *   does_not_support_stepdowns,
  * ]
  */
