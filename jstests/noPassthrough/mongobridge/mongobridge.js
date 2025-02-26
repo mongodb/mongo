@@ -22,6 +22,14 @@ var st = new ShardingTest({
     useBridge: true,
     rsOptions: {settings: {electionTimeoutMillis: 60000}}
 });
+
+// Inserting the first document on a collection implicitly registers a database in the global
+// catalog and in the shard-local catalog. This requires to do some writes with majority write
+// concern on the shard and in the config server. Since this test intentionally disrupts
+// replication (via mongobridge), we need to create the database upfront while the network is
+// healthy to avoid hanging in the commit phase of the create database DDL.
+assert.commandWorked(st.s.adminCommand({enableSharding: "testDB"}));
+
 var wc = {writeConcern: {w: 2, wtimeout: 4000}};
 
 // delayMessagesFrom should cause a write error on this insert
@@ -29,7 +37,7 @@ st.rs0.getPrimary().delayMessagesFrom(st.rs0.getSecondary(), 13000);
 assert.commandFailed(st.s0.getCollection('testDB.cll').insert({test: 5}, wc));
 st.rs0.getPrimary().delayMessagesFrom(st.rs0.getSecondary(), 0);
 
-// discardMessages w/ a loss probabilty of 1 should also cause a write error
+// discardMessages w/ a loss probability of 1 should also cause a write error
 st.rs0.getPrimary().discardMessagesFrom(st.rs0.getSecondary(), 1.0);
 assert.commandFailed(st.s0.getCollection('testDB.cll').insert({test: 5}, wc));
 st.rs0.getPrimary().discardMessagesFrom(st.rs0.getSecondary(), 0.0);
