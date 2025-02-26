@@ -36,6 +36,7 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/executor/async_rpc.h"
+#include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
@@ -440,6 +441,12 @@ private:
     void _sendCommandToAllRecipients(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
                                      std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts);
 
+    void _sendRecipientCloneCmdToShards(
+        OperationContext* opCtx,
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        ShardsvrReshardRecipientClone cmd,
+        std::set<ShardId> recipientShardIds);
+
     /**
      * Sends '_flushRoutingTableCacheUpdatesWithWriteConcern' to ensure donor state machine creation
      * by the time the refresh completes.
@@ -453,6 +460,11 @@ private:
      */
     void _establishAllRecipientsAsParticipants(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    /**
+     * Sends '_shardsvrReshardRecipientClone' to all recipient shards.
+     */
+    void _tellAllRecipientsToClone(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
      * Sends '_flushReshardingStateChange' to all recipient shards.
@@ -498,9 +510,6 @@ private:
      * When called with an error Status, the coordinator will never enter the critical section.
      */
     void _fulfillOkayToEnterCritical(Status status);
-
-    // Waits for majority replication of the latest opTime unless token is cancelled.
-    SemiFuture<void> _waitForMajority(const CancellationToken& token);
 
     /**
      * Print a log containing the information of this resharding operation.

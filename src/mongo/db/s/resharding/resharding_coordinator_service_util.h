@@ -107,7 +107,15 @@ makeFlushRoutingTableCacheUpdatesOptions(const NamespaceString& nss,
                                          CancellationToken token);
 TypeCollectionRecipientFields constructRecipientFields(
     const ReshardingCoordinatorDocument& coordinatorDoc);
-}  // namespace resharding
 
+struct ShardOwnership {
+    std::set<ShardId> shardsOwningChunks;
+    std::set<ShardId> shardsNotOwningChunks;
+};
+
+ShardOwnership computeRecipientChunkOwnership(OperationContext* opCtx,
+                                              const ReshardingCoordinatorDocument& coordinatorDoc);
+
+}  // namespace resharding
 
 }  // namespace mongo

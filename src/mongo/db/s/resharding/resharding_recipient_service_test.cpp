@@ -28,6 +28,7 @@
  */
 
 
+#include "mongo/platform/random.h"
 #include <absl/container/node_hash_map.h>
 #include <boost/cstdint.hpp>
 #include <boost/none.hpp>
@@ -522,10 +523,34 @@ public:
             opCtx, recipientDoc.getTempReshardingNss(), options);
     }
 
+    SemiFuture<void> notifyToStartCloningUsingCmd(const CancellationToken& cancelToken,
+                                                  RecipientStateMachine& recipient,
+                                                  const ReshardingRecipientDocument& recipientDoc) {
+        auto recipientFields = _makeRecipientFields(recipientDoc);
+        return recipient.fulfillAllDonorsPreparedToDonate(
+            {recipientFields.getCloneTimestamp().get(),
+             recipientFields.getApproxDocumentsToCopy().get(),
+             recipientFields.getApproxBytesToCopy().get(),
+             recipientFields.getDonorShards()},
+            cancelToken);
+    }
+
     void notifyToStartCloning(OperationContext* opCtx,
                               RecipientStateMachine& recipient,
                               const ReshardingRecipientDocument& recipientDoc) {
-        _onReshardingFieldsChanges(opCtx, recipient, recipientDoc, CoordinatorStateEnum::kCloning);
+        auto driveCloneNoRefresh =
+            resharding::gFeatureFlagReshardingNoRefresh.isEnabledAndIgnoreFCVUnsafe();
+
+        if (driveCloneNoRefresh) {
+            CancellationSource cancelSource;
+            SemiFuture<void> future =
+                notifyToStartCloningUsingCmd(cancelSource.token(), recipient, recipientDoc);
+            cancelSource.cancel();
+            ASSERT(future.getNoThrow() == ErrorCodes::CallbackCanceled);
+        } else {
+            _onReshardingFieldsChanges(
+                opCtx, recipient, recipientDoc, CoordinatorStateEnum::kCloning);
+        }
     }
 
     void notifyReshardingCommitting(OperationContext* opCtx,
@@ -760,6 +785,16 @@ protected:
         auto expectedApproxDocsToCopy = testOptions.noChunksToCopy ? 0 : approxDocumentsToCopy;
         auto expectedApproxBytesToCopy = testOptions.noChunksToCopy ? 0 : approxBytesToCopy;
 
+        auto driveCloneNoRefresh =
+            resharding::gFeatureFlagReshardingNoRefresh.isEnabledAndIgnoreFCVUnsafe();
+        if (driveCloneNoRefresh) {
+            // Unit tests rely on resharding fields to set the copy metrics. With no refresh
+            // enabled, the coordinator sends copy metrics according to the chunk manager, which
+            // ignores the arbitary noChunksToCopy value set in unit tests.
+            expectedApproxDocsToCopy = approxDocumentsToCopy;
+            expectedApproxBytesToCopy = approxBytesToCopy;
+        }
+
         ASSERT_EQ(*recipientDoc.getMetrics()->getApproxDocumentsToCopy(), expectedApproxDocsToCopy);
         ASSERT_EQ(*recipientDoc.getMetrics()->getApproxBytesToCopy(), expectedApproxBytesToCopy);
 
@@ -945,7 +980,6 @@ protected:
         checkCoordinatorOplogMetrics(testRecipientMetrics, coordinatorDoc, recipientState);
     }
 
-
     void writeToCollection(OperationContext* opCtx,
                            const ReshardingRecipientDocument& recipientDoc,
                            int numInserts,
@@ -974,6 +1008,8 @@ protected:
             client.remove(recipientDoc.getTempReshardingNss(), BSON("_id" << i), false);
         }
     }
+
+    PseudoRandom _random = PseudoRandom(123456);
 
 private:
     TypeCollectionRecipientFields _makeRecipientFields(
@@ -1031,6 +1067,7 @@ TEST_F(ReshardingRecipientServiceTest, CanTransitionThroughEachStateToCompletion
               "Running case",
               "test"_attr = _agent.getTestName(),
               "testOptions"_attr = testOptions);
+
         auto removeRecipientDocFailpoint =
             globalFailPointRegistry().find("removeRecipientDocFailpoint");
         auto timesEnteredFailPoint = removeRecipientDocFailpoint->setMode(FailPoint::alwaysOn);
@@ -1124,10 +1161,18 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
                                                           RecipientStateEnum::kStrictConsistency,
                                                           RecipientStateEnum::kDone};
     for (const auto& testOptions : makeBasicTestOptions()) {
+        bool isNoRefreshEnabled = false;
+        if (_random.nextInt32(2) == 0) {
+            isNoRefreshEnabled = true;
+        }
         LOGV2(5551106,
               "Running case",
               "test"_attr = _agent.getTestName(),
-              "testOptions"_attr = testOptions);
+              "testOptions"_attr = testOptions,
+              "noRefreshEnabled"_attr = isNoRefreshEnabled);
+
+        RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+            "featureFlagReshardingNoRefresh", isNoRefreshEnabled);
 
         PauseDuringStateTransitions stateTransitionsGuard{controller(), recipientStates};
         auto doc = makeRecipientDocument(testOptions);
@@ -1683,10 +1728,18 @@ TEST_F(ReshardingRecipientServiceTest, ReshardingMetricsBasic) {
                                                           RecipientStateEnum::kDone};
 
     for (auto& testOptions : makeAllTestOptions()) {
+        bool isNoRefreshEnabled = false;
+        if (_random.nextInt32(2) == 0) {
+            isNoRefreshEnabled = true;
+        }
         LOGV2(9297807,
               "Running case",
               "test"_attr = _agent.getTestName(),
-              "testOptions"_attr = testOptions);
+              "testOptions"_attr = testOptions,
+              "noRefreshEnabled"_attr = isNoRefreshEnabled);
+
+        RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+            "featureFlagReshardingNoRefresh", isNoRefreshEnabled);
         setNoChunksToCopy(testOptions);
 
         PauseDuringStateTransitions stateTransitionsGuard{controller(), recipientStates};
@@ -1809,11 +1862,18 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
                                                           RecipientStateEnum::kDone};
 
     for (const auto& testOptions : makeAllTestOptions()) {
+        bool isNoRefreshEnabled = false;
+        if (_random.nextInt32(2) == 0) {
+            isNoRefreshEnabled = true;
+        }
         LOGV2(9297808,
               "Running case",
               "test"_attr = _agent.getTestName(),
-              "testOptions"_attr = testOptions);
+              "testOptions"_attr = testOptions,
+              "noRefreshEnabled"_attr = isNoRefreshEnabled);
 
+        RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+            "featureFlagReshardingNoRefresh", isNoRefreshEnabled);
         setNoChunksToCopy(testOptions);
 
         PauseDuringStateTransitions stateTransitionsGuard{controller(), recipientStates};

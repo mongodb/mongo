@@ -242,6 +242,9 @@ public:
 
     void checkIfOptionsConflict(const BSONObj& stateDoc) const final {}
 
+    SemiFuture<void> fulfillAllDonorsPreparedToDonate(CloneDetails cloneDetails,
+                                                      const CancellationToken& cancelToken);
+
 private:
     class CloningMetrics {
     public:
@@ -379,6 +382,8 @@ private:
     // in the cloner resume data documents. Otherwise, return none.
     boost::optional<CloningMetrics> _tryFetchCloningMetrics(OperationContext* opCtx);
 
+    void _fulfillPromisesOnStepup(boost::optional<mongo::ReshardingRecipientMetrics> metrics);
+
     // The primary-only service instance corresponding to the recipient instance. Not owned.
     const ReshardingRecipientService* const _recipientService;
 
@@ -456,6 +461,9 @@ private:
     SharedPromise<void> _coordinatorHasDecisionPersisted;
 
     SharedPromise<void> _completionPromise;
+
+    // This promise is emplaced if the recipient has majority committed the createCollection state.
+    SharedPromise<void> _transitionedToCreateCollection;
 };
 
 }  // namespace mongo

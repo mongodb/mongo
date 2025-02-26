@@ -60,6 +60,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/document_source_resharding_add_resume_id.h"
 #include "mongo/db/s/resharding/document_source_resharding_iterate_transaction.h"
@@ -614,6 +615,16 @@ ReshardingCoordinatorDocument getCoordinatorDoc(OperationContext* opCtx,
                           << reshardingUUID.toString(),
             !doc.isEmpty());
     return ReshardingCoordinatorDocument::parse(IDLParserContext("getCoordinatorDoc"), doc);
+}
+
+SemiFuture<void> waitForMajority(const CancellationToken& token,
+                                 const CancelableOperationContextFactory& factory) {
+    auto opCtx = factory.makeOperationContext(&cc());
+    auto client = opCtx->getClient();
+    repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(opCtx.get());
+    auto opTime = repl::ReplClientInfo::forClient(client).getLastOp();
+    return WaitForMajorityService::get(client->getServiceContext())
+        .waitUntilMajorityForWrite(opTime, token);
 }
 
 }  // namespace resharding

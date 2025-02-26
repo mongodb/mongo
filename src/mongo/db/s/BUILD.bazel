@@ -1237,6 +1237,7 @@ mongo_cc_library(
         "shardsvr_rename_collection_participant_command.cpp",
         "shardsvr_rename_index_metadata_command.cpp",
         "shardsvr_reshard_collection_command.cpp",
+        "shardsvr_reshard_recipient_clone_cmd.cpp",
         "shardsvr_resharding_donor_fetch_final_collection_stats_command.cpp",
         "shardsvr_resharding_donor_start_change_streams_monitor_command.cpp",
         "shardsvr_resharding_operation_time_command.cpp",

@@ -50,6 +50,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
@@ -468,6 +469,10 @@ Date_t getCurrentTime();
 
 ReshardingCoordinatorDocument getCoordinatorDoc(OperationContext* opCtx,
                                                 const UUID& reshardingUUID);
+
+// Waits for majority replication of the latest opTime unless token is cancelled.
+SemiFuture<void> waitForMajority(const CancellationToken& token,
+                                 const CancelableOperationContextFactory& factory);
 
 }  // namespace resharding
 }  // namespace mongo

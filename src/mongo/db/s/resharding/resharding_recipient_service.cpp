@@ -30,6 +30,7 @@
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
 
 #include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/util/cancellation.h"
 #include <absl/container/node_hash_map.h>
 #include <algorithm>
 #include <boost/cstdint.hpp>
@@ -127,6 +128,7 @@ MONGO_FAIL_POINT_DEFINE(reshardingOpCtxKilledWhileRestoringMetrics);
 MONGO_FAIL_POINT_DEFINE(reshardingRecipientFailsAfterTransitionToCloning);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeBuildingIndex);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeEnteringStrictConsistency);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeTransitionToCreateCollection);
 
 namespace {
 
@@ -320,8 +322,8 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
                               }) != _donorShards.end();
       }()) {
     invariant(_externalState);
-
     _metrics->onStateTransition(boost::none, _recipientCtx.getState());
+    _fulfillPromisesOnStepup(recipientDoc.getMetrics());
 
     if (_changeStreamsMonitorCtx) {
         invariant(_metadata.getPerformVerification());
@@ -725,7 +727,10 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     auto coordinatorState = reshardingFields.getState();
-    if (coordinatorState >= CoordinatorStateEnum::kCloning) {
+    auto driveCloneViaRefresh = !resharding::gFeatureFlagReshardingNoRefresh.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
+    if (driveCloneViaRefresh && coordinatorState >= CoordinatorStateEnum::kCloning) {
         auto recipientFields = *reshardingFields.getRecipientFields();
         invariant(recipientFields.getCloneTimestamp());
         invariant(recipientFields.getApproxDocumentsToCopy());
@@ -769,11 +774,39 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
         .thenRunOn(**executor)
         .then([this, executor, &factory](
                   ReshardingRecipientService::RecipientStateMachine::CloneDetails cloneDetails) {
+            {
+                auto opCtx = factory.makeOperationContext(&cc());
+                reshardingPauseRecipientBeforeTransitionToCreateCollection.pauseWhileSet(
+                    opCtx.get());
+            }
+
             _transitionToCreatingCollection(
                 cloneDetails, (*executor)->now() + _minimumOperationDuration, factory);
+
             _metrics->setDocumentsToProcessCounts(cloneDetails.approxDocumentsToCopy,
                                                   cloneDetails.approxBytesToCopy);
+        })
+        .then([this, &factory, abortToken] {
+            return resharding::waitForMajority(abortToken, factory);
+        })
+        .thenRunOn(**executor)
+        .then([this] {
+            {
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
+                ensureFulfilledPromise(lk, _transitionedToCreateCollection);
+            }
         });
+}
+
+SemiFuture<void>
+ReshardingRecipientService::RecipientStateMachine::fulfillAllDonorsPreparedToDonate(
+    CloneDetails cloneDetails, const CancellationToken& cancelToken) {
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        ensureFulfilledPromise(lk, _allDonorsPreparedToDonate, cloneDetails);
+    }
+
+    return future_util::withCancellation(_transitionedToCreateCollection.getFuture(), cancelToken);
 }
 
 void ReshardingRecipientService::RecipientStateMachine::
@@ -1973,6 +2006,26 @@ void ReshardingRecipientService::RecipientStateMachine::abort(bool isUserCancell
     if (abortSource) {
         abortSource->cancel();
     }
+}
+
+void ReshardingRecipientService::RecipientStateMachine::_fulfillPromisesOnStepup(
+    boost::optional<mongo::ReshardingRecipientMetrics> metrics) {
+    if (!resharding::gFeatureFlagReshardingNoRefresh.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
+        _recipientCtx.getState() <= RecipientStateEnum::kAwaitingFetchTimestamp) {
+        return;
+    }
+
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (metrics && _cloneTimestamp) {
+        ensureFulfilledPromise(lk,
+                               _allDonorsPreparedToDonate,
+                               {*_cloneTimestamp,
+                                *metrics->getApproxDocumentsToCopy(),
+                                *metrics->getApproxBytesToCopy(),
+                                _donorShards});
+    }
+    ensureFulfilledPromise(lk, _transitionedToCreateCollection);
 }
 
 }  // namespace mongo

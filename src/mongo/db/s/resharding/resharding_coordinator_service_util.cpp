@@ -1191,5 +1191,29 @@ makeFlushRoutingTableCacheUpdatesOptions(const NamespaceString& nss,
     return opts;
 }
 
+ShardOwnership computeRecipientChunkOwnership(OperationContext* opCtx,
+                                              const ReshardingCoordinatorDocument& coordinatorDoc) {
+    const auto cm =
+        uassertStatusOK(RoutingInformationCache::get(opCtx)->getCollectionPlacementInfoWithRefresh(
+            opCtx, coordinatorDoc.getTempReshardingNss()));
+    std::set<ShardId> shardsOwningChunks;
+    cm.getAllShardIds(&shardsOwningChunks);
+
+    auto recipientShardIds =
+        resharding::extractShardIdsFromParticipantEntries(coordinatorDoc.getRecipientShards());
+
+    std::set<ShardId> shardsNotOwningChunks;
+    std::copy_if(recipientShardIds.begin(),
+                 recipientShardIds.end(),
+                 std::inserter(shardsNotOwningChunks, shardsNotOwningChunks.end()),
+                 [&shardsOwningChunks](const ShardId& shard) {
+                     return !shardsOwningChunks.contains(shard);
+                 });
+
+    invariant(recipientShardIds.size() == shardsOwningChunks.size() + shardsNotOwningChunks.size());
+
+    return ShardOwnership{shardsOwningChunks, shardsNotOwningChunks};
+}
+
 }  // namespace resharding
 }  // namespace mongo

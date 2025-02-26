@@ -198,6 +198,7 @@ let testCases = {
     _shardsvrReshardingDonorFetchFinalCollectionStats: {skip: "internal command"},
     _shardsvrReshardingDonorStartChangeStreamsMonitor: {skip: "internal command"},
     _shardsvrReshardingOperationTime: {skip: "internal command"},
+    _shardsvrReshardRecipientClone: {skip: "internal command"},
     _shardsvrResolveView: {skip: "internal command"},
     _shardsvrRunSearchIndexCommand: {skip: "internal command"},
     _shardsvrSetAllowMigrations: {skip: "internal command"},
