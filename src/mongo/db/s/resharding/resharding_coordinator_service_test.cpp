@@ -937,8 +937,6 @@ public:
 
     RAIIServerParameterControllerForTest _serverParamController{
         "reshardingMinimumOperationDurationMillis", 0};
-    FailPointEnableBlock _performVerificationAfterApplying{
-        "reshardingPerformValidationAfterApplying"};
 
     long long _term = 0;
 
