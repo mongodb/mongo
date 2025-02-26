@@ -130,8 +130,20 @@ std::vector<DatabaseType> getDatabasesThisShardIsPrimaryFor(OperationContext* op
     std::vector<DatabaseType> databases;
     databases.reserve(rawDatabases.size());
     for (auto&& rawDb : rawDatabases) {
-        databases.emplace_back(
-            DatabaseType::parseOwned(IDLParserContext("DatabaseType"), std::move(rawDb)));
+        auto db = DatabaseType::parseOwned(IDLParserContext("DatabaseType"), std::move(rawDb));
+        if (db.getDbName() == DatabaseName::kAdmin) {
+            // TODO (SERVER-101175): Convert this into a new metadata inconsistency.
+            // The 'admin' database should not be explicitly assigned a primary shard. It may exist
+            // in the global catalog due to upgrade from an older MongoDB version.
+            LOGV2_INFO(
+                9866400,
+                "Found internal 'admin' database registered in the global catalog during the "
+                "execution of checkMetadataConsistency command. Skipping consistency check for "
+                "this database.",
+                "dbMetadata"_attr = db);
+            continue;
+        }
+        databases.emplace_back(std::move(db));
     }
     if (thisShardId == ShardId::kConfigServerId) {
         // Config database

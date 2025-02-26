@@ -386,6 +386,8 @@ last-continuous:
       ticket: SERVER-99618
     - test_file: jstests/concurrency/fsm_workloads/ddl/collMod/collMod.js
       ticket: SERVER-99618
+    - test_file: jstests/sharding/check_metadata_consistency.js
+      ticket: SERVER-98664
   suites: null
 last-lts:
   all:
@@ -821,4 +823,6 @@ last-lts:
       ticket: SERVER-99618
     - test_file: jstests/concurrency/fsm_workloads/ddl/collMod/collMod.js
       ticket: SERVER-99618
+    - test_file: jstests/sharding/check_metadata_consistency.js
+      ticket: SERVER-98664
   suites: null
