@@ -49,6 +49,19 @@ assert.commandFailedWithCode(buildAndRunCommand({
                              }),
                              6050204);
 
+// Fail if 'sortBy' is invalid when using 'output.test.value'.
+assert.commandFailedWithCode(
+    buildAndRunCommand({$fill: {output: {test: {value: "foo"}}, sortBy: {"$obj": 1}}}), 16410);
+
+// Fail if 'partitionBy' is invalid when using 'output.test.value'.
+assert.commandFailedWithCode(
+    buildAndRunCommand({$fill: {output: {test: {value: "foo"}}, partitionBy: {$part: "foobar"}}}),
+    168);
+
+// Fail if 'partitionByFields' is invalid when using 'output.test.value'.
+assert.commandFailedWithCode(
+    buildAndRunCommand({$fill: {output: {test: {value: "foo"}}, partitionByFields: [""]}}), 40352);
+
 // Fail if linearFill does not receive a sortBy field.
 assert.commandFailedWithCode(
     buildAndRunCommand({
@@ -216,6 +229,17 @@ let testCases = [
         ],
 
     ],  // 9
+    [
+        {
+            $fill: {
+                output: {val: {value: "foo"}},
+                sortBy: {key: 1},
+                partitionBy: {part: "$part", partTwo: "$partTwo"}
+            }
+        },
+        [{"$addFields": {"val": {$ifNull: ["$val", {"$const": "foo"}]}}}],
+        [],
+    ],  // 10
 ];
 
 function modifyObjectAtPath(orig, path) {

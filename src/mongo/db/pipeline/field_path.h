@@ -152,7 +152,7 @@ public:
      * Precondition getPathLength() > 1.
      */
     FieldPath tail() const {
-        massert(16409, "FieldPath::tail() called on single element path", getPathLength() > 1);
+        tassert(16409, "FieldPath::tail() called on single element path", getPathLength() > 1);
         return {_fieldPath.substr(_fieldPathDotPosition[1] + 1)};
     }
 
