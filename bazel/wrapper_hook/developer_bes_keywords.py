@@ -15,6 +15,12 @@ def write_workstation_bazelrc(args):
         with open(workstation_file) as f:
             existing_hash = hashlib.md5(f.read().encode()).hexdigest()
 
+    status = "Unknown"
+    remote = "Unknown"
+    branch = "Unknown"
+    commit = "Unknown"
+    user = "Unknown"
+    hostname = "Unknown"
     try:
         repo = git.Repo()
     except Exception:
@@ -25,7 +31,7 @@ def write_workstation_bazelrc(args):
         try:
             status = "clean" if repo.head.commit.diff(None) is None else "modified"
         except Exception:
-            status = "Unknown"
+            pass
 
         try:
             remote = repo.branches.master.repo.remote().url
@@ -33,23 +39,23 @@ def write_workstation_bazelrc(args):
             try:
                 remote = repo.remotes[0].url
             except Exception:
-                remote = "Unknown"
+                pass
 
         try:
             branch = repo.active_branch.name
         except Exception:
-            branch = "Unknown"
+            pass
 
         try:
             commit = repo.commit("HEAD")
         except Exception:
-            commit = "Unknown"
+            pass
 
         try:
             reader = repo.config_reader()
             user = reader.get_value("user", "email")
         except Exception:
-            user = "Unknown"
+            pass
 
     if os.environ.get("CI") is not None:
         user = os.environ.get("author_email", "Unknown")
@@ -57,7 +63,7 @@ def write_workstation_bazelrc(args):
     try:
         hostname = socket.gethostname()
     except Exception:
-        hostname = "Unknown"
+        pass
 
     developer_build = os.environ.get("CI") is None
     b64_cmd_line = base64.b64encode(json.dumps(args[1:]).encode()).decode()
