@@ -109,6 +109,7 @@ MONGO_FAIL_POINT_DEFINE(blockHeartbeatReconfigFinish);
 MONGO_FAIL_POINT_DEFINE(hangAfterTrackingNewHandleInHandleHeartbeatResponseForTest);
 MONGO_FAIL_POINT_DEFINE(waitForPostActionCompleteInHbReconfig);
 MONGO_FAIL_POINT_DEFINE(pauseInHandleHeartbeatResponse);
+MONGO_FAIL_POINT_DEFINE(hangHeartbeatReconfigStore);
 
 }  // namespace
 
@@ -717,6 +718,12 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
               "configuration was not persisted but was used",
               "newConfig"_attr = newConfig.toBSON());
         return;
+    }
+
+    if (MONGO_unlikely(hangHeartbeatReconfigStore.shouldFail())) {
+        LOGV2(10142900,
+              "hangHeartbeatReconfigStore failpoint set, hanging while failpoint is active");
+        hangHeartbeatReconfigStore.pauseWhileSet();
     }
 
     auto rsc = _getReplSetConfig();

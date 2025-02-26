@@ -2085,9 +2085,23 @@ TEST_F(HBStepdownAndReconfigTest, HBStepdownThenHBReconfig) {
 }
 
 TEST_F(HBStepdownAndReconfigTest, HBReconfigThenHBStepdown) {
+    auto reconfigFp = globalFailPointRegistry().find("hangHeartbeatReconfigStore");
+    auto timesEnteredReconfig = reconfigFp->setMode(FailPoint::alwaysOn);
+
     // A node has started to reconfig then learns about a new term via heartbeat.
     sendHBResponseWithNewConfig();
+
+    // Wait for the mock repl executor to be in _heartbeatReconfigStore() and hang it there.
+    reconfigFp->waitForTimesEntered(timesEnteredReconfig + 1);
+
+    // Issue the heartbeat with the new term. This will schedule the stepDown task in the repl
+    // executor, ensuring it is scheduled before the new config is installed and cancels all
+    // heartbeats.
     sendHBResponseWithNewTerm();
+
+    // Turn the failpoint off so that we can proceed with reconfig.
+    reconfigFp->setMode(FailPoint::off);
+
     assertSteppedDown();
     assertConfigStored();
 }
