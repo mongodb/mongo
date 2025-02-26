@@ -216,14 +216,13 @@ Status compressAndWriteBucket(OperationContext* opCtx,
  * Given a compressed bucket to reopen, performs validation and constructs the in-memory
  * representation of the bucket. Does *not* hand ownership of the bucket to the catalog.
  */
-StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
-                                                         const BSONObj& bucketDoc,
-                                                         const BucketKey& bucketKey,
-                                                         const TimeseriesOptions& options,
-                                                         uint64_t catalogEra,
-                                                         const StringDataComparator* comparator,
-                                                         const BucketDocumentValidator& validator,
-                                                         ExecutionStatsController& stats);
+StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(
+    BucketCatalog& catalog,
+    const BSONObj& bucketDoc,
+    uint64_t catalogEra,
+    const StringDataComparator* comparator,
+    const BucketDocumentValidator& validator,
+    bucket_catalog::InsertContext& insertContext);
 
 /**
  * Given a rehydrated 'bucket', passes ownership of that bucket to the catalog, marking the bucket
@@ -287,14 +286,13 @@ void archiveBucket(BucketCatalog& catalog,
                    ExecutionStatsController& stats);
 
 /**
- * Identifies a previously archived bucket that may be able to accommodate a measurement with
- * 'time', if one exists.
+ * Identifies a previously archived bucket that may be able to accommodate the measurement
+ * represented by 'info', if one exists.
  */
 boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
                                            Stripe& stripe,
                                            WithLock stripeLock,
-                                           const BucketKey& bucketKey,
-                                           const TimeseriesOptions& options,
+                                           const InsertContext& info,
                                            const Date_t& time);
 
 /**
@@ -325,18 +323,16 @@ InsertResult getReopeningContext(BucketCatalog& catalog,
 boost::optional<OID> getArchiveReopeningCandidate(BucketCatalog& catalog,
                                                   Stripe& stripe,
                                                   WithLock stripeLock,
-                                                  const BucketKey& bucketKey,
-                                                  const TimeseriesOptions& options,
+                                                  const InsertContext& info,
                                                   const Date_t& time);
 
 /**
- * Returns an aggregation pipeline to reopen a bucket with 'time' using 'bucketKey' and 'options'.
+ * Returns an aggregation pipeline used to reopen a bucket with 'info' and 'time'.
  */
 std::vector<BSONObj> getQueryReopeningCandidate(BucketCatalog& catalog,
                                                 Stripe& stripe,
                                                 WithLock stripeLock,
-                                                const BucketKey& bucketKey,
-                                                const TimeseriesOptions& options,
+                                                const InsertContext& info,
                                                 uint64_t storageCacheSizeBytes,
                                                 const Date_t& time);
 
@@ -456,14 +452,14 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
  * appropriate.
  */
 RolloverReason determineRolloverReason(const BSONObj& doc,
+                                       ExecutionStatsController stats,
                                        const TimeseriesOptions& timeseriesOptions,
                                        Bucket& bucket,
                                        uint32_t numberOfActiveBuckets,
                                        const Sizes& sizesToBeAdded,
                                        const Date_t& time,
                                        uint64_t storageCacheSizeBytes,
-                                       const StringDataComparator* comparator,
-                                       ExecutionStatsController& stats);
+                                       const StringDataComparator* comparator);
 
 /**
  * Updates the stats based on the RolloverReason.

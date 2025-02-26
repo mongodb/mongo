@@ -137,77 +137,6 @@ void updateBucketFetchAndQueryStats(const ReopeningContext& context,
         }
     }
 }
-
-/**
- * Returns an open bucket from stripe that can fit 'measurement'. If none available, returns
- * nullptr.
- * Makes the decision to skip query-based reopening if 'measurementTimestamp' is later than
- * the bucket's time range.
- */
-Bucket* findOpenBucketForMeasurement(BucketCatalog& catalog,
-                                     Stripe& stripe,
-                                     WithLock stripeLock,
-                                     const BSONObj& measurement,
-                                     const BucketKey& bucketKey,
-                                     const Date_t& measurementTimestamp,
-                                     const TimeseriesOptions& options,
-                                     const StringDataComparator* comparator,
-                                     uint64_t storageCacheSizeBytes,
-                                     internal::AllowQueryBasedReopening& allowQueryBasedReopening,
-                                     ExecutionStatsController& stats) {
-    // Gets a vector of potential buckets, starting with kSoftClose/kArchived buckets, followed by
-    // at most one kNone bucket.
-    auto potentialBuckets = findAndRolloverOpenBuckets(catalog,
-                                                       stripe,
-                                                       stripeLock,
-                                                       bucketKey,
-                                                       measurementTimestamp,
-                                                       Seconds(*options.getBucketMaxSpanSeconds()));
-    if (potentialBuckets.empty()) {
-        return nullptr;
-    }
-
-    for (const auto& potentialBucket : potentialBuckets) {
-        // Check if the measurement can fit in the potential bucket.
-        Bucket::NewFieldNames newFieldNamesToBeInserted;
-        Sizes sizesToBeAdded;
-        calculateBucketFieldsAndSizeChange(catalog.trackingContexts,
-                                           *potentialBucket,
-                                           measurement,
-                                           options.getMetaField(),
-                                           newFieldNamesToBeInserted,
-                                           sizesToBeAdded);
-        auto rolloverReason = internal::determineRolloverReason(
-            measurement,
-            options,
-            *potentialBucket,
-            catalog.globalExecutionStats.numActiveBuckets.loadRelaxed(),
-            sizesToBeAdded,
-            measurementTimestamp,
-            storageCacheSizeBytes,
-            comparator,
-            stats);
-        auto rolloverAction = getRolloverAction(rolloverReason);
-
-        if (rolloverAction == RolloverAction::kNone) {
-            // The measurement can be inserted into the open bucket.
-            internal::markBucketNotIdle(stripe, stripeLock, *potentialBucket);
-            return potentialBucket;
-        }
-
-        // Update the bucket's 'rolloverAction'.
-        potentialBucket->rolloverAction = rolloverAction;
-        internal::updateRolloverStats(stats, rolloverReason);
-
-        // Skip query based reopening when 'measurementTimestamp' is later than the
-        // current open bucket's time range.
-        allowQueryBasedReopening = rolloverReason == RolloverReason::kTimeForward
-            ? internal::AllowQueryBasedReopening::kDisallow
-            : internal::AllowQueryBasedReopening::kAllow;
-    }
-
-    return nullptr;
-}
 }  // namespace
 
 SuccessfulInsertion::SuccessfulInsertion(std::shared_ptr<WriteBatch>&& b) : batch{std::move(b)} {}
@@ -442,12 +371,10 @@ StatusWith<InsertResult> insertWithReopeningContext(BucketCatalog& catalog,
     auto rehydratedBucket = (reopeningContext.bucketToReopen.has_value())
         ? internal::rehydrateBucket(catalog,
                                     reopeningContext.bucketToReopen->bucketDocument,
-                                    insertContext.key,
-                                    insertContext.options,
                                     reopeningContext.catalogEra,
                                     comparator,
                                     reopeningContext.bucketToReopen->validator,
-                                    insertContext.stats)
+                                    insertContext)
         : StatusWith<tracking::unique_ptr<Bucket>>{ErrorCodes::BadValue, "No bucket to rehydrate"};
     if (rehydratedBucket.getStatus().code() == ErrorCodes::WriteConflict) {
         return rehydratedBucket.getStatus();
@@ -887,22 +814,22 @@ StatusWith<tracking::unique_ptr<Bucket>> getReopenedBucket(
     OperationContext* opCtx,
     BucketCatalog& catalog,
     const Collection* bucketsColl,
-    const BucketKey& bucketKey,
-    const TimeseriesOptions& options,
     const std::variant<OID, std::vector<BSONObj>>& reopeningCandidate,
     BucketStateRegistry::Era catalogEra,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
-    ExecutionStatsController& stats) {
-    BSONObj reopenedBucketDoc = visit(
-        OverloadedVisitor{
-            [&](const OID& bucketId) {
-                return internal::reopenFetchedBucket(opCtx, bucketsColl, bucketId, stats);
-            },
-            [&](const std::vector<BSONObj>& pipeline) {
-                return internal::reopenQueriedBucket(opCtx, bucketsColl, options, pipeline, stats);
-            },
-        },
-        reopeningCandidate);
+    bucket_catalog::InsertContext& insertContext) {
+    BSONObj reopenedBucketDoc =
+        visit(OverloadedVisitor{
+                  [&](const OID& bucketId) {
+                      return internal::reopenFetchedBucket(
+                          opCtx, bucketsColl, bucketId, insertContext.stats);
+                  },
+                  [&](const std::vector<BSONObj>& pipeline) {
+                      return internal::reopenQueriedBucket(
+                          opCtx, bucketsColl, insertContext.options, pipeline, insertContext.stats);
+                  },
+              },
+              reopeningCandidate);
 
     if (reopenedBucketDoc.isEmpty()) {
         // We couldn't find an eligible bucket document with the 'reopeningCandidate'.
@@ -914,13 +841,14 @@ StatusWith<tracking::unique_ptr<Bucket>> getReopenedBucket(
     if (!timeseries::isCompressedBucket(reopenedBucketDoc)) {
         // Compress the uncompressed bucket document and return.
         auto uncompressedBucketId =
-            extractBucketId(catalog, options, bucketsColl->uuid(), reopenedBucketDoc);
-        if (const auto& status = internal::compressAndWriteBucket(opCtx,
-                                                                  catalog,
-                                                                  bucketsColl,
-                                                                  uncompressedBucketId,
-                                                                  options.getTimeField(),
-                                                                  compressAndWriteBucketFunc);
+            extractBucketId(catalog, insertContext.options, bucketsColl->uuid(), reopenedBucketDoc);
+        if (const auto& status =
+                internal::compressAndWriteBucket(opCtx,
+                                                 catalog,
+                                                 bucketsColl,
+                                                 uncompressedBucketId,
+                                                 insertContext.options.getTimeField(),
+                                                 compressAndWriteBucketFunc);
             !status.isOK()) {
             return status;
         }
@@ -935,90 +863,10 @@ StatusWith<tracking::unique_ptr<Bucket>> getReopenedBucket(
     };
     return internal::rehydrateBucket(catalog,
                                      reopenedBucketDoc,
-                                     bucketKey,
-                                     options,
                                      catalogEra,
                                      bucketsColl->getDefaultCollator(),
                                      bucketDocumentValidator,
-                                     stats);
-}
-
-Bucket& getEligibleBucket(OperationContext* opCtx,
-                          BucketCatalog& catalog,
-                          Stripe& stripe,
-                          WithLock stripeLock,
-                          const CollectionPtr& bucketsColl,
-                          const BSONObj& measurement,
-                          const BucketKey& bucketKey,
-                          const Date_t& measurementTimestamp,
-                          const TimeseriesOptions& options,
-                          const StringDataComparator* comparator,
-                          BucketStateRegistry::Era era,
-                          uint64_t storageCacheSizeBytes,
-                          const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
-                          ExecutionStatsController& stats) {
-    Status reopeningStatus = Status::OK();
-    do {
-        auto allowQueryBasedReopening = internal::AllowQueryBasedReopening::kAllow;
-        // 1. Try to find an eligible open bucket for the next measurement.
-        if (auto eligibleBucket = findOpenBucketForMeasurement(catalog,
-                                                               stripe,
-                                                               stripeLock,
-                                                               measurement,
-                                                               bucketKey,
-                                                               measurementTimestamp,
-                                                               options,
-                                                               comparator,
-                                                               storageCacheSizeBytes,
-                                                               allowQueryBasedReopening,
-                                                               stats)) {
-            return *eligibleBucket;
-        }
-
-        // 2. Attempt to reopen a bucket.
-        // Explicitly pass in the lock which can be unlocked and relocked during reopening.
-        stdx::unique_lock lk(stripe.mutex, stdx::adopt_lock);
-        auto swReopenedBucket = potentiallyReopenBucket(
-            opCtx,
-            catalog,
-            stripe,
-            lk,
-            bucketsColl.get(),
-            bucketKey,
-            measurementTimestamp,
-            options,
-            era,
-            allowQueryBasedReopening == internal::AllowQueryBasedReopening::kAllow,
-            storageCacheSizeBytes,
-            compressAndWriteBucketFunc,
-            stats);
-        if (swReopenedBucket.isOK() && swReopenedBucket.getValue()) {
-            return *swReopenedBucket.getValue();
-        }
-
-        reopeningStatus = swReopenedBucket.getStatus();
-        // Try again when reopening or the reopened bucket encounters a conflict.
-    } while (reopeningStatus.code() == ErrorCodes::WriteConflict);
-
-    // 3. Reopening can release and reacquire the stripe lock. Look for an eligible open bucket
-    // again. If not found, allocate a new bucket this time.
-    auto allowQueryBasedReopening = internal::AllowQueryBasedReopening::kAllow;
-    if (auto eligibleBucket = findOpenBucketForMeasurement(catalog,
-                                                           stripe,
-                                                           stripeLock,
-                                                           measurement,
-                                                           bucketKey,
-                                                           measurementTimestamp,
-                                                           options,
-                                                           comparator,
-                                                           storageCacheSizeBytes,
-                                                           allowQueryBasedReopening,
-                                                           stats)) {
-        return *eligibleBucket;
-    }
-
-    return internal::allocateBucket(
-        catalog, stripe, stripeLock, bucketKey, options, measurementTimestamp, comparator, stats);
+                                     insertContext);
 }
 
 StatusWith<Bucket*> potentiallyReopenBucket(
@@ -1027,19 +875,18 @@ StatusWith<Bucket*> potentiallyReopenBucket(
     Stripe& stripe,
     stdx::unique_lock<stdx::mutex>& stripeLock,
     const Collection* bucketsColl,
-    const BucketKey& bucketKey,
     const Date_t& time,
-    const TimeseriesOptions& options,
     BucketStateRegistry::Era catalogEra,
     bool allowQueryBasedReopening,
     uint64_t storageCacheSizeBytes,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
-    ExecutionStatsController& stats) {
+    bucket_catalog::InsertContext& insertContext) {
     // Get the information needed for reopening.
     boost::optional<std::variant<OID, std::vector<BSONObj>>> reopeningCandidate;
     boost::optional<InsertWaiter> reopeningConflict;
+    const auto& bucketKey = insertContext.key;
     if (const auto& archivedCandidate = internal::getArchiveReopeningCandidate(
-            catalog, stripe, stripeLock, bucketKey, options, time)) {
+            catalog, stripe, stripeLock, insertContext, time)) {
         reopeningConflict =
             internal::checkForReopeningConflict(stripe, stripeLock, bucketKey, archivedCandidate);
         if (!reopeningConflict) {
@@ -1049,7 +896,7 @@ StatusWith<Bucket*> potentiallyReopenBucket(
         reopeningConflict = internal::checkForReopeningConflict(stripe, stripeLock, bucketKey);
         if (!reopeningConflict) {
             reopeningCandidate = internal::getQueryReopeningCandidate(
-                catalog, stripe, stripeLock, bucketKey, options, storageCacheSizeBytes, time);
+                catalog, stripe, stripeLock, insertContext, storageCacheSizeBytes, time);
         }
     }
 
@@ -1081,12 +928,10 @@ StatusWith<Bucket*> potentiallyReopenBucket(
         auto swReopenedBucket = getReopenedBucket(opCtx,
                                                   catalog,
                                                   bucketsColl,
-                                                  bucketKey,
-                                                  options,
                                                   reopeningCandidate.get(),
                                                   catalogEra,
                                                   compressAndWriteBucketFunc,
-                                                  stats);
+                                                  insertContext);
 
         if (!swReopenedBucket.isOK()) {
             return swReopenedBucket.getStatus();
@@ -1098,13 +943,36 @@ StatusWith<Bucket*> potentiallyReopenBucket(
         // Reacquire the stripe lock to load the bucket back into the catalog.
     }
 
-    auto swBucket = internal::loadBucketIntoCatalog(
-        catalog, stripe, stripeLock, stats, bucketKey, std::move(reopenedBucket), catalogEra);
+    auto swBucket = internal::loadBucketIntoCatalog(catalog,
+                                                    stripe,
+                                                    stripeLock,
+                                                    insertContext.stats,
+                                                    bucketKey,
+                                                    std::move(reopenedBucket),
+                                                    catalogEra);
     if (!swBucket.isOK()) {
         return swBucket.getStatus();
     }
 
     return &swBucket.getValue().get();
+}
+
+Bucket& getEligibleBucket(OperationContext* opCtx,
+                          BucketCatalog& catalog,
+                          Stripe& stripe,
+                          WithLock stripeLock,
+                          const CollectionPtr& bucketsColl,
+                          const BSONObj& measurement,
+                          const BucketKey& bucketKey,
+                          const Date_t& measurementTimestamp,
+                          const TimeseriesOptions& options,
+                          const StringDataComparator* comparator,
+                          BucketStateRegistry::Era era,
+                          uint64_t storageCacheSizeBytes,
+                          const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+                          ExecutionStatsController& stats) {
+    return internal::allocateBucket(
+        catalog, stripe, stripeLock, bucketKey, options, measurementTimestamp, comparator, stats);
 }
 
 }  // namespace mongo::timeseries::bucket_catalog
