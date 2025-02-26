@@ -167,7 +167,7 @@ TEST(WiredTigerConnectionTest, resetConfigurationBeforeReleasingSessionToCache) 
     // Assert that we start off with no sessions in the session cache.
     ASSERT_EQ(connection->getIdleSessionsCount(), 0U);
     {
-        WiredTigerRecoveryUnit recoveryUnit(connection, nullptr);
+        WiredTigerRecoveryUnit recoveryUnit(connection, nullptr, nullptr);
         // Set cache max wait time to be a non-default value.
         recoveryUnit.setCacheMaxWaitTimeout(Milliseconds{100});
 
@@ -191,7 +191,7 @@ TEST(WiredTigerConnectionTest, resetConfigurationBeforeReleasingSessionToCache) 
     // session cache.
     ASSERT_EQ(connection->getIdleSessionsCount(), 1U);
     {
-        WiredTigerRecoveryUnit recoveryUnit(connection, nullptr);
+        WiredTigerRecoveryUnit recoveryUnit(connection, nullptr, nullptr);
         WiredTigerSession* session = recoveryUnit.getSessionNoTxn();
         // Assert that before it was released back into the session cache, the set of undo config
         // strings was cleared, which should indicate that the changes to the default settings of
@@ -207,7 +207,7 @@ TEST(WiredTigerConnectionTest, resetConfigurationToDefault) {
     WiredTigerConnectionHarnessHelper harnessHelper("");
     WiredTigerConnection* connection = harnessHelper.getConnection();
 
-    WiredTigerRecoveryUnit recoveryUnit(connection, nullptr);
+    WiredTigerRecoveryUnit recoveryUnit(connection, nullptr, nullptr);
     // Set cache max wait time to be a non-default value.
     recoveryUnit.setCacheMaxWaitTimeout(Milliseconds{100});
 

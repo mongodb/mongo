@@ -169,9 +169,9 @@ bool WiredTigerConnection::isEphemeral() {
     return _engine && _engine->isEphemeral();
 }
 
-WiredTigerManagedSession WiredTigerConnection::getSession(OperationContext* opCtx) {
+WiredTigerManagedSession WiredTigerConnection::getSession(RecoveryUnit& ru) {
     auto session = getUninterruptibleSession();
-    session->_attachOperationContext(opCtx);
+    session->attachRecoveryUnit(ru);
     return session;
 }
 
@@ -215,7 +215,7 @@ void WiredTigerConnection::_releaseSession(std::unique_ptr<WiredTigerSession> se
     }
 
     invariant(session->cursorsOut() == 0);
-    session->_detachOperationContext();
+    session->detachRecoveryUnit();
 
     {
         uint64_t range;

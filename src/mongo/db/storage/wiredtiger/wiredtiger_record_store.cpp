@@ -1020,10 +1020,6 @@ StatusWith<int64_t> WiredTigerRecordStore::_compact(OperationContext* opCtx,
         WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))->getSession();
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
-    // Ensure that the WT session is configured to interrupt on this operation
-    invariant(
-        s->with([opCtx](auto wtSession) { return wtSession && wtSession->app_private == opCtx; }));
-
     StringBuilder config;
     config << "timeout=0";
     if (options.dryRun) {

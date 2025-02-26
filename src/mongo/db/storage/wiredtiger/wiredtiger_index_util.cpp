@@ -107,10 +107,6 @@ StatusWith<int64_t> WiredTigerIndexUtil::compact(OperationContext* opCtx,
     WiredTigerSession* s = ru.getSession();
     ru.abandonSnapshot();
 
-    // Ensure that the WT session is configured to interrupt on this operation
-    invariant(
-        s->with([opCtx](auto wtSession) { return wtSession && wtSession->app_private == opCtx; }));
-
     StringBuilder config;
     config << "timeout=0";
     if (options.dryRun) {

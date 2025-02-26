@@ -74,7 +74,7 @@ private:
 class WiredTigerTestHelper : public ScopedGlobalServiceContextForTest {
 public:
     WiredTigerTestHelper() {
-        _ru = std::make_unique<WiredTigerRecoveryUnit>(&_connection, nullptr);
+        _ru = std::make_unique<WiredTigerRecoveryUnit>(&_connection, nullptr, nullptr);
         _session = _ru->getSession();
         invariant(wtRCToStatus(_session->create("table:mytable", nullptr), *_session));
         _ru->abandonSnapshot();

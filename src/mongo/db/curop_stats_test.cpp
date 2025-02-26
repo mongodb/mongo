@@ -523,14 +523,17 @@ TEST_F(CurOpStatsTest, StashAndUnstashingMultipleRecoveryUnits) {
         shard_role_details::setRecoveryUnit(opCtx.get(), std::move(recoveryUnit2), ruState, lk);
         curop->updateStorageMetricsOnRecoveryUnitUnstash(lk);
         ASSERT_EQ(curop->getOperationStorageMetrics().prepareReadConflicts, 0);
+        ASSERT_EQ(curop->getOperationStorageMetrics().interruptDelayMs, 0);
     }
 
     {
         // Increment stats on recovery unit currently used by operation.
-        shard_role_details::getRecoveryUnit(opCtx.get())
-            ->getStorageMetrics()
-            .incrementPrepareReadConflicts(1);
+        auto& storageMetrics =
+            shard_role_details::getRecoveryUnit(opCtx.get())->getStorageMetrics();
+        storageMetrics.incrementPrepareReadConflicts(1);
+        storageMetrics.incrementInterruptDelayMs(3);
         ASSERT_EQ(curop->getOperationStorageMetrics().prepareReadConflicts, 1);
+        ASSERT_EQ(curop->getOperationStorageMetrics().interruptDelayMs, 3);
 
         // Stats from stashed recovery unit are still reported in curop.
         curop->updateStorageMetricsOnRecoveryUnitStash(lk);
@@ -538,25 +541,31 @@ TEST_F(CurOpStatsTest, StashAndUnstashingMultipleRecoveryUnits) {
         shard_role_details::setRecoveryUnit(opCtx.get(), std::move(recoveryUnit1), ruState, lk);
         curop->updateStorageMetricsOnRecoveryUnitUnstash(lk);
         ASSERT_EQ(curop->getOperationStorageMetrics().prepareReadConflicts, 1);
+        ASSERT_EQ(curop->getOperationStorageMetrics().interruptDelayMs, 3);
     }
 
     {
         // Storage metrics report cumulative stats of previously stashed recovery unit and current
         // recovery unit.
-        shard_role_details::getRecoveryUnit(opCtx.get())
-            ->getStorageMetrics()
-            .incrementPrepareReadConflicts(2);
+        auto& storageMetrics =
+            shard_role_details::getRecoveryUnit(opCtx.get())->getStorageMetrics();
+        storageMetrics.incrementPrepareReadConflicts(2);
+        storageMetrics.incrementInterruptDelayMs(12);
         ASSERT_EQ(curop->getOperationStorageMetrics().prepareReadConflicts, 3);
+        ASSERT_EQ(curop->getOperationStorageMetrics().interruptDelayMs, 15);
 
-        // Without unstashing recovery unit metrics, stats from recoveryUnit2 are double
+
+        // Without unstashing recovery unit metrics, stats from recoveryUnit2 are added to ru1.
         curop->updateStorageMetricsOnRecoveryUnitStash(lk);
         recoveryUnit1 = shard_role_details::releaseRecoveryUnit(opCtx.get(), lk);
         shard_role_details::setRecoveryUnit(opCtx.get(), std::move(recoveryUnit2), ruState, lk);
         ASSERT_EQ(curop->getOperationStorageMetrics().prepareReadConflicts, 4);
+        ASSERT_EQ(curop->getOperationStorageMetrics().interruptDelayMs, 18);
 
         // Only report stats from both recovery units once.
         curop->updateStorageMetricsOnRecoveryUnitUnstash(lk);
         ASSERT_EQ(curop->getOperationStorageMetrics().prepareReadConflicts, 3);
+        ASSERT_EQ(curop->getOperationStorageMetrics().interruptDelayMs, 15);
     }
 }
 

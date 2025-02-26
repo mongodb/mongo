@@ -265,7 +265,7 @@ public:
      * Sets the OperationContext that currently owns this RecoveryUnit. Should only be called by the
      * OperationContext.
      */
-    void setOperationContext(OperationContext* opCtx);
+    virtual void setOperationContext(OperationContext* opCtx);
 
     /**
      * Extensible structure for configuring options to begin a new transaction.
@@ -869,6 +869,41 @@ public:
         return _blockingAllowed;
     }
 
+    /**
+     * Return true if the RecoveryUnit has been notified that it should stop executing the current
+     * operation
+     */
+    virtual bool isInterrupted() {
+        return false;
+    }
+
+    /**
+     * Callback to notify the RecoveryUnit that the current operation should be interrupted.
+     * This may be called by a non-owning thread provided that the lifetime of the RecoveryUnit is
+     * guaranteed
+     */
+    virtual void notifyOperationInterrupted() {}
+
+    /**
+     * Callback to acknowledge that an interrupt was observed.
+     * This may be called by a non-owning thread provided that the lifetime of the RecoveryUnit is
+     * guaranteed
+     */
+    virtual void notifyInterruptionAcknowledged() {}
+
+    /**
+     * When true, cache eviction should be skipped when the operation is interrupted.
+     * This may be called by a non-owning thread provided that the lifetime of the RecoveryUnit is
+     * guaranteed
+     */
+    virtual void setCancelCacheEvictionOnInterrupt(bool cancelCacheEvictionOnInterrupt) {}
+
+    /**
+     * Whether or not cache eviction should occur when the operation is interrupted.
+     */
+    virtual bool shouldCancelCacheEvictionOnInterrupt() const {
+        return false;
+    }
 
 protected:
     RecoveryUnit() = default;

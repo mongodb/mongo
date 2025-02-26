@@ -43,7 +43,7 @@ namespace mongo {
 
 class StatsCollectionPermit;
 class WiredTigerConnection;
-class OperationContext;
+class RecoveryUnit;
 
 /**
  * This is a structure that caches 1 cursor for each uri.
@@ -208,13 +208,27 @@ public:
         return _undoConfigStrings;
     }
 
-    // Drops this session immediately (without calling close()). This may be necessary during
-    // shutdown to avoid racing against the connection's close. Only call this method if you're
-    // about to delete the session.
+    /**
+     * Drops this session immediately (without calling close()). This may be necessary during
+     * shutdown to avoid racing against the connection's close. Only call this method if you're
+     * about to delete the session.
+     */
     void dropSessionBeforeDeleting() {
         invariant(_session);
         _session = nullptr;
     }
+
+    /**
+     * Attach an recovery that acts as an interrupt source and contains other relevant
+     * state. WT will periodically use callbacks to check whether specific WT operations should be
+     * interrupted.
+     */
+    void attachRecoveryUnit(RecoveryUnit& ru);
+
+    /**
+     * Remove the recovery unit.
+     */
+    void detachRecoveryUnit();
 
 private:
     class CachedCursor {
@@ -238,13 +252,6 @@ private:
     uint64_t _getEpoch() const {
         return _epoch;
     }
-
-    // Attach an operation context that acts as an interrupt source and contains other relevant
-    // state. WT will periodically use callbacks to check whether specific WT operations should be
-    // interrupted
-    void _attachOperationContext(OperationContext* opCtx);
-    // Remove the interrupt source
-    void _detachOperationContext();
 
     const uint64_t _epoch;
 

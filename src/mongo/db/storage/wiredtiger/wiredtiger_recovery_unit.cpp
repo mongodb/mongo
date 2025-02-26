@@ -57,6 +57,7 @@
 #include "mongo/util/hex.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
+#include "mongo/util/system_clock_source.h"
 #include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -87,12 +88,15 @@ void handleWriteContextForDebugging(WiredTigerRecoveryUnit& ru, Timestamp& ts) {
 
 AtomicWord<std::int64_t> snapshotTooOldErrorCount{0};
 
-WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerConnection* sc)
-    : WiredTigerRecoveryUnit(sc, sc->getKVEngine()->getOplogManager()) {}
+WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerConnection* sc, ClockSource* cs)
+    : WiredTigerRecoveryUnit(sc, sc->getKVEngine()->getOplogManager(), cs) {}
 
 WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerConnection* sc,
-                                               WiredTigerOplogManager* oplogManager)
-    : _connection(sc), _oplogManager(oplogManager) {}
+                                               WiredTigerOplogManager* oplogManager,
+                                               ClockSource* cs)
+    : _connection(sc),
+      _oplogManager(oplogManager),
+      _clockSource(cs ? cs : SystemClockSource::get()) {}
 
 WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
     invariant(!_inUnitOfWork(), toString(_getState()));
@@ -173,7 +177,7 @@ void WiredTigerRecoveryUnit::_ensureSession() {
     if (!_managed_sesion) {
         invariant(!_session);
         if (_opCtx) {
-            _managed_sesion = _connection->getSession(_opCtx);
+            _managed_sesion = _connection->getSession(*this);
         } else {
             _managed_sesion = _connection->getUninterruptibleSession();
         }
@@ -393,6 +397,8 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     if (_timestampReadSource == ReadSource::kLastApplied) {
         _timestampReadSource = ReadSource::kNoTimestamp;
     }
+    // Reset if the interrupt wasn't acknowledged.
+    _interruptNotifyTimeMs.store(0);
 }
 
 Status WiredTigerRecoveryUnit::majorityCommittedSnapshotAvailable() const {
@@ -896,6 +902,18 @@ void WiredTigerRecoveryUnit::storeWriteContextForDebugging(const BSONObj& info) 
     _writeContextForDebugging.push_back(info);
 }
 
+void WiredTigerRecoveryUnit::setOperationContext(OperationContext* opCtx) {
+    if (_opCtx && _session) {
+        _session->detachRecoveryUnit();
+    }
+    // Reset between operations.
+    _interruptNotifyTimeMs.store(0);
+    RecoveryUnit::setOperationContext(opCtx);
+    if (_opCtx && _session) {
+        _session->attachRecoveryUnit(*this);
+    }
+}
+
 void WiredTigerRecoveryUnit::setCacheMaxWaitTimeout(Milliseconds timeout) {
     _cacheMaxWaitTimeout = timeout;
     auto session = getSessionNoTxn();
@@ -903,5 +921,18 @@ void WiredTigerRecoveryUnit::setCacheMaxWaitTimeout(Milliseconds timeout) {
     session->modifyConfiguration(
         fmt::format("cache_max_wait_ms={}", durationCount<Milliseconds>(_cacheMaxWaitTimeout)),
         "cache_max_wait_ms=0");
+}
+
+void WiredTigerRecoveryUnit::notifyOperationInterrupted() {
+    _interruptNotifyTimeMs.store(_clockSource->now().toMillisSinceEpoch());
+}
+
+void WiredTigerRecoveryUnit::notifyInterruptionAcknowledged() {
+    if (auto interruptNotifyTimeMs = _interruptNotifyTimeMs.load()) {
+        auto now = _clockSource->now().toMillisSinceEpoch();
+        // Log at least 0 to ensure that the storage stats don't show as empty.
+        getStorageMetrics().incrementInterruptDelayMs(now - interruptNotifyTimeMs);
+        _interruptNotifyTimeMs.store(0);
+    }
 }
 }  // namespace mongo

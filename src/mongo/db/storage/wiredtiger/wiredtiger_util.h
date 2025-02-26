@@ -347,6 +347,12 @@ public:
         kLastTableId
     };
 
+    /**
+     * Helper for handling WT eviction events. Returns non-zero to indicate that WT should not take
+     * part in optional eviction on this session, and zero otherwise
+     */
+    static int handleWtEvictionEvent(WT_SESSION* session);
+
 private:
     /**
      * Casts unsigned 64-bit statistics value to T.

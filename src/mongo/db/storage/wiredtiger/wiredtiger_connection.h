@@ -88,7 +88,7 @@ public:
      * The passed in OperationContext is used to propagate interrupts from MongoDB to WiredTiger. If
      * interrupts are not needed call getUninterruptibleSession()
      */
-    WiredTigerManagedSession getSession(OperationContext* opCtx);
+    WiredTigerManagedSession getSession(RecoveryUnit& ru);
 
     /**
      * As above but does not propagate interrupts

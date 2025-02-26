@@ -152,6 +152,10 @@ public:
         return &_engine;
     }
 
+    ClockSourceMock* getClockSourceMock() {
+        return &_cs;
+    }
+
 private:
     unittest::TempDir _dbpath;
     ClockSourceMock _cs;
@@ -1002,6 +1006,35 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, AbandonSnapshotAbortMode) {
     const char* returnedKey = nullptr;
     ASSERT_EQ(0, cursor->get_key(cursor, &returnedKey));
     ASSERT_EQ(0, strncmp(key, returnedKey, strlen(key)));
+}
+
+// Validate the return of mdb_handle_general when killing an opCtx with the RU configured to cancel
+// cache eviction.
+TEST_F(WiredTigerRecoveryUnitTestFixture, OptionalEvictionCanBeInterrupted) {
+    harnessHelper->getClockSourceMock()->advance(Milliseconds(100));
+
+    OperationContext* opCtx = clientAndCtx1.second.get();
+    WiredTigerEventHandler eventHandler;
+    WT_SESSION* session = ru1->getSessionNoTxn()->with([](WT_SESSION* arg) { return arg; });
+    ASSERT_EQ(0,
+              eventHandler.getWtEventHandler()->handle_general(eventHandler.getWtEventHandler(),
+                                                               ru1->getConnection()->conn(),
+                                                               session,
+                                                               WT_EVENT_EVICTION,
+                                                               nullptr));
+
+    ru1->setCancelCacheEvictionOnInterrupt(true);
+    opCtx->markKilled(ErrorCodes::Interrupted);
+    harnessHelper->getClockSourceMock()->advance(Milliseconds(23));
+    ASSERT_NE(0,
+              eventHandler.getWtEventHandler()->handle_general(eventHandler.getWtEventHandler(),
+                                                               ru1->getConnection()->conn(),
+                                                               session,
+                                                               WT_EVENT_EVICTION,
+                                                               nullptr));
+
+    auto stats = shard_role_details::getRecoveryUnit(opCtx)->getStorageMetrics();
+    ASSERT_EQ(23, stats.interruptDelayMs.load());
 }
 
 class SnapshotTestDecoration {

@@ -689,21 +689,35 @@ int mdb_handle_general(WT_EVENT_HANDLER* handler,
                        WT_SESSION* session,
                        WT_EVENT_TYPE type,
                        void* arg) {
-    WiredTigerEventHandler* wtHandler = reinterpret_cast<WiredTigerEventHandler*>(handler);
-    if (type == WT_EVENT_CONN_READY) {
-        wtHandler->setWtConnReady(wt_conn);
-    } else if (type == WT_EVENT_CONN_CLOSE) {
-        wtHandler->setWtConnNotReady();
-    }
-    if (type != WT_EVENT_COMPACT_CHECK || session == nullptr || session->app_private == nullptr) {
-        return 0;
-    }
 
-    return reinterpret_cast<OperationContext*>(session->app_private)
-               ->checkForInterruptNoAssert()
-               .isOK()
-        ? 0
-        : -1;  // Returning non-zero indicates an error to WT. The precise value is irrelevant.
+    WiredTigerEventHandler* wtHandler = reinterpret_cast<WiredTigerEventHandler*>(handler);
+
+    switch (type) {
+        case WT_EVENT_CONN_READY: {
+            wtHandler->setWtConnReady(wt_conn);
+            return 0;
+        }
+        case WT_EVENT_CONN_CLOSE: {
+            wtHandler->setWtConnNotReady();
+            return 0;
+        }
+        case WT_EVENT_COMPACT_CHECK: {
+            if (session->app_private) {
+                return reinterpret_cast<RecoveryUnit*>(session->app_private)->isInterrupted()
+                    ? -1  // Returning non-zero indicates an error to WT. The precise value is
+                          // irrelevant.
+                    : 0;
+            }
+            return 0;
+        }
+        case WT_EVENT_EVICTION: {
+            return WiredTigerUtil::handleWtEvictionEvent(session);
+        }
+        default: {
+            return 0;
+        }
+    }
+    MONGO_UNREACHABLE;
 }
 
 WT_EVENT_HANDLER defaultEventHandlers() {
@@ -1368,6 +1382,19 @@ bool WiredTigerConfigParser::isTableLoggingSettingValid() {
               fmt::format("expected WT_NOTFOUND from WT_CONFIG_PARSER::next() but got {} instead",
                           retCode));
     return true;
+}
+
+int WiredTigerUtil::handleWtEvictionEvent(WT_SESSION* session) {
+    if (!session->app_private) {
+        return 0;
+    }
+    auto ru = reinterpret_cast<RecoveryUnit*>(session->app_private);
+
+    if (ru->shouldCancelCacheEvictionOnInterrupt() && ru->isInterrupted()) {
+        ru->notifyInterruptionAcknowledged();
+        return -1;
+    }
+    return 0;
 }
 
 }  // namespace mongo

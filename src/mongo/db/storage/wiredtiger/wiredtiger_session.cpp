@@ -69,7 +69,7 @@ WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection,
       _idleExpireTime(Date_t::min()) {}
 
 WiredTigerSession::~WiredTigerSession() {
-    _detachOperationContext();
+    detachRecoveryUnit();
     if (_session) {
         invariantWTOK(_session->close(_session, nullptr), nullptr);
     }
@@ -221,14 +221,13 @@ void WiredTigerSession::resetSessionConfiguration() {
     _undoConfigStrings.clear();
 }
 
-void WiredTigerSession::_attachOperationContext(OperationContext* opCtx) {
+void WiredTigerSession::attachRecoveryUnit(RecoveryUnit& ru) {
     invariant(_session);
     invariant(!_session->app_private);
-    invariant(opCtx);
-    _session->app_private = opCtx;
+    _session->app_private = &ru;
 }
 
-void WiredTigerSession::_detachOperationContext() {
+void WiredTigerSession::detachRecoveryUnit() {
     if (_session) {
         _session->app_private = nullptr;
     }

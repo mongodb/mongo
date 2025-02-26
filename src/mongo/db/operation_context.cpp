@@ -378,6 +378,11 @@ void OperationContext::markKilled(ErrorCodes::Error killCode) {
         if (_baton) {
             _baton->notify();
         }
+        if (_recoveryUnit) {
+            // We don't acquire the ClientLock here as it should be held by the caller of
+            // markKilled.
+            _recoveryUnit->notifyOperationInterrupted();
+        }
     }
 }
 

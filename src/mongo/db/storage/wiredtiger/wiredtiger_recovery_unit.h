@@ -64,7 +64,7 @@ extern AtomicWord<std::int64_t> snapshotTooOldErrorCount;
 
 class WiredTigerRecoveryUnit final : public RecoveryUnit {
 public:
-    WiredTigerRecoveryUnit(WiredTigerConnection* sc);
+    WiredTigerRecoveryUnit(WiredTigerConnection* sc, ClockSource* cs);
 
     /**
      * It's expected a consumer would want to call the constructor that simply takes a
@@ -73,7 +73,9 @@ public:
      * `WiredTigerConnection` that do not have a valid `WiredTigerKVEngine`. This constructor is
      * expected to only be useful in those cases.
      */
-    WiredTigerRecoveryUnit(WiredTigerConnection* sc, WiredTigerOplogManager* oplogManager);
+    WiredTigerRecoveryUnit(WiredTigerConnection* sc,
+                           WiredTigerOplogManager* oplogManager,
+                           ClockSource* cs);
     ~WiredTigerRecoveryUnit() override;
 
     void prepareUnitOfWork() override;
@@ -205,6 +207,26 @@ public:
     bool gatherWriteContextForDebugging() const;
     void storeWriteContextForDebugging(const BSONObj& info);
 
+    void setOperationContext(OperationContext* opCtx) override;
+
+    void notifyOperationInterrupted() override;
+    void notifyInterruptionAcknowledged() override;
+
+    bool isInterrupted() override {
+        if (!_opCtx) {
+            return false;
+        }
+        return !_opCtx->checkForInterruptNoAssert().isOK();
+    }
+
+    void setCancelCacheEvictionOnInterrupt(bool cancelCacheEvictionOnInterrupt) override {
+        _cancelCacheEvictionOnInterrupt.store(cancelCacheEvictionOnInterrupt);
+    }
+
+    bool shouldCancelCacheEvictionOnInterrupt() const override {
+        return _cancelCacheEvictionOnInterrupt.load();
+    }
+
 private:
     void doBeginUnitOfWork() override;
     void doCommitUnitOfWork() override;
@@ -304,6 +326,15 @@ private:
 
     // Detects any attempt to reconfigure options used by an open transaction.
     OpenSnapshotOptions _optionsUsedToOpenSnapshot;
+
+    // Tracks when we received a notification to interrupt any ongoing operation.
+    AtomicWord<long long> _interruptNotifyTimeMs{0};
+
+    // If true, any ongoing/future cache eviction for the session will be cancelled.
+    AtomicWord<bool> _cancelCacheEvictionOnInterrupt{false};
+
+    // Clock source used for timing events.
+    ClockSource* _clockSource;
 };
 
 }  // namespace mongo

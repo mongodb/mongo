@@ -577,14 +577,6 @@ public:
         return _alwaysInterruptAtStepDownOrUp.load();
     }
 
-    void setCancelCacheEvictionOnInterrupt(bool cancelCacheEvictionOnInterrupt) {
-        _cancelCacheEvictionOnInterrupt.store(cancelCacheEvictionOnInterrupt);
-    }
-
-    bool cancelCacheEvictionOnInterrupt() const {
-        return _cancelCacheEvictionOnInterrupt.load();
-    }
-
     /**
      * Indicates that this operation should not receive interruptions while acquiring locks. Note
      * that new usages of this require the use of UninterruptibleLockGuard and are subject to the
@@ -986,9 +978,6 @@ private:
     // If true, this OpCtx will get interrupted during replica set stepUp and stepDown, regardless
     // of what locks it's taken.
     AtomicWord<bool> _alwaysInterruptAtStepDownOrUp{false};
-
-    // If true, interrupting this opCtx will also cancel any ongoing/future cache eviction.
-    AtomicWord<bool> _cancelCacheEvictionOnInterrupt{false};
 
     // If populated, this is an owned singleton BSONObj whose only field, 'comment', is a copy of
     // the 'comment' field from the input command object.
