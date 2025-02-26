@@ -184,6 +184,29 @@ BSONObj prepareDistinctForPassthrough(const BSONObj& cmd,
     return CommandHelpers::filterCommandRequestForPassthrough(cmd);
 }
 
+BSONObj translateCmdObjForRawData(OperationContext* opCtx,
+                                  const BSONObj& cmdObj,
+                                  NamespaceString& ns) {
+    if (!OptionalBool::parseFromBSON(cmdObj[DistinctCommandRequest::kRawDataFieldName]) ||
+        !CollectionRoutingInfoTargeter{opCtx, ns}.timeseriesNamespaceNeedsRewrite(ns)) {
+        return cmdObj;
+    }
+
+    ns = ns.makeTimeseriesBucketsNamespace();
+
+    // Rewrite the command object to use the buckets namespace.
+    BSONObjBuilder builder{cmdObj.objsize()};
+    for (auto&& [fieldName, elem] : cmdObj) {
+        if (fieldName == DistinctCommandRequest::kCommandName) {
+            builder.append(fieldName, ns.coll());
+        } else {
+            builder.append(elem);
+        }
+    }
+
+    return builder.obj();
+}
+
 class DistinctCmd : public BasicCommand {
 public:
     DistinctCmd() : BasicCommand("distinct") {}
@@ -250,8 +273,9 @@ public:
                    const OpMsgRequest& opMsgRequest,
                    ExplainOptions::Verbosity verbosity,
                    rpc::ReplyBuilderInterface* result) const override {
-        const BSONObj& cmdObj = opMsgRequest.body;
-        const NamespaceString nss(parseNs(opMsgRequest.parseDbName(), cmdObj));
+        const BSONObj& originalCmdObj = opMsgRequest.body;
+        NamespaceString nss(parseNs(opMsgRequest.parseDbName(), originalCmdObj));
+        auto cmdObj = translateCmdObjForRawData(opCtx, originalCmdObj, nss);
         auto canonicalQuery = parseDistinctCmd(
             opCtx, nss, cmdObj, ExtensionsCallbackNoop(), nullptr /* defaultCollator */, verbosity);
 
@@ -314,29 +338,7 @@ public:
              BSONObjBuilder& result) override {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         NamespaceString nss(parseNs(dbName, originalCmdObj));
-
-        auto cmdObj = [&] {
-            if (!OptionalBool::parseFromBSON(
-                    originalCmdObj[DistinctCommandRequest::kRawDataFieldName]) ||
-                !CollectionRoutingInfoTargeter{opCtx, nss}.timeseriesNamespaceNeedsRewrite(nss)) {
-                return originalCmdObj;
-            }
-
-            nss = nss.makeTimeseriesBucketsNamespace();
-
-            // Rewrite the command object to use the buckets namespace.
-            BSONObjBuilder builder{originalCmdObj.objsize()};
-            for (auto&& [fieldName, elem] : originalCmdObj) {
-                if (fieldName == DistinctCommandRequest::kCommandName) {
-                    builder.append(fieldName, nss.coll());
-                } else {
-                    builder.append(elem);
-                }
-            }
-
-            return builder.obj();
-        }();
-
+        auto cmdObj = translateCmdObjForRawData(opCtx, originalCmdObj, nss);
         auto canonicalQuery = parseDistinctCmd(opCtx,
                                                nss,
                                                cmdObj,

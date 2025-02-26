@@ -39,6 +39,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/query/explain_common.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/idl/command_generic_argument.h"
@@ -137,12 +138,13 @@ BSONObj ClusterExplain::wrapAsExplain(const BSONObj& cmdObj,
     // https://www.mongodb.com/docs/manual/reference/command/explain/.
     // The "readConcern" parameter will also be propagated out of the inner command as the final
     // explain command inherits readConcern from the inner command invocation.
+    // Another exception is the "rawData" field, which must be passed along in the inner command.
     BSONObjBuilder explainBuilder = out.subobjStart("explain");
     BSONElement commentField;
     BSONElement readConcernField;
     for (auto&& elem : cmdObj) {
         const auto& fieldName = elem.fieldNameStringData();
-        if (!isGenericArgument(fieldName)) {
+        if (!isGenericArgument(fieldName) || fieldName == kRawDataFieldName) {
             explainBuilder.append(elem);
         } else if (fieldName == "comment"_sd) {
             commentField = elem;

@@ -288,6 +288,43 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createExecutorForDistinctCo
     return uassertStatusOK(
         getExecutorFind(opCtx, collections, std::move(cqWithoutProjection), yieldPolicy));
 }
+
+template <class NamespaceType>
+BSONObj translateCmdObjForRawData(OperationContext* opCtx,
+                                  const BSONObj& cmdObj,
+                                  NamespaceType& ns,
+                                  boost::optional<CollectionOrViewAcquisition>& collectionOrView,
+                                  const std::function<CollectionOrViewAcquisition()>& acquire) {
+    if (OptionalBool::parseFromBSON(cmdObj[DistinctCommandRequest::kRawDataFieldName])) {
+        const auto vts = auth::ValidatedTenancyScope::get(opCtx);
+        const auto serializationContext = vts != boost::none
+            ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
+            : SerializationContext::stateCommandRequest();
+
+        auto [isTimeseriesViewRequest, translatedNs] = timeseries::isTimeseriesViewRequest(
+            opCtx,
+            DistinctCommandRequest::parse(
+                IDLParserContext{"rawData", vts, ns.dbName().tenantId(), serializationContext},
+                cmdObj));
+        if (isTimeseriesViewRequest) {
+            ns = translatedNs;
+            collectionOrView = acquire();
+
+            // Rewrite the command object to use the buckets namespace.
+            BSONObjBuilder builder{cmdObj.objsize()};
+            for (auto&& [fieldName, elem] : cmdObj) {
+                if (fieldName == DistinctCommandRequest::kCommandName) {
+                    builder.append(fieldName, translatedNs.coll());
+                } else {
+                    builder.append(elem);
+                }
+            }
+            return builder.obj();
+        }
+    }
+
+    return cmdObj;
+}
 }  // namespace
 
 class DistinctCommand : public BasicCommand {
@@ -390,10 +427,10 @@ public:
                    ExplainOptions::Verbosity verbosity,
                    rpc::ReplyBuilderInterface* replyBuilder) const override {
         const DatabaseName dbName = request.parseDbName();
-        const BSONObj& cmdObj = request.body;
+        const BSONObj& originalCmdObj = request.body;
         // Acquire locks. The RAII object is optional, because in the case of a view, the locks
         // need to be released.
-        const auto nss = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
+        auto nss = CommandHelpers::parseNsCollectionRequired(dbName, originalCmdObj);
 
         AutoStatsTracker tracker(opCtx,
                                  nss,
@@ -402,10 +439,17 @@ public:
                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
                                      .getDatabaseProfileLevel(nss.dbName()));
 
-        const auto acquisitionRequest = CollectionOrViewAcquisitionRequest::fromOpCtx(
-            opCtx, nss, AcquisitionPrerequisites::kRead);
-        boost::optional<CollectionOrViewAcquisition> collectionOrView =
-            acquireCollectionOrViewMaybeLockFree(opCtx, acquisitionRequest);
+        auto acquire = [&] {
+            return acquireCollectionOrViewMaybeLockFree(
+                opCtx,
+                CollectionOrViewAcquisitionRequest::fromOpCtx(
+                    opCtx, nss, AcquisitionPrerequisites::kRead));
+        };
+        boost::optional<CollectionOrViewAcquisition> collectionOrView = acquire();
+
+        auto cmdObj =
+            translateCmdObjForRawData(opCtx, originalCmdObj, nss, collectionOrView, acquire);
+
         const CollatorInterface* defaultCollator = collectionOrView->getCollectionPtr()
             ? collectionOrView->getCollectionPtr()->getDefaultCollator()
             : nullptr;
@@ -484,40 +528,8 @@ public:
         };
         boost::optional<CollectionOrViewAcquisition> collectionOrView = acquire();
 
-        auto cmdObj = [&] {
-            if (OptionalBool::parseFromBSON(
-                    originalCmdObj[DistinctCommandRequest::kRawDataFieldName])) {
-                const auto vts = auth::ValidatedTenancyScope::get(opCtx);
-                const auto serializationContext = vts != boost::none
-                    ? SerializationContext::stateCommandRequest(vts->hasTenantId(),
-                                                                vts->isFromAtlasProxy())
-                    : SerializationContext::stateCommandRequest();
-
-                auto [isTimeseriesViewRequest, ns] = timeseries::isTimeseriesViewRequest(
-                    opCtx,
-                    DistinctCommandRequest::parse(
-                        IDLParserContext{
-                            "rawData", vts, nssOrUUID.dbName().tenantId(), serializationContext},
-                        originalCmdObj));
-                if (isTimeseriesViewRequest) {
-                    nssOrUUID = ns;
-                    collectionOrView = acquire();
-
-                    // Rewrite the command object to use the buckets namespace.
-                    BSONObjBuilder builder{originalCmdObj.objsize()};
-                    for (auto&& [fieldName, elem] : originalCmdObj) {
-                        if (fieldName == DistinctCommandRequest::kCommandName) {
-                            builder.append(fieldName, ns.coll());
-                        } else {
-                            builder.append(elem);
-                        }
-                    }
-                    return builder.obj();
-                }
-            }
-
-            return originalCmdObj;
-        }();
+        auto cmdObj =
+            translateCmdObjForRawData(opCtx, originalCmdObj, nssOrUUID, collectionOrView, acquire);
         const auto nss = collectionOrView->nss();
 
         if (!tracker) {

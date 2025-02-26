@@ -6,6 +6,7 @@
  *   # incomplete results if interrupted by a stepdown.
  *   does_not_support_stepdowns,
  *   featureFlagRawDataCrudOperations,
+ *   known_query_shape_computation_problem,  # TODO (SERVER-101293): Remove this tag.
  *   requires_timeseries,
  * ]
  */
@@ -43,5 +44,5 @@ const assertExplain = function(explain) {
 
 assertExplain(bucketsColl.explain().aggregate([{$match: {"control.count": 2}}]));
 assertExplain(coll.explain().count({"control.count": 2}, {rawData: true}));
-assertExplain(bucketsColl.explain().distinct("control.count"));
+assertExplain(coll.explain().distinct("control.count", {}, {rawData: true}));
 assertExplain(bucketsColl.explain().find({"control.count": 2}).finish());
