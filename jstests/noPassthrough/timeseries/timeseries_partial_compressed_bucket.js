@@ -59,21 +59,20 @@ assert.eq(stats.timeseries.numBucketsFrozen, 1, tojson(stats.timeseries));
 assert.eq(stats.timeseries.numBucketQueriesFailed, 0, tojson(stats.timeseries));
 assert.eq(stats.timeseries.numBucketReopeningsFailed, 1, tojson(stats.timeseries));
 
-jsTestLog(
-    "Replace compressed data field with an uncompressed field, thus corrupting a compressed bucket.");
+jsTestLog("Remove the newly created bucket, so it will not be present for the next insert.");
 bucketId = bucketsColl.find({"control.min.a": 2})[0]._id;
-res = assert.commandWorked(bucketsColl.updateOne({_id: bucketId}, {$set: {"data.b": {"0": 1}}}));
-assert.eq(res.modifiedCount, 1);
+res = assert.commandWorked(bucketsColl.deleteOne({_id: bucketId}));
+assert.eq(res.deletedCount, 1);
 
 jsTestLog(
-    "Insert fourth measurement. This will attempt to re-open the second corrupted bucket, but should then freeze it and insert into a new bucket.");
+    "Insert fourth measurement. This will attempt to re-open the same corrupted bucket which is already frozen. It will insert into a new bucket.");
 assert.commandWorked(coll.insert(measurements[3]));
 
 stats = assert.commandWorked(coll.stats());
 assert.eq(stats.timeseries.numBucketInserts, 4, tojson(stats.timeseries));
 assert.eq(stats.timeseries.numCommits, 4, tojson(stats.timeseries));
 assert.eq(stats.timeseries.numBucketsReopened, 0, tojson(stats.timeseries));
-assert.eq(stats.timeseries.numBucketsFrozen, 2, tojson(stats.timeseries));
+assert.eq(stats.timeseries.numBucketsFrozen, 1, tojson(stats.timeseries));
 assert.eq(stats.timeseries.numBucketQueriesFailed, 0, tojson(stats.timeseries));
 assert.eq(stats.timeseries.numBucketReopeningsFailed, 2, tojson(stats.timeseries));
 

@@ -1656,8 +1656,14 @@ TEST_F(BucketCatalogTest, ReopenClosedBuckets) {
                     "b":{"0":1,"1":2,"2":3}}})");
         BSONObj compressedClosedBucketDoc = _getCompressedBucketDoc(closedBucket);
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), compressedClosedBucketDoc));
+        auto bucketStates = _bucketCatalog->bucketStateRegistry.bucketStates;
+        ASSERT_EQ(1, bucketStates.size());
+        ASSERT(isBucketStateFrozen(bucketStates.begin()->second));
     }
+}
 
+TEST_F(BucketCatalogTest, ReopenNotClosedBuckets) {
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
     {
         // control.closed: false
         BSONObj openBucket = ::mongo::fromjson(
@@ -1672,6 +1678,10 @@ TEST_F(BucketCatalogTest, ReopenClosedBuckets) {
                     "b":{"0":1,"1":2,"2":3}}})");
         BSONObj compressedOpenBucketDoc = _getCompressedBucketDoc(openBucket);
         ASSERT_OK(_reopenBucket(autoColl.getCollection(), compressedOpenBucketDoc));
+        auto bucketStates = _bucketCatalog->bucketStateRegistry.bucketStates;
+        ASSERT_EQ(1, bucketStates.size());
+        ASSERT(std::holds_alternative<BucketState>(bucketStates.begin()->second));
+        ASSERT_EQ(BucketState::kNormal, std::get<BucketState>(bucketStates.begin()->second));
     }
 
     {
@@ -1687,6 +1697,10 @@ TEST_F(BucketCatalogTest, ReopenClosedBuckets) {
                     "b":{"0":1,"1":2,"2":3}}})");
         BSONObj compressedOpenBucketDoc = _getCompressedBucketDoc(openBucket);
         ASSERT_OK(_reopenBucket(autoColl.getCollection(), compressedOpenBucketDoc));
+        auto bucketStates = _bucketCatalog->bucketStateRegistry.bucketStates;
+        ASSERT_EQ(1, bucketStates.size());
+        ASSERT(std::holds_alternative<BucketState>(bucketStates.begin()->second));
+        ASSERT_EQ(BucketState::kNormal, std::get<BucketState>(bucketStates.begin()->second));
     }
 }
 
@@ -1912,7 +1926,14 @@ TEST_F(BucketCatalogTest, RehydrateClosedBuckets) {
                     "b":{"0":1,"1":2,"2":3}}})");
         BSONObj compressedClosedBucketDoc = _getCompressedBucketDoc(closedBucket);
         ASSERT_NOT_OK(_testRehydrateBucket(autoColl.getCollection(), compressedClosedBucketDoc));
+        auto bucketStates = _bucketCatalog->bucketStateRegistry.bucketStates;
+        ASSERT_EQ(1, bucketStates.size());
+        ASSERT(isBucketStateFrozen(bucketStates.begin()->second));
     }
+}
+
+TEST_F(BucketCatalogTest, RehydrateNotClosedBuckets) {
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
 
     {
         // control.closed: false

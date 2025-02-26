@@ -540,19 +540,6 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(
                 str::stream() << kBucketIdFieldName << " is missing or not an ObjectId"};
     }
 
-    // Validate the bucket document against the schema.
-    auto result = validator(bucketDoc);
-    if (result.first != Collection::SchemaValidationResult::kPass) {
-        return result.second;
-    }
-
-    auto controlField = bucketDoc.getObjectField(kBucketControlFieldName);
-    auto closedElem = controlField.getField(kBucketControlClosedFieldName);
-    if (closedElem.booleanSafe()) {
-        return {ErrorCodes::BadValue,
-                "Bucket has been marked closed and is not eligible for reopening"};
-    }
-
     BSONElement metadata;
     const auto& options = insertContext.options;
     auto metaFieldName = options.getMetaField();
@@ -571,10 +558,38 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(
         return {ErrorCodes::BadValue, "Bucket metadata does not match (hash collision)"};
     }
 
+    BucketId bucketId{key.collectionUUID, bucketIdElem.OID(), key.signature()};
+    {
+        auto& bucketStateRegistry = catalog.bucketStateRegistry;
+        stdx::lock_guard catalogLock{bucketStateRegistry.mutex};
+
+        auto it = bucketStateRegistry.bucketStates.find(bucketId);
+        if (it != bucketStateRegistry.bucketStates.end() && isBucketStateFrozen(it->second)) {
+            return {ErrorCodes::BadValue,
+                    "Bucket has been marked frozen and is not eligible for reopening"};
+        }
+    }
+
+    ScopeGuard freezeBucketOnError(
+        [&catalog, &bucketId] { timeseries::bucket_catalog::freeze(catalog, bucketId); });
+
+    // Validate the bucket document against the schema.
+    auto result = validator(bucketDoc);
+    if (result.first != Collection::SchemaValidationResult::kPass) {
+        return result.second;
+    }
+
+    auto controlField = bucketDoc.getObjectField(kBucketControlFieldName);
+    auto closedElem = controlField.getField(kBucketControlClosedFieldName);
+    if (closedElem.booleanSafe()) {
+        return {ErrorCodes::BadValue,
+                "Bucket has been marked closed and is not eligible for reopening"};
+    }
+
     auto minTime = controlField.getObjectField(kBucketControlMinFieldName)
                        .getField(options.getTimeField())
                        .Date();
-    BucketId bucketId{key.collectionUUID, bucketIdElem.OID(), key.signature()};
+
     tracking::unique_ptr<Bucket> bucket = tracking::make_unique<Bucket>(
         getTrackingContext(catalog.trackingContexts, TrackingScope::kOpenBucketsById),
         catalog.trackingContexts,
@@ -648,13 +663,13 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(
                                   base64::encode(bucketDoc.objdata(), bucketDoc.objsize()));
 
         invariant(!TestingProctor::instance().isEnabled());
-        timeseries::bucket_catalog::freeze(catalog, bucketId);
         return Status(BucketCompressionFailure(
                           insertContext.key.collectionUUID, bucketId.oid, bucketId.keySignature),
                       ex.reason());
     }
 
     updateStatsOnError.dismiss();
+    freezeBucketOnError.dismiss();
     return {std::move(bucket)};
 }
 
