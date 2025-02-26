@@ -336,7 +336,15 @@ void convertToCapped(OperationContext* opCtx,
         // Return if the collection is already capped with the given UUID.
         if (sourceAcq.exists() && (sourceAcq.uuid() == targetUUID) &&
             sourceAcq.getCollectionPtr()->isCapped()) {
-            invariant(sourceAcq.getCollectionPtr()->getCappedMaxSize() == size);
+            auto actualSize = sourceAcq.getCollectionPtr()->getCappedMaxSize();
+            tassert(10050600,
+                    fmt::format("Found a capped collection at namespace {} with UUID {}, "
+                                "but it has size {} instead of {}",
+                                ns.toStringForErrorMsg(),
+                                targetUUID->toString(),
+                                size,
+                                actualSize),
+                    actualSize == size);
             return;
         }
 
@@ -344,7 +352,11 @@ void convertToCapped(OperationContext* opCtx,
             // A previous execution left an existing temporary collection with the given targetUUID.
             // In that case let's drop the temporary collection to be able to proceed with the
             // creation of a new one.
-            invariant(leftoverAcq->exists() && leftoverAcq->getCollectionPtr()->isTemporary());
+            invariant(leftoverAcq->exists());
+            tassert(10050601,
+                    fmt::format("Expected leftover capped collection with UUID {} to be temporary",
+                                targetUUID->toString()),
+                    leftoverAcq->getCollectionPtr()->isTemporary());
             DropReply unused;
             uassertStatusOK(
                 dropCollection(opCtx,
