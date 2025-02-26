@@ -334,7 +334,7 @@ CEResult CardinalityEstimator::estimate(const MatchExpression* node, const bool 
             break;
         case MatchExpression::ELEM_MATCH_OBJECT:
             // TODO SERVER-100293
-            return Status(ErrorCodes::UnsupportedCbrNode, "elemMatchObject supported");
+            return Status(ErrorCodes::UnsupportedCbrNode, "elemMatchObject not supported");
         case MatchExpression::INTERNAL_SCHEMA_XOR:
             ceRes =
                 estimate(static_cast<const InternalSchemaXorMatchExpression*>(node), isFilterRoot);
@@ -604,10 +604,10 @@ CEResult CardinalityEstimator::indexUnionCard(const T* node) {
         if (!ceRes.isOK()) {
             return ceRes;
         }
+        popSelectivities(selOffset);
         if (ceRes.getValue() == zeroCE) {
             continue;
         }
-        popSelectivities(selOffset);
         disjSels.emplace_back(ceRes.getValue() / _inputCard);
     }
     if (!disjSels.empty()) {

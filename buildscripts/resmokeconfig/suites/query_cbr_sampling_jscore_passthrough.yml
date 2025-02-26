@@ -34,8 +34,6 @@ selector:
     # Asserts on output of allPlansExecution. CBR picks a single plan so there is no multiplanning.
     - jstests/core/query/explain/explain_winning_plan.js
 
-    # TODO SERVER-100144
-    - jstests/core/query/elemmatch/elemmatch_or_pushdown.js
     - jstests/core/query/index_correctness_pbt.js
     - jstests/core/query/run_all_plans_pbt.js
     # TODO SERVER-100417

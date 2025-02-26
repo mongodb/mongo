@@ -6,6 +6,7 @@ import {
     canonicalizePlan,
     getExecutionStats,
     getPlanStage,
+    getPlanStages,
     getRejectedPlans,
     getWinningPlanFromExplain,
     isCollscan
@@ -273,6 +274,27 @@ function verifyHeuristicEstimateSource() {
     assert.eq(w1.estimatesMetadata.ceSource, "Heuristics", w1);
 }
 
+function verifyFetchOverFetchDoesNotAssert() {
+    coll.drop();
+    assert.commandWorked(coll.insert({_id: 1}));
+    assert.commandWorked(coll.createIndex({a: 1, 'b.c': 1}));
+
+    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "heuristicCE"}));
+
+    const explain =
+        coll.find({a: 1, $or: [{a: 2}, {b: {$elemMatch: {$or: [{c: 4}, {c: 5}]}}}]}).explain();
+    // At least one plan should contain a FETCH over FETCH stages and that should not raise an
+    // assertion in FETCH's cardinality estimation.
+    let foundFetchOverFetch = false;
+    [getWinningPlanFromExplain(explain), ...getRejectedPlans(explain)].forEach(plan => {
+        const fetches = getPlanStages(plan, "FETCH");
+        if (fetches.length > 1) {
+            foundFetchOverFetch = true;
+        }
+    });
+    assert.eq(foundFetchOverFetch, true);
+}
+
 try {
     for (const q of queries) {
         checkWinningPlan({query: q});
@@ -298,6 +320,7 @@ try {
 
     verifyCollectionCardinalityEstimate();
     verifyHeuristicEstimateSource();
+    verifyFetchOverFetchDoesNotAssert();
 
     /**
      * Test strict and automatic CE modes.
