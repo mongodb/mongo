@@ -92,14 +92,6 @@ __wt_txn_err_set(WT_SESSION_IMPL *session, int ret)
 
     /* The transaction has to be rolled back. */
     F_SET(txn, WT_TXN_ERROR);
-
-    /*
-     * Check for a prepared transaction, and quit: we can't ignore the error and we can't roll back
-     * a prepared transaction.
-     */
-    if (F_ISSET(txn, WT_TXN_PREPARE))
-        WT_IGNORE_RET(__wt_panic(session, ret,
-          "transactional error logged after transaction was prepared, failing the system"));
 }
 
 /*

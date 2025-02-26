@@ -759,6 +759,10 @@ __wt_txn_reconfigure(WT_SESSION_IMPL *session, const char *config)
     txn = session->txn;
 
     ret = __wt_config_getones(session, config, "isolation", &cval);
+    if (ret == 0)
+        /* Can only reconfigure this if transaction is not active. */
+        WT_RET(__wt_txn_context_check(session, false));
+
     if (ret == 0 && cval.len != 0) {
         session->isolation = txn->isolation = WT_CONFIG_LIT_MATCH("snapshot", cval) ?
                                                           WT_ISO_SNAPSHOT :

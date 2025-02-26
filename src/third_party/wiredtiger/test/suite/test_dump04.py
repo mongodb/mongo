@@ -26,6 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+import json
 import wttest
 from suite_subprocess import suite_subprocess
 
@@ -67,6 +68,12 @@ class test_dump04(wttest.WiredTigerTestCase, suite_subprocess):
         for (k, v) in self.dict.items():
             self.check_key_value(not key or k == key, self.format_string(json, True, k), self.format_string(json, False, v))
 
+    # Check that the output file contains valid json by attempting to load it into a dictionary.
+    # This will throw an exception if the json file is invalid.
+    def check_valid_jason(self):
+        with open(self.output, 'r') as file:
+            data = json.load(file)
+
     def run_test(self, json, key):
         args = ["dump"]
         if json:
@@ -77,6 +84,9 @@ class test_dump04(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(args, outfilename=self.output)
 
         self.check_file(json, key)
+
+        if json:
+            self.check_valid_jason()
 
     def test_dump(self):
         self.session.create(self.uri, self.create_params)

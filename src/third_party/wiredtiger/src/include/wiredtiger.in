@@ -852,8 +852,8 @@ struct __wt_session {
      *
      * Only configurations listed in the method arguments are modified, other configurations
      * remain in their current state. This method additionally resets the cursors associated
-     * with the session. WT_SESSION::reconfigure will fail if a transaction is in progress in
-     * the session.
+     * with the session. Transaction-related configurations can only be modified when no transaction
+     * is active.
      *
      * @snippet ex_all.c Reconfigure a session
      *
@@ -4081,69 +4081,63 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp)
  */
 #define	WT_BACKGROUND_COMPACT_ALREADY_RUNNING	(-32001)
 /*!
- * Max capacity of configured sessions reached.
- * This sub-level error returns when the user has created more than the maximum
- * number of sessions configured (including internal sessions).
- */
-#define	WT_SESSION_MAX	(-32002)
-/*!
  * Cache capacity has overflown.
  * This sub-level error indicates that the configured cache has exceeded full
  * capacity.
  */
-#define	WT_CACHE_OVERFLOW	(-32003)
+#define	WT_CACHE_OVERFLOW	(-32002)
 /*!
  * Write conflict between concurrent operations.
  * This sub-level error indicates that there is a write conflict on the same
  * page between concurrent operations.
  */
-#define	WT_WRITE_CONFLICT	(-32004)
+#define	WT_WRITE_CONFLICT	(-32003)
 /*!
  * Transaction has the oldest pinned transaction ID.
  * This sub-level error indicates that a given transaction has the oldest
  * transaction ID and needs to be rolled back.
  */
-#define	WT_OLDEST_FOR_EVICTION	(-32005)
+#define	WT_OLDEST_FOR_EVICTION	(-32004)
 /*!
  * Conflict performing operation due to running backup.
  * This sub-level error indicates that there is conflict perform the operation
  * because of a running backup in the system.
  */
-#define	WT_CONFLICT_BACKUP	(-32006)
+#define	WT_CONFLICT_BACKUP	(-32005)
 /*!
  * Another thread currently holds the data handle of the table.
  * This sub-level error indicates that a concurrent operation is holding the
  * data handle of the table.
  */
-#define	WT_CONFLICT_DHANDLE	(-32007)
+#define	WT_CONFLICT_DHANDLE	(-32006)
 /*!
  * Conflict performing schema operation.
  * This sub-level error indicates that a concurrent operation is performing a
  * schema type operation or currently holds the schema lock.
  */
-#define	WT_CONFLICT_SCHEMA_LOCK	(-32008)
+#define	WT_CONFLICT_SCHEMA_LOCK	(-32007)
 /*!
  * Table has uncommitted data.
  * This sub-level error returns when the table has uncommitted data.
  */
-#define	WT_UNCOMMITTED_DATA	(-32009)
+#define	WT_UNCOMMITTED_DATA	(-32008)
 /*!
  * Table has dirty data.
  * This sub-level error returns when the table has dirty content.
  */
-#define	WT_DIRTY_DATA	(-32010)
+#define	WT_DIRTY_DATA	(-32009)
 /*!
  * Another thread currently holds the table lock.
  * This sub-level error indicates that a concurrent operation is performing a
  * table operation.
  */
-#define	WT_CONFLICT_TABLE_LOCK	(-32011)
+#define	WT_CONFLICT_TABLE_LOCK	(-32010)
 /*!
  * Another thread currently holds the checkpoint lock.
  * This sub-level error indicates that a concurrent operation is performing a
  * checkpoint.
  */
-#define	WT_CONFLICT_CHECKPOINT_LOCK	(-32012)
+#define	WT_CONFLICT_CHECKPOINT_LOCK	(-32011)
 /*
  * Sub-level error return section: END
  * DO NOT EDIT: automatically built by dist/api_err.py.

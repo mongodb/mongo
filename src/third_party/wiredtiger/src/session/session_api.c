@@ -573,10 +573,8 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
     WT_SESSION_IMPL *session;
 
     session = (WT_SESSION_IMPL *)wt_session;
-    SESSION_API_CALL_PREPARE_NOT_ALLOWED(session, ret, reconfigure, config, cfg);
+    SESSION_API_CALL_PREPARE_ALLOWED(session, reconfigure, config, cfg);
     WT_UNUSED(cfg);
-
-    WT_ERR(__wt_txn_context_check(session, false));
 
     WT_ERR(__wt_session_reset_cursors(session, false));
 
@@ -584,7 +582,15 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
      * Note that this method only checks keys that are passed in by the application: we don't want
      * to reset other session settings to their default values.
      */
-    WT_ERR(__wt_txn_reconfigure(session, config));
+    ret = __wt_txn_reconfigure(session, config);
+    if (ret == EINVAL) {
+        /*
+         * EINVAL is returned iff there is an active transaction and txn is being reconfigured. In
+         * this case, don't want to fail the transaction - same as in SESSION_API_PREPARE_CHECK.
+         */
+        __set_err = false;
+        goto err;
+    }
 
     WT_ERR(__session_config_int(session, config));
 
@@ -1949,6 +1955,14 @@ __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
     F_CLR(session, WT_SESSION_RESOLVING_TXN);
 
 err:
+    /*
+     * Check for a prepared transaction, and quit: we can't ignore the error and we can't roll back
+     * a prepared transaction.
+     */
+    if (ret != 0 && session->txn && F_ISSET(session->txn, WT_TXN_PREPARE))
+        WT_IGNORE_RET(__wt_panic(session, ret,
+          "transactional error logged after transaction was prepared, failing the system"));
+
 #ifdef HAVE_CALL_LOG
     WT_TRET(__wt_call_log_rollback_transaction(session, config, ret));
 #endif

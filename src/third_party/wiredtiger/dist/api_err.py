@@ -146,45 +146,41 @@ sub_errors = [
         "Background compaction is already running", '''
         This sub-level error returns when the user tries to reconfigure background
         compaction while it is already running.'''),
-    Error('WT_SESSION_MAX', -32002,
-        "Max capacity of configured sessions reached", '''
-        This sub-level error returns when the user has created more than the maximum
-        number of sessions configured (including internal sessions).'''),
-    Error('WT_CACHE_OVERFLOW', -32003,
+    Error('WT_CACHE_OVERFLOW', -32002,
         "Cache capacity has overflown", '''
         This sub-level error indicates that the configured cache has exceeded full
         capacity.'''),
-    Error('WT_WRITE_CONFLICT', -32004,
+    Error('WT_WRITE_CONFLICT', -32003,
         "Write conflict between concurrent operations", '''
         This sub-level error indicates that there is a write conflict on the same
         page between concurrent operations.'''),
-    Error('WT_OLDEST_FOR_EVICTION', -32005,
+    Error('WT_OLDEST_FOR_EVICTION', -32004,
         "Transaction has the oldest pinned transaction ID", '''
         This sub-level error indicates that a given transaction has the oldest
         transaction ID and needs to be rolled back.'''),
-    Error('WT_CONFLICT_BACKUP', -32006,
+    Error('WT_CONFLICT_BACKUP', -32005,
         "Conflict performing operation due to running backup", '''
         This sub-level error indicates that there is conflict perform the operation
         because of a running backup in the system.'''),
-    Error('WT_CONFLICT_DHANDLE', -32007,
+    Error('WT_CONFLICT_DHANDLE', -32006,
         "Another thread currently holds the data handle of the table", '''
         This sub-level error indicates that a concurrent operation is holding the data
         handle of the table.'''),
-    Error('WT_CONFLICT_SCHEMA_LOCK', -32008,
+    Error('WT_CONFLICT_SCHEMA_LOCK', -32007,
         "Conflict performing schema operation", '''
         This sub-level error indicates that a concurrent operation is performing a schema
         type operation or currently holds the schema lock.'''),
-    Error('WT_UNCOMMITTED_DATA', -32009,
+    Error('WT_UNCOMMITTED_DATA', -32008,
         "Table has uncommitted data", '''
         This sub-level error returns when the table has uncommitted data.'''),
-    Error('WT_DIRTY_DATA', -32010,
+    Error('WT_DIRTY_DATA', -32009,
         "Table has dirty data", '''
         This sub-level error returns when the table has dirty content.'''),
-    Error('WT_CONFLICT_TABLE_LOCK', -32011,
+    Error('WT_CONFLICT_TABLE_LOCK', -32010,
         "Another thread currently holds the table lock", '''
         This sub-level error indicates that a concurrent operation is performing
         a table operation.'''),
-    Error('WT_CONFLICT_CHECKPOINT_LOCK', -32012,
+    Error('WT_CONFLICT_CHECKPOINT_LOCK', -32011,
         "Another thread currently holds the checkpoint lock", '''
         This sub-level error indicates that a concurrent operation is performing
         a checkpoint.'''),

@@ -42,6 +42,7 @@ function(get_gnu_base_flags flags)
     # FIXME-WT-11788: Remove the following flag once the violation of the standard C11 7.1.3 has
     # been addressed.
     list(APPEND gnu_flags "-Wno-reserved-identifier")
+    list(APPEND gnu_flags "-Wno-switch-default")
     list(APPEND gnu_flags "-Wpacked")
     list(APPEND gnu_flags "-Wpointer-arith")
     list(APPEND gnu_flags "-Wredundant-decls")
@@ -127,6 +128,7 @@ function(get_clang_base_flags flags)
     # FIXME-WT-11788: Remove the following flag once the violation of the standard C11 7.1.3 has
     # been addressed.
     list(APPEND clang_flags "-Wno-reserved-identifier")
+    list(APPEND clang_flags "-Wno-switch-default")
     list(APPEND clang_flags "-Wno-unsafe-buffer-usage")
     list(APPEND clang_flags "-Wno-zero-length-array")
 

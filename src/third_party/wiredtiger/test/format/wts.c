@@ -383,6 +383,25 @@ configure_prefetch(char **p, size_t max)
 }
 
 /*
+ * configure_obsolete_cleanup --
+ *     Configure obsolete cleanup settings.
+ */
+static void
+configure_obsolete_cleanup(char **p, size_t max)
+{
+    CONFIG_APPEND(*p, ",checkpoint_cleanup=[");
+
+    /* Strategy. */
+    if (strcmp(GVS(OBSOLETE_CLEANUP_METHOD), "off") != 0)
+        CONFIG_APPEND(*p, "method=%s", (char *)GVS(OBSOLETE_CLEANUP_METHOD));
+
+    /* Interval. */
+    CONFIG_APPEND(*p, ",wait=%" PRIu32, GV(OBSOLETE_CLEANUP_WAIT));
+
+    CONFIG_APPEND(*p, "]");
+}
+
+/*
  * create_database --
  *     Create a WiredTiger database.
  */
@@ -474,6 +493,9 @@ create_database(const char *home, WT_CONNECTION **connp)
 
     /* Optional prefetch. */
     configure_prefetch(&p, max);
+
+    /* Obsolete cleanup. */
+    configure_obsolete_cleanup(&p, max);
 
 #define EXTENSION_PATH(path) (access((path), R_OK) == 0 ? (path) : "")
 
@@ -669,6 +691,9 @@ wts_open(const char *home, WT_CONNECTION **connp, bool verify_metadata)
 
     /* Optional prefetch. */
     configure_prefetch(&p, max);
+
+    /* Obsolete cleanup. */
+    configure_obsolete_cleanup(&p, max);
 
     /* If in-memory, there's only a single, shared WT_CONNECTION handle. */
     if (GV(RUNS_IN_MEMORY) != 0)

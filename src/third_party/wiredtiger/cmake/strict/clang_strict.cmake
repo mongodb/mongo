@@ -9,6 +9,7 @@ list(APPEND clang_flags "-Weverything")
 list(APPEND clang_flags "-Wno-declaration-after-statement")
 list(APPEND clang_flags "-Wjump-misses-init")
 list(APPEND clang_flags "-Wconditional-uninitialized")
+list(APPEND clang_flags "-Wno-switch-default")
 
 # In code coverage builds inline functions may not be inlined, which can result in additional
 # unused copies of those functions, so the unused-function warning much be turned off.

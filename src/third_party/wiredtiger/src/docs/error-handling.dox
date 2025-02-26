@@ -111,10 +111,6 @@ necessary.
 This sub-level error returns when the user tries to reconfigure background compaction while it is
 already running.
 
-@par \c WT_SESSION_MAX
-This sub-level error returns when the user has created more than the maximum number of sessions
-configured (including internal sessions).
-
 @par \c WT_CACHE_OVERFLOW
 This sub-level error indicates that the configured cache has exceeded full capacity.
 

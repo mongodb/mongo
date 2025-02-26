@@ -37,6 +37,8 @@ import wiredtiger, wttest
 class test_prepare02(wttest.WiredTigerTestCase, suite_subprocess):
 
     def test_prepare_session_operations(self):
+        msg = "/not permitted in a prepared transaction/"
+        msgRunning = "/not permitted in a running transaction/"
 
         # Test the session methods forbidden after the transaction is prepared.
         self.session.create("table:mytable", "key_format=S,value_format=S")
@@ -44,12 +46,14 @@ class test_prepare02(wttest.WiredTigerTestCase, suite_subprocess):
         cursor = self.session.open_cursor("table:mytable", None)
         cursor["key"] = "value"
         self.session.prepare_transaction("prepare_timestamp=2a")
-        msg = "/not permitted in a prepared transaction/"
 
         # The operations are listed in the same order as they are declared in the session structure.
         # WT_SESSION.close permitted.
+        # WT_SESSION.reconfigure permitted.
+        self.session.reconfigure()
+        # WT_SESSION.reconfigure with "isolation" - not permitted.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.session.reconfigure(), msg)
+            lambda:self.session.reconfigure("isolation=snapshot"), msgRunning)
         # WT_SESSION.strerror permitted, but currently broken in the Python API (WT-5399).
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.open_cursor("table:mytable", None), msg)

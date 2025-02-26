@@ -227,6 +227,10 @@ CONFIG configuration_list[] = {
 
 {"logging.remove", "configure log file removal", C_BOOL, 50, 0, 0}
 
+{"obsolete_cleanup.method", "obsolete cleanup strategy", C_IGNORE | C_STRING, 0, 0, 0}
+
+{"obsolete_cleanup.wait", "obsolete cleanup interval in seconds", 0x0, 1, 3600, 100000}
+
 {"ops.alter", "configure table alterations", C_BOOL, 10, 0, 0}
 
 {"ops.compaction", "configure compaction", C_BOOL, 10, 0, 0}

@@ -51,6 +51,16 @@ buildvariants:
     <<: *ubuntu2004-perf-tests-expansions-template
     collection: AllPerfTestsARM64
 
+# FIXME-WT-14152: Enable once LZ4 and snappy compressors are on machines
+#- <<: *perf-tasks-template
+#  name: amazon2023-perf-tests-arm64
+#  display_name: (ARMV9) Amazon Linux 2023 Performance tests (ARM64)
+#  run_on:
+#    - amazon2023-arm64-latest-large-m8g
+#  expansions:
+#    <<: *ubuntu2004-perf-tests-expansions-template
+#    collection: AllPerfTestsARM64
+
 - <<: *perf-tasks-template
   name: ubuntu2004-perf-tests-arm64-only
   display_name: ~ Ubuntu 20.04 Performance tests (ARM64 only)

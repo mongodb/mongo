@@ -8,6 +8,20 @@ application or system failure without impacting performance (although
 the creation of each checkpoint is a relatively heavy-weight operation).
 See @ref durability_log for information on commit-level durability.
 
+Checkpoints can be taken by the application via the WT_SESSION::checkpoint API.
+Alternatively checkpoints can be taken automatically by WiredTiger by
+providing the \c checkpoint configuration to
+::wiredtiger_open. The frequency of automatic checkpoints is controlled by
+two additional API settings: \c wait and \c log_size.
+The \c wait setting defines the interval, in seconds, between the end of the current
+checkpoint and the start of the next checkpoint. The \c log_size setting
+instructs WiredTiger to take a checkpoint when the number of bytes written
+to the log since the last checkpoint exceeds the size threshold. Both configurations
+can be used at the same time and a checkpoint will be taken whenever either
+threshold is met.  If using \c log_size to scheduled automatic checkpoints, we
+recommend the size selected be a multiple of the physical size of the underlying log
+file to more easily support automatic log file removal.
+
 @section checkpoint_snapshot Checkpoints vs. snapshots
 
 Here is a brief explanation of the terms "checkpoint" and "snapshot", as

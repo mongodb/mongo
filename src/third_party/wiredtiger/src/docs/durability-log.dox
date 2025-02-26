@@ -88,17 +88,6 @@ checkpoints bound the time required for recovery to complete after
 application or system failure by limiting the log records that need to
 be processed.
 
-Checkpoints can be done either explicitly by the application or periodically
-based on elapsed time or data size with the \c checkpoint configuration to
-::wiredtiger_open. The period between checkpoint completion and the start of
-a subsequent checkpoint can be set in seconds via \c wait, as the number of
-bytes written to the log since the last checkpoint via \c log_size, or both.
-If both are set then the checkpoint occurs as soon as either threshold has
-occurred and both are reset once the checkpoint is complete.  If using
-\c log_size to scheduled automatic checkpoints, we recommend the size selected
-be a multiple of the physical size of the underlying log file to more easily
-support automatic log file removal.
-
 @section commit_durability_backup Backups
 
 Backups are done using backup cursors (see @ref backup for more information).

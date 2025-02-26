@@ -13,9 +13,10 @@ enabled, will not reclaim any log files.
 Each physical WiredTiger log record represents one or more operations
 in the database.  When a log record represents more than a single
 operation in the database, all of the operations in a log record will
-be part of the same transaction, however, there is no corresponding
-guarantee that all operations in a transaction must appear in the same
-log record.
+be part of the same transaction. Using a log cursor, walking a transaction
+commit log record will return each operation of the transaction in the
+record individually.  If a transaction updates both logged and not logged
+tables, only the operations on the logged tables appear in the record.
 
 The following examples are taken from the complete example program
 @ex_ref{ex_log.c}.

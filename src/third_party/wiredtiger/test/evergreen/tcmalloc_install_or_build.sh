@@ -53,6 +53,25 @@ fi
 # From this point onward: any and all errors are fatal, and will cause the build to FAIL.
 set -e
 
+# Fetch the operating system and hardware architecture to download bazelisk binaries. The bazelisk
+# binary is used to specifically obtain the bazel 7.5.0 version. Note: We do not spport TCMalloc
+# with Windows.
+RUN_OS=$(uname -s)
+ARCH=$(uname -m)
+os=$(echo "$RUN_OS" | tr '[:upper:]' '[:lower:]')
+arch_tag=""
+if [[ $ARCH = "x86_64" ]]; then
+    arch_tag="amd64"
+else
+    arch_tag="arm64"
+fi
+
+BAZELISK_URL="https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-${os}-${arch_tag}"
+curl --retry 5 -L $BAZELISK_URL -sS --max-time 120 --fail --output bazelisk
+chmod 755 bazelisk
+export USE_BAZEL_VERSION="7.5.0"
+./bazelisk
+
 # Download and unpack. Allow a generous 2 minutes for the download to complete.
 curl --retry 5 -L $PATCHED_TGZ_URL -sS --max-time 120 --fail --output ${PATCHED_TGZ}
 rm -rf ${PATCHED_SRC_DIR}
@@ -73,13 +92,9 @@ cc_shared_library(
 )
 EOF
 
+# Install tcmalloc library.
 (cd $PATCHED_SRC_DIR ;
-
- # FIXME-WT-12775 When DEVPROD upgrades to using Bazel 7+, and the corresponding
- # Evergreen sandboxing is fixed. The bazel invocation should be reviewed and
- # hopefully simplified.
- mkdir -p /data/tmp/bazel-working-directory/_main ;
- PATH=/opt/mongodbtoolchain/v4/bin:$PATH bazel build --sandbox_debug --sandbox_writable_path=/data/tmp/bazel-working-directory --sandbox_writable_path=/data/tmp/bazel-working-directory/_main --verbose_failures libtcmalloc )
+ PATH=/opt/mongodbtoolchain/v4/bin:$PATH bazel build --verbose_failures libtcmalloc )
 
 # Package and upload. If the upload fails: fail the WT build, even though
 # there is an available binary. This is to ensure any problem becomes

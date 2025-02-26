@@ -47,8 +47,6 @@ __wt_wiredtiger_error(int error)
         return ("WT_NONE: No additional context");
     case WT_BACKGROUND_COMPACT_ALREADY_RUNNING:
         return ("WT_BACKGROUND_COMPACT_ALREADY_RUNNING: Background compaction is already running");
-    case WT_SESSION_MAX:
-        return ("WT_SESSION_MAX: Max capacity of configured sessions reached");
     case WT_CACHE_OVERFLOW:
         return ("WT_CACHE_OVERFLOW: Cache capacity has overflown");
     case WT_WRITE_CONFLICT:

@@ -181,6 +181,7 @@ eviction. When a page image is written out the block manager the \c bm->write
 API is called. See \c bt_io.c for more detail.
 
 @subsubsection Checkpoint
+\anchor block-checkpoint
 
 For details on checkpoint at the WiredTiger level see: @ref arch-checkpoint "Checkpoint".
 

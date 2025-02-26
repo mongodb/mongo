@@ -224,7 +224,7 @@ functions:
         echo "startup --output_user_root=${workdir}/bazel-output-root" >> ~/.bazelrc
         echo "BAZELISK_HOME=${workdir}/bazelisk_home" >> ~/.bazeliskrc
 
-        bazel build --mongo_toolchain_version=v4 --build_enterprise=False install-mongod
+        bazel build --mongo_toolchain_version=v4 --config=opt --build_enterprise=False install-mongod
   "configure wiredtiger": &configure_wiredtiger
     command: shell.exec
     params:
@@ -277,6 +277,19 @@ functions:
           DEFINED_EVERGREEN_CONFIG_FLAGS=${DEFINED_EVERGREEN_CONFIG_FLAGS/\-DHAVE_BUILTIN_EXTENSION_ZSTD=1/}
         fi
 
+        # FIXME-WT-14152: Enable LZ4 and snappy compressors once installed on machines.
+        if [[ "${build_variant|}" =~ "amazon2023" ]]; then
+          if [[ "$DEFINED_EVERGREEN_CONFIG_FLAGS" =~ (\-DHAVE_BUILTIN_EXTENSION_LZ4=1) ]]; then
+            DEFINED_EVERGREEN_CONFIG_FLAGS=${DEFINED_EVERGREEN_CONFIG_FLAGS/\-DHAVE_BUILTIN_EXTENSION_LZ4=1/}
+          fi
+          if [[ "$DEFINED_EVERGREEN_CONFIG_FLAGS" =~ (\-DHAVE_BUILTIN_EXTENSION_ZSTD=1) ]]; then
+            DEFINED_EVERGREEN_CONFIG_FLAGS=${DEFINED_EVERGREEN_CONFIG_FLAGS/\-DHAVE_BUILTIN_EXTENSION_ZSTD=1/}
+          fi
+          if [[ "$DEFINED_EVERGREEN_CONFIG_FLAGS" =~ (\-DHAVE_BUILTIN_EXTENSION_SNAPPY=1) ]]; then
+            DEFINED_EVERGREEN_CONFIG_FLAGS=${DEFINED_EVERGREEN_CONFIG_FLAGS/\-DHAVE_BUILTIN_EXTENSION_SNAPPY=1/}
+          fi
+        fi
+
         if [[ "${build_variant|}" =~ "macos-14" ]]; then
           # For mac builds, we want explicitly tell cmake which python to use, as
           # well as the matching library directory and header files. The find_libpython
@@ -318,6 +331,18 @@ functions:
           powershell.exe  -NonInteractive '.\test\evergreen\build_windows.ps1' -configure 1 $DEFINED_EVERGREEN_CONFIG_FLAGS ${windows_configure_flags|}
         else
           echo "Using config flags $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|}"
+
+          SWIG_VERSION=$(swig -version | awk '/SWIG Version/ {print $3}')
+
+          if [[ "$(printf '%s\n' "4.0.0" "$SWIG_VERSION" | sort -V | head -n1)" == "4.0.0" ]]; then
+              echo "SWIG version $SWIG_VERSION is 4.0 or later."
+          else
+              echo "SWIG version $SWIG_VERSION is earlier than 4.0. Installing a newer version ..."
+              python3 -mvenv venv
+              source venv/bin/activate
+              pip3 install swig==4.2.1
+              swig -version
+          fi
 
           if [[ ${ENABLE_TCMALLOC|0} -eq 1 ]]; then
             # Preclude use of tcmalloc with sanitizer builds.
@@ -1329,6 +1354,11 @@ variables:
       ENABLE_TCMALLOC: 0
     tasks:
       - name: compile
+        # This is a special case and should *only* be used for the macOS buildvariant.
+        # The macOS variant can take up to an hour to schedule tasks, but we want PR testing to complete
+        # in under 30 minutes. The compile task also only takes 2 minutes to run so we can bump up priority
+        # with minimal impact on other projects.
+        priority: 5
       - name: make-check-test
       # Use a special version of unit-test for macOS that checks for Python version consistency.
       - name: unit-test-macos
@@ -6043,3 +6073,158 @@ buildvariants:
     - name: unit-test
     - name: unit-test-extra-long
       distros: amazon2-arm64-large
+
+- name: amazon2023-armv9-release-nonstandalone
+  display_name: (ARMV9) Amazon 2023 (ARM64, Release Build, Non-standalone)
+  run_on:
+  - amazon2023-arm64-latest-small-m8g
+  expansions:
+    ENABLE_TCMALLOC: 0
+    CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=RelWithDebInfo
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+    NONSTANDALONE: -DWT_STANDALONE_BUILD=0
+    unit_test_variant_args: "--hook nonstandalone"
+  tasks:
+    - name: ".stress-test-1"
+      distros: amazon2023-arm64-latest-large-m8g
+    - name: ".stress-test-2"
+      distros: amazon2023-arm64-latest-large-m8g
+    - name: format-abort-recovery-stress-test
+      distros: amazon2023-arm64-latest-large-m8g
+    - name: compile
+    - name: make-check-test
+    - name: unit-test
+    - name: unit-test-extra-long
+      distros: amazon2023-arm64-latest-large-m8g
+
+- name: amazon2023-armv9-nonstandalone
+  display_name: (ARMV9) Amazon Linux 2023 (ARM64, Non-standalone)
+  run_on:
+  - amazon2023-arm64-latest-large-m8g
+  expansions:
+    ENABLE_TCMALLOC: 0
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+    NONSTANDALONE: -DWT_STANDALONE_BUILD=0
+    unit_test_variant_args: "--hook nonstandalone"
+  tasks:
+    - name: compile
+      distros: amazon2023-arm64-latest-small-m8g
+    - name: make-check-test
+      distros: amazon2023-arm64-latest-small-m8g
+    - name: unit-test
+      distros: amazon2023-arm64-latest-small-m8g
+    - name: unit-test-extra-long
+    - name: ".stress-test-1"
+    - name: ".stress-test-2"
+    - name: ".stress-test-3"
+    - name: ".stress-test-4"
+    - name: ".stress-test-no-barrier"
+    - name: format-abort-recovery-stress-test
+    # FIXME-WT-14152: Enable stress tests that require snappy compressors
+    - name: ".cppsuite-stress-test !cppsuite-burst-inserts-stress !cppsuite-hs-cleanup-stress !cppsuite-operations-test-stress !cppsuite-reverse-split-stress"
+      batchtime: 720 # 12 hours
+
+- name: amazon2023-release-armv9
+  display_name: "(ARMV9) Amazon 2023 (ARM64, Release Build)"
+  run_on:
+  - amazon2023-arm64-latest-small-m8g
+  batchtime: 720 # 12 hours
+  expansions:
+    ENABLE_TCMALLOC: 0
+    CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=RelWithDebInfo
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
+  tasks:
+    - name: compile
+    - name: make-check-test
+    - name: unit-test
+    - name: format-smoke-test
+    - name: fops
+    - name: checkpoint-filetypes-test
+    - name: unit-test-zstd
+    - name: spinlock-gcc-test
+    - name: spinlock-pthread-adaptive-test
+      distros: amazon2023-arm64-latest-large-m8g
+    - name: long-test
+      distros: amazon2023-arm64-latest-large-m8g
+    - name: format-smoke-test
+    - name: s3-tiered-storage-extensions-test
+
+- name: amazon2023-armv9
+  display_name: "(ARMV9) Amazon Linux 2023 ARM64"
+  run_on:
+  - amazon2023-arm64-latest-small-m8g
+  batchtime: 1440 # 24 hours
+  expansions:
+    ENABLE_TCMALLOC: 0
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
+  tasks:
+    # FIXME-WT-14152: Enable once LZ4 and snappy compressors are on machines
+    # - name: ".workgen-test"
+    #  batchtime: 1440 # 24 hours
+    - name: checkpoint-filetypes-test
+    - name: chunkcache-test
+    - name: compile
+    - name: fops
+    # FIXME-WT-14152: Enable once LZ4 and snappy compressors are on machines
+    # - name: format-failure-configs-test
+    #  distros: amazon2023-arm64-latest-large-m8g
+    - name: format-smoke-test
+    - name: format-stress-pull-request-test
+    - name: long-test
+      distros: amazon2023-arm64-latest-large-m8g
+    - name: make-check-test
+    - name: memory-model-test
+      batchtime: 40320 # 28 days
+    - name: model-test-failure-workloads
+      batchtime: 1440 # 24 hours
+    - name: model-test-long
+      batchtime: 1440 # once a day
+    - name: model-test-long-with-coverage
+      batchtime: 1440 # once a day
+    - name: model-test-long-random-config
+      batchtime: 1440 # once a day
+    - name: model-unit-test
+    - name: s3-tiered-storage-extensions-test
+    - name: spinlock-gcc-test
+    - name: spinlock-pthread-adaptive-test
+      distros: amazon2023-arm64-latest-large-m8g
+    - name: unit-test
+    - name: unit-test-extra-long
+      distros: amazon2023-arm64-latest-large-m8g
+    - name: unit-test-zstd
+    - name: wtperf-test
+    - name: checkpoint-filetypes-test
+    - name: compile
+    - name: fops
+    # FIXME-WT-14152: Enable once LZ4 and snappy compressors are on machines
+    # - name: format-failure-configs-test
+    #  distros: amazon2023-arm64-latest-large-m8g
+
+- name: cppsuite-stress-tests-armv9
+  display_name: "(ARMV9) Cppsuite Stress Tests ARM64"
+  batchtime: 720 # twice a day
+  run_on:
+  - amazon2023-arm64-latest-large-m8g
+  expansions:
+    ENABLE_TCMALLOC: 0
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+  tasks:
+    - name: compile
+    # FIXME-WT-14152: Enable stress tests that require snappy compressors
+    - name: ".cppsuite-stress-test !cppsuite-burst-inserts-stress !cppsuite-hs-cleanup-stress !cppsuite-operations-test-stress !cppsuite-reverse-split-stress"
+
+- name: amazon2023-stress-tests-armv9
+  display_name: (ARMV9) Amazon2023 Stress tests ARM64
+  run_on:
+  - amazon2023-arm64-latest-large-m8g
+  expansions:
+    ENABLE_TCMALLOC: 0
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+  tasks:
+    - name: ".stress-test-1"
+    - name: ".stress-test-2"
+    - name: ".stress-test-3"
+    - name: ".stress-test-4"
+    - name: ".stress-test-no-barrier"
+    - name: checkpoint-stress-test-tiered
+    - name: format-abort-recovery-stress-test

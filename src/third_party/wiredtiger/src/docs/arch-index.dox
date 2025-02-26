@@ -66,6 +66,7 @@ rectangle "**WiredTiger Engine**                                                
   rectangle "[[arch-snapshot.html Snapshots]]" as snapshot
   rectangle "[[arch-cache.html Cache]]" as cache
   rectangle "[[arch-eviction.html Eviction]]" as evict
+  rectangle "[[arch-checkpoint.html Checkpoint]]" as checkpoint
 
   together {
     rectangle "[[arch-block.html Block\nManager]]" as block
@@ -94,28 +95,33 @@ c_api -down-> txn
 
 schema -down-> meta
 schema -down-> btree
+
 cursor -down-> btree
+cursor -down-> history
+
 btree -down-> row
+
 meta -up-> cursor
-' The hidden arrow helps our boxes to line up in a better way.
-meta -[hidden]right-> btree
-cursor -[hidden]right-> txn
+
 txn -down-> snapshot
-row -down-> cache
-cache -down-> history
-evict -down-> history
-history -up-> cursor
-snapshot -down-> evict
-cache -right-> evict
-cache -down-> block
-evict -down-> block
 txn -down-> log
 
-block -[hidden]right-> SPACE_log
-cache -[hidden]down-> SPACE_log
-evict -[hidden]down-> SPACE_log
-SPACE_log -[hidden]right-> log
-log -[hidden]right-> SPACE_log2
+snapshot -down-> evict
+snapshot -down-> checkpoint
+
+row -down-> cache
+
+cache -right-> evict
+cache -down-> block
+
+evict -down-> history
+evict -down-> block
+
+checkpoint -down-> block
+checkpoint -down-> os
+checkpoint -up-> meta
+checkpoint -down-> btree
+checkpoint -down-> history
 
 block -down-> os
 log -down-> os
