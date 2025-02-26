@@ -51,7 +51,10 @@ const transactionShell = startParallelShell(async function() {
 
 for (let i = 0; i < 2000; ++i) {
     const result = primary.getDB(dbName)[collName].find({x: 1}).toArray();
-    assert([0, 1].includes(result.length), result);
+    // Although there are either 0 or 1 documents in the collection at all times, it's possible
+    // for more than 1 document to show up in the query due to yielding mechanics. See
+    // SERVER-101381 for more information.
+    assert.gte(result.length, 0, result);
 }
 
 assert.commandWorked(primary.getDB(dbName)["stopQueries"].insert({stop: 1}));
