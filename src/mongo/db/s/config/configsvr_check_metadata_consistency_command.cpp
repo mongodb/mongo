@@ -57,7 +57,6 @@
 #include "mongo/db/metadata_consistency_types_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/db/query/plan_executor.h"
@@ -187,8 +186,8 @@ public:
             OperationContext* opCtx,
             const CollectionType& coll,
             std::vector<MetadataInconsistencyItem>& inconsistenciesMerged) {
-            auto chunksInconsistencies = metadata_consistency_util::checkChunksConsistency(
-                opCtx, coll, _getCollectionChunks(opCtx, coll));
+            auto chunksInconsistencies =
+                metadata_consistency_util::checkChunksConsistency(opCtx, coll);
 
             inconsistenciesMerged.insert(inconsistenciesMerged.end(),
                                          std::make_move_iterator(chunksInconsistencies.begin()),
@@ -208,29 +207,6 @@ public:
             inconsistenciesMerged.insert(inconsistenciesMerged.end(),
                                          std::make_move_iterator(zonesInconsistencies.begin()),
                                          std::make_move_iterator(zonesInconsistencies.end()));
-        }
-
-        std::vector<ChunkType> _getCollectionChunks(OperationContext* opCtx,
-                                                    const CollectionType& coll) {
-            auto matchStage = BSON("$match" << BSON(ChunkType::collectionUUID() << coll.getUuid()));
-            static const auto sortStage = BSON("$sort" << BSON(ChunkType::min() << 1));
-
-            AggregateCommandRequest aggRequest{NamespaceString::kConfigsvrChunksNamespace,
-                                               {std::move(matchStage), sortStage}};
-            auto aggResponse =
-                ShardingCatalogManager::get(opCtx)->localCatalogClient()->runCatalogAggregation(
-                    opCtx,
-                    aggRequest,
-                    {repl::ReadConcernLevel::kSnapshotReadConcern},
-                    Milliseconds(gFindChunksOnConfigTimeoutMS.load()));
-
-            std::vector<ChunkType> chunks;
-            chunks.reserve(aggResponse.size());
-            for (auto&& responseEntry : aggResponse) {
-                chunks.emplace_back(uassertStatusOK(ChunkType::parseFromConfigBSON(
-                    responseEntry, coll.getEpoch(), coll.getTimestamp())));
-            }
-            return chunks;
         }
 
         std::vector<TagsType> _getCollectionZones(OperationContext* opCtx,

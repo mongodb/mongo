@@ -62,6 +62,9 @@
 namespace mongo {
 namespace {
 
+const ShardId kShard0{"shard0"};
+const ShardId kShard1{"shard1"};
+
 ChunkType generateChunk(const UUID& collUuid,
                         const ShardId& shardId,
                         const BSONObj& minKey,
@@ -127,8 +130,7 @@ std::vector<CollectionPtr> getLocalCatalogCollections(OperationContext* opCtx,
 
 class MetadataConsistencyTest : public ShardServerTestFixture {
 protected:
-    std::string _shardName = "shard0000";
-    const ShardId _shardId{_shardName};
+    const ShardId _shardId = kShard0;
     const NamespaceString _nss =
         NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
     const DatabaseName _dbName = _nss.dbName();
@@ -143,6 +145,27 @@ protected:
                                           const KeyPattern& keyPattern = KeyPattern(BSON("_id"
                                                                                          << 1))) {
         return CollectionType{nss, OID::gen(), Timestamp(1), Date_t::now(), uuid, keyPattern};
+    }
+
+    void updateConfigChunks(const std::vector<ChunkType>& chunks) {
+        DBDirectClient client(operationContext());
+
+        // Remove all chunks
+        const auto resRemove = client.remove(write_ops::DeleteCommandRequest{
+            NamespaceString::kConfigsvrChunksNamespace,
+            {write_ops::DeleteOpEntry{BSONObj(), true /* multi */}}});
+        write_ops::checkWriteErrors(resRemove);
+
+        // Insert the given chunks
+        if (chunks.size()) {
+            std::vector<BSONObj> docs;
+            for (auto& chunk : chunks) {
+                docs.emplace_back(chunk.toConfigBSON());
+            }
+            const auto resInsert = client.insert(
+                write_ops::InsertCommandRequest{NamespaceString::kConfigsvrChunksNamespace, docs});
+            write_ops::checkWriteErrors(resInsert);
+        }
     }
 
     void assertOneInconsistencyFound(
@@ -189,7 +212,17 @@ protected:
     }
 };
 
-TEST_F(MetadataConsistencyTest, FindRoutingTableRangeGapInconsistency) {
+class MetadataConsistencyConfigTest : public MetadataConsistencyTest {
+protected:
+    void setUp() override {
+        // The ShardingState must be set to 'config' to be able to call
+        // metadata_consistency_util::checkChunksConsistency()
+        kMyShardName = ShardId::kConfigServerId;
+        MetadataConsistencyTest::setUp();
+    }
+};
+
+TEST_F(MetadataConsistencyConfigTest, FindRoutingTableRangeGapInconsistency) {
     const auto chunk1 = generateChunk(_collUuid,
                                       _shardId,
                                       _keyPattern.globalMin(),
@@ -201,43 +234,46 @@ TEST_F(MetadataConsistencyTest, FindRoutingTableRangeGapInconsistency) {
                                       BSON("x" << 1),
                                       _keyPattern.globalMax(),
                                       {ChunkHistory(Timestamp(1, 0), _shardId)});
+    updateConfigChunks({chunk1, chunk2});
 
-    const auto inconsistencies = metadata_consistency_util::checkChunksConsistency(
-        operationContext(), _coll, {chunk1, chunk2});
+    const auto inconsistencies =
+        metadata_consistency_util::checkChunksConsistency(operationContext(), _coll);
 
     assertOneInconsistencyFound(MetadataInconsistencyTypeEnum::kRoutingTableRangeGap,
                                 inconsistencies);
 }
 
-TEST_F(MetadataConsistencyTest, FindMissingChunkWithMaxKeyInconsistency) {
+TEST_F(MetadataConsistencyConfigTest, FindMissingChunkWithMaxKeyInconsistency) {
     const auto chunk = generateChunk(_collUuid,
                                      _shardId,
                                      _keyPattern.globalMin(),
                                      BSON("x" << 0),
                                      {ChunkHistory(Timestamp(1, 0), _shardId)});
+    updateConfigChunks({chunk});
 
     const auto inconsistencies =
-        metadata_consistency_util::checkChunksConsistency(operationContext(), _coll, {chunk});
+        metadata_consistency_util::checkChunksConsistency(operationContext(), _coll);
 
     assertOneInconsistencyFound(MetadataInconsistencyTypeEnum::kRoutingTableMissingMaxKey,
                                 inconsistencies);
 }
 
-TEST_F(MetadataConsistencyTest, FindMissingChunkWithMinKeyInconsistency) {
+TEST_F(MetadataConsistencyConfigTest, FindMissingChunkWithMinKeyInconsistency) {
     const auto chunk = generateChunk(_collUuid,
                                      _shardId,
                                      BSON("x" << 0),
                                      _keyPattern.globalMax(),
                                      {ChunkHistory(Timestamp(1, 0), _shardId)});
+    updateConfigChunks({chunk});
 
     const auto inconsistencies =
-        metadata_consistency_util::checkChunksConsistency(operationContext(), _coll, {chunk});
+        metadata_consistency_util::checkChunksConsistency(operationContext(), _coll);
 
     assertOneInconsistencyFound(MetadataInconsistencyTypeEnum::kRoutingTableMissingMinKey,
                                 inconsistencies);
 }
 
-TEST_F(MetadataConsistencyTest, FindRoutingTableRangeOverlapInconsistency) {
+TEST_F(MetadataConsistencyConfigTest, FindRoutingTableRangeOverlapInconsistency) {
     const auto chunk1 = generateChunk(_collUuid,
                                       _shardId,
                                       _keyPattern.globalMin(),
@@ -249,15 +285,16 @@ TEST_F(MetadataConsistencyTest, FindRoutingTableRangeOverlapInconsistency) {
                                       BSON("x" << -10),
                                       _keyPattern.globalMax(),
                                       {ChunkHistory(Timestamp(1, 0), _shardId)});
+    updateConfigChunks({chunk1, chunk2});
 
-    const auto inconsistencies = metadata_consistency_util::checkChunksConsistency(
-        operationContext(), _coll, {chunk1, chunk2});
+    const auto inconsistencies =
+        metadata_consistency_util::checkChunksConsistency(operationContext(), _coll);
 
     assertOneInconsistencyFound(MetadataInconsistencyTypeEnum::kRoutingTableRangeOverlap,
                                 inconsistencies);
 }
 
-TEST_F(MetadataConsistencyTest, FindCorruptedChunkShardKeyInconsistency) {
+TEST_F(MetadataConsistencyConfigTest, FindCorruptedChunkShardKeyInconsistency) {
     const auto chunk1 = generateChunk(_collUuid,
                                       _shardId,
                                       _keyPattern.globalMin(),
@@ -269,16 +306,17 @@ TEST_F(MetadataConsistencyTest, FindCorruptedChunkShardKeyInconsistency) {
                                       BSON("y" << 0),
                                       _keyPattern.globalMax(),
                                       {ChunkHistory(Timestamp(1, 0), _shardId)});
+    updateConfigChunks({chunk1, chunk2});
 
-    const auto inconsistencies = metadata_consistency_util::checkChunksConsistency(
-        operationContext(), _coll, {chunk1, chunk2});
+    const auto inconsistencies =
+        metadata_consistency_util::checkChunksConsistency(operationContext(), _coll);
 
     ASSERT_EQ(2, inconsistencies.size());
     ASSERT_EQ(MetadataInconsistencyTypeEnum::kCorruptedChunkShardKey, inconsistencies[0].getType());
     ASSERT_EQ(MetadataInconsistencyTypeEnum::kRoutingTableRangeGap, inconsistencies[1].getType());
 }
 
-TEST_F(MetadataConsistencyTest, FindCorruptedZoneShardKeyInconsistency) {
+TEST_F(MetadataConsistencyConfigTest, FindCorruptedZoneShardKeyInconsistency) {
     const auto zone1 = generateZone(_nss, _keyPattern.globalMin(), BSON("x" << 0));
 
     const auto zone2 = generateZone(_nss, BSON("y" << 0), _keyPattern.globalMax());
@@ -290,7 +328,7 @@ TEST_F(MetadataConsistencyTest, FindCorruptedZoneShardKeyInconsistency) {
                                 inconsistencies);
 }
 
-TEST_F(MetadataConsistencyTest, FindZoneRangeOverlapInconsistency) {
+TEST_F(MetadataConsistencyConfigTest, FindZoneRangeOverlapInconsistency) {
     const auto zone1 = generateZone(_nss, _keyPattern.globalMin(), BSON("x" << 0));
 
     const auto zone2 = generateZone(_nss, BSON("x" << -10), _keyPattern.globalMax());
@@ -301,7 +339,7 @@ TEST_F(MetadataConsistencyTest, FindZoneRangeOverlapInconsistency) {
     assertOneInconsistencyFound(MetadataInconsistencyTypeEnum::kZonesRangeOverlap, inconsistencies);
 }
 
-TEST_F(MetadataConsistencyTest, FindCorruptedShardKeyInconsistencyForUnsplittableCollection) {
+TEST_F(MetadataConsistencyConfigTest, FindCorruptedShardKeyInconsistencyForUnsplittableCollection) {
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("TestDB", "TestCollUnsplittable");
     const UUID collUuid = UUID::gen();
@@ -673,15 +711,9 @@ TEST_F(MetadataConsistencyTest, FindInconsistentDurableDatabaseMetadataInShard) 
         inconsistencies);
 }
 
-class MetadataConsistencyRandomRoutingTableTest : public ShardServerTestFixture {
+class MetadataConsistencyRandomRoutingTableTest : public MetadataConsistencyConfigTest {
 protected:
-    const NamespaceString _nss =
-        NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
-    const UUID _collUuid = UUID::gen();
-    const KeyPattern _keyPattern{BSON("x" << 1)};
-    const CollectionType _coll{
-        _nss, OID::gen(), Timestamp(1), Date_t::now(), _collUuid, _keyPattern};
-    inline const static auto _shards = std::vector<ShardId>{ShardId{"shard0"}, ShardId{"shard1"}};
+    inline const static auto _shards = std::vector<ShardId>{kShard0, kShard1};
     PseudoRandom _random{SecureRandom().nextInt64()};
 
     std::vector<ChunkType> getRandomRoutingTable() {
@@ -713,10 +745,11 @@ protected:
  */
 TEST_F(MetadataConsistencyRandomRoutingTableTest, FindRoutingTableRangeGapInconsistency) {
     auto chunks = getRandomRoutingTable();
+    updateConfigChunks(chunks);
 
     // Check that there are no inconsistencies in the routing table
     auto inconsistencies =
-        metadata_consistency_util::checkChunksConsistency(operationContext(), _coll, chunks);
+        metadata_consistency_util::checkChunksConsistency(operationContext(), _coll);
     ASSERT_EQ(0, inconsistencies.size());
 
     // Remove randoms chunk from the routing table
@@ -725,9 +758,9 @@ TEST_F(MetadataConsistencyRandomRoutingTableTest, FindRoutingTableRangeGapIncons
         const auto itChunkToRemove = _random.nextInt64(chunks.size());
         chunks.erase(chunks.begin() + itChunkToRemove);
     }
+    updateConfigChunks(chunks);
 
-    inconsistencies =
-        metadata_consistency_util::checkChunksConsistency(operationContext(), _coll, chunks);
+    inconsistencies = metadata_consistency_util::checkChunksConsistency(operationContext(), _coll);
 
     // Assert that there is at least one gap inconsistency
     try {
@@ -755,10 +788,11 @@ TEST_F(MetadataConsistencyRandomRoutingTableTest, FindRoutingTableRangeGapIncons
  */
 TEST_F(MetadataConsistencyRandomRoutingTableTest, FindRoutingTableRangeOverlapInconsistency) {
     auto chunks = getRandomRoutingTable();
+    updateConfigChunks(chunks);
 
     // Check that there are no inconsistencies in the routing table
     auto inconsistencies =
-        metadata_consistency_util::checkChunksConsistency(operationContext(), _coll, chunks);
+        metadata_consistency_util::checkChunksConsistency(operationContext(), _coll);
     ASSERT_EQ(0, inconsistencies.size());
 
     // If there is only one chunk, we can't introduce an overlap
@@ -772,7 +806,7 @@ TEST_F(MetadataConsistencyRandomRoutingTableTest, FindRoutingTableRangeOverlapIn
     auto overlapMax = [&]() {
         auto newMax = [&] {
             if (_random.nextInt64(10) == 0) {
-                // With 1/10 probability, set min to MinKey
+                // With 1/10 probability, set max to MaxKey
                 return _keyPattern.globalMax();
             } else {
                 // Otherwise, set max to a random value bigger than actual
@@ -811,16 +845,17 @@ TEST_F(MetadataConsistencyRandomRoutingTableTest, FindRoutingTableRangeOverlapIn
         }
     }
 
-    inconsistencies =
-        metadata_consistency_util::checkChunksConsistency(operationContext(), _coll, chunks);
+    updateConfigChunks(chunks);
+    inconsistencies = metadata_consistency_util::checkChunksConsistency(operationContext(), _coll);
 
     // Assert that there is at least one overlap inconsistency
     try {
         ASSERT_LTE(1, inconsistencies.size());
-        for (const auto& inconsistency : inconsistencies) {
-            ASSERT_EQ(MetadataInconsistencyTypeEnum::kRoutingTableRangeOverlap,
-                      inconsistency.getType());
-        }
+        ASSERT_TRUE(std::any_of(
+            inconsistencies.begin(), inconsistencies.end(), [](const auto& inconsistency) {
+                return inconsistency.getType() ==
+                    MetadataInconsistencyTypeEnum::kRoutingTableRangeOverlap;
+            }));
     } catch (...) {
         LOGV2_INFO(7424601,
                    "Expecting overlap inconsistencies",

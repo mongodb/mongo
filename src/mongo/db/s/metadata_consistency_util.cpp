@@ -70,6 +70,7 @@
 #include "mongo/s/query/exec/cluster_query_result.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -381,6 +382,26 @@ std::vector<BSONObj> _runExhaustiveAggregation(OperationContext* opCtx,
         logMetadataInconsistency(nss, e);
     }
     return results;
+}
+
+std::unique_ptr<DBClientCursor> _getCollectionChunksCursor(DBDirectClient* client,
+                                                           const CollectionType& coll) {
+    // Running the following pipeline against 'config.chunks':
+    //    db.chunks.aggregate([{ $match: { 'uuid': <UUID> }},{ $sort: { 'min': 1 }}])
+    return uassertStatusOK(DBClientCursor::fromAggregationRequest(
+        client,
+        std::invoke([&coll] {
+            AggregateCommandRequest aggRequest{
+                NamespaceString::kConfigsvrChunksNamespace,
+                std::vector<mongo::BSONObj>{
+                    BSON("$match" << BSON(ChunkType::collectionUUID() << coll.getUuid())),
+                    BSON("$sort" << BSON(ChunkType::min() << 1))}};
+            aggRequest.setReadConcern(
+                repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern));
+            return aggRequest;
+        }),
+        false /* secondaryOK */,
+        false /* useExhaust */));
 }
 
 std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardLocalCatalog(
@@ -959,30 +980,26 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistencyAcrossS
     return inconsistencies;
 }
 
-std::vector<MetadataInconsistencyItem> checkChunksConsistency(
-    OperationContext* opCtx,
-    const CollectionType& collection,
-    const std::vector<ChunkType>& chunks) {
+std::vector<MetadataInconsistencyItem> checkChunksConsistency(OperationContext* opCtx,
+                                                              const CollectionType& collection) {
+    tassert(9996600,
+            "This method must run on the 'config' server.",
+            ShardingState::get(opCtx)->shardId() == ShardId::kConfigServerId);
+
+    DBDirectClient client{opCtx};
+    const auto chunksCursor = _getCollectionChunksCursor(&client, collection);
+
     const auto& uuid = collection.getUuid();
     const auto& nss = collection.getNss();
     const auto shardKeyPattern = ShardKeyPattern{collection.getKeyPattern()};
-
     std::vector<MetadataInconsistencyItem> inconsistencies;
-    if (collection.getUnsplittable() && chunks.size() > 1) {
-        inconsistencies.emplace_back(makeInconsistency(
-            MetadataInconsistencyTypeEnum::kTrackedUnshardedCollectionHasMultipleChunks,
-            TrackedUnshardedCollectionHasMultipleChunksDetails{
-                nss, collection.getUuid(), int(chunks.size())}));
-    }
+    size_t totalChunks = 0;
+    ChunkType previousChunk, firstChunk;
 
-    auto previousChunk = chunks.begin();
-    for (auto it = chunks.begin(); it != chunks.end(); it++) {
-        const auto& chunk = *it;
-
-        // Skip the first iteration as we need to compare the current chunk with the previous one.
-        if (it == chunks.begin()) {
-            continue;
-        }
+    while (chunksCursor->more()) {
+        const auto chunk = uassertStatusOK(ChunkType::parseFromConfigBSON(
+            chunksCursor->nextSafe(), collection.getEpoch(), collection.getTimestamp()));
+        totalChunks++;
 
         if (!shardKeyPattern.isShardKey(chunk.getMin()) ||
             !shardKeyPattern.isShardKey(chunk.getMax())) {
@@ -992,29 +1009,44 @@ std::vector<MetadataInconsistencyItem> checkChunksConsistency(
                                       nss, uuid, chunk.toConfigBSON(), shardKeyPattern.toBSON()}));
         }
 
-        auto cmp = previousChunk->getMax().woCompare(chunk.getMin());
+        // Skip the first iteration as we need to compare the current chunk with the previous one.
+        if (totalChunks == 1) {
+            firstChunk = chunk;
+            previousChunk = chunk;
+            continue;
+        }
+
+        auto cmp = previousChunk.getMax().woCompare(chunk.getMin());
         if (cmp < 0) {
             inconsistencies.emplace_back(makeInconsistency(
                 MetadataInconsistencyTypeEnum::kRoutingTableRangeGap,
                 RoutingTableRangeGapDetails{
-                    nss, uuid, previousChunk->toConfigBSON(), chunk.toConfigBSON()}));
+                    nss, uuid, previousChunk.toConfigBSON(), chunk.toConfigBSON()}));
         } else if (cmp > 0) {
             inconsistencies.emplace_back(makeInconsistency(
                 MetadataInconsistencyTypeEnum::kRoutingTableRangeOverlap,
                 RoutingTableRangeOverlapDetails{
-                    nss, uuid, previousChunk->toConfigBSON(), chunk.toConfigBSON()}));
+                    nss, uuid, previousChunk.toConfigBSON(), chunk.toConfigBSON()}));
         }
 
-        previousChunk = it;
+        previousChunk = std::move(chunk);
     }
 
+    const ChunkType lastChunk = previousChunk;
+
+    if (collection.getUnsplittable() && totalChunks > 1) {
+        inconsistencies.emplace_back(makeInconsistency(
+            MetadataInconsistencyTypeEnum::kTrackedUnshardedCollectionHasMultipleChunks,
+            TrackedUnshardedCollectionHasMultipleChunksDetails{
+                nss, collection.getUuid(), int(totalChunks)}));
+    }
     // Check if the first and last chunk have MinKey and MaxKey respectively
-    if (chunks.empty()) {
+    if (!totalChunks) {
         inconsistencies.emplace_back(
             makeInconsistency(MetadataInconsistencyTypeEnum::kMissingRoutingTable,
                               MissingRoutingTableDetails{nss, uuid}));
     } else {
-        const BSONObj& minKeyObj = chunks.front().getMin();
+        const BSONObj& minKeyObj = firstChunk.getMin();
         const auto globalMin = shardKeyPattern.getKeyPattern().globalMin();
         if (minKeyObj.woCompare(shardKeyPattern.getKeyPattern().globalMin()) != 0) {
             inconsistencies.emplace_back(makeInconsistency(
@@ -1022,7 +1054,7 @@ std::vector<MetadataInconsistencyItem> checkChunksConsistency(
                 RoutingTableMissingMinKeyDetails{nss, uuid, minKeyObj, globalMin}));
         }
 
-        const BSONObj& maxKeyObj = chunks.back().getMax();
+        const BSONObj& maxKeyObj = lastChunk.getMax();
         const auto globalMax = shardKeyPattern.getKeyPattern().globalMax();
         if (maxKeyObj.woCompare(globalMax) != 0) {
             inconsistencies.emplace_back(makeInconsistency(
