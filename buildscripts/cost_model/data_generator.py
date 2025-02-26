@@ -89,7 +89,6 @@ class DataGenerator:
         if not self.config.enabled:
             return
 
-        await self.database.enable_cascades(False)
         t0 = time.time()
         tasks = []
         for coll_info in self.collection_infos:

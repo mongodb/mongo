@@ -230,7 +230,6 @@ async def smoke_test():
 
     config = BenchmarkConfig(warmup_runs=3, runs=20)
     database = DatabaseInstance(main_config.database)
-    await database.enable_cascades(True)
     cost_model_a = CostModelCoefficients(index_scan_incremental_cost=0.0001)
     cost_model_b = CostModelCoefficients(index_scan_incremental_cost=0.9)
     task = BenchmarkTask(

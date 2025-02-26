@@ -96,7 +96,6 @@ class WorkloadExecution:
     async def async_init(self):
         """Initialize the database settings."""
         await self.database.enable_sbe(True)
-        await self.database.enable_cascades(True)
 
         if self.config.write_mode == WriteMode.REPLACE:
             await self.database.drop_collection(self.config.output_collection_name)

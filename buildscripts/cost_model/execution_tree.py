@@ -107,7 +107,7 @@ def process_filter(stage: dict[str, any]) -> Node:
 
 
 def process_traverse(stage: dict[str, any]) -> Node:
-    """Process traverse, not used by Bonsai."""
+    """Process traverse"""
     outer_stage = process_stage(stage["outerStage"])
     inner_stage = process_stage(stage["innerStage"])
     return Node(

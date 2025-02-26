@@ -60,7 +60,6 @@ class DatabaseInstance:
 
     def __exit__(self, exc_type, exc_value, traceback):
         if self.config.dump_on_exit:
-            self.enable_cascades(False)
             self.dump()
 
     async def drop(self):
@@ -93,15 +92,6 @@ class DatabaseInstance:
         """Enable new query execution engine. Throw pymongo.errors.OperationFailure in case of failure."""
         await self.set_parameter(
             "internalQueryFrameworkControl", "trySbeEngine" if state else "forceClassicEngine"
-        )
-
-    async def enable_cascades(self, state: bool) -> None:
-        """Enable new query optimizer."""
-        await self.client.admin.command(
-            {"configureFailPoint": "enableExplainInBonsai", "mode": "alwaysOn"}
-        )
-        await self.set_parameter(
-            "internalQueryFrameworkControl", "forceBonsai" if state else "trySbeEngine"
         )
 
     async def explain(self, collection_name: str, pipeline: Pipeline) -> dict[str, any]:
