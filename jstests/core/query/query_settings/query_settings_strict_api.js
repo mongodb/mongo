@@ -12,7 +12,9 @@
 //   not_allowed_with_signed_security_token,
 //   # The test sets API parameter values.
 //   uses_api_parameters,
-//   requires_fcv_80
+//   requires_fcv_80,
+//   # Test includes SBE plan cache assertions if the SBE plan cache is used.
+//   examines_sbe_cache,
 // ]
 //
 

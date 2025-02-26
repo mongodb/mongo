@@ -12,6 +12,8 @@
 //   # happens between where we compute a cache key using explain(), and where we look it up using
 //   # $planCacheStats, the two operations will use different cache keys and the test will fail.
 //   assumes_balancer_off,
+//   # Test includes SBE plan cache assertions if the SBE plan cache is used.
+//   examines_sbe_cache,
 //   # Query settings commands can not be run on the shards directly.
 //   directly_against_shardsvrs_incompatible,
 //   # Index filter commands do not accept security token.
