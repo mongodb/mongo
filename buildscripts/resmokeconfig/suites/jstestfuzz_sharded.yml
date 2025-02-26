@@ -19,9 +19,9 @@ executor:
       crashOnInvalidBSONError: ""
       objcheck: ""
   hooks:
+    - class: FuzzerRestoreSettings
     - class: RunQueryStats
       allow_feature_not_supported: true
-    - class: FuzzerRestoreSettings
     - class: CheckReplDBHash
       shell_options:
         global_vars:
