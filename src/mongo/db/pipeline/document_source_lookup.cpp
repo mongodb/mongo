@@ -296,9 +296,6 @@ std::vector<BSONObj> extractSourceStage(const std::vector<BSONObj>& pipeline) {
     }
     // When we first create a $lookup stage, the input 'pipeline' is unparsed, so we
     // check for the $documents stage itself.
-    //
-    // TODO SERVER-59628 This code should be updated when we enable any valid data source stage on
-    // the $lookup pipelined
     if (pipeline[0].hasField(DocumentSourceDocuments::kStageName) ||
         pipeline[0].hasField("$search"_sd) ||
         pipeline[0].hasField(DocumentSourceQueue::kStageName)) {
@@ -446,8 +443,6 @@ void validateLookupCollectionlessPipeline(const std::vector<BSONObj>& pipeline) 
             "$lookup stage without explicit collection must have a pipeline with $documents as "
             "first stage",
             pipeline.size() > 0 &&
-                // TODO SERVER-59628 We should be able to check for any valid data source here, not
-                // just $documents.
                 !pipeline[0].getField(DocumentSourceDocuments::kStageName).eoo());
 }
 

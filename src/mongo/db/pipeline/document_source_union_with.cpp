@@ -147,7 +147,6 @@ void validateUnionWithCollectionlessPipeline(
                 "first"_attr = firstStageBson);
     uassert(ErrorCodes::FailedToParse,
             errMsg,
-            // TODO SERVER-59628 replace with constraints check
             (firstStageBson.hasField(DocumentSourceDocuments::kStageName) ||
              firstStageBson.hasField(DocumentSourceQueue::kStageName))
 
