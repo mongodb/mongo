@@ -830,10 +830,17 @@ BSONObj WriteError::serialize() const {
     BSONObjBuilder errBuilder;
     errBuilder.append(WriteError::kIndexFieldName, _index);
 
-    errBuilder.append(WriteError::kCodeFieldName, int32_t(_status.code()));
-    errBuilder.append(WriteError::kErrmsgFieldName, _status.reason());
-    if (auto extraInfo = _status.extraInfo()) {
-        extraInfo->serialize(&errBuilder);
+    if (auto wceInfo = _status.extraInfo<ErrorWithWriteConcernErrorInfo>(); wceInfo) {
+        // Special handling is required for errors that contain a writeConcernError inside.
+        // An 'ErrorWithWriteConcernErrorInfo' has its own error code, but when serialized, it must
+        // emit the original error code and message.
+        wceInfo->serialize(&errBuilder);
+    } else {
+        errBuilder.append(WriteError::kCodeFieldName, int32_t(_status.code()));
+        errBuilder.append(WriteError::kErrmsgFieldName, _status.reason());
+        if (auto extraInfo = _status.extraInfo()) {
+            extraInfo->serialize(&errBuilder);
+        }
     }
 
     return errBuilder.obj();

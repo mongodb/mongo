@@ -145,10 +145,17 @@ BSONObj BulkWriteReplyItem::serialize() const {
     if (!_status.isOK()) {
         invariant(_ok == 0.0);
 
-        builder.append(kCodeFieldName, int32_t(_status.code()));
-        builder.append(kErrmsgFieldName, _status.reason());
-        if (auto extraInfo = _status.extraInfo()) {
-            extraInfo->serialize(&builder);
+        if (auto wceInfo = _status.extraInfo<ErrorWithWriteConcernErrorInfo>(); wceInfo) {
+            // Special handling is required for errors that contain a writeConcernError inside.
+            // An 'ErrorWithWriteConcernErrorInfo' has its own error code, but when serialized, it
+            // must emit the original error code and message.
+            wceInfo->serialize(&builder);
+        } else {
+            builder.append(kCodeFieldName, int32_t(_status.code()));
+            builder.append(kErrmsgFieldName, _status.reason());
+            if (auto extraInfo = _status.extraInfo()) {
+                extraInfo->serialize(&builder);
+            }
         }
     } else {
         invariant(_ok == 1.0);

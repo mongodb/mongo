@@ -838,6 +838,7 @@ error_codes:
       code: 441,
       name: ErrorWithWriteConcernError,
       extra: ErrorWithWriteConcernErrorInfo,
+      categories: [InternalOnly],
     }
 
   # Error codes 4000-8999 are reserved.
