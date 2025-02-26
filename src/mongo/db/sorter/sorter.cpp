@@ -336,6 +336,10 @@ private:
      * read, then _done is set to true and the function returns immediately.
      */
     void _fillBufferFromDisk() {
+        // The size is both written to and read from in platform-specific endian order. In the
+        // unlikely event that data files are written and read by platforms of differing endianness,
+        // the result will be a checksum mismatch in the worst case, which callers must recover
+        // from.
         int32_t rawSize;
         _read(&rawSize, sizeof(rawSize));
         if (_done)
@@ -1588,6 +1592,10 @@ void SortedFileWriter<Key, Value>::writeChunk() {
 
     // Negative size means compressed.
     int32_t signedSize = shouldCompress ? -size : size;
+
+    // The size is both written to and read from in platform-specific endian order. In the unlikely
+    // event that data files are written and read by platforms of differing endianness, the result
+    // will be a read checksum mismatch in the worst case, which callers must recover from.
     _file->write(reinterpret_cast<const char*>(&signedSize), sizeof(signedSize));
     _file->write(outBuffer, size);
     sortCounters.incrementSortCountersPerSpilling(1 /* sortSpills */, sizeof(signedSize) + size);
