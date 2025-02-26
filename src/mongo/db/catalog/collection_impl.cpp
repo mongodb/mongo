@@ -1647,7 +1647,7 @@ Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
               str::stream() << "index " << imd.nameStringData()
                             << " is already in current metadata: " << _metadata->toBSON());
 
-    if (getTimeseriesBucketsMayHaveMixedSchemaData() &&
+    if (getTimeseriesBucketsMayHaveMixedSchemaData().value_or(false) &&
         timeseries::doesBucketsIndexIncludeMeasurement(
             opCtx, ns(), *getTimeseriesOptions(), spec->infoObj())) {
         LOGV2(6057502,
