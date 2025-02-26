@@ -203,7 +203,7 @@ void logStatus(const Status& status, bool plainShell) {
         attrs.add("errmsg", redact(status.reason()));
         attrs.add("code", status.code());
         if (auto codeString = status.codeString(); !codeString.empty()) {
-            attrs.add("codeName", codeString);
+            attrs.addDeepCopy("codeName", std::move(codeString));
         }
         if (auto extraInfo = status.extraInfo<JSExceptionInfo>()) {
             attrs.add("originalError", extraInfo->originalError);
