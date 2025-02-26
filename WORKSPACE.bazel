@@ -387,3 +387,7 @@ bazel_skylib_workspace()
 load("@buildifier_prebuilt//:defs.bzl", "buildifier_prebuilt_register_toolchains")
 
 buildifier_prebuilt_register_toolchains()
+
+load("//bazel/platforms:local_host_values.bzl", "setup_local_host_values")
+
+setup_local_host_values(name = "local_host_values")

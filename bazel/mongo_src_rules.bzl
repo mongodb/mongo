@@ -24,6 +24,7 @@ load(
     "extract_debuginfo_binary",
     "extract_debuginfo_test",
 )
+load("@local_host_values//:local_host_values_set.bzl", "NUM_CPUS")
 
 # https://learn.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library?view=msvc-170
 #   /MD defines _MT and _DLL and links in MSVCRT.lib into each .obj file
@@ -2147,7 +2148,11 @@ def _mongo_cc_binary_and_test(
         "copts": MONGO_GLOBAL_COPTS + package_specific_copts + copts + fincludes_copt,
         "data": data + SANITIZER_DATA,
         "tags": tags,
-        "linkopts": MONGO_GLOBAL_LINKFLAGS + package_specific_linkflags + linkopts + rpath_flags,
+        "linkopts": MONGO_GLOBAL_LINKFLAGS + package_specific_linkflags + linkopts + rpath_flags + select({
+            "//bazel/config:thin_lto_enabled": ["-Wl,--threads=" + str(NUM_CPUS)],
+            "//bazel/config:bolt_enabled": ["-Wl,--threads=" + str(NUM_CPUS)],
+            "//conditions:default": [],
+        }),
         "linkstatic": LINKSTATIC_ENABLED,
         "local_defines": MONGO_GLOBAL_DEFINES + local_defines,
         "defines": defines,
@@ -2166,6 +2171,10 @@ def _mongo_cc_binary_and_test(
             # Debug compression significantly reduces .o, .dwo, and .a sizes
             "//bazel/config:compress_debug_compile_enabled": {"cpp_link.coefficient": "6.0"},
             "//conditions:default": {"cpp_link.coefficient": "2.0"},
+        }) | select({
+            "//bazel/config:thin_lto_enabled": {"cpp_link.cpus": str(NUM_CPUS)},
+            "//bazel/config:bolt_enabled": {"cpp_link.cpus": str(NUM_CPUS)},
+            "//conditions:default": {},
         }),
         "env": env | SANITIZER_ENV,
     } | kwargs

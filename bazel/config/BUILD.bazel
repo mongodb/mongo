@@ -2275,6 +2275,18 @@ config_setting(
 )
 
 bool_flag(
+    name = "bolt",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "bolt_enabled",
+    flag_values = {
+        "//bazel/config:bolt": "True",
+    },
+)
+
+bool_flag(
     name = "scons_query",
     build_setting_default = False,
 )
