@@ -1621,7 +1621,7 @@ class RunPlugin(PluginInterface):
         parser.add_argument(
             "--logLevel",
             dest="log_level",
-            choices=("NONE", "ERROR", "WARNING", "INFO", "DEBUG"),
+            choices=("ERROR", "WARNING", "INFO", "DEBUG"),
             default="INFO",
             help="Resmoke output log severity level. Defaults to '%(default)s'.",
         )
