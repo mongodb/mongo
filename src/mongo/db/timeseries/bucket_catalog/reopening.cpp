@@ -108,8 +108,8 @@ ReopeningScope::ReopeningScope(BucketCatalog& catalog,
         _oid));
 }
 
+// When the RAII type is destructed, '_stripe' should be locked.
 ReopeningScope::~ReopeningScope() {
-    stdx::lock_guard stripeLock{_stripe->mutex};
     auto keyIt = _stripe->outstandingReopeningRequests.find(_key);
     invariant(keyIt != _stripe->outstandingReopeningRequests.end());
     auto& list = keyIt->second;

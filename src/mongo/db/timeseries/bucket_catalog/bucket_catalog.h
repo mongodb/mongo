@@ -425,10 +425,12 @@ StatusWith<tracking::unique_ptr<Bucket>> getReopenedBucket(
     OperationContext* opCtx,
     BucketCatalog& catalog,
     const Collection* bucketsColl,
+    const BucketKey& bucketKey,
+    const TimeseriesOptions& options,
     const std::variant<OID, std::vector<BSONObj>>& reopeningCandidate,
     BucketStateRegistry::Era catalogEra,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
-    bucket_catalog::InsertContext& insertContext);
+    ExecutionStatsController& stats);
 
 /**
  * Reopens and loads a bucket eligible for inserts into the bucket catalog. Checks for conflicting
@@ -439,18 +441,21 @@ StatusWith<tracking::unique_ptr<Bucket>> getReopenedBucket(
  * Called with a stripe lock. May release the lock for reopening. Returns holding the lock.
  * Manages the lifetime of the reopening request in 'stripe'.
  */
+// TODO (SERVER-101256): use internal::AllowQueryBasedReopening type directly.
 StatusWith<Bucket*> potentiallyReopenBucket(
     OperationContext* opCtx,
     BucketCatalog& catalog,
     Stripe& stripe,
-    WithLock stripeLock,
+    stdx::unique_lock<stdx::mutex>& stripeLock,
     const Collection* bucketsColl,
+    const BucketKey& bucketKey,
     const Date_t& time,
+    const TimeseriesOptions& options,
     BucketStateRegistry::Era catalogEra,
     bool allowQueryBasedReopening,
     uint64_t storageCacheSizeBytes,
     const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
-    bucket_catalog::InsertContext& insertContext);
+    ExecutionStatsController& stats);
 
 /**
  * Returns a bucket where 'measurement' can be inserted. Attempts to get the bucket with the steps:
@@ -465,7 +470,7 @@ StatusWith<Bucket*> potentiallyReopenBucket(
 Bucket& getEligibleBucket(OperationContext* opCtx,
                           BucketCatalog& catalog,
                           Stripe& stripe,
-                          WithLock stripeLock,
+                          stdx::unique_lock<stdx::mutex>& stripeLock,
                           const CollectionPtr& bucketsColl,
                           const BSONObj& measurement,
                           const BucketKey& bucketKey,

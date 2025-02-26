@@ -1137,7 +1137,7 @@ std::vector<std::shared_ptr<bucket_catalog::WriteBatch>> stageInsertBatch(
     // conflict if it sees a newer era.
     const auto catalogEra = getCurrentEra(bucketCatalog.bucketStateRegistry);
     auto& stripe = *bucketCatalog.stripes[batch.stripeNumber];
-    stdx::lock_guard stripeLock{stripe.mutex};
+    stdx::unique_lock<stdx::mutex> stripeLock{stripe.mutex};
     std::vector<std::shared_ptr<bucket_catalog::WriteBatch>> writeBatches;
     size_t currentPosition = 0;
     bool needsAnotherBucket = true;
