@@ -42,7 +42,7 @@ const secondaryColl = secondaryDB.getCollection('test');
 // Avoid optimization on empty colls.
 assert.commandWorked(coll.insert({a: 1}));
 
-// Pause the index builds on the secondary, using the 'hangAfterStartingIndexBuild' failpoint.
+// Pause the index builds on the secondary.
 const failpointHangAfterInit = configureFailPoint(secondaryDB, "hangAfterInitializingIndexBuild");
 
 // Block the primary before commit.
@@ -94,6 +94,8 @@ assert.eq(MongoRunner.EXIT_ABORT, res.exitCode);
 // tries to request an abort while a 'commitIndexBuild' is being applied.
 assert(rawMongoProgramOutput(".*").match('Fatal assertion.*(7329403|7329407)'),
        'Receiving a commit from the primary for a failing index build should crash the secondary');
+
+rst.start(secondary, {}, false);  // Restart the secondary with restart=false
 
 createIdx();
 
