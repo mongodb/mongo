@@ -5,8 +5,9 @@
  *
  * See the file LICENSE for redistribution information.
  */
-
 #include "wt_internal.h"
+#include "reconcile_private.h"
+#include "reconcile_inline.h"
 
 /*
  * Estimated memory cost for a structure on the overflow lists, the size of the structure plus two

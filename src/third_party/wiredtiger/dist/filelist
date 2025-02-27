@@ -112,7 +112,6 @@ src/evict/evict_page.c
 src/evict/evict_stat.c
 src/history/hs_conn.c
 src/history/hs_cursor.c
-src/history/hs_rec.c
 src/history/hs_verify.c
 src/live_restore/live_restore_fs.c       POSIX_HOST
 src/live_restore/live_restore_server.c       POSIX_HOST
@@ -187,6 +186,7 @@ src/reconcile/rec_row.c
 src/reconcile/rec_track.c
 src/reconcile/rec_visibility.c
 src/reconcile/rec_write.c
+src/reconcile/rec_hs.c
 src/schema/schema_alter.c
 src/schema/schema_create.c
 src/schema/schema_drop.c

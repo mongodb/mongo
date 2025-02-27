@@ -42,7 +42,7 @@
  *     Track statistics for time values associated with an address.
  */
 static WT_INLINE void
-__rec_cell_addr_stats(WT_RECONCILE *r, WT_TIME_AGGREGATE *ta)
+__rec_cell_addr_stats(WTI_RECONCILE *r, WT_TIME_AGGREGATE *ta)
 {
     if (ta->newest_start_durable_ts != WT_TS_NONE)
         FLD_SET(r->ts_usage_flags, WT_REC_TIME_NEWEST_START_DURABLE_TS);
@@ -65,7 +65,7 @@ __rec_cell_addr_stats(WT_RECONCILE *r, WT_TIME_AGGREGATE *ta)
  *     Gather statistics about this cell.
  */
 static WT_INLINE void
-__rec_cell_tw_stats(WT_RECONCILE *r, WT_TIME_WINDOW *tw)
+__rec_cell_tw_stats(WTI_RECONCILE *r, WT_TIME_WINDOW *tw)
 {
     if (tw->durable_start_ts != WT_TS_NONE)
         ++r->count_durable_start_ts;
@@ -88,7 +88,7 @@ __rec_cell_tw_stats(WT_RECONCILE *r, WT_TIME_WINDOW *tw)
  *     Clear page statistics.
  */
 static WT_INLINE void
-__rec_page_time_stats_clear(WT_RECONCILE *r)
+__rec_page_time_stats_clear(WTI_RECONCILE *r)
 {
     r->count_durable_start_ts = 0;
     r->count_start_ts = 0;
@@ -106,7 +106,7 @@ __rec_page_time_stats_clear(WT_RECONCILE *r)
  *     Update statistics about this page.
  */
 static WT_INLINE void
-__rec_page_time_stats(WT_SESSION_IMPL *session, WT_RECONCILE *r)
+__rec_page_time_stats(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
 {
     /* Time window statistics */
     if (r->count_durable_start_ts != 0) {
@@ -181,7 +181,7 @@ __rec_page_time_stats(WT_SESSION_IMPL *session, WT_RECONCILE *r)
  *     Check whether adding some bytes to the page requires a split.
  */
 static WT_INLINE bool
-__wti_rec_need_split(WT_RECONCILE *r, size_t len)
+__wti_rec_need_split(WTI_RECONCILE *r, size_t len)
 {
     uint32_t page_items;
 
@@ -212,7 +212,7 @@ __wti_rec_need_split(WT_RECONCILE *r, size_t len)
  *     Update the memory tracking structure for a set of new entries.
  */
 static WT_INLINE void
-__wti_rec_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, size_t size)
+__wti_rec_incr(WT_SESSION_IMPL *session, WTI_RECONCILE *r, uint32_t v, size_t size)
 {
     /*
      * The buffer code is fragile and prone to off-by-one errors -- check for overflow in diagnostic
@@ -243,7 +243,7 @@ __wti_rec_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, size_t siz
  *     Copy a key/value cell and buffer pair into the new image.
  */
 static WT_INLINE void
-__wti_rec_image_copy(WT_SESSION_IMPL *session, WT_RECONCILE *r, WTI_REC_KV *kv)
+__wti_rec_image_copy(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_KV *kv)
 {
     size_t len;
     uint8_t *p, *t;
@@ -271,7 +271,7 @@ __wti_rec_image_copy(WT_SESSION_IMPL *session, WT_RECONCILE *r, WTI_REC_KV *kv)
  *     Update the memory tracking structure for a set of new entries in the auxiliary image.
  */
 static WT_INLINE void
-__rec_auxincr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, size_t size)
+__rec_auxincr(WT_SESSION_IMPL *session, WTI_RECONCILE *r, uint32_t v, size_t size)
 {
     /*
      * The buffer code is fragile and prone to off-by-one errors -- check for overflow in diagnostic
@@ -291,7 +291,7 @@ __rec_auxincr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, size_t size
  *     Copy a key/value cell and buffer pair into the new auxiliary image.
  */
 static WT_INLINE void
-__wti_rec_auximage_copy(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t count, WTI_REC_KV *kv)
+__wti_rec_auximage_copy(WT_SESSION_IMPL *session, WTI_RECONCILE *r, uint32_t count, WTI_REC_KV *kv)
 {
     size_t len;
     uint8_t *p;
@@ -324,7 +324,7 @@ __wti_rec_auximage_copy(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t coun
  *     Process an address or unpack reference and return a cell structure to be stored on the page.
  */
 static WT_INLINE void
-__wti_rec_cell_build_addr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ADDR *addr,
+__wti_rec_cell_build_addr(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_ADDR *addr,
   WT_CELL_UNPACK_ADDR *vpack, uint64_t recno, WT_PAGE_DELETED *page_del)
 {
     WTI_REC_KV *val;
@@ -403,7 +403,7 @@ __wti_rec_cell_build_addr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ADDR *ad
  *     Process a data item and return a WT_CELL structure and byte string to be stored on the page.
  */
 static WT_INLINE int
-__wti_rec_cell_build_val(WT_SESSION_IMPL *session, WT_RECONCILE *r, const void *data, size_t size,
+__wti_rec_cell_build_val(WT_SESSION_IMPL *session, WTI_RECONCILE *r, const void *data, size_t size,
   WT_TIME_WINDOW *tw, uint64_t rle)
 {
     WT_BTREE *btree;
@@ -440,7 +440,7 @@ __wti_rec_cell_build_val(WT_SESSION_IMPL *session, WT_RECONCILE *r, const void *
  */
 static WT_INLINE int
 __wti_rec_dict_replace(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_TIME_WINDOW *tw, uint64_t rle, WTI_REC_KV *val)
+  WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_TIME_WINDOW *tw, uint64_t rle, WTI_REC_KV *val)
 {
     WTI_REC_DICTIONARY *dp;
     uint64_t offset;
@@ -489,7 +489,7 @@ __wti_rec_dict_replace(
  */
 static WT_INLINE void
 __wti_rec_time_window_clear_obsolete(WT_SESSION_IMPL *session, WTI_UPDATE_SELECT *upd_select,
-  WT_CELL_UNPACK_KV *vpack, WT_RECONCILE *r)
+  WT_CELL_UNPACK_KV *vpack, WTI_RECONCILE *r)
 {
     WT_TIME_WINDOW *tw;
 

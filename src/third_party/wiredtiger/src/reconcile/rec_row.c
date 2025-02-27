@@ -7,13 +7,15 @@
  */
 
 #include "wt_internal.h"
+#include "reconcile_private.h"
+#include "reconcile_inline.h"
 
 /*
  * __rec_key_state_update --
  *     Update prefix and suffix compression based on the last key.
  */
 static WT_INLINE void
-__rec_key_state_update(WT_RECONCILE *r, bool ovfl_key)
+__rec_key_state_update(WTI_RECONCILE *r, bool ovfl_key)
 {
     WT_ITEM *a;
 
@@ -55,7 +57,7 @@ __rec_key_state_update(WT_RECONCILE *r, bool ovfl_key)
  *     internal page.
  */
 static int
-__rec_cell_build_int_key(WT_SESSION_IMPL *session, WT_RECONCILE *r, const void *data, size_t size)
+__rec_cell_build_int_key(WT_SESSION_IMPL *session, WTI_RECONCILE *r, const void *data, size_t size)
 {
     WTI_REC_KV *key;
 
@@ -78,7 +80,7 @@ __rec_cell_build_int_key(WT_SESSION_IMPL *session, WT_RECONCILE *r, const void *
  */
 static int
 __rec_cell_build_leaf_key(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, const void *data, size_t size, bool *is_ovflp)
+  WT_SESSION_IMPL *session, WTI_RECONCILE *r, const void *data, size_t size, bool *is_ovflp)
 {
     WT_BTREE *btree;
     WTI_REC_KV *key;
@@ -177,7 +179,7 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 {
     WT_BTREE *btree;
     WT_CURSOR *cursor;
-    WT_RECONCILE *r;
+    WTI_RECONCILE *r;
     WTI_REC_KV *key, *val;
     WT_TIME_WINDOW tw;
     bool ovfl_key;
@@ -235,7 +237,7 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
  *     Merge in a split page.
  */
 static int
-__rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
+__rec_row_merge(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
 {
     WT_ADDR *addr;
     WT_MULTI *multi;
@@ -278,7 +280,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
  *     Reconcile a row-store internal page.
  */
 int
-__wti_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
+__wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
 {
     WT_ADDR *addr;
     WT_BTREE *btree;
@@ -493,7 +495,7 @@ __rec_row_zero_len(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
  *     Walk an insert chain, writing K/V pairs.
  */
 static int
-__rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
+__rec_row_leaf_insert(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins)
 {
     WT_BTREE *btree;
     WT_CURSOR_BTREE *cbt;
@@ -642,7 +644,7 @@ err:
  */
 static WT_INLINE int
 __rec_cell_repack(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_CELL_UNPACK_KV *vpack, WT_TIME_WINDOW *tw)
+  WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *vpack, WT_TIME_WINDOW *tw)
 {
     WT_DECL_ITEM(tmpval);
     WT_DECL_RET;
@@ -666,7 +668,7 @@ err:
  */
 int
 __wti_rec_row_leaf(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref, WT_SALVAGE_COOKIE *salvage)
+  WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref, WT_SALVAGE_COOKIE *salvage)
 {
     static WT_UPDATE upd_tombstone = {.txnid = WT_TXN_NONE, .type = WT_UPDATE_TOMBSTONE};
     WT_BTREE *btree;

@@ -209,8 +209,6 @@ struct __wt_data_handle;
 typedef struct __wt_data_handle WT_DATA_HANDLE;
 struct __wt_data_handle_cache;
 typedef struct __wt_data_handle_cache WT_DATA_HANDLE_CACHE;
-struct __wt_delete_hs_upd;
-typedef struct __wt_delete_hs_upd WT_DELETE_HS_UPD;
 struct __wt_dlh;
 typedef struct __wt_dlh WT_DLH;
 struct __wt_dsrc_stats;
@@ -309,8 +307,6 @@ struct __wt_prefetch_queue_entry;
 typedef struct __wt_prefetch_queue_entry WT_PREFETCH_QUEUE_ENTRY;
 struct __wt_process;
 typedef struct __wt_process WT_PROCESS;
-struct __wt_reconcile;
-typedef struct __wt_reconcile WT_RECONCILE;
 struct __wt_reconcile_timeline;
 typedef struct __wt_reconcile_timeline WT_RECONCILE_TIMELINE;
 struct __wt_recovery_timeline;
@@ -413,6 +409,8 @@ struct __wti_ckpt_timer;
 typedef struct __wti_ckpt_timer WTI_CKPT_TIMER;
 struct __wti_cursor_log;
 typedef struct __wti_cursor_log WTI_CURSOR_LOG;
+struct __wti_delete_hs_upd;
+typedef struct __wti_delete_hs_upd WTI_DELETE_HS_UPD;
 struct __wti_evict_entry;
 typedef struct __wti_evict_entry WTI_EVICT_ENTRY;
 struct __wti_evict_queue;
@@ -443,6 +441,8 @@ struct __wti_rec_dictionary;
 typedef struct __wti_rec_dictionary WTI_REC_DICTIONARY;
 struct __wti_rec_kv;
 typedef struct __wti_rec_kv WTI_REC_KV;
+struct __wti_reconcile;
+typedef struct __wti_reconcile WTI_RECONCILE;
 union __wt_lsn;
 typedef union __wt_lsn WT_LSN;
 union __wt_rand_state;
@@ -587,7 +587,6 @@ typedef uint64_t wt_timestamp_t;
 #include "os_fs_inline.h"
 #include "os_fstream_inline.h"
 #include "packing_inline.h"
-#include "../reconcile/reconcile_inline.h"
 #include "serial_inline.h"
 #include "str_inline.h"
 #include "time_inline.h"

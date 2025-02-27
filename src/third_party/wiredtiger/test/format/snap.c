@@ -29,8 +29,6 @@
 #include "format.h"
 
 #define SNAP_LIST_SIZE 512
-#define TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION \
-    "oldest pinned transaction ID rolled back for eviction"
 
 /*
  * snap_init --
@@ -632,13 +630,12 @@ static void
 snap_repeat(TINFO *tinfo, SNAP_OPS *snap)
 {
     WT_DECL_RET;
-    WT_SESSION *session;
-    const char *rollback_reason;
 #define MAX_RETRY_ON_ROLLBACK WT_THOUSAND
     u_int max_retry;
 
-    rollback_reason = NULL;
-    session = tinfo->session;
+    int sub_level_err = 0;
+    const char *err_msg = NULL;
+    WT_SESSION *session = tinfo->session;
 
     /* Start a transaction with a read-timestamp and verify the record. */
     for (max_retry = 0; max_retry < MAX_RETRY_ON_ROLLBACK; ++max_retry, __wt_yield()) {
@@ -661,7 +658,8 @@ snap_repeat(TINFO *tinfo, SNAP_OPS *snap)
             break;
         testutil_assertfmt(ret == WT_ROLLBACK, "operation failed: %d", ret);
 
-        rollback_reason = session->get_rollback_reason(session);
+        sub_level_err = ((WT_SESSION_IMPL *)session)->err_info.sub_level_err;
+        err_msg = ((WT_SESSION_IMPL *)session)->err_info.err_msg;
 
         testutil_check(session->rollback_transaction(session, NULL));
     }
@@ -671,10 +669,9 @@ snap_repeat(TINFO *tinfo, SNAP_OPS *snap)
      * This would cause the snapshot read to rollback even we retry many times. Give up and ignore
      * this case.
      */
-    if (max_retry >= MAX_RETRY_ON_ROLLBACK && rollback_reason != NULL &&
-      strcmp(rollback_reason, TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION) == 0)
-        WARN(
-          "%s: %s", "snap repeat exceeds maximum retry", TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION);
+    if (max_retry >= MAX_RETRY_ON_ROLLBACK && err_msg != NULL &&
+      sub_level_err == WT_OLDEST_FOR_EVICTION)
+        WARN("%s: %s", "snap repeat exceeds maximum retry", err_msg);
     else {
         testutil_assert(max_retry < MAX_RETRY_ON_ROLLBACK);
         testutil_check(session->rollback_transaction(session, NULL));

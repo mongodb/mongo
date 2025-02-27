@@ -17,11 +17,11 @@ The following page describes how backup works inside WiredTiger. Please refer to
 When the application opens a backup cursor, internally WiredTiger generates a list of all
 files in the database that are necessary for the backup and creates a file which contains the
 snapshot of the metadata called WiredTiger.backup. WiredTiger takes both the checkpoint and schema
-locks to block database file modifications to generate a list of files required for backup and is
-released once generated. There is a contract that all files that exist at the
+locks to block database file modifications to generate a list of files required for backup and
+those locks are released once the list is generated. There is a contract that all files that exist at the
 time the backup starts exist for the entire time the backup cursor is open. This contract
 applies to all files in the database, not just files that are included in the generated list. The
-WiredTiger.backup file is also included in the backup list and is used upon the startup of a backup, to
+WiredTiger.backup file is also included in the backup list and is used upon the restore of a backup, to
 create the WiredTiger.wt metadata file. After WiredTiger.wt is created the WiredTiger.backup file
 is removed. Note that we do not use WiredTiger.wt as the metadata source and it is not included
 in the backup list, because the metadata can be modified after the list has been generated.
@@ -33,7 +33,7 @@ WiredTiger forces a log file switch when opening the backup cursor. To fulfill t
 contract that all files must exist during backup, WiredTiger does not use any pre-allocated
 log files nor does it remove log files during the time the backup cursor is open.
 
-Once the backup is opened successfully, any checkpoints that exist on the database before
+Once the backup cursor is opened successfully, any checkpoints that exist on the database before
 backup starts must be retained until the backup cursor is closed. All the newer checkpoints
 that are created during the backup in progress are cleaned whenever a newer checkpoint is
 created.

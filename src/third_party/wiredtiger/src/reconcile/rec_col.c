@@ -7,6 +7,8 @@
  */
 
 #include "wt_internal.h"
+#include "reconcile_private.h"
+#include "reconcile_inline.h"
 
 /*
  * __rec_col_fix_bulk_insert_split_check --
@@ -16,7 +18,7 @@ static WT_INLINE int
 __rec_col_fix_bulk_insert_split_check(WT_CURSOR_BULK *cbulk)
 {
     WT_BTREE *btree;
-    WT_RECONCILE *r;
+    WTI_RECONCILE *r;
     WT_SESSION_IMPL *session;
 
     session = CUR2S(cbulk);
@@ -54,7 +56,7 @@ __wt_bulk_insert_fix(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool delet
 {
     WT_BTREE *btree;
     WT_CURSOR *cursor;
-    WT_RECONCILE *r;
+    WTI_RECONCILE *r;
     WT_TIME_WINDOW tw;
 
     r = cbulk->reconcile;
@@ -86,7 +88,7 @@ __wt_bulk_insert_fix_bitmap(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 {
     WT_BTREE *btree;
     WT_CURSOR *cursor;
-    WT_RECONCILE *r;
+    WTI_RECONCILE *r;
     WT_TIME_WINDOW tw;
     uint32_t entries, offset, page_entries, page_size;
     const uint8_t *data;
@@ -123,7 +125,7 @@ int
 __wt_bulk_insert_var(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool deleted)
 {
     WT_BTREE *btree;
-    WT_RECONCILE *r;
+    WTI_RECONCILE *r;
     WTI_REC_KV *val;
     WT_TIME_WINDOW tw;
 
@@ -168,7 +170,7 @@ __wt_bulk_insert_var(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool delet
  *     Merge in a split page.
  */
 static int
-__rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
+__rec_col_merge(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
 {
     WT_ADDR *addr;
     WT_MULTI *multi;
@@ -205,7 +207,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
  *     Reconcile a column-store internal page.
  */
 int
-__wti_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
+__wti_rec_col_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref)
 {
     WT_ADDR *addr;
     WT_BTREE *btree;
@@ -383,7 +385,7 @@ __col_fix_estimate_auxiliary_space(WT_PAGE *page)
  *     Figure the bitmap size of a new page from the reconciliation info.
  */
 static uint32_t
-__rec_col_fix_get_bitmap_size(WT_SESSION_IMPL *session, WT_RECONCILE *r)
+__rec_col_fix_get_bitmap_size(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
 {
     uint32_t primary_size;
 
@@ -400,7 +402,7 @@ __rec_col_fix_get_bitmap_size(WT_SESSION_IMPL *session, WT_RECONCILE *r)
  */
 static int
 __rec_col_fix_addtw(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t recno_offset, WT_TIME_WINDOW *tw)
+  WT_SESSION_IMPL *session, WTI_RECONCILE *r, uint32_t recno_offset, WT_TIME_WINDOW *tw)
 {
     WTI_REC_KV *key, *val;
     size_t add_len, len;
@@ -461,7 +463,7 @@ __rec_col_fix_addtw(
  */
 int
 __wti_rec_col_fix(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref, WT_SALVAGE_COOKIE *salvage)
+  WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref, WT_SALVAGE_COOKIE *salvage)
 {
     WT_BTREE *btree;
     WT_CELL *cell;
@@ -1063,8 +1065,8 @@ __wti_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, uint32_t entries,
      * leaf page size but get it from the reconciliation info.
      *
      * Note: it is important to use *this* chunk's auxiliary start offset (passed in) and not read
-     * the auxiliary start offset from the WT_RECONCILE, as we may be writing the previous chunk and
-     * the latter describes the current chunk.
+     * the auxiliary start offset from the WTI_RECONCILE, as we may be writing the previous chunk
+     * and the latter describes the current chunk.
      */
 
     /* Figure how much primary data we have. */
@@ -1109,7 +1111,7 @@ __wti_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, uint32_t entries,
  *     Create a column-store variable length record cell and write it onto a page.
  */
 static int
-__rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_SALVAGE_COOKIE *salvage,
+__rec_col_var_helper(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_SALVAGE_COOKIE *salvage,
   WT_ITEM *value, WT_TIME_WINDOW *tw, uint64_t rle, bool deleted, bool dictionary, bool *ovfl_usedp)
 {
     WTI_REC_KV *val;
@@ -1186,7 +1188,7 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_SALVAGE_COOKI
  */
 int
 __wti_rec_col_var(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref, WT_SALVAGE_COOKIE *salvage)
+  WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *pageref, WT_SALVAGE_COOKIE *salvage)
 {
     enum { OVFL_IGNORE, OVFL_UNUSED, OVFL_USED } ovfl_state;
     struct {
