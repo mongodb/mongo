@@ -31,12 +31,14 @@
 #include <boost/optional.hpp>
 #include <functional>
 #include <memory>
+#include <utility>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -47,7 +49,6 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
-#include <utility>
 
 namespace mongo {
 
@@ -442,7 +443,32 @@ public:
 
     std::pair<const std::function<void()>*, const std::function<void()>*> getCoroutineFunctors()
         const {
-        return {_coroYield, _coroResume};
+        // Some temporary, auxiliary and background threads, such as
+        // `startPeriodicThreadToAbortExpiredTransactions` and `js`, invoke this function. These
+        // threads share the same OperationContext with the worker thread named `thread_group`, but
+        // they should not call yield or resume functions. Therefore, we need to verify the thread
+        // name.
+        StringData threadName = getThreadName();
+        if (MONGO_likely(threadName.startsWith("thread_group"))) {
+            return {_coroYield, _coroResume};
+        } else {
+            return {nullptr, nullptr};
+        }
+    }
+
+    int getIsolationLevel() const {
+        return _isolationLevel;
+    }
+
+    void setIsolationLevel(repl::ReadConcernLevel level) {
+        if (level == repl::ReadConcernLevel::kLocalReadConcern ||
+            level == repl::ReadConcernLevel::kMajorityReadConcern ||
+            level == repl::ReadConcernLevel::kLinearizableReadConcern ||
+            level == repl::ReadConcernLevel::kAvailableReadConcern ||
+            level == repl::ReadConcernLevel::kSnapshotReadConcern) {
+            level = repl::ReadConcernLevel::kEloqReadCommittedIsolationLevel;
+        }
+        _isolationLevel = static_cast<int>(level);
     }
 
 private:
@@ -539,6 +565,7 @@ private:
 
     const std::function<void()>* _coroYield{nullptr};
     const std::function<void()>* _coroResume{nullptr};
+    int _isolationLevel{0};
 };
 
 namespace repl {

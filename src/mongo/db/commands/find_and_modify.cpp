@@ -340,12 +340,13 @@ public:
                               << " within a transaction.",
                 !(inTransaction && nsString.isSystem()));
 
+        /* This limitation does not exist in Eloq.
         const auto replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
         uassert(50777,
                 str::stream() << "Cannot write to unreplicated collection " << nsString.ns()
                               << " within a transaction.",
                 !(inTransaction && replCoord->isOplogDisabledFor(opCtx, nsString)));
-
+        */
 
         const auto stmtId = 0;
         if (opCtx->getTxnNumber()) {

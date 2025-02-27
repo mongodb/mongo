@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/concurrency/eloq_locker_noop.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -367,12 +368,13 @@ void Session::beginOrContinueTxn(OperationContext* opCtx,
                 (getTestCommandsEnabled() &&
                  txnCmdForTestingWhitelist.find(cmdName) != txnCmdForTestingWhitelist.cend()));
 
-    uassert(ErrorCodes::OperationNotSupportedInTransaction,
-            str::stream() << "Cannot run command against the '" << dbName
-                          << "' database in a transaction",
-            !autocommit || (dbName != "config"_sd && dbName != "local"_sd &&
-                            (dbName != "admin"_sd ||
-                             txnAdminCommands.find(cmdName) != txnAdminCommands.cend())));
+    uassert(
+        ErrorCodes::OperationNotSupportedInTransaction,
+        str::stream() << "Cannot run command against the '" << dbName
+                      << "' database in a transaction",
+        !autocommit ||
+            (dbName != "config"_sd && dbName != "local"_sd &&
+             (dbName != "admin"_sd || txnAdminCommands.find(cmdName) != txnAdminCommands.cend())));
 
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     _beginOrContinueTxn(lg, txnNumber, autocommit, startTransaction);
@@ -652,9 +654,7 @@ void Session::_beginOrContinueTxn(WithLock wl,
 void Session::_checkTxnValid(WithLock, TxnNumber txnNumber) const {
     uassert(ErrorCodes::TransactionTooOld,
             str::stream() << "Cannot start transaction " << txnNumber << " on session "
-                          << getSessionId()
-                          << " because a newer transaction "
-                          << _activeTxnNumber
+                          << getSessionId() << " because a newer transaction " << _activeTxnNumber
                           << " has already started.",
             txnNumber >= _activeTxnNumber);
 }
@@ -664,7 +664,8 @@ Session::TxnResources::TxnResources(OperationContext* opCtx, bool keepTicket) {
     _ruState = opCtx->getWriteUnitOfWork()->release();
     opCtx->setWriteUnitOfWork(nullptr);
 
-    _locker = opCtx->swapLockState(stdx::make_unique<DefaultLockerImpl>());
+    // _locker = opCtx->swapLockState(stdx::make_unique<DefaultLockerImpl>());
+    _locker = opCtx->swapLockState(stdx::make_unique<EloqLockerNoop>());
     if (!keepTicket) {
         _locker->releaseTicket();
     }
@@ -1019,8 +1020,7 @@ void Session::addTransactionOperation(OperationContext* opCtx,
     // when possible (e.g. to avoid exhausting server memory).
     uassert(ErrorCodes::TransactionTooLarge,
             str::stream() << "Total size of all transaction operations must be less than "
-                          << BSONObjMaxInternalSize
-                          << ". Actual size is "
+                          << BSONObjMaxInternalSize << ". Actual size is "
                           << _transactionOperationBytes,
             _transactionOperationBytes <= BSONObjMaxInternalSize);
 }
@@ -1291,11 +1291,8 @@ void Session::_checkValid(WithLock) const {
 void Session::_checkIsActiveTransaction(WithLock, TxnNumber txnNumber, bool checkAbort) const {
     uassert(ErrorCodes::ConflictingOperationInProgress,
             str::stream() << "Cannot perform operations on transaction " << txnNumber
-                          << " on session "
-                          << getSessionId()
-                          << " because a different transaction "
-                          << _activeTxnNumber
-                          << " is now active.",
+                          << " on session " << getSessionId() << " because a different transaction "
+                          << _activeTxnNumber << " is now active.",
             txnNumber == _activeTxnNumber);
 
     uassert(ErrorCodes::NoSuchTransaction,
@@ -1316,8 +1313,7 @@ boost::optional<repl::OpTime> Session::_checkStatementExecuted(WithLock wl,
     if (it == _activeTxnCommittedStatements.end()) {
         uassert(ErrorCodes::IncompleteTransactionHistory,
                 str::stream() << "Incomplete history detected for transaction " << txnNumber
-                              << " on session "
-                              << _sessionId.toBSON(),
+                              << " on session " << _sessionId.toBSON(),
                 !_hasIncompleteHistory);
 
         return boost::none;
@@ -1364,62 +1360,60 @@ void Session::_registerUpdateCacheOnCommit(OperationContext* opCtx,
                                            TxnNumber newTxnNumber,
                                            std::vector<StmtId> stmtIdsWritten,
                                            const repl::OpTime& lastStmtIdWriteOpTime) {
-    opCtx->recoveryUnit()->onCommit(
-        [ this, newTxnNumber, stmtIdsWritten = std::move(stmtIdsWritten), lastStmtIdWriteOpTime ](
-            boost::optional<Timestamp>) {
-            RetryableWritesStats::get(getGlobalServiceContext())
-                ->incrementTransactionsCollectionWriteCount();
+    opCtx->recoveryUnit()->onCommit([this,
+                                     newTxnNumber,
+                                     stmtIdsWritten = std::move(stmtIdsWritten),
+                                     lastStmtIdWriteOpTime](boost::optional<Timestamp>) {
+        RetryableWritesStats::get(getGlobalServiceContext())
+            ->incrementTransactionsCollectionWriteCount();
 
-            stdx::lock_guard<stdx::mutex> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
 
-            if (!_isValid)
-                return;
+        if (!_isValid)
+            return;
 
-            // The cache of the last written record must always be advanced after a write so that
-            // subsequent writes have the correct point to start from.
-            if (!_lastWrittenSessionRecord) {
-                _lastWrittenSessionRecord.emplace();
+        // The cache of the last written record must always be advanced after a write so that
+        // subsequent writes have the correct point to start from.
+        if (!_lastWrittenSessionRecord) {
+            _lastWrittenSessionRecord.emplace();
 
-                _lastWrittenSessionRecord->setSessionId(_sessionId);
+            _lastWrittenSessionRecord->setSessionId(_sessionId);
+            _lastWrittenSessionRecord->setTxnNum(newTxnNumber);
+            _lastWrittenSessionRecord->setLastWriteOpTime(lastStmtIdWriteOpTime);
+        } else {
+            if (newTxnNumber > _lastWrittenSessionRecord->getTxnNum())
                 _lastWrittenSessionRecord->setTxnNum(newTxnNumber);
+
+            if (lastStmtIdWriteOpTime > _lastWrittenSessionRecord->getLastWriteOpTime())
                 _lastWrittenSessionRecord->setLastWriteOpTime(lastStmtIdWriteOpTime);
-            } else {
-                if (newTxnNumber > _lastWrittenSessionRecord->getTxnNum())
-                    _lastWrittenSessionRecord->setTxnNum(newTxnNumber);
+        }
 
-                if (lastStmtIdWriteOpTime > _lastWrittenSessionRecord->getLastWriteOpTime())
-                    _lastWrittenSessionRecord->setLastWriteOpTime(lastStmtIdWriteOpTime);
-            }
+        if (newTxnNumber > _activeTxnNumber) {
+            // This call is necessary in order to advance the txn number and reset the cached
+            // state in the case where just before the storage transaction commits, the cache
+            // entry gets invalidated and immediately refreshed while there were no writes for
+            // newTxnNumber yet. In this case _activeTxnNumber will be less than newTxnNumber
+            // and we will fail to update the cache even though the write was successful.
+            _beginOrContinueTxn(lg, newTxnNumber, boost::none, boost::none);
+        }
 
-            if (newTxnNumber > _activeTxnNumber) {
-                // This call is necessary in order to advance the txn number and reset the cached
-                // state in the case where just before the storage transaction commits, the cache
-                // entry gets invalidated and immediately refreshed while there were no writes for
-                // newTxnNumber yet. In this case _activeTxnNumber will be less than newTxnNumber
-                // and we will fail to update the cache even though the write was successful.
-                _beginOrContinueTxn(lg, newTxnNumber, boost::none, boost::none);
-            }
+        if (newTxnNumber == _activeTxnNumber) {
+            for (const auto stmtId : stmtIdsWritten) {
+                if (stmtId == kIncompleteHistoryStmtId) {
+                    _hasIncompleteHistory = true;
+                    continue;
+                }
 
-            if (newTxnNumber == _activeTxnNumber) {
-                for (const auto stmtId : stmtIdsWritten) {
-                    if (stmtId == kIncompleteHistoryStmtId) {
-                        _hasIncompleteHistory = true;
-                        continue;
-                    }
-
-                    const auto insertRes =
-                        _activeTxnCommittedStatements.emplace(stmtId, lastStmtIdWriteOpTime);
-                    if (!insertRes.second) {
-                        const auto& existingOpTime = insertRes.first->second;
-                        fassertOnRepeatedExecution(_sessionId,
-                                                   newTxnNumber,
-                                                   stmtId,
-                                                   existingOpTime,
-                                                   lastStmtIdWriteOpTime);
-                    }
+                const auto insertRes =
+                    _activeTxnCommittedStatements.emplace(stmtId, lastStmtIdWriteOpTime);
+                if (!insertRes.second) {
+                    const auto& existingOpTime = insertRes.first->second;
+                    fassertOnRepeatedExecution(
+                        _sessionId, newTxnNumber, stmtId, existingOpTime, lastStmtIdWriteOpTime);
                 }
             }
-        });
+        }
+    });
 
     MONGO_FAIL_POINT_BLOCK(onPrimaryTransactionalWrite, customArgs) {
         const auto& data = customArgs.getData();
@@ -1475,7 +1469,7 @@ boost::optional<repl::OplogEntry> Session::createMatchingTransactionTableUpdate(
         boost::none,  // prevWriteOpTime
         boost::none,  // preImangeOpTime
         boost::none   // postImageOpTime
-        );
+    );
 }
 
 }  // namespace mongo

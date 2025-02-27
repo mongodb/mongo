@@ -115,6 +115,7 @@ void OperationContext::reset(Client* client, unsigned int opId) {
     _writesAreReplicated = true;
     _coroYield = nullptr;
     _coroResume = nullptr;
+    _isolationLevel = 0;
 }
 
 void OperationContext::setDeadlineAndMaxTime(Date_t when,

@@ -422,7 +422,7 @@ public:
         return nullptr;
     }
 
-    virtual  RecordStore* getRecordStore() const {
+    virtual RecordStore* getRecordStore() const {
         return nullptr;
     }
 

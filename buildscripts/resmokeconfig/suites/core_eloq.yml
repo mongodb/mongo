@@ -113,7 +113,7 @@ selector:
   - jstests/core/convert_to_capped_nonexistant.js
   - jstests/core/copydb.js
   - jstests/core/count.js
-  # - jstests/core/count10.js # Invariant failure RESOURCE_DATABASE == resId.getType() || RESOURCE_COLLECTION == resId.getType() || (RESOURCE_GLOBAL == resId.getType() && isSharedLockMode(mode)) src/mongo/db/concurrency/monograph_locker_noop.h 264 
+  # - jstests/core/count10.js # Invariant failure RESOURCE_DATABASE == resId.getType() || RESOURCE_COLLECTION == resId.getType() || (RESOURCE_GLOBAL == resId.getType() && isSharedLockMode(mode)) src/mongo/db/concurrency/eloq_locker_noop.h 264 
   - jstests/core/count11.js
   - jstests/core/count2.js
   - jstests/core/count3.js
@@ -154,7 +154,7 @@ selector:
   - jstests/core/cursor5.js
   - jstests/core/cursor6.js
   - jstests/core/cursor7.js
-    # - jstests/core/cursora.js # Invariant failure RESOURCE_DATABASE == resId.getType() || RESOURCE_COLLECTION == resId.getType() || (RESOURCE_GLOBAL == resId.getType() && isSharedLockMode(mode)) src/mongo/db/concurrency/monograph_locker_noop.h 264
+    # - jstests/core/cursora.js # Invariant failure RESOURCE_DATABASE == resId.getType() || RESOURCE_COLLECTION == resId.getType() || (RESOURCE_GLOBAL == resId.getType() && isSharedLockMode(mode)) src/mongo/db/concurrency/eloq_locker_noop.h 264
   - jstests/core/datasize2.js
   - jstests/core/date1.js
   - jstests/core/date2.js
@@ -209,7 +209,7 @@ selector:
   - jstests/core/eval_nolock.js
   - jstests/core/eval_wait_for_read_write_concern.js
   - jstests/core/evala.js
-  # - jstests/core/evalb.js 53: Invariant failure Hit a MONGO_UNREACHABLE! src/mongo/db/concurrency/monograph_locker_noop.h 227
+  # - jstests/core/evalb.js 53: Invariant failure Hit a MONGO_UNREACHABLE! src/mongo/db/concurrency/eloq_locker_noop.h 227
   # - jstests/core/evald.js eval JavaScript execution interrupted
   - jstests/core/evale.js
   - jstests/core/evalg.js
@@ -541,7 +541,7 @@ selector:
   - jstests/core/indexr.js
   - jstests/core/indexs.js
   # - jstests/core/indext.js # 11: sparse index
-  # - jstests/core/indexu.js # 15: crash at MyMonograph::MongoSkEncoder::GenerateBSONKeys()
+  # - jstests/core/indexu.js # 15: crash at MyEloq::MongoSkEncoder::GenerateBSONKeys()
   - jstests/core/indexv.js
   - jstests/core/insert1.js
   - jstests/core/insert2.js
@@ -553,7 +553,7 @@ selector:
   - jstests/core/ismaster.js
   - jstests/core/js1.js
   - jstests/core/js2.js
-  # - jstests/core/js3.js # Invariant failure RESOURCE_DATABASE == resId.getType() || RESOURCE_COLLECTION == resId.getType() || (RESOURCE_GLOBAL == resId.getType() && isSharedLockMode(mode)) src/mongo/db/concurrency/monograph_locker_noop.h 264
+  # - jstests/core/js3.js # Invariant failure RESOURCE_DATABASE == resId.getType() || RESOURCE_COLLECTION == resId.getType() || (RESOURCE_GLOBAL == resId.getType() && isSharedLockMode(mode)) src/mongo/db/concurrency/eloq_locker_noop.h 264
   - jstests/core/js4.js
   - jstests/core/js5.js
   - jstests/core/js7.js
@@ -694,9 +694,9 @@ selector:
   - jstests/core/plan_cache_list_shapes.js
   - jstests/core/plan_cache_shell_helpers.js
   - jstests/core/pop_server_13516.js
-  # - jstests/core/profile1.js # 107: Unimplemented MonographLockerNoop::getLockerInfo
-  # - jstests/core/profile2.js # 20: Unimplemented MonographLockerNoop::getLockerInfo
-  # - jstests/core/profile3.js # 51: Unimplemented MonographLockerNoop::getLockerInfo
+  # - jstests/core/profile1.js # 107: Unimplemented EloqLockerNoop::getLockerInfo
+  # - jstests/core/profile2.js # 20: Unimplemented EloqLockerNoop::getLockerInfo
+  # - jstests/core/profile3.js # 51: Unimplemented EloqLockerNoop::getLockerInfo
   # - jstests/core/profile_agg.js
   # - jstests/core/profile_count.js
   # - jstests/core/profile_delete.js
@@ -763,7 +763,7 @@ selector:
   - jstests/core/remove6.js
   - jstests/core/remove7.js
   - jstests/core/remove8.js # 29: After eval(). count wrong number.
-  # - jstests/core/remove9.js # 30: MonographRecordStoreCursor::seekExact null MonographRecord.
+  # - jstests/core/remove9.js # 30: EloqRecordStoreCursor::seekExact null EloqRecord.
   - jstests/core/remove_justone.js
   - jstests/core/remove_undefined.js
   - jstests/core/removea.js
@@ -959,60 +959,59 @@ selector:
   - jstests/core/write_result.js
   - jstests/core_standalone/read_concern.js
   - jstests/core_standalone/write_concern.js
-  # - Tests that would be excluded from suite core_monograph
-  # - jstests/core/txns/abort_expired_transaction.js # 40: Transaction numbers are only allowed on a replica set member or mongos
-  # - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
-  # - jstests/core/txns/abort_transactions_on_FCV_downgrade.js
-  # - jstests/core/txns/aggregation_in_transaction.js
-  # - jstests/core/txns/ban_tailable_cursor.js
-  # - jstests/core/txns/banned_txn_dbs.js
-  # - jstests/core/txns/basic_causal_consistency.js
-  # - jstests/core/txns/commands_not_allowed_in_txn.js
-  # - jstests/core/txns/concurrent_drops_and_creates.js
-  # - jstests/core/txns/do_txn_atomicity.js
-  # - jstests/core/txns/do_txn_basic.js
-  # - jstests/core/txns/find_and_modify_in_transaction.js
-  # - jstests/core/txns/finished_transaction_error_handling.js
-  # - jstests/core/txns/kill_cursors_in_transaction.js
-  # - jstests/core/txns/kill_op_on_txn_expiry.js
-  # - jstests/core/txns/kill_sessions_kills_transaction.js
-  # - jstests/core/txns/kill_transaction_cursors_after_commit.js
-  # - jstests/core/txns/kill_txn_cursor.js
-  # - jstests/core/txns/libs/write_conflicts.js
-  # - jstests/core/txns/list_collections_not_blocked_by_txn.js
-  # - jstests/core/txns/multi_delete_in_transaction.js
-  # - jstests/core/txns/multi_statement_transaction.js
-  # - jstests/core/txns/multi_statement_transaction_abort.js
-  # - jstests/core/txns/multi_statement_transaction_command_args.js
-  # - jstests/core/txns/multi_statement_transaction_using_api.js
-  # - jstests/core/txns/multi_update_in_transaction.js
-  # - jstests/core/txns/no_implicit_collection_creation_in_txn.js
-  # - jstests/core/txns/no_read_concern_snapshot_outside_txn.js
-  # - jstests/core/txns/no_read_or_write_concern_inside_txn.js
-  # - jstests/core/txns/no_writes_to_system_collections_in_txn.js
-  # - jstests/core/txns/non_transactional_operations_on_session_with_transaction.js
-  # - jstests/core/txns/noop_createIndexes_not_blocked_by_txn.js
-  # - jstests/core/txns/only_allow_transactions_on_FCV_40.js
-  # - jstests/core/txns/read_own_multikey_writes.js
-  # - jstests/core/txns/repeatable_reads_in_transaction.js
-  # - jstests/core/txns/shell_prompt_in_transaction.js
-  # - jstests/core/txns/speculative_snapshot_includes_all_writes.js
-  # - jstests/core/txns/start_transaction_with_read.js
-  # - jstests/core/txns/statement_ids_accepted.js
-  # - jstests/core/txns/transaction_error_handling.js
-  # - jstests/core/txns/transactions_block_ddl.js
-  # - jstests/core/txns/transactions_profiling.js
-  # - jstests/core/txns/transactions_profiling_with_drops.js
-  # - jstests/core/txns/transactions_write_conflicts.js
-  # - jstests/core/txns/transactions_write_conflicts_unique_indexes.js
-  # - jstests/core/txns/upconvert_read_concern.js
-  # - jstests/core/txns/view_reads_in_transaction.js
-  # - jstests/core/txns/write_conflicts_with_non_txns.js
+  # - Tests that would be excluded from suite core_eloq
+  - jstests/core/txns/abort_expired_transaction.js
+  # - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js # startParallelShell
+  # - jstests/core/txns/abort_transactions_on_FCV_downgrade.js # unsupported maxTimeMS in txservice
+  - jstests/core/txns/aggregation_in_transaction.js 
+  # - jstests/core/txns/ban_tailable_cursor.js # Unsupported feature. Do not set the value of capped field to true.
+  - jstests/core/txns/banned_txn_dbs.js
+  - jstests/core/txns/basic_causal_consistency.js
+  # - jstests/core/txns/commands_not_allowed_in_txn.js # Unsupported feature. geoNear command.
+  # - jstests/core/txns/concurrent_drops_and_creates.js # 67:Error: no write error: { "nInserted" : 1 }
+  # - jstests/core/txns/do_txn_atomicity.js # Unsupported feature. Do not set the value of capped field to true.
+  - jstests/core/txns/do_txn_basic.js # 
+  - jstests/core/txns/find_and_modify_in_transaction.js
+  - jstests/core/txns/finished_transaction_error_handling.js
+  # - jstests/core/txns/kill_cursors_in_transaction.js # startParallelShell
+  # - jstests/core/txns/kill_op_on_txn_expiry.js # workerThread.start();
+  # - jstests/core/txns/kill_sessions_kills_transaction.js # killSessions stuck during abort
+  - jstests/core/txns/kill_transaction_cursors_after_commit.js
+  - jstests/core/txns/kill_txn_cursor.js
+  - jstests/core/txns/libs/write_conflicts.js
+  - jstests/core/txns/list_collections_not_blocked_by_txn.js
+  - jstests/core/txns/multi_delete_in_transaction.js
+  - jstests/core/txns/multi_statement_transaction.js
+  # - jstests/core/txns/multi_statement_transaction_abort.js # 160: Error: command worked when it should have failed: { "n" : 1, "ok" : 1 } Eloq detect conflict at commit phase.
+  # - jstests/core/txns/multi_statement_transaction_command_args.js # Error: error loading js file: jstests/core/txns/multi_statement_transaction_command_args.js @(shell):1:1 TypeError: TestData is undefined
+  - jstests/core/txns/multi_statement_transaction_using_api.js
+  - jstests/core/txns/multi_update_in_transaction.js
+  - jstests/core/txns/no_implicit_collection_creation_in_txn.js
+  # - jstests/core/txns/no_read_concern_snapshot_outside_txn.js # 85: Error: command worked when it should have failed: { "n" : 1, "ok" : 1 }
+  - jstests/core/txns/no_read_or_write_concern_inside_txn.js
+  - jstests/core/txns/no_writes_to_system_collections_in_txn.js
+  - jstests/core/txns/non_transactional_operations_on_session_with_transaction.js
+  # - jstests/core/txns/noop_createIndexes_not_blocked_by_txn.js # stuck
+  # - jstests/core/txns/only_allow_transactions_on_FCV_40.js # 36: Error: ["3.6"] != ["4.0"] are not equal : { "_id" : "featureCompatibilityVersion", "version" : "3.6" }
+  - jstests/core/txns/read_own_multikey_writes.js
+  - jstests/core/txns/repeatable_reads_in_transaction.js
+  - jstests/core/txns/shell_prompt_in_transaction.js
+  # - jstests/core/txns/speculative_snapshot_includes_all_writes.js # startParallelShell
+  - jstests/core/txns/start_transaction_with_read.js
+  # - jstests/core/txns/statement_ids_accepted.js # 249: This storage engine does not support prepared transactions
+  - jstests/core/txns/transaction_error_handling.js
+  # - jstests/core/txns/transactions_block_ddl.js # unsupported maxTimeMS in txservice
+  # - jstests/core/txns/transactions_profiling.js # 40: Error: assert failed : could not find any entries in the profile collection matching filter: undefined
+  # - jstests/core/txns/transactions_profiling_with_drops.js # startParallelShell
+  # - jstests/core/txns/transactions_write_conflicts.js # 59: Error: command worked when it should have failed: { "n" : 1, "ok" : 1 } Eloq detect conflict at commit phase.
+  # - jstests/core/txns/transactions_write_conflicts_unique_indexes.js # 36: Error: command worked when it should have failed: { "n" : 1, "ok" : 1 }
+  - jstests/core/txns/upconvert_read_concern.js
+  - jstests/core/txns/view_reads_in_transaction.js
+  # - jstests/core/txns/write_conflicts_with_non_txns.js # 71: Error: command worked when it should have failed: { "n" : 1, "ok" : 1 } 
 
   exclude_files:
-  # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests in the
-  # 'core' suite. Instead we run them against a 1-node replica set in the 'core_txns' suite.
-  - jstests/core/txns/**/*.js
+  # Transactions have been supported on MongoDB standalone node.
+  # - jstests/core/txns/**/*.js
 executor:
   archive:
     hooks:

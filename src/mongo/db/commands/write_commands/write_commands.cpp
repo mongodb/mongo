@@ -110,7 +110,7 @@ void serializeReply(OperationContext* opCtx,
     BSONSizeTracker upsertInfoSizeTracker;
     BSONSizeTracker errorsSizeTracker;
 
-    auto errorMessage = [&, errorSize = size_t(0) ](StringData rawMessage) mutable {
+    auto errorMessage = [&, errorSize = size_t(0)](StringData rawMessage) mutable {
         // Start truncating error messages once both of these limits are exceeded.
         constexpr size_t kErrorSizeTruncationMin = 1024 * 1024;
         constexpr size_t kErrorCountTruncationMin = 2;
@@ -268,11 +268,13 @@ private:
                 str::stream() << "Cannot write to system collection " << ns().toString()
                               << " within a transaction.",
                 !ns().isSystem());
+        /* This limitation does not exist in Eloq.
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         uassert(50790,
                 str::stream() << "Cannot write to unreplicated collection " << ns().toString()
                               << " within a transaction.",
                 !replCoord->isOplogDisabledFor(opCtx, ns()));
+        */
     }
 
     const OpMsgRequest* _request;

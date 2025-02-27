@@ -32,6 +32,14 @@ namespace mongo {
 namespace repl {
 
 enum class ReadConcernLevel {
+    // The ReadConcern in Eloq actually represents the isolation level.
+    // Ensure the values align with `txservice::IsolationLevel`.
+    kEloqReadCommittedIsolationLevel = 0,
+    kEloqSnapshotIsolationLevel,
+    kEloqRepeatableReadIsolationLevel,
+    kEloqSerializableIsolationLevel,
+
+    // Deprecated ReadConcern level in Eloq
     kLocalReadConcern,
     kMajorityReadConcern,
     kLinearizableReadConcern,

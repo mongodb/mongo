@@ -28,11 +28,11 @@
 
 #pragma once
 
-#include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/util/time_support.h"
 #include <utility>
 
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 // Global lock. Every server operation, which uses the Locker must acquire this lock at least
@@ -67,19 +67,19 @@ public:
     }
 
     LockerId getId() const override {
-        MONGO_UNREACHABLE;
+        return {};
     }
 
     stdx::thread::id getThreadId() const override {
-        MONGO_UNREACHABLE;
+        return {};
     }
 
     void updateThreadIdToCurrentThread() override {
-        MONGO_UNREACHABLE;
+        // No-op
     }
 
     void unsetThreadId() override {
-        MONGO_UNREACHABLE;
+        // No-op
     }
 
     void setSharedLocksShouldTwoPhaseLock(bool sharedLocksShouldTwoPhaseLock) override {
@@ -87,16 +87,15 @@ public:
     }
 
     void setMaxLockTimeout(Milliseconds maxTimeout) override {
-        MONGO_UNREACHABLE;
+        _maxLockTimeout = maxTimeout;
     }
 
     bool hasMaxLockTimeout() override {
-        MONGO_UNREACHABLE;
-        return false;
+        return static_cast<bool>(_maxLockTimeout);
     }
 
     void unsetMaxLockTimeout() override {
-        MONGO_UNREACHABLE;
+        _maxLockTimeout = boost::none;
     }
 
     LockResult lockGlobal(OperationContext* opCtx, LockMode mode) override {
@@ -224,11 +223,17 @@ public:
     }
 
     void getLockerInfo(LockerInfo* lockerInfo) const override {
-        MONGO_UNREACHABLE;
+        invariant(lockerInfo);
+
+        // Zero-out the contents
+        lockerInfo->locks.clear();
+        lockerInfo->waitingResource = ResourceId();
+        lockerInfo->stats.reset();
     }
 
     boost::optional<LockerInfo> getLockerInfo() const override {
-        return boost::none;
+        // Return a default-constructed LockerInfo object instead of boost::none.
+        return {LockerInfo{}};
     }
 
     // Refer to LockerImpl<IsForMMAPV1>::saveLockStateAndUnlock
@@ -293,11 +298,11 @@ public:
     }
 
     void releaseTicket() override {
-        MONGO_UNREACHABLE;
+        // No-op
     }
 
     void reacquireTicket(OperationContext* opCtx) override {
-        MONGO_UNREACHABLE;
+        // No-op
     }
 
     void dump() const override {
@@ -342,6 +347,13 @@ private:
     // Delays release of exclusive/intent-exclusive locked resources until the write unit of
     // work completes. Value of 0 means we are not inside a write unit of work.
     int _wuowNestingLevel{0};
+
+    // If this is set, dictates the max number of milliseconds that we will wait for lock
+    // acquisition. Effectively resets lock acquisition deadlines to time out sooner. If set to 0,
+    // for example, lock attempts will time out immediately if the lock is not immediately
+    // available.
+    // This variable is and serves no purpose for Eloq.
+    boost::optional<Milliseconds> _maxLockTimeout;
 
     // Indicates whether the client is active reader/writer or is queued.
     // AtomicWord<ClientState> _clientState{kInactive};

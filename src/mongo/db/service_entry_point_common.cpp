@@ -343,6 +343,7 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(const CommandInvocation* i
         }
     }
 
+    /* No need for Eloq
     if (!invocation->supportsReadConcern(readConcernArgs.getLevel())) {
         // We must be in a transaction if the readConcern level was upconverted to snapshot and the
         // command must support readConcern level snapshot in order to be supported in transactions.
@@ -354,7 +355,7 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(const CommandInvocation* i
                 str::stream() << "Command does not support read concern "
                               << readConcernArgs.toString()};
     }
-
+    */
     return readConcernArgs;
 }
 
@@ -827,8 +828,10 @@ void execCommandDatabase(OperationContext* opCtx,
                 (sessionOptions->getStartTransaction() == boost::optional<bool>(true));
             readConcernArgs = uassertStatusOK(
                 _extractReadConcern(invocation.get(), request.body, upconvertToSnapshot));
+            opCtx->setIsolationLevel(readConcernArgs.getOriginalLevel());
         }
 
+        /* No need for Eloq
         if (readConcernArgs.getArgsAtClusterTime()) {
             uassert(ErrorCodes::InvalidOptions,
                     "atClusterTime is only used for testing",
@@ -850,26 +853,26 @@ void execCommandDatabase(OperationContext* opCtx,
             opCtx->lockState()->setSharedLocksShouldTwoPhaseLock(true);
         }
 
-        // @starrysky no need for sharding
-        // auto& oss = OperationShardingState::get(opCtx);
+        auto& oss = OperationShardingState::get(opCtx);
 
-        // if (!opCtx->getClient()->isInDirectClient() &&
-        //     readConcernArgs.getLevel() != repl::ReadConcernLevel::kAvailableReadConcern &&
-        //     (iAmPrimary ||
-        //      (readConcernArgs.hasLevel() || readConcernArgs.getArgsAfterClusterTime()))) {
-        //     oss.initializeClientRoutingVersions(invocation->ns(), request.body);
+        if (!opCtx->getClient()->isInDirectClient() &&
+            readConcernArgs.getLevel() != repl::ReadConcernLevel::kAvailableReadConcern &&
+            (iAmPrimary ||
+             (readConcernArgs.hasLevel() || readConcernArgs.getArgsAfterClusterTime()))) {
+            oss.initializeClientRoutingVersions(invocation->ns(), request.body);
 
-        //     auto const shardingState = ShardingState::get(opCtx);
-        //     if (oss.hasShardVersion() || oss.hasDbVersion()) {
-        //         uassertStatusOK(shardingState->canAcceptShardedCommands());
-        //     }
+            auto const shardingState = ShardingState::get(opCtx);
+            if (oss.hasShardVersion() || oss.hasDbVersion()) {
+                uassertStatusOK(shardingState->canAcceptShardedCommands());
+            }
 
-        //     // Handle config optime information that may have been sent along with the command.
-        //     rpc::advanceConfigOptimeFromRequestMetadata(opCtx);
-        // }
+            // Handle config optime information that may have been sent along with the command.
+            rpc::advanceConfigOptimeFromRequestMetadata(opCtx);
+        }
 
-        // oss.setAllowImplicitCollectionCreation(allowImplicitCollectionCreationField);
-        // ScopedOperationCompletionShardingActions operationCompletionShardingActions(opCtx);
+        oss.setAllowImplicitCollectionCreation(allowImplicitCollectionCreationField);
+        ScopedOperationCompletionShardingActions operationCompletionShardingActions(opCtx);
+        */
 
         // This may trigger the maxTimeAlwaysTimeOut failpoint.
         auto status = opCtx->checkForInterruptNoAssert();
@@ -895,7 +898,8 @@ void execCommandDatabase(OperationContext* opCtx,
             rpc::TrackingMetadata::get(opCtx).setIsLogged(true);
         }
 
-        behaviors.waitForReadConcern(opCtx, invocation.get(), request);
+        // No need for Eloq
+        // behaviors.waitForReadConcern(opCtx, invocation.get(), request);
 
         try {
             if (!runCommandImpl(opCtx,

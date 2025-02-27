@@ -101,9 +101,11 @@ boost::optional<OperationSessionInfoFromClient> initializeOperationSessionInfo(
         invariant(osi.getSessionId());
         stdx::lock_guard<Client> lk(*opCtx->getClient());
 
+        // This limitation does not exist in Eloq.
         uassert(ErrorCodes::IllegalOperation,
                 "Transaction numbers are only allowed on a replica set member or mongos",
-                isReplSetMemberOrMongos);
+                true  // isReplSetMemberOrMongos
+        );
         uassert(ErrorCodes::IllegalOperation,
                 "Transaction numbers are only allowed on storage engines that support "
                 "document-level locking",

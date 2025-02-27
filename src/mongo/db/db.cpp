@@ -280,7 +280,9 @@ ExitCode _initAndListen(int listenPort) {
 
     serviceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds(10)));
     auto opObserverRegistry = stdx::make_unique<OpObserverRegistry>();
+    /* Disable the sharding op observer for Eloq
     opObserverRegistry->addObserver(stdx::make_unique<OpObserverShardingImpl>());
+    */
     opObserverRegistry->addObserver(stdx::make_unique<UUIDCatalogObserver>());
 
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
