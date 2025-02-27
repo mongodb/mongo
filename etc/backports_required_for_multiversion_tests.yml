@@ -21,6 +21,8 @@
 #
 last-continuous:
   all:
+    - test_file: jstests/core/query/json_schema/json_schema.js
+      ticket: SERVER-98676
     - test_file: jstests/change_streams/change_streams_namespace_match_expressions.js
       ticket: SERVER-100489
     - test_file: jstests/change_streams/change_streams_dynamic_match_expressions.js
@@ -391,6 +393,8 @@ last-continuous:
   suites: null
 last-lts:
   all:
+    - test_file: jstests/core/query/json_schema/json_schema.js
+      ticket: SERVER-98676
     - test_file: jstests/change_streams/change_streams_namespace_match_expressions.js
       ticket: SERVER-100489
     - test_file: jstests/change_streams/change_streams_dynamic_match_expressions.js

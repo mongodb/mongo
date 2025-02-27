@@ -34,7 +34,6 @@
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
-#include <memory>
 #include <type_traits>
 
 #include "mongo/bson/util/builder.h"
@@ -91,15 +90,15 @@ void FieldRef::parse(StringData path) {
     // We guarantee that accesses through getPart() will be valid while 'this' is. So we
     // keep a copy in a local sting.
 
-    _dotted = path.toString();
+    _dotted = ValidatedPathString{path.toString()};
     tassert(1589700,
             "the size of the path is larger than accepted",
-            _dotted.size() <= BSONObjMaxInternalSize);
+            _dotted.get().size() <= BSONObjMaxInternalSize);
 
     // Separate the field parts using '.' as a delimiter.
-    std::string::iterator beg = _dotted.begin();
-    std::string::iterator cur = beg;
-    const std::string::iterator end = _dotted.end();
+    std::string::const_iterator beg = _dotted.get().begin();
+    std::string::const_iterator cur = beg;
+    const std::string::const_iterator end = _dotted.get().end();
     while (true) {
         if (cur != end && *cur != '.') {
             cur++;
@@ -116,7 +115,7 @@ void FieldRef::parse(StringData path) {
         // instead reach the break statement.
 
         if (cur != beg) {
-            size_t offset = beg - _dotted.begin();
+            size_t offset = beg - _dotted.get().begin();
             size_t len = cur - beg;
             appendParsedPart(StringView{offset, len});
         } else {
@@ -139,7 +138,7 @@ void FieldRef::setPart(FieldIndex i, StringData part) {
         _replacements.resize(_parts.size());
     }
 
-    _replacements[i] = part.toString();
+    _replacements[i] = ValidatedPathString{part.toString()};
     _parts[i] = boost::none;
 }
 
@@ -148,7 +147,7 @@ void FieldRef::appendPart(StringData part) {
         _replacements.resize(_parts.size());
     }
 
-    _replacements.push_back(part.toString());
+    _replacements.push_back(ValidatedPathString{part.toString()});
     _parts.push_back(boost::none);
 }
 
@@ -197,7 +196,7 @@ void FieldRef::reserialize() const {
     }
 
     // Make the new string our contents
-    _dotted.swap(nextDotted);
+    _dotted = ValidatedPathString{std::move(nextDotted)};
 
     // Before we reserialize, it's possible that _cachedSize != _size because parts were added or
     // removed. This reserialization process reconciles the components in our cached string
@@ -205,11 +204,11 @@ void FieldRef::reserialize() const {
     _cachedSize = parts;
 
     // Fixup the parts to refer to the new string
-    std::string::const_iterator where = _dotted.begin();
-    const std::string::const_iterator end = _dotted.end();
+    std::string::const_iterator where = _dotted.get().begin();
+    const std::string::const_iterator end = _dotted.get().end();
     for (size_t i = 0; i != parts; ++i) {
         boost::optional<StringView>& part = _parts[i];
-        const size_t size = part ? part->len : _replacements[i].size();
+        const size_t size = part ? part->len : _replacements[i].get().size();
 
         // There is one case where we expect to see the "where" iterator to be at "end" here: we
         // are at the last part of the FieldRef and that part is the empty string. In that case, we
@@ -218,7 +217,7 @@ void FieldRef::reserialize() const {
         if (!size) {
             part = StringView{};
         } else {
-            std::size_t offset = where - _dotted.begin();
+            std::size_t offset = where - _dotted.get().begin();
             part = StringView{offset, size};
         }
         where += size;
@@ -243,9 +242,9 @@ StringData FieldRef::getPart(FieldIndex i) const {
             boost::container::small_vector<boost::optional<StringView>, kFewDottedFieldParts>>());
     const boost::optional<StringView>& part = _parts[i];
     if (part) {
-        return part->toStringData(_dotted);
+        return part->toStringData(_dotted.get());
     } else {
-        return StringData(_replacements[i]);
+        return StringData(_replacements[i].get());
     }
 }
 
@@ -404,7 +403,7 @@ StringData FieldRef::dottedSubstring(FieldIndex startPart, FieldIndex endPart) c
         reserialize();
     dassert(_replacements.empty() && _parts.size() == _cachedSize);
 
-    StringData result(_dotted);
+    StringData result(_dotted.get());
 
     // Fast-path if we want the whole thing
     if (startPart == 0 && endPart == numParts())

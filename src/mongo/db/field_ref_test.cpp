@@ -40,13 +40,13 @@
 namespace mongo {
 namespace {
 
-TEST(Empty, NoFields) {
+TEST(FieldRefTest, NoFields) {
     FieldRef fieldRef("");
     ASSERT_EQUALS(fieldRef.numParts(), 0U);
     ASSERT_EQUALS(fieldRef.dottedField(), "");
 }
 
-TEST(Empty, NoFieldNames) {
+TEST(FieldRefTest, NoFieldNames) {
     std::string field = ".";
     FieldRef fieldRef(field);
     ASSERT_EQUALS(fieldRef.numParts(), 2U);
@@ -55,7 +55,7 @@ TEST(Empty, NoFieldNames) {
     ASSERT_EQUALS(fieldRef.dottedField(), field);
 }
 
-TEST(Empty, NoFieldNames2) {
+TEST(FieldRefTest, NoFieldNames2) {
     std::string field = "..";
     FieldRef fieldRef(field);
     ASSERT_EQUALS(fieldRef.numParts(), 3U);
@@ -65,7 +65,7 @@ TEST(Empty, NoFieldNames2) {
     ASSERT_EQUALS(fieldRef.dottedField(), field);
 }
 
-TEST(Empty, EmptyFieldName) {
+TEST(FieldRefTest, EmptyFieldName) {
     std::string field = ".b.";
     FieldRef fieldRef(field);
     ASSERT_EQUALS(fieldRef.numParts(), 3U);
@@ -75,7 +75,7 @@ TEST(Empty, EmptyFieldName) {
     ASSERT_EQUALS(fieldRef.dottedField(), field);
 }
 
-TEST(Empty, ReinitializeWithEmptyString) {
+TEST(FieldRefTest, ReinitializeWithEmptyString) {
     FieldRef fieldRef("a.b.c.d.e");
     ASSERT_EQUALS(fieldRef.numParts(), 5U);
 
@@ -84,7 +84,7 @@ TEST(Empty, ReinitializeWithEmptyString) {
     ASSERT_EQUALS(fieldRef.dottedField(), "");
 }
 
-TEST(Normal, SinglePart) {
+TEST(FieldRefTest, SinglePart) {
     std::string field = "a";
     FieldRef fieldRef(field);
     ASSERT_EQUALS(fieldRef.numParts(), 1U);
@@ -92,7 +92,7 @@ TEST(Normal, SinglePart) {
     ASSERT_EQUALS(fieldRef.dottedField(), field);
 }
 
-DEATH_TEST_REGEX(Normal, Overflow, "Tripwire assertion.*1589700") {
+DEATH_TEST_REGEX(FieldRefTest, Overflow, "Tripwire assertion.*1589700") {
     std::string field = "a";
     for (size_t s = 1; s <= BSONObjMaxInternalSize / 2; s++) {
         field.append(".a");
@@ -103,7 +103,7 @@ DEATH_TEST_REGEX(Normal, Overflow, "Tripwire assertion.*1589700") {
 }
 
 
-TEST(Normal, ParseTwice) {
+TEST(FieldRefTest, ParseTwice) {
     std::string field = "a";
     FieldRef fieldRef;
     for (int i = 0; i < 2; i++) {
@@ -114,7 +114,7 @@ TEST(Normal, ParseTwice) {
     }
 }
 
-TEST(Normal, MulitplePartsVariable) {
+TEST(FieldRefTest, MultiplePartsVariable) {
     const char* parts[] = {"a", "b", "c", "d", "e"};
     size_t size = sizeof(parts) / sizeof(char*);
     std::string field(parts[0]);
@@ -131,7 +131,19 @@ TEST(Normal, MulitplePartsVariable) {
     ASSERT_EQUALS(fieldRef.dottedField(), field);
 }
 
-TEST(Replacement, SingleField) {
+TEST(FieldRefTest, ConstructorRejectsEmbeddedNullChars) {
+    const auto embeddedNull = "a\0"_sd;
+    FieldRef fieldRef;
+    ASSERT_THROWS_CODE(FieldRef(embeddedNull), AssertionException, 9867600);
+}
+
+TEST(FieldRefTest, ParseRejectsEmbeddedNullChars) {
+    const auto embeddedNull = "a\0"_sd;
+    FieldRef fieldRef;
+    ASSERT_THROWS_CODE(fieldRef.parse(embeddedNull), AssertionException, 9867600);
+}
+
+TEST(FieldRefTest, ReplaceSingleField) {
     std::string field = "$";
     FieldRef fieldRef(field);
     ASSERT_EQUALS(fieldRef.numParts(), 1U);
@@ -144,7 +156,7 @@ TEST(Replacement, SingleField) {
     ASSERT_EQUALS(fieldRef.dottedField(), newField);
 }
 
-TEST(Replacement, InMultipleField) {
+TEST(FieldRefTest, ReplaceInMultipleField) {
     std::string field = "a.b.c.$.e";
     FieldRef fieldRef(field);
     ASSERT_EQUALS(fieldRef.numParts(), 5U);
@@ -157,7 +169,7 @@ TEST(Replacement, InMultipleField) {
     ASSERT_EQUALS(fieldRef.dottedField(), "a.b.c.d.e");
 }
 
-TEST(Replacement, SameFieldMultipleReplacements) {
+TEST(FieldRefTest, SameFieldMultipleReplacements) {
     std::string prefix = "a.";
     std::string field = prefix + "$";
     FieldRef fieldRef(field);
@@ -171,7 +183,13 @@ TEST(Replacement, SameFieldMultipleReplacements) {
     }
 }
 
-TEST(Prefix, Normal) {
+TEST(FieldRefTest, SetPartRejectsEmbeddedNullChars) {
+    FieldRef fieldRef("f");
+    const auto embeddedNull = "a\0"_sd;
+    ASSERT_THROWS_CODE(fieldRef.setPart(0, embeddedNull), AssertionException, 9867600);
+}
+
+TEST(FieldRefTest, NormalPrefix) {
     FieldRef prefix, base("a.b.c");
 
     prefix.parse("a.b");
@@ -187,7 +205,7 @@ TEST(Prefix, Normal) {
     ASSERT_TRUE(prefix.isPrefixOfOrEqualTo(base));
 }
 
-TEST(Prefix, Dotted) {
+TEST(FieldRefTest, DottedPrefix) {
     FieldRef prefix("a.0"), base("a.0.c");
     ASSERT_TRUE(prefix.isPrefixOf(base));
     ASSERT_TRUE(prefix.isPrefixOfOrEqualTo(base));
@@ -197,7 +215,7 @@ TEST(Prefix, Dotted) {
     ASSERT_TRUE(prefix.isPrefixOfOrEqualTo(base));
 }
 
-TEST(Prefix, NoPrefixes) {
+TEST(FieldRefTest, NoPrefixes) {
     FieldRef prefix("a.b"), base("a.b");
     ASSERT_FALSE(prefix.isPrefixOf(base));
     ASSERT_TRUE(prefix.isPrefixOfOrEqualTo(base));
@@ -211,14 +229,14 @@ TEST(Prefix, NoPrefixes) {
     ASSERT_FALSE(prefix.isPrefixOfOrEqualTo(base));
 }
 
-TEST(Prefix, EmptyBase) {
+TEST(FieldRefTest, EmptyPrefix) {
     FieldRef field("a"), empty;
     ASSERT_FALSE(field.isPrefixOf(empty));
     ASSERT_FALSE(empty.isPrefixOf(field));
     ASSERT_FALSE(empty.isPrefixOf(empty));
 }
 
-TEST(PrefixSize, Normal) {
+TEST(FieldRefTest, CommonPrefixSizeNormal) {
     FieldRef fieldA("a.b"), fieldB("a");
     ASSERT_EQUALS(fieldA.commonPrefixSize(fieldB), 1U);
 
@@ -229,20 +247,20 @@ TEST(PrefixSize, Normal) {
     ASSERT_EQUALS(fieldA.commonPrefixSize(fieldB), 2U);
 }
 
-TEST(PrefixSize, NoCommonatility) {
+TEST(FieldRefTest, CommonPrefixNoCommonality) {
     FieldRef fieldA, fieldB;
     fieldA.parse("a");
     fieldB.parse("b");
     ASSERT_EQUALS(fieldA.commonPrefixSize(fieldB), 0U);
 }
 
-TEST(PrefixSize, Empty) {
+TEST(FieldRefTest, CommonPrefixSizeEmpty) {
     FieldRef fieldA("a"), empty;
     ASSERT_EQUALS(fieldA.commonPrefixSize(empty), 0U);
     ASSERT_EQUALS(empty.commonPrefixSize(fieldA), 0U);
 }
 
-TEST(FullyOverlapsWith, Normal) {
+TEST(FieldRefTest, FullyOverlapsWithNormal) {
     FieldRef fieldA("a"), fieldB("a.b"), fieldC("a.b.c");
     FieldRef fieldD("a.b.d");
     ASSERT(fieldA.fullyOverlapsWith(fieldA));
@@ -261,19 +279,19 @@ TEST(FullyOverlapsWith, Normal) {
     ASSERT_FALSE(fieldC.fullyOverlapsWith(fieldD));
 }
 
-TEST(FullyOverlapsWith, NoCommonality) {
+TEST(FieldRefTest, FullyOverlapsWithNoCommonality) {
     FieldRef fieldA("a.b.c"), fieldB("b.c.d");
     ASSERT_FALSE(fieldA.fullyOverlapsWith(fieldB));
     ASSERT_FALSE(fieldB.fullyOverlapsWith(fieldA));
 }
 
-TEST(FullyOverlapsWith, Empty) {
+TEST(FieldRefTest, FullyOverlapsWithEmpty) {
     FieldRef field("a"), empty;
     ASSERT_FALSE(field.fullyOverlapsWith(empty));
     ASSERT_FALSE(empty.fullyOverlapsWith(field));
 }
 
-TEST(Equality, Simple1) {
+TEST(FieldRefTest, EqualitySimple1) {
     FieldRef a("a.b");
     ASSERT(a.equalsDottedField("a.b"));
     ASSERT(!a.equalsDottedField("a"));
@@ -281,7 +299,7 @@ TEST(Equality, Simple1) {
     ASSERT(!a.equalsDottedField("a.b.c"));
 }
 
-TEST(Equality, Simple2) {
+TEST(FieldRefTest, EqualitySimple2) {
     FieldRef a("a");
     ASSERT(!a.equalsDottedField("a.b"));
     ASSERT(a.equalsDottedField("a"));
@@ -289,7 +307,7 @@ TEST(Equality, Simple2) {
     ASSERT(!a.equalsDottedField("a.b.c"));
 }
 
-TEST(Comparison, BothEmpty) {
+TEST(FieldRefTest, ComparisonBothEmpty) {
     FieldRef a;
     ASSERT_TRUE(a == a);
     ASSERT_FALSE(a != a);
@@ -299,7 +317,7 @@ TEST(Comparison, BothEmpty) {
     ASSERT_TRUE(a >= a);
 }
 
-TEST(Comparison, EqualInSize) {
+TEST(FieldRefTest, ComparisonEqualInSize) {
     FieldRef a("a.b.c"), b("a.d.c");
     ASSERT_FALSE(a == b);
     ASSERT_TRUE(a != b);
@@ -309,7 +327,7 @@ TEST(Comparison, EqualInSize) {
     ASSERT_FALSE(a >= b);
 }
 
-TEST(Comparison, NonEqual) {
+TEST(FieldRefTest, ComparisonNonEqual) {
     FieldRef a("a.b.c"), b("b.d");
     ASSERT_FALSE(a == b);
     ASSERT_TRUE(a != b);
@@ -319,7 +337,7 @@ TEST(Comparison, NonEqual) {
     ASSERT_FALSE(a >= b);
 }
 
-TEST(Comparison, MixedEmtpyAndNot) {
+TEST(FieldRefTest, ComparisonMixedEmptyAndNot) {
     FieldRef a("a"), b;
     ASSERT_FALSE(a == b);
     ASSERT_TRUE(a != b);
@@ -329,7 +347,7 @@ TEST(Comparison, MixedEmtpyAndNot) {
     ASSERT_TRUE(a >= b);
 }
 
-TEST(DottedField, Simple1) {
+TEST(FieldRefTest, DottedFieldSimple1) {
     FieldRef a("a.b.c.d.e");
     ASSERT_EQUALS("a.b.c.d.e", a.dottedField());
     ASSERT_EQUALS("a.b.c.d.e", a.dottedField(0));
@@ -341,7 +359,7 @@ TEST(DottedField, Simple1) {
     ASSERT_EQUALS("", a.dottedField(6));
 }
 
-TEST(DottedSubstring, Short) {
+TEST(FieldRefTest, DottedSubstringShort) {
     FieldRef path("a");
     ASSERT_EQUALS(1u, path.numParts());
     ASSERT_EQUALS("a", path.dottedSubstring(0, path.numParts()));
@@ -349,7 +367,7 @@ TEST(DottedSubstring, Short) {
     ASSERT_EQUALS("", path.dottedSubstring(0, 0));
 }
 
-TEST(DottedSubstring, Empty) {
+TEST(FieldRefTest, DottedSubstringEmpty) {
     FieldRef path("");
     ASSERT_EQUALS(0u, path.numParts());
     ASSERT_EQUALS("", path.dottedSubstring(0, path.numParts()));
@@ -357,7 +375,7 @@ TEST(DottedSubstring, Empty) {
     ASSERT_EQUALS("", path.dottedSubstring(0, 0));
 }
 
-TEST(DottedSubstring, Nested) {
+TEST(FieldRefTest, DottedSubstringNested) {
     FieldRef path("a.b.c.d.e");
     ASSERT_EQUALS(5u, path.numParts());
 
@@ -384,7 +402,7 @@ TEST(DottedSubstring, Nested) {
 }
 
 // The "short" append tests operate entirely in "reserve" space.
-TEST(AppendShort, Simple) {
+TEST(FieldRefTest, AppendShortSimple) {
     FieldRef path("a.b");
     ASSERT_EQUALS(2u, path.numParts());
 
@@ -393,7 +411,7 @@ TEST(AppendShort, Simple) {
     ASSERT_EQUALS("a.b.c", path.dottedField());
 }
 
-TEST(AppendShort, AppendAndReplace1) {
+TEST(FieldRefTest, AppendAndReplaceShort1) {
     FieldRef path("a.b");
     ASSERT_EQUALS(2u, path.numParts());
 
@@ -403,7 +421,7 @@ TEST(AppendShort, AppendAndReplace1) {
     ASSERT_EQUALS("a.0.c", path.dottedField());
 }
 
-TEST(AppendShort, AppendAndReplace2) {
+TEST(FieldRefTest, AppendAndReplaceShort2) {
     FieldRef path("a.b");
     ASSERT_EQUALS(2u, path.numParts());
 
@@ -413,7 +431,7 @@ TEST(AppendShort, AppendAndReplace2) {
     ASSERT_EQUALS("a.b.0", path.dottedField());
 }
 
-TEST(AppendShort, ReplaceAndAppend) {
+TEST(FieldRefTest, ReplaceAndAppendShort) {
     FieldRef path("a.b");
     ASSERT_EQUALS(2u, path.numParts());
 
@@ -424,7 +442,7 @@ TEST(AppendShort, ReplaceAndAppend) {
     ASSERT_EQUALS("a.0.c", path.dottedField());
 }
 
-TEST(AppendShort, AppendAndGetPart) {
+TEST(FieldRefTest, AppendShortAndGetPart) {
     FieldRef path("a.b");
     ASSERT_EQUALS(2u, path.numParts());
 
@@ -435,7 +453,7 @@ TEST(AppendShort, AppendAndGetPart) {
     ASSERT_EQUALS("c", path.getPart(2));
 }
 
-TEST(AppendShort, AppendEmptyPart) {
+TEST(FieldRefTest, AppendEmptyPart) {
     FieldRef path("a.b");
     ASSERT_EQUALS(2u, path.numParts());
 
@@ -445,7 +463,7 @@ TEST(AppendShort, AppendEmptyPart) {
     ASSERT_EQUALS("a.b.", path.dottedField());
 }
 
-TEST(AppendShort, SetEmptyPartThenAppend) {
+TEST(FieldRefTest, SetEmptyPartThenAppendShort) {
     FieldRef path("a.b");
     ASSERT_EQUALS(2u, path.numParts());
 
@@ -456,9 +474,17 @@ TEST(AppendShort, SetEmptyPartThenAppend) {
     ASSERT_EQUALS("", path.getPart(1));
 }
 
+TEST(FieldRefTest, AppendPartRejectsEmbeddedNullChars) {
+    FieldRef fieldRef("f");
+    const auto embeddedNull = "a\0"_sd;
+    ASSERT_THROWS_CODE(fieldRef.appendPart(embeddedNull), AssertionException, 9867600);
+    ASSERT_THROWS_CODE(
+        FieldRef::FieldRefTempAppend(fieldRef, embeddedNull), AssertionException, 9867600);
+}
+
 // The "medium" append tests feature an append operation that spills out of reserve space (i.e.,
 // we append to a path that has _size == kReserveAhead).
-TEST(AppendMedium, Simple) {
+TEST(FieldRefTest, AppendMediumSimple) {
     FieldRef path("a.b.c.d");
     ASSERT_EQUALS(4u, path.numParts());
 
@@ -467,7 +493,7 @@ TEST(AppendMedium, Simple) {
     ASSERT_EQUALS("a.b.c.d.e", path.dottedField());
 }
 
-TEST(AppendMedium, AppendAndReplace1) {
+TEST(FieldRefTest, AppendAndReplaceMedium1) {
     FieldRef path("a.b.c.d");
     ASSERT_EQUALS(4u, path.numParts());
 
@@ -477,7 +503,7 @@ TEST(AppendMedium, AppendAndReplace1) {
     ASSERT_EQUALS("a.0.c.d.e", path.dottedField());
 }
 
-TEST(AppendMedium, AppendAndReplace2) {
+TEST(FieldRefTest, AppendAndReplaceMedium2) {
     FieldRef path("a.b.c.d");
     ASSERT_EQUALS(4u, path.numParts());
 
@@ -487,7 +513,7 @@ TEST(AppendMedium, AppendAndReplace2) {
     ASSERT_EQUALS("a.b.c.d.0", path.dottedField());
 }
 
-TEST(AppendMedium, ReplaceAndAppend) {
+TEST(FieldRefTest, ReplaceAndAppendMedium) {
     FieldRef path("a.b.c.d");
     ASSERT_EQUALS(4u, path.numParts());
 
@@ -498,7 +524,7 @@ TEST(AppendMedium, ReplaceAndAppend) {
     ASSERT_EQUALS("a.0.c.d.e", path.dottedField());
 }
 
-TEST(AppendMedium, AppendAndGetPart) {
+TEST(FieldRefTest, AppendAndGetPartMedium) {
     FieldRef path("a.b.c.d");
     ASSERT_EQUALS(4u, path.numParts());
 
@@ -511,7 +537,7 @@ TEST(AppendMedium, AppendAndGetPart) {
     ASSERT_EQUALS("e", path.getPart(4));
 }
 
-TEST(AppendMedium, AppendEmptyPart) {
+TEST(FieldRefTest, AppendEmptyPartToMedium) {
     FieldRef path("a.b.c.d");
     ASSERT_EQUALS(4u, path.numParts());
 
@@ -521,7 +547,7 @@ TEST(AppendMedium, AppendEmptyPart) {
     ASSERT_EQUALS("a.b.c.d.", path.dottedField());
 }
 
-TEST(AppendMedium, SetEmptyPartThenAppend) {
+TEST(FieldRefTest, SetEmptyPartThenAppendToMedium) {
     FieldRef path("a.b.c.d");
     ASSERT_EQUALS(4u, path.numParts());
 
@@ -534,7 +560,7 @@ TEST(AppendMedium, SetEmptyPartThenAppend) {
 
 // The "long" append tests have paths that are bigger than the reserve space throughout their life
 // cycle.
-TEST(AppendLong, Simple) {
+TEST(FieldRefTest, AppendLongSimple) {
     FieldRef path("a.b.c.d.e.f");
     ASSERT_EQUALS(6u, path.numParts());
 
@@ -545,7 +571,7 @@ TEST(AppendLong, Simple) {
     ASSERT_EQUALS("a.b.c.d.e.f.g.h.i", path.dottedField());
 }
 
-TEST(AppendLong, AppendAndReplace1) {
+TEST(FieldRefTest, AppendAndReplaceLong1) {
     FieldRef path("a.b.c.d.e.f");
     ASSERT_EQUALS(6u, path.numParts());
 
@@ -558,7 +584,7 @@ TEST(AppendLong, AppendAndReplace1) {
     ASSERT_EQUALS("a.0.c.d.e.1.g.h.i", path.dottedField());
 }
 
-TEST(AppendLong, AppendAndReplace2) {
+TEST(FieldRefTest, AppendAndReplaceLong2) {
     FieldRef path("a.b.c.d.e.f");
     ASSERT_EQUALS(6u, path.numParts());
 
@@ -570,7 +596,7 @@ TEST(AppendLong, AppendAndReplace2) {
     ASSERT_EQUALS("a.b.c.d.e.f.g.0.i", path.dottedField());
 }
 
-TEST(AppendLong, ReplaceAndAppend) {
+TEST(FieldRefTest, ReplaceAndAppendLong) {
     FieldRef path("a.b.c.d.e.f");
     ASSERT_EQUALS(6u, path.numParts());
 
@@ -585,7 +611,7 @@ TEST(AppendLong, ReplaceAndAppend) {
     ASSERT_EQUALS("a.0.c.d.e.1.g.h.i", path.dottedField());
 }
 
-TEST(AppendLong, AppendAndGetPart) {
+TEST(FieldRefTest, AppendAndGetPartLong) {
     FieldRef path("a.b.c.d.e.f");
     ASSERT_EQUALS(6u, path.numParts());
 
@@ -606,7 +632,7 @@ TEST(AppendLong, AppendAndGetPart) {
     ASSERT_EQUALS("i", path.getPart(8));
 }
 
-TEST(AppendLong, AppendEmptyPart) {
+TEST(FieldRefTest, AppendEmptyPartToLong) {
     FieldRef path("a.b.c.d.e.f");
     ASSERT_EQUALS(6u, path.numParts());
 
@@ -616,7 +642,7 @@ TEST(AppendLong, AppendEmptyPart) {
     ASSERT_EQUALS("a.b.c.d.e.f.", path.dottedField());
 }
 
-TEST(AppendLong, SetEmptyPartThenAppend) {
+TEST(FieldRefTest, SetEmptyPartThenAppendToLong) {
     FieldRef path("a.b.c.d.e.f");
     ASSERT_EQUALS(6u, path.numParts());
 
@@ -630,7 +656,7 @@ TEST(AppendLong, SetEmptyPartThenAppend) {
 }
 
 // The "short" removeLastPart tests operate entirely in "reserve" space.
-TEST(RemoveLastPartShort, Simple) {
+TEST(FieldRefTest, RemoveLastParthShortSimple) {
     FieldRef path("a.b");
     ASSERT_EQUALS(2u, path.numParts());
 
@@ -639,7 +665,7 @@ TEST(RemoveLastPartShort, Simple) {
     ASSERT_EQUALS("a", path.dottedField());
 }
 
-TEST(RemoveLastPartShort, RemoveUntilEmpty) {
+TEST(FieldRefTest, RemoveLastPartShortUntilEmpty) {
     FieldRef path("a.b");
     ASSERT_EQUALS(2u, path.numParts());
 
@@ -649,7 +675,7 @@ TEST(RemoveLastPartShort, RemoveUntilEmpty) {
     ASSERT_EQUALS("", path.dottedField());
 }
 
-TEST(RemoveLastPartShort, AppendThenRemove) {
+TEST(FieldRefTest, AppendThenRemoveLastPartShort) {
     FieldRef path("a.b");
     ASSERT_EQUALS(2u, path.numParts());
 
@@ -659,7 +685,7 @@ TEST(RemoveLastPartShort, AppendThenRemove) {
     ASSERT_EQUALS("a.b", path.dottedField());
 }
 
-TEST(RemoveLastPartShort, RemoveThenAppend) {
+TEST(FieldRefTest, RemoveLastPartShortThenAppend) {
     FieldRef path("a.b");
     ASSERT_EQUALS(2u, path.numParts());
 
@@ -669,7 +695,7 @@ TEST(RemoveLastPartShort, RemoveThenAppend) {
     ASSERT_EQUALS("a.b", path.dottedField());
 }
 
-TEST(RemoveLastPartShort, RemoveThenSetPart) {
+TEST(FieldRefTest, RemoveLastPartShortThenSetPart) {
     FieldRef path("a.b");
     ASSERT_EQUALS(2u, path.numParts());
 
@@ -679,7 +705,7 @@ TEST(RemoveLastPartShort, RemoveThenSetPart) {
     ASSERT_EQUALS("0", path.dottedField());
 }
 
-TEST(RemoveLastPartShort, SetPartThenRemove) {
+TEST(FieldRefTest, SetPartThenRemoveLastPartShort) {
     FieldRef path("a.b");
     ASSERT_EQUALS(2u, path.numParts());
 
@@ -690,7 +716,7 @@ TEST(RemoveLastPartShort, SetPartThenRemove) {
     ASSERT_EQUALS("0", path.dottedField());
 }
 
-TEST(RemoveLastPartShort, AppendThenSetPartThenRemove) {
+TEST(FieldRefTest, AppendThenSetPartThenRemoveLastPartShort) {
     FieldRef path("a.b");
     ASSERT_EQUALS(2u, path.numParts());
 
@@ -703,7 +729,7 @@ TEST(RemoveLastPartShort, AppendThenSetPartThenRemove) {
 
 // The "medium" removeLastPart tests feature paths that change in size during the test so that they
 // transition between fitting and not fitting in "reserve" space.
-TEST(RemoveLastPartMedium, Simple) {
+TEST(FieldRefTest, RemoveLastPartMediumSimple) {
     FieldRef path("a.b.c.d.e");
     ASSERT_EQUALS(5u, path.numParts());
 
@@ -712,7 +738,7 @@ TEST(RemoveLastPartMedium, Simple) {
     ASSERT_EQUALS("a.b.c.d", path.dottedField());
 }
 
-TEST(RemoveLastPartMedium, RemoveUntilEmpty) {
+TEST(FieldRefTest, RemoveLastPartMediumUntilEmpty) {
     FieldRef path("a.b.c.d.e");
     ASSERT_EQUALS(5u, path.numParts());
 
@@ -723,7 +749,7 @@ TEST(RemoveLastPartMedium, RemoveUntilEmpty) {
     ASSERT_EQUALS("", path.dottedField());
 }
 
-TEST(RemoveLastPartMedium, AppendThenRemove) {
+TEST(FieldRefTest, AppendThenRemoveLastPartMedium) {
     FieldRef path("a.b.c.d");
     ASSERT_EQUALS(4u, path.numParts());
 
@@ -733,7 +759,7 @@ TEST(RemoveLastPartMedium, AppendThenRemove) {
     ASSERT_EQUALS("a.b.c.d", path.dottedField());
 }
 
-TEST(RemoveLastPartMedium, RemoveThenAppend) {
+TEST(FieldRefTest, RemoveLastPartMediumThenAppend) {
     FieldRef path("a.b.c.d.e");
     ASSERT_EQUALS(5u, path.numParts());
 
@@ -743,7 +769,7 @@ TEST(RemoveLastPartMedium, RemoveThenAppend) {
     ASSERT_EQUALS("a.b.c.d.e", path.dottedField());
 }
 
-TEST(RemoveLastPartMedium, RemoveThenSetPart) {
+TEST(FieldRefTest, RemoveLastPartMediumThenSetPart) {
     FieldRef path("a.b.c.d.e");
     ASSERT_EQUALS(5u, path.numParts());
 
@@ -753,7 +779,7 @@ TEST(RemoveLastPartMedium, RemoveThenSetPart) {
     ASSERT_EQUALS("0.b.c.d", path.dottedField());
 }
 
-TEST(RemoveLastPartMedium, SetPartThenRemove) {
+TEST(FieldRefTest, SetPartThenRemoveLastPartMedium) {
     FieldRef path("a.b.c.d.e");
     ASSERT_EQUALS(5u, path.numParts());
 
@@ -764,7 +790,7 @@ TEST(RemoveLastPartMedium, SetPartThenRemove) {
     ASSERT_EQUALS("0.b.c.d", path.dottedField());
 }
 
-TEST(RemoveLastPartMedium, AppendThenSetPartThenRemove) {
+TEST(FieldRefTest, AppendThenSetPartThenRemoveLastPartMedium) {
     FieldRef path("a.b.c.d");
     ASSERT_EQUALS(4u, path.numParts());
 
@@ -778,7 +804,7 @@ TEST(RemoveLastPartMedium, AppendThenSetPartThenRemove) {
 
 // The "long" removeLastPart tests have paths that are bigger than the reserve space throughout
 // their life cycle (with the exception of RemoveUntilempty).
-TEST(RemoveLastPartLong, Simple) {
+TEST(FieldRefTest, RemoveLastPartLongSimple) {
     FieldRef path("a.b.c.d.e.f.g");
     ASSERT_EQUALS(7u, path.numParts());
 
@@ -787,7 +813,7 @@ TEST(RemoveLastPartLong, Simple) {
     ASSERT_EQUALS("a.b.c.d.e.f", path.dottedField());
 }
 
-TEST(RemoveLastPartLong, RemoveUntilEmpty) {
+TEST(FieldRefTest, RemoveLastPartLongUntilEmpty) {
     FieldRef path("a.b.c.d.e.f.g");
     ASSERT_EQUALS(7u, path.numParts());
 
@@ -798,7 +824,7 @@ TEST(RemoveLastPartLong, RemoveUntilEmpty) {
     ASSERT_EQUALS("", path.dottedField());
 }
 
-TEST(RemoveLastPartLong, AppendThenRemove) {
+TEST(FieldRefTest, AppendThenRemoveLastPartLong) {
     FieldRef path("a.b.c.d.e.f");
     ASSERT_EQUALS(6u, path.numParts());
 
@@ -808,7 +834,7 @@ TEST(RemoveLastPartLong, AppendThenRemove) {
     ASSERT_EQUALS("a.b.c.d.e.f", path.dottedField());
 }
 
-TEST(RemoveLastPartLong, RemoveThenAppend) {
+TEST(FieldRefTest, RemoveLastPartLongThenAppend) {
     FieldRef path("a.b.c.d.e.f.g");
     ASSERT_EQUALS(7u, path.numParts());
 
@@ -818,7 +844,7 @@ TEST(RemoveLastPartLong, RemoveThenAppend) {
     ASSERT_EQUALS("a.b.c.d.e.f.g", path.dottedField());
 }
 
-TEST(RemoveLastPartLong, RemoveThenSetPart) {
+TEST(FieldRefTest, RemoveLastPartLongThenSetPart) {
     FieldRef path("a.b.c.d.e.f.g");
     ASSERT_EQUALS(7u, path.numParts());
 
@@ -829,7 +855,7 @@ TEST(RemoveLastPartLong, RemoveThenSetPart) {
     ASSERT_EQUALS("0.b.c.d.1.f", path.dottedField());
 }
 
-TEST(RemoveLastPartLong, SetPartThenRemove) {
+TEST(FieldRefTest, SetPartThenRemoveLastPartLong) {
     FieldRef path("a.b.c.d.e.f.g");
     ASSERT_EQUALS(7u, path.numParts());
 
@@ -841,7 +867,7 @@ TEST(RemoveLastPartLong, SetPartThenRemove) {
     ASSERT_EQUALS("0.b.c.d.1.f", path.dottedField());
 }
 
-TEST(RemoveLastPartLong, AppendThenSetPartThenRemove) {
+TEST(FieldRefTest, AppendThenSetPartThenRemoveLastPartLong) {
     FieldRef path("a.b.c.d.e.f");
     ASSERT_EQUALS(6u, path.numParts());
 
@@ -854,13 +880,13 @@ TEST(RemoveLastPartLong, AppendThenSetPartThenRemove) {
     ASSERT_EQUALS("a.b.0.d.1.f", path.dottedField());
 }
 
-TEST(RemoveLastPartLong, FieldRefCopyConstructor) {
+TEST(FieldRefTest, CopyConstructor) {
     FieldRef original("a.b.c");
     FieldRef copy = original;
     ASSERT_EQ(original, copy);
 }
 
-TEST(RemoveLastPartLong, FieldRefCopyAssignment) {
+TEST(FieldRefTest, CopyAssignment) {
     FieldRef original("a.b.c");
     FieldRef other("x.y.z");
     ASSERT_NE(original, other);
@@ -868,7 +894,7 @@ TEST(RemoveLastPartLong, FieldRefCopyAssignment) {
     ASSERT_EQ(original, other);
 }
 
-TEST(RemoveLastPartLong, FieldRefFromCopyAssignmentIsValidAfterOriginalIsDeleted) {
+TEST(FieldRefTest, FromCopyAssignmentIsValidAfterOriginalIsDeleted) {
     FieldRef copy("x.y.z");
     {
         FieldRef original("a.b.c");
@@ -878,7 +904,7 @@ TEST(RemoveLastPartLong, FieldRefFromCopyAssignmentIsValidAfterOriginalIsDeleted
     ASSERT_EQ(copy, FieldRef("a.b.c"));
 }
 
-TEST(RemoveLastPartLong, FieldRefFromCopyAssignmentIsADeepCopy) {
+TEST(FieldRefTest, FromCopyAssignmentIsADeepCopy) {
     FieldRef original("a.b.c");
     FieldRef other("x.y.z");
     ASSERT_NE(original, other);
@@ -892,7 +918,7 @@ TEST(RemoveLastPartLong, FieldRefFromCopyAssignmentIsADeepCopy) {
     ASSERT_EQ(other, FieldRef("a.b.c"));
 }
 
-TEST(NumericPathComponents, CanIdentifyNumericPathComponents) {
+TEST(FieldRefTest, CanIdentifyNumericPathComponents) {
     FieldRef path("a.0.b.1.c");
     ASSERT(!path.isNumericPathComponentStrict(0));
     ASSERT(path.isNumericPathComponentStrict(1));
@@ -901,40 +927,40 @@ TEST(NumericPathComponents, CanIdentifyNumericPathComponents) {
     ASSERT(!path.isNumericPathComponentStrict(4));
 }
 
-TEST(NumericPathComponents, CanObtainAllNumericPathComponents) {
+TEST(FieldRefTest, CanObtainAllNumericPathComponents) {
     FieldRef path("a.0.b.1.c.2.d");
     std::set<FieldIndex> expectedComponents{FieldIndex(1), FieldIndex(3), FieldIndex(5)};
     auto numericPathComponents = path.getNumericPathComponents();
     ASSERT(numericPathComponents == expectedComponents);
 }
 
-TEST(NumericPathComponents, FieldsWithLeadingZeroesAreNotConsideredNumeric) {
+TEST(FieldRefTest, FieldsWithLeadingZeroesAreNotConsideredNumeric) {
     FieldRef path("a.0.b.01.c.2.d");
     std::set<FieldIndex> expectedComponents{FieldIndex(1), FieldIndex(5)};
     auto numericPathComponents = path.getNumericPathComponents();
     ASSERT(numericPathComponents == expectedComponents);
 }
 
-TEST(RemoveFirstPart, EmptyPathDoesNothing) {
+TEST(FieldRefTest, RemoveFirstPartOnEmptyPathDoesNothing) {
     FieldRef path;
     path.removeFirstPart();
     ASSERT_EQ(path.numParts(), 0U);
 }
 
-TEST(RemoveFirstPart, PathWithOneComponentBecomesEmpty) {
+TEST(FieldRefTest, RemoveFirstPartPathWithOneComponentBecomesEmpty) {
     FieldRef path("first");
     path.removeFirstPart();
     ASSERT_EQ(path.numParts(), 0U);
 }
 
-TEST(RemoveFirstPart, PathWithTwoComponentsOnlyHoldsSecond) {
+TEST(FieldRefTest, RemoveFirstPartPathWithTwoComponentsOnlyHoldsSecond) {
     FieldRef path("remove.keep");
     path.removeFirstPart();
     ASSERT_EQ(path.numParts(), 1U);
     ASSERT_EQ(path, FieldRef("keep"));
 }
 
-TEST(RemoveFirstPart, RemovingFirstPartFromLongPathMultipleTimes) {
+TEST(FieldRefTest, RemovingFirstPartFromLongPathMultipleTimes) {
     FieldRef path("first.second.third.fourth.fifth.sixth.seventh.eigth.ninth.tenth");
     path.removeFirstPart();
     ASSERT_EQ(path, FieldRef("second.third.fourth.fifth.sixth.seventh.eigth.ninth.tenth"));
@@ -948,7 +974,7 @@ TEST(RemoveFirstPart, RemovingFirstPartFromLongPathMultipleTimes) {
     ASSERT_EQ(path, FieldRef("sixth.seventh.eigth.ninth.tenth"));
 }
 
-TEST(FieldRefCanonicalIndexField, CanonicalIndexField) {
+TEST(FieldRefTest, CanonicalIndexField) {
     ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a")), FieldRef("a"_sd));
     ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("aaa")), FieldRef("aaa"_sd));
     ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.b")), FieldRef("a.b"_sd));
@@ -976,7 +1002,7 @@ TEST(FieldRefCanonicalIndexField, CanonicalIndexField) {
     ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.$")), FieldRef("a"_sd));
 }
 
-TEST(FieldRefCanonicalIndexField, CanonicalIndexFieldForNestedNumericFieldNames) {
+TEST(FieldRefTest, CanonicalIndexFieldForNestedNumericFieldNames) {
     ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.0.0")), FieldRef("a"_sd));
     ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.55.01")), FieldRef("a"_sd));
     ASSERT_EQ(FieldRef::getCanonicalIndexField(FieldRef("a.0.0.b.1")), FieldRef("a"_sd));
