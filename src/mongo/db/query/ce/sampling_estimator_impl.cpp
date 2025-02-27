@@ -440,10 +440,19 @@ void SamplingEstimatorImpl::generateSampleBySeqScanningForTesting() {
 
 CardinalityEstimate SamplingEstimatorImpl::estimateCardinality(const MatchExpression* expr) const {
     size_t cnt = 0;
-    for (const auto& doc : _sample) {
-        if (exec::matcher::matchesBSON(expr, doc, nullptr)) {
-            cnt++;
+    try {
+        for (const auto& doc : _sample) {
+            if (exec::matcher::matchesBSON(expr, doc, nullptr)) {
+                cnt++;
+            }
         }
+    } catch (const DBException&) {
+        // The evaluation of this expression failed. This estimation stops here and returns a
+        // CardinalityEstimate calculated based on whatever we have counted at this point with a
+        // erroneous status.
+        CardinalityEstimate ce{CardinalityType{(cnt * getCollCard()) / _sampleSize},
+                               EstimationSource::Sampling};
+        return ce;
     }
     CardinalityEstimate estimate{CardinalityType{(cnt * getCollCard()) / _sampleSize},
                                  EstimationSource::Sampling};
@@ -457,20 +466,29 @@ CardinalityEstimate SamplingEstimatorImpl::estimateCardinality(const MatchExpres
 
 std::vector<CardinalityEstimate> SamplingEstimatorImpl::estimateCardinality(
     const std::vector<const MatchExpression*>& expressions) const {
+    // The bool value indicates whether the estimation of the corresponding expression was aborted
+    // or not. The estimation would be stopped if any error occurred during the estimation.
+    std::vector<std::pair<double, bool>> estimates(expressions.size(), {0, true});
     // Experiment showed that this batch process performs better than calling
     // 'estimateCardinality(const MatchExpression* expr)' over and over.
-    std::vector<double> estimates(expressions.size(), 0);
     for (const auto& doc : _sample) {
         for (size_t i = 0; i < expressions.size(); i++) {
-            if (exec::matcher::matchesBSON(expressions[i], doc, nullptr)) {
-                estimates[i] += 1;
+            if (estimates[i].second) {
+                try {
+                    if (exec::matcher::matchesBSON(expressions[i], doc, nullptr)) {
+                        estimates[i].first += 1;
+                    }
+                } catch (const DBException&) {
+                    // The expression failed to evaluate. Abort the estimation of this expression.
+                    estimates[i].second = false;
+                }
             }
         }
     }
 
     std::vector<CardinalityEstimate> estimatesCard;
     for (auto card : estimates) {
-        double estimate = (card * getCollCard()) / _sampleSize;
+        double estimate = (card.first * getCollCard()) / _sampleSize;
         estimatesCard.push_back(
             CardinalityEstimate{CardinalityType{estimate}, EstimationSource::Sampling});
     }
