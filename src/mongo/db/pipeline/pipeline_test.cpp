@@ -5866,7 +5866,7 @@ TEST_F(PipelineDependenciesTest, ShouldNotRequireTextScoreIfThereIsNoScoreAvaila
 
 TEST_F(PipelineDependenciesTest, ShouldThrowIfTextScoreIsNeededButNotPresent) {
     auto ctx = getExpCtx();
-    auto needsText = DocumentSourceNeedsOnlyTextScore::create(ctx);
+    auto needsText = DocumentSourceNeedsMetaField::create(ctx, DocumentMetadataFields::kTextScore);
     auto pipeline = makePipeline({needsText});
 
     ASSERT_THROWS(pipeline->getDependencies(DepsTracker::kNoMetadata), AssertionException);
@@ -5901,8 +5901,8 @@ TEST_F(PipelineDependenciesTest,
 
 TEST_F(PipelineDependenciesTest, ShouldNotRequireTextScoreIfAvailableButDefinitelyNotNeeded) {
     auto ctx = getExpCtx();
-    auto stripsTextScore = DocumentSourceStripsTextScore::create(ctx);
-    auto needsText = DocumentSourceNeedsOnlyTextScore::create(ctx);
+    auto stripsTextScore = DocumentSourceStripsMetadata::create(ctx);
+    auto needsText = DocumentSourceNeedsMetaField::create(ctx, DocumentMetadataFields::kTextScore);
     auto pipeline = makePipeline({stripsTextScore, needsText});
 
     auto depsTracker = pipeline->getDependencies(DepsTracker::kOnlyTextScore);
@@ -5912,6 +5912,107 @@ TEST_F(PipelineDependenciesTest, ShouldNotRequireTextScoreIfAvailableButDefinite
     ASSERT_FALSE(depsTracker.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 }
 
+TEST_F(PipelineDependenciesTest, ValidateMetaDependenciesPassesIfMetaFieldNeededAfterGenerated) {
+    auto ctx = getExpCtx();
+    auto generatesScore =
+        DocumentSourceGeneratesMetaField::create(ctx, DocumentMetadataFields::kScore);
+    auto needsScore = DocumentSourceNeedsMetaField::create(ctx, DocumentMetadataFields::kScore);
+
+    auto pipeline = makePipeline({generatesScore, needsScore});
+
+    // The meta dependencies are valid since it generates the score prior to needing the score.
+    ASSERT_DOES_NOT_THROW(pipeline->validateMetaDependencies());
+}
+
+TEST_F(PipelineDependenciesTest, ValidateMetaDependenciesThrowsIfMetaFieldNeededBeforeGenerated) {
+    auto ctx = getExpCtx();
+    auto needsScore = DocumentSourceNeedsMetaField::create(ctx, DocumentMetadataFields::kScore);
+    auto generatesScore =
+        DocumentSourceGeneratesMetaField::create(ctx, DocumentMetadataFields::kScore);
+
+    auto pipeline = makePipeline({needsScore, generatesScore});
+
+    // The meta dependencies are invalid since it requests the score prior to score being generated.
+    ASSERT_THROWS_CODE(pipeline->validateMetaDependencies(), AssertionException, 40218);
+}
+
+TEST_F(PipelineDependenciesTest,
+       ValidateMetaDependenciesThrowsIfMetaFieldNeededAfterMetadataStripped) {
+    auto ctx = getExpCtx();
+
+    auto generatesScore =
+        DocumentSourceGeneratesMetaField::create(ctx, DocumentMetadataFields::kScore);
+    auto stripsMetadata = DocumentSourceStripsMetadata::create(ctx);
+    auto needsScore = DocumentSourceNeedsMetaField::create(ctx, DocumentMetadataFields::kScore);
+
+    auto pipeline = makePipeline({generatesScore, stripsMetadata, needsScore});
+
+    // The meta dependencies are invalid since it requests the score after metadata is stripped.
+    ASSERT_THROWS_CODE(pipeline->validateMetaDependencies(), AssertionException, 40218);
+}
+
+TEST_F(PipelineDependenciesTest,
+       ValidateMetaDependenciesPassesIfMetaFieldNeededBeforeMetadataStripped) {
+    auto ctx = getExpCtx();
+
+    auto generatesScore =
+        DocumentSourceGeneratesMetaField::create(ctx, DocumentMetadataFields::kScore);
+    auto needsScore = DocumentSourceNeedsMetaField::create(ctx, DocumentMetadataFields::kScore);
+    auto stripsMetadata = DocumentSourceStripsMetadata::create(ctx);
+
+    auto pipeline = makePipeline({generatesScore, needsScore, stripsMetadata});
+
+    // The meta dependencies are valid since it requests the score before metadata is stripped.
+    ASSERT_DOES_NOT_THROW(pipeline->validateMetaDependencies());
+}
+
+TEST_F(PipelineDependenciesTest,
+       ValidateMetaDependenciesPassesIfMetaFieldGeneratedAfterMetadataStripped) {
+    auto ctx = getExpCtx();
+
+    auto stripsMetadata = DocumentSourceStripsMetadata::create(ctx);
+    auto generatesScore =
+        DocumentSourceGeneratesMetaField::create(ctx, DocumentMetadataFields::kScore);
+    auto needsScore = DocumentSourceNeedsMetaField::create(ctx, DocumentMetadataFields::kScore);
+
+    auto pipeline = makePipeline({stripsMetadata, generatesScore, needsScore});
+
+    // The meta dependencies are valid since it generates the score after metadata is stripped.
+    ASSERT_DOES_NOT_THROW(pipeline->validateMetaDependencies());
+}
+
+TEST_F(PipelineDependenciesTest, ValidateMetaDependenciesThrowsMetadataStrippedMultipleTimes) {
+    auto ctx = getExpCtx();
+
+    auto stripsMetadata1 = DocumentSourceStripsMetadata::create(ctx);
+    auto generatesScore =
+        DocumentSourceGeneratesMetaField::create(ctx, DocumentMetadataFields::kScore);
+    auto stripsMetadata2 = DocumentSourceStripsMetadata::create(ctx);
+    auto needsScore = DocumentSourceNeedsMetaField::create(ctx, DocumentMetadataFields::kScore);
+    auto stripsMetadata3 = DocumentSourceStripsMetadata::create(ctx);
+
+    auto pipeline = makePipeline(
+        {stripsMetadata1, generatesScore, stripsMetadata2, needsScore, stripsMetadata3});
+
+    // The meta dependencies are invalid since it requests the score after metadata is stripped.
+    ASSERT_THROWS_CODE(pipeline->validateMetaDependencies(), AssertionException, 40218);
+}
+
+TEST_F(PipelineDependenciesTest, ValidateMetaDependenciesPassesMetadataStrippedMultipleTimes) {
+    auto ctx = getExpCtx();
+
+    auto stripsMetadata1 = DocumentSourceStripsMetadata::create(ctx);
+    auto generatesScore =
+        DocumentSourceGeneratesMetaField::create(ctx, DocumentMetadataFields::kScore);
+    auto needsScore = DocumentSourceNeedsMetaField::create(ctx, DocumentMetadataFields::kScore);
+    auto stripsMetadata2 = DocumentSourceStripsMetadata::create(ctx);
+
+    auto pipeline = makePipeline({stripsMetadata1, generatesScore, needsScore, stripsMetadata2});
+
+    // The meta dependencies are valid since it neither stages that strip metadata interfere between
+    // when the score and generated and needed.
+    ASSERT_DOES_NOT_THROW(pipeline->validateMetaDependencies());
+}
 
 class DocumentSourceProducerConsumer : public DocumentSourceDependencyDummy {
 public:

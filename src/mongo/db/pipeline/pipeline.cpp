@@ -791,9 +791,19 @@ void Pipeline::validateMetaDependencies(QueryMetadataBitSet availableMetadata) c
     // we mark it as available. We should implement better dependency tracking for $geoNear.
     availableMetadata |= DepsTracker::kAllGeoNearData;
 
-    // We can ignore the return value since we're only concerned that the pipeline has been
-    // validated.
-    (void)getDependenciesForContainer(getContext(), _sources, availableMetadata);
+    DepsTracker deps(availableMetadata);
+    for (auto&& source : _sources) {
+        // Calls to setNeedsMetadata() inside the per-stage implementations of getDependencies() may
+        // trigger a uassert if the metadata requested is not available to that stage. That is where
+        // validation occurs.
+        DepsTracker::State status = source->getDependencies(&deps);
+        auto mayDestroyMetadata = status & DepsTracker::State::EXHAUSTIVE_META;
+        if (mayDestroyMetadata) {
+            // TODO SERVER-100443 Right now this only actually clears "score" and "scoreDetails",
+            // but we should reset all fields to be validated in downstream stages.
+            deps.clearMetadataAvailable();
+        }
+    }
 }
 
 bool Pipeline::generatesMetadataType(DocumentMetadataFields::MetaType type) const {

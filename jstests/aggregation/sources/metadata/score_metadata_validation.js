@@ -1,5 +1,5 @@
 /**
- * Test that if the references to "score" are correctly validated with the $score stage in different
+ * Test that references to "score" are correctly validated with the $score stage in different
  * relative positions.
  *
  * TODO SERVER-97341: This test only checks if the query succeeds or not. We should also test (here
@@ -62,10 +62,13 @@ assert.commandWorked(db.runCommand({
     cursor: {}
 }));
 
-// TODO SERVER-40900 / SERVER-100443: Project'ing "score" after a $group should raise an error since
-// $group drops the per-document metadata, but it curently passes.
-assert.commandWorked(db.runCommand(
-    {aggregate: collName, pipeline: [scoreStage, groupStage, metaProjectScoreStage], cursor: {}}));
+// Project'ing "score" after a $group is rejected since $group drops the per-document metadata.
+assert.commandFailedWithCode(db.runCommand({
+    aggregate: collName,
+    pipeline: [scoreStage, groupStage, metaProjectScoreStage],
+    cursor: {}
+}),
+                             kUnavailableMetadataErrCode);
 
 // Project'ing "score" before the $score stage is rejected.
 assert.commandFailedWithCode(db.runCommand({
@@ -77,6 +80,5 @@ assert.commandFailedWithCode(db.runCommand({
 
 // Project'ing "score" when there is no score generated is rejected.
 assert.commandFailedWithCode(
-    db.runCommand(
-        {aggregate: coll.getName(), pipeline: [{$project: {score: {$meta: "score"}}}], cursor: {}}),
+    db.runCommand({aggregate: coll.getName(), pipeline: [metaProjectScoreStage], cursor: {}}),
     kUnavailableMetadataErrCode);

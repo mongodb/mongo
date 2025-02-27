@@ -146,6 +146,8 @@ void DepsTracker::setMetadataAvailable(DocumentMetadataFields::MetaType type) {
         case DocumentMetadataFields::MetaType::kTextScore:
         case DocumentMetadataFields::MetaType::kSearchScore:
         case DocumentMetadataFields::MetaType::kVectorSearchScore:
+        // Setting "scoreDetails" will also set "score".
+        case DocumentMetadataFields::MetaType::kScoreDetails:
             availableMetadataBitSet[DocumentMetadataFields::MetaType::kScore] = true;
             break;
         case DocumentMetadataFields::MetaType::kSearchScoreDetails:
@@ -162,6 +164,20 @@ void DepsTracker::setMetadataAvailable(const QueryMetadataBitSet& metadata) {
             setMetadataAvailable(static_cast<DocumentMetadataFields::MetaType>(i));
         }
     }
+}
+
+void DepsTracker::clearMetadataAvailable() {
+    // TODO SERVER-100443 Right now we only clear "score" and "scoreDetails", but we should be able
+    // to reset the entire bit set.
+
+    std::visit(OverloadedVisitor{
+                   [](NoMetadataValidation) {},
+                   [](auto& availableMetadataBitSet) {
+                       availableMetadataBitSet[DocumentMetadataFields::kScore] = false;
+                       availableMetadataBitSet[DocumentMetadataFields::kScoreDetails] = false;
+                   },
+               },
+               _availableMetadata);
 }
 
 // Returns true if the lhs value should sort before the rhs, false otherwise.

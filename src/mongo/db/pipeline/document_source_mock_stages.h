@@ -233,32 +233,59 @@ public:
     }
 };
 
-class DocumentSourceNeedsOnlyTextScore : public DocumentSourceDependencyDummy {
+class DocumentSourceNeedsMetaField : public DocumentSourceDependencyDummy {
 public:
-    DocumentSourceNeedsOnlyTextScore(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSourceDependencyDummy(expCtx) {}
+    DocumentSourceNeedsMetaField(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                 const DocumentMetadataFields::MetaType type)
+        : DocumentSourceDependencyDummy(expCtx), _type(type) {}
+
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
-        deps->setNeedsMetadata(DocumentMetadataFields::kTextScore);
+        deps->setNeedsMetadata(_type);
         return DepsTracker::State::EXHAUSTIVE_META;
     }
 
-    static boost::intrusive_ptr<DocumentSourceNeedsOnlyTextScore> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        return new DocumentSourceNeedsOnlyTextScore(expCtx);
+    static boost::intrusive_ptr<DocumentSourceNeedsMetaField> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const DocumentMetadataFields::MetaType type) {
+        return new DocumentSourceNeedsMetaField(expCtx, type);
     }
+
+private:
+    const DocumentMetadataFields::MetaType _type;
 };
 
-class DocumentSourceStripsTextScore : public DocumentSourceDependencyDummy {
+class DocumentSourceGeneratesMetaField : public DocumentSourceDependencyDummy {
 public:
-    DocumentSourceStripsTextScore(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    DocumentSourceGeneratesMetaField(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                     const DocumentMetadataFields::MetaType type)
+        : DocumentSourceDependencyDummy(expCtx), _type(type) {}
+
+    DepsTracker::State getDependencies(DepsTracker* deps) const final {
+        deps->setMetadataAvailable(_type);
+        return DepsTracker::State::SEE_NEXT;
+    }
+
+    static boost::intrusive_ptr<DocumentSourceGeneratesMetaField> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const DocumentMetadataFields::MetaType type) {
+        return new DocumentSourceGeneratesMetaField(expCtx, type);
+    }
+
+private:
+    const DocumentMetadataFields::MetaType _type;
+};
+
+class DocumentSourceStripsMetadata : public DocumentSourceDependencyDummy {
+public:
+    DocumentSourceStripsMetadata(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSourceDependencyDummy(expCtx) {}
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
         return DepsTracker::State::EXHAUSTIVE_META;
     }
 
-    static boost::intrusive_ptr<DocumentSourceStripsTextScore> create(
+    static boost::intrusive_ptr<DocumentSourceStripsMetadata> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        return new DocumentSourceStripsTextScore(expCtx);
+        return new DocumentSourceStripsMetadata(expCtx);
     }
 };
 

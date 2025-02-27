@@ -207,6 +207,16 @@ struct DepsTracker {
     void setMetadataAvailable(const QueryMetadataBitSet& metadata);
 
     /**
+     * Clears the set of available metadata. This is used for tracking and validating metadata
+     * dependencies. When walking a pipeline, we may encounter a stage that destroys per-document
+     * metadata, so we must mark that downstream stages do not have access to any
+     * previously-existing metadata.
+     *
+     * TODO SERVER-100902 Split $meta validation logic out of DepsTracker.
+     */
+    void clearMetadataAvailable();
+
+    /**
      * Marks that the given metadata type (or set of metadata types) is required by this pipeline,
      * because the pipeline wants to read that metadata type for some purpose.
      *

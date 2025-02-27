@@ -187,14 +187,14 @@ const MetaFields = Object.freeze({
         shouldBeValidated: true,
         debugName: "score",
         validSortKey: true,
+        // TODO SERVER-100209 $rankFusion should always populate "score" regardless of
+        // "scoreDetails".
         firstStageRequired: [
             FirstStageOptions.FTS_MATCH,
             FirstStageOptions.SCORE,
             FirstStageOptions.VECTOR_SEARCH,
-            // $search and $rankFusion should always populate "score" regardless of "scoreDetails".
             FirstStageOptions.SEARCH,
             FirstStageOptions.SEARCH_W_DETAILS,
-            FirstStageOptions.RANK_FUSION,
             FirstStageOptions.RANK_FUSION_W_DETAILS,
         ]
     },
@@ -242,7 +242,8 @@ function generateMetaReferencingStage(stageName, metaFieldName) {
     }
 }
 
-function shouldQuerySucceed(metaField, firstStage, metaReferencingStageName) {
+function shouldQuerySucceed(
+    metaField, firstStage, metaReferencingStageName, hasBlockingStageBeforeMetaReference = false) {
     if (!metaField.shouldBeValidated) {
         return true;
     }
@@ -257,6 +258,14 @@ function shouldQuerySucceed(metaField, firstStage, metaReferencingStageName) {
             return true;
         }
 
+        // TODO SERVER-100404: If you have a sharded query with a blocking stage before the
+        // meta-referencing stage, validation of $geoNear-related metadata won't occur since the
+        // meta-referencing stage won't be sent to the shards. This validation should take place on
+        // the router too.
+        if (isSharded && hasBlockingStageBeforeMetaReference) {
+            return true;
+        }
+
         // TODO SERVER-99965 Mongot queries skip validation for "geoNearDist" and "geoNearPoint".
         if (firstStage === FirstStageOptions.SEARCH ||
             firstStage === FirstStageOptions.SEARCH_W_DETAILS ||
@@ -265,6 +274,12 @@ function shouldQuerySucceed(metaField, firstStage, metaReferencingStageName) {
             firstStage == FirstStageOptions.RANK_FUSION_W_DETAILS) {
             return true;
         }
+    }
+
+    // TODO SERVER-100402 If there is a blocking stage before trying to reference "sortKey"
+    // metadata, it always succeeds even if there is no sort key.
+    if (hasBlockingStageBeforeMetaReference && metaField === MetaFields.SORT_KEY) {
+        return true;
     }
 
     // TODO SERVER-100402: {$meta: "sortKey"} referenced under a $group currently succeeds, even if
@@ -276,17 +291,40 @@ function shouldQuerySucceed(metaField, firstStage, metaReferencingStageName) {
     return metaField.firstStageRequired.includes(firstStage);
 }
 
+// Most cases will fail with kUnavailableMetadataErrCode, but some "sortKey" validation will
+// fail with BadValue.
+const expectedErrCodes = [kUnavailableMetadataErrCode, ErrorCodes.BadValue];
+
+// First, test just the pipeline with two stages: the first stage may or may not generate metadtata
+// fields, and the second stage attempts to reference some metadata field.
 fc.assert(fc.property(testCaseArb, ({firstStage, metaField, metaReferencingStageName}) => {
     let metaStage = generateMetaReferencingStage(metaReferencingStageName, metaField.name);
-    let pipeline = [firstStage, metaStage];
 
+    let pipeline = [firstStage, metaStage];
     if (shouldQuerySucceed(metaField, firstStage, metaReferencingStageName)) {
         assert.commandWorked(db.runCommand({aggregate: collName, pipeline, cursor: {}}));
     } else {
-        // Most cases will fail with kUnavailableMetadataErrCode, but some "sortKey" validation will
-        // fail with BadValue.
-        const expectedErrCodes = [kUnavailableMetadataErrCode, ErrorCodes.BadValue];
         assertErrCodeAndErrMsgContains(coll, pipeline, expectedErrCodes, metaField.debugName);
+    }
+}), {seed: 5, numRuns: 500});
+
+// Also test when we insert a $group stage (which drops all metadata) between the stage that
+// generates the metadata and the stage that attempts to reference the metadata.
+fc.assert(fc.property(testCaseArb, ({firstStage, metaField, metaReferencingStageName}) => {
+    let metaStage = generateMetaReferencingStage(metaReferencingStageName, metaField.name);
+    let pipeline = [firstStage, {$group: {_id: null}}, metaStage];
+
+    // TODO SERVER-100443 Since the $group drops per-document metadata, this should always fail for
+    // every meta stage that is validated, not just "score" and "scoreDetails".
+    const hasBlockingStageBeforeMetaReference = true;
+    if (metaField == MetaFields.SCORE || metaField == MetaFields.SCORE_DETAILS ||
+        (!shouldQuerySucceed(metaField,
+                             firstStage,
+                             metaReferencingStageName,
+                             hasBlockingStageBeforeMetaReference))) {
+        assertErrCodeAndErrMsgContains(coll, pipeline, expectedErrCodes, metaField.debugName);
+    } else {
+        assert.commandWorked(db.runCommand({aggregate: collName, pipeline, cursor: {}}));
     }
 }), {seed: 5, numRuns: 500});
 

@@ -999,6 +999,15 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
     // The end of last-minute pipeline optimizations.
     // =============================================================================================
 
+    // Before performing dependency analysis, we must validate the meta dependencies. This is a bit
+    // redundant since calling Pipeline::getDependencies() also performs some $meta validation.
+    // However, as of SERVER-99153, calling Pipeline::validateMetaDependencies() performs _more_
+    // validation.
+    // TODO SERVER-40900 $meta validation should occur before optimization, at a consistent point
+    // for all queries.
+    // TODO SERVER-100902 Calling Pipeline::getDependencies() should perform no validation.
+    pipeline->validateMetaDependencies(availableMetadata);
+
     // Perform dependency analysis. In order to minimize the dependency set, we only analyze the
     // stages that remain in the pipeline after pushdown. In particular, any dependencies for a
     // $match or $sort pushed down into the query layer will not be reflected here.

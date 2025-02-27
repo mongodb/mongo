@@ -264,6 +264,39 @@ TEST(DependenciesNeedsMetadataTest, ShouldThrowIfSetGeoMetadataAvailableButTextS
     ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kTextScore), AssertionException);
 }
 
+// TODO SERVER-100443 This should apply to all validated fields, not just "score" and
+// "scoreDetails".
+TEST(DependenciesNeedsMetadataTest, OnlyScoreAndScoreDetailsShouldThrowIfAvailableMetadataCleared) {
+    DepsTracker deps(DepsTracker::kAllMetadata);
+    deps.clearMetadataAvailable();
+
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kScore), AssertionException);
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kScoreDetails), AssertionException);
+
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kTextScore));
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kSearchScore));
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kSearchScoreDetails));
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearDist));
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint));
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfMetadataClearedAndRepopulated) {
+    DepsTracker deps(DepsTracker::kAllMetadata);
+    deps.clearMetadataAvailable();
+    deps.setMetadataAvailable(DocumentMetadataFields::kScore);
+    deps.setMetadataAvailable(DocumentMetadataFields::kScoreDetails);
+
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kScore));
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kScoreDetails));
+
+    // TODO SERVER-100443 These fields would need to be set available to pass validation.
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kTextScore));
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kSearchScore));
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kSearchScoreDetails));
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearDist));
+    ASSERT_DOES_NOT_THROW(deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint));
+}
+
 TEST(DependenciesToProjectionTest, ShouldIncludeAllFieldsAndExcludeIdIfNotSpecified) {
     const char* array[] = {"a", "b"};
     DepsTracker deps;
