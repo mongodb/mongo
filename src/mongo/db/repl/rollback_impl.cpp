@@ -490,10 +490,6 @@ RollbackImpl::_namespacesAndUUIDsForOp(const OplogEntry& oplogEntry) {
                 }
                 break;
             }
-            case OplogEntry::CommandType::kDropDatabase: {
-                // There is no specific namespace to save for a drop database operation.
-                break;
-            }
             case OplogEntry::CommandType::kDbCheck:
             case OplogEntry::CommandType::kModifyCollectionShardingIndexCatalog:
             case OplogEntry::CommandType::kCreate:
@@ -515,8 +511,11 @@ RollbackImpl::_namespacesAndUUIDsForOp(const OplogEntry& oplogEntry) {
                 }
                 break;
             }
+            case OplogEntry::CommandType::kDropDatabase:
             case OplogEntry::CommandType::kCommitTransaction:
-            case OplogEntry::CommandType::kAbortTransaction: {
+            case OplogEntry::CommandType::kAbortTransaction:
+            case OplogEntry::CommandType::kDatabaseMetadataUpdate: {
+                // There is no specific namespace to save for these operations.
                 break;
             }
             case OplogEntry::CommandType::kApplyOps:
