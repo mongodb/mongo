@@ -544,12 +544,11 @@ jsTestOptions = function() {
  * @param {string} msg - The message to be printed.
  * @param {object} args
  * @param {object} args.attr - An object used to declare extra logging params.
- * @param {number} args.id - An unique identified to help with filtering logs.
  * @param {("I"|"D"|"W"|"E")} args.severity - An unique identified to help with filtering logs.
  */
 jsTestLog = function(
     msg,
-    {severity, attr, id} = {},
+    {severity, attr} = {},
 ) {
     if (TestData?.logFormat === "json") {
         severity = severity === undefined ? "I" : severity;
@@ -581,9 +580,6 @@ jsTestLog = function(
         };
         if (attr && typeof attr === "object" && Object.keys(attr).length > 0) {
             new_msg["attr"] = attr;
-        }
-        if (id && typeof id === "number") {
-            new_msg["id"] = id;
         }
         print(toEJSON(new_msg));
         return;
@@ -617,20 +613,20 @@ jsTest.adminUserRoles = ["root"];
  */
 jsTest.log = jsTestLog;
 
-jsTest.log.info = function(msg, attr, id) {
-    jsTestLog(msg, {id, attr, severity: "I"});
+jsTest.log.info = function(msg, attr) {
+    jsTestLog(msg, {attr, severity: "I"});
 };
 
-jsTest.log.debug = function(msg, attr, id) {
-    jsTestLog(msg, {id, attr, severity: "D"});
+jsTest.log.debug = function(msg, attr) {
+    jsTestLog(msg, {attr, severity: "D"});
 };
 
-jsTest.log.warning = function(msg, attr, id) {
-    jsTestLog(msg, {id, attr, severity: "W"});
+jsTest.log.warning = function(msg, attr) {
+    jsTestLog(msg, {attr, severity: "W"});
 };
 
-jsTest.log.error = function(msg, attr, id) {
-    jsTestLog(msg, {id, attr, severity: "E"});
+jsTest.log.error = function(msg, attr) {
+    jsTestLog(msg, {attr, severity: "E"});
 };
 
 jsTest.authenticate = function(conn) {

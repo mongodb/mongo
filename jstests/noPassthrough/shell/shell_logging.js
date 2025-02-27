@@ -37,7 +37,7 @@ const jsTestLogUtils = {
 };
 
 tests.push(function assertJsTestLogJsonFormat() {
-    const extraArgs = {attr: {hello: "world", foo: "bar"}, id: 87};
+    const extraArgs = {attr: {hello: "world", foo: "bar"}};
     jsTestLogUtils.setup(() => {
         const printedJson =
             jsTestLogUtils.getCapturedJSONOutput(() => jsTestLog("test message", extraArgs));
@@ -47,7 +47,6 @@ tests.push(function assertJsTestLogJsonFormat() {
             "ctx": "shell_logging",
             "msg": "test message",
             "attr": extraArgs.attr,
-            "id": extraArgs.id,
         };
         assert.docEq(expectedJson, printedJson, "expected a different log format");
 
@@ -70,14 +69,13 @@ tests.push(function assertLogSeverities() {
     jsTestLogUtils.setup(() => {
         for (const [severity, logFnName] of Object.entries(severities)) {
             const printedJson = jsTestLogUtils.getCapturedJSONOutput(
-                () => jsTest.log[logFnName]("test message", extraArgs.attr, extraArgs.id));
+                () => jsTest.log[logFnName]("test message", extraArgs.attr));
             const expectedJson = {
                 "s": severity,
                 "c": "js_test",
                 "ctx": "shell_logging",
                 "msg": "test message",
                 "attr": extraArgs.attr,
-                "id": extraArgs.id,
             };
             assert.docEq(expectedJson, printedJson, "expected a different log to be printed");
         }
@@ -85,8 +83,8 @@ tests.push(function assertLogSeverities() {
         const testMsg = "info is default.";
         const printedLogInfo = jsTestLogUtils.getCapturedJSONOutput(
             () => jsTest.log(testMsg, {...extraArgs, nonUsefulProp: "some value"}));
-        const printedLogDefault = jsTestLogUtils.getCapturedJSONOutput(
-            () => jsTest.log.info(testMsg, extraArgs.attr, extraArgs.id));
+        const printedLogDefault =
+            jsTestLogUtils.getCapturedJSONOutput(() => jsTest.log.info(testMsg, extraArgs.attr));
         assert.docEq(printedLogInfo, printedLogDefault, "Expected default log severity to be info");
     });
 });
