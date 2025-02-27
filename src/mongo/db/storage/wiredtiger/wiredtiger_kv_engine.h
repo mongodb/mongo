@@ -91,7 +91,7 @@ struct WiredTigerFileVersion {
     inline static const std::string kLatestWTRelease = "compatibility=(release=10.0)";
 
     StartupVersion _startupVersion;
-    bool shouldDowngrade(bool readOnly, bool hasRecoveryTimestamp);
+    bool shouldDowngrade(bool hasRecoveryTimestamp);
     std::string getDowngradeString();
 };
 
@@ -129,8 +129,7 @@ public:
                        size_t maxHistoryFileSizeMB,
                        bool durable,
                        bool ephemeral,
-                       bool repair,
-                       bool readOnly);
+                       bool repair);
 
     ~WiredTigerKVEngine();
 
@@ -509,7 +508,6 @@ private:
     bool _durable;
     bool _ephemeral;  // whether we are using the in-memory mode of the WT engine
     const bool _inRepairMode;
-    bool _readOnly;
 
     // If _keepDataHistory is true, then the storage engine keeps all history after the stable
     // timestamp, and WiredTigerKVEngine is responsible for advancing the oldest timestamp. If

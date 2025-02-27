@@ -58,9 +58,7 @@ WriteUnitOfWork::WriteUnitOfWork(OperationContext* opCtx, bool groupOplogEntries
 
     _opCtx->lockState()->beginWriteUnitOfWork();
     if (_toplevel) {
-        if (!storageGlobalParams.readOnly) {
-            _opCtx->recoveryUnit()->beginUnitOfWork(_opCtx);
-        }
+        _opCtx->recoveryUnit()->beginUnitOfWork(_opCtx->readOnly());
         _opCtx->_ruState = RecoveryUnitState::kActiveUnitOfWork;
     }
     // Make sure we don't silently proceed after a previous WriteUnitOfWork under the same parent
@@ -71,7 +69,7 @@ WriteUnitOfWork::WriteUnitOfWork(OperationContext* opCtx, bool groupOplogEntries
 WriteUnitOfWork::~WriteUnitOfWork() {
     if (!_released && !_committed) {
         invariant(_opCtx->_ruState != RecoveryUnitState::kNotInUnitOfWork);
-        if (!storageGlobalParams.readOnly) {
+        if (!_opCtx->readOnly()) {
             if (_toplevel) {
                 // Abort unit of work and execute rollback handlers
                 _opCtx->recoveryUnit()->abortUnitOfWork();
@@ -80,7 +78,8 @@ WriteUnitOfWork::~WriteUnitOfWork() {
                 _opCtx->_ruState = RecoveryUnitState::kFailedUnitOfWork;
             }
         } else {
-            // Just execute rollback handlers in readOnly mode
+            // Clear the readOnly state and execute rollback handlers in readOnly mode.
+            _opCtx->recoveryUnit()->endReadOnlyUnitOfWork();
             _opCtx->recoveryUnit()->abortRegisteredChanges();
         }
         _opCtx->lockState()->endWriteUnitOfWork();
@@ -142,12 +141,12 @@ void WriteUnitOfWork::commit() {
         // Execute preCommit hooks before committing the transaction. This is an opportunity to
         // throw or do any last changes before committing.
         _opCtx->recoveryUnit()->runPreCommitHooks(_opCtx);
-        if (!storageGlobalParams.readOnly) {
-            // Just execute commit handlers in readOnly mode
-            _opCtx->recoveryUnit()->commitUnitOfWork();
-        } else {
+        if (!_opCtx->readOnly()) {
             // Commit unit of work and execute commit or rollback handlers depending on whether the
             // commit was successful.
+            _opCtx->recoveryUnit()->commitUnitOfWork();
+        } else {
+            // Just execute commit handlers in readOnly mode
             _opCtx->recoveryUnit()->commitRegisteredChanges(boost::none);
         }
 

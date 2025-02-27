@@ -149,6 +149,7 @@ public:
 
             auto viewAggCmd = OpMsgRequest::fromDBAndBody(nss.db(), aggCmdOnView.getValue()).body;
             auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
+                opCtx,
                 nss,
                 viewAggCmd,
                 verbosity,
@@ -232,6 +233,7 @@ public:
 
             auto viewAggCmd = OpMsgRequest::fromDBAndBody(nss.db(), aggCmdOnView.getValue()).body;
             auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
+                opCtx,
                 nss,
                 viewAggCmd,
                 boost::none,

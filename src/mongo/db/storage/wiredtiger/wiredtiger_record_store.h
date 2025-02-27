@@ -114,7 +114,6 @@ public:
         boost::optional<int64_t> oplogMaxSize;
         CappedCallback* cappedCallback;
         WiredTigerSizeStorer* sizeStorer;
-        bool isReadOnly;
         bool tracksSizeAdjustments;
         bool forceUpdateWithFullDocument;
     };

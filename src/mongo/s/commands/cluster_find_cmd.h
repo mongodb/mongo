@@ -181,6 +181,7 @@ public:
                     OpMsgRequest::fromDBAndBody(_dbName, aggCmdOnView).body;
 
                 auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
+                    opCtx,
                     ns(),
                     viewAggregationCommand,
                     verbosity,
@@ -252,6 +253,7 @@ public:
                     OpMsgRequest::fromDBAndBody(_dbName, aggCmdOnView).body;
 
                 auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
+                    opCtx,
                     ns(),
                     viewAggregationCommand,
                     boost::none,

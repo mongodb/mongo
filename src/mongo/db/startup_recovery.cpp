@@ -76,7 +76,7 @@ MONGO_FAIL_POINT_DEFINE(exitBeforeRepairInvalidatesConfig);
 
 // Returns true if storage engine is writable.
 bool isWriteableStorageEngine() {
-    return !storageGlobalParams.readOnly && (storageGlobalParams.engine != "devnull");
+    return storageGlobalParams.engine != "devnull";
 }
 
 // Attempt to restore the featureCompatibilityVersion document if it is missing.
@@ -501,7 +501,7 @@ void setReplSetMemberInStandaloneMode(OperationContext* opCtx, StartupRecoveryMo
 void startupRepair(OperationContext* opCtx,
                    StorageEngine* storageEngine,
                    BSONObjBuilder* startupTimeElapsedBuilder = nullptr) {
-    invariant(!storageGlobalParams.readOnly);
+    invariant(!storageGlobalParams.queryableBackupMode);
     ServiceContext* svcCtx = opCtx->getServiceContext();
 
     if (MONGO_unlikely(exitBeforeDataRepair.shouldFail())) {
@@ -606,20 +606,6 @@ void startupRepair(OperationContext* opCtx,
     }
 }
 
-// Perform startup procedures for read-only mode.
-void startupRecoveryReadOnly(OperationContext* opCtx, StorageEngine* storageEngine) {
-    invariant(!storageGlobalParams.repair);
-
-    setReplSetMemberInStandaloneMode(opCtx, StartupRecoveryMode::kAuto);
-
-    FeatureCompatibilityVersion::initializeForStartup(opCtx);
-
-    openDatabases(opCtx, storageEngine, [&](auto db) {
-        // Ensures all collections meet requirements such as having _id indexes.
-        uassertStatusOK(ensureCollectionProperties(opCtx, db, EnsureIndexPolicy::kError));
-    });
-}
-
 // Perform routine startup recovery procedure.
 // The optional parameter `startupTimeElapsedBuilder` is for adding time elapsed of tasks done in
 // this function into one single builder that records the time elapsed during startup. Its default
@@ -629,7 +615,7 @@ void startupRecovery(OperationContext* opCtx,
                      StorageEngine::LastShutdownState lastShutdownState,
                      StartupRecoveryMode mode,
                      BSONObjBuilder* startupTimeElapsedBuilder = nullptr) {
-    invariant(!storageGlobalParams.readOnly && !storageGlobalParams.repair);
+    invariant(!storageGlobalParams.repair);
 
     ServiceContext* svcCtx = opCtx->getServiceContext();
 
@@ -714,8 +700,6 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
 
     if (storageGlobalParams.repair) {
         startupRepair(opCtx, storageEngine, startupTimeElapsedBuilder);
-    } else if (storageGlobalParams.readOnly) {
-        startupRecoveryReadOnly(opCtx, storageEngine);
     } else {
         startupRecovery(opCtx,
                         storageEngine,
@@ -736,7 +720,7 @@ void runStartupRecoveryInMode(OperationContext* opCtx,
     auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
     Lock::GlobalWrite lk(opCtx);
 
-    invariant(isWriteableStorageEngine() && !storageGlobalParams.readOnly);
+    invariant(isWriteableStorageEngine());
     invariant(!storageGlobalParams.repair);
     const bool usingReplication = repl::ReplicationCoordinator::get(opCtx)->isReplEnabled();
     invariant(usingReplication);

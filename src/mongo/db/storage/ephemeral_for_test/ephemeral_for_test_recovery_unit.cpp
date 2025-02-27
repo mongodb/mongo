@@ -53,7 +53,7 @@ RecoveryUnit::~RecoveryUnit() {
     _abort();
 }
 
-void RecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
+void RecoveryUnit::doBeginUnitOfWork() {
     invariant(!_inUnitOfWork(), toString(_getState()));
     _setState(_isActive() ? State::kActive : State::kInactiveInUnitOfWork);
 }

@@ -952,7 +952,7 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
 
     // 1) Initialize the top of oplog to "1".
     ServiceContext::UniqueOperationContext op1(harnessHelper->newOperationContext());
-    op1->recoveryUnit()->beginUnitOfWork(op1.get());
+    op1->recoveryUnit()->beginUnitOfWork(op1->readOnly());
     Timestamp tsOne = Timestamp(
         static_cast<unsigned long long>(_oplogOrderInsertOplog(op1.get(), rs, 1).getLong()));
     op1->recoveryUnit()->commitUnitOfWork();
@@ -960,7 +960,7 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
     ASSERT_EQ(tsOne, wtrs->getLatestOplogTimestamp(op1.get()));
 
     // 2) Open a hole at time "2".
-    op1->recoveryUnit()->beginUnitOfWork(op1.get());
+    op1->recoveryUnit()->beginUnitOfWork(op1->readOnly());
     // Don't save the return value because the compiler complains about unused variables.
     _oplogOrderInsertOplog(op1.get(), rs, 2);
     // Querying with the recovery unit with a snapshot will not return the uncommitted value.
@@ -971,7 +971,7 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
     Client::initThread("client2");
 
     ServiceContext::UniqueOperationContext op2(harnessHelper->newOperationContext());
-    op2->recoveryUnit()->beginUnitOfWork(op2.get());
+    op2->recoveryUnit()->beginUnitOfWork(op2->readOnly());
     Timestamp tsThree = Timestamp(
         static_cast<unsigned long long>(_oplogOrderInsertOplog(op2.get(), rs, 3).getLong()));
     // Before committing, the query still only sees timestamp "1".
@@ -1116,7 +1116,6 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     params.cappedCallback = nullptr;
     params.sizeStorer = nullptr;
     params.tracksSizeAdjustments = true;
-    params.isReadOnly = false;
     params.forceUpdateWithFullDocument = false;
 
     const auto wtKvEngine = dynamic_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());

@@ -141,6 +141,7 @@ public:
                 uassertStatusOK(countCommandAsAggregationCommand(countRequest, nss));
             auto aggCmdOnViewObj = OpMsgRequest::fromDBAndBody(nss.db(), aggCmdOnView).body;
             auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
+                opCtx,
                 nss,
                 aggCmdOnViewObj,
                 boost::none,
@@ -256,6 +257,7 @@ public:
             auto aggCmdOnViewObj =
                 OpMsgRequest::fromDBAndBody(nss.db(), aggCmdOnView.getValue()).body;
             auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
+                opCtx,
                 nss,
                 aggCmdOnViewObj,
                 verbosity,

@@ -223,7 +223,6 @@ private:
         serverGlobalParams.enableMajorityReadConcern = _stashedEnableMajorityReadConcern;
 
         ServiceContextMongoDTest::tearDown();
-        storageGlobalParams.readOnly = false;
         gTakeUnstableCheckpointOnShutdown = false;
     }
 
@@ -1488,10 +1487,6 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogAsStandaloneRecoversOplog) {
 
     recovery.recoverFromOplogAsStandalone(opCtx);
     _assertDocsInTestCollection(opCtx, {5});
-
-    // Test the node is readOnly.
-    ASSERT_THROWS(getStorageInterface()->insertDocument(opCtx, testNs, {_makeInsertDocument(2)}, 1),
-                  AssertionException);
 }
 
 TEST_F(ReplicationRecoveryTest,

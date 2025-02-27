@@ -420,6 +420,13 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     auto runner = makePeriodicRunner(serviceContext);
     serviceContext->setPeriodicRunner(std::move(runner));
 
+    // When starting the server with --queryableBackupMode or --recoverFromOplogAsStandalone, we are
+    // in read-only mode and don't allow user-originating operations to perform writes
+    if (storageGlobalParams.queryableBackupMode ||
+        repl::ReplSettings::shouldRecoverFromOplogAsStandalone()) {
+        serviceContext->disallowUserWrites();
+    }
+
 #ifdef MONGO_CONFIG_SSL
     OCSPManager::start(serviceContext);
     CertificateExpirationMonitor::get()->start(serviceContext);
@@ -718,7 +725,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     readWriteConcernDefaultsMongodStartupChecks(startupOpCtx.get(), replSettings.usingReplSets());
 
     // Perform replication recovery for queryable backup mode if needed.
-    if (storageGlobalParams.readOnly) {
+    if (storageGlobalParams.queryableBackupMode) {
         uassert(ErrorCodes::BadValue,
                 str::stream() << "Cannot specify both queryableBackupMode and "
                               << "recoverFromOplogAsStandalone at the same time",
@@ -745,7 +752,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         replCoord->startup(startupOpCtx.get(), lastShutdownState);
     }
 
-    if (!storageGlobalParams.readOnly) {
+    if (!storageGlobalParams.queryableBackupMode) {
 
         if (storageEngine->supportsCappedCollections()) {
             logStartup(startupOpCtx.get());

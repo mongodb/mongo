@@ -90,13 +90,15 @@ StatusWith<PrivilegeVector> getPrivilegesForAggregate(AuthorizationSession* auth
 
 // Checks if this connection has the privileges necessary to create 'ns' with the options
 // supplied in 'cmdObj' either directly on mongoD or via mongoS.
-Status checkAuthForCreate(AuthorizationSession* authSession,
+Status checkAuthForCreate(OperationContext* opCtx,
+                          AuthorizationSession* authSession,
                           const CreateCommand& cmd,
                           bool isMongos);
 
 // Checks if this connection has the privileges necessary to modify 'ns' with the options
 // supplied in 'cmdObj' either directly on mongoD or via mongoS.
-Status checkAuthForCollMod(AuthorizationSession* authSession,
+Status checkAuthForCollMod(OperationContext* opCtx,
+                           AuthorizationSession* authSession,
                            const NamespaceString& ns,
                            const BSONObj& cmdObj,
                            bool isMongos);

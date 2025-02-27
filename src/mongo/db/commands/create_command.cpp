@@ -97,7 +97,7 @@ public:
 
         void doCheckAuthorization(OperationContext* opCtx) const final {
             uassertStatusOK(auth::checkAuthForCreate(
-                AuthorizationSession::get(opCtx->getClient()), request(), false));
+                opCtx, AuthorizationSession::get(opCtx->getClient()), request(), false));
         }
 
         NamespaceString ns() const final {

@@ -92,19 +92,16 @@ StorageEngine::LastShutdownState initializeStorageEngine(
 
     const std::string dbpath = storageGlobalParams.dbpath;
 
-    if (!storageGlobalParams.readOnly) {
-        StorageRepairObserver::set(service, std::make_unique<StorageRepairObserver>(dbpath));
-        auto repairObserver = StorageRepairObserver::get(service);
+    StorageRepairObserver::set(service, std::make_unique<StorageRepairObserver>(dbpath));
+    auto repairObserver = StorageRepairObserver::get(service);
 
-        if (storageGlobalParams.repair) {
-            repairObserver->onRepairStarted();
-        } else if (repairObserver->isIncomplete()) {
-            LOGV2_FATAL_NOTRACE(
-                50922,
-                "An incomplete repair has been detected! This is likely because a repair "
-                "operation unexpectedly failed before completing. MongoDB will not start up "
-                "again without --repair.");
-        }
+    if (storageGlobalParams.repair) {
+        repairObserver->onRepairStarted();
+    } else if (repairObserver->isIncomplete()) {
+        LOGV2_FATAL_NOTRACE(50922,
+                            "An incomplete repair has been detected! This is likely because a "
+                            "repair operation unexpectedly failed before completing. MongoDB will "
+                            "not start up again without --repair.");
     }
 
     if (auto existingStorageEngine = StorageEngineMetadata::getStorageEngineForPath(dbpath)) {
@@ -141,12 +138,12 @@ StorageEngine::LastShutdownState initializeStorageEngine(
                           << storageGlobalParams.engine,
             factory);
 
-    if (storageGlobalParams.readOnly) {
+    if (storageGlobalParams.queryableBackupMode) {
         uassert(34368,
-                str::stream()
-                    << "Server was started in read-only mode, but the configured storage engine, "
-                    << storageGlobalParams.engine << ", does not support read-only operation",
-                factory->supportsReadOnly());
+                str::stream() << "Server was started in queryable backup mode, but the configured "
+                              << "storage engine, " << storageGlobalParams.engine
+                              << ", does not support queryable backup mode",
+                factory->supportsQueryableBackupMode());
     }
 
     std::unique_ptr<StorageEngineMetadata> metadata;
@@ -156,13 +153,6 @@ StorageEngine::LastShutdownState initializeStorageEngine(
                                                 "Get metadata describing storage engine",
                                                 startupTimeElapsedBuilder);
         metadata = StorageEngineMetadata::forPath(dbpath);
-    }
-
-    if (storageGlobalParams.readOnly) {
-        uassert(34415,
-                "Server was started in read-only mode, but the storage metadata file was not"
-                " found.",
-                metadata.get());
     }
 
     // Validate options in metadata against current startup options.
@@ -242,7 +232,6 @@ StorageEngine::LastShutdownState initializeStorageEngine(
     // Write a new metadata file if it is not present.
     if (!metadata.get() &&
         (initFlags & StorageEngineInitFlags::kSkipMetadataFile) == StorageEngineInitFlags{}) {
-        invariant(!storageGlobalParams.readOnly);
         auto scopedTimer =
             createTimeElapsedBuilderScopedTimer(service->getFastClockSource(),
                                                 "Write a new metadata for storage engine",
@@ -322,18 +311,13 @@ void createLockFile(ServiceContext* service) {
     }
     const bool wasUnclean = lockFile->createdByUncleanShutdown();
     const auto openStatus = lockFile->open();
-    if (storageGlobalParams.readOnly && openStatus == ErrorCodes::IllegalOperation) {
+    if (openStatus == ErrorCodes::IllegalOperation) {
         lockFile = boost::none;
     } else {
         uassertStatusOK(openStatus);
     }
 
     if (wasUnclean) {
-        if (storageGlobalParams.readOnly) {
-            LOGV2_FATAL_NOTRACE(34416,
-                                "Attempted to open dbpath in readOnly mode, but the server was "
-                                "previously not shut down cleanly.");
-        }
         LOGV2_WARNING(22271,
                       "Detected unclean shutdown - Lock file is not empty",
                       "lockFile"_attr = lockFile->getFilespec());
