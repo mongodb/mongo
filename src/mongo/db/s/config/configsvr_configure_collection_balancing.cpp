@@ -84,7 +84,7 @@ public:
                 request().getChunkSizeMB(),
                 request().getDefragmentCollection(),
                 request().getEnableAutoMerger(),
-                request().getNoBalance());
+                request().getEnableBalancing());
         }
 
     private:

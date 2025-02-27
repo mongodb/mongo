@@ -19,8 +19,8 @@ const setAllowMigrationsCmd = function(ns, allow) {
 };
 
 // Test the effects of setAllowMigrations on the balancing of the targeted collection (having the
-// 'noBalance' setting specified).
-const testSetAllowMigrationsVsConfigureCollectionBalancing = function(noBalanceSetting) {
+// 'enableBalancing' setting specified).
+const testSetAllowMigrationsVsConfigureCollectionBalancing = function(enableBalancingSetting) {
     setUpDb();
 
     const testCollName = "testColl";
@@ -51,14 +51,16 @@ const testSetAllowMigrationsVsConfigureCollectionBalancing = function(noBalanceS
               findChunksUtil.findChunksByNs(configDB, testColl.getFullName(), {shard: primaryShard})
                   .count());
 
-    jsTestLog(
-        `{setAllowMigrations: false} has higher priority than {noBalance: ${noBalanceSetting}}`);
-    if (noBalanceSetting === null) {
+    jsTestLog(`{setAllowMigrations: false} has higher priority than {enableBalancing: ${
+        enableBalancingSetting}}`);
+    if (enableBalancingSetting === null) {
         assert.commandWorked(
             configDB.collections.update({_id: testColl.getFullName()}, {$unset: {noBalance: 1}}));
     } else {
-        assert.commandWorked(st.s.adminCommand(
-            {configureCollectionBalancing: testColl.getFullName(), noBalance: noBalanceSetting}));
+        assert.commandWorked(st.s.adminCommand({
+            configureCollectionBalancing: testColl.getFullName(),
+            enableBalancing: enableBalancingSetting
+        }));
     }
 
     setAllowMigrationsCmd(testColl.getFullName(), false);
@@ -72,11 +74,12 @@ const testSetAllowMigrationsVsConfigureCollectionBalancing = function(noBalanceS
               findChunksUtil.findChunksByNs(configDB, testColl.getFullName(), {shard: primaryShard})
                   .count());
 
-    jsTestLog(`{setAllowMigrations: true} allows {noBalance: ${noBalanceSetting}'} to be applied`);
+    jsTestLog(`{setAllowMigrations: true} allows {enableBalancing: ${
+        enableBalancingSetting}'} to be applied`);
     setAllowMigrationsCmd(testColl.getFullName(), true);
     st.startBalancer();
 
-    if (noBalanceSetting === null || noBalanceSetting === false) {
+    if (enableBalancingSetting === null || enableBalancingSetting === true) {
         st.awaitBalance(testCollName, dbName);
         st.stopBalancer();
         st.verifyCollectionIsBalanced(testColl);
@@ -90,9 +93,9 @@ const testSetAllowMigrationsVsConfigureCollectionBalancing = function(noBalanceS
     }
 };
 
-testSetAllowMigrationsVsConfigureCollectionBalancing(null /*noBalanceSetting*/);
-testSetAllowMigrationsVsConfigureCollectionBalancing(false /*noBalanceSetting*/);
-testSetAllowMigrationsVsConfigureCollectionBalancing(true /*noBalanceSetting*/);
+testSetAllowMigrationsVsConfigureCollectionBalancing(null /*enableBalancingSetting*/);
+testSetAllowMigrationsVsConfigureCollectionBalancing(false /*enableBalancingSetting*/);
+testSetAllowMigrationsVsConfigureCollectionBalancing(true /*enableBalancingSetting*/);
 
 jsTest.log('setAllowMigration has only effects on the targeted namespace');
 {

@@ -489,7 +489,7 @@ public:
                                       boost::optional<int32_t> chunkSizeMB,
                                       boost::optional<bool> defragmentCollection,
                                       boost::optional<bool> enableAutoMerger,
-                                      boost::optional<bool> noBalance);
+                                      boost::optional<bool> enableBalancing);
 
     /**
      * Updates the bucketing parameters of a time-series collection. Also bumps the placement

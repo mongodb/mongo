@@ -1321,7 +1321,7 @@ DBCollection.prototype.getSplitKeysForChunks = function(chunkSize) {
 
 /**
  * Enable balancing for this collection. Uses the configureCollectionBalancing command
- * with the noBalance paramater if FCV >= 8.1 and directly writes to config.collections if FCV
+ * with the enableBalancing paramater if FCV >= 8.1 and directly writes to config.collections if FCV
  * < 8.1.
  * TODO: SERVER-94845 remove FCV check when 9.0 becomes the last LTS
  */
@@ -1339,7 +1339,8 @@ DBCollection.prototype.enableBalancing = function() {
             fcvDoc.featureCompatibilityVersion.version,
             "8.1",
             ) >= 0) {
-        return adminDb.runCommand({configureCollectionBalancing: this._fullName, noBalance: false});
+        return adminDb.runCommand(
+            {configureCollectionBalancing: this._fullName, enableBalancing: true});
     } else {
         var configDb = this.getDB().getSiblingDB("config");
         return assert.commandWorked(
@@ -1349,7 +1350,7 @@ DBCollection.prototype.enableBalancing = function() {
 
 /**
  * Disable balancing for this collection. Uses the configureCollectionBalancing command
- * with the noBalance paramater if FCV >= 8.1 and directly writes to config.collections if FCV
+ * with the enableBalancing paramater if FCV >= 8.1 and directly writes to config.collections if FCV
  * < 8.1.
  * TODO: SERVER-94845 remove FCV check when 9.0 becomes the last LTS
  */
@@ -1366,7 +1367,8 @@ DBCollection.prototype.disableBalancing = function() {
             fcvDoc.featureCompatibilityVersion.version,
             "8.1",
             ) >= 0) {
-        return adminDb.runCommand({configureCollectionBalancing: this._fullName, noBalance: true});
+        return adminDb.runCommand(
+            {configureCollectionBalancing: this._fullName, enableBalancing: false});
     } else {
         var configDb = this.getDB().getSiblingDB("config");
         return assert.commandWorked(

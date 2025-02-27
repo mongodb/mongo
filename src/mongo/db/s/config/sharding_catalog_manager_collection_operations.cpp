@@ -432,9 +432,9 @@ void ShardingCatalogManager::configureCollectionBalancing(
     boost::optional<int32_t> chunkSizeMB,
     boost::optional<bool> defragmentCollection,
     boost::optional<bool> enableAutoMerger,
-    boost::optional<bool> noBalance) {
+    boost::optional<bool> enableBalancing) {
 
-    if (!chunkSizeMB && !defragmentCollection && !enableAutoMerger && !noBalance) {
+    if (!chunkSizeMB && !defragmentCollection && !enableAutoMerger && !enableBalancing) {
         // No-op in case no supported parameter has been specified.
         // This allows not breaking backwards compatibility as command
         // options may be added/removed over time.
@@ -491,8 +491,8 @@ void ShardingCatalogManager::configureCollectionBalancing(
                                     enableAutoMerger.value());
             updatedFields++;
         }
-        if (noBalance) {
-            setClauseBuilder.append(CollectionType::kNoBalanceFieldName, noBalance.value());
+        if (enableBalancing) {
+            setClauseBuilder.append(CollectionType::kNoBalanceFieldName, !enableBalancing.value());
             updatedFields++;
         }
     }
