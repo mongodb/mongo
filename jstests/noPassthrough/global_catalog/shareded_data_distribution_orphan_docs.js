@@ -18,17 +18,14 @@ const emptyNss = 'test.emptyNss';
 const nssWithDocs = 'test.coll2';
 const numDocs = 6;
 
+const emptyTimeseriesNss = 'test.emptyTimeseriesNss';
+const timeseriesNssWithDocs = 'test.collTimeseries2';
+const emptyBucketTimeseriesNss = 'test.system.buckets.emptyTimeseriesNss';
+const bucketTimeseriesNssWithDocs = 'test.system.buckets.collTimeseries2';
+
 const primaryShard = st.shard0.shardName;
 const temporaryDataShard = st.shard1.shardName;
 const finalDataShard = st.shard2.shardName;
-
-function buildExpectedDataOnShard(shardName, expectedNumDocs, expectedNumOrphans) {
-    return {
-        shardName: shardName,
-        numOwnedDocuments: expectedNumDocs,
-        numOrphanedDocs: expectedNumOrphans
-    };
-}
 
 function verifyShardedDataDistributionFor(nss, expectedDistribution) {
     const aggregationResponse =
@@ -48,39 +45,58 @@ function verifyShardedDataDistributionFor(nss, expectedDistribution) {
 
 // Setup the namespaces to be tested.
 st.adminCommand({enablesharding: dbName, primaryShard: primaryShard});
+
 st.adminCommand({shardcollection: emptyNss, key: {skey: 1}});
 st.adminCommand({shardcollection: nssWithDocs, key: {skey: 1}});
+
+st.adminCommand(
+    {shardcollection: emptyTimeseriesNss, key: {time: 1}, timeseries: {timeField: 'time'}});
+st.adminCommand(
+    {shardcollection: timeseriesNssWithDocs, key: {time: 1}, timeseries: {timeField: 'time'}});
 
 // Insert data to validate the aggregation stage
 for (let i = 0; i < numDocs; i++) {
     assert.commandWorked(st.s.getCollection(nssWithDocs).insert({skey: i}));
 }
 
+for (let i = 0; i < numDocs; i++) {
+    assert.commandWorked(st.s.getCollection(timeseriesNssWithDocs)
+                             .insertOne({'time': ISODate('2021-05-18T00:00:00.000Z'), 'temp': i}));
+}
+
 // Move the chunk of each collection twice, so that it visits each shard of the cluster.
-for (let nss of [emptyNss, nssWithDocs]) {
-    for (let destinationShardId of [temporaryDataShard, finalDataShard]) {
+for (let destinationShardId of [temporaryDataShard, finalDataShard]) {
+    for (let nss of [emptyNss, nssWithDocs]) {
         assert.commandWorked(
             st.s.adminCommand({moveChunk: nss, find: {skey: 1}, to: destinationShardId}));
+    }
+    for (let nss of [bucketTimeseriesNssWithDocs, emptyBucketTimeseriesNss]) {
+        assert.commandWorked(st.s.adminCommand(
+            {moveChunk: nss, find: {"control.min.time": 1}, to: destinationShardId}));
     }
 }
 
 // The empty collection will have transitioned through the shards of the cluster without leaving
 // orphans; verify that $shardedDataDistribution only returns information about the current data
 // shard.
-let expectedDistributionForEmptyNss =
-    [buildExpectedDataOnShard(finalDataShard, 0 /*expectedNumDocs*/, 0 /*expectedNumOrphans*/)];
-
-verifyShardedDataDistributionFor(emptyNss, expectedDistributionForEmptyNss);
+verifyShardedDataDistributionFor(
+    emptyNss, [{shardName: finalDataShard, numOwnedDocuments: 0, numOrphanedDocs: 0}]);
 
 // The non-empty collection, on the other hand, will have left orphan documents on each previous
 // data shard - and all the docs should be present on the current one.
-let expectedDistributionForNssWithDocs = [
-    buildExpectedDataOnShard(primaryShard, 0 /*expectedNumDocs*/, numDocs /*expectedNumOrphans*/),
-    buildExpectedDataOnShard(
-        temporaryDataShard, 0 /*expectedNumDocs*/, numDocs /*expectedNumOrphans*/),
-    buildExpectedDataOnShard(finalDataShard, numDocs /*expectedNumDocs*/, 0 /*expectedNumOrphans*/)
-];
+verifyShardedDataDistributionFor(nssWithDocs, [
+    {shardName: primaryShard, numOwnedDocuments: 0, numOrphanedDocs: numDocs},
+    {shardName: temporaryDataShard, numOwnedDocuments: 0, numOrphanedDocs: numDocs},
+    {shardName: finalDataShard, numOwnedDocuments: numDocs, numOrphanedDocs: 0}
+]);
 
-verifyShardedDataDistributionFor(nssWithDocs, expectedDistributionForNssWithDocs);
+verifyShardedDataDistributionFor(
+    emptyBucketTimeseriesNss,
+    [{shardName: finalDataShard, numOwnedDocuments: 0, numOrphanedDocs: 0}]);
+verifyShardedDataDistributionFor(bucketTimeseriesNssWithDocs, [
+    {shardName: primaryShard, numOwnedDocuments: 0, numOrphanedDocs: 1},
+    {shardName: temporaryDataShard, numOwnedDocuments: 0, numOrphanedDocs: 1},
+    {shardName: finalDataShard, numOwnedDocuments: 1, numOrphanedDocs: 0}
+]);
 
 st.stop();
