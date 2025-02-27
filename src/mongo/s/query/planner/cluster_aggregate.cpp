@@ -81,6 +81,7 @@
 #include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/tailable_mode_gen.h"
+#include "mongo/db/query/timeseries/timeseries_rewrites.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_id.h"
@@ -453,6 +454,28 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     return pipeline;
 }
 
+void rewritePipelineIfTimeseries(AggregateCommandRequest& request,
+                                 const CollectionRoutingInfo& cri) {
+    // Conditions for enabling the viewless code path: feature flag is on, request does not use
+    // the rawData flag, and we're querying against a sharded viewless timeseries collection.
+    if (!request.getRawData() && cri.cm.isTimeseriesCollection() &&
+        cri.cm.isNewTimeseriesWithoutView()) {
+        // TypeCollectionTimeseriesFields encapsulates TimeseriesOptions.
+        const auto timeseriesFields = cri.cm.getTimeseriesFields();
+        tassert(9949202,
+                "Expected getTimeseriesFields() to return a meaningful value",
+                timeseriesFields.has_value());
+        if (timeseriesFields.has_value()) {
+            timeseries::rewriteRequestPipelineAndHintForTimeseriesCollection(
+                request, *timeseriesFields, timeseriesFields->getTimeseriesOptions());
+            // The query has been rewritten to something that should run directly against the bucket
+            // collection. Set this flag to indicate to the shard that the query's target has
+            // changed to avoid incorrect rewrites in the shard role.
+            request.setRawData(true);
+        }
+    }
+}
+
 }  // namespace
 
 Status ClusterAggregate::runAggregate(OperationContext* opCtx,
@@ -573,6 +596,18 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         }
     }
 
+    // This is used later on as well.
+    const auto routingTableIsAvailable = cri && cri->hasRoutingTable();
+
+    // If cri is valueful, then the database definitely exists and the cluster has shards. If the
+    // routing table also exists, the collection exists and is tracked in the router role, so it is
+    // appropriate to attempt the rewrite. If any of these conditions are false, then either cri is
+    // none or the routing table is absent, and the rewrite will either be performed in the shard
+    // role or the database is nonexistent or the cluster has no shards to execute the query anyway.
+    if (routingTableIsAvailable) {
+        rewritePipelineIfTimeseries(request, *cri);
+    }
+
     // pipelineBuilder will be invoked within AggregationTargeter::make() if and only if it chooses
     // any policy other than "specific shard only".
     boost::intrusive_ptr<ExpressionContext> expCtx;
@@ -614,7 +649,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         // This is because the results of optimization may depend on knowing the collation.
         // TODO SERVER-81991: Determine whether this is necessary once all unsharded collections are
         // tracked as unsplittable collections in the sharding catalog.
-        if ((cri && cri->cm.hasRoutingTable()) || requiresCollationForParsingUnshardedAggregate ||
+        if (routingTableIsAvailable || requiresCollationForParsingUnshardedAggregate ||
             hasChangeStream || shouldDoFLERewrite ||
             expCtx->getNamespaceString().isCollectionlessAggregateNS()) {
             pipeline->optimizePipeline();

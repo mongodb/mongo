@@ -264,11 +264,9 @@ public:
     }
 
     bool isTimeseriesCollection() const final {
-        unimplementedTasserted();
         return false;
     }
 
-    // TODO (SERVER-100717): To be implemented
     bool isNewTimeseriesWithoutView() const final {
         return false;
     }

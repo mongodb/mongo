@@ -1009,6 +1009,16 @@ public:
         return *_rt->optRt;
     }
 
+    bool isTimeseriesCollection() const {
+        tassert(9949200, "Expected routing table to be initialized", _rt->optRt);
+        return _rt->optRt->isTimeseriesCollection();
+    }
+
+    bool isNewTimeseriesWithoutView() const {
+        tassert(9949201, "Expected routing table to be initialized", _rt->optRt);
+        return _rt->optRt->isNewTimeseriesWithoutView();
+    }
+
 private:
     ShardId _dbPrimary;
     DatabaseVersion _dbVersion;
