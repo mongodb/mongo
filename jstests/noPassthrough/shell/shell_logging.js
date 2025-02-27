@@ -50,16 +50,16 @@ tests.push(function assertJsTestLogJsonFormat() {
         };
         assert.docEq(expectedJson, printedJson, "expected a different log format");
 
-        // Assert the legacy format works as before.
-        TestData.logFormat = "legacy";
-        jsTestLog("test message legacy", extraArgs);
+        // Assert the plain format works as before.
+        TestData.logFormat = "plain";
+        jsTestLog("test message plain", extraArgs);
         assert.eq(1, print.console.length);
         const expectedLegacyResult =
-            ["----", "test message legacy " + tojson(extraArgs.attr), "----"].map(
+            ["----", "test message plain " + tojson(extraArgs.attr), "----"].map(
                 s => `[jsTest] ${s}`);
         assert.eq(`\n\n${expectedLegacyResult.join("\n")}\n\n`,
                   print.console,
-                  "expected a different log format when legacy mode is on");
+                  "expected a different log format when plain mode is on");
     });
 });
 

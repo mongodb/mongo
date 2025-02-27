@@ -1615,8 +1615,8 @@ class RunPlugin(PluginInterface):
         parser.add_argument(
             "--logFormat",
             dest="log_format",
-            choices=("json", "legacy"),
-            default="legacy",
+            choices=("json", "plain"),
+            default="plain",
             help="Resmoke output log format. Defaults to '%(default)s'.",
         )
 

@@ -11,7 +11,7 @@ from buildscripts.resmokelib import config
 class TimestampFormatter(logging.Formatter):
     """Timestamp formatter for log messages.
 
-    Depending on whether --logFormat parameter is set to 'json' or 'legacy'
+    Depending on whether --logFormat parameter is set to 'json' or 'plain'
     the timestamp format would be either 2021-01-01T13:27:03.246+00:00 or
     2021-01-01T13:27:03.246Z. This is done to match the format of timestamps
     produced by mongo{d,s} instances in case of 'json' log format but also to

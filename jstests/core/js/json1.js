@@ -2,8 +2,8 @@ if (typeof TestData === "undefined") {
     TestData = {};
 }
 
-function assertToJson({fn, expectedStr, assertMsg, logFormat = "legacy"}) {
-    assert.eq(true, logFormat == "legacy" || logFormat == "json");
+function assertToJson({fn, expectedStr, assertMsg, logFormat = "plain"}) {
+    assert.eq(true, logFormat == "plain" || logFormat == "json");
     const oldLogFormat = TestData.logFormat;
     try {
         TestData.logFormat = logFormat;
