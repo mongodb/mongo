@@ -176,3 +176,12 @@ server_parameters:
           gte: 1
         default: 1000
         redact: false
+
+    terminateSecondaryReadsOnOrphanCleanup:
+        description: >-
+          Enables the termination of queries on a secondary node due to orphan cleanup.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: terminateSecondaryReadsOnOrphanCleanup
+        default: true
+        redact: false
