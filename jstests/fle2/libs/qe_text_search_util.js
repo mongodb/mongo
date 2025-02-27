@@ -27,7 +27,10 @@ export class SuffixField extends TextFieldBase {
         assert.gt(this._lb, 0);
         assert.gte(this._ub, this._lb);
         assert.gte(byte_len, 0);
-        // TODO SERVER-94395 Link to documentation section explaining the StrEncode algorithm
+
+        // See
+        // https://github.com/10gen/mongo/blob/master/src/mongo/db/modules/enterprise/docs/fle/fle_string_search.md#strencode-suffix-and-prefix
+        // for an explanation of this calculation.
         const padded_len = Math.ceil((byte_len + 5) / 16) * 16 - 5;
         if (this._lb > padded_len) {
             return 1;  // 1 is for just the exact match string
@@ -62,6 +65,9 @@ export class SubstringField extends TextFieldBase {
         assert.gte(this._ub, this._lb);
         assert.gte(this._mlen, this._ub);
 
+        // See
+        // https://github.com/10gen/mongo/blob/master/src/mongo/db/modules/enterprise/docs/fle/fle_string_search.md#strencode-substring
+        // for an explanation of this calculation.
         const padded_len = Math.ceil((byte_len + 5) / 16) * 16 - 5;
         if (byte_len > this._mlen || this._lb > padded_len) {
             return 1;  // 1 is for just the exact match string
