@@ -51,6 +51,9 @@ public:
 
     const std::string& getResult(OperationContext* opCtx) const;
 
+protected:
+    bool _mustAlwaysMakeProgress() override;
+
 private:
     StringData serializePhase(const Phase& phase) const override {
         return AddShardCoordinatorPhase_serializer(phase);
@@ -74,10 +77,13 @@ private:
     boost::optional<std::function<OperationSessionInfo(OperationContext*)>> _osiGenerator();
 
     void _standardizeClusterParameters(OperationContext* opCt,
-                                       bool isFirstShard,
                                        std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
     bool _isFirstShard(OperationContext* opCtx);
+
+    void _setFCVOnReplicaSet(OperationContext* opCtx,
+                             mongo::ServerGlobalParams::FCVSnapshot::FCV fcv,
+                             std::shared_ptr<executor::TaskExecutor> executor);
 
     // Set on successful completion of the coordinator.
     boost::optional<std::string> _result;

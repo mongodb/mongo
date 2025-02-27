@@ -29,8 +29,13 @@
 
 #include "mongo/db/s/add_shard_coordinator.h"
 
+#include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/topology_change_helpers.h"
+#include "mongo/db/vector_clock_mutable.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -114,22 +119,123 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 topology_change_helpers::createShardIdentity(
                     opCtx, targeter, shardName, boost::none, **executor);
 
-                _standardizeClusterParameters(opCtx, _isFirstShard(opCtx), executor);
+                _doc.setChosenName(shardName);
+
+                _standardizeClusterParameters(opCtx, executor);
+            }))
+        .then(_buildPhaseHandler(
+            Phase::kCommit,
+            [this, _ = shared_from_this(), executor]() {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+
+                // Keep the FCV stable across checking the FCV, sending setFCV to the new shard and
+                // writing the entry for the new shard to config.shards. This ensures the FCV
+                // doesn't change after we send setFCV to the new shard, but before we write its
+                // entry to config.shards.
+                //
+                // NOTE: We don't use a Global IX lock here, because we don't want to hold the
+                // global lock while blocking on the network).
+                const FixedFCVRegion fcvRegion(opCtx);
+                const auto fcvSnapshot = (*fcvRegion).acquireFCVSnapshot();
+
+                auto& targeter = _getTargeter(opCtx);
+
+                auto dbList = topology_change_helpers::getDBNamesListFromReplicaSet(
+                    opCtx, targeter, **executor);
+
+                // (Generic FCV reference): These FCV checks should exist across LTS binary
+                // versions.
+                if (fcvSnapshot.isUpgradingOrDowngrading()) {
+                    _completeOnError = true;
+                    uasserted(5563604, "Cannot add shard while in upgrading/downgrading FCV state");
+                }
+
+                const auto currentFCV = fcvSnapshot.getVersion();
+                invariant(currentFCV == multiversion::GenericFCV::kLatest ||
+                          currentFCV == multiversion::GenericFCV::kLastContinuous ||
+                          currentFCV == multiversion::GenericFCV::kLastLTS);
+
+                _setFCVOnReplicaSet(opCtx, currentFCV, **executor);
+
+                topology_change_helpers::blockDDLCoordinatorsAndDrain(opCtx);
+
+                auto& shardingCatalogManager = *ShardingCatalogManager::get(opCtx);
+
+                auto clusterCardinalityParameterLock =
+                    shardingCatalogManager.acquireClusterCardinalityParameterLockForTopologyChange(
+                        opCtx);
+                auto shardMembershipLock =
+                    shardingCatalogManager.acquireShardMembershipLockForTopologyChange(opCtx);
+
+
+                ShardType shard;
+                shard.setName(_doc.getChosenName()->toString());
+                shard.setHost(_doc.getConnectionString().toString());
+                shard.setState(ShardType::ShardState::kShardAware);
+
+                auto newTopologyTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);
+                shard.setTopologyTime(newTopologyTime.asTimestamp());
+
+                {
+                    const auto originalWC = opCtx->getWriteConcern();
+                    ScopeGuard resetWCGuard([&] { opCtx->setWriteConcern(originalWC); });
+
+                    opCtx->setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern);
+                    topology_change_helpers::addShardInTransaction(
+                        opCtx, shard, std::move(dbList), std::vector<CollectionType>{});
+                }
+
+                BSONObjBuilder shardDetails;
+                shardDetails.append("name", shard.getName());
+                shardDetails.append("host", shard.getHost());
+
+                ShardingLogging::get(opCtx)->logChange(opCtx,
+                                                       "addShard",
+                                                       NamespaceString::kEmpty,
+                                                       shardDetails.obj(),
+                                                       ShardingCatalogClient::kMajorityWriteConcern,
+                                                       shardingCatalogManager.localConfigShard(),
+                                                       shardingCatalogManager.localCatalogClient());
+
+                auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+                shardRegistry->reload(opCtx);
+                tassert(9870601,
+                        "Shard not found in ShardRegistry after committing addShard",
+                        shardRegistry->getShard(opCtx, shard.getName()).isOK());
+
+                topology_change_helpers::
+                    hangAddShardBeforeUpdatingClusterCardinalityParameterFailpoint(opCtx);
+
+                shardMembershipLock.unlock();
+
+                {
+                    // TODO (SERVER-99433) remove this once the _kClusterCardinalityParameterLock is
+                    // removed alongside the RSEndpoint.
+                    // Some paths of add/remove shard take the _kClusterCardinalityParameterLock
+                    // before the FixedFCVRegion and others take the FixedFCVRegion before the
+                    // _kClusterCardinalityParameterLock lock. However, all paths take the
+                    // _kAddRemoveShardLock before either, so we do not actually have a lock
+                    // ordering problem. See SERVER-99708 for more information.
+                    DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
+                    topology_change_helpers::unblockDDLCoordinators(opCtx);
+                }
+
+                topology_change_helpers::updateClusterCardinalityParameter(
+                    clusterCardinalityParameterLock, opCtx);
             }))
         .then(_buildPhaseHandler(Phase::kFinal,
                                  [this, _ = shared_from_this()]() {
                                      auto opCtxHolder = cc().makeOperationContext();
                                      auto* opCtx = opCtxHolder.get();
 
-                                     // TODO this should not happen later on. if we reach the final
-                                     // phase that means we added something (or was already added).
+                                     // If we reach the final phase that means we added a shard (or
+                                     // was already added).
                                      // If we were not able to add anything then an assert should
                                      // had been thrown earlier.
-                                     // invariant(_doc.getChosenName().has_value());
-                                     uassert(
-                                         ErrorCodes::NotImplemented,
-                                         "something is still missing here in the implementation...",
-                                         _doc.getChosenName().has_value());
+                                     tassert(10105000,
+                                             "Final state is reached but no name was chosen.",
+                                             _doc.getChosenName().has_value());
 
                                      repl::ReplClientInfo::forClient(opCtx->getClient())
                                          .setLastOpToSystemLastOpTime(opCtx);
@@ -159,6 +265,10 @@ const std::string& AddShardCoordinator::getResult(OperationContext* opCtx) const
     const_cast<AddShardCoordinator*>(this)->getCompletionFuture().get(opCtx);
     invariant(_result.is_initialized());
     return *_result;
+}
+
+bool AddShardCoordinator::_mustAlwaysMakeProgress() {
+    return _doc.getPhase() >= Phase::kPrepareNewShard;
 }
 
 // TODO (SPM-4017): these changes should be done on the cluster command level.
@@ -235,16 +345,14 @@ AddShardCoordinator::_osiGenerator() {
 }
 
 void AddShardCoordinator::_standardizeClusterParameters(
-    OperationContext* opCtx,
-    bool isFirstShard,
-    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    OperationContext* opCtx, std::shared_ptr<executor::ScopedTaskExecutor> executor) {
     auto configSvrClusterParameterDocs =
         topology_change_helpers::getClusterParametersLocally(opCtx);
 
     // If this is the first shard being added, and no cluster parameters have been set, then this
     // can be seen as a replica set to shard conversion - absorb all of this shard's cluster
     // parameters. Otherwise, push our cluster parameters to the shard.
-    if (isFirstShard) {
+    if (_isFirstShard(opCtx)) {
         bool clusterParameterDocsEmpty = std::all_of(
             configSvrClusterParameterDocs.begin(),
             configSvrClusterParameterDocs.end(),
@@ -266,6 +374,27 @@ bool AddShardCoordinator::_isFirstShard(OperationContext* opCtx) {
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     shardRegistry->reload(opCtx);
     return shardRegistry->getNumShards(opCtx) == 0;
+}
+
+void AddShardCoordinator::_setFCVOnReplicaSet(OperationContext* opCtx,
+                                              mongo::ServerGlobalParams::FCVSnapshot::FCV fcv,
+                                              std::shared_ptr<executor::TaskExecutor> executor) {
+    if (_doc.getIsConfigShard()) {
+        return;
+    }
+    auto const sessionInfo = getNewSession(opCtx);
+
+    SetFeatureCompatibilityVersion setFcvCmd(fcv);
+    setFcvCmd.setDbName(DatabaseName::kAdmin);
+    setFcvCmd.setFromConfigServer(true);
+    generic_argument_util::setMajorityWriteConcern(setFcvCmd);
+    // TODO(SERVER-100897): Find out why this fails if we pass a session info
+    // generic_argument_util::setOperationSessionInfo(setFcvCmd, sessionInfo);
+
+    uassertStatusOK(
+        topology_change_helpers::runCommandForAddShard(
+            opCtx, _getTargeter(opCtx), DatabaseName::kAdmin, setFcvCmd.toBSON(), executor)
+            .commandStatus);
 }
 
 }  // namespace mongo

@@ -103,10 +103,8 @@ const clusterParameter4 = {
     assert.commandWorked(foo.foo.insertOne({a: 1}));
 
     jsTest.log("Non-empty RS can be added if this is the first shard");
-    assert.commandFailedWithCode(
-        st.configRS.getPrimary().adminCommand(
-            {_configsvrAddShardCoordinator: rs.getURL(), "writeConcern": {"w": "majority"}}),
-        ErrorCodes.NotImplemented);
+    assert.commandWorked(st.configRS.getPrimary().adminCommand(
+        {_configsvrAddShardCoordinator: rs.getURL(), "writeConcern": {"w": "majority"}}));
 
     jsTest.log("First RS is never locked for write");
     assert.commandWorked(foo.foo.insertOne({b: 1}));
@@ -134,8 +132,13 @@ const clusterParameter4 = {
 
     assert.commandWorked(rs.getPrimary().adminCommand({setClusterParameter: clusterParameter2}));
     assert.commandWorked(rs.getPrimary().adminCommand({setClusterParameter: clusterParameter4}));
+    assert.commandWorked(
+        rs.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
     rs.restart(0, {shardsvr: ""});
+
+    assert.neq(rs.getPrimary().getDB("admin").system.version.findOne().version,
+               st.configRS.getPrimary().getDB("admin").system.version.findOne());
 
     assert.commandWorked(rs.getPrimary().getDB("foo").foo.insertOne({a: 1}));
 
@@ -150,12 +153,21 @@ const clusterParameter4 = {
     assert.commandWorked(rs.getPrimary().getDB("foo").dropDatabase({w: "majority"}));
 
     jsTest.log("Empty non-first RS can be added");
-    assert.commandFailedWithCode(st.configRS.getPrimary().adminCommand({
-        _configsvrAddShardCoordinator: rs.getURL(),
-        name: "hagymasbab",
-        "writeConcern": {"w": "majority"}
-    }),
-                                 ErrorCodes.NotImplemented);
+    {
+        const response = st.configRS.getPrimary().adminCommand({
+            _configsvrAddShardCoordinator: rs.getURL(),
+            name: "hagymasbab",
+            "writeConcern": {"w": "majority"}
+        });
+        assert.commandWorked(response);
+        assert.eq(response.shardAdded, "hagymasbab");
+    }
+    {
+        const response = st.s.adminCommand({listShards: 1});
+        assert.commandWorked(response);
+        assert.eq(response.shards.length, 2);
+        assert(response.shards.some(shard => shard._id === "hagymasbab"))
+    }
 
     jsTest.log("Non-first RS is locked for write");
     try {
@@ -188,6 +200,10 @@ const clusterParameter4 = {
                                                 {_id: 0, clusterParameterTime: 0}),
               clusterParametersConfigColl.findOne({_id: clusterParameter3_4Name},
                                                   {_id: 0, clusterParameterTime: 0}));
+
+    jsTest.log("FCV must match");
+    assert.neq(rs.getPrimary().getDB("admin").system.version.findOne().version,
+               st.configRS.getPrimary().getDB("admin").system.version.findOne());
 
     rs.stopSet();
     st.stop();

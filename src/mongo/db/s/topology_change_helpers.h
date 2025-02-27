@@ -194,22 +194,6 @@ void validateHostAsShard(OperationContext* opCtx,
                          bool isConfigShard,
                          std::shared_ptr<executor::TaskExecutor> executor);
 
-using FetcherDocsCallbackFn = std::function<bool(const std::vector<BSONObj>& batch)>;
-using FetcherStatusCallbackFn = std::function<void(const Status& status)>;
-
-/**
- * Creates a Fetcher task for fetching documents in the given collection on the given shard.
- * After the task is scheduled, applies 'processDocsCallback' to each fetched batch and
- * 'processStatusCallback' to the fetch status.
- */
-std::unique_ptr<Fetcher> createFetcher(OperationContext* opCtx,
-                                       RemoteCommandTargeter& targeter,
-                                       const NamespaceString& nss,
-                                       const repl::ReadConcernLevel& readConcernLevel,
-                                       FetcherDocsCallbackFn processDocsCallback,
-                                       FetcherStatusCallbackFn processStatusCallback,
-                                       std::shared_ptr<executor::TaskExecutor> executor);
-
 /**
  * Given the shard draining state, returns the message that should be included as part of the remove
  * shard response.
@@ -349,6 +333,29 @@ void removeShard(const Lock::ExclusiveLock&,
                  const std::shared_ptr<Shard> localConfigShard,
                  const std::string& shardName,
                  std::shared_ptr<executor::TaskExecutor> executor);
+
+/**
+ * Inserts new entries into the config catalog to describe the shard being added (and the
+ * databases being imported) through the internal transaction API.
+ */
+void addShardInTransaction(OperationContext* opCtx,
+                           const ShardType& newShard,
+                           std::vector<DatabaseName>&& databasesInNewShard,
+                           std::vector<CollectionType>&& collectionsInNewShard);
+
+/**
+ * Updates the "hasTwoOrMoreShard" cluster cardinality parameter. Can only be called while holding
+ * the _kClusterCardinalityParameterLock in exclusive mode and not holding the _kShardMembershipLock
+ * in exclusive mode since setting cluster parameters requires taking the latter in shared mode.
+ */
+void updateClusterCardinalityParameter(const Lock::ExclusiveLock& clusterCardinalityParameterLock,
+                                       OperationContext* opCtx);
+
+/**
+ * Handles the hangAddShardBeforeUpdatingClusterCardinalityParameter failpoint that is used from
+ * multiple places
+ */
+void hangAddShardBeforeUpdatingClusterCardinalityParameterFailpoint(OperationContext* opCtx);
 
 }  // namespace topology_change_helpers
 }  // namespace mongo
