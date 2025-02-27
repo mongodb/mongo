@@ -494,7 +494,9 @@ class TestRunner(Subcommand):
 
         # We don't need to return the resmoke invocation if we aren't running on evergreen.
         if not config.EVERGREEN_TASK_ID:
-            print("Skipping local invocation because evergreen task id was not provided.")
+            self._resmoke_logger.info(
+                "Skipping local invocation because evergreen task id was not provided."
+            )
             return
 
         evg_conf = parse_evergreen_file(config.EVERGREEN_PROJECT_CONFIG_PATH)
