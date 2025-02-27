@@ -1,5 +1,4 @@
 /build
-/src/mongo/db/modules
 /.jsdbshell
 /.dbshell
 /*.ninja

@@ -1,0 +1,3 @@
+[submodule "src/mongo/db/modules/eloq"]
+	path = src/mongo/db/modules/eloq
+	url = git@github.com:monographdb/monographdb_engine_for_mongodb.git
