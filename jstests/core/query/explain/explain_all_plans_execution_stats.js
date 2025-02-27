@@ -3,6 +3,7 @@
 //
 // @tags: [
 //   assumes_read_concern_local,
+//   requires_fcv_80,
 // ]
 //
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
