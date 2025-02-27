@@ -208,7 +208,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    boost::optional<bool> getTimeseriesBucketsMayHaveMixedSchemaData() const override {
+    timeseries::MixedSchemaBucketsState getTimeseriesMixedSchemaBucketsState() const override {
         MONGO_UNREACHABLE;
     }
 

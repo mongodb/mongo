@@ -91,7 +91,8 @@ void TimeSeriesOpObserver::onInserts(OperationContext* opCtx,
             "Cannot write time-series bucket containing mixed schema data, please run collMod "
             "with timeseriesBucketsMayHaveMixedSchemaData and retry your insert",
             !opCtx->isEnforcingConstraints() ||
-                bucketsColl->getTimeseriesBucketsMayHaveMixedSchemaData().value_or(false) ||
+                bucketsColl->getTimeseriesMixedSchemaBucketsState()
+                    .canStoreMixedSchemaBucketsSafely() ||
                 std::none_of(first, last, [bucketsColl](auto&& insert) {
                     auto mixedSchema =
                         bucketsColl->doesTimeseriesBucketsDocContainMixedSchemaData(insert.doc);
@@ -118,7 +119,8 @@ void TimeSeriesOpObserver::onUpdate(OperationContext* opCtx,
                 "Cannot write time-series bucket containing mixed schema data, please run collMod "
                 "with timeseriesBucketsMayHaveMixedSchemaData and retry your update",
                 !opCtx->isEnforcingConstraints() ||
-                    args.coll->getTimeseriesBucketsMayHaveMixedSchemaData().value_or(false) ||
+                    args.coll->getTimeseriesMixedSchemaBucketsState()
+                        .canStoreMixedSchemaBucketsSafely() ||
                     !mixedSchema());
 
         timeseries::bucket_catalog::handleDirectWrite(

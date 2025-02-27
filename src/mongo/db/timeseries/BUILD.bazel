@@ -13,6 +13,7 @@ idl_generator(
     name = "timeseries_gen",
     src = "timeseries.idl",
     hdrs = [
+        "mixed_schema_buckets_state.h",
         "//src/mongo/db/timeseries:timeseries_global_options.h",
     ],
     deps = [

@@ -276,8 +276,10 @@ TEST_F(CollModTest, CollModTimeseriesMixedSchemaData) {
         opCtx.get(), curNss, collModCmd, true, &result));
     {
         AutoGetCollectionForRead bucketsCollForRead(opCtx.get(), bucketsColl);
-        ASSERT_TRUE(bucketsCollForRead->getTimeseriesBucketsMayHaveMixedSchemaData());
-        ASSERT_TRUE(*bucketsCollForRead->getTimeseriesBucketsMayHaveMixedSchemaData());
+        auto mixedSchemaState = bucketsCollForRead->getTimeseriesMixedSchemaBucketsState();
+        ASSERT_TRUE(mixedSchemaState.isValid());
+        ASSERT_TRUE(mixedSchemaState.mustConsiderMixedSchemaBucketsInReads());
+        ASSERT_TRUE(mixedSchemaState.canStoreMixedSchemaBucketsSafely());
     }
 
     // Test that both backwards compatibles option and legacy parameter have been properly set

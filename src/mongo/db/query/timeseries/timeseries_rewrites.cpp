@@ -56,7 +56,7 @@ std::vector<BSONObj> rewritePipelineForTimeseriesCollection(
     const StringData timeField,
     const boost::optional<StringData>& metaField,
     const boost::optional<std::int32_t>& bucketMaxSpanSeconds,
-    const boost::optional<bool>& timeseriesBucketsMayHaveMixedSchemaData,
+    const MixedSchemaBucketsState& timeseriesMixedSchemaBucketsState,
     const bool timeseriesBucketsAreFixed) {
     if (!pipeline.empty()) {
         const auto& firstStage = *pipeline.begin();
@@ -80,7 +80,7 @@ std::vector<BSONObj> rewritePipelineForTimeseriesCollection(
         timeField,
         metaField,
         bucketMaxSpanSeconds,
-        timeseriesBucketsMayHaveMixedSchemaData,
+        timeseriesMixedSchemaBucketsState,
         timeseriesBucketsAreFixed);
 }
 

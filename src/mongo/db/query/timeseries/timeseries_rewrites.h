@@ -32,6 +32,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/timeseries/mixed_schema_buckets_state.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 
 namespace mongo {
@@ -54,7 +55,7 @@ std::vector<BSONObj> rewritePipelineForTimeseriesCollection(
     const StringData timeField,
     const boost::optional<StringData>& metaField,
     const boost::optional<std::int32_t>& bucketMaxSpanSeconds,
-    const boost::optional<bool>& timeseriesBucketsMayHaveMixedSchemaData,
+    const timeseries::MixedSchemaBucketsState& timeseriesMixedSchemaBucketsState,
     const bool timeseriesBucketsAreFixed);
 
 }  // namespace timeseries

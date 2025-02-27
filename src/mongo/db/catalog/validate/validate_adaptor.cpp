@@ -942,8 +942,8 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                               containsMixedSchemaDataResponse.getStatus());
                 } else if (containsMixedSchemaDataResponse.isOK() &&
                            containsMixedSchemaDataResponse.getValue()) {
-                    bool mixedSchemaAllowed =
-                        coll->getTimeseriesBucketsMayHaveMixedSchemaData().get();
+                    bool mixedSchemaAllowed = coll->getTimeseriesMixedSchemaBucketsState()
+                                                  .canStoreMixedSchemaBucketsSafely();
                     if (mixedSchemaAllowed &&
                         results->addWarning(kExpectedMixedSchemaTimeseriesWarning)) {
                         LOGV2_WARNING_OPTIONS(8469901,

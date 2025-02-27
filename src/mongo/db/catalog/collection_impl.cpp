@@ -113,6 +113,10 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(allowSettingMalformedCollectionValidators);
 MONGO_FAIL_POINT_DEFINE(timeseriesBucketingParametersChangedInputValue);
 MONGO_FAIL_POINT_DEFINE(skipCappedDeletes);
+// Simulate the behavior of mixed-schema flag of MongoDB versions without SERVER-91195:
+// Only set the legacy time-series mixed-schema flag at the top level of the catalog,
+// and clear the new durable flag which is stored inside the collection options.
+MONGO_FAIL_POINT_DEFINE(simulateLegacyTimeseriesMixedSchemaFlag);
 
 Status checkValidatorCanBeUsedOnNs(const BSONObj& validator,
                                    const NamespaceString& nss,
@@ -516,13 +520,12 @@ void CollectionImpl::_setMetadata(
     if (metadata->options.timeseries) {
         // If present, reuse the storageEngine options to work around the issue described in
         // SERVER-91194.
-        boost::optional<bool> optBackwardsCompatiblesMayHaveMixedSchemaDataFlag =
-            getFlagFromStorageEngineBson(
-                metadata->options.storageEngine,
-                backwards_compatible_collection_options::kTimeseriesBucketsMayHaveMixedSchemaData);
-        if (optBackwardsCompatiblesMayHaveMixedSchemaDataFlag.has_value()) {
+        _shared->_durableTimeseriesBucketsMayHaveMixedSchemaData = getFlagFromStorageEngineBson(
+            metadata->options.storageEngine,
+            backwards_compatible_collection_options::kTimeseriesBucketsMayHaveMixedSchemaData);
+        if (_shared->_durableTimeseriesBucketsMayHaveMixedSchemaData.has_value()) {
             metadata->timeseriesBucketsMayHaveMixedSchemaData =
-                *optBackwardsCompatiblesMayHaveMixedSchemaDataFlag;
+                *_shared->_durableTimeseriesBucketsMayHaveMixedSchemaData;
         }
 
         // If present, reuse storageEngine options to work around the issue described in
@@ -860,11 +863,27 @@ bool CollectionImpl::isTemporary() const {
     return _metadata->options.temp;
 }
 
-boost::optional<bool> CollectionImpl::getTimeseriesBucketsMayHaveMixedSchemaData() const {
+timeseries::MixedSchemaBucketsState CollectionImpl::getTimeseriesMixedSchemaBucketsState() const {
     if (!getTimeseriesOptions()) {
-        return boost::none;
+        return timeseries::MixedSchemaBucketsState::Invalid;
     }
-    return _metadata->timeseriesBucketsMayHaveMixedSchemaData;
+
+    if (!_shared->_durableTimeseriesBucketsMayHaveMixedSchemaData.has_value() &&
+        !_metadata->timeseriesBucketsMayHaveMixedSchemaData.has_value()) {
+        return timeseries::MixedSchemaBucketsState::Invalid;
+    }
+
+    if (_shared->_durableTimeseriesBucketsMayHaveMixedSchemaData.value_or(false)) {
+        return timeseries::MixedSchemaBucketsState::DurableMayHaveMixedSchemaBuckets;
+    }
+
+    if (_metadata->timeseriesBucketsMayHaveMixedSchemaData.value_or(false)) {
+        return timeseries::MixedSchemaBucketsState::NonDurableMayHaveMixedSchemaBuckets;
+    }
+
+    invariant(!_shared->_durableTimeseriesBucketsMayHaveMixedSchemaData.value_or(true) ||
+              !_metadata->timeseriesBucketsMayHaveMixedSchemaData.value_or(true));
+    return timeseries::MixedSchemaBucketsState::NoMixedSchemaBuckets;
 }
 
 boost::optional<bool> CollectionImpl::timeseriesBucketingParametersHaveChanged() const {
@@ -931,10 +950,13 @@ void CollectionImpl::setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext
     _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
         // Reuse storageEngine options to work around the issue described in SERVER-91194
         if (setting.has_value()) {
+            _shared->_durableTimeseriesBucketsMayHaveMixedSchemaData =
+                MONGO_unlikely(simulateLegacyTimeseriesMixedSchemaFlag.shouldFail()) ? boost::none
+                                                                                     : setting;
             md.options.storageEngine = setFlagToStorageEngineBson(
                 md.options.storageEngine,
                 backwards_compatible_collection_options::kTimeseriesBucketsMayHaveMixedSchemaData,
-                *setting);
+                _shared->_durableTimeseriesBucketsMayHaveMixedSchemaData);
         }
 
         // Also update legacy parameter for compatibility when downgrading to older sub-versions
@@ -1647,7 +1669,8 @@ Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
               str::stream() << "index " << imd.nameStringData()
                             << " is already in current metadata: " << _metadata->toBSON());
 
-    if (getTimeseriesBucketsMayHaveMixedSchemaData().value_or(false) &&
+    if (getTimeseriesMixedSchemaBucketsState().isValid() &&
+        getTimeseriesMixedSchemaBucketsState().mustConsiderMixedSchemaBucketsInReads() &&
         timeseries::doesBucketsIndexIncludeMeasurement(
             opCtx, ns(), *getTimeseriesOptions(), spec->infoObj())) {
         LOGV2(6057502,

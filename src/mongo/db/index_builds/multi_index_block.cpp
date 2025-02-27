@@ -375,7 +375,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             if (options &&
                 timeseries::doesBucketsIndexIncludeMeasurement(
                     opCtx, collection->ns(), *options, info)) {
-                invariant(collection->getTimeseriesBucketsMayHaveMixedSchemaData());
+                invariant(collection->getTimeseriesMixedSchemaBucketsState().isValid());
                 _containsIndexBuildOnTimeseriesMeasurement = true;
             }
 
@@ -792,7 +792,8 @@ Status MultiIndexBlock::_insert(
     // expression below. Only check for mixed-schema data if it's possible for the time-series
     // collection to have it.
     if (_containsIndexBuildOnTimeseriesMeasurement &&
-        *collection->getTimeseriesBucketsMayHaveMixedSchemaData()) {
+        collection->getTimeseriesMixedSchemaBucketsState()
+            .mustConsiderMixedSchemaBucketsInReads()) {
         auto docHasMixedSchemaData =
             collection->doesTimeseriesBucketsDocContainMixedSchemaData(doc);
 
@@ -1114,11 +1115,10 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
     // because this node doesn't contain mixed-schema it doesn't mean that other shards can't have
     // mixed schema data. This flag needs to be consistent across the shards.
     if (_containsIndexBuildOnTimeseriesMeasurement && !_timeseriesBucketContainsMixedSchemaData) {
-        boost::optional<bool> mayContainMixedSchemaData =
-            collection->getTimeseriesBucketsMayHaveMixedSchemaData();
-        invariant(mayContainMixedSchemaData);
+        auto mixedSchemaState = collection->getTimeseriesMixedSchemaBucketsState();
+        invariant(mixedSchemaState.isValid());
 
-        if (*mayContainMixedSchemaData) {
+        if (mixedSchemaState.mustConsiderMixedSchemaBucketsInReads()) {
             LOGV2_WARNING(9301400,
                           "Index build finished for time-series collection marked as containing "
                           "mixed schema buckets without detecting any buckets with mixed schema.");

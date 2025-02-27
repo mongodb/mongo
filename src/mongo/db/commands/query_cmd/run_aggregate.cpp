@@ -1078,7 +1078,7 @@ void rewritePipelineBsonForTimeseriesCollection(const CollectionPtr& coll,
     const auto maxSpanSeconds = tsOpts->getBucketMaxSpanSeconds().get_value_or(
         mongo::timeseries::getMaxSpanSecondsFromGranularity(
             tsOpts->getGranularity().get_value_or(BucketGranularityEnum::Seconds)));
-    const auto bucketsMayHaveMixedSchemaData = coll->getTimeseriesBucketsMayHaveMixedSchemaData();
+    const auto mixedSchemaBucketsState = coll->getTimeseriesMixedSchemaBucketsState();
     // Assume parameters have changed unless otherwise specified.
     const auto parametersChanged = coll->timeseriesBucketingParametersHaveChanged().value_or(true);
     const auto bucketsAreFixed = timeseries::areTimeseriesBucketsFixed(*tsOpts, parametersChanged);
@@ -1087,7 +1087,7 @@ void rewritePipelineBsonForTimeseriesCollection(const CollectionPtr& coll,
                                                            timeField,
                                                            metaField,
                                                            {maxSpanSeconds},
-                                                           bucketsMayHaveMixedSchemaData,
+                                                           mixedSchemaBucketsState,
                                                            bucketsAreFixed);
     aggRequest.setPipeline(std::move(newPipelineBson));
 

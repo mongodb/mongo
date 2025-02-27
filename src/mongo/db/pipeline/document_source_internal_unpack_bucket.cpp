@@ -1021,7 +1021,7 @@ std::vector<BSONObj> DocumentSourceInternalUnpackBucket::generateStageInPipeline
     const StringData timeField,
     const boost::optional<StringData>& metaField,
     const boost::optional<std::int32_t>& bucketMaxSpanSeconds,
-    const boost::optional<bool>& timeseriesBucketsMayHaveMixedSchemaData,
+    const timeseries::MixedSchemaBucketsState& timeseriesMixedSchemaBucketsState,
     const bool timeseriesBucketsAreFixed) {
     auto bob = BSONObjBuilder{};
 
@@ -1031,7 +1031,8 @@ std::vector<BSONObj> DocumentSourceInternalUnpackBucket::generateStageInPipeline
         bob.append(timeseries::kMetaFieldName, *metaField);
     }
 
-    const auto assumeNoMixedSchemaData = !timeseriesBucketsMayHaveMixedSchemaData.value_or(true);
+    const auto assumeNoMixedSchemaData =
+        !timeseriesMixedSchemaBucketsState.mustConsiderMixedSchemaBucketsInReads();
     bob.append(DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData,
                assumeNoMixedSchemaData);
 

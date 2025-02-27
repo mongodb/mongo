@@ -305,8 +305,8 @@ public:
         return _coll->isNewTimeseriesWithoutView();
     }
 
-    boost::optional<bool> getTimeseriesBucketsMayHaveMixedSchemaData() const override {
-        return _coll->getTimeseriesBucketsMayHaveMixedSchemaData();
+    timeseries::MixedSchemaBucketsState getTimeseriesMixedSchemaBucketsState() const override {
+        return _coll->getTimeseriesMixedSchemaBucketsState();
     }
 
     void setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext* opCtx,

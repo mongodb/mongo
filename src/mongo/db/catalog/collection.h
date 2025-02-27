@@ -74,6 +74,7 @@
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot.h"
+#include "mongo/db/timeseries/mixed_schema_buckets_state.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/yieldable.h"
 #include "mongo/logv2/log_attr.h"
@@ -388,11 +389,10 @@ public:
     virtual bool isTemporary() const = 0;
 
     /**
-     * Returns true if the time-series collection may have mixed-schema data.
-     *
-     * If FCV < 5.2 or if this is not a time-series collection, returns boost::none.
+     * Returns a description of whether time-series mixed-schema buckets may be present for this
+     * collection, and how they should be handled.
      */
-    virtual boost::optional<bool> getTimeseriesBucketsMayHaveMixedSchemaData() const = 0;
+    virtual timeseries::MixedSchemaBucketsState getTimeseriesMixedSchemaBucketsState() const = 0;
 
     /**
      * Sets the 'timeseriesBucketsMayHaveMixedSchemaData' catalog entry flag to 'setting' for this

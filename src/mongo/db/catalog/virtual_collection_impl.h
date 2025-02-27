@@ -273,9 +273,9 @@ public:
         return false;
     }
 
-    boost::optional<bool> getTimeseriesBucketsMayHaveMixedSchemaData() const final {
+    timeseries::MixedSchemaBucketsState getTimeseriesMixedSchemaBucketsState() const final {
         unimplementedTasserted();
-        return boost::none;
+        return timeseries::MixedSchemaBucketsState::Invalid;
     }
 
     void setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext* opCtx,
