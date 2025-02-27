@@ -411,9 +411,10 @@ public:
         auto cmd = idl::parseCommandDocument<HelloCommand>(
             IDLParserContext("hello", vts, dbName.tenantId(), sc), cmdObj);
 
-        uassert(ErrorCodes::LoadBalancerSupportMismatch,
-                "Mongod does not support load-balanced connections",
-                !cmd.getLoadBalanced().value_or(false));
+        if (cmd.getLoadBalanced().value_or(false)) {
+            LOGV2(10107800,
+                  "Client declared load balancer support. This is not supported on mongod.");
+        }
 
         shardWaitInHello.execute(
             [&](const BSONObj& customArgs) { _handleHelloFailPoint(customArgs, opCtx, cmdObj); });
