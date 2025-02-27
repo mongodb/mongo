@@ -62,6 +62,7 @@
 #include "mongo/db/query/stage_builder/sbe/gen_expression.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_types.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -93,6 +94,10 @@ public:
     void benchmarkExpression(BSONObj expressionSpec,
                              benchmark::State& benchmarkState,
                              const std::vector<Document>& documents) final {
+        // TODO SERVER-100579 Remove this when feature flag is removed
+        RAIIServerParameterControllerForTest sbeUpgrageBinaryTreesFeatureFlag{
+            "featureFlagSbeUpgradeBinaryTrees", true};
+
         QueryTestServiceContext serviceContext;
         auto opCtx = serviceContext.makeOperationContext();
         auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), kNss);
