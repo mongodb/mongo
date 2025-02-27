@@ -37,36 +37,31 @@ const topology = DiscoverTopology.findConnectedNodes(mongos);
 const recipientShardNames = reshardingTest.recipientShardNames;
 const recipient0 = new Mongo(topology.shards[recipientShardNames[0]].primary);
 
-const reshardingOptions = {
-    newShardKeyPattern: {newKey: 1},
-    newChunks: [
-        {min: {newKey: MinKey}, max: {newKey: 0}, shard: recipientShardNames[0]},
-        {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
-    ],
-};
-const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
-if (!isMultiversion) {
-    // This test explicitly inserts a document into the resharding temporary collection so
-    // resharding verification is expected to fail.
-    reshardingOptions.performVerification = false;
-}
-
 const err = assert.throws(() => {
-    reshardingTest.withReshardingInBackground(reshardingOptions, (tempNs) => {
-        // Wait for the recipients to have finished cloning so the temporary resharding
-        // collection is known to exist.
-        assert.soon(() => {
-            const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne();
-            return coordinatorDoc !== null && coordinatorDoc.state === "applying";
-        });
+    reshardingTest.withReshardingInBackground(
+        {
+            newShardKeyPattern: {newKey: 1},
+            newChunks: [
+                {min: {newKey: MinKey}, max: {newKey: 0}, shard: recipientShardNames[0]},
+                {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
+            ],
+        },
+        (tempNs) => {
+            // Wait for the recipients to have finished cloning so the temporary resharding
+            // collection is known to exist.
+            assert.soon(() => {
+                const coordinatorDoc =
+                    mongos.getCollection("config.reshardingOperations").findOne();
+                return coordinatorDoc !== null && coordinatorDoc.state === "applying";
+            });
 
-        // Insert a document directly into recipient0 that is truly owned by recipient1.
-        const tempColl = recipient0.getCollection(tempNs);
-        assert.commandWorked(tempColl.runCommand("insert", {
-            documents: [{_id: "unowned by recipient0", oldKey: 10, newKey: 10}],
-            shardVersion: ShardVersioningUtil.kIgnoredShardVersion
-        }));
-    });
+            // Insert a document directly into recipient0 that is truly owned by recipient1.
+            const tempColl = recipient0.getCollection(tempNs);
+            assert.commandWorked(tempColl.runCommand("insert", {
+                documents: [{_id: "unowned by recipient0", oldKey: 10, newKey: 10}],
+                shardVersion: ShardVersioningUtil.kIgnoredShardVersion
+            }));
+        });
 });
 
 assert(/temporary resharding collection had unowned documents/.test(err.message), err);
