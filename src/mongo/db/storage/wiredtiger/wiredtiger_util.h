@@ -55,10 +55,10 @@ class WiredTigerSession;
 class WiredTigerItem {
 public:
     WiredTigerItem() = default;
-    WiredTigerItem(const void* d, size_t s) noexcept {
+    WiredTigerItem(const void* d, size_t s) {
         _item = {d, s};
     }
-    WiredTigerItem(std::span<const char> str) noexcept : WiredTigerItem(str.data(), str.size()) {}
+    WiredTigerItem(std::span<const char> str) : WiredTigerItem(str.data(), str.size()) {}
 
     // Get this item as a WT_ITEM pointer
     // The pointer returned by get() must not be allowed to live longer than *this.
@@ -71,16 +71,16 @@ public:
 
     // Conform to std::ranges::contiguous_range and std::ranges::sized_range so that buffers read
     // from WiredTiger can be consumed as ranges.
-    size_t size() const noexcept {
+    size_t size() const {
         return _item.size;
     }
-    const char* data() const noexcept {
+    const char* data() const {
         return static_cast<const char*>(_item.data);
     }
-    const char* begin() const noexcept {
+    const char* begin() const {
         return data();
     }
-    const char* end() const noexcept {
+    const char* end() const {
         return data() + size();
     }
 

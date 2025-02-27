@@ -64,7 +64,7 @@ public:
      * Called by the decorator's destructor to tell us that an opCtx with the old storage engine has
      * been destroyed.
      */
-    void notifyOpCtxDestroyed() noexcept;
+    void notifyOpCtxDestroyed();
 
 private:
     stdx::mutex _mutex;

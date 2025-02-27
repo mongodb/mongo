@@ -451,7 +451,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                           dbVersion = oss.getDbVersion(dbName),
                           resumeInfo,
                           forwardableOpMetadata =
-                              std::move(forwardableOpMetadata)](auto status) mutable noexcept {
+                              std::move(forwardableOpMetadata)](auto status) mutable {
         ScopeGuard onScopeExitGuard([&] {
             stdx::unique_lock<stdx::mutex> lk(_throttlingMutex);
             _numActiveIndexBuilds--;

@@ -52,13 +52,11 @@ enum class StorageEngineInitFlags {
     kForRestart = 1 << 2,  // Used by reinitialzeStorageEngine only.
 };
 
-constexpr StorageEngineInitFlags operator&(StorageEngineInitFlags a,
-                                           StorageEngineInitFlags b) noexcept {
+constexpr StorageEngineInitFlags operator&(StorageEngineInitFlags a, StorageEngineInitFlags b) {
     return StorageEngineInitFlags{stdx::to_underlying(a) & stdx::to_underlying(b)};
 }
 
-constexpr StorageEngineInitFlags operator|(StorageEngineInitFlags a,
-                                           StorageEngineInitFlags b) noexcept {
+constexpr StorageEngineInitFlags operator|(StorageEngineInitFlags a, StorageEngineInitFlags b) {
     return StorageEngineInitFlags{stdx::to_underlying(a) | stdx::to_underlying(b)};
 }
 

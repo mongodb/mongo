@@ -44,11 +44,11 @@ protected:
 
 class SimpleAction : public DiskSpaceMonitor::Action {
 public:
-    int64_t getThresholdBytes() noexcept override {
+    int64_t getThresholdBytes() override {
         return 1024;
     }
 
-    void act(OperationContext* opCtx, int64_t availableBytes) noexcept override {
+    void act(OperationContext* opCtx, int64_t availableBytes) override {
         hits += 1;
     }
 

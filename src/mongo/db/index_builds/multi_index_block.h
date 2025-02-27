@@ -282,7 +282,7 @@ public:
     using OnCleanUpFn = std::function<void()>;
     void abortIndexBuild(OperationContext* opCtx,
                          CollectionWriter& collection,
-                         OnCleanUpFn onCleanUp) noexcept;
+                         OnCleanUpFn onCleanUp);
 
     /**
      * Not all index aborts need this function, in particular index builds that do not need

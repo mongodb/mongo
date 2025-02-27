@@ -97,13 +97,13 @@ public:
     using propagate_on_container_move_assignment = std::true_type;
 
     Allocator() = delete;
-    explicit Allocator(AllocatorStats& stats) noexcept : _stats(stats){};
+    explicit Allocator(AllocatorStats& stats) : _stats(stats) {}
     Allocator(const Allocator&) noexcept = default;
 
     ~Allocator() = default;
 
     template <class U>
-    Allocator(const Allocator<U>& ta) noexcept : _stats{ta.stats()} {};
+    Allocator(const Allocator<U>& ta) noexcept : _stats{ta.stats()} {}
 
     T* allocate(size_t n) {
         const size_t allocation = n * sizeof(T);
@@ -126,13 +126,8 @@ private:
 };
 
 template <class T, class U>
-bool operator==(const Allocator<T>& lhs, const Allocator<U>& rhs) noexcept {
+bool operator==(const Allocator<T>& lhs, const Allocator<U>& rhs) {
     return &lhs.stats() == &rhs.stats();
-}
-
-template <class T, class U>
-bool operator!=(const Allocator<T>& lhs, const Allocator<U>& rhs) noexcept {
-    return &lhs.stats() != &rhs.stats();
 }
 
 }  // namespace mongo::tracking

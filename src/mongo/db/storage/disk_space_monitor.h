@@ -63,13 +63,13 @@ public:
          * If the disk space in bytes falls below this threshold, the act() function should be
          * called.
          */
-        virtual int64_t getThresholdBytes() noexcept = 0;
+        virtual int64_t getThresholdBytes() = 0;
 
         /**
          * Takes action when the defined threshold is reached. This function may be called an
          * indefinite number of times when the disk falls below its threshold.
          */
-        virtual void act(OperationContext* opCtx, int64_t availableBytes) noexcept = 0;
+        virtual void act(OperationContext* opCtx, int64_t availableBytes) = 0;
     };
 
     /**

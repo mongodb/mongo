@@ -598,12 +598,12 @@ IndexBuildsCoordinator::makeKillIndexBuildOnLowDiskSpaceAction() {
     public:
         KillIndexBuildsAction(IndexBuildsCoordinator* coordinator) : _coord(coordinator) {}
 
-        int64_t getThresholdBytes() noexcept final {
+        int64_t getThresholdBytes() final {
             // This parameter's validator ensures that this multiplication will not overflow.
             return gIndexBuildMinAvailableDiskSpaceMB.load() * 1024 * 1024;
         }
 
-        void act(OperationContext* opCtx, int64_t availableBytes) noexcept final {
+        void act(OperationContext* opCtx, int64_t availableBytes) final {
             if (_coord->noIndexBuildInProgress()) {
                 // Avoid excessive logging when no index builds are in progress. Nothing prevents an
                 // index build from starting after this check.  Subsequent calls will see any
@@ -2583,11 +2583,10 @@ Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
     return Status::OK();
 }
 
-void IndexBuildsCoordinator::_runIndexBuild(
-    OperationContext* opCtx,
-    const UUID& buildUUID,
-    const IndexBuildOptions& indexBuildOptions,
-    const boost::optional<ResumeIndexInfo>& resumeInfo) noexcept {
+void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
+                                            const UUID& buildUUID,
+                                            const IndexBuildOptions& indexBuildOptions,
+                                            const boost::optional<ResumeIndexInfo>& resumeInfo) {
     activeIndexBuilds.sleepIfNecessary_forTestOnly();
 
     // If the index build does not exist, do not continue building the index. This may happen if an
@@ -3353,7 +3352,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
     OperationContext* opCtx,
     CollectionWriter& collection,
     const UUID& buildUUID,
-    RepairData repair) noexcept {
+    RepairData repair) {
     invariant(
         shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(collection->ns(), MODE_X));
 

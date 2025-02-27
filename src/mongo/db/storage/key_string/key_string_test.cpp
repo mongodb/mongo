@@ -2182,7 +2182,9 @@ TEST_F(KeyStringBuilderTest, DecimalFromUniformDoublePerf) {
     perfTest(version, numbers);
 }
 
-DEATH_TEST(KeyStringBuilderTest, ToBsonPromotesAssertionsToTerminate, "terminate() called") {
+DEATH_TEST(KeyStringBuilderTest,
+           ToBsonPromotesAssertionsToTerminate,
+           "KeyString format error: Failed to find null terminator in string.") {
     const char invalidString[] = {
         60,  // CType::kStringLike
         55,  // Non-null terminated

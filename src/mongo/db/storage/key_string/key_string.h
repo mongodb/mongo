@@ -1300,17 +1300,18 @@ std::ostream& operator<<(std::ostream& stream, const T& value) {
 size_t getKeySize(std::span<const char> buffer, Ordering ord, Version version);
 
 /**
- * Decodes the given KeyString buffer into it's BSONObj representation. This is marked as
- * noexcept since the assumption is that 'buffer' is a valid KeyString buffer and this method
- * is not expected to throw.
+ * Decodes the given KeyString buffer into it's BSONObj representation. These
+ * functions require that the buffer contains valid BSON and will terminate the
+ * process if this is not the case.
  *
- * If the buffer provided may not be valid, use the 'safe' version instead.
+ * If the buffer provided may not be valid, use the 'Safe' version instead.
  */
-BSONObj toBson(std::span<const char> data, Ordering ord, const TypeBits& types) noexcept;
+BSONObj toBson(std::span<const char> data, Ordering ord, const TypeBits& types);
 BSONObj toBson(std::span<const char> data,
                Ordering ord,
                std::span<const char> typeBitsRawBuffer,
                Version version);
+
 BSONObj toBsonSafe(std::span<const char> data, Ordering ord, const TypeBits& types);
 void toBsonSafe(std::span<const char> data,
                 Ordering ord,
@@ -1320,12 +1321,13 @@ void toBsonSafe(std::span<const char> data,
                 Ordering ord,
                 TypeBits::ReaderBase& typeBitsReader,
                 BSONObjBuilder& builder);
+
 Discriminator decodeDiscriminator(std::span<const char> data,
                                   Ordering ord,
                                   const TypeBits& typeBits);
 
 template <class T>
-BSONObj toBson(const T& keyString, Ordering ord) noexcept {
+BSONObj toBson(const T& keyString, Ordering ord) {
     return toBson(keyString.getView(), ord, keyString.getTypeBits());
 }
 

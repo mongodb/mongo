@@ -675,7 +675,7 @@ protected:
     void _runIndexBuild(OperationContext* opCtx,
                         const UUID& buildUUID,
                         const IndexBuildOptions& indexBuildOptions,
-                        const boost::optional<ResumeIndexInfo>& resumeInfo) noexcept;
+                        const boost::optional<ResumeIndexInfo>& resumeInfo);
 
     /**
      * Acquires locks and runs index build. Throws on error.
@@ -895,7 +895,7 @@ protected:
         OperationContext* opCtx,
         CollectionWriter& collection,
         const UUID& buildUUID,
-        RepairData repair) noexcept;
+        RepairData repair);
 
     /**
      * Looks up active index build by UUID. Returns NoSuchKey if the build does not exist.

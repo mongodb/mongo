@@ -2799,19 +2799,27 @@ BSONObj toBsonSafe(std::span<const char> data, Ordering ord, const TypeBits& typ
     return builder.obj();
 }
 
-BSONObj toBson(std::span<const char> data, Ordering ord, const TypeBits& typeBits) noexcept {
-    return toBsonSafe(data, ord, typeBits);
+BSONObj toBson(std::span<const char> data, Ordering ord, const TypeBits& typeBits) {
+    try {
+        return toBsonSafe(data, ord, typeBits);
+    } catch (const AssertionException& ex) {
+        LOGV2_FATAL(9895200, "toBson() called with invalid buffer", "exception"_attr = ex);
+    }
 }
 
 BSONObj toBson(std::span<const char> data,
                Ordering ord,
                std::span<const char> typeBitsRawBuffer,
                Version version) {
-    BSONObjBuilder builder;
-    auto br = makeBufReader(typeBitsRawBuffer);
-    auto reader = TypeBits::getReaderFromBuffer(version, &br);
-    toBsonSafe(data, ord, reader, builder);
-    return builder.obj();
+    try {
+        BSONObjBuilder builder;
+        auto br = makeBufReader(typeBitsRawBuffer);
+        auto reader = TypeBits::getReaderFromBuffer(version, &br);
+        toBsonSafe(data, ord, reader, builder);
+        return builder.obj();
+    } catch (const AssertionException& ex) {
+        LOGV2_FATAL(9895201, "toBson() called with invalid buffer", "exception"_attr = ex);
+    }
 }
 
 RecordId decodeRecordIdLongAtEnd(std::span<const char> buf) {

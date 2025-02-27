@@ -56,31 +56,30 @@ public:
               boost::allocate_unique<T>(Context.makeAllocator<T>(), std::forward<Args>(args)...)) {}
     unique_ptr(Context& Context, std::nullptr_t)
         : _uniquePtr(nullptr, boost::alloc_deleter<T, Allocator<T>>(Context.makeAllocator<T>())) {}
-    unique_ptr(unique_ptr& utp) noexcept : _uniquePtr(*utp.get()){};
     unique_ptr(unique_ptr&&) = default;
     ~unique_ptr() = default;
 
-    T* operator->() {
+    T* operator->() noexcept {
         return _uniquePtr.get().ptr();
     }
 
-    T* operator->() const {
+    T* operator->() const noexcept {
         return _uniquePtr.get().ptr();
     }
 
-    T* get() {
+    T* get() noexcept {
         return _uniquePtr.get().ptr();
     }
 
-    T* get() const {
+    T* get() const noexcept {
         return _uniquePtr.get().ptr();
     }
 
-    T& operator*() {
+    T& operator*() noexcept {
         return *get();
     }
 
-    T& operator*() const {
+    T& operator*() const noexcept {
         return *get();
     }
 

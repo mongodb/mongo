@@ -157,7 +157,7 @@ public:
         _onCommitOrAbort = std::move(fn);
     }
 
-    void committedOrAborted() noexcept {
+    void committedOrAborted() {
         if (_onCommitOrAbort) {
             _onCommitOrAbort();
         }
