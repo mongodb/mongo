@@ -1,10 +1,14 @@
 """Unit tests for the evergreen_task_timeout script."""
 
 import unittest
+from unittest.mock import patch
 
 from git import Commit, Repo
 
-from buildscripts.validate_commit_message import is_valid_commit
+from buildscripts.validate_commit_message import (
+    get_non_merge_queue_squashed_commits,
+    is_valid_commit,
+)
 
 
 class ValidateCommitMessageTest(unittest.TestCase):
@@ -68,3 +72,28 @@ class ValidateCommitMessageTest(unittest.TestCase):
         ]
 
         self.assertTrue(all(not is_valid_commit(message) for message in messages))
+
+    @patch("requests.post")
+    def test_squashed_commit(self, mock_request):
+        class FakeResponse:
+            def json(self):
+                return {
+                    "data": {
+                        "repository": {
+                            "pullRequest": {
+                                "viewerMergeHeadlineText": "SERVER-1234 Add a ton of great support (#32823)",
+                                "viewerMergeBodyText": "This PR adds back support for a lot of things\nMany great things!",
+                            }
+                        }
+                    }
+                }
+
+        mock_request.return_value = FakeResponse()
+        commits = get_non_merge_queue_squashed_commits(
+            github_org="fun_org", github_repo="fun_repo", pr_number=1024, github_token="fun_token"
+        )
+        self.assertEqual(len(commits), 1)
+        self.assertEqual(
+            commits[0].message,
+            "SERVER-1234 Add a ton of great support (#32823)\nThis PR adds back support for a lot of things\nMany great things!",
+        )

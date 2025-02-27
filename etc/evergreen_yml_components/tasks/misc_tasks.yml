@@ -1516,6 +1516,7 @@ tasks:
           docker_password: ${dockerhub_password}
 
   - name: validate_commit_message
+    allowed_requesters: ["github_merge_queue", "github_pr"]
     tags:
       [
         "assigned_to_jira_team_devprod_correctness",
@@ -1532,10 +1533,20 @@ tasks:
       - func: "upload pip requirements"
       - func: "configure evergreen api credentials"
       - func: "f_expansions_write"
+      - command: github.generate_token
+        params:
+          owner: ${github_org}
+          repo: ${github_repo}
+          expansion_name: github_token
+          permissions:
+            pull_requests: read
+            metadata: read
       - command: subprocess.exec
         type: test
         params:
           binary: bash
+          include_expansions_in_env:
+            - github_token
           args:
             - "./src/evergreen/run_python_script_with_report.sh"
             - "validate_commit_message"
@@ -1545,8 +1556,12 @@ tasks:
             JIRA_AUTH_ACCESS_TOKEN_SECRET: ${jira_auth_access_token_secret}
             JIRA_AUTH_CONSUMER_KEY: ${jira_auth_consumer_key}
             JIRA_AUTH_KEY_CERT: ${jira_auth_key_cert}
-            IS_COMMIT_QUEUE: ${is_commit_queue}
+            REQUESTER: ${requester}
             BRANCH_NAME: ${branch_name}
+            PR_NUMBER: ${github_pr_number}
+            GITHUB_ORG: ${github_org}
+            GITHUB_REPO: ${github_repo}
+            GITHUB_TOKEN: ${github_token}
 
   - name: version_burn_in_gen
     run_on: ubuntu2004-medium

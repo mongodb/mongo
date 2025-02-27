@@ -32,6 +32,7 @@ import pathlib
 import re
 import subprocess
 
+import requests
 import structlog
 import typer
 from git import Commit, Repo
@@ -65,7 +66,10 @@ def is_valid_commit(commit: Commit) -> bool:
     # 4. Revert "Import wiredtiger
     if not VALID_SUMMARY.match(commit.summary):
         LOGGER.error(
-            "Commit did not contain a valid summary",
+            f"""Commit did not contain a valid summary.
+Please update the PR title and description to match the following regular expressions {VALID_SUMMARY}.
+If you are seeing this on a PR, after changing the title/description you will need to rerun this check before being able to submit your PR.
+The decision to add this check was made in SERVER-101443, please feel free to leave comments/feedback on that ticket.""",
             commit_hexsha=commit.hexsha,
             commit_summary=commit.summary,
         )
@@ -77,7 +81,10 @@ def is_valid_commit(commit: Commit) -> bool:
     for banned_string in BANNED_STRINGS:
         if "".join(banned_string.split()) in stripped_message:
             LOGGER.error(
-                "Commit contains banned string (ignoring whitespace)",
+                """Commit contains banned string (ignoring whitespace).
+Please update the PR title and description to not contain the following banned string.
+If you are seeing this on a PR, after changing the title/description you will need to rerun this check before being able to submit your PR.
+The decision to add this check was made in SERVER-101443, please feel free to leave comments/feedback on that ticket.""",
                 banned_string=banned_string,
                 commit_hexsha=commit.hexsha,
                 commit_message=commit.message,
@@ -87,28 +94,57 @@ def is_valid_commit(commit: Commit) -> bool:
     return True
 
 
-def main(
-    branch_name: Annotated[
-        str,
-        typer.Option(envvar="BRANCH_NAME", help="Name of the branch to compare against HEAD"),
-    ],
-    is_commit_queue: Annotated[
-        str,
-        typer.Option(
-            envvar="IS_COMMIT_QUEUE",
-            help="If this is being run in the commit/merge queue. Set to anything to be considered part of the commit/merge queue.",
-        ),
-    ] = "",
-):
-    """
-    Validate the commit message.
+def get_non_merge_queue_squashed_commits(
+    github_org: str,
+    github_repo: str,
+    pr_number: int,
+    github_token: str,
+) -> list[Commit]:
+    assert github_org
+    assert github_repo
+    assert pr_number >= 0
+    assert github_token
 
-    It validates the latest message when no arguments are provided.
-    """
+    pr_merge_info_query = {
+        "query": f"""{{
+            repository(owner: "{github_org}", name: "{github_repo}") {{
+                pullRequest(number: {pr_number}) {{
+                    viewerMergeHeadlineText(mergeType: SQUASH)
+                    viewerMergeBodyText(mergeType: SQUASH)
+                }}
+            }}
+         }}"""
+    }
+    headers = {"Authorization": f"token {github_token}"}
 
-    if not is_commit_queue:
-        LOGGER.info("Exiting early since this is not running in the commit/merge queue")
-        raise typer.Exit(code=STATUS_OK)
+    LOGGER.info("Sending request", request=pr_merge_info_query)
+    req = requests.post(
+        url="https://api.github.com/graphql",
+        json=pr_merge_info_query,
+        headers=headers,
+        timeout=60,  # 60s
+    )
+    resp = req.json()
+    # Response will look like
+    # {'data': {'repository': {'pullRequest':
+    # {
+    #   'viewerMergeHeadlineText': 'SERVER-1234 Add a ton of great support (#32823)',
+    #   'viewerMergeBodyText': 'This PR adds back support for a lot of things\nMany great things!'
+    # }}}}
+    LOGGER.info("Squashed content", content=resp)
+    pr_info = resp["data"]["repository"]["pullRequest"]
+    fake_repo = Repo()
+    return [
+        Commit(
+            repo=fake_repo,
+            binsha=b"00000000000000000000",
+            message="\n".join([pr_info["viewerMergeHeadlineText"], pr_info["viewerMergeBodyText"]]),
+        )
+    ]
+
+
+def get_merge_queue_commits(branch_name: str) -> list[Commit]:
+    assert branch_name
 
     diff_commits = subprocess.run(
         ["git", "log", '--pretty=format:"%H"', f"{branch_name}...HEAD"],
@@ -121,8 +157,56 @@ def main(
     LOGGER.info("Diff commit hashes", commit_hashs=commit_hashs)
     repo = Repo(repo_root)
 
-    for commit_hash in commit_hashs:
-        commit = repo.commit(commit_hash)
+    return [repo.commit(commit_hash) for commit_hash in commit_hashs]
+
+
+def main(
+    github_org: Annotated[
+        str,
+        typer.Option(envvar="GITHUB_ORG", help="Name of the github organization (e.g. 10gen)"),
+    ] = "",
+    github_repo: Annotated[
+        str,
+        typer.Option(envvar="GITHUB_REPO", help="Name of the repo (e.g. mongo)"),
+    ] = "",
+    branch_name: Annotated[
+        str,
+        typer.Option(envvar="BRANCH_NAME", help="Name of the branch to compare against HEAD"),
+    ] = "",
+    pr_number: Annotated[
+        int,
+        typer.Option(envvar="PR_NUMBER", help="PR Number to compare with"),
+    ] = -1,
+    github_token: Annotated[
+        str,
+        typer.Option(envvar="GITHUB_TOKEN", help="Github token with pr read access"),
+    ] = "",
+    requester: Annotated[
+        str,
+        typer.Option(
+            envvar="REQUESTER",
+            help="What is requested this task. Defined https://docs.devprod.prod.corp.mongodb.com/evergreen/Project-Configuration/Project-Configuration-Files#expansions.",
+        ),
+    ] = "",
+):
+    """
+    Validate the commit message.
+
+    It validates the latest message when no arguments are provided.
+    """
+
+    commits: list[Commit] = []
+    if requester == "github_merge_queue":
+        commits = get_merge_queue_commits(branch_name)
+    elif requester == "github_pr":
+        commits = get_non_merge_queue_squashed_commits(
+            github_org, github_repo, pr_number, github_token
+        )
+    else:
+        LOGGER.error("Running with an invalid requester", requester=requester)
+        raise typer.Exit(code=STATUS_ERROR)
+
+    for commit in commits:
         if not is_valid_commit(commit):
             LOGGER.error("Found an invalid commit", commit=commit)
             raise typer.Exit(code=STATUS_ERROR)
