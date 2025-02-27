@@ -1058,7 +1058,9 @@ BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
             // For tracked timeseries collections, only the bucket collections are tracked. This
             // sets the namespace to the namespace of the tracked bucket collection.
             nsInfoEntry.setNs(targeter->getNS());
-            nsInfoEntry.setIsTimeseriesNamespace(true);
+            if (!_clientRequest.getRawData()) {
+                nsInfoEntry.setIsTimeseriesNamespace(true);
+            }
         }
 
         // If we are using the two phase write protocol introduced in PM-1632, we allow shard key

@@ -31,9 +31,6 @@ selector:
     # The conditions of this test returns a different error for delete compared to the function bulkWrite uses.
     # bulkWrite is consistent with the other CRUD operations here.
     - jstests/core/txns/multi_statement_transaction_write_error.js
-    # Bulk writes do not support the rawData field yet. TODO (SERVER-97424): Remove this exclusion.
-    - jstests/core/write/raw_data_write_feature_flag_disabled.js
-    - jstests/core/write/raw_data_write_explain_feature_flag_disabled.js
 
     # Multiple cluster specific exclusions
 

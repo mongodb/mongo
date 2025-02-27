@@ -84,6 +84,10 @@ DBCollection.prototype.bulkWrite = function(operations, options) {
     // Use bulk operation API already in the shell
     var bulkOp = opts.ordered ? this.initializeOrderedBulkOp() : this.initializeUnorderedBulkOp();
 
+    if (opts.rawData) {
+        bulkOp.setRawData();
+    }
+
     // Contains all inserted _ids
     var insertedIds = {};
 

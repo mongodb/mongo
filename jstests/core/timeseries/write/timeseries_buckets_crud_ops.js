@@ -56,17 +56,6 @@ crudTest(() => {
     assert.eq(agg.toArray().length, 1);
 });
 
-// bulkWrite()
-crudTest(() => {
-    const res = bucketsColl.bulkWrite([
-        {insertOne: {document: insertBucket}},
-        {deleteOne: {filter: {"_id": insertBucket["_id"]}}},
-    ]);
-    assert(res.acknowledged);
-    assert.eq(res.insertedCount, 1);
-    assert.eq(res.deletedCount, 1);
-}, false);
-
 // count()
 crudTest(() => {
     assert.eq(coll.count({"control.count": 2}, {rawData: true}), 1);

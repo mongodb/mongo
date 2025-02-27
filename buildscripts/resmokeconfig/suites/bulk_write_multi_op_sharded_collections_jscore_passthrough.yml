@@ -54,9 +54,6 @@ selector:
     - jstests/core/**/index_multikey.js
     - jstests/core/**/query/explain/optimized_match_explain.js
     - jstests/core/**/sort_array.js
-    # Bulk writes do not support the rawData field yet. TODO (SERVER-97424): Remove this exclusion.
-    - jstests/core/write/raw_data_write_feature_flag_disabled.js
-    - jstests/core/write/raw_data_write_explain_feature_flag_disabled.js
 
     # ----------------------------------------
     # Multiple cluster specific exclusions
