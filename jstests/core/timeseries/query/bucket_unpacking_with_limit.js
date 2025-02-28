@@ -153,6 +153,65 @@ assertPlanStagesInPipeline({
     ],
     onlyMeta: true
 });
+// Test that sort with limit and skip returns the correct number of documents.
+// TODO: SERVER-101506 The unpack bucket stage only tries to optimize the end of its pipeline after
+// it checks if it can do some rewrites. Therefore, we need a (complicated, alwaysTrue) match
+// expression or some other stage following _internalUnpackBucket before $sort to trigger the end of
+// the pipeline optimization and test for the correctness of the number of documents return in such
+// cases. We need to fix the tests below after optimization is added for other cases as well.
+assertPlanStagesInPipeline({
+    pipeline: [
+        {
+            "$match": {
+                "$nor": [
+                    {"temp": {"$in": []}},
+                ]
+            }
+        },
+        {$sort: {"m.sensorId": 1}},
+        {$skip: 1},
+        {$limit: 1}
+    ],
+    expectedStages: ["$_internalUnpackBucket", "$limit", "$skip"],
+    expectedResults: [metaDocs[1]],
+    onlyMeta: true
+});
+assertPlanStagesInPipeline({
+    pipeline: [
+        {
+            "$match": {
+                "$nor": [
+                    {"temp": {"$in": []}},
+                ]
+            }
+        },
+        {$sort: {"m.sensorId": 1}},
+        {$skip: 1},
+        {$limit: 2},
+        {$skip: 1}
+    ],
+    expectedStages: ["$_internalUnpackBucket", "$limit", "$skip"],
+    expectedResults: [metaDocs[2]],
+    onlyMeta: true
+});
+assertPlanStagesInPipeline({
+    pipeline: [
+        {
+            $match: {
+                $nor: [
+                    {"temp": {$in: []}},
+                ]
+            }
+        },
+        {$limit: 5},
+        {$sort: {"m.sensorId": 1}},
+        {$skip: 2},
+        {$limit: 2}
+    ],
+    expectedStages: ["$_internalUnpackBucket", "$limit", "$sort", "$skip"],
+    expectedResults: [metaDocs[2], metaDocs[3]],
+    onlyMeta: true
+});
 // Test limit comes before sort.
 assertPlanStagesInPipeline({
     pipeline: [{$limit: 2}, {$sort: {"m.sensorId": 1}}],

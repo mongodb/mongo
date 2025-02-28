@@ -1867,12 +1867,16 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
                 // and return a pointer to the preceding stage.
                 auto sortForReorder = createMetadataSortForReorder(*sortPtr);
 
-                // If the original sort had a limit that did not come from the limit value that we
-                // just added above, we will not preserve that limit in the swapped sort. Instead we
-                // will add a $limit to the end of the pipeline to keep the number of expected
-                // results.
+                // If the original sort had a limit, pushing the $sort stage before the unpack
+                // stage will not preserve that limit. To truly limit the number of documents,
+                // we need to add an additional limit after the unpack stage.
                 if (auto limit = sortPtr->getLimit(); limit && *limit != 0) {
-                    container->push_back(DocumentSourceLimit::create(pExpCtx, *limit));
+                    // Current iterator is at $_internalUnpackBucket which is followed by $sort. We
+                    // are pushing $limit after $sort.
+                    auto limitPos = itr;
+                    std::advance(limitPos, 2);
+                    _triedLimitPushDown = true;
+                    container->insert(limitPos, DocumentSourceLimit::create(pExpCtx, *limit));
                 }
 
                 // Reorder sort and current doc.

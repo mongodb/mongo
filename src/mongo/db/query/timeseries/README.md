@@ -91,6 +91,8 @@ find({tags: 34})
 In 5.0+, a `$sort` stage on the `metaField` that immediately follows the `$_internalUnpackBucket` stage is pushed
 before `$_internalUnpackBucket`.
 
+When swapping a `$sort` and a `$_internalUnpackBucketStage`, the `$sort` may have absorbed a `$limit` from the rest of the pipeline. In this case, we can swap the `$sort` (and its absorbed `$limit`) with the `$_internalUnpackBucketStage`, and we must also add a new `$limit` stage after the `$_internalUnpackBucketStage`. This reduces the number of fetched buckets and ensures that this limit is respected after the buckets have been unpacked. This is similar to the logic we follow when we see a standalone `$limit` stage; see the "$limit reorder section."
+
 For example, for a time-series collections where the `metaField = tags`:
 
 ```
