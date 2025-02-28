@@ -109,8 +109,6 @@
 - name: fallback_core_excludes
   value:
     exclude_files:
-      # TODO SERVER-96805 Investigate why wildcard index candidate plans are non-deterministic.
-      - jstests/core/index/wildcard/*.js
       - jstests/core/query/index_correctness_pbt.js
       - jstests/core/query/plan_cache/cache_correctness_pbt.js
       - jstests/core/query/run_all_plans_pbt.js

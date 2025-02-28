@@ -53,9 +53,9 @@ bool applyProjectionToOneField(projection_executor::ProjectionExecutor* executor
  * if the projection would allow that field to remain in a document.
  **/
 template <typename Container>
-stdx::unordered_set<std::string> applyProjectionToFields(
-    projection_executor::ProjectionExecutor* executor, Container const& fields) {
-    stdx::unordered_set<std::string> out;
+std::set<std::string> applyProjectionToFields(projection_executor::ProjectionExecutor* executor,
+                                              Container const& fields) {
+    std::set<std::string> out;
     for (const auto& field : fields) {
         if (applyProjectionToOneField(executor, field)) {
             out.insert(field);

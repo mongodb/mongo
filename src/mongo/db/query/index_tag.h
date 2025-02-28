@@ -75,6 +75,10 @@ public:
         return Type::IndexTag;
     }
 
+    void hash(absl::HashState state) const override {
+        state = absl::HashState::combine(std::move(state), index, pos, canCombineBounds);
+    }
+
     // What index should we try to use for this leaf?
     size_t index = kNoIndex;
 
@@ -140,6 +144,10 @@ public:
         ret->first = first;
         ret->notFirst = notFirst;
         return ret;
+    }
+
+    void hash(absl::HashState state) const override {
+        MONGO_UNREACHABLE_TASSERT(9766200);
     }
 
     Type getType() const override {
@@ -224,6 +232,12 @@ public:
 
     Type getType() const override {
         return Type::OrPushdownTag;
+    }
+
+    void hash(absl::HashState state) const override {
+        if (_indexTag) {
+            state = absl::HashState::combine(std::move(state), *_indexTag.get());
+        }
     }
 
     void addDestination(Destination dest) {

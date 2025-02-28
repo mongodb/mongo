@@ -458,7 +458,7 @@ bool canOnlyAnswerWildcardPrefixQuery(const IndexEntry& index, const IndexBounds
 }  // namespace
 
 void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
-                              const stdx::unordered_set<std::string>& fields,
+                              const std::set<std::string>& fields,
                               std::vector<IndexEntry>* out) {
     tassert(7246502, "out parameter cannot be null", out);
     tassert(7246503,

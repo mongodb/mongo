@@ -446,6 +446,13 @@ public:
         virtual void debugString(StringBuilder* builder) const = 0;
         virtual TagData* clone() const = 0;
         virtual Type getType() const = 0;
+
+        template <typename H>
+        friend H AbslHashValue(H state, const TagData& tagData) {
+            tagData.hash(absl::HashState::Create(&state));
+            return state;
+        }
+        virtual void hash(absl::HashState state) const = 0;
     };
 
     /**

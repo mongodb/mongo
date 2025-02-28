@@ -36,17 +36,19 @@ namespace mongo {
  * Describes whether we include parameter IDs or values from the query in the hash.
  */
 enum HashValuesOrParams {
-    // Hash parameter IDs where parameters are present. If parameters are not present, hash values.
+    // Hash parameter IDs where parameters are present.
     kHashParamIds = 1 << 1,
     // Hash values from the query.
     kHashValues = 1 << 2,
+    // Hash index tags.
+    kHashIndexTags = 1 << 3,
 };
 
 struct MatchExpressionHashParams {
+    const HashValuesOrParams hashValuesOrParams;
     // 'maxNumberOfInElementsToHash' is the maximum number of equalities or regexes to hash to avoid
     // performance issues related to hashing of large '$in's.
-    const size_t maxNumberOfInElementsToHash;
-    const HashValuesOrParams hashValuesOrParams;
+    const size_t maxNumberOfInElementsToHash = 20;
 };
 
 /**
@@ -63,8 +65,7 @@ size_t calculateHash(const MatchExpression& expr, const MatchExpressionHashParam
  */
 struct MatchExpressionHasher {
     explicit MatchExpressionHasher(MatchExpressionHashParams params =
-                                       MatchExpressionHashParams{20,
-                                                                 HashValuesOrParams::kHashValues})
+                                       MatchExpressionHashParams{HashValuesOrParams::kHashValues})
         : _params(std::move(params)) {}
 
     size_t operator()(const MatchExpression* expr) const {

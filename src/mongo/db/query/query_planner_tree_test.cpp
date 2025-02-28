@@ -366,21 +366,17 @@ TEST_F(QueryPlannerTest, ContainedOrOfAndCollapseIndenticalScansWithFilter) {
         "filter: null}}}");
 }
 
-/**
- * Due to SERVER-78752 this test was modified to disallow collapsing the or branches due to IETs
- * mismatch. To fix this and being able to collapse the $or the {$gte:1,$lte:1} needs to be
- * simplified to {a:1} before parameterization. TODO: SERVER-78962
- */
-TEST_F(QueryPlannerTest, ContainedOrOfAndDoesNotCollapseIndenticalScans) {
-    addIndex(BSON("a" << 1));
-    runQuery(fromjson("{$or: [{a:{$gte:1,$lte:1}}, {a:1}]}"));
+TEST_F(QueryPlannerTest, ContainedOrOfAndCollapseIndenticalScansWithFilter2) {
+    addIndex(BSON("a" << 1 << "b" << 1));
+    runQuery(fromjson("{c: 1, $or: [{a:{$gte:1,$lte:1}, b:2}, {a:1, b:2, d:3}]}"));
 
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
     assertSolutionExists(
-        "{fetch: {filter: null, node: {or: {nodes: ["
-        "{ixscan: {pattern: {a:1}, bounds: {a: [[1,1,true,true]]}}}, "
-        "{ixscan: {pattern: {a:1}, bounds: {a: [[1,1,true,true]]}}}]}}}}");
+        "{fetch: {filter: {c: 1}, node: {fetch: {filter: null, node: "
+        "{ixscan: {pattern: {a: 1, b: 1}},"
+        "bounds: {a: [[1,1,true,true]], b: [[2,2,true,true]]},"
+        "filter: null}}}}}");
 }
 
 TEST_F(QueryPlannerTest, ContainedOrOfAndCollapseIdenticalScansTwoFilters) {
