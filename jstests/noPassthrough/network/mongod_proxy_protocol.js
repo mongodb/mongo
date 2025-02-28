@@ -14,7 +14,8 @@ if (_isWindows()) {
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-function runHello(port, loadBalanced) {
+function sendHelloMaybeLB(node, port, loadBalanced, count) {
+    const kLoadBalancerNoOpMessage = 10107800;
     let uri = `mongodb://127.0.0.1:${port}`;
     if (typeof loadBalanced != 'undefined') {
         uri += `/?loadBalanced=${loadBalanced}`;
@@ -22,12 +23,17 @@ function runHello(port, loadBalanced) {
     const conn = new Mongo(uri);
     assert.neq(null, conn, 'Client was unable to connect to the load balancer port');
     assert.commandWorked(conn.getDB('admin').runCommand({hello: 1}));
+
+    if (loadBalanced) {
+        assert(checkLog.checkContainsWithCountJson(node, 10107800, {}, count, undefined, true),
+               `Did not find log id 10107800 ${tojson(count)} times in the log`);
+    }
 }
 
 function failInvalidProtocol(node, port, id, attrs, loadBalanced, count) {
     let uri = `mongodb://127.0.0.1:${port}`;
     if (typeof loadBalanced != 'undefined') {
-        uri += `/?loadBalanced=${loadBalanced}`;
+        uri += `/?loadBalanced=${tojson(loadBalanced)}`;
     }
     try {
         new Mongo(uri);
@@ -48,31 +54,26 @@ function testProxyProtocolReplicaSet(ingressPort, egressPort, version) {
     rs.startSet({setParameter: {featureFlagMongodProxyProtocolSupport: true}});
     rs.initiate();
 
+    const node = rs.getPrimary();
     // Connecting to the to the proxy port succeeds.
-    runHello(ingressPort, undefined);
-    runHello(ingressPort, false);
+    sendHelloMaybeLB(node, ingressPort, undefined, 0);
+    sendHelloMaybeLB(node, ingressPort, false, 0);
 
     // Connecting to the to the proxy port with {loadBalanced: true} fails.
-    const lbmismatch = {
-        "error": "LoadBalancerSupportMismatch: Mongod does not support load-balanced connections"
-    };
-
-    const kCmdExecAssertion = 21962;
-    const node = rs.getPrimary();
-    failInvalidProtocol(node, ingressPort, kCmdExecAssertion, lbmismatch, "true", 1);
+    sendHelloMaybeLB(node, ingressPort, true, 1);
 
     // Connecting to the standard port without proxy header succeeds.
     const port = node.port;
-    runHello(port, undefined);
-    runHello(port, false);
+    sendHelloMaybeLB(node, port, undefined, 0);
+    sendHelloMaybeLB(node, port, false, 0);
 
     // Connecting to the standard port without and with {loadBalanced:true} proxy header fails.
-    failInvalidProtocol(node, port, kCmdExecAssertion, lbmismatch, "true", 2);
+    sendHelloMaybeLB(node, port, true, 2);
 
     // Connecting to the proxy port without proxy header fails.
     const kProxyProtocolParseError = 6067900;
-    failInvalidProtocol(node, egressPort, kProxyProtocolParseError, undefined, "true", 1);
-    failInvalidProtocol(node, egressPort, kProxyProtocolParseError, undefined, "false", 2);
+    failInvalidProtocol(node, egressPort, kProxyProtocolParseError, undefined, true, 1);
+    failInvalidProtocol(node, egressPort, kProxyProtocolParseError, undefined, false, 2);
     failInvalidProtocol(node, egressPort, kProxyProtocolParseError, undefined, undefined, 3);
 
     proxy_server.stop();
@@ -87,9 +88,9 @@ function testProxyProtocolReplicaSet(ingressPort, egressPort, version) {
             "errmsg": "ProxyProtocol message detected on mongorpc port",
         }
     };
-    failInvalidProtocol(node, ingressPort, 22988, attrs, "true", 1);
-    failInvalidProtocol(node, ingressPort, 22988, attrs, "false", 2);
-    failInvalidProtocol(node, ingressPort, 22988, attrs, undefined, 3);
+    failInvalidProtocol(node, ingressPort, 22988, attrs, true, 1);
+    failInvalidProtocol(node, ingressPort, 22988, attrs, false, 2);
+    failInvalidProtocol(node, ingressPort, 22988, attrs, false, 3);
     proxy_server.stop();
 
     rs.stopSet();
