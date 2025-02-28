@@ -50,6 +50,7 @@
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/egress_connection_closer.h"
 #include "mongo/executor/egress_connection_closer_manager.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
@@ -496,7 +497,7 @@ protected:
 private:
     size_t _generation;
     Date_t _lastUsed;
-    std::atomic<size_t> _timesUsed{0};
+    AtomicWord<size_t> _timesUsed{0};
     Status _status = ConnectionPool::kConnectionStateUnknown;
 };
 

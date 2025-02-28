@@ -153,7 +153,7 @@ Checks:          '-*,
                   -readability-string-compare,
                   -readability-uniqueptr-delete-release
                   '
-HeaderFilterRegex: '(mongo/.*|@MONGO_BUILD_DIR@)'
+HeaderFilterRegex: 'mongo/[-A-Za-z0-9_/]*\.(h|hpp|ipp|inl|cstruct.h|defs|def.h)'
 CheckOptions:
   - key:             bugprone-assert-side-effect.AssertMacros
     value:           assert

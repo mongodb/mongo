@@ -86,7 +86,7 @@ class GRPCSession : public Session {
 public:
     explicit GRPCSession(TransportLayer* tl, HostAndPort remote);
 
-    virtual ~GRPCSession() override = default;
+    ~GRPCSession() override = default;
 
     const HostAndPort& remote() const override {
         return _remote;
@@ -346,15 +346,15 @@ public:
 
     // IngressSession does not support asynchronous operations.
 
-    Future<Message> _asyncReadFromStream() override final {
+    Future<Message> _asyncReadFromStream() final {
         MONGO_UNIMPLEMENTED;
     }
 
-    Future<void> _asyncWriteToStream(Message m) override final {
+    Future<void> _asyncWriteToStream(Message m) final {
         MONGO_UNIMPLEMENTED;
     }
 
-    void _cancelAsyncOperations() override final {
+    void _cancelAsyncOperations() final {
         MONGO_UNIMPLEMENTED;
     }
 

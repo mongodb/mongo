@@ -40,7 +40,7 @@ public:
     explicit GRPCServerStream(::grpc::ServerReaderWriter<ConstSharedBuffer, SharedBuffer>* stream)
         : _stream{stream} {}
 
-    ~GRPCServerStream() = default;
+    ~GRPCServerStream() override = default;
 
     boost::optional<SharedBuffer> read() override {
         SharedBuffer msg;

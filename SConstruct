@@ -6,7 +6,6 @@ import errno
 import functools
 import json
 import os
-import pathlib
 import platform
 import re
 import shlex
@@ -6973,27 +6972,6 @@ def injectMongoIncludePaths(thisEnv):
 
 
 env.AddMethod(injectMongoIncludePaths, "InjectMongoIncludePaths")
-
-gen_header_paths = [
-    (pathlib.Path(env.Dir("$BAZEL_OUT_DIR").path) / "src" / "mongo").as_posix(),
-    (pathlib.Path(env.Dir("$BUILD_DIR").path) / "mongo").as_posix(),
-]
-
-replacements = {
-    "@MONGO_BUILD_DIR@": (
-        gen_header_paths[0] + "(?!.*\.pb\.h)" + "|" + gen_header_paths[1] + "/.*"
-    ),
-    "@MONGO_BRACKET_BUILD_DIR@": (";".join(gen_header_paths)),
-}
-
-clang_tidy_config = env.Substfile(
-    target=".clang-tidy",
-    source=[
-        ".clang-tidy.in",
-    ],
-    SUBST_DICT=replacements,
-)
-env.Alias("generated-sources", clang_tidy_config)
 
 if get_option("bazel-includes-info"):
     env.Tool("bazel_includes_info")

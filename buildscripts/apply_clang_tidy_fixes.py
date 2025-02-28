@@ -8,6 +8,8 @@ import os
 import sys
 from collections import defaultdict
 
+import yaml
+
 
 def is_writeable(file) -> bool:
     try:
@@ -60,12 +62,78 @@ def get_replacements_to_apply(fixes_file) -> dict:
     return replacements_to_apply
 
 
+def _combine_errors(dir: str) -> str:
+    failed_files = 0
+    all_fixes = {}
+    files_to_parse = []
+    for root, _, files in os.walk(dir):
+        for name in files:
+            if name.endswith("clang-tidy.yaml"):
+                files_to_parse.append(os.path.join(root, name))
+
+    # loop files_to_parse and count the number of failed_files
+    for item in files_to_parse:
+        if item is None:
+            continue
+        failed_files += 1
+
+        # Read the yaml fixes for the file to combine them with the other suggested fixes
+        with open(item) as input_yml:
+            fixes = yaml.safe_load(input_yml)
+        if not fixes:
+            continue
+        for fix in fixes["Diagnostics"]:
+            fix_msg = None
+            if "Notes" in fix:
+                fix_msg = fix["Notes"][0]
+                if len(fix["Notes"]) > 1:
+                    print(f'Warning: this script may be missing values in [{fix["Notes"]}]')
+            else:
+                fix_msg = fix["DiagnosticMessage"]
+            fix_data = (
+                all_fixes.setdefault(fix["DiagnosticName"], {})
+                .setdefault(fix_msg.get("FilePath", "FilePath Not Found"), {})
+                .setdefault(
+                    str(fix_msg.get("FileOffset", "FileOffset Not Found")),
+                    {
+                        "replacements": fix_msg.get("Replacements", "Replacements not found"),
+                        "message": fix_msg.get("Message", "Message not found"),
+                        "count": 0,
+                        "source_files": [],
+                    },
+                )
+            )
+            for replacement in fix_data["replacements"]:
+                if replacement.get("FilePath") and os.path.exists(replacement.get("FilePath")):
+                    with open(replacement.get("FilePath"), "rb") as contents:
+                        replacement["FileContentsMD5"] = hashlib.md5(contents.read()).hexdigest()
+
+            fix_data["count"] += 1
+            fix_data["source_files"].append(fixes["MainSourceFile"])
+
+    fixes_file = os.path.join(dir, "clang_tidy_fixes.json")
+    with open(fixes_file, "w") as files_file:
+        json.dump(all_fixes, files_file, indent=4, sort_keys=True)
+
+    return fixes_file
+
+
 def main(argv=sys.argv[1:]):
     parser = argparse.ArgumentParser()
-    parser.add_argument(dest="fixes_file", help="Path to fixes file.")
+    parser.add_argument(
+        dest="fixes",
+        help="Path to fixes file or directory of fixes files.",
+        nargs="?",
+        default="bazel-bin",
+    )
     args = parser.parse_args(argv)
 
-    replacements_to_apply = get_replacements_to_apply(args.fixes_file)
+    if os.path.isdir(args.fixes):
+        fixes_file = _combine_errors(args.fixes)
+    else:
+        fixes_file = args.fixes
+
+    replacements_to_apply = get_replacements_to_apply(fixes_file)
 
     for file in replacements_to_apply:
         with open(file, "rb") as fin:

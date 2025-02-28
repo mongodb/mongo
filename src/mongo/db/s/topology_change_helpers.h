@@ -266,7 +266,7 @@ TenantIdMap<std::vector<BSONObj>> getClusterParametersLocally(OperationContext* 
  * and throws any error that occurs while running this command.
  */
 long long runCountCommandOnConfig(OperationContext* opCtx,
-                                  const std::shared_ptr<Shard> localConfigShard,
+                                  std::shared_ptr<Shard> localConfigShard,
                                   const NamespaceString& nss,
                                   BSONObj query);
 
@@ -289,7 +289,7 @@ struct DrainingShardUsage {
  * shard being removed.
  */
 DrainingShardUsage getDrainingProgress(OperationContext* opCtx,
-                                       const std::shared_ptr<Shard> localConfigShard,
+                                       std::shared_ptr<Shard> localConfigShard,
                                        const std::string& shardName);
 
 /**
@@ -330,7 +330,7 @@ boost::optional<RemoveShardProgress> dropLocalCollectionsAndDatabases(
  */
 void removeShard(const Lock::ExclusiveLock&,
                  OperationContext* opCtx,
-                 const std::shared_ptr<Shard> localConfigShard,
+                 std::shared_ptr<Shard> localConfigShard,
                  const std::string& shardName,
                  std::shared_ptr<executor::TaskExecutor> executor);
 

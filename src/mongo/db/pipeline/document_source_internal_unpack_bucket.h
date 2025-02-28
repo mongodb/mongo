@@ -123,11 +123,11 @@ public:
      */
     static std::vector<BSONObj> generateStageInPipeline(
         const std::vector<BSONObj>& pipeline,
-        const StringData timeField,
+        StringData timeField,
         const boost::optional<StringData>& metaField,
         const boost::optional<std::int32_t>& bucketMaxSpanSeconds,
         const timeseries::MixedSchemaBucketsState& timeseriesMixedSchemaBucketsState,
-        const bool timeseriesBucketsAreFixed);
+        bool timeseriesBucketsAreFixed);
 
     bool includeMetaField() const {
         return _bucketUnpacker.includeMetaField();

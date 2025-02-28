@@ -50,7 +50,7 @@ namespace timeseries {
  * Returns true if `options.bucketRoundingSeconds` and `options.bucketMaxSpanSeconds` are equal and
  * the `parametersChanged` argument is `false`.
  */
-bool areTimeseriesBucketsFixed(const TimeseriesOptions& options, const bool parametersChanged);
+bool areTimeseriesBucketsFixed(const TimeseriesOptions& options, bool parametersChanged);
 
 /**
  * Evaluates whether the transition of timeseries granularities is valid (returning Status::OK if

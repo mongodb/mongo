@@ -49,7 +49,7 @@ public:
         }
     }
 
-    ~GRPCServerContext() = default;
+    ~GRPCServerContext() override = default;
 
     void addInitialMetadataEntry(const std::string& key, const std::string& value) override {
         _ctx->AddInitialMetadata(key, value);

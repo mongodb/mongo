@@ -1942,3 +1942,4 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
 #endif  // RESHARDING_COORDINATOR_PART_4
 
 }  // namespace mongo
+#undef MONGO_LOGV2_DEFAULT_COMPONENT

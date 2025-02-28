@@ -45,21 +45,18 @@ namespace mongo {
  */
 namespace timeseries {
 
-namespace {
-
 // TODO(SERVER-101169): Remove these helper functions.
-timeseries::MixedSchemaBucketsState getTimeseriesMixedSchemaBucketsState(const Collection& coll) {
+inline timeseries::MixedSchemaBucketsState getTimeseriesMixedSchemaBucketsState(
+    const Collection& coll) {
     return coll.getTimeseriesMixedSchemaBucketsState();
 }
 
-timeseries::MixedSchemaBucketsState getTimeseriesMixedSchemaBucketsState(
+inline timeseries::MixedSchemaBucketsState getTimeseriesMixedSchemaBucketsState(
     const TypeCollectionTimeseriesFields& timeseriesFields) {
     return timeseriesFields.getTimeseriesBucketsMayHaveMixedSchemaData().value_or(true)
         ? timeseries::MixedSchemaBucketsState::NonDurableMayHaveMixedSchemaBuckets
         : timeseries::MixedSchemaBucketsState::NoMixedSchemaBuckets;
 }
-
-}  // namespace
 
 /**
  * Returns a rewritten pipeline that queries against a timeseries collection.
@@ -71,11 +68,11 @@ timeseries::MixedSchemaBucketsState getTimeseriesMixedSchemaBucketsState(
  */
 std::vector<BSONObj> rewritePipelineForTimeseriesCollection(
     const std::vector<BSONObj>& pipeline,
-    const StringData timeField,
+    StringData timeField,
     const boost::optional<StringData>& metaField,
     const boost::optional<std::int32_t>& bucketMaxSpanSeconds,
     const timeseries::MixedSchemaBucketsState& timeseriesMixedSchemaBucketsState,
-    const bool timeseriesBucketsAreFixed);
+    bool timeseriesBucketsAreFixed);
 
 /**
  * Rewrite the aggregate request's pipeline BSON for a timeseries query. The command object's

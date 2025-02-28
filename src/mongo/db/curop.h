@@ -607,7 +607,7 @@ public:
      * must hold the client lock, but updates to memory usage may be frequent and cause contention
      * on the client lock.
      */
-    void setMemoryTrackingStats(const int64_t inUseMemoryBytes, const int64_t maxUsedMemoryBytes);
+    void setMemoryTrackingStats(int64_t inUseMemoryBytes, int64_t maxUsedMemoryBytes);
 
     int64_t getInUseMemoryBytes() const {
         return _inUseMemoryBytes.load();
