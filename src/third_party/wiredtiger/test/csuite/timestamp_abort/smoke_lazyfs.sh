@@ -24,5 +24,5 @@ then
     test_bin=$binary_dir/test_timestamp_abort
 fi
 
-$TEST_WRAPPER $test_bin -l $default_test_args
-$TEST_WRAPPER $test_bin -l -C $default_test_args
+$TEST_WRAPPER $test_bin -L $default_test_args
+$TEST_WRAPPER $test_bin -L -C $default_test_args

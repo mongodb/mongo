@@ -184,19 +184,15 @@ functions:
         set -o errexit
         set -o verbose
         pushd wiredtiger
+        mongo_repo=https://github.com/mongodb/mongo
         # Find the equivalent mongodb branch that matches the same branch version to wiredtiger. In
         # the case of patch builds, it is possible that the developer has a branch name that doesn't
         # adhere to naming rules, therefore derive the base branch name from git.
         branch=$(git branch --contains | grep -e "mongodb" -e "develop" -e "evg-pr-test-")
         if [[ $branch =~ "mongodb-" ]]; then
-          mongo_repo=https://github.com/mongodb/mongo
           mongo_branch=v$(echo $branch | cut -d'-' -f 2)
         else
-          # FIXME-WT-14185 Use the public main repo when it is starting to sync with private repo.
-          # The WT-13948 ticket requires changes from the private repository. As a workaround
-          # use a mongodb forked repo with custom branch.
-          mongo_repo=https://github.com/jiechenbo/mongo
-          mongo_branch=wt-13948-workaround
+          mongo_branch=master
         fi
         popd
         git clone $mongo_repo -b $mongo_branch
@@ -6230,5 +6226,120 @@ buildvariants:
     - name: ".stress-test-3"
     - name: ".stress-test-4"
     - name: ".stress-test-no-barrier"
-    - name: checkpoint-stress-test-tiered
     - name: format-abort-recovery-stress-test
+    - name: ".stress-test-sanitizer"
+    - name: format-predictable-test
+    - name: schema-abort-predictable-test
+    - name: checkpoint-filetypes-predictable-test
+
+- name: amazon2023-armv9-asan
+  display_name: "(ARMV9) Amazon Linux 2023 ASAN"
+  run_on:
+  - amazon2023-arm64-latest-small-m8g
+  expansions:
+    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
+    CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=ASan
+    ENABLE_TCMALLOC: 0
+    additional_env_vars: |
+      export LSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/asan_leaks.supp"
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+    # Exclude wt12015_backup_corruption for ASan builds. It creates false positives when it deliberately kills processes that invoke corruption.
+    ctest_extra_args: -E "wt12015_backup_corruption"
+  tasks:
+    - name: ".pull_request !.pull_request_compilers !.python !.tiered_unittest !csuite-wt12015-backup-corruption-test"
+    - name: examples-c-test
+    - name: format-asan-smoke-test
+    - name: model-test-long
+      batchtime: 1440 # once a day
+    - name: model-test-long-random-config
+      batchtime: 1440 # once a day
+    - name: live-restore-long
+
+- name: amazon2023-armv9-tsan
+  display_name: "(ARMV9) Amazon Linux 2023 TSAN"
+  run_on:
+  - amazon2023-arm64-latest-small-m8g
+  expansions:
+    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
+    CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=TSan
+    ENABLE_TCMALLOC: 0
+    additional_env_vars: |
+      export TSAN_OPTIONS="$COMMON_SAN_OPTIONS:history_size=7:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/tsan_warnings.supp"
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+  tasks:
+    - name: examples-c-tsan
+
+- name: amazon2023-armv9-msan
+  display_name: "(ARMV9) Amazon Linux 2023 MSAN"
+  run_on:
+  - amazon2023-arm64-latest-small-m8g
+  expansions:
+    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
+    CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=MSan
+    # MemorySanitizer requires that all program code is instrumented, otherwise it may generate false reports.
+    posix_configure_flags: -DENABLE_LZ4=0 -DENABLE_SNAPPY=0 -DENABLE_ZLIB=0 -DENABLE_ZSTD=0
+    # Use optimisation level -O0 since Clang treats -Og (our default optimisation for non-release
+    # builds) as -O1, making test binaries more difficult to debug.
+    CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
+    ENABLE_TCMALLOC: 0
+    # We don't run C++ memory sanitized testing as it creates false positives. MSAN also causes
+    # some csuite tests to take an extended amount of time. These are excluded from the
+    # make-check-test task and are covered by the csuite-long-running task.
+    ctest_extra_args: -LE "cppsuite|long_running"
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` / 2" | bc)
+  tasks:
+    - name: compile
+    - name: compile-production-disable-shared
+    - name: compile-production-disable-static
+    - name: examples-c-production-disable-shared-test
+    - name: examples-c-production-disable-static-test
+    - name: format-msan-test
+    - name: make-check-test
+      distros: amazon2023-arm64-latest-large-m8g
+    - name: csuite-long-running
+      # Some of the long-running tests require a large instance to run successfully.
+      distros: amazon2023-arm64-latest-large-m8g
+      batchtime: 1440 # once a day
+
+- name: amazon2023-armv9-ubsan
+  display_name: "(ARMV9) Amazon Linux 2023 UBSAN"
+  run_on:
+  - amazon2023-arm64-latest-small-m8g
+  expansions:
+    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
+    CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=UBSan
+    # Use optimisation level -O0 since Clang treats -Og (our default optimisation for non-release
+    # builds) as -O1, making test binaries more difficult to debug.
+    CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
+    ENABLE_TCMALLOC: 0
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+  tasks:
+    - name: compile
+    - name: compile-production-disable-shared
+    - name: compile-production-disable-static
+    - name: examples-c-production-disable-shared-test
+    - name: examples-c-production-disable-static-test
+    - name: format-stress-pull-request-test
+    - name: make-check-test
+      distros: amazon2023-arm64-latest-large-m8g
+    - name: cppsuite-default-all
+
+- name: amazon2023-stress-nonstandalone
+  display_name: "(ARMV9) Amazon Linux 2023 Stress tests (Non-standalone)"
+  run_on:
+  - amazon2023-arm64-latest-large-m8g
+  expansions:
+    ENABLE_TCMALLOC: 1
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+    NONSTANDALONE: -DWT_STANDALONE_BUILD=0
+  tasks:
+    - name: ".stress-test-1"
+    - name: ".stress-test-2"
+    - name: ".stress-test-3"
+    - name: ".stress-test-4"
+    - name: ".stress-test-no-barrier"
+    - name: format-abort-recovery-stress-test
+    - name: compile
+    # FIXME-WT-14152: Enable stress tests that require snappy compressors
+    - name: ".cppsuite-stress-test !cppsuite-burst-inserts-stress !cppsuite-hs-cleanup-stress !cppsuite-operations-test-stress !cppsuite-reverse-split-stress"
+      batchtime: 720 # 12 hours

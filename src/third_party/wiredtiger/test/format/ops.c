@@ -230,12 +230,20 @@ tinfo_teardown(void)
 static void
 rollback_to_stable(WT_SESSION *session)
 {
+    u_int num_threads;
+    char cfg[32];
+
     /* Rollback-to-stable only makes sense for timestamps. */
     if (!g.transaction_timestamps_config)
         return;
 
-    /* Rollback the system. */
-    testutil_check(g.wts_conn->rollback_to_stable(g.wts_conn, NULL));
+    /*
+     * Rollback the system using up to 10 threads. Extend to 11 values to cover the NULL config
+     * case.
+     */
+    num_threads = mmrand(&g.extra_rnd, 0, 11);
+    testutil_snprintf(cfg, sizeof(cfg), "threads=%" PRIu32, num_threads);
+    testutil_check(g.wts_conn->rollback_to_stable(g.wts_conn, num_threads == 11 ? NULL : cfg));
 
     /*
      * Get the stable timestamp, and update ours. They should be the same, but there's no point in

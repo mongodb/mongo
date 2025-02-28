@@ -605,6 +605,7 @@ COMPARE_NOTFOUND_OK(__wt_cursor::_search_near)
 %exception __wt_connection::get_home;
 %exception __wt_connection::is_new;
 %exception __wt_connection::search_near;
+%exception __wt_session::get_rollback_reason;
 %exception __wt_session::get_last_error;
 %exception __wt_session::strerror;
 %exception __wt_cursor::_set_key;

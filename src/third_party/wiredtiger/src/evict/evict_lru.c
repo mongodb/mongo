@@ -887,8 +887,7 @@ __evict_pass(WT_SESSION_IMPL *session)
             __wt_verbose_debug1(session, WT_VERB_EVICTION, "%s", "unable to reach eviction goal");
             break;
         }
-        if (__wt_atomic_load32(&evict->evict_aggressive_score) > 0)
-            (void)__wt_atomic_subv32(&evict->evict_aggressive_score, 1);
+        __wt_atomic_decrement_if_positive(&evict->evict_aggressive_score);
         loop = 0;
         eviction_progress = __wt_atomic_loadv64(&evict->eviction_progress);
     }
@@ -2866,12 +2865,11 @@ __wti_evict_app_assist_worker(
         if (!F_ISSET(conn, WT_CONN_RECOVERING) && __wt_evict_cache_stuck(session)) {
             ret = __wt_txn_is_blocking(session);
             if (ret == WT_ROLLBACK) {
-                if (__wt_atomic_load32(&evict->evict_aggressive_score) > 0)
-                    (void)__wt_atomic_subv32(&evict->evict_aggressive_score, 1);
+                __wt_atomic_decrement_if_positive(&evict->evict_aggressive_score);
+
                 WT_STAT_CONN_INCR(session, txn_rollback_oldest_pinned);
-                if (F_ISSET(session, WT_SESSION_SAVE_ERRORS))
-                    __wt_verbose_debug1(session, WT_VERB_TRANSACTION, "rollback reason: %s",
-                      session->err_info.err_msg);
+                __wt_verbose_debug1(session, WT_VERB_TRANSACTION, "rollback reason: %s",
+                  session->txn->rollback_reason);
             }
             WT_ERR(ret);
         }
@@ -2951,15 +2949,14 @@ err:
          * takes precedence over asking for a rollback. We can not do both.
          */
         if (ret == 0 && cache_max_wait_us != 0 && session->cache_wait_us > cache_max_wait_us) {
-            ret = WT_ROLLBACK;
+            ret = __wt_txn_rollback_required(session, WT_TXN_ROLLBACK_REASON_CACHE_OVERFLOW);
             __wt_session_set_last_error(
-              session, ret, WT_CACHE_OVERFLOW, WT_TXN_ROLLBACK_REASON_CACHE_OVERFLOW);
-            if (__wt_atomic_load32(&evict->evict_aggressive_score) > 0)
-                (void)__wt_atomic_subv32(&evict->evict_aggressive_score, 1);
+              session, ret, WT_CACHE_OVERFLOW, "Cache capacity has overflown");
+            __wt_atomic_decrement_if_positive(&evict->evict_aggressive_score);
+
             WT_STAT_CONN_INCR(session, eviction_timed_out_ops);
-            if (F_ISSET(session, WT_SESSION_SAVE_ERRORS))
-                __wt_verbose_notice(
-                  session, WT_VERB_TRANSACTION, "rollback reason: %s", session->err_info.err_msg);
+            __wt_verbose_notice(
+              session, WT_VERB_TRANSACTION, "rollback reason: %s", session->txn->rollback_reason);
         }
     }
 

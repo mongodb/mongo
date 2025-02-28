@@ -26,18 +26,16 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, time
-from error_info_util import error_info_util
+import wiredtiger, wttest, time
 from wtdataset import SimpleDataSet
 
 # test_txn27.py
 #   Test that the API returning a rollback error sets the reason for the rollback.
-class test_txn27(error_info_util):
+class test_txn27(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=1MB'
 
     def test_rollback_reason(self):
         uri = "table:txn27"
-
         # Create a very basic table.
         ds = SimpleDataSet(self, uri, 10, key_format='S', value_format='S')
         ds.populate()
@@ -56,12 +54,11 @@ class test_txn27(error_info_util):
         cursor2.set_value("bbb")
         msg1 = '/conflict between concurrent operations/'
         self.assertRaisesException(wiredtiger.WiredTigerError, lambda: cursor2.update(), msg1)
-        self.session = session2
-        self.assert_error_equal(wiredtiger.WT_ROLLBACK, wiredtiger.WT_WRITE_CONFLICT, "Write conflict between concurrent operations")
+        self.assertEqual('/' + session2.get_rollback_reason() + '/', msg1)
 
         # Rollback the transactions, check that session2's rollback error was cleared.
         session2.rollback_transaction()
-        self.assert_error_equal(0, wiredtiger.WT_NONE, "last API call was successful")
+        self.assertEqual(session2.get_rollback_reason(), None)
         session1.rollback_transaction()
 
         # Start a new transaction and insert a value far too large for cache.
@@ -78,9 +75,10 @@ class test_txn27(error_info_util):
         cursor1.set_key(ds.key(2))
         cursor1.set_value("b"*1024)
 
+        # This is the message that we expect to be raised when a thread is rolled back due to
+        # cache pressure.
+        msg2 = 'oldest pinned transaction ID rolled back for eviction'
         # This reason is the default reason for WT_ROLLBACK errors so we need to catch it.
         self.assertRaisesException(wiredtiger.WiredTigerError, lambda: cursor1.update(), msg1)
-
-        # Expect the last saved error to give us the true reason for the rollback.
-        self.session = session1
-        self.assert_error_equal(wiredtiger.WT_ROLLBACK, wiredtiger.WT_OLDEST_FOR_EVICTION, "Transaction has the oldest pinned transaction ID")
+        # Expect the rollback reason to give us the true reason for the rollback.
+        self.assertEqual(session1.get_rollback_reason(), msg2)

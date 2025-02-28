@@ -27,6 +27,7 @@ fi
 $TEST_WRAPPER $test_bin $default_test_args
 $TEST_WRAPPER $test_bin $default_test_args -c
 $TEST_WRAPPER $test_bin $default_test_args -B -I 3
+$TEST_WRAPPER $test_bin $default_test_args -B -I 3 -l
 $TEST_WRAPPER $test_bin -m $default_test_args
 $TEST_WRAPPER $test_bin -m $default_test_args -c
 $TEST_WRAPPER $test_bin -C $default_test_args

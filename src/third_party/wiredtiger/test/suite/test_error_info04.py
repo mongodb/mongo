@@ -55,9 +55,10 @@ class test_error_info04(error_info_util):
         # Configure the lowest cache max wait time so that application attempts eviction.
         self.conn.reconfigure('cache_max_wait_ms=2')
         # Commit all transactions large enough to trigger eviction app worker threads.
-        for temp_session in sessions:
-            self.assertEqual(temp_session.commit_transaction(), 0)
-            self.assert_error_equal(0, wiredtiger.WT_NONE, "last API call was successful")
+        with self.expectedStdoutPattern("transaction rolled back because of cache overflow"):
+            for temp_session in sessions:
+                self.assertEqual(temp_session.commit_transaction(), 0)
+                self.assert_error_equal(0, wiredtiger.WT_NONE, "last API call was successful")
 
         self.session.checkpoint()
 
@@ -79,6 +80,7 @@ class test_error_info04(error_info_util):
         # Configure the lowest cache max wait time so that application attempts eviction.
         self.conn.reconfigure('cache_max_wait_ms=2')
         # Rollback all transactions large enough to trigger eviction app worker threads.
-        for temp_session in sessions:
-            self.assertEqual(temp_session.rollback_transaction(), 0)
-            self.assert_error_equal(0, wiredtiger.WT_NONE, "last API call was successful")
+        with self.expectedStdoutPattern("transaction rolled back because of cache overflow"):
+            for temp_session in sessions:
+                self.assertEqual(temp_session.rollback_transaction(), 0)
+                self.assert_error_equal(0, wiredtiger.WT_NONE, "last API call was successful")
