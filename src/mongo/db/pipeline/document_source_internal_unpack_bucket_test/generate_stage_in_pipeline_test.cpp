@@ -40,8 +40,7 @@ struct RewritePipelineHelperArgs {
     const StringData timeField = "time"_sd;
     const boost::optional<StringData> metaField = boost::none;
     const boost::optional<std::int32_t> bucketMaxSpanSeconds = boost::none;
-    const timeseries::MixedSchemaBucketsState timeseriesMixedSchemaBucketsState =
-        timeseries::MixedSchemaBucketsState::Invalid;
+    const bool assumeNoMixedSchemaData = {false};
     const bool timeseriesBucketsAreFixed = {false};
 };
 
@@ -49,13 +48,13 @@ struct RewritePipelineHelperArgs {
 std::tuple<std::vector<BSONObj>, BSONObj> rewritePipelineHelper(
     const RewritePipelineHelperArgs& args = {},
     const std::vector<BSONObj>& originalPipeline = std::vector{BSON("$match" << BSON("a" << 1))}) {
-    const auto alteredPipeline = DocumentSourceInternalUnpackBucket::generateStageInPipeline(
-        originalPipeline,
-        args.timeField,
-        args.metaField,
-        args.bucketMaxSpanSeconds,
-        args.timeseriesMixedSchemaBucketsState,
-        args.timeseriesBucketsAreFixed);
+    const auto alteredPipeline =
+        DocumentSourceInternalUnpackBucket::generateStageInPipeline(originalPipeline,
+                                                                    args.timeField,
+                                                                    args.metaField,
+                                                                    args.bucketMaxSpanSeconds,
+                                                                    args.assumeNoMixedSchemaData,
+                                                                    args.timeseriesBucketsAreFixed);
 
     ASSERT_EQ(alteredPipeline.size(), originalPipeline.size() + 1);
 
@@ -84,8 +83,7 @@ TEST_F(InternalUnpackBucketGenerateInPipelineTest, ValidateFieldCombinations) {
     const auto [alteredPipeline, firstStage] = rewritePipelineHelper({
         .metaField = "foo"_sd,
         .bucketMaxSpanSeconds = 42,
-        .timeseriesMixedSchemaBucketsState =
-            timeseries::MixedSchemaBucketsState::NoMixedSchemaBuckets,
+        .assumeNoMixedSchemaData = true,
         .timeseriesBucketsAreFixed = true,
     });
     ASSERT_BSONOBJ_EQ(BSON(timeseries::kTimeFieldName
@@ -170,8 +168,7 @@ TEST_F(InternalUnpackBucketGenerateInPipelineTest, ValidateMetaField) {
 TEST_F(InternalUnpackBucketGenerateInPipelineTest, ValidateAssumeNoMixedSchemaDataField) {
     {
         const auto [alteredPipeline, firstStage] = rewritePipelineHelper({
-            .timeseriesMixedSchemaBucketsState =
-                timeseries::MixedSchemaBucketsState::NoMixedSchemaBuckets,
+            .assumeNoMixedSchemaData = true,
         });
         ASSERT_BSONOBJ_EQ(
             BSON(timeseries::kTimeFieldName
@@ -180,12 +177,9 @@ TEST_F(InternalUnpackBucketGenerateInPipelineTest, ValidateAssumeNoMixedSchemaDa
             firstStage);
     }
 
-    for (auto timeseriesMixedSchemaBucketsState :
-         {timeseries::MixedSchemaBucketsState::NonDurableMayHaveMixedSchemaBuckets,
-          timeseries::MixedSchemaBucketsState::DurableMayHaveMixedSchemaBuckets,
-          timeseries::MixedSchemaBucketsState::Invalid}) {
+    {
         const auto [alteredPipeline, firstStage] = rewritePipelineHelper({
-            .timeseriesMixedSchemaBucketsState = timeseriesMixedSchemaBucketsState,
+            .assumeNoMixedSchemaData = false,
         });
         ASSERT_BSONOBJ_EQ(
             BSON(timeseries::kTimeFieldName

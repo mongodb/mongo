@@ -56,7 +56,7 @@ std::vector<BSONObj> rewritePipelineForTimeseriesCollection(
     const StringData timeField,
     const boost::optional<StringData>& metaField,
     const boost::optional<std::int32_t>& bucketMaxSpanSeconds,
-    const MixedSchemaBucketsState& timeseriesMixedSchemaBucketsState,
+    const bool assumeNoMixedSchemaData,
     const bool timeseriesBucketsAreFixed) {
     if (!pipeline.empty()) {
         const auto& firstStage = *pipeline.begin();
@@ -75,13 +75,12 @@ std::vector<BSONObj> rewritePipelineForTimeseriesCollection(
     }
 
     // Default case.
-    return DocumentSourceInternalUnpackBucket::generateStageInPipeline(
-        pipeline,
-        timeField,
-        metaField,
-        bucketMaxSpanSeconds,
-        timeseriesMixedSchemaBucketsState,
-        timeseriesBucketsAreFixed);
+    return DocumentSourceInternalUnpackBucket::generateStageInPipeline(pipeline,
+                                                                       timeField,
+                                                                       metaField,
+                                                                       bucketMaxSpanSeconds,
+                                                                       assumeNoMixedSchemaData,
+                                                                       timeseriesBucketsAreFixed);
 }
 
 }  // namespace timeseries

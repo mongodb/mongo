@@ -126,7 +126,7 @@ public:
         StringData timeField,
         const boost::optional<StringData>& metaField,
         const boost::optional<std::int32_t>& bucketMaxSpanSeconds,
-        const timeseries::MixedSchemaBucketsState& timeseriesMixedSchemaBucketsState,
+        bool assumeNoMixedSchemaData,
         bool timeseriesBucketsAreFixed);
 
     bool includeMetaField() const {

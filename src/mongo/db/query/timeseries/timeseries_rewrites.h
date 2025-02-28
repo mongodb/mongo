@@ -46,16 +46,13 @@ namespace mongo {
 namespace timeseries {
 
 // TODO(SERVER-101169): Remove these helper functions.
-inline timeseries::MixedSchemaBucketsState getTimeseriesMixedSchemaBucketsState(
-    const Collection& coll) {
-    return coll.getTimeseriesMixedSchemaBucketsState();
+inline bool canAssumeNoMixedSchemaData(const Collection& coll) {
+    return !coll.getTimeseriesMixedSchemaBucketsState().mustConsiderMixedSchemaBucketsInReads();
 }
 
-inline timeseries::MixedSchemaBucketsState getTimeseriesMixedSchemaBucketsState(
-    const TypeCollectionTimeseriesFields& timeseriesFields) {
-    return timeseriesFields.getTimeseriesBucketsMayHaveMixedSchemaData().value_or(true)
-        ? timeseries::MixedSchemaBucketsState::NonDurableMayHaveMixedSchemaBuckets
-        : timeseries::MixedSchemaBucketsState::NoMixedSchemaBuckets;
+inline bool canAssumeNoMixedSchemaData(const TypeCollectionTimeseriesFields& timeseriesFields) {
+    // Assume the worst case (that buckets may have mixed schema data) if none.
+    return !timeseriesFields.getTimeseriesBucketsMayHaveMixedSchemaData().value_or(true);
 }
 
 /**
@@ -71,7 +68,7 @@ std::vector<BSONObj> rewritePipelineForTimeseriesCollection(
     StringData timeField,
     const boost::optional<StringData>& metaField,
     const boost::optional<std::int32_t>& bucketMaxSpanSeconds,
-    const timeseries::MixedSchemaBucketsState& timeseriesMixedSchemaBucketsState,
+    bool assumeNoMixedSchemaData,
     bool timeseriesBucketsAreFixed);
 
 /**
@@ -96,7 +93,7 @@ void rewriteRequestPipelineAndHintForTimeseriesCollection(
     const auto maxSpanSeconds =
         timeseriesOptions.getBucketMaxSpanSeconds().get_value_or(getMaxSpanSecondsFromGranularity(
             timeseriesOptions.getGranularity().get_value_or(BucketGranularityEnum::Seconds)));
-    const auto mixedSchemaBucketsState = getTimeseriesMixedSchemaBucketsState(catalogData);
+    const auto assumeNoMixedSchemaData = canAssumeNoMixedSchemaData(catalogData);
     // This particular API call is not consistent between the router role and shard role APIs.
     // TODO(SERVER-101169): Remove the need for this lambda once the API has been consolidated.
     const auto parametersChanged = [](const auto& catalogData) {
@@ -116,7 +113,7 @@ void rewriteRequestPipelineAndHintForTimeseriesCollection(
                                                                timeField,
                                                                metaField,
                                                                maxSpanSeconds,
-                                                               mixedSchemaBucketsState,
+                                                               assumeNoMixedSchemaData,
                                                                bucketsAreFixed));
 
     // Rewrite index hints if needed.
