@@ -42,6 +42,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
@@ -72,12 +73,16 @@ using IndexKeyCorruptionCheckCallback = void (*)(OperationContext* opCtx,
 class CollectionRef {
 public:
     bool isInitialized() const {
-        return _collPtr.has_value();
+        return _collPtr.has_value() || _collAcq.has_value();
+    }
+
+    bool isAcquisition() const {
+        return _collAcq.has_value();
     }
 
     const CollectionPtr& getPtr() const {
         dassert(isInitialized());
-        return *_collPtr;
+        return isAcquisition() ? _collAcq->getCollectionPtr() : *_collPtr;
     }
 
     operator bool() const {
@@ -92,7 +97,14 @@ public:
         _collPtr = boost::none;
     }
 
-    boost::optional<NamespaceString> getCollName() const {
+    void setCollAcquisition(boost::optional<CollectionAcquisition> collAcq) {
+        _collAcq = collAcq;
+    }
+
+    boost::optional<NamespaceString> getCollName() {
+        if (isAcquisition()) {
+            return _collAcq->getCollectionPtr()->ns();
+        }
         return _collName;
     }
 
@@ -131,6 +143,7 @@ private:
                                  const UUID& collUuid);
     boost::optional<CollectionPtr> _collPtr;
     boost::optional<NamespaceString> _collName;
+    boost::optional<CollectionAcquisition> _collAcq;
     boost::optional<uint64_t> _catalogEpoch;
 };
 }  // namespace mongo::sbe

@@ -48,6 +48,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/transaction_resources.h"
@@ -96,7 +97,7 @@ void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
         uassert(4822821, str::stream() << "duplicate slot: " << _vars[idx], inserted);
     }
 
-    tassert(5709602, "'_coll' should not be initialized prior to 'acquireCollection()'", !_coll);
+    // No-op if using acquisition.
     _coll.acquireCollection(_opCtx, _dbName, _collUuid);
 
     auto indexCatalog = _coll.getPtr()->getIndexCatalog();
@@ -186,12 +187,13 @@ void IndexScanStageBase::doSaveState(bool relinquishCursor) {
 
     // Set the index entry to null, since accessing this pointer is illegal during yield.
     _entry = nullptr;
-
     _coll.reset();
 }
 
 void IndexScanStageBase::restoreCollectionAndIndex() {
-    _coll.restoreCollection(_opCtx, _dbName, _collUuid);
+    if (!_coll.isAcquisition()) {
+        _coll.restoreCollection(_opCtx, _dbName, _collUuid);
+    }
 
     auto [identTag, identVal] = _indexIdentAccessor.getViewOfValue();
     tassert(7566700, "Expected ident to be a string", value::isString(identTag));
@@ -212,14 +214,14 @@ void IndexScanStageBase::restoreCollectionAndIndex() {
 
 void IndexScanStageBase::doRestoreState(bool relinquishCursor) {
     invariant(_opCtx);
-    invariant(!_coll);
-
-    // If this stage has not been prepared, then yield recovery is a no-op.
-    if (!_coll.getCollName()) {
-        return;
+    if (!_coll.isAcquisition()) {
+        invariant(!_coll);
+        // If this stage has not been prepared, then yield recovery is a no-op.
+        if (!_coll.getCollName()) {
+            return;
+        }
     }
     restoreCollectionAndIndex();
-
     if (_cursor && relinquishCursor) {
         _cursor->restore();
     }
@@ -255,14 +257,14 @@ void IndexScanStageBase::openImpl(bool reOpen) {
     }
 
     tassert(5071009, "first open to IndexScanStageBase but reOpen=true", !_open);
-
     if (!_coll) {
         // We're being opened for the first time after 'close()', or we're being opened for the
         // first time ever. We need to re-acquire '_coll' in this case and make some validity
         // checks (the collection has not been dropped, renamed, etc).
         tassert(5071010, "IndexScanStageBase is not open but have _cursor", !_cursor);
-        restoreCollectionAndIndex();
     }
+
+    restoreCollectionAndIndex();
 
     if (!_cursor) {
         _cursor = _entry->accessMethod()->asSortedData()->newCursor(_opCtx, _forward);
@@ -275,6 +277,10 @@ void IndexScanStageBase::openImpl(bool reOpen) {
 void IndexScanStageBase::trackIndexRead() {
     ++_specificStats.numReads;
     trackRead();
+}
+
+void IndexScanStageBase::doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) {
+    _coll.setCollAcquisition(mca.getCollectionAcquisitionFromUuid(_collUuid));
 }
 
 PlanState IndexScanStageBase::getNext() {

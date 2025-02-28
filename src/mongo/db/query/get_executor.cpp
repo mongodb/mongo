@@ -1362,6 +1362,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetada
                                        nullptr /* cq */,
                                        nullptr /* solution */,
                                        std::move(root),
+                                       collections,
                                        {} /* plannerOptions */,
                                        cq.nss(),
                                        std::move(sbeYieldPolicy),

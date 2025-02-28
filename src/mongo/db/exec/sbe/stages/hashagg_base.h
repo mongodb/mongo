@@ -63,6 +63,9 @@ protected:
     void doRestoreState(bool relinquishCursor) override;
     void doDetachFromOperationContext() override;
     void doAttachToOperationContext(OperationContext* opCtx) override;
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
+        return;
+    }
 
     using SpilledRow = std::pair<value::MaterializedRow, value::MaterializedRow>;
     using TableType = stdx::unordered_map<value::MaterializedRow,

@@ -86,6 +86,11 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
+protected:
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
+        return;
+    }
+
 private:
     const std::vector<value::SlotVector> _inputKeys;
     const std::vector<value::SortDirection> _dirs;

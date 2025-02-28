@@ -84,6 +84,10 @@ protected:
     void doSaveState(bool relinquishCursor) final;
     void doRestoreState(bool relinquishCursor) final;
 
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
+        return;
+    }
+
 private:
     const value::SlotId _inField;
     const value::SlotId _outField;

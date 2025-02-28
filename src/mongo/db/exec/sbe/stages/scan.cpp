@@ -201,7 +201,7 @@ void ScanStage::prepare(CompileCtx& ctx) {
         _oplogTsAccessor = ctx.getRuntimeEnvAccessor(*(_state->oplogTsSlot));
     }
 
-    tassert(5709600, "'_coll' should not be initialized prior to 'acquireCollection()'", !_coll);
+    // No-op if using acquisition.
     _coll.acquireCollection(_opCtx, _state->dbName, _state->collUuid);
 }
 
@@ -277,14 +277,14 @@ void ScanStage::doSaveState(bool relinquishCursor) {
 
 void ScanStage::doRestoreState(bool relinquishCursor) {
     invariant(_opCtx);
-    invariant(!_coll);
 
-    // If this stage has not been prepared, then yield recovery is a no-op.
-    if (!_coll.getCollName()) {
-        return;
+    if (!_coll.isAcquisition()) {
+        // If this stage has not been prepared, then yield recovery is a no-op.
+        if (!_coll.getCollName()) {
+            return;
+        }
+        _coll.restoreCollection(_opCtx, _state->dbName, _state->collUuid);
     }
-
-    _coll.restoreCollection(_opCtx, _state->dbName, _state->collUuid);
 
     if (auto cursor = getActiveCursor(); cursor != nullptr) {
         if (relinquishCursor) {
@@ -418,12 +418,13 @@ void ScanStage::open(bool reOpen) {
     // first time ever, or this stage is being opened for the first time after calling close().
     tassert(5071004, "first open to ScanStage but reOpen=true", !reOpen && !_open);
     tassert(5071005, "ScanStage is not open but has a cursor", !getActiveCursor());
+    if (!_coll.isAcquisition()) {
+        // We need to re-acquire '_coll' in this case and make some validity checks (the collection
+        // has not been dropped, renamed, etc).
+        _coll.restoreCollection(_opCtx, _state->dbName, _state->collUuid);
 
-    // We need to re-acquire '_coll' in this case and make some validity checks (the collection has
-    // not been dropped, renamed, etc).
-    _coll.restoreCollection(_opCtx, _state->dbName, _state->collUuid);
-
-    tassert(5959701, "restoreCollection() unexpectedly returned null in ScanStage", _coll);
+        tassert(5959701, "restoreCollection() unexpectedly returned null in ScanStage", _coll);
+    }
 
     if (_state->scanCallbacks.scanOpenCallback) {
         _state->scanCallbacks.scanOpenCallback(_opCtx, _coll.getPtr());
@@ -431,6 +432,10 @@ void ScanStage::open(bool reOpen) {
 
     scanResetState(reOpen);
     _open = true;
+}
+
+void ScanStage::doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) {
+    _coll.setCollAcquisition(mca.getCollectionAcquisitionFromUuid(_state->collUuid));
 }
 
 PlanState ScanStage::getNext() {
@@ -908,7 +913,7 @@ void ParallelScanStage::prepare(CompileCtx& ctx) {
         _indexKeyPatternAccessor = ctx.getAccessor(*_indexKeyPatternSlot);
     }
 
-    tassert(5709601, "'_coll' should not be initialized prior to 'acquireCollection()'", !_coll);
+    // No-op if using acquisition.
     _coll.acquireCollection(_opCtx, _dbName, _collUuid);
 }
 
@@ -968,14 +973,14 @@ void ParallelScanStage::doSaveState(bool relinquishCursor) {
 
 void ParallelScanStage::doRestoreState(bool relinquishCursor) {
     invariant(_opCtx);
-    invariant(!_coll);
 
-    // If this stage has not been prepared, then yield recovery is a no-op.
-    if (!_coll.getCollName()) {
-        return;
+    if (!_coll.isAcquisition()) {
+        // If this stage has not been prepared, then yield recovery is a no-op.
+        if (!_coll.getCollName()) {
+            return;
+        }
+        _coll.restoreCollection(_opCtx, _dbName, _collUuid);
     }
-
-    _coll.restoreCollection(_opCtx, _dbName, _collUuid);
 
     if (_cursor && relinquishCursor) {
         const bool couldRestore = _cursor->restore();
@@ -1021,7 +1026,7 @@ void ParallelScanStage::open(bool reOpen) {
     invariant(_opCtx);
     invariant(!reOpen, "parallel scan is not restartable");
 
-    if (!_coll) {
+    if (!_coll.isAcquisition()) {
         // we're being opened after 'close()'. we need to re-acquire '_coll' in this case and
         // make some validity checks (the collection has not been dropped, renamed, etc.).
         tassert(5071013, "ParallelScanStage is not open but have _cursor", !_cursor);
@@ -1079,6 +1084,10 @@ value::OwnedValueAccessor* ParallelScanStage::getFieldAccessor(StringData name) 
         return &_scanFieldAccessors[pos];
     }
     return nullptr;
+}
+
+void ParallelScanStage::doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) {
+    _coll.setCollAcquisition(mca.getCollectionAcquisitionFromUuid(_collUuid));
 }
 
 PlanState ParallelScanStage::getNext() {

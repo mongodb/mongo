@@ -127,6 +127,10 @@ protected:
     void doSaveState(bool relinquishCursor) override;
     void doRestoreState(bool relinquishCursor) override;
 
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
+        return;
+    }
+
 private:
     using HashTableType = std::unordered_map<value::MaterializedRow,  // NOLINT
                                              std::vector<size_t>,

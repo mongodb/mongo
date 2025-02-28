@@ -77,6 +77,10 @@ public:
 protected:
     void doSaveState(bool relinquishCursor) override;
 
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
+        return;
+    }
+
 private:
     PlanState getNextFromDeblockedValues();
     void freeDeblockedValueRuns();

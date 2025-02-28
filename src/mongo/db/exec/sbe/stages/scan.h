@@ -57,6 +57,7 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/platform/atomic_word.h"
@@ -262,6 +263,7 @@ protected:
     void doRestoreState(bool relinquishCursor) override;
     void doDetachFromOperationContext() override;
     void doAttachToOperationContext(OperationContext* opCtx) override;
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override;
 
 private:
     // Returns the primary cursor or the random cursor depending on whether _useRandomCursor is set.
@@ -424,6 +426,7 @@ public:
 
     std::unique_ptr<PlanStage> clone() const final;
 
+
     void prepare(CompileCtx& ctx) final;
     value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) final;
     void open(bool reOpen) final;
@@ -440,6 +443,7 @@ protected:
     void doRestoreState(bool fullSave) final;
     void doDetachFromOperationContext() final;
     void doAttachToOperationContext(OperationContext* opCtx) final;
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override;
 
 private:
     boost::optional<Record> nextRange();

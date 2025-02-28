@@ -152,6 +152,10 @@ protected:
         return true;
     }
 
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
+        return;
+    }
+
 private:
     void projectField(value::Object* obj, size_t idx);
     void projectField(UniqueBSONObjBuilder* bob, size_t idx);

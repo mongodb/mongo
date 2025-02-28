@@ -125,10 +125,18 @@ public:
 
     CollectionPtr lookupCollection(const NamespaceString& nss) const {
         if (isAcquisition()) {
-            return _lookupCollectionAcquisition(nss);
+            return _lookupCollectionAcquisitionAndGetCollPtr(nss);
         } else {
             return _lookupCollectionAutoGetters(nss);
         }
+    }
+
+    boost::optional<CollectionAcquisition> getCollectionAcquisitionFromUuid(const UUID uuid) const {
+        if (isAcquisition()) {
+            return _lookupCollectionAcquisition(uuid);
+        }
+        tasserted(9367602, "No collection acquisition with associated UUID");
+        return boost::none;
     }
 
     void clear() {
@@ -172,7 +180,8 @@ private:
         return collMap;
     }
 
-    inline CollectionPtr _lookupCollectionAcquisition(const NamespaceString& nss) const {
+    inline CollectionPtr _lookupCollectionAcquisitionAndGetCollPtr(
+        const NamespaceString& nss) const {
         if (nss == _mainAcq->nss()) {
             return CollectionPtr{_mainAcq->getCollectionPtr().get()};
         } else if (auto itr = _secondaryAcq.find(nss); itr != _secondaryAcq.end()) {
@@ -183,6 +192,20 @@ private:
             str::stream() << "MultipleCollectionAccessor::_lookupCollectionAcquisition: requested "
                              "unexpected collection nss: "
                           << nss.toStringForErrorMsg());
+    }
+
+    inline boost::optional<CollectionAcquisition> _lookupCollectionAcquisition(UUID uuid) const {
+        if (_mainAcq && _mainAcq->isCollection() && uuid == _mainAcq->getCollection().uuid()) {
+            return _mainAcq->getCollection();
+        }
+        // Since _secondaryAcq is keyed by NamespaceString, iterate over all secondary
+        // acquisitions.
+        for (const auto& entry : _secondaryAcq) {
+            if (entry.second.isCollection() && entry.second.getCollection().uuid() == uuid) {
+                return entry.second.getCollection();
+            }
+        }
+        MONGO_UNREACHABLE_TASSERT(9367601);
     }
 
     inline CollectionPtr _lookupCollectionAutoGetters(const NamespaceString& nss) const {

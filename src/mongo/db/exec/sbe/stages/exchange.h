@@ -298,6 +298,11 @@ public:
     ExchangePipe* pipe(size_t producerTid);
     size_t estimateCompileTimeSize() const final;
 
+protected:
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
+        return;
+    }
+
 private:
     ExchangeBuffer* getBuffer(size_t producerId);
     void putBuffer(size_t producerId);
@@ -351,6 +356,11 @@ public:
     // since ExchangeProducer is not created in compile time.
     size_t estimateCompileTimeSize() const final {
         MONGO_UNREACHABLE;
+    }
+
+protected:
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
+        return;
     }
 
 private:

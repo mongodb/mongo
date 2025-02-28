@@ -103,6 +103,11 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
+protected:
+    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
+        return;
+    }
+
 private:
     class SortIface {
     public:

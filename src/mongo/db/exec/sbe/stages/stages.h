@@ -37,6 +37,7 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/util/str.h"
@@ -755,6 +756,13 @@ public:
         }
     }
 
+    void attachCollectionAcquisition(const MultipleCollectionAccessor& mca) {
+        doAttachCollectionAcquisition(mca);
+        for (auto&& child : _children) {
+            child->attachCollectionAcquisition(mca);
+        }
+    }
+
     /**
      * Moves to the next position. If the end is reached then return EOF otherwise ADVANCED. Callers
      * are not required to call getNext until EOF. They can stop consuming results at any time. Once
@@ -798,6 +806,13 @@ protected:
     virtual void doRestoreState(bool relinquishCursor) {}
     virtual void doDetachFromOperationContext() {}
     virtual void doAttachToOperationContext(OperationContext* opCtx) {}
+
+    /**
+     * Allows collection accessing stages to obtain a reference to the collection acquisition. This
+     * should be a no-op for non-collection accessing stages, and needs to be implemented by
+     * collection accessing stages like scan and ixscan.
+     */
+    virtual void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) = 0;
 
     Vector _children;
 };
