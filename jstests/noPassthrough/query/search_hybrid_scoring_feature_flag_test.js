@@ -49,6 +49,16 @@
     });
     assert.neq(null, conn, 'failed to start mongod');
     const testDB = conn.getDB('test');
+    const coll = testDB.getCollection('coll');
+
+    // Pipeline to run $rankFusion with scoreDetails should fail without full feature flag turned
+    // on.
+    assert.commandFailedWithCode(testDB.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [{$rankFusion: {input: {pipelines: {a: [{$sort: {a: 1}}]}}, scoreDetails: true}}],
+        cursor: {}
+    }),
+                                 ErrorCodes.QueryFeatureNotAllowed);
 
     assert.commandFailedWithCode(
         testDB.runCommand({aggregate: 1, pipeline: [{$score: {}}], cursor: {}}),

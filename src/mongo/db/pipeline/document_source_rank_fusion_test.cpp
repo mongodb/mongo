@@ -2436,6 +2436,31 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
         asOneObj);
 }
 
+TEST_F(DocumentSourceRankFusionTest, ScoreDetailsIsRejectedWithoutRankFusionFullFF) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", false);
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            input: {
+                pipelines: {
+                    agatha: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $sort: {author: 1} }
+                    ]
+                }
+            },
+            combination: {
+                weights: {
+                    agatha: 5
+                }
+            },
+            scoreDetails: true
+        }
+    })");
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::QueryFeatureNotAllowed);
+}
+
 TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
     auto spec = fromjson(R"({

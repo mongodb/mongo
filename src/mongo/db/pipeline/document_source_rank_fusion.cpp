@@ -747,6 +747,16 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
     // For now, the rankConstant is always 60.
     static const double rankConstant = 60;
     const bool includeScoreDetails = spec.getScoreDetails();
+    // TODO SERVER-85426: Remove this check once all feature flags have been removed.
+    if (includeScoreDetails) {
+        auto isRankFusionFullEnabled =
+            feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+        uassert(ErrorCodes::QueryFeatureNotAllowed,
+                "'featureFlagRankFusionFull' must be enabled to use scoreDetails",
+                isRankFusionFullEnabled);
+    }
+
     std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
     for (auto it = inputPipelines.begin(); it != inputPipelines.end(); it++) {
         const auto& name = it->first;
