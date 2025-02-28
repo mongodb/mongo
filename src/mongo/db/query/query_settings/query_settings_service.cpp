@@ -428,36 +428,46 @@ QuerySettings lookupQuerySettingsWithRejectionCheckOnRouter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const query_shape::DeferredQueryShape& deferredShape,
     const NamespaceString& nss) {
-    // No query settings lookup for IDHACK queries.
-    if (expCtx->isIdHackQuery()) {
-        return QuerySettings();
-    }
+    QuerySettings settings = [&]() {
+        try {
+            // No query settings lookup for IDHACK queries.
+            if (expCtx->isIdHackQuery()) {
+                return QuerySettings();
+            }
 
-    // No query settings for queries with encryption information.
-    if (expCtx->isFleQuery()) {
-        return QuerySettings();
-    }
+            // No query settings for queries with encryption information.
+            if (expCtx->isFleQuery()) {
+                return QuerySettings();
+            }
 
-    // No query settings lookup on internal dbs or system collections in user dbs.
-    if (nss.isOnInternalDb() || nss.isSystem()) {
-        return QuerySettings();
-    }
+            // No query settings lookup on internal dbs or system collections in user dbs.
+            if (nss.isOnInternalDb() || nss.isSystem()) {
+                return QuerySettings();
+            }
 
-    // Force shape computation and early exit with empty settings if shape computation has failed.
-    const auto& shapePtr = deferredShape();
-    if (!shapePtr) {
-        return QuerySettings();
-    }
+            // Force shape computation and early exit with empty settings if shape computation has
+            // failed.
+            const auto& shapePtr = deferredShape();
+            if (!shapePtr) {
+                return QuerySettings();
+            }
 
-    // Compute the QueryShapeHash and store it in CurOp.
-    auto* opCtx = expCtx->getOperationContext();
-    QueryShapeHash hash = shapePtr->sha256Hash(opCtx, kSerializationContext);
-    setQueryShapeHash(opCtx, hash);
+            // Compute the QueryShapeHash and store it in CurOp.
+            auto* opCtx = expCtx->getOperationContext();
+            QueryShapeHash hash = shapePtr->sha256Hash(opCtx, kSerializationContext);
+            setQueryShapeHash(opCtx, hash);
 
-    // Return the found query settings or an empty one.
-    auto& manager = QuerySettingsManager::get(opCtx);
-    auto settings =
-        manager.getQuerySettingsForQueryShapeHash(hash, nss.tenantId()).get_value_or({});
+            // Return the found query settings or an empty one.
+            auto& manager = QuerySettingsManager::get(opCtx);
+            return manager.getQuerySettingsForQueryShapeHash(hash, nss.tenantId()).get_value_or({});
+        } catch (const DBException& ex) {
+            LOGV2_WARNING_OPTIONS(10153400,
+                                  {logv2::LogComponent::kQuery},
+                                  "Failed to perform query settings lookup",
+                                  "error"_attr = ex.toString());
+            return QuerySettings();
+        }
+    }();
 
     // Fail the current command, if 'reject: true' flag is present.
     failIfRejectedBySettings(expCtx, settings);
