@@ -364,8 +364,7 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
             // prompt the oplog read timestamp to be forwarded.
             //
             // This should happen only on primary nodes.
-            auto commitTs = _lastTimestampSet ? _lastTimestampSet.value() : _commitTimestamp;
-            _oplogManager->triggerOplogVisibilityUpdate(_connection->getKVEngine(), commitTs);
+            _oplogManager->triggerOplogVisibilityUpdate();
         }
         _isTimestamped = false;
     }

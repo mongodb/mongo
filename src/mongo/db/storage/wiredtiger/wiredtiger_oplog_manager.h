@@ -64,11 +64,16 @@ public:
     WiredTigerOplogManager() = default;
     ~WiredTigerOplogManager() = default;
 
-    /*
-     * Initializes the oplog read timestamp with the highest oplog timestamp and saves the oplog
-     * pointer for notifying capped waiters.
+    /**
+     * Starts the oplog manager, initializing the oplog read timestamp with the highest oplog
+     * timestamp.
      */
-    void initialize(OperationContext* opCtx, RecordStore* oplogRecordStore);
+    void start(OperationContext*, const KVEngine&, RecordStore& oplog);
+
+    /**
+     * Stops the oplog manager.
+     */
+    void stop();
 
     /**
      * Updates the oplog read timestamp if the visibility timestamp is behind the provided
@@ -78,7 +83,7 @@ public:
      * Callers must ensure this call is not concurrent with a call to `initialize`, as this is not
      * thread-safe.
      */
-    void triggerOplogVisibilityUpdate(KVEngine* engine, Timestamp commitTimestamp);
+    void triggerOplogVisibilityUpdate();
 
     /**
      * Waits for all committed writes at this time to become visible (that is, until no holes exist
@@ -107,16 +112,38 @@ public:
     StringData getIdent() const;
 
 private:
+    enum class VisibilityUpdateResult {
+        NotUpdated,
+        Updated,
+        Stopped,
+    };
+    VisibilityUpdateResult _updateVisibility(const KVEngine&, const RecordStore::Capped& oplog);
+
     void _setOplogReadTimestamp(WithLock, uint64_t newTimestamp);
+
+    std::string _oplogIdent;
 
     AtomicWord<unsigned long long> _oplogReadTimestamp{0};
 
-    RecordStore* _oplogRecordStore = nullptr;
+    stdx::thread _oplogVisibilityThread;
+
+    // Signaled to trigger the oplog visibility thread to run.
+    mutable stdx::condition_variable _oplogVisibilityThreadCV;
 
     // Signaled when oplog visibility has been updated.
     mutable stdx::condition_variable _oplogEntriesBecameVisibleCV;
 
     // Protects the state below.
     mutable stdx::mutex _oplogVisibilityStateMutex;
+
+    // Whether this oplog manager is currently running.
+    bool _running = false;
+
+    // Whether an oplog to oplog visibility is being triggered.
+    bool _triggerOplogVisibilityUpdate = false;
+
+    // The number of operations waiting for more of the oplog to become visible, to avoid update
+    // delays for batching.
+    int64_t _opsWaitingForOplogVisibilityUpdate = 0;
 };
 }  // namespace mongo

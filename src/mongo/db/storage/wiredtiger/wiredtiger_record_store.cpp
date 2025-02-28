@@ -1501,6 +1501,8 @@ WiredTigerRecordStore::Oplog::~Oplog() {
     if (_oplog->getTruncateMarkers()) {
         _oplog->getTruncateMarkers()->kill();
     }
+
+    _kvEngine->getOplogManager()->stop();
 }
 
 std::unique_ptr<SeekableRecordCursor> WiredTigerRecordStore::Oplog::getCursor(

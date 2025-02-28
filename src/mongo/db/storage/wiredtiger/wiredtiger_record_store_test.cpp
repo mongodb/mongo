@@ -243,12 +243,12 @@ RecordId oplogOrderInsertOplog(OperationContext* opCtx,
 TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
-    auto engine = harnessHelper->getEngine();
+    auto engine = static_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
+    engine->getOplogManager()->stop();
 
     auto isOpHidden = [&engine](const RecordId& id) {
-        return static_cast<WiredTigerKVEngine*>(engine)
-                   ->getOplogManager()
-                   ->getOplogReadTimestamp() < static_cast<std::uint64_t>(id.getLong());
+        return engine->getOplogManager()->getOplogReadTimestamp() <
+            static_cast<std::uint64_t>(id.getLong());
     };
 
     {
@@ -258,7 +258,7 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
         RecordId id = oplogOrderInsertOplog(opCtx.get(), engine, rs, 1);
         ASSERT(isOpHidden(id));
         txn.commit();
-        ASSERT_FALSE(isOpHidden(id));
+        ASSERT(isOpHidden(id));
     }
 
     {
@@ -268,7 +268,7 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
         RecordId id = oplogOrderInsertOplog(opCtx.get(), engine, rs, 2);
         ASSERT(isOpHidden(id));
         txn.commit();
-        ASSERT_FALSE(isOpHidden(id));
+        ASSERT(isOpHidden(id));
     }
 }
 
@@ -279,12 +279,12 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
 TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
-    auto engine = harnessHelper->getEngine();
+    auto engine = static_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
+    engine->getOplogManager()->stop();
 
     auto isOpHidden = [&engine](const RecordId& id) {
-        return static_cast<WiredTigerKVEngine*>(engine)
-                   ->getOplogManager()
-                   ->getOplogReadTimestamp() < static_cast<std::uint64_t>(id.getLong());
+        return engine->getOplogManager()->getOplogReadTimestamp() <
+            static_cast<std::uint64_t>(id.getLong());
     };
 
     ServiceContext::UniqueOperationContext longLivedOp(harnessHelper->newOperationContext());
@@ -311,9 +311,10 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
 
     txn.commit();
 
-    ASSERT_FALSE(isOpHidden(id1));
-    ASSERT_FALSE(isOpHidden(id2));
+    ASSERT(isOpHidden(id1));
+    ASSERT(isOpHidden(id2));
 
+    engine->getOplogManager()->start(longLivedOp.get(), *engine, *rs);
     engine->waitForAllEarlierOplogWritesToBeVisible(longLivedOp.get(), rs.get());
 
     ASSERT_FALSE(isOpHidden(id1));
