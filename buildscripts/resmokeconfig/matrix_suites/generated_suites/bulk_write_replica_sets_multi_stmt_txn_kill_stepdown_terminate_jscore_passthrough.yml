@@ -126,7 +126,7 @@ selector:
     - jstests/core/**/update_modifier_pop.js
     - jstests/core/**/update_dollar_fields.js
     - jstests/core/**/update_fail_halts_modifications.js
-    - jstests/core/views/views_drop.js
+    - jstests/core/catalog/views/views_drop.js
     - jstests/core/**/agg_hint.js
     - jstests/core/**/and.js
     - jstests/core/**/query/collation/collation.js
@@ -141,7 +141,7 @@ selector:
     - jstests/core/**/list_sessions.js
     - jstests/core/**/operation_latency_histogram.js
     - jstests/core/catalog/collstats/views_coll_stats.js
-    - jstests/core/views/views_stats.js
+    - jstests/core/catalog/views/views_stats.js
     - jstests/core/**/bulk_api_ordered.js
     - jstests/core/**/bulk_api_unordered.js
     - jstests/core/**/doc_validation.js
@@ -159,7 +159,7 @@ selector:
     - jstests/core/**/dbref2.js
     - jstests/core/**/ref3.js
     - jstests/core/**/update_mod_dotted.js
-    - jstests/core/views/invalid_system_views.js
+    - jstests/core/catalog/views/invalid_system_views.js
     - jstests/core/**/query/exhaust.js
     - jstests/core/**/awaitdata_getmore_cmd.js
     - jstests/core/**/getmore_cmd_maxtimems.js
@@ -168,7 +168,7 @@ selector:
     - jstests/core/**/query/top/top.js
     - jstests/core/**/insert_id_undefined.js
     - jstests/core/query/json_schema/misc_validation.js
-    - jstests/core/views/views_all_commands.js
+    - jstests/core/catalog/views/views_all_commands.js
     - jstests/core/**/fsync.js
     - jstests/core/**/constructors.js
     - jstests/core/**/commands_namespace_parsing.js

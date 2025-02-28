@@ -176,7 +176,7 @@ selector:
     # multiple clusters.
     - jstests/core/administrative/current_op/currentop_cursors.js
     - jstests/core/diagnostics/operation_latency_histogram.js
-    - jstests/core/views/views_stats.js
+    - jstests/core/catalog/views/views_stats.js
 
     # Rely on the testingReplication field
     - jstests/core/administrative/hello_response_validation.js

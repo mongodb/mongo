@@ -7,7 +7,7 @@ selector:
     - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_files:
     # Duplicate namespace may cause cloner to try and clone view instead of collection
-    - jstests/core/views/duplicate_ns.js
+    - jstests/core/catalog/views/duplicate_ns.js
     # Change stream pre-images are not cloned during initial sync.
     - jstests/core/**/write_change_stream_pit_preimage.js
 

@@ -91,7 +91,7 @@ selector:
     - jstests/core/**/profile3.js
     - jstests/core/**/profile_findandmodify.js
     - jstests/core/**/query/top/top.js
-    - jstests/core/views/views_stats.js
+    - jstests/core/catalog/views/views_stats.js
     - jstests/core/**/crud_api.js
     - jstests/core/**/find_and_modify.js
     - jstests/core/**/find_and_modify_fields.js

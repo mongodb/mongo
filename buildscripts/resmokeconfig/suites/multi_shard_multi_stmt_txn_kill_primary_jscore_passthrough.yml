@@ -136,7 +136,7 @@ selector:
     # $collStats
     - jstests/core/**/operation_latency_histogram.js
     - jstests/core/catalog/collstats/views_coll_stats.js
-    - jstests/core/views/views_stats.js
+    - jstests/core/catalog/views/views_stats.js
 
     # Errors expected to happen in tests, which can cause transactions to get aborted.
     # So when the test tries to inspect the documents it can be out of sync (relative
@@ -184,7 +184,7 @@ selector:
     # Creates sessions explicitly, resulting in txns being run through different sessions
     # using a single txnNumber.
     - jstests/core/query/json_schema/misc_validation.js
-    - jstests/core/views/views_all_commands.js
+    - jstests/core/catalog/views/views_all_commands.js
 
     # dropDatabase is not resilient to stepdowns on sharded cluster
     - jstests/core/ddl/drop_database.js

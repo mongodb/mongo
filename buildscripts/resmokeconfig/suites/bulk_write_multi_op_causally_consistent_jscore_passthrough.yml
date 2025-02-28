@@ -149,7 +149,7 @@ selector:
     # multiple clusters.
     - jstests/core/administrative/current_op/currentop_cursors.js
     - jstests/core/diagnostics/operation_latency_histogram.js
-    - jstests/core/views/views_stats.js
+    - jstests/core/catalog/views/views_stats.js
 
     # Sets cluster parameters, which do writes with timestamps that will vary b/w clusters.
     - jstests/core/cluster_parameters/cluster_parameter_commands.js

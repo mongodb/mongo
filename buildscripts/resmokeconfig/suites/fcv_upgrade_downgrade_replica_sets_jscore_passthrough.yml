@@ -84,7 +84,7 @@ selector:
     # The tests below use transactions (which are aborted on fcv upgrade/downgrade) and thus are expected to fail.
     - jstests/core/shell/role_management_helpers.js
     - jstests/core/administrative/roles_info.js
-    - jstests/core/views/views_all_commands.js
+    - jstests/core/catalog/views/views_all_commands.js
 
     # Queryable encryption uses internal transactions (which are aborted on fcv upgrade/downgrade).
     - jstests/core/query/queryable_encryption/**/*.js

@@ -87,7 +87,7 @@ selector:
     - jstests/core/query/collation/collation.js
     - jstests/core/diagnostics/operation_latency_histogram.js
     - jstests/core/query/top/top.js
-    - jstests/core/views/views_stats.js
+    - jstests/core/catalog/views/views_stats.js
     - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
     - jstests/core/timeseries/ddl/timeseries_sparse_index.js
     - jstests/core/administrative/getlog2.js

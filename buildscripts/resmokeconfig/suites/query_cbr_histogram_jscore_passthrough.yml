@@ -27,10 +27,10 @@ selector:
     # Asserts on output of allPlansExecution. CBR picks a single plan so there is no multiplanning.
     - jstests/core/query/explain/explain_winning_plan.js
     # Asserts on state of system collections. This passthrough creates statistics system collection.
-    - jstests/core/views/views_drop.js
+    - jstests/core/catalog/views/views_drop.js
     # Override functions fail when view catalog is deliberately corrupted.
-    - jstests/core/views/invalid_system_views.js
-    - jstests/core/views/views_all_commands.js
+    - jstests/core/catalog/views/invalid_system_views.js
+    - jstests/core/catalog/views/views_all_commands.js
     - jstests/core/catalog/agg_internal_list_collections_stage.js
     - jstests/core/catalog/agg_list_cluster_catalog_with_match.js
     # This test runs many queries. This passthrough runs analyze for each indexed field on every query,

@@ -57,7 +57,7 @@ selector:
     - src/mongo/db/modules/enterprise/jstests/fle2/fle2_bulk_write.js
 
     # Uses invalid views which causes listCollections to fail in the data consistency checker.
-    - jstests/core/views/invalid_system_views.js
+    - jstests/core/catalog/views/invalid_system_views.js
     - jstests/core/views/views_validation.js
     - jstests/core/txns/no_writes_to_config_transactions_with_prepared_transaction.js
     - jstests/core/catalog/list_collections_no_views.js

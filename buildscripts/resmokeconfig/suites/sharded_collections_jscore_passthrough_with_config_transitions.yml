@@ -173,7 +173,7 @@ selector:
     # Exclude tests that run cleanupOrphaned, which can fail running on a config shard if a
     # concurrent migration fails due to the config shard transitioning to dedicated.
     - jstests/core/administrative/cleanup_orphaned.js
-    - jstests/core/views/views_all_commands.js
+    - jstests/core/catalog/views/views_all_commands.js
     - jstests/core/repro/commands_namespace_parsing.js
     # Runs commands using legacy queries, which are not supported on sessions.
     - jstests/core/**/query/exhaust.js

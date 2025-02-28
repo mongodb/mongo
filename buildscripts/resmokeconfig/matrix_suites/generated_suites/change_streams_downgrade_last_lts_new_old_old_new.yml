@@ -178,7 +178,7 @@ selector:
     - jstests/core/**/list_sessions.js
     - jstests/core/**/operation_latency_histogram.js
     - jstests/core/catalog/collstats/views_coll_stats.js
-    - jstests/core/views/views_stats.js
+    - jstests/core/catalog/views/views_stats.js
     - jstests/core/**/bulk_api_ordered.js
     - jstests/core/**/bulk_api_unordered.js
     - jstests/core/**/doc_validation.js
@@ -203,7 +203,7 @@ selector:
     - jstests/core/**/query/top/top.js
     - jstests/core/**/insert_id_undefined.js
     - jstests/core/query/json_schema/misc_validation.js
-    - jstests/core/views/views_all_commands.js
+    - jstests/core/catalog/views/views_all_commands.js
     - jstests/core/ddl/drop_database.js
     - jstests/core/**/fsync.js
     - jstests/core/**/constructors.js

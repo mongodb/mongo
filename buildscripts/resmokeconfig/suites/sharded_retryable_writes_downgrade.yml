@@ -15,7 +15,7 @@ selector:
     - jstests/core/**/profile3.js
     - jstests/core/**/profile_findandmodify.js
     - jstests/core/**/query/top/top.js
-    - jstests/core/views/views_stats.js
+    - jstests/core/catalog/views/views_stats.js
 
     # TODO SERVER-31242: findAndModify no-op retry should respect the fields option.
     - jstests/core/**/crud_api.js

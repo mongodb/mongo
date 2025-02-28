@@ -404,6 +404,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/core/catalog/collstats/OWNERS.yml
 /jstests/core/catalog/collstats/**/* @10gen/server-catalog-and-routing @10gen/server-storage-engine-integration @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/core/catalog/views/OWNERS.yml
+/jstests/core/catalog/views/**/* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/core/cluster_parameters/OWNERS.yml
 /jstests/core/cluster_parameters/**/* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
@@ -562,9 +565,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/txns/OWNERS.yml
 /jstests/core/txns/**/* @10gen/server-replication @svc-auto-approve-bot
-
-# The following patterns are parsed from ./jstests/core/views/OWNERS.yml
-/jstests/core/views/**/* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/write/OWNERS.yml
 /jstests/core/write/**/* @10gen/server-collection-write-path @svc-auto-approve-bot

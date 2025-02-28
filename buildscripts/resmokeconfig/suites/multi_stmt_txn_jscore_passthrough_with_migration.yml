@@ -150,7 +150,7 @@ selector:
     # $collStats
     - jstests/core/**/operation_latency_histogram.js
     - jstests/core/catalog/collstats/views_coll_stats.js
-    - jstests/core/views/views_stats.js
+    - jstests/core/catalog/views/views_stats.js
 
     # Errors expected to happen in tests, which can cause transactions to get aborted.
     # So when the test tries to inspect the documents it can be out of sync (relative
@@ -181,7 +181,7 @@ selector:
     ##
 
     # Collection drops done through applyOps are not converted to w:majority
-    - jstests/core/views/invalid_system_views.js
+    - jstests/core/catalog/views/invalid_system_views.js
 
     ##
     ## Misc. reasons.
@@ -205,7 +205,7 @@ selector:
     # Creates sessions explicitly, resulting in txns being run through different sessions
     # using a single txnNumber.
     - jstests/core/query/json_schema/misc_validation.js
-    - jstests/core/views/views_all_commands.js
+    - jstests/core/catalog/views/views_all_commands.js
 
     # Committing a transaction when the server is fsync locked fails.
     - jstests/core/**/fsync.js
