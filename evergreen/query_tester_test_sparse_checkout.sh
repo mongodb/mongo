@@ -30,7 +30,17 @@ cd $repo_name_local
 ls ../${repo_name}/generated_tests | while read i; do
   TEST_DIR=generated_tests/$i
   echo "Checking out $TEST_DIR at $(date)"
-  git sparse-checkout add $TEST_DIR
+
+  for i in {1..5}; do
+    git sparse-checkout add $TEST_DIR && RET=0 && break || RET=$? && sleep 5
+    echo "git sparse-checkout add $TEST_DIR failed, retrying..."
+  done
+
+  if [ $RET -ne 0 ]; then
+    echo "Failed to git sparse-checkout add $TEST_DIR"
+    exit $RET
+  fi
+
   touch $TEST_DIR/.sparse-checkout-done
   cp $TEST_DIR/* $TEST_DIR/.sparse-checkout-done ../$repo_name/$TEST_DIR/
 done
