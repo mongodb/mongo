@@ -61,7 +61,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
 
     auto nss = cq()->nss();
     tassert(8551900,
-            "Solution must be present if cachedPlanHash is present",
+            "Solution must be present if cachedPlanHash is present: ",
             solution != nullptr || !cachedPlanHash.has_value());
     return uassertStatusOK(plan_executor_factory::make(opCtx(),
                                                        std::move(canonicalQuery),

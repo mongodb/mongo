@@ -43,9 +43,11 @@ namespace mongo::classic_runtime_planner_for_sbe {
 MultiPlanner::MultiPlanner(PlannerDataForSBE plannerData,
                            std::vector<std::unique_ptr<QuerySolution>> candidatePlans,
                            bool shouldWriteToPlanCache,
+                           const std::function<void()>& incrementReplannedPlanIsCachedPlanCounterCb,
                            boost::optional<std::string> replanReason)
     : PlannerBase(std::move(plannerData)),
       _shouldWriteToPlanCache(shouldWriteToPlanCache),
+      _incrementReplannedPlanIsCachedPlanCounterCb(incrementReplannedPlanIsCachedPlanCounterCb),
       _replanReason(replanReason) {
     LOGV2_DEBUG(
         6215001, 5, "Using classic multi-planner for SBE", "replanReason"_attr = _replanReason);
@@ -159,6 +161,11 @@ void MultiPlanner::_buildSbePlanAndMaybeCache(
         // `_multiPlanStage` (not yet extracted).
         _winningSolution = extendSolutionWithPipeline(_multiPlanStage->extractBestSolution());
         solnToCache = _winningSolution.get();
+    }
+
+    if (cachedPlanSolutionHash() && solnToCache &&
+        *cachedPlanSolutionHash() == solnToCache->hash()) {
+        _incrementReplannedPlanIsCachedPlanCounterCb();
     }
 
     _sbePlanAndData = prepareSbePlanAndData(*solnToCache, std::move(_replanReason));

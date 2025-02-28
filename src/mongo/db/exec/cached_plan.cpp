@@ -74,11 +74,13 @@ CachedPlanStage::CachedPlanStage(ExpressionContext* expCtx,
                                  WorkingSet* ws,
                                  CanonicalQuery* cq,
                                  size_t decisionWorks,
-                                 std::unique_ptr<PlanStage> root)
+                                 std::unique_ptr<PlanStage> root,
+                                 const size_t cachedPlanHash)
     : RequiresAllIndicesStage(kStageType, expCtx, collection),
       _ws(ws),
       _canonicalQuery(cq),
-      _decisionWorks(decisionWorks) {
+      _decisionWorks(decisionWorks),
+      _cachedPlanHash(cachedPlanHash) {
     _children.emplace_back(std::move(root));
 }
 
@@ -290,14 +292,23 @@ Status CachedPlanStage::replan(const QueryPlannerParams& plannerParams,
         return pickBestPlanStatus;
     }
 
+    const auto isSameAsCachedPlan =
+        multiPlanStage->bestSolution() && _cachedPlanHash == multiPlanStage->bestSolution()->hash();
+
     auto explainer = plan_explainer_factory::make(child().get());
     LOGV2_DEBUG(20582,
                 1,
                 "Query plan after replanning and its cache status",
                 "query"_attr = redact(_canonicalQuery->toStringShort()),
                 "planSummary"_attr = explainer->getPlanSummary(),
-                "shouldCache"_attr = (shouldCache ? "yes" : "no"));
+                "shouldCache"_attr = (shouldCache ? "yes" : "no"),
+                "isSameAsCachedPlan"_attr = isSameAsCachedPlan);
     _bestPlanChosen = true;
+
+    if (isSameAsCachedPlan) {
+        planCacheCounters.incrementClassicReplannedPlanIsCachedPlanCounter();
+    }
+
     return Status::OK();
 }
 

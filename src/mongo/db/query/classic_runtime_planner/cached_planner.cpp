@@ -40,7 +40,8 @@ CachedPlanner::CachedPlanner(PlannerData plannerData,
                                                   ws(),
                                                   cq(),
                                                   cachedSolution->decisionWorks().value(),
-                                                  buildExecutableTree(*_querySolution));
+                                                  buildExecutableTree(*_querySolution),
+                                                  _querySolution->hash());
     _cachedPlanStage = root.get();
     setRoot(std::move(root));
 }
