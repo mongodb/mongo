@@ -30,7 +30,13 @@ function assertPipelineCorrect(pipeline, v) {
     assert.eq(unoptimizedResults.length, 1);
     assert.eq(optimizedResults.length, 1);
 
-    assert.eq(unoptimizedResults[0]._id, optimizedResults[0]._id, tojson(pipeline));
+    // It is possible for optimization to cause the floating point results to differ slightly due to
+    // precision limitations, so we must only assert an equality violation when the delta is not
+    // infinitesimal. We have observed values differing by one in the 16th significant digit.
+    if (Math.abs(unoptimizedResults[0]._id - optimizedResults[0]._id) > 1e-14) {
+        // This will now fail, but we know the difference is more than 1e-14 so we actually care.
+        assert.eq(unoptimizedResults[0]._id, optimizedResults[0]._id, tojson(pipeline));
+    }
 }
 
 /**
