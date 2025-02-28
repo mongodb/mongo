@@ -32,7 +32,7 @@ export class QuerySettingsIndexHintsTests {
         this.indexA = {a: 1};
         this.indexB = {b: 1};
         this.indexAB = {a: 1, b: 1};
-        this.allIndexes = [this.indexA, this.indexB, this.indexAB]
+        this.allIndexes = [this.indexA, this.indexB, this.indexAB];
     }
 
     static shouldCheckPlanCache(db, command) {

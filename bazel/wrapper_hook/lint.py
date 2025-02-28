@@ -282,11 +282,13 @@ def run_rules_lint(bazel_bin, args):
         .split("\n")
     )
 
+    failing_reports = 0
     for report in valid_reports:
         # Exclude coverage reports, and check if the output is empty.
         if "coverage.dat" in report or not os.path.exists(report) or not os.path.getsize(report):
             # Report is empty. No linting errors.
             continue
+        failing_reports += 1
         print(f"From {report}:")
         with open(report, "r", encoding="utf-8") as f:
             print(f.read())
@@ -323,3 +325,5 @@ def run_rules_lint(bazel_bin, args):
             else:
                 print(f"ERROR: unknown fix type {fix}", file=sys.stderr)
                 sys.exit(1)
+    elif failing_reports != 0:
+        sys.exit(1)

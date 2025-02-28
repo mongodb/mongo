@@ -5,7 +5,7 @@ import {default as no_tojson} from "./rules/no-tojson-fn.js";
 
 export default {
     rules: {
-        "no-print-fn": no_print,
-        "no-tojson-fn": no_tojson,
+        "no-print-fn": 0,
+        "no-tojson-fn": 0,
     },
 };

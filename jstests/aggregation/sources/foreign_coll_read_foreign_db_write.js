@@ -38,7 +38,7 @@ function runTest({
     // to run the pipeline against. Also create a view named localTargetName is localCollIsView
     // is true.
     let localColl = localDB[localTargetName];
-    let localTarget = localColl
+    let localTarget = localColl;
     if (localTargetIsView) {
         localColl = localDB[localTargetName + "_coll"];
         assert.commandWorked(

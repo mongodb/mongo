@@ -154,4 +154,4 @@ TimeseriesTest.run((insert) => {
             ],
             /* queryFilter = */ {[metaFieldName + ".nested"]: {a: 1, b: 1}},
             /* expectedUnsuccessfulQueryFilter=*/ {[metaFieldName + ".nested"]: {b: 1, a: 1}});
-})
+});

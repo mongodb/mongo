@@ -44,7 +44,7 @@ function genPipeline(collection) {
                 }
             ]
         }
-    }]
+    }];
 }
 
 function setup() {
@@ -70,9 +70,9 @@ function assertPipeline(coll, pipeline) {
 }
 
 setup();
-jsTestLog("From Normal Collection Lookup To Time Series Collection")
+jsTestLog("From Normal Collection Lookup To Time Series Collection");
 assertPipeline(collName, genPipeline(tsCollName));
-jsTestLog("From Time Series Collection Lookup To Normal Collection")
+jsTestLog("From Time Series Collection Lookup To Normal Collection");
 assertPipeline(tsCollName, genPipeline(collName));
-jsTestLog("From Time Series Collection Lookup To Time Series Collection")
+jsTestLog("From Time Series Collection Lookup To Time Series Collection");
 assertPipeline(tsCollName, genPipeline(tsCollName));

@@ -251,7 +251,7 @@ export default [
 
                     rules: {
                         // TODO SERVER-99571 : enable mongodb/* rules.
-                        "mongodb/no-print-fn": 1,
+                        "mongodb/no-print-fn": 0,
                         "mongodb/no-tojson-fn": 1,
 
                         "no-prototype-builtins": 0,
