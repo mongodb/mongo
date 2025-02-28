@@ -384,7 +384,11 @@ bool finalizeDistinctScan(const CanonicalQuery& canonicalQuery,
                 projectionNode = static_cast<ProjectionNode*>(currNode);
                 break;
             case STAGE_FETCH:
-                tassert(9245801, "Didn't expect to find two fetch nodes", !fetchNode);
+                if (fetchNode) {
+                    // In some specific circumstances, we generate a second fetch node! For
+                    // simplicity, bail out here.
+                    return false;
+                }
                 fetchNode = static_cast<FetchNode*>(currNode);
                 break;
             case STAGE_SORT_KEY_GENERATOR:
