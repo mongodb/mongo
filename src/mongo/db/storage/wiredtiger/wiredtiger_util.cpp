@@ -959,6 +959,33 @@ bool WiredTigerUtil::collectConnectionStatistics(WiredTigerKVEngine* engine, BSO
     return true;
 }
 
+bool WiredTigerUtil::historyStoreStatistics(WiredTigerKVEngine* engine, BSONObjBuilder& bob) {
+    // History Storage does not exists on the in Memory storage.
+    if (engine->isEphemeral()) {
+        return false;
+    }
+
+    boost::optional<StatsCollectionPermit> permit = engine->tryGetStatsCollectionPermit();
+    if (!permit) {
+        return false;
+    }
+
+    // Obtain a session that can be used during shut down, potentially before the storage engine
+    // itself shuts down.
+    WiredTigerSession session(&engine->getConnection(), *permit);
+
+    const auto historyStorageStatUri = "statistics:file:WiredTigerHS.wt";
+
+    Status status =
+        WiredTigerUtil::exportTableToBSON(session, historyStorageStatUri, "statistics=(fast)", bob);
+    if (!status.isOK()) {
+        bob.append("error", "unable to retrieve statistics");
+        bob.append("code", static_cast<int>(status.code()));
+        bob.append("reason", status.reason());
+    }
+    return true;
+}
+
 Status WiredTigerUtil::exportTableToBSON(WiredTigerSession& session,
                                          const std::string& uri,
                                          const std::string& config,

@@ -71,6 +71,13 @@ BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* opCtx,
                           Timestamp(engine->getOplogManager()->getOplogReadTimestamp()));
     }
 
+    {
+        BSONObjBuilder subsection(bob.subobjStart("historyStorageStats"));
+        if (!WiredTigerUtil::historyStoreStatistics(engine, subsection)) {
+            LOGV2_DEBUG(10100101, 2, "WiredTiger is not ready to collect statistics.");
+        }
+    }
+
     return bob.obj();
 }
 

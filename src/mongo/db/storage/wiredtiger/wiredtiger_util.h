@@ -110,6 +110,13 @@ public:
     static bool collectConnectionStatistics(WiredTigerKVEngine* engine, BSONObjBuilder& bob);
 
     /**
+     * Adds the History Store Statistics to the provided BSON Object builder.
+     *
+     * Returns true if statistics can be safely collected and false otherwise.
+     */
+    static bool historyStoreStatistics(WiredTigerKVEngine* engine, BSONObjBuilder& bob);
+
+    /**
      * Reads the WT database statistics table using the URI and exports all keys to BSON as string
      * elements. Additionally, adds the 'uri' field to output document.
      *
